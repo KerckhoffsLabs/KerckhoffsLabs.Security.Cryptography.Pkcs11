@@ -55,7 +55,7 @@ public class Mechanism
     /// <param name="type">Mechanism type</param>
     public Mechanism(ulong type)
     {
-        _ckMechanism = CkmUtils.CreateMechanism(Convert.ToUInt64(type));
+        _ckMechanism = CK_MECHANISM.CreateMechanism((NativeCULong)type);
     }
 
     /// <summary>
@@ -64,7 +64,7 @@ public class Mechanism
     /// <param name="type">Mechanism type</param>
     public Mechanism(CKM type)
     {
-        _ckMechanism = CkmUtils.CreateMechanism(type);
+        _ckMechanism = CK_MECHANISM.CreateMechanism(type);
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public class Mechanism
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(ulong type, byte[] parameter)
     {
-        _ckMechanism = CkmUtils.CreateMechanism((NativeCULong)(type), parameter);
+        _ckMechanism = CK_MECHANISM.CreateMechanism((NativeCULong)(type), parameter);
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public class Mechanism
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(CKM type, byte[] parameter)
     {
-        _ckMechanism = CkmUtils.CreateMechanism(type, parameter);
+        _ckMechanism = CK_MECHANISM.CreateMechanism(type, parameter);
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public class Mechanism
         _mechanismParams = parameter;
 
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
-        _ckMechanism = CkmUtils.CreateMechanism((NativeCULong)(type), lowLevelParams);
+        _ckMechanism = CK_MECHANISM.CreateMechanism((NativeCULong)(type), lowLevelParams);
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public class Mechanism
         _mechanismParams = parameter;
 
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
-        _ckMechanism = CkmUtils.CreateMechanism(type, lowLevelParams);
+        _ckMechanism = CK_MECHANISM.CreateMechanism(type, lowLevelParams);
     }
 
     #region IDisposable
