@@ -1,0 +1,3 @@
+[submodule "third-party/pkcs11-mock"]
+	path = third-party/pkcs11-mock
+	url = https://github.com/Pkcs11Interop/pkcs11-mock.git
