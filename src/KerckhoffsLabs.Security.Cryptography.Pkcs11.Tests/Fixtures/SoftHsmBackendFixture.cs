@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 /// xUnit collection fixture wrapping SoftHSM2. Creates a fresh token directory
 /// per test run, initializes a token with a deterministic SO/USER PIN, loads
 /// libsofthsm2.so, and exposes the resulting slot through <see cref="IPkcs11Backend"/>.
-/// Tests using this fixture must use <see cref="SoftHsmAvailable"/> as a [SkippableFact]
+/// Tests using this fixture must use <see cref="SoftHsmAvailable"/> as a [ConditionalFact]
 /// gate to skip when SoftHSM2 isn't installed.
 /// </summary>
 public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
@@ -23,7 +23,8 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     private readonly string _tokenDir;
     private readonly string _configPath;
 
-    public static bool SoftHsmAvailable => SoftHsmDiscover() is not null;
+    public static bool SoftHsmAvailable =>
+        (Settings.SoftHsmLibraryPath is { } p && File.Exists(p)) || SoftHsmDiscover() is not null;
 
     public SoftHsmBackendFixture()
     {
@@ -58,7 +59,7 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         try
         {
             var slots = Library.GetSlotList(SlotsType.WithTokenPresent);
-            Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label?.Trim() == TokenLabel);
+            Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel);
             if (found is null)
                 throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
             SlotId = (NativeCULong)found.SlotId;
@@ -94,18 +95,15 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     {
         var psi = new ProcessStartInfo("softhsm2-util", args)
         {
-            RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
         psi.Environment["SOFTHSM2_CONF"] = _configPath;
         using var p = Process.Start(psi) ?? throw new InvalidOperationException("Could not start softhsm2-util.");
+        string err = p.StandardError.ReadToEnd();
         p.WaitForExit();
         if (p.ExitCode != 0)
-        {
-            string err = p.StandardError.ReadToEnd();
             throw new InvalidOperationException($"softhsm2-util failed (exit {p.ExitCode}): {err}");
-        }
     }
 }
 
