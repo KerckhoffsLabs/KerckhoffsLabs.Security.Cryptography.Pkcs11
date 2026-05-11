@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11", "KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj", "{08043EBE-C091-3C47-DDAE-0562E6A5EB50}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Runtime.InteropServices.UnitTests", "KerckhoffsLabs.Runtime.InteropServices.UnitTests\KerckhoffsLabs.Runtime.InteropServices.UnitTests.csproj", "{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Runtime.InteropServices", "KerckhoffsLabs.Runtime.InteropServices\KerckhoffsLabs.Runtime.InteropServices.csproj", "{0C9AF666-20C9-94AE-690B-249B50D2A696}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {36EC92E6-9777-46E1-8051-929BFF4BE206}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,40 @@
+using System.Runtime.InteropServices;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.MechanismParams;
+
+/// <summary>
+/// Structure, which provides the parameters to the CKM_TLS_PRF mechanism
+/// </summary>
+[PlatformSpecificPack]
+public struct CK_TLS_PRF_PARAMS
+{
+    /// <summary>
+    /// Pointer to the input seed
+    /// </summary>
+    public IntPtr Seed;
+
+    /// <summary>
+    /// Length in bytes of the input seed
+    /// </summary>
+    public NativeCULong SeedLen;
+
+    /// <summary>
+    /// Pointer to the identifying label
+    /// </summary>
+    public IntPtr Label;
+
+    /// <summary>
+    /// Length in bytes of the identifying label
+    /// </summary>
+    public NativeCULong LabelLen;
+
+    /// <summary>
+    /// Pointer receiving the output of the operation
+    /// </summary>
+    public IntPtr Output;
+
+    /// <summary>
+    /// Pointer to the length in bytes that the output to be created shall have, has to hold the desired length as input and will receive the calculated length as output
+    /// </summary>
+    public IntPtr OutputLen;
+}

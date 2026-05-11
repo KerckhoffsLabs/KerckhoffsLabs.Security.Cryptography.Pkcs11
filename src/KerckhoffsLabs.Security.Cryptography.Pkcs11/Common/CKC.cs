@@ -1,0 +1,55 @@
+using System.Runtime.InteropServices;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+
+/// <summary>
+/// Certificate types
+/// </summary>
+public enum CKC : uint
+{
+    /// <summary>
+    /// X.509 public key certificate
+    /// </summary>
+    CKC_X_509 = 0x00000000,
+
+    /// <summary>
+    /// X.509 attribute certificate
+    /// </summary>
+    CKC_X_509_ATTR_CERT = 0x00000001,
+
+    /// <summary>
+    /// WTLS public key certificate
+    /// </summary>
+    CKC_WTLS = 0x00000002,
+
+    /// <summary>
+    /// Permanently reserved for token vendors
+    /// </summary>
+    CKC_VENDOR_DEFINED = 0x80000000
+}
+
+/// <summary>
+/// Utility class that helps with data type conversions.
+/// </summary>
+public static class CKCExtensions
+{
+    /// <summary>
+    /// Converts CKC to NativeCULong
+    /// </summary>
+    /// <param name="value">CKC that should be converted</param>
+    /// <returns>NativeCULong with value from CKC</returns>
+    public static NativeCULong ToCULong(this CKC value)
+    {
+        return new NativeCULong(Convert.ToUInt32(value));
+    }
+
+    /// <summary>
+    /// Converts NativeCULong to CKC
+    /// </summary>
+    /// <param name="value">NativeCULong that should be converted</param>
+    /// <returns>CKC with NativeCULong value</returns>
+    public static CKC ToCKC(this NativeCULong value)
+    {
+        return (CKC)value.Value;
+    }
+}

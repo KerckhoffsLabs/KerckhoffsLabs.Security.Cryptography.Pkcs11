@@ -1,0 +1,48 @@
+# Build output
+bin/
+obj/
+out/
+
+# Test output
+TestResults/
+coverage*/
+*.trx
+*.coverage
+*.coveragexml
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+
+# Rider
+*.DotSettings.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# Logs and dumps
+*.log
+*.dmp
+
+# Local secrets / env
+.env
+.env.*
+appsettings.Local.json
+appsettings.Development.local.json
+
+# Build artifacts of pkcs11-mock (added in Phase 0)
+src/**/runtimes/**/native/
+
+# Submodule build trees (kept separate from submodule sources)
+third-party/*/build/
