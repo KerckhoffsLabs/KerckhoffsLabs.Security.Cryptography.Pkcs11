@@ -19,11 +19,11 @@ public interface IPkcs11Backend
     /// <summary>Slot id of a slot containing an initialized token.</summary>
     NativeCULong SlotId { get; }
 
-    /// <summary>SO PIN for the fixture's token (raw bytes).</summary>
-    byte[] SoPin { get; }
+    /// <summary>SO PIN for the fixture's token (raw bytes, immutable view).</summary>
+    ReadOnlyMemory<byte> SoPin { get; }
 
-    /// <summary>Normal-user PIN for the fixture's token (raw bytes).</summary>
-    byte[] UserPin { get; }
+    /// <summary>Normal-user PIN for the fixture's token (raw bytes, immutable view).</summary>
+    ReadOnlyMemory<byte> UserPin { get; }
 
     /// <summary>Label of the fixture's token.</summary>
     string TokenLabel { get; }
