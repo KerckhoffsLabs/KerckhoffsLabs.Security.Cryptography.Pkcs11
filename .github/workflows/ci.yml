@@ -32,6 +32,16 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
+      - name: Install SoftHSM2 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y softhsm2
+
+      - name: Install SoftHSM2 (Windows)
+        if: runner.os == 'Windows'
+        run: choco install -y softhsm
+        shell: pwsh
+        continue-on-error: true
+
       - name: Restore
         run: dotnet restore src/src.sln
 

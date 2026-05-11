@@ -1,26 +1,51 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
 
 /// <summary>
-/// End-to-end smoke check that the library loads a backend and completes a
-/// minimal Cryptoki lifecycle. Runs against pkcs11-mock; SoftHSM2 gets its
-/// own smoke variant in T4.
+/// Shared assertions for the smoke tests. Not an xUnit test class itself — concrete
+/// subclasses wire up the xUnit attributes so each backend can control skip logic.
 /// </summary>
-public abstract class SmokeTests
+internal static class SmokeTestAssertions
 {
-    private readonly IPkcs11Backend _backend;
-    protected SmokeTests(IPkcs11Backend backend) { _backend = backend; }
-
-    [Fact]
-    public void GetInfo_ReturnsNonEmptyManufacturerAndVersion()
+    internal static void AssertGetInfo_ReturnsNonEmptyManufacturerAndVersion(IPkcs11Backend backend)
     {
-        LibraryInfo info = _backend.Library.GetInfo();
+        LibraryInfo info = backend.Library.GetInfo();
         Assert.False(string.IsNullOrWhiteSpace(info.ManufacturerId));
         Assert.False(string.IsNullOrWhiteSpace(info.CryptokiVersion));
     }
 }
 
+/// <summary>
+/// End-to-end smoke check against pkcs11-mock. Always runs — the mock library is
+/// always present in the test output directory.
+/// </summary>
 [Collection("Mock")]
-public sealed class SmokeTests_Mock : SmokeTests { public SmokeTests_Mock(MockBackendFixture f) : base(f) { } }
+public sealed class SmokeTests_Mock
+{
+    private readonly MockBackendFixture _backend;
+    public SmokeTests_Mock(MockBackendFixture f) { _backend = f; }
+
+    [Fact]
+    public void GetInfo_ReturnsNonEmptyManufacturerAndVersion()
+        => SmokeTestAssertions.AssertGetInfo_ReturnsNonEmptyManufacturerAndVersion(_backend);
+}
+
+/// <summary>
+/// End-to-end smoke check against SoftHSM2. Skipped automatically when SoftHSM2 is
+/// not installed on the host (library binary not found by <see cref="SoftHsmBackendFixture"/>).
+/// </summary>
+[Collection("SoftHsm")]
+public sealed class SmokeTests_SoftHsm
+{
+    private readonly SoftHsmBackendFixture _backend;
+    public SmokeTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void GetInfo_ReturnsNonEmptyManufacturerAndVersion()
+        => SmokeTestAssertions.AssertGetInfo_ReturnsNonEmptyManufacturerAndVersion(_backend);
+}
