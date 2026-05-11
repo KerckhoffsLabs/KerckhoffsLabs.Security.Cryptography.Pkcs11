@@ -47,12 +47,29 @@ public class LowLevelPkcs11Library
     /// </summary>
     /// <param name="initArgs">CK_C_INITIALIZE_ARGS structure containing information on how the library should deal with multi-threaded access or null if an application will not be accessing Cryptoki through multiple threads simultaneously</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CANT_LOCK, CKR_CRYPTOKI_ALREADY_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_NEED_TO_CREATE_THREADS, CKR_OK</returns>
-    public CKR C_Initialize(CK_C_INITIALIZE_ARGS initArgs)
+    public CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong rv = _delegates.C_Initialize(initArgs);
-        return rv.ToCKRChecked();
+        if (initArgs == null)
+        {
+            NativeCULong rv = _delegates.C_Initialize(IntPtr.Zero);
+            return rv.ToCKRChecked();
+        }
+        else
+        {
+            IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf(typeof(CK_C_INITIALIZE_ARGS)));
+            try
+            {
+                UnmanagedMemory.Write(pInitArgs, initArgs);
+                NativeCULong rv = _delegates.C_Initialize(pInitArgs);
+                return rv.ToCKRChecked();
+            }
+            finally
+            {
+                UnmanagedMemory.Free(ref pInitArgs);
+            }
+        }
     }
 
     /// <summary>

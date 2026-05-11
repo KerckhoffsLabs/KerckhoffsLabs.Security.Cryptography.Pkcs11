@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_InitializeDelegate(CK_C_INITIALIZE_ARGS initArgs);
+internal delegate NativeCULong C_InitializeDelegate(IntPtr pInitArgs);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FinalizeDelegate(IntPtr reserved);
@@ -218,7 +218,7 @@ internal partial class Delegates
     private static partial class NativeMethods
     {
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_Initialize(CK_C_INITIALIZE_ARGS initArgs);
+        internal static extern NativeCULong C_Initialize(IntPtr pInitArgs);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_Finalize(IntPtr reserved);

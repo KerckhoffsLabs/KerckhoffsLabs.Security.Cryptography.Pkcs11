@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 /// <summary>
 /// High level PKCS#11 wrapper
 /// </summary>
-public class Pkcs11Library
+public class Pkcs11Library : IDisposable
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
