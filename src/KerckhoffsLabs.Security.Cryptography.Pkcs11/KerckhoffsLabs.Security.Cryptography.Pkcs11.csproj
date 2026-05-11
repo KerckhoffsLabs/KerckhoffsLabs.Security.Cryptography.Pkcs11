@@ -46,4 +46,8 @@
     <ProjectReference Include="..\KerckhoffsLabs.Runtime.InteropServices\KerckhoffsLabs.Runtime.InteropServices.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests" />
+  </ItemGroup>
+
 </Project>
