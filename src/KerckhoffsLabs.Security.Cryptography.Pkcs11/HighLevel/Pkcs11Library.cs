@@ -146,7 +146,7 @@ public class Pkcs11Library : IDisposable
 
             List<Slot> list = [];
             foreach (NativeCULong slot in slotList)
-                list.Add(new Slot(_pkcs11Library, Convert.ToUInt64(slot)));
+                list.Add(new Slot(_pkcs11Library, (ulong)slot));
 
             return list;
         }
@@ -174,12 +174,12 @@ public class Pkcs11Library : IDisposable
             if (rv == CKR.CKR_OK)
             {
                 eventOccured = true;
-                slotId = Convert.ToUInt64(slotId_);
+                slotId = (ulong)slotId_;
             }
             else if (rv == CKR.CKR_NO_EVENT)
             {
                 eventOccured = false;
-                slotId = Convert.ToUInt64(slotId_);
+                slotId = (ulong)slotId_;
             }
             else
             {
@@ -191,7 +191,7 @@ public class Pkcs11Library : IDisposable
             if (rv == CKR.CKR_OK)
             {
                 eventOccured = true;
-                slotId = Convert.ToUInt64(slotId_);
+                slotId = (ulong)slotId_;
             }
             else
             {
