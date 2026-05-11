@@ -5,691 +5,341 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
 /// <summary>
-/// Attribute of cryptoki object (CK_ATTRIBUTE alternative)
+/// Attribute of a cryptoki object — managed wrapper around CK_ATTRIBUTE.
+/// Owns an unmanaged buffer for the value; callers MUST dispose to free it.
 /// </summary>
-public class ObjectAttribute
+public sealed class ObjectAttribute : IDisposable
 {
-    /// <summary>
-    /// Flag indicating whether instance has been disposed
-    /// </summary>
-    protected bool _disposed = false;
+    private CK_ATTRIBUTE _ckAttribute;
+    private bool _disposed;
 
-    /// <summary>
-    /// Low level attribute structure
-    /// </summary>
-    protected CK_ATTRIBUTE _ckAttribute;
+    // --- Public read surface -------------------------------------------------
 
-    /// <summary>
-    /// Attribute type
-    /// </summary>
+    /// <summary>Attribute type (raw, e.g. 0x00000000 for CKA_CLASS).</summary>
     public ulong Type
     {
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            return (ulong)_ckAttribute.type;
+        }
+    }
 
-            return Convert.ToUInt64(_ckAttribute.type);
+    /// <summary>Length in bytes of the attribute's value, or 0 if no value.</summary>
+    public int ValueLength
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (CannotBeRead) return 0;
+            return (int)_ckAttribute.valueLen;
         }
     }
 
     /// <summary>
-    /// Flag indicating whether attribute value cannot be read either because object is sensitive or unextractable or because specified attribute for the object is invalid.
+    /// True when the underlying CK_ATTRIBUTE's valueLen is the sentinel -1, indicating
+    /// the module refused to disclose the attribute (sensitive/unextractable).
     /// </summary>
     public bool CannotBeRead
     {
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-
-            // PKCS#11 v2.20 page 133:
-            // If the specified attribute (i.e., the attribute specified by the type field) for the object
-            // cannot be revealed because the object is sensitive or unextractable, then the
-            // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
-            // CK_LONG, it holds -1).
-            return (CLong)_ckAttribute.valueLen == -1;
+            return (long)_ckAttribute.valueLen == -1L;
         }
     }
 
-    /// <summary>
-    /// Returns managed object corresponding to CK_ATTRIBUTE structure that can be marshaled to an unmanaged block of memory
-    /// </summary>
-    /// <returns>A managed object holding the data to be marshaled. This object must be an instance of a formatted class.</returns>
-    public object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+    // --- Marshalling adapter (internal-only; not exposed publicly) ----------
 
-        return _ckAttribute;
+    internal CK_ATTRIBUTE CkAttribute
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _ckAttribute;
+        }
     }
 
-    /// <summary>
-    /// Creates attribute defined by low level CK_ATTRIBUTE structure
-    /// </summary>
-    /// <param name="attribute">CK_ATTRIBUTE structure</param>
-    protected internal ObjectAttribute(CK_ATTRIBUTE attribute)
+    // --- Constructors --------------------------------------------------------
+
+    /// <summary>Wraps an existing low-level CK_ATTRIBUTE. The instance takes ownership of any unmanaged buffer.</summary>
+    internal ObjectAttribute(CK_ATTRIBUTE attribute)
     {
         _ckAttribute = attribute;
     }
 
-    #region Attribute with no value
+    public ObjectAttribute(ulong type)             { _ckAttribute = _CreateAttribute((NativeCULong)type, ReadOnlySpan<byte>.Empty); }
+    public ObjectAttribute(CKA   type)             : this((ulong)type) { }
 
-    /// <summary>
-    /// Creates attribute of given type with no value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    public ObjectAttribute(ulong type)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type));
-    }
-
-    /// <summary>
-    /// Creates attribute of given type with no value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    public ObjectAttribute(CKA type)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type);
-    }
-
-    #endregion
-
-    #region Attribute with ulong value
-
-    /// <summary>
-    /// Creates attribute of given type with ulong value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
     public ObjectAttribute(ulong type, ulong value)
     {
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), ConvertUtils.UInt32FromUInt64(value));
+        Span<byte> buf = stackalloc byte[sizeof(ulong)];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(buf, value);
+        _ckAttribute = _CreateAttribute((NativeCULong)type, buf[..UnmanagedMemory.NativeULongSize]);
     }
+    public ObjectAttribute(CKA type, ulong value)  : this((ulong)type, value) { }
+    public ObjectAttribute(CKA type, CKC   value)  : this((ulong)type, (ulong)value) { }
+    public ObjectAttribute(CKA type, CKK   value)  : this((ulong)type, (ulong)value) { }
+    public ObjectAttribute(CKA type, CKO   value)  : this((ulong)type, (ulong)value) { }
 
-    /// <summary>
-    /// Creates attribute of given type with ulong value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, ulong value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, ConvertUtils.UInt32FromUInt64(value));
-    }
-
-    /// <summary>
-    /// Creates attribute of given type with CKC value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, CKC value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
-    }
-
-    /// <summary>
-    /// Creates attribute of given type with CKK value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, CKK value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
-    }
-
-    /// <summary>
-    /// Creates attribute of given type with CKO value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, CKO value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
-    }
-
-    /// <summary>
-    /// Reads value of attribute and returns it as ulong
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public ulong GetValueAsUlong()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
-            throw new AttributeValueException(Type);
-
-        try
-        {
-            NativeCULong value = 0;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-            return ConvertUtils.UInt32ToUInt64(value);
-        }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
-    }
-
-    #endregion
-
-    #region Attribute with bool value
-
-    /// <summary>
-    /// Creates attribute of given type with bool value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
     public ObjectAttribute(ulong type, bool value)
     {
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), value);
+        Span<byte> buf = stackalloc byte[1];
+        buf[0] = value ? (byte)0x01 : (byte)0x00;
+        _ckAttribute = _CreateAttribute((NativeCULong)type, buf);
     }
+    public ObjectAttribute(CKA type, bool value)   : this((ulong)type, value) { }
 
-    /// <summary>
-    /// Creates attribute of given type with bool value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, bool value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
-    }
-
-    /// <summary>
-    /// Reads value of attribute and returns it as bool
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public bool GetValueAsBool()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
-            throw new AttributeValueException(Type);
-
-        try
-        {
-            bool value = false;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-            return value;
-        }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
-    }
-
-    #endregion
-
-    #region Attribute with string value
-
-    /// <summary>
-    /// Creates attribute of given type with string value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
     public ObjectAttribute(ulong type, string value)
     {
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), value);
+        ArgumentNullException.ThrowIfNull(value);
+        ReadOnlySpan<byte> bytes = System.Text.Encoding.UTF8.GetBytes(value); // no null terminator
+        _ckAttribute = _CreateAttribute((NativeCULong)type, bytes);
     }
+    public ObjectAttribute(CKA type, string value) : this((ulong)type, value) { }
 
-    /// <summary>
-    /// Creates attribute of given type with string value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, string value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
-    }
-
-    /// <summary>
-    /// Reads value of attribute and returns it as string
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public string GetValueAsString()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
-            throw new AttributeValueException(Type);
-
-        try
-        {
-            string value = null;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-            return value;
-        }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
-    }
-
-    #endregion
-
-    #region Attribute with byte array value
-
-    /// <summary>
-    /// Creates attribute of given type with byte array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
     public ObjectAttribute(ulong type, byte[] value)
+        : this(type, (ReadOnlySpan<byte>)(value ?? Array.Empty<byte>())) { }
+    public ObjectAttribute(CKA type, byte[] value) : this((ulong)type, value) { }
+
+    public ObjectAttribute(ulong type, ReadOnlySpan<byte> value)
     {
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), value);
+        _ckAttribute = _CreateAttribute((NativeCULong)type, value);
     }
+    public ObjectAttribute(CKA type, ReadOnlySpan<byte> value) : this((ulong)type, value) { }
 
-    /// <summary>
-    /// Creates attribute of given type with byte array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, byte[] value)
-    {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
-    }
-
-    /// <summary>
-    /// Reads value of attribute and returns it as byte array
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public byte[] GetValueAsByteArray()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
-            throw new AttributeValueException(Type);
-
-        try
-        {
-            byte[] value = null;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-            return value;
-        }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
-    }
-
-    #endregion
-
-    #region Attribute with DateTime value
-
-    /// <summary>
-    /// Creates attribute of given type with DateTime (CK_DATE) value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
     public ObjectAttribute(ulong type, DateTime value)
     {
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), value);
+        // CK_DATE wire format: 8 ASCII bytes "YYYYMMDD"
+        string formatted = value.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
+        ReadOnlySpan<byte> bytes = System.Text.Encoding.ASCII.GetBytes(formatted);
+        _ckAttribute = _CreateAttribute((NativeCULong)type, bytes);
     }
+    public ObjectAttribute(CKA type, DateTime value) : this((ulong)type, value) { }
 
-    /// <summary>
-    /// Creates attribute of given type with DateTime (CK_DATE) value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, DateTime value)
+    public ObjectAttribute(ulong type, List<ObjectAttribute> value)
     {
-        _ckAttribute = CkaUtils.CreateAttribute(type, value);
+        ArgumentNullException.ThrowIfNull(value);
+        int stride = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
+        byte[] flat = new byte[stride * value.Count];
+        // Marshal each child's CK_ATTRIBUTE into the flat buffer.
+        unsafe
+        {
+            fixed (byte* p = flat)
+            {
+                IntPtr basePtr = (IntPtr)p;
+                for (int i = 0; i < value.Count; i++)
+                {
+                    IntPtr slot = new IntPtr(basePtr.ToInt64() + (long)i * stride);
+                    Marshal.StructureToPtr<CK_ATTRIBUTE>(value[i]._ckAttribute, slot, false);
+                }
+            }
+        }
+        _ckAttribute = _CreateAttribute((NativeCULong)type, flat);
+    }
+    public ObjectAttribute(CKA type, List<ObjectAttribute> value) : this((ulong)type, value) { }
+
+    public ObjectAttribute(ulong type, List<ulong> value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        int stride = UnmanagedMemory.NativeULongSize;
+        byte[] flat = new byte[stride * value.Count];
+        Span<byte> dest = flat;
+        for (int i = 0; i < value.Count; i++)
+        {
+            // PKCS#11 uses CK_ULONG (NativeCULong) for these lists — 4 bytes on Windows, 8 on Unix-x64.
+            // We always write the low 32 bits little-endian when stride==4, otherwise 64 bits.
+            if (stride == 4)
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(i * stride, 4), checked((uint)value[i]));
+            else
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), value[i]);
+        }
+        _ckAttribute = _CreateAttribute((NativeCULong)type, flat);
+    }
+    public ObjectAttribute(CKA type, List<ulong> value) : this((ulong)type, value) { }
+
+    public ObjectAttribute(ulong type, List<CKM> value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        // Reuse the List<ulong> path after converting each CKM.
+        List<ulong> ulist = new(value.Count);
+        for (int i = 0; i < value.Count; i++)
+            ulist.Add((ulong)value[i]);
+        // Inline rather than `this(type, ulist)` so we only allocate the native buffer once.
+        int stride = UnmanagedMemory.NativeULongSize;
+        byte[] flat = new byte[stride * ulist.Count];
+        Span<byte> dest = flat;
+        for (int i = 0; i < ulist.Count; i++)
+        {
+            if (stride == 4)
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(i * stride, 4), checked((uint)ulist[i]));
+            else
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), ulist[i]);
+        }
+        _ckAttribute = _CreateAttribute((NativeCULong)type, flat);
+    }
+    public ObjectAttribute(CKA type, List<CKM> value) : this((ulong)type, value) { }
+
+    // --- Read-back -----------------------------------------------------------
+
+    public bool GetValueAsBool()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        if ((int)_ckAttribute.valueLen != 1)
+            throw new AttributeValueException(Type);
+        byte b = Marshal.ReadByte(_ckAttribute.value);
+        return b != 0;
+    }
+
+    public ulong GetValueAsUlong()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int len = (int)_ckAttribute.valueLen;
+        if (len != UnmanagedMemory.NativeULongSize)
+            throw new AttributeValueException(Type);
+        Span<byte> tmp = stackalloc byte[8];
+        UnmanagedMemory.Read(_ckAttribute.value, tmp[..len]);
+        return len == 4
+            ? System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(tmp[..4])
+            : System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(tmp[..8]);
+    }
+
+    public string GetValueAsString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int len = (int)_ckAttribute.valueLen;
+        if (len == 0) return string.Empty;
+        byte[] buf = new byte[len];
+        UnmanagedMemory.Read(_ckAttribute.value, buf);
+        return System.Text.Encoding.UTF8.GetString(buf).TrimEnd('\0');
+    }
+
+    public byte[] GetValueAsByteArray()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int len = (int)_ckAttribute.valueLen;
+        byte[] buf = new byte[len];
+        if (len > 0) UnmanagedMemory.Read(_ckAttribute.value, buf);
+        return buf;
     }
 
     /// <summary>
-    /// Reads value of attribute and returns it as DateTime
+    /// Copies the attribute's raw value bytes into <paramref name="destination"/>. Returns the
+    /// number of bytes written. Allocates nothing. Use <see cref="ValueLength"/> to size the
+    /// destination buffer.
     /// </summary>
-    /// <returns>Value of attribute</returns>
+    /// <exception cref="ArgumentException">if <paramref name="destination"/> is too small.</exception>
+    public int CopyValueTo(Span<byte> destination)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int len = (int)_ckAttribute.valueLen;
+        if (destination.Length < len)
+            throw new ArgumentException($"Destination too small: needs {len} bytes, got {destination.Length}.", nameof(destination));
+        if (len > 0) UnmanagedMemory.Read(_ckAttribute.value, destination[..len]);
+        return len;
+    }
+
     public DateTime? GetValueAsDateTime()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int len = (int)_ckAttribute.valueLen;
+        if (len == 0) return null;
+        if (len != 8) throw new AttributeValueException(Type);
+        byte[] buf = new byte[8];
+        UnmanagedMemory.Read(_ckAttribute.value, buf);
+        string s = System.Text.Encoding.ASCII.GetString(buf);
+        if (!DateTime.TryParseExact(s, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture,
+                                    System.Globalization.DateTimeStyles.None, out DateTime dt))
+        {
+            return null;
+        }
+        return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+    }
 
-        if (CannotBeRead)
+    public ObjectAttribute[] GetValueAsAttributeArray()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int total = (int)_ckAttribute.valueLen;
+        int stride = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
+        int n = total / stride;
+        if (total % stride != 0)
             throw new AttributeValueException(Type);
-
-        try
+        ObjectAttribute[] result = new ObjectAttribute[n];
+        for (int i = 0; i < n; i++)
         {
-            DateTime? value = null;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-            return value;
+            IntPtr slot = new IntPtr(_ckAttribute.value.ToInt64() + (long)i * stride);
+            CK_ATTRIBUTE attr = (CK_ATTRIBUTE)UnmanagedMemory.Read(slot, typeof(CK_ATTRIBUTE))!;
+            result[i] = new ObjectAttribute(attr);
         }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
+        return result;
     }
 
-    #endregion
-
-    #region Attribute with attribute array value
-
-    /// <summary>
-    /// Creates attribute of given type with attribute array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(ulong type, List<ObjectAttribute> value)
+    public ulong[] GetValueAsUlongArray()
     {
-        CK_ATTRIBUTE[] attributes = null;
-
-        if (value != null)
-        {
-            attributes = new CK_ATTRIBUTE[value.Count];
-
-            try
-            {
-                for (int i = 0; i < value.Count; i++)
-                {
-                    CK_ATTRIBUTE attribute = (CK_ATTRIBUTE)value[i].ToMarshalableStructure();
-                    attributes[i] = DuplicateAttribute(ref attribute);
-                }
-            }
-            catch
-            {
-                for (int i = 0; i < value.Count; i++)
-                    FreeAttribute(ref attributes[i]);
-
-                throw;
-            }
-        }
-
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), attributes);
-    }
-
-    /// <summary>
-    /// Creates attribute of given type with attribute array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, List<ObjectAttribute> value)
-    {
-        CK_ATTRIBUTE[] attributes = null;
-        
-        if (value != null)
-        {
-            attributes = new CK_ATTRIBUTE[value.Count];
-
-            try
-            {
-                for (int i = 0; i < value.Count; i++)
-                {
-                    CK_ATTRIBUTE attribute = (CK_ATTRIBUTE)value[i].ToMarshalableStructure();
-                    attributes[i] = DuplicateAttribute(ref attribute);
-                }
-            }
-            catch
-            {
-                for (int i = 0; i < value.Count; i++)
-                    FreeAttribute(ref attributes[i]);
-
-                throw;
-            }
-        }
-
-        _ckAttribute = CkaUtils.CreateAttribute(type, attributes);
-    }
-
-    /// <summary>
-    /// Reads value of attribute and returns it as attribute array
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public List<ObjectAttribute> GetValueAsObjectAttributeList()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (CannotBeRead) throw new AttributeValueException(Type);
+        int stride = UnmanagedMemory.NativeULongSize;
+        int total = (int)_ckAttribute.valueLen;
+        int n = total / stride;
+        if (total % stride != 0)
             throw new AttributeValueException(Type);
-
-        try
+        ulong[] result = new ulong[n];
+        byte[] buf = new byte[total];
+        if (total > 0) UnmanagedMemory.Read(_ckAttribute.value, buf);
+        for (int i = 0; i < n; i++)
         {
-            CK_ATTRIBUTE[] value = null;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-
-            List<ObjectAttribute> attributes = null;
-
-            if (value != null)
-            {
-                attributes = new List<ObjectAttribute>();
-                for (int i = 0; i < value.Length; i++)
-                {
-                    CK_ATTRIBUTE copy = DuplicateAttribute(ref value[i]);
-                    attributes.Add(new ObjectAttribute(copy));
-                }
-            }
-
-            return attributes;
+            ReadOnlySpan<byte> slice = buf.AsSpan(i * stride, stride);
+            result[i] = stride == 4
+                ? System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(slice)
+                : System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(slice);
         }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
+        return result;
     }
 
-    /// <summary>
-    /// Creates copy of low level attribute
-    /// </summary>
-    /// <param name="attribute">Attribute to be copied</param>
-    /// <returns>Copy of low level attribute</returns>
-    protected CK_ATTRIBUTE DuplicateAttribute(ref CK_ATTRIBUTE attribute)
+    public CKM[] GetValueAsCkmArray()
     {
-        if (!MiscSettings.AttributesWithNestedAttributes.ContainsKey(ConvertUtils.UInt32ToUInt64(attribute.type)))
+        ulong[] raw = GetValueAsUlongArray();
+        CKM[] result = new CKM[raw.Length];
+        for (int i = 0; i < raw.Length; i++) result[i] = (CKM)raw[i];
+        return result;
+    }
+
+    // --- IDisposable ---------------------------------------------------------
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        if (_ckAttribute.value != IntPtr.Zero)
         {
-            byte[] value = null;
-            CkaUtils.ConvertValue(ref attribute, out value);
-            return CkaUtils.CreateAttribute(attribute.type, value);
+            UnmanagedMemory.Free(ref _ckAttribute.value);
+        }
+        _ckAttribute.valueLen = (NativeCULong)0;
+        _disposed = true;
+    }
+
+    // --- Private marshalling kernel ------------------------------------------
+
+    private static CK_ATTRIBUTE _CreateAttribute(NativeCULong type, ReadOnlySpan<byte> value)
+    {
+        CK_ATTRIBUTE a = new CK_ATTRIBUTE { type = type };
+        if (value.Length > 0)
+        {
+            a.value = UnmanagedMemory.Allocate(value.Length);
+            UnmanagedMemory.Write(a.value, value);
+            a.valueLen = (NativeCULong)value.Length;
         }
         else
         {
-            CK_ATTRIBUTE[] srcNestedAttrs = null;
-            CkaUtils.ConvertValue(ref attribute, out srcNestedAttrs);
-
-            CK_ATTRIBUTE[] dstNestedAttrs = new CK_ATTRIBUTE[srcNestedAttrs.Length];
-            for (int i = 0; i < srcNestedAttrs.Length; i++)
-                dstNestedAttrs[i] = DuplicateAttribute(ref srcNestedAttrs[i]);
-
-            return CkaUtils.CreateAttribute(attribute.type, dstNestedAttrs);
+            a.value = IntPtr.Zero;
+            a.valueLen = (NativeCULong)0;
         }
+        return a;
     }
-
-    #endregion
-
-    #region Attribute with ulong array value
-
-    /// <summary>
-    /// Creates attribute of given type with ulong array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(ulong type, List<ulong> value)
-    {
-        NativeCULong[] array = null;
-        
-        if (value != null)
-        {
-            array = new NativeCULong[value.Count];
-            for (int i = 0; i < value.Count; i++)
-                array[i] = ConvertUtils.UInt32FromUInt64(value[i]);
-        }
-        
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), array);
-    }
-
-    /// <summary>
-    /// Creates attribute of given type with ulong array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, List<ulong> value)
-    {
-        NativeCULong[] array = null;
-
-        if (value != null)
-        {
-            array = new NativeCULong[value.Count];
-            for (int i = 0; i < value.Count; i++)
-                array[i] = ConvertUtils.UInt32FromUInt64(value[i]);
-        }
-
-        _ckAttribute = CkaUtils.CreateAttribute(type, array);
-    }
-
-    /// <summary>
-    /// Reads value of attribute and returns it as list of ulong
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public List<ulong> GetValueAsULongList()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
-            throw new AttributeValueException(Type);
-
-        try
-        {
-            NativeCULong[] value = null;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-
-            List<ulong> ulongs = null;
-            if (value != null)
-            {
-                ulongs = new List<ulong>();
-                for (int i = 0; i < value.Length; i++)
-                    ulongs.Add(ConvertUtils.UInt32ToUInt64(value[i]));
-            }
-
-            return ulongs;
-        }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
-    }
-
-    #endregion
-
-    #region Attribute with mechanism array value
-
-    /// <summary>
-    /// Creates attribute of given type with mechanism array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(ulong type, List<CKM> value)
-    {
-        CKM[] mechanisms = null;
-        
-        if (value != null)
-            mechanisms = value.ToArray();
-        
-        _ckAttribute = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(type), mechanisms);
-    }
-    
-    /// <summary>
-    /// Creates attribute of given type with mechanism array value
-    /// </summary>
-    /// <param name="type">Attribute type</param>
-    /// <param name="value">Attribute value</param>
-    public ObjectAttribute(CKA type, List<CKM> value)
-    {
-        CKM[] mechanisms = null;
-        
-        if (value != null)
-            mechanisms = value.ToArray();
-        
-        _ckAttribute = CkaUtils.CreateAttribute(type, mechanisms);
-    }
-    
-    /// <summary>
-    /// Reads value of attribute and returns it as list of mechanisms
-    /// </summary>
-    /// <returns>Value of attribute</returns>
-    public List<CKM> GetValueAsCkmList()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        if (CannotBeRead)
-            throw new AttributeValueException(Type);
-
-        try
-        {
-            CKM[] value = null;
-            CkaUtils.ConvertValue(ref _ckAttribute, out value);
-            return (value == null) ? null : new List<CKM>(value);
-        }
-        catch (Exception ex)
-        {
-            throw new AttributeValueException(Type, ex);
-        }
-    }
-
-    #endregion
-
-    #region IDisposable
-
-    /// <summary>
-    /// Disposes object
-    /// </summary>
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Disposes object
-    /// </summary>
-    /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed)
-        {
-            if (disposing)
-            {
-                // Dispose managed objects
-            }
-
-            // Dispose unmanaged objects
-
-            FreeAttribute(ref _ckAttribute);
-
-            _disposed = true;
-        }
-    }
-
-    /// <summary>
-    /// Frees low level attribute
-    /// </summary>
-    /// <param name="attribute">Attribute to be freed</param>
-    protected void FreeAttribute(ref CK_ATTRIBUTE attribute)
-    {
-        if (MiscSettings.AttributesWithNestedAttributes.ContainsKey(ConvertUtils.UInt32ToUInt64(attribute.type)))
-        {
-            CK_ATTRIBUTE[] nestedAttributes = null;
-
-            if (!CannotBeRead)
-                CkaUtils.ConvertValue(ref attribute, out nestedAttributes);
-
-            if (nestedAttributes != null)
-            {
-                for (int i = 0; i < nestedAttributes.Length; i++)
-                    FreeAttribute(ref nestedAttributes[i]);
-            }
-        }
-
-        UnmanagedMemory.Free(ref attribute.value);
-        attribute.valueLen = 0;
-    }
-
-    /// <summary>
-    /// Class destructor that disposes object if caller forgot to do so
-    /// </summary>
-    ~ObjectAttribute()
-    {
-        Dispose(false);
-    }
-
-    #endregion
 }

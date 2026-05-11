@@ -8,6 +8,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 public static class UnmanagedMemory
 {
+    /// <summary>Size in bytes of one CK_ULONG (NativeCULong) on the current platform: 4 on Windows, 8 on Unix-LP64.</summary>
+    public static int NativeULongSize { get; } = Marshal.SizeOf<NativeCULong>();
+
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
@@ -139,6 +142,19 @@ public static class UnmanagedMemory
     }
 
     /// <summary>
+    /// Copies content of a read-only byte span to unmanaged memory
+    /// </summary>
+    /// <param name="memory">Previously allocated unmanaged memory to copy to</param>
+    /// <param name="data">Data to copy from</param>
+    public static void Write(IntPtr memory, ReadOnlySpan<byte> data)
+    {
+        if (memory == IntPtr.Zero)
+            throw new ArgumentNullException(nameof(memory));
+
+        unsafe { fixed (byte* src = data) Buffer.MemoryCopy(src, (void*)memory, data.Length, data.Length); }
+    }
+
+    /// <summary>
     /// Copies content of structure to unmanaged memory
     /// </summary>
     /// <param name="memory">Previously allocated unmanaged memory to copy to</param>
@@ -170,6 +186,34 @@ public static class UnmanagedMemory
         byte[] output = new byte[size];
         Marshal.Copy(memory, output, 0, size);
         return output;
+    }
+
+    /// <summary>
+    /// Copies content of unmanaged memory into the provided byte array
+    /// </summary>
+    /// <param name="memory">Memory that should be copied</param>
+    /// <param name="destination">Byte array to copy into; length determines number of bytes copied</param>
+    public static void Read(IntPtr memory, byte[] destination)
+    {
+        if (memory == IntPtr.Zero)
+            throw new ArgumentNullException(nameof(memory));
+
+        ArgumentNullException.ThrowIfNull(destination);
+
+        Marshal.Copy(memory, destination, 0, destination.Length);
+    }
+
+    /// <summary>
+    /// Copies content of unmanaged memory into the provided byte span
+    /// </summary>
+    /// <param name="memory">Memory that should be copied</param>
+    /// <param name="destination">Span to copy into; length determines number of bytes copied</param>
+    public static void Read(IntPtr memory, Span<byte> destination)
+    {
+        if (memory == IntPtr.Zero)
+            throw new ArgumentNullException(nameof(memory));
+
+        unsafe { fixed (byte* dst = destination) Buffer.MemoryCopy((void*)memory, dst, destination.Length, destination.Length); }
     }
 
     /// <summary>
