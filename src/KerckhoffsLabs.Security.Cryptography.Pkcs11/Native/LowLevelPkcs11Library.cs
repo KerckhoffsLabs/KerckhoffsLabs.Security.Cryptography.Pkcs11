@@ -52,7 +52,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Initialize(initArgs);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -65,7 +65,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Finalize(reserved);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -78,7 +78,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetInfo(ref info);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetFunctionList(out functionList);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetSlotList(tokenPresent, slotList, ref count);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -123,7 +123,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetSlotInfo(slotId, ref info);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -137,7 +137,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetTokenInfo(slotId, ref info);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -166,7 +166,7 @@ public class LowLevelPkcs11Library
                 mechanismList[i] = CULongList[i].ToCKM();
         }
 
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetMechanismInfo(slotId, type.ToCULong(), ref info);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -197,7 +197,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_InitToken(slotId, pin, pinLen, label);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -212,7 +212,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_InitPIN(session, pin, pinLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -229,7 +229,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SetPIN(session, oldPin, oldPinLen, newPin, newPinLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -246,7 +246,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_OpenSession(slotId, flags, application, notify, ref session);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -259,7 +259,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CloseSession(session);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -272,7 +272,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CloseAllSessions(slotId);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -286,7 +286,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetSessionInfo(session, ref info);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -304,7 +304,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetOperationState(session, operationState, ref operationStateLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -321,7 +321,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SetOperationState(session, operationState, operationStateLen, encryptionKey, authenticationKey);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -336,8 +336,8 @@ public class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong rv = _delegates.C_Login(session, ConvertUtils.CULongFromCKU(userType), pin, pinLen);
-        return ConvertUtils.CULongToCKR(rv);
+        NativeCULong rv = _delegates.C_Login(session, userType.ToCULong(), pin, pinLen);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -350,7 +350,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Logout(session);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -366,7 +366,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CreateObject(session, template, count, ref objectId);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -383,7 +383,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CopyObject(session, objectId, template, count, ref newObjectId);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -397,7 +397,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DestroyObject(session, objectId);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -412,7 +412,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetObjectSize(session, objectId, ref size);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -428,7 +428,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetAttributeValue(session, objectId, template, count);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -444,7 +444,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SetAttributeValue(session, objectId, template, count);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -459,7 +459,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_FindObjectsInit(session, template, count);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -475,7 +475,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_FindObjects(session, objectId, maxObjectCount, ref objectCount);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -488,7 +488,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_FindObjectsFinal(session);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -503,7 +503,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_EncryptInit(session, ref mechanism, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -523,7 +523,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Encrypt(session, data, dataLen, encryptedData, ref encryptedDataLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -543,7 +543,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_EncryptUpdate(session, part, partLen, encryptedPart, ref encryptedPartLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -561,7 +561,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_EncryptFinal(session, lastEncryptedPart, ref lastEncryptedPartLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -576,7 +576,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptInit(session, ref mechanism, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -596,7 +596,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Decrypt(session, encryptedData, encryptedDataLen, data, ref dataLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -616,7 +616,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptUpdate(session, encryptedPart, encryptedPartLen, part, ref partLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -634,7 +634,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptFinal(session, lastPart, ref lastPartLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -648,7 +648,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestInit(session, ref mechanism);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -668,7 +668,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Digest(session, data, dataLen, digest, ref digestLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -683,7 +683,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestUpdate(session, part, partLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -697,7 +697,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestKey(session, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -715,7 +715,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestFinal(session, digest, ref digestLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -730,7 +730,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignInit(session, ref mechanism, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -750,7 +750,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Sign(session, data, dataLen, signature, ref signatureLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -765,7 +765,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignUpdate(session, part, partLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -783,7 +783,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignFinal(session, signature, ref signatureLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -798,7 +798,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignRecoverInit(session, ref mechanism, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -818,7 +818,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignRecover(session, data, dataLen, signature, ref signatureLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -833,7 +833,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyInit(session, ref mechanism, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -850,7 +850,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Verify(session, data, dataLen, signature, signatureLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -865,7 +865,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyUpdate(session, part, partLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -880,7 +880,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyFinal(session, signature, signatureLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -895,7 +895,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyRecoverInit(session, ref mechanism, key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -915,7 +915,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyRecover(session, signature, signatureLen, data, ref dataLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -935,7 +935,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestEncryptUpdate(session, part, partLen, encryptedPart, ref encryptedPartLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -955,7 +955,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptDigestUpdate(session, encryptedPart, encryptedPartLen, part, ref partLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -975,7 +975,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignEncryptUpdate(session, part, partLen, encryptedPart, ref encryptedPartLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -995,7 +995,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptVerifyUpdate(session, encryptedPart, encryptedPartLen, part, ref partLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1012,7 +1012,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GenerateKey(session, ref mechanism, template, count, ref key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1032,7 +1032,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GenerateKeyPair(session, ref mechanism, publicKeyTemplate, publicKeyAttributeCount, privateKeyTemplate, privateKeyAttributeCount, ref publicKey, ref privateKey);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1053,7 +1053,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_WrapKey(session, ref mechanism, wrappingKey, key, wrappedKey, ref wrappedKeyLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1073,7 +1073,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_UnwrapKey(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, ref key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1091,7 +1091,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DeriveKey(session, ref mechanism, baseKey, template, attributeCount, ref key);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1106,7 +1106,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SeedRandom(session, seed, seedLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1121,7 +1121,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GenerateRandom(session, randomData, randomLen);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1134,7 +1134,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetFunctionStatus(session);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1147,7 +1147,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CancelFunction(session);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
     /// <summary>
@@ -1162,7 +1162,7 @@ public class LowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_WaitForSlotEvent(flags, ref slot, reserved);
-        return ConvertUtils.CULongToCKR(rv);
+        return rv.ToCKRChecked();
     }
 
 

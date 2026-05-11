@@ -38,6 +38,6 @@ public class ObjectHandle
     /// <param name="objectId">PKCS#11 handle of object</param>
     public ObjectHandle(ulong objectId)
     {
-        _objectId = ConvertUtils.UInt32FromUInt64(objectId);
+        _objectId = (NativeCULong)(objectId);
     }
 }

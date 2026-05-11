@@ -804,7 +804,7 @@ internal partial class Delegates
 
         IntPtr functionList = IntPtr.Zero;
 
-        CKR returnValue = ConvertUtils.CULongToCKR(getFunctionList(out functionList));
+        CKR returnValue = getFunctionList(out functionList).ToCKRChecked();
         if (returnValue != CKR.CKR_OK || functionList == IntPtr.Zero)
             throw new Pkcs11Exception("C_GetFunctionList", returnValue);
 
@@ -819,7 +819,7 @@ internal partial class Delegates
     {
         IntPtr functionList = IntPtr.Zero;
 
-        CKR returnValue = ConvertUtils.CULongToCKR(NativeMethods.C_GetFunctionList(out functionList));
+        CKR returnValue = NativeMethods.C_GetFunctionList(out functionList).ToCKRChecked();
         if (returnValue != CKR.CKR_OK || functionList == IntPtr.Zero)
             throw new Pkcs11Exception("C_GetFunctionList", returnValue);
 

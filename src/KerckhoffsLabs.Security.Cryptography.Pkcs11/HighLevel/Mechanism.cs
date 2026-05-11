@@ -74,7 +74,7 @@ public class Mechanism
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(ulong type, byte[] parameter)
     {
-        _ckMechanism = CkmUtils.CreateMechanism(ConvertUtils.UInt32FromUInt64(type), parameter);
+        _ckMechanism = CkmUtils.CreateMechanism((NativeCULong)(type), parameter);
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public class Mechanism
         _mechanismParams = parameter;
 
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
-        _ckMechanism = CkmUtils.CreateMechanism(ConvertUtils.UInt32FromUInt64(type), lowLevelParams);
+        _ckMechanism = CkmUtils.CreateMechanism((NativeCULong)(type), lowLevelParams);
     }
 
     /// <summary>

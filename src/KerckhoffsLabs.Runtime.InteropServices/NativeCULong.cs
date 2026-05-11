@@ -72,15 +72,15 @@ public readonly struct NativeCULong
     // The generic-math path remains available: NativeCULong.CreateChecked(int) and
     // int.CreateChecked(nativeCULong) work today via INumberBase<T>.
 
-    public static explicit operator NativeCULong(int   value) => new NativeCULong(unchecked((uint)value));
-    public static explicit operator NativeCULong(uint  value) => new NativeCULong(value);
-    public static explicit operator NativeCULong(long  value) => new NativeCULong(unchecked((nuint)value));
-    public static explicit operator NativeCULong(ulong value) => new NativeCULong(unchecked((nuint)value));
-    public static explicit operator NativeCULong(nuint value) => new NativeCULong(value);
+    public static explicit operator NativeCULong(int   value) => new(unchecked((uint)value));
+    public static explicit operator NativeCULong(uint  value) => new(value);
+    public static explicit operator NativeCULong(long  value) => new(unchecked((nuint)value));
+    public static explicit operator NativeCULong(ulong value) => new(unchecked((nuint)value));
+    public static explicit operator NativeCULong(nuint value) => new(value);
 
-    public static explicit operator checked NativeCULong(int   value) => new NativeCULong(checked((uint)value));
-    public static explicit operator checked NativeCULong(long  value) => new NativeCULong(checked((nuint)value));
-    public static explicit operator checked NativeCULong(ulong value) => new NativeCULong(checked((nuint)value));
+    public static explicit operator checked NativeCULong(int   value) => new(checked((uint)value));
+    public static explicit operator checked NativeCULong(long  value) => new(checked((nuint)value));
+    public static explicit operator checked NativeCULong(ulong value) => new(checked((nuint)value));
 
     public static explicit operator int   (NativeCULong value) => unchecked((int)value._value);
     public static explicit operator uint  (NativeCULong value) => unchecked((uint)value._value);

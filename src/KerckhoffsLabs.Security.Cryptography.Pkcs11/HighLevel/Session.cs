@@ -88,7 +88,7 @@ public class Session
             throw new ArgumentException("Invalid handle specified", "sessionId");
 
         _pkcs11Library = pkcs11Library;
-        _sessionId = ConvertUtils.UInt32FromUInt64(sessionId);
+        _sessionId = (NativeCULong)(sessionId);
     }
 
     /// <summary>
@@ -125,8 +125,8 @@ public class Session
         NativeCULong pinValueLen = 0;
         if (userPin != null)
         {
-            pinValue = ConvertUtils.Utf8StringToBytes(userPin);
-            pinValueLen = ConvertUtils.UInt32FromInt32(pinValue.Length);
+            pinValue = System.Text.Encoding.UTF8.GetBytes(userPin);
+            pinValueLen = (NativeCULong)(pinValue.Length);
         }
 
         CKR rv = _pkcs11Library.C_InitPIN(_sessionId, pinValue, pinValueLen);
@@ -150,7 +150,7 @@ public class Session
         if (userPin != null)
         {
             pinValue = userPin;
-            pinValueLen = ConvertUtils.UInt32FromInt32(userPin.Length);
+            pinValueLen = (NativeCULong)(userPin.Length);
         }
         
         CKR rv = _pkcs11Library.C_InitPIN(_sessionId, pinValue, pinValueLen);
@@ -174,16 +174,16 @@ public class Session
         NativeCULong oldPinValueLen = 0;
         if (oldPin != null)
         {
-            oldPinValue = ConvertUtils.Utf8StringToBytes(oldPin);
-            oldPinValueLen = ConvertUtils.UInt32FromInt32(oldPinValue.Length);
+            oldPinValue = System.Text.Encoding.UTF8.GetBytes(oldPin);
+            oldPinValueLen = (NativeCULong)(oldPinValue.Length);
         }
 
         byte[] newPinValue = null;
         NativeCULong newPinValueLen = 0;
         if (newPin != null)
         {
-            newPinValue = ConvertUtils.Utf8StringToBytes(newPin);
-            newPinValueLen = ConvertUtils.UInt32FromInt32(newPinValue.Length);
+            newPinValue = System.Text.Encoding.UTF8.GetBytes(newPin);
+            newPinValueLen = (NativeCULong)(newPinValue.Length);
         }
 
         CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPinValue, oldPinValueLen, newPinValue, newPinValueLen);
@@ -208,7 +208,7 @@ public class Session
         if (oldPin != null)
         {
             oldPinValue = oldPin;
-            oldPinValueLen = ConvertUtils.UInt32FromInt32(oldPin.Length);
+            oldPinValueLen = (NativeCULong)(oldPin.Length);
         }
         
         byte[] newPinValue = null;
@@ -216,7 +216,7 @@ public class Session
         if (newPin != null)
         {
             newPinValue = newPin;
-            newPinValueLen = ConvertUtils.UInt32FromInt32(newPin.Length);
+            newPinValueLen = (NativeCULong)(newPin.Length);
         }
         
         CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPinValue, oldPinValueLen, newPinValue, newPinValueLen);
@@ -289,7 +289,7 @@ public class Session
         if (authenticationKey == null)
             throw new ArgumentNullException("authenticationKey");
 
-        CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, ConvertUtils.UInt32FromInt32(state.Length), ConvertUtils.UInt32FromUInt64(encryptionKey.ObjectId), ConvertUtils.UInt32FromUInt64(authenticationKey.ObjectId));
+        CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(state.Length), (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SetOperationState", rv);
     }
@@ -313,8 +313,8 @@ public class Session
         NativeCULong pinValueLen = 0;
         if (pin != null)
         {
-            pinValue = ConvertUtils.Utf8StringToBytes(pin);
-            pinValueLen = ConvertUtils.UInt32FromInt32(pinValue.Length);
+            pinValue = System.Text.Encoding.UTF8.GetBytes(pin);
+            pinValueLen = (NativeCULong)(pinValue.Length);
         }
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pinValue, pinValueLen);
@@ -342,7 +342,7 @@ public class Session
         if (pin != null)
         {
             pinValue = pin;
-            pinValueLen = ConvertUtils.UInt32FromInt32(pin.Length);
+            pinValueLen = (NativeCULong)(pin.Length);
         }
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pinValue, pinValueLen);
@@ -386,9 +386,9 @@ public class Session
         
         if (attributes != null)
         {
-            templateLength = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLength = (NativeCULong)(attributes.Count);
             template = new CK_ATTRIBUTE[templateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(templateLength); i++)
+            for (int i = 0; i < (int)(templateLength); i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
         }
 
@@ -422,13 +422,13 @@ public class Session
 
         if (attributes != null)
         {
-            templateLength = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLength = (NativeCULong)(attributes.Count);
             template = new CK_ATTRIBUTE[templateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(templateLength); i++)
+            for (int i = 0; i < (int)(templateLength); i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
         }
 
-        CKR rv = _pkcs11Library.C_CopyObject(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId), template, templateLength, ref objectId);
+        CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, templateLength, ref objectId);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_CopyObject", rv);
 
@@ -449,7 +449,7 @@ public class Session
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
 
-        CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DestroyObject", rv);
     }
@@ -470,11 +470,11 @@ public class Session
             throw new ArgumentNullException("objectHandle");
 
         NativeCULong objectSize = 0;
-        CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId), ref objectSize);
+        CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, (NativeCULong)(objectHandle.ObjectId), ref objectSize);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_GetObjectSize", rv);
 
-        return ConvertUtils.UInt32ToUInt64(objectSize);
+        return (ulong)(objectSize);
     }
 
     /// <summary>
@@ -501,7 +501,7 @@ public class Session
 
         List<ulong> ulongs = new List<ulong>();
         foreach (CKA attribute in attributes)
-            ulongs.Add(ConvertUtils.UInt32FromCKA(attribute));
+            ulongs.Add((uint)attribute.ToCULong());
 
         return GetAttributeValue(objectHandle, ulongs);
     }
@@ -531,10 +531,10 @@ public class Session
         // Prepare array of CK_ATTRIBUTEs
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
         for (int i = 0; i < attributes.Count; i++)
-            template[i] = CkaUtils.CreateAttribute(ConvertUtils.UInt32FromUInt64(attributes[i]));
+            template[i] = CkaUtils.CreateAttribute((NativeCULong)(attributes[i]));
 
         // Determine size of attribute values
-        CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId), template, ConvertUtils.UInt32FromInt32(template.Length));
+        CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
         if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_ATTRIBUTE_SENSITIVE) && (rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID))
             throw new Pkcs11Exception("C_GetAttributeValue", rv);
 
@@ -547,11 +547,11 @@ public class Session
             // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
             // CK_LONG, it holds -1).
             if ((CLong)template[i].valueLen != -1)
-                template[i].value = UnmanagedMemory.Allocate(ConvertUtils.UInt32ToInt32(template[i].valueLen));
+                template[i].value = UnmanagedMemory.Allocate((int)(template[i].valueLen));
         }
 
         // Read values of attributes
-        rv = _pkcs11Library.C_GetAttributeValue(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId), template, ConvertUtils.UInt32FromInt32(template.Length));
+        rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
         if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_ATTRIBUTE_SENSITIVE) && (rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID))
             throw new Pkcs11Exception("C_GetAttributeValue", rv);
 
@@ -559,7 +559,7 @@ public class Session
         bool thirdCallNeeded = false;
         for (int i = 0; i < template.Length; i++)
         {
-            if (MiscSettings.AttributesWithNestedAttributes.ContainsKey(ConvertUtils.UInt32ToUInt64(template[i].type)))
+            if (MiscSettings.AttributesWithNestedAttributes.ContainsKey((ulong)(template[i].type)))
             {
                 // PKCS#11 v2.20 page 133:
                 // If the specified attribute (i.e., the attribute specified by the type field) for the object
@@ -570,8 +570,8 @@ public class Session
                     continue;
 
                 int ckAttributeSize = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
-                int nestedAttrCount = ConvertUtils.UInt32ToInt32(template[i].valueLen) / ckAttributeSize;
-                int nestedAttrCountMod = ConvertUtils.UInt32ToInt32(template[i].valueLen) % ckAttributeSize;
+                int nestedAttrCount = (int)(template[i].valueLen) / ckAttributeSize;
+                int nestedAttrCountMod = (int)(template[i].valueLen) % ckAttributeSize;
 
                 if (nestedAttrCountMod != 0)
                     throw new Exception("Unable to read attribute value as attribute array");
@@ -591,7 +591,7 @@ public class Session
                         CK_ATTRIBUTE tempAttribute = (CK_ATTRIBUTE)UnmanagedMemory.Read(tempPointer, typeof(CK_ATTRIBUTE));
 
                         if ((CLong)tempAttribute.valueLen != -1)
-                            tempAttribute.value = UnmanagedMemory.Allocate(ConvertUtils.UInt32ToInt32(tempAttribute.valueLen));
+                            tempAttribute.value = UnmanagedMemory.Allocate((int)(tempAttribute.valueLen));
 
                         UnmanagedMemory.Write(tempPointer, tempAttribute);
                     }
@@ -602,7 +602,7 @@ public class Session
         // Read values of all nested attributes
         if (thirdCallNeeded)
         {
-            rv = _pkcs11Library.C_GetAttributeValue(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId), template, ConvertUtils.UInt32FromInt32(template.Length));
+            rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
             if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_ATTRIBUTE_SENSITIVE) && (rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID))
                 throw new Pkcs11Exception("C_GetAttributeValue", rv);
         }
@@ -640,7 +640,7 @@ public class Session
         for (int i = 0; i < attributes.Count; i++)
             template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, ConvertUtils.UInt32FromUInt64(objectHandle.ObjectId), template, ConvertUtils.UInt32FromInt32(template.Length));
+        CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SetAttributeValue", rv);
     }
@@ -661,9 +661,9 @@ public class Session
         
         if (attributes != null)
         {
-            templateLength = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLength = (NativeCULong)(attributes.Count);
             template = new CK_ATTRIBUTE[templateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(templateLength); i++)
+            for (int i = 0; i < (int)(templateLength); i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
         }
 
@@ -688,11 +688,11 @@ public class Session
 
         NativeCULong[] objects = new NativeCULong[objectCount];
         NativeCULong foundObjectsCount = 0;
-        CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, ConvertUtils.UInt32FromInt32(objectCount), ref foundObjectsCount);
+        CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, (NativeCULong)(objectCount), ref foundObjectsCount);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_FindObjects", rv);
 
-        for (int i = 0; i < ConvertUtils.UInt32ToInt32(foundObjectsCount); i++)
+        for (int i = 0; i < (int)(foundObjectsCount); i++)
             foundObjects.Add(new ObjectHandle(objects[i]));
 
         return foundObjects;
@@ -732,9 +732,9 @@ public class Session
         
         if (attributes != null)
         {
-            templateLength = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLength = (NativeCULong)(attributes.Count);
             template = new CK_ATTRIBUTE[templateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(templateLength); i++)
+            for (int i = 0; i < (int)(templateLength); i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
         }
 
@@ -751,7 +751,7 @@ public class Session
             if (rv != CKR.CKR_OK)
                 throw new Pkcs11Exception("C_FindObjects", rv);
 
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(objectCount); i++)
+            for (int i = 0; i < (int)(objectCount); i++)
                 foundObjects.Add(new ObjectHandle(objects[i]));
         }
 
@@ -787,22 +787,22 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_EncryptInit", rv);
 
         NativeCULong encryptedDataLen = 0;
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), null, ref encryptedDataLen);
+        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), null, ref encryptedDataLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Encrypt", rv);
 
         byte[] encryptedData = new byte[encryptedDataLen];
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), encryptedData, ref encryptedDataLen);
+        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), encryptedData, ref encryptedDataLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Encrypt", rv);
 
-        if (encryptedData.Length != ConvertUtils.UInt32ToInt32(encryptedDataLen))
-            Array.Resize(ref encryptedData, ConvertUtils.UInt32ToInt32(encryptedDataLen));
+        if (encryptedData.Length != (int)(encryptedDataLen))
+            Array.Resize(ref encryptedData, (int)(encryptedDataLen));
 
         return encryptedData;
     }
@@ -868,19 +868,19 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_EncryptInit", rv);
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
-        NativeCULong encryptedPartLen = ConvertUtils.UInt32FromInt32(encryptedPart.Length);
+        NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
         
         int bytesRead = 0;
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            encryptedPartLen = ConvertUtils.UInt32FromInt32(encryptedPart.Length);
-            rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead), encryptedPart, ref encryptedPartLen);
+            encryptedPartLen = (NativeCULong)(encryptedPart.Length);
+            rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
                 throw new Pkcs11Exception("C_EncryptUpdate", rv);
 
@@ -888,12 +888,12 @@ public class Session
             {
                 encryptedPart = new byte[encryptedPartLen];
 
-                rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead), encryptedPart, ref encryptedPartLen);
+                rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
                 if (rv != CKR.CKR_OK)
                     throw new Pkcs11Exception("C_EncryptUpdate", rv);
             }
 
-            outputStream.Write(encryptedPart, 0, ConvertUtils.UInt32ToInt32(encryptedPartLen));
+            outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
         }
 
         byte[] lastEncryptedPart = null;
@@ -908,7 +908,7 @@ public class Session
             throw new Pkcs11Exception("C_EncryptFinal", rv);
 
         if (lastEncryptedPartLen > 0)
-            outputStream.Write(lastEncryptedPart, 0, ConvertUtils.UInt32ToInt32(lastEncryptedPartLen));
+            outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
     }
 
     /// <summary>
@@ -936,22 +936,22 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DecryptInit", rv);
 
         NativeCULong decryptedDataLen = 0;
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, ConvertUtils.UInt32FromInt32(encryptedData.Length), null, ref decryptedDataLen);
+        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), null, ref decryptedDataLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Decrypt", rv);
 
         byte[] decryptedData = new byte[decryptedDataLen];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, ConvertUtils.UInt32FromInt32(encryptedData.Length), decryptedData, ref decryptedDataLen);
+        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), decryptedData, ref decryptedDataLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Decrypt", rv);
 
-        if (decryptedData.Length != ConvertUtils.UInt32ToInt32(decryptedDataLen))
-            Array.Resize(ref decryptedData, ConvertUtils.UInt32ToInt32(decryptedDataLen));
+        if (decryptedData.Length != (int)(decryptedDataLen))
+            Array.Resize(ref decryptedData, (int)(decryptedDataLen));
 
         return decryptedData;
     }
@@ -1017,19 +1017,19 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DecryptInit", rv);
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
-        NativeCULong partLen = ConvertUtils.UInt32FromInt32(part.Length);
+        NativeCULong partLen = (NativeCULong)(part.Length);
 
         int bytesRead = 0;
         while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
         {
-            partLen = ConvertUtils.UInt32FromInt32(part.Length);
-            rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, ConvertUtils.UInt32FromInt32(bytesRead), part, ref partLen);
+            partLen = (NativeCULong)(part.Length);
+            rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
                 throw new Pkcs11Exception("C_DecryptUpdate", rv);
 
@@ -1037,12 +1037,12 @@ public class Session
             {
                 part = new byte[partLen];
 
-                rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, ConvertUtils.UInt32FromInt32(bytesRead), part, ref partLen);
+                rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
                 if (rv != CKR.CKR_OK)
                     throw new Pkcs11Exception("C_DecryptUpdate", rv);
             }
 
-            outputStream.Write(part, 0, ConvertUtils.UInt32ToInt32(partLen));
+            outputStream.Write(part, 0, (int)(partLen));
         }
 
         byte[] lastPart = null;
@@ -1057,7 +1057,7 @@ public class Session
             throw new Pkcs11Exception("C_DecryptFinal", rv);
 
         if (lastPartLen > 0)
-            outputStream.Write(lastPart, 0, ConvertUtils.UInt32ToInt32(lastPartLen));
+            outputStream.Write(lastPart, 0, (int)(lastPartLen));
     }
 
     /// <summary>
@@ -1085,7 +1085,7 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DigestInit", rv);
         
-        rv = _pkcs11Library.C_DigestKey(_sessionId, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DigestKey", rv);
         
@@ -1099,8 +1099,8 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DigestFinal", rv);
 
-        if (digest.Length != ConvertUtils.UInt32ToInt32(digestLen))
-            Array.Resize(ref digest, ConvertUtils.UInt32ToInt32(digestLen));
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
 
         return digest;
     }
@@ -1131,17 +1131,17 @@ public class Session
             throw new Pkcs11Exception("C_DigestInit", rv);
 
         NativeCULong digestLen = 0;
-        rv = _pkcs11Library.C_Digest(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), null, ref digestLen);
+        rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), null, ref digestLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Digest", rv);
 
         byte[] digest = new byte[digestLen];
-        rv = _pkcs11Library.C_Digest(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), digest, ref digestLen);
+        rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), digest, ref digestLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Digest", rv);
 
-        if (digest.Length != ConvertUtils.UInt32ToInt32(digestLen))
-            Array.Resize(ref digest, ConvertUtils.UInt32ToInt32(digestLen));
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
 
         return digest;
     }
@@ -1202,7 +1202,7 @@ public class Session
 
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            rv = _pkcs11Library.C_DigestUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead));
+            rv = _pkcs11Library.C_DigestUpdate(_sessionId, part, (NativeCULong)(bytesRead));
             if (rv != CKR.CKR_OK)
                 throw new Pkcs11Exception("C_DigestUpdate", rv);
         }
@@ -1217,8 +1217,8 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DigestFinal", rv);
 
-        if (digest.Length != ConvertUtils.UInt32ToInt32(digestLen))
-            Array.Resize(ref digest, ConvertUtils.UInt32ToInt32(digestLen));
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
 
         return digest;
     }
@@ -1250,7 +1250,7 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignInit", rv);
 
@@ -1261,7 +1261,7 @@ public class Session
             if (keyPin != null)
             {
                 pinValue = keyPin;
-                pinValueLen = ConvertUtils.UInt32FromInt32(keyPin.Length);
+                pinValueLen = (NativeCULong)(keyPin.Length);
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
@@ -1270,17 +1270,17 @@ public class Session
         }
 
         NativeCULong signatureLen = 0;
-        rv = _pkcs11Library.C_Sign(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), null, ref signatureLen);
+        rv = _pkcs11Library.C_Sign(_sessionId, data, (NativeCULong)(data.Length), null, ref signatureLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Sign", rv);
 
         byte[] signature = new byte[signatureLen];
-        rv = _pkcs11Library.C_Sign(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), signature, ref signatureLen);
+        rv = _pkcs11Library.C_Sign(_sessionId, data, (NativeCULong)(data.Length), signature, ref signatureLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_Sign", rv);
 
-        if (signature.Length != ConvertUtils.UInt32ToInt32(signatureLen))
-            Array.Resize(ref signature, ConvertUtils.UInt32ToInt32(signatureLen));
+        if (signature.Length != (int)(signatureLen))
+            Array.Resize(ref signature, (int)(signatureLen));
 
         return signature;
     }
@@ -1335,7 +1335,7 @@ public class Session
         if (data == null)
             throw new ArgumentNullException("data");
 
-        return Sign(mechanism, keyHandle, data, true, ConvertUtils.Utf8StringToBytes(keyPin));
+        return Sign(mechanism, keyHandle, data, true, System.Text.Encoding.UTF8.GetBytes(keyPin));
     }
 
     /// <summary>
@@ -1476,7 +1476,7 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignInit", rv);
 
@@ -1487,7 +1487,7 @@ public class Session
             if (keyPin != null)
             {
                 pinValue = keyPin;
-                pinValueLen = ConvertUtils.UInt32FromInt32(keyPin.Length);
+                pinValueLen = (NativeCULong)(keyPin.Length);
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
@@ -1500,7 +1500,7 @@ public class Session
 
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            rv = _pkcs11Library.C_SignUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead));
+            rv = _pkcs11Library.C_SignUpdate(_sessionId, part, (NativeCULong)(bytesRead));
             if (rv != CKR.CKR_OK)
                 throw new Pkcs11Exception("C_SignUpdate", rv);
         }
@@ -1515,8 +1515,8 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignFinal", rv);
 
-        if (signature.Length != ConvertUtils.UInt32ToInt32(signatureLen))
-            Array.Resize(ref signature, ConvertUtils.UInt32ToInt32(signatureLen));
+        if (signature.Length != (int)(signatureLen))
+            Array.Resize(ref signature, (int)(signatureLen));
 
         return signature;
     }
@@ -1579,7 +1579,7 @@ public class Session
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
 
-        return Sign(mechanism, keyHandle, inputStream, bufferLength, true, ConvertUtils.Utf8StringToBytes(keyPin));
+        return Sign(mechanism, keyHandle, inputStream, bufferLength, true, System.Text.Encoding.UTF8.GetBytes(keyPin));
     }
 
     /// <summary>
@@ -1640,7 +1640,7 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_SignRecoverInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_SignRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignRecoverInit", rv);
 
@@ -1651,7 +1651,7 @@ public class Session
             if (keyPin != null)
             {
                 pinValue = keyPin;
-                pinValueLen = ConvertUtils.UInt32FromInt32(keyPin.Length);
+                pinValueLen = (NativeCULong)(keyPin.Length);
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
@@ -1660,17 +1660,17 @@ public class Session
         }
 
         NativeCULong signatureLen = 0;
-        rv = _pkcs11Library.C_SignRecover(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), null, ref signatureLen);
+        rv = _pkcs11Library.C_SignRecover(_sessionId, data, (NativeCULong)(data.Length), null, ref signatureLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignRecover", rv);
 
         byte[] signature = new byte[signatureLen];
-        rv = _pkcs11Library.C_SignRecover(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), signature, ref signatureLen);
+        rv = _pkcs11Library.C_SignRecover(_sessionId, data, (NativeCULong)(data.Length), signature, ref signatureLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignRecover", rv);
 
-        if (signature.Length != ConvertUtils.UInt32ToInt32(signatureLen))
-            Array.Resize(ref signature, ConvertUtils.UInt32ToInt32(signatureLen));
+        if (signature.Length != (int)(signatureLen))
+            Array.Resize(ref signature, (int)(signatureLen));
 
         return signature;
     }
@@ -1725,7 +1725,7 @@ public class Session
         if (data == null)
             throw new ArgumentNullException("data");
 
-        return SignRecover(mechanism, keyHandle, data, true, ConvertUtils.Utf8StringToBytes(keyPin));
+        return SignRecover(mechanism, keyHandle, data, true, System.Text.Encoding.UTF8.GetBytes(keyPin));
     }
 
     /// <summary>
@@ -1784,11 +1784,11 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_VerifyInit", rv);
 
-        rv = _pkcs11Library.C_Verify(_sessionId, data, ConvertUtils.UInt32FromInt32(data.Length), signature, ConvertUtils.UInt32FromInt32(signature.Length));
+        rv = _pkcs11Library.C_Verify(_sessionId, data, (NativeCULong)(data.Length), signature, (NativeCULong)(signature.Length));
         if (rv == CKR.CKR_OK)
             isValid = true;
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
@@ -1860,7 +1860,7 @@ public class Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_VerifyInit", rv);
 
@@ -1869,12 +1869,12 @@ public class Session
 
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead));
+            rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part, (NativeCULong)(bytesRead));
             if (rv != CKR.CKR_OK)
                 throw new Pkcs11Exception("C_VerifyUpdate", rv);
         }
 
-        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, ConvertUtils.UInt32FromInt32(signature.Length));
+        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
         if (rv == CKR.CKR_OK)
             isValid = true;
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
@@ -1909,17 +1909,17 @@ public class Session
         
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_VerifyRecoverInit", rv);
 
         NativeCULong dataLen = 0;
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, ConvertUtils.UInt32FromInt32(signature.Length), null, ref dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), null, ref dataLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_VerifyRecover", rv);
 
         byte[] data = new byte[dataLen];
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, ConvertUtils.UInt32FromInt32(signature.Length), data, ref dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), data, ref dataLen);
         if (rv == CKR.CKR_OK)
             isValid = true;
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
@@ -1927,8 +1927,8 @@ public class Session
         else 
             throw new Pkcs11Exception("C_VerifyRecover", rv);
 
-        if (data.Length != ConvertUtils.UInt32ToInt32(dataLen))
-            Array.Resize(ref data, ConvertUtils.UInt32ToInt32(dataLen));
+        if (data.Length != (int)(dataLen))
+            Array.Resize(ref data, (int)(dataLen));
 
         return data;
     }
@@ -2045,19 +2045,19 @@ public class Session
 
         CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
 
-        rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_EncryptInit", rv);
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
-        NativeCULong encryptedPartLen = ConvertUtils.UInt32FromInt32(encryptedPart.Length);
+        NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
 
         int bytesRead = 0;
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            encryptedPartLen = ConvertUtils.UInt32FromInt32(encryptedPart.Length);
-            rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead), encryptedPart, ref encryptedPartLen);
+            encryptedPartLen = (NativeCULong)(encryptedPart.Length);
+            rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
                 throw new Pkcs11Exception("C_DigestEncryptUpdate", rv);
 
@@ -2065,12 +2065,12 @@ public class Session
             {
                 encryptedPart = new byte[encryptedPartLen];
 
-                rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead), encryptedPart, ref encryptedPartLen);
+                rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
                 if (rv != CKR.CKR_OK)
                     throw new Pkcs11Exception("C_DigestEncryptUpdate", rv);
             }
 
-            outputStream.Write(encryptedPart, 0, ConvertUtils.UInt32ToInt32(encryptedPartLen));
+            outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
         }
 
         byte[] lastEncryptedPart = null;
@@ -2085,7 +2085,7 @@ public class Session
             throw new Pkcs11Exception("C_EncryptFinal", rv);
 
         if (lastEncryptedPartLen > 0)
-            outputStream.Write(lastEncryptedPart, 0, ConvertUtils.UInt32ToInt32(lastEncryptedPartLen));
+            outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
 
         NativeCULong digestLen = 0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
@@ -2097,8 +2097,8 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DigestFinal", rv);
 
-        if (digest.Length != ConvertUtils.UInt32ToInt32(digestLen))
-            Array.Resize(ref digest, ConvertUtils.UInt32ToInt32(digestLen));
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
 
         return digest;
     }
@@ -2213,19 +2213,19 @@ public class Session
 
         CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
 
-        rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId));
+        rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DecryptInit", rv);
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
-        NativeCULong partLen = ConvertUtils.UInt32FromInt32(part.Length);
+        NativeCULong partLen = (NativeCULong)(part.Length);
 
         int bytesRead = 0;
         while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
         {
-            partLen = ConvertUtils.UInt32FromInt32(part.Length);
-            rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, ConvertUtils.UInt32FromInt32(bytesRead), part, ref partLen);
+            partLen = (NativeCULong)(part.Length);
+            rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
                 throw new Pkcs11Exception("C_DecryptDigestUpdate", rv);
 
@@ -2233,12 +2233,12 @@ public class Session
             {
                 part = new byte[partLen];
 
-                rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, ConvertUtils.UInt32FromInt32(bytesRead), part, ref partLen);
+                rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
                 if (rv != CKR.CKR_OK)
                     throw new Pkcs11Exception("C_DecryptDigestUpdate", rv);
             }
 
-            outputStream.Write(part, 0, ConvertUtils.UInt32ToInt32(partLen));
+            outputStream.Write(part, 0, (int)(partLen));
         }
 
         byte[] lastPart = null;
@@ -2253,7 +2253,7 @@ public class Session
             throw new Pkcs11Exception("C_DecryptFinal", rv);
 
         if (lastPartLen > 0)
-            outputStream.Write(lastPart, 0, ConvertUtils.UInt32ToInt32(lastPartLen));
+            outputStream.Write(lastPart, 0, (int)(lastPartLen));
 
         NativeCULong digestLen = 0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
@@ -2265,8 +2265,8 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DigestFinal", rv);
 
-        if (digest.Length != ConvertUtils.UInt32ToInt32(digestLen))
-            Array.Resize(ref digest, ConvertUtils.UInt32ToInt32(digestLen));
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
 
         return digest;
     }
@@ -2549,7 +2549,7 @@ public class Session
 
         CK_MECHANISM ckSigningMechanism = (CK_MECHANISM)signingMechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckSigningMechanism, ConvertUtils.UInt32FromUInt64(signingKeyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckSigningMechanism, (NativeCULong)(signingKeyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignInit", rv);
 
@@ -2560,7 +2560,7 @@ public class Session
             if (signingKeyPin != null)
             {
                 pinValue = signingKeyPin;
-                pinValueLen = ConvertUtils.UInt32FromInt32(signingKeyPin.Length);
+                pinValueLen = (NativeCULong)(signingKeyPin.Length);
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
@@ -2570,19 +2570,19 @@ public class Session
 
         CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
 
-        rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, ConvertUtils.UInt32FromUInt64(encryptionKeyHandle.ObjectId));
+        rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(encryptionKeyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_EncryptInit", rv);
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
-        NativeCULong encryptedPartLen = ConvertUtils.UInt32FromInt32(encryptedPart.Length);
+        NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
 
         int bytesRead = 0;
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            encryptedPartLen = ConvertUtils.UInt32FromInt32(encryptedPart.Length);
-            rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead), encryptedPart, ref encryptedPartLen);
+            encryptedPartLen = (NativeCULong)(encryptedPart.Length);
+            rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
                 throw new Pkcs11Exception("C_SignEncryptUpdate", rv);
 
@@ -2590,12 +2590,12 @@ public class Session
             {
                 encryptedPart = new byte[encryptedPartLen];
 
-                rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, ConvertUtils.UInt32FromInt32(bytesRead), encryptedPart, ref encryptedPartLen);
+                rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
                 if (rv != CKR.CKR_OK)
                     throw new Pkcs11Exception("C_SignEncryptUpdate", rv);
             }
 
-            outputStream.Write(encryptedPart, 0, ConvertUtils.UInt32ToInt32(encryptedPartLen));
+            outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
         }
 
         byte[] lastEncryptedPart = null;
@@ -2610,7 +2610,7 @@ public class Session
             throw new Pkcs11Exception("C_EncryptFinal", rv);
 
         if (lastEncryptedPartLen > 0)
-            outputStream.Write(lastEncryptedPart, 0, ConvertUtils.UInt32ToInt32(lastEncryptedPartLen));
+            outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
 
         NativeCULong signatureLen = 0;
         rv = _pkcs11Library.C_SignFinal(_sessionId, null, ref signatureLen);
@@ -2622,8 +2622,8 @@ public class Session
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SignFinal", rv);
 
-        if (signature.Length != ConvertUtils.UInt32ToInt32(signatureLen))
-            Array.Resize(ref signature, ConvertUtils.UInt32ToInt32(signatureLen));
+        if (signature.Length != (int)(signatureLen))
+            Array.Resize(ref signature, (int)(signatureLen));
 
         return signature;
     }
@@ -2710,7 +2710,7 @@ public class Session
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
 
-        return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, bufferLength, true, ConvertUtils.Utf8StringToBytes(signingKeyPin));
+        return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, bufferLength, true, System.Text.Encoding.UTF8.GetBytes(signingKeyPin));
     }
 
     /// <summary>
@@ -2886,25 +2886,25 @@ public class Session
 
         CK_MECHANISM ckVerificationMechanism = (CK_MECHANISM)verificationMechanism.ToMarshalableStructure();
 
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, ConvertUtils.UInt32FromUInt64(verificationKeyHandle.ObjectId));
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_VerifyInit", rv);
 
         CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
 
-        rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, ConvertUtils.UInt32FromUInt64(decryptionKeyHandle.ObjectId));
+        rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DecryptInit", rv);
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
-        NativeCULong partLen = ConvertUtils.UInt32FromInt32(part.Length);
+        NativeCULong partLen = (NativeCULong)(part.Length);
 
         int bytesRead = 0;
         while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
         {
-            partLen = ConvertUtils.UInt32FromInt32(part.Length);
-            rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, ConvertUtils.UInt32FromInt32(bytesRead), part, ref partLen);
+            partLen = (NativeCULong)(part.Length);
+            rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
                 throw new Pkcs11Exception("C_DecryptVerifyUpdate", rv);
 
@@ -2912,12 +2912,12 @@ public class Session
             {
                 part = new byte[partLen];
 
-                rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, ConvertUtils.UInt32FromInt32(bytesRead), part, ref partLen);
+                rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
                 if (rv != CKR.CKR_OK)
                     throw new Pkcs11Exception("C_DecryptVerifyUpdate", rv);
             }
 
-            outputStream.Write(part, 0, ConvertUtils.UInt32ToInt32(partLen));
+            outputStream.Write(part, 0, (int)(partLen));
         }
 
         byte[] lastPart = null;
@@ -2932,9 +2932,9 @@ public class Session
             throw new Pkcs11Exception("C_DecryptFinal", rv);
 
         if (lastPartLen > 0)
-            outputStream.Write(lastPart, 0, ConvertUtils.UInt32ToInt32(lastPartLen));
+            outputStream.Write(lastPart, 0, (int)(lastPartLen));
 
-        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, ConvertUtils.UInt32FromInt32(signature.Length));
+        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
         if (rv == CKR.CKR_OK)
             isValid = true;
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
@@ -2966,9 +2966,9 @@ public class Session
         
         if (attributes != null)
         {
-            templateLength = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLength = (NativeCULong)(attributes.Count);
             template = new CK_ATTRIBUTE[templateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(templateLength); i++)
+            for (int i = 0; i < (int)(templateLength); i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
         }
 
@@ -3005,9 +3005,9 @@ public class Session
         
         if (publicKeyAttributes != null)
         {
-            publicKeyTemplateLength = ConvertUtils.UInt32FromInt32(publicKeyAttributes.Count);
+            publicKeyTemplateLength = (NativeCULong)(publicKeyAttributes.Count);
             publicKeyTemplate = new CK_ATTRIBUTE[publicKeyTemplateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(publicKeyTemplateLength); i++)
+            for (int i = 0; i < (int)(publicKeyTemplateLength); i++)
                 publicKeyTemplate[i] = (CK_ATTRIBUTE)publicKeyAttributes[i].ToMarshalableStructure();
         }
 
@@ -3016,9 +3016,9 @@ public class Session
         
         if (privateKeyAttributes != null)
         {
-            privateKeyTemplateLength = ConvertUtils.UInt32FromInt32(privateKeyAttributes.Count);
+            privateKeyTemplateLength = (NativeCULong)(privateKeyAttributes.Count);
             privateKeyTemplate = new CK_ATTRIBUTE[privateKeyTemplateLength];
-            for (int i = 0; i < ConvertUtils.UInt32ToInt32(privateKeyTemplateLength); i++)
+            for (int i = 0; i < (int)(privateKeyTemplateLength); i++)
                 privateKeyTemplate[i] = (CK_ATTRIBUTE)privateKeyAttributes[i].ToMarshalableStructure();
         }
 
@@ -3058,17 +3058,17 @@ public class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         NativeCULong wrappedKeyLen = 0;
-        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(wrappingKeyHandle.ObjectId), ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId), null, ref wrappedKeyLen);
+        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), null, ref wrappedKeyLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_WrapKey", rv);
 
         byte[] wrappedKey = new byte[wrappedKeyLen];
-        rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(wrappingKeyHandle.ObjectId), ConvertUtils.UInt32FromUInt64(keyHandle.ObjectId), wrappedKey, ref wrappedKeyLen);
+        rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), wrappedKey, ref wrappedKeyLen);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_WrapKey", rv);
 
-        if (wrappedKey.Length != ConvertUtils.UInt32ToInt32(wrappedKeyLen))
-            Array.Resize(ref wrappedKey, ConvertUtils.UInt32ToInt32(wrappedKeyLen));
+        if (wrappedKey.Length != (int)(wrappedKeyLen))
+            Array.Resize(ref wrappedKey, (int)(wrappedKeyLen));
 
         return wrappedKey;
     }
@@ -3106,11 +3106,11 @@ public class Session
             template = new CK_ATTRIBUTE[attributes.Count];
             for (int i = 0; i < attributes.Count; i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
-            templateLen = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLen = (NativeCULong)(attributes.Count);
         }
 
         NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(unwrappingKeyHandle.ObjectId), wrappedKey, ConvertUtils.UInt32FromInt32(wrappedKey.Length), template, templateLen, ref unwrappedKey);
+        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_UnwrapKey", rv);
 
@@ -3146,11 +3146,11 @@ public class Session
             template = new CK_ATTRIBUTE[attributes.Count];
             for (int i = 0; i < attributes.Count; i++)
                 template[i] = (CK_ATTRIBUTE)attributes[i].ToMarshalableStructure();
-            templateLen = ConvertUtils.UInt32FromInt32(attributes.Count);
+            templateLen = (NativeCULong)(attributes.Count);
         }
 
         NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, ConvertUtils.UInt32FromUInt64(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
+        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_DeriveKey", rv);
 
@@ -3171,7 +3171,7 @@ public class Session
         if (seed == null)
             throw new ArgumentNullException("seed");
 
-        CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed, ConvertUtils.UInt32FromInt32(seed.Length));
+        CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed, (NativeCULong)(seed.Length));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_SeedRandom", rv);
     }
@@ -3192,7 +3192,7 @@ public class Session
             throw new ArgumentException("Value has to be positive number", "length");
 
         byte[] randomData = new byte[length];
-        CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, ConvertUtils.UInt32FromInt32(length));
+        CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, (NativeCULong)(length));
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_GenerateRandom", rv);
 

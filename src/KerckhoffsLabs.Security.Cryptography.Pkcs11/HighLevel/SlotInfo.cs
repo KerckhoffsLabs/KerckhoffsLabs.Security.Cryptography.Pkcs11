@@ -113,8 +113,8 @@ public class SlotInfo
     protected internal SlotInfo(NativeCULong slotId, CK_SLOT_INFO ck_slot_info)
     {
         _slotId = slotId;
-        _slotDescription = ConvertUtils.BytesToUtf8String(ck_slot_info.SlotDescription, true);
-        _manufacturerId = ConvertUtils.BytesToUtf8String(ck_slot_info.ManufacturerId, true);
+        _slotDescription = System.Text.Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
+        _manufacturerId = System.Text.Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
         _slotFlags = new SlotFlags(ck_slot_info.Flags);
         _hardwareVersion = ck_slot_info.HardwareVersion.ToString();
         _firmwareVersion = ck_slot_info.FirmwareVersion.ToString();

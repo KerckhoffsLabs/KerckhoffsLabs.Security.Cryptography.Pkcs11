@@ -49,7 +49,7 @@ public class Slot
             throw new ArgumentNullException("pkcs11Library");
 
         _pkcs11Library = pkcs11Library;
-        _slotId = ConvertUtils.UInt32FromUInt64(slotId);
+        _slotId = (NativeCULong)(slotId);
         }
 
     /// <summary>
@@ -105,8 +105,8 @@ public class Slot
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_GetMechanismList", rv);
 
-        if (mechanismList.Length != ConvertUtils.UInt32ToInt32(mechanismCount))
-            Array.Resize(ref mechanismList, ConvertUtils.UInt32ToInt32(mechanismCount));
+        if (mechanismList.Length != (int)(mechanismCount))
+            Array.Resize(ref mechanismList, (int)(mechanismCount));
 
         return new List<CKM>(mechanismList);
     }
@@ -141,11 +141,13 @@ public class Slot
         NativeCULong soPinValueLen = 0;
         if (soPin != null)
         {
-            soPinValue = ConvertUtils.Utf8StringToBytes(soPin);
-            soPinValueLen = ConvertUtils.UInt32FromInt32(soPinValue.Length);
+            soPinValue = System.Text.Encoding.UTF8.GetBytes(soPin);
+            soPinValueLen = (NativeCULong)(soPinValue.Length);
         }
 
-        byte[] tokenLabel = ConvertUtils.Utf8StringToBytes(label, 32, 0x20);
+        byte[] tokenLabel = new byte[32];
+        Array.Fill(tokenLabel, (byte)0x20);
+        if (label != null) { byte[] _lb = System.Text.Encoding.UTF8.GetBytes(label); Array.Copy(_lb, 0, tokenLabel, 0, Math.Min(_lb.Length, 32)); }
 
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPinValue, soPinValueLen, tokenLabel);
         if (rv != CKR.CKR_OK)
@@ -166,7 +168,7 @@ public class Slot
         if (soPin != null)
         {
             soPinValue = soPin;
-            soPinValueLen = ConvertUtils.UInt32FromInt32(soPin.Length);
+            soPinValueLen = (NativeCULong)(soPin.Length);
         }
 
         // PKCS#11 v2.20 page 113:

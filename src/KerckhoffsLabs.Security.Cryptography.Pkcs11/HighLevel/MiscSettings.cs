@@ -30,9 +30,9 @@ public static class MiscSettings
     {
         _attributesWithNestedAttributes = new Dictionary<ulong, string>
         {
-            { ConvertUtils.UInt64FromCKA(CKA.CKA_WRAP_TEMPLATE), "CKA_WRAP_TEMPLATE" },
-            { ConvertUtils.UInt64FromCKA(CKA.CKA_UNWRAP_TEMPLATE), "CKA_UNWRAP_TEMPLATE" },
-            { ConvertUtils.UInt64FromCKA(CKA.CKA_DERIVE_TEMPLATE), "CKA_DERIVE_TEMPLATE" }
+            { (ulong)CKA.CKA_WRAP_TEMPLATE.ToCULong(), "CKA_WRAP_TEMPLATE" },
+            { (ulong)CKA.CKA_UNWRAP_TEMPLATE.ToCULong(), "CKA_UNWRAP_TEMPLATE" },
+            { (ulong)CKA.CKA_DERIVE_TEMPLATE.ToCULong(), "CKA_DERIVE_TEMPLATE" }
         };
     }
 }

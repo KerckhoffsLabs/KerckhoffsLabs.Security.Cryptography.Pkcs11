@@ -142,7 +142,7 @@ public class Pkcs11Library
                 throw new Pkcs11Exception("C_GetSlotList", rv);
 
             if (new NativeCULong((uint)slotList.Length).Value != slotCount.Value)
-                Array.Resize(ref slotList, ConvertUtils.UInt32ToInt32(slotCount));
+                Array.Resize(ref slotList, (int)(slotCount));
 
             List<Slot> list = [];
             foreach (NativeCULong slot in slotList)

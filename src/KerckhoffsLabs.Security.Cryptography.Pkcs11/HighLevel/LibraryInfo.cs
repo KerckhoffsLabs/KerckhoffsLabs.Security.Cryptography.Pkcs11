@@ -96,9 +96,9 @@ public class LibraryInfo
     protected internal LibraryInfo(CK_INFO ck_info)
     {
         _cryptokiVersion = ck_info.CryptokiVersion.ToString();
-        _manufacturerId = ConvertUtils.BytesToUtf8String(ck_info.ManufacturerId, true);
+        _manufacturerId = System.Text.Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd();
         _flags = ck_info.Flags;
-        _libraryDescription = ConvertUtils.BytesToUtf8String(ck_info.LibraryDescription, true);
+        _libraryDescription = System.Text.Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd();
         _libraryVersion = ck_info.LibraryVersion.ToString();
     }
 }

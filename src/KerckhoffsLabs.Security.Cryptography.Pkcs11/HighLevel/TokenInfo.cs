@@ -337,10 +337,10 @@ public class TokenInfo
     protected internal TokenInfo(NativeCULong slotId, CK_TOKEN_INFO ck_token_info)
     {
         _slotId = slotId;
-        _label = ConvertUtils.BytesToUtf8String(ck_token_info.Label, true);
-        _manufacturerId = ConvertUtils.BytesToUtf8String(ck_token_info.ManufacturerId, true);
-        _model = ConvertUtils.BytesToUtf8String(ck_token_info.Model, true);
-        _serialNumber = ConvertUtils.BytesToUtf8String(ck_token_info.SerialNumber, true);
+        _label = System.Text.Encoding.UTF8.GetString(ck_token_info.Label).TrimEnd();
+        _manufacturerId = System.Text.Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd();
+        _model = System.Text.Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd();
+        _serialNumber = System.Text.Encoding.UTF8.GetString(ck_token_info.SerialNumber).TrimEnd();
         _tokenFlags = new TokenFlags(ck_token_info.Flags);
         _maxSessionCount = ck_token_info.MaxSessionCount;
         _sessionCount = ck_token_info.SessionCount;
@@ -354,15 +354,15 @@ public class TokenInfo
         _freePrivateMemory = ck_token_info.FreePrivateMemory;
         _hardwareVersion = ck_token_info.HardwareVersion.ToString();
         _firmwareVersion = ck_token_info.FirmwareVersion.ToString();
-        _utcTimeString = ConvertUtils.BytesToUtf8String(ck_token_info.UtcTime, true);
+        _utcTimeString = System.Text.Encoding.UTF8.GetString(ck_token_info.UtcTime).TrimEnd();
 
-        try
-        {
-            _utcTime = ConvertUtils.UtcTimeStringToDateTime(_utcTimeString);
-        }
-        catch
-        {
-            _utcTime = null;
-        }
+        _utcTime = DateTime.TryParseExact(
+            _utcTimeString,
+            "yyyyMMddHHmmssff",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var _parsedUtcTime)
+                ? _parsedUtcTime
+                : (DateTime?)null;
     }
 }
