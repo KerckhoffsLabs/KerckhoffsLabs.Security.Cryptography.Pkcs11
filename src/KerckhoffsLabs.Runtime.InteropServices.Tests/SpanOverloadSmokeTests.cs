@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Xunit;
 
-namespace KerckhoffsLabs.Runtime.InteropServices.UnitTests;
+namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
 public class SpanOverloadSmokeTests
 {

@@ -4,7 +4,7 @@
 using System.Numerics;
 using Xunit;
 
-namespace KerckhoffsLabs.Runtime.InteropServices.UnitTests;
+namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
 public class NativeCULongTests_GenericMath
 {

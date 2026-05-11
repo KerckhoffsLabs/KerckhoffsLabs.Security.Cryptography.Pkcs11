@@ -3,7 +3,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using Xunit;
 
-namespace KerckhoffsLabs.Runtime.InteropServices.UnitTests;
+namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
 public class NativeCULongCastTests
 {

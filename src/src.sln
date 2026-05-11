@@ -5,13 +5,13 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11", "KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj", "{08043EBE-C091-3C47-DDAE-0562E6A5EB50}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Runtime.InteropServices.UnitTests", "KerckhoffsLabs.Runtime.InteropServices.UnitTests\KerckhoffsLabs.Runtime.InteropServices.UnitTests.csproj", "{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Runtime.InteropServices", "KerckhoffsLabs.Runtime.InteropServices\KerckhoffsLabs.Runtime.InteropServices.csproj", "{0C9AF666-20C9-94AE-690B-249B50D2A696}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests", "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj", "{1BF65904-C5E3-473C-8D0E-60086E5499D8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Mock", "KerckhoffsLabs.Security.Cryptography.Pkcs11.Mock\KerckhoffsLabs.Security.Cryptography.Pkcs11.Mock.csproj", "{9F7BA994-48FB-4E8C-913C-2391C6EB8519}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Runtime.InteropServices.Tests", "KerckhoffsLabs.Runtime.InteropServices.Tests\KerckhoffsLabs.Runtime.InteropServices.Tests.csproj", "{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,18 +35,6 @@ Global
 		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Release|x64.Build.0 = Release|Any CPU
 		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Release|x86.ActiveCfg = Release|Any CPU
 		{08043EBE-C091-3C47-DDAE-0562E6A5EB50}.Release|x86.Build.0 = Release|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|x64.Build.0 = Debug|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Debug|x86.Build.0 = Debug|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|x64.ActiveCfg = Release|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|x64.Build.0 = Release|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|x86.ActiveCfg = Release|Any CPU
-		{9967FEF0-5400-4CCB-EF4D-4A13CD686C8E}.Release|x86.Build.0 = Release|Any CPU
 		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C9AF666-20C9-94AE-690B-249B50D2A696}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -83,6 +71,18 @@ Global
 		{9F7BA994-48FB-4E8C-913C-2391C6EB8519}.Release|x64.Build.0 = Release|Any CPU
 		{9F7BA994-48FB-4E8C-913C-2391C6EB8519}.Release|x86.ActiveCfg = Release|Any CPU
 		{9F7BA994-48FB-4E8C-913C-2391C6EB8519}.Release|x86.Build.0 = Release|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Debug|x64.Build.0 = Debug|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Debug|x86.Build.0 = Debug|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Release|x64.ActiveCfg = Release|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Release|x64.Build.0 = Release|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Release|x86.ActiveCfg = Release|Any CPU
+		{AE1D6C11-30C3-4BBF-BCE0-400B5F4A0C27}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

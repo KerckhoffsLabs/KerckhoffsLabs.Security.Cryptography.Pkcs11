@@ -3,7 +3,7 @@
 
 using System.Numerics;
 
-namespace KerckhoffsLabs.Runtime.InteropServices.UnitTests;
+namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
 public static class AdditionOperatorsHelper<TSelf, TOther, TResult>
     where TSelf : IAdditionOperators<TSelf, TOther, TResult>
