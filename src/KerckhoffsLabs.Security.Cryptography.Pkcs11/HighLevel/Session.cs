@@ -501,7 +501,7 @@ public class Session
 
         List<ulong> ulongs = new List<ulong>();
         foreach (CKA attribute in attributes)
-            ulongs.Add((uint)attribute.ToCULong());
+            ulongs.Add((ulong)attribute.ToCULong());
 
         return GetAttributeValue(objectHandle, ulongs);
     }
