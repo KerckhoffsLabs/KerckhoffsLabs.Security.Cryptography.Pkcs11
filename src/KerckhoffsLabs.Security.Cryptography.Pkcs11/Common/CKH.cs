@@ -33,23 +33,30 @@ public enum CKH : uint
 /// </summary>
 public static class CKHExtensions
 {
-    /// <summary>
-    /// Converts CKH to NativeCULong
-    /// </summary>
-    /// <param name="value">CKH that should be converted</param>
-    /// <returns>NativeCULong with value from CKH</returns>
-    public static NativeCULong ToCULong(CKH value)
+    /// <summary>Converts <see cref="CKH"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKH value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKH
+    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKH"/>. Use only when the
+    /// value is trusted; otherwise prefer <see cref="ToCKHChecked"/>.
     /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKH with NativeCULong value</returns>
-    public static CKH ToCKH(NativeCULong value)
+    public static CKH ToCKH(this NativeCULong value)
     {
-        return (CKH)value.Value;
+        return (CKH)(ulong)value;
+    }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKH"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
+    public static CKH ToCKHChecked(this NativeCULong value)
+    {
+        CKH result = (CKH)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKH), (ulong)value);
+        return result;
     }
 }

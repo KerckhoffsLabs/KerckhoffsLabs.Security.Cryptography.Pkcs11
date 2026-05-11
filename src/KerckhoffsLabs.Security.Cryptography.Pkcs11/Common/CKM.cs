@@ -1694,4 +1694,22 @@ public static class CKMExtensions
     {
         return (CKM)value.Value;
     }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKM"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// Use this for values coming from the PKCS#11 module (return codes, attribute values, etc.)
+    /// where a malformed response must fail loudly. For values that originate in trusted
+    /// application code, prefer the loose <see cref="ToCKM(NativeCULong)"/> for speed.
+    /// </summary>
+    /// <param name="value">NativeCULong value to convert.</param>
+    /// <returns>The corresponding CKM enum member.</returns>
+    /// <exception cref="InvalidEnumValueException">if <paramref name="value"/> is not a defined CKM member.</exception>
+    public static CKM ToCKMChecked(this NativeCULong value)
+    {
+        CKM result = (CKM)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKM), (ulong)value);
+        return result;
+    }
 }

@@ -567,4 +567,22 @@ public static class CKAExtensions
     {
         return (CKA)value.Value;
     }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKA"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// Use this for values coming from the PKCS#11 module (return codes, attribute values, etc.)
+    /// where a malformed response must fail loudly. For values that originate in trusted
+    /// application code, prefer the loose <see cref="ToCKA(NativeCULong)"/> for speed.
+    /// </summary>
+    /// <param name="value">NativeCULong value to convert.</param>
+    /// <returns>The corresponding CKA enum member.</returns>
+    /// <exception cref="InvalidEnumValueException">if <paramref name="value"/> is not a defined CKA member.</exception>
+    public static CKA ToCKAChecked(this NativeCULong value)
+    {
+        CKA result = (CKA)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKA), (ulong)value);
+        return result;
+    }
 }

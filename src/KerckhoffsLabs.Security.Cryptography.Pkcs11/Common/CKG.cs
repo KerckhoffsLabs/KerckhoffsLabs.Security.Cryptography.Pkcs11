@@ -38,23 +38,30 @@ public enum CKG : uint
 /// </summary>
 public static class CKGExtensions
 {
-    /// <summary>
-    /// Converts CKG to NativeCULong
-    /// </summary>
-    /// <param name="value">CKG that should be converted</param>
-    /// <returns>NativeCULong with value from CKG</returns>
-    public static NativeCULong ToCULong(CKG value)
+    /// <summary>Converts <see cref="CKG"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKG value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKG
+    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKG"/>. Use only when the
+    /// value is trusted; otherwise prefer <see cref="ToCKGChecked"/>.
     /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKG with NativeCULong value</returns>
-    public static CKG ToCKG(NativeCULong value)
+    public static CKG ToCKG(this NativeCULong value)
     {
-        return (CKG)value.Value;
+        return (CKG)(ulong)value;
+    }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKG"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
+    public static CKG ToCKGChecked(this NativeCULong value)
+    {
+        CKG result = (CKG)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKG), (ulong)value);
+        return result;
     }
 }

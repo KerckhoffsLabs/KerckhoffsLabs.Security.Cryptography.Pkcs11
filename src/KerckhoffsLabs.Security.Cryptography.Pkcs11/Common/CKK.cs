@@ -233,23 +233,30 @@ public enum CKK : uint
 /// </summary>
 public static class CKKExtensions
 {
-    /// <summary>
-    /// Converts CKK to NativeCULong
-    /// </summary>
-    /// <param name="value">CKK that should be converted</param>
-    /// <returns>NativeCULong with value from CKK</returns>
-    public static NativeCULong ToCULong(CKK value)
+    /// <summary>Converts <see cref="CKK"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKK value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKK
+    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKK"/>. Use only when the
+    /// value is trusted; otherwise prefer <see cref="ToCKKChecked"/>.
     /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKK with NativeCULong value</returns>
-    public static CKK ToCKK(NativeCULong value)
+    public static CKK ToCKK(this NativeCULong value)
     {
-        return (CKK)value.Value;
+        return (CKK)(ulong)value;
+    }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKK"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
+    public static CKK ToCKKChecked(this NativeCULong value)
+    {
+        CKK result = (CKK)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKK), (ulong)value);
+        return result;
     }
 }

@@ -488,23 +488,30 @@ public enum CKR : uint
 /// </summary>
 public static class CKRExtensions
 {
-    /// <summary>
-    /// Converts CKR to NativeCULong
-    /// </summary>
-    /// <param name="value">CKR that should be converted</param>
-    /// <returns>NativeCULong with value from CKR</returns>
-    public static NativeCULong ToCULong(CKR value)
+    /// <summary>Converts <see cref="CKR"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKR value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKR
+    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKR"/>. Use only when the
+    /// value is trusted; otherwise prefer <see cref="ToCKRChecked"/>.
     /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKR with NativeCULong value</returns>
-    public static CKR ToCKR(NativeCULong value)
+    public static CKR ToCKR(this NativeCULong value)
     {
-        return (CKR)value.Value;
+        return (CKR)(ulong)value;
+    }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKR"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
+    public static CKR ToCKRChecked(this NativeCULong value)
+    {
+        CKR result = (CKR)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKR), (ulong)value);
+        return result;
     }
 }

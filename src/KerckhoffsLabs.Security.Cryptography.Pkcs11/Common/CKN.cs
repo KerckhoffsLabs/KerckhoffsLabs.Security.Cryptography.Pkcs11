@@ -23,23 +23,24 @@ public enum CKN : uint
 /// </summary>
 public static class CKNExtensions
 {
-    /// <summary>
-    /// Converts CKN to NativeCULong
-    /// </summary>
-    /// <param name="value">CKN that should be converted</param>
-    /// <returns>NativeCULong with value from CKN</returns>
-    public static NativeCULong TOCULong(CKN value)
+    /// <summary>Converts <see cref="CKN"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKN value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
-    /// <summary>
-    /// Converts NativeCULong to CKN
-    /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKN with NativeCULong value</returns>
-    public static CKN ToCKN(NativeCULong value)
+    /// <summary>Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKN"/>.</summary>
+    public static CKN ToCKN(this NativeCULong value)
     {
-        return (CKN)value.Value;
+        return (CKN)(ulong)value;
+    }
+
+    /// <summary>Strict variant; throws <see cref="InvalidEnumValueException"/> on undefined values.</summary>
+    public static CKN ToCKNChecked(this NativeCULong value)
+    {
+        CKN result = (CKN)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKN), (ulong)value);
+        return result;
     }
 }

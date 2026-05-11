@@ -53,23 +53,30 @@ public enum CKP : uint
 /// </summary>
 public static class CKPExtensions
 {
-    /// <summary>
-    /// Converts CKP to NativeCULong
-    /// </summary>
-    /// <param name="value">CKP that should be converted</param>
-    /// <returns>NativeCULong with value from CKP</returns>
-    public static NativeCULong ToCULong(CKP value)
+    /// <summary>Converts <see cref="CKP"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKP value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKP
+    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKP"/>. Use only when the
+    /// value is trusted; otherwise prefer <see cref="ToCKPChecked"/>.
     /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKP with NativeCULong value</returns>
-    public static CKP ToCKP(NativeCULong value)
+    public static CKP ToCKP(this NativeCULong value)
     {
-        return (CKP)value.Value;
+        return (CKP)(ulong)value;
+    }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKP"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
+    public static CKP ToCKPChecked(this NativeCULong value)
+    {
+        CKP result = (CKP)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKP), (ulong)value);
+        return result;
     }
 }

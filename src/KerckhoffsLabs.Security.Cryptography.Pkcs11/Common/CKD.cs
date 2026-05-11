@@ -58,23 +58,30 @@ public enum CKD : uint
 /// </summary>
 public static class CKDExtensions
 {
-    /// <summary>
-    /// Converts CKD to NativeCULong
-    /// </summary>
-    /// <param name="value">CKD that should be converted</param>
-    /// <returns>NativeCULong with value from CKD</returns>
-    public static NativeCULong ToCULong(CKD value)
+    /// <summary>Converts <see cref="CKD"/> to <see cref="NativeCULong"/>.</summary>
+    public static NativeCULong ToCULong(this CKD value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKD
+    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKD"/>. Use only when the
+    /// value is trusted; otherwise prefer <see cref="ToCKDChecked"/>.
     /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKD with NativeCULong value</returns>
-    public static CKD ToCKD(NativeCULong value)
+    public static CKD ToCKD(this NativeCULong value)
     {
-        return (CKD)value.Value;
+        return (CKD)(ulong)value;
+    }
+
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKD"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
+    public static CKD ToCKDChecked(this NativeCULong value)
+    {
+        CKD result = (CKD)(ulong)value;
+        if (!Enum.IsDefined(result))
+            throw new InvalidEnumValueException(typeof(CKD), (ulong)value);
+        return result;
     }
 }
