@@ -62,7 +62,7 @@ public readonly struct NativeCULong
     /// </summary>
     public nuint Value => _value;
 
-    // ---- Explicit cast operators (range-checked under <CheckForOverflowUnderflow>true>) ----
+    // ---- Explicit cast operators (range-checked when CheckForOverflowUnderflow is true) ----
     //
     // These let callers write idiomatic `(NativeCULong)x` and `(int)c` instead of
     // verbose `new NativeCULong((uint)x)` / `(int)c.Value`. With project-wide
@@ -345,7 +345,7 @@ public readonly struct NativeCULong
     //
 
     /// <inheritdoc cref="IDivisionOperators{TSelf, TOther, TResult}.op_Division(TSelf, TOther)" />
-    public static NativeCULong operator /(NativeCULong left, NativeCULong right) => new(unchecked(left._value / right._value));
+    public static NativeCULong operator /(NativeCULong left, NativeCULong right) => new(left._value / right._value);
 
     /// <inheritdoc cref="IDivisionOperators{TSelf, TOther, TResult}.op_CheckedDivision(TSelf, TOther)" />
     static NativeCULong IDivisionOperators<NativeCULong, NativeCULong, NativeCULong>.operator checked /(NativeCULong left, NativeCULong right) => left / right;

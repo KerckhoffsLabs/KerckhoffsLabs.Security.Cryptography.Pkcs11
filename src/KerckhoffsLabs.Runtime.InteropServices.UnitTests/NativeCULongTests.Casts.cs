@@ -112,4 +112,31 @@ public class NativeCULongCastTests
             Assert.Equal(uint.MaxValue, (uint)c.Value);
         }
     }
+
+    private static bool Has64BitStorage => !Has32BitStorage;
+    private static bool Has32BitStorage => IntPtr.Size == 4 || OperatingSystem.IsWindows();
+
+    [ConditionalFact(nameof(Has64BitStorage))]
+    public void Cast_ToInt_ThrowsOnUnix64WhenValueExceedsIntRange()
+    {
+        // On 64-bit Unix, NativeCULong is backed by nuint (64-bit), so it can hold
+        // values larger than int.MaxValue. The checked outgoing operator must throw.
+        NativeCULong tooBig = new NativeCULong((nuint)((long)int.MaxValue + 1));
+        Assert.Throws<System.OverflowException>(() =>
+        {
+            int _ = (int)tooBig;
+        });
+    }
+
+    [ConditionalFact(nameof(Has64BitStorage))]
+    public void Cast_ToInt_WrapsOnUnix64InUncheckedBlock()
+    {
+        NativeCULong tooBig = new NativeCULong((nuint)((long)int.MaxValue + 1));
+        unchecked
+        {
+            int wrapped = (int)tooBig;
+            // (int)((long)int.MaxValue + 1) underflows to int.MinValue
+            Assert.Equal(int.MinValue, wrapped);
+        }
+    }
 }
