@@ -40,7 +40,7 @@ public static class CKCExtensions
     /// <returns>NativeCULong with value from CKC</returns>
     public static NativeCULong ToCULong(this CKC value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>

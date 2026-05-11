@@ -555,7 +555,7 @@ public static class CKAExtensions
     /// <returns>NativeCULong with value from CKA</returns>
     public static NativeCULong ToCULong(this CKA value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>

@@ -1682,7 +1682,7 @@ public static class CKMExtensions
     /// <returns>NativeCULong with value from CKM</returns>
     public static NativeCULong ToCULong(this CKM value)
     {
-        return new NativeCULong(Convert.ToUInt32(value));
+        return (NativeCULong)(ulong)value;
     }
 
     /// <summary>
