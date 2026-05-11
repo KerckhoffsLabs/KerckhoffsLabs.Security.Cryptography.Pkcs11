@@ -350,17 +350,17 @@ public enum CKA : uint
     /// <summary>
     /// The attribute template to match against any keys wrapped using this wrapping key. Keys that do not match cannot be wrapped. [List of ObjectAttribute / CK_ATTRIBUTE array]
     /// </summary>
-    CKA_WRAP_TEMPLATE = CKF.CKF_ARRAY_ATTRIBUTE | 0x00000211,
-    
+    CKA_WRAP_TEMPLATE = 0x40000000 | 0x00000211,
+
     /// <summary>
     /// The attribute template to apply to any keys unwrapped using this wrapping key. Any user supplied template is applied after this template as if the object has already been created. [List of ObjectAttribute / CK_ATTRIBUTE array]
     /// </summary>
-    CKA_UNWRAP_TEMPLATE = CKF.CKF_ARRAY_ATTRIBUTE | 0x00000212,
+    CKA_UNWRAP_TEMPLATE = 0x40000000 | 0x00000212,
 
     /// <summary>
     /// The attribute template to apply to any keys derived using this key. Any user supplied template is applied after this template as if the object has already been created. [List of ObjectAttribute / CK_ATTRIBUTE array]
     /// </summary>
-    CKA_DERIVE_TEMPLATE = CKF.CKF_ARRAY_ATTRIBUTE | 0x00000213,
+    CKA_DERIVE_TEMPLATE = 0x40000000 | 0x00000213,
 
     /// <summary>
     /// Format of OTP values produced with this key: CK_OTP_FORMAT_DECIMAL = Decimal, CK_OTP_FORMAT_HEXADECIMAL = Hexadecimal, CK_OTP_FORMAT_ALPHANUMERIC = Alphanumeric, CK_OTP_FORMAT_BINARY = Only binary values [uint]
@@ -535,7 +535,7 @@ public enum CKA : uint
     /// <summary>
     /// A list of mechanisms allowed to be used with this key [List of CKM / List of uint / CKM array / uint array]
     /// </summary>
-    CKA_ALLOWED_MECHANISMS = CKF.CKF_ARRAY_ATTRIBUTE | 0x00000600,
+    CKA_ALLOWED_MECHANISMS = 0x40000000 | 0x00000600,
 
     /// <summary>
     /// Permanently reserved for token vendors

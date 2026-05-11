@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 #if WINDOWS

@@ -15,4 +15,8 @@
     <DefineConstants>WINDOWS</DefineConstants>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\KerckhoffsLabs.Runtime.InteropServices\KerckhoffsLabs.Runtime.InteropServices.csproj" />
+  </ItemGroup>
+
 </Project>
