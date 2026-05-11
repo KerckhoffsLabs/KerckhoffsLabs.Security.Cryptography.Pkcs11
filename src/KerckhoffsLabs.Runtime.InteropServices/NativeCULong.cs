@@ -62,6 +62,37 @@ public readonly struct NativeCULong
     /// </summary>
     public nuint Value => _value;
 
+    // ---- Explicit cast operators (range-checked under <CheckForOverflowUnderflow>true>) ----
+    //
+    // These let callers write idiomatic `(NativeCULong)x` and `(int)c` instead of
+    // verbose `new NativeCULong((uint)x)` / `(int)c.Value`. With project-wide
+    // CheckForOverflowUnderflow enabled, out-of-range conversions throw
+    // OverflowException. Callers wanting silent truncation use `unchecked { ... }`.
+    //
+    // The generic-math path remains available: NativeCULong.CreateChecked(int) and
+    // int.CreateChecked(nativeCULong) work today via INumberBase<T>.
+
+    public static explicit operator NativeCULong(int   value) => new NativeCULong(unchecked((uint)value));
+    public static explicit operator NativeCULong(uint  value) => new NativeCULong(value);
+    public static explicit operator NativeCULong(long  value) => new NativeCULong(unchecked((nuint)value));
+    public static explicit operator NativeCULong(ulong value) => new NativeCULong(unchecked((nuint)value));
+    public static explicit operator NativeCULong(nuint value) => new NativeCULong(value);
+
+    public static explicit operator checked NativeCULong(int   value) => new NativeCULong(checked((uint)value));
+    public static explicit operator checked NativeCULong(long  value) => new NativeCULong(checked((nuint)value));
+    public static explicit operator checked NativeCULong(ulong value) => new NativeCULong(checked((nuint)value));
+
+    public static explicit operator int   (NativeCULong value) => unchecked((int)value._value);
+    public static explicit operator uint  (NativeCULong value) => unchecked((uint)value._value);
+    public static explicit operator long  (NativeCULong value) => unchecked((long)value._value);
+    public static explicit operator ulong (NativeCULong value) => unchecked((ulong)value._value);
+    public static explicit operator nuint (NativeCULong value) => value._value;
+
+    public static explicit operator checked int   (NativeCULong value) => checked((int)value._value);
+    public static explicit operator checked uint  (NativeCULong value) => checked((uint)value._value);
+    public static explicit operator checked long  (NativeCULong value) => checked((long)value._value);
+    public static explicit operator checked ulong (NativeCULong value) => checked((ulong)value._value);
+
     /// <summary>
     /// Returns a value indicating whether this instance is equal to a specified object.
     /// </summary>
@@ -104,7 +135,7 @@ public readonly struct NativeCULong
     //
 
     /// <inheritdoc cref="IAdditionOperators{TSelf, TOther, TResult}.op_Addition(TSelf, TOther)" />
-    public static NativeCULong operator +(NativeCULong left, NativeCULong right) => new(left._value + right._value);
+    public static NativeCULong operator +(NativeCULong left, NativeCULong right) => new(unchecked(left._value + right._value));
 
     /// <inheritdoc cref="IAdditionOperators{TSelf, TOther, TResult}.op_Addition(TSelf, TOther)" />
     public static NativeCULong operator checked +(NativeCULong left, NativeCULong right) => new(checked(left._value + right._value));
@@ -293,7 +324,7 @@ public readonly struct NativeCULong
     public static NativeCULong operator --(NativeCULong value)
     {
         NativeType tmp = value._value;
-        --tmp;
+        unchecked { --tmp; }
         return new NativeCULong(tmp);
     }
 
@@ -314,7 +345,7 @@ public readonly struct NativeCULong
     //
 
     /// <inheritdoc cref="IDivisionOperators{TSelf, TOther, TResult}.op_Division(TSelf, TOther)" />
-    public static NativeCULong operator /(NativeCULong left, NativeCULong right) => new(left._value / right._value);
+    public static NativeCULong operator /(NativeCULong left, NativeCULong right) => new(unchecked(left._value / right._value));
 
     /// <inheritdoc cref="IDivisionOperators{TSelf, TOther, TResult}.op_CheckedDivision(TSelf, TOther)" />
     static NativeCULong IDivisionOperators<NativeCULong, NativeCULong, NativeCULong>.operator checked /(NativeCULong left, NativeCULong right) => left / right;
@@ -344,7 +375,7 @@ public readonly struct NativeCULong
     public static NativeCULong operator ++(NativeCULong value)
     {
         NativeType tmp = value._value;
-        ++tmp;
+        unchecked { ++tmp; }
         return new NativeCULong(tmp);
     }
 
@@ -389,7 +420,7 @@ public readonly struct NativeCULong
     //
 
     /// <inheritdoc cref="IMultiplyOperators{TSelf, TOther, TResult}.op_Multiply(TSelf, TOther)" />
-    public static NativeCULong operator *(NativeCULong left, NativeCULong right) => new(left._value * right._value);
+    public static NativeCULong operator *(NativeCULong left, NativeCULong right) => new(unchecked(left._value * right._value));
 
     /// <inheritdoc cref="IMultiplyOperators{TSelf, TOther, TResult}.op_CheckedMultiply(TSelf, TOther)" />
     public static NativeCULong operator checked *(NativeCULong left, NativeCULong right) => new(checked(left._value * right._value));
@@ -777,7 +808,7 @@ public readonly struct NativeCULong
     //
 
     /// <inheritdoc cref="ISubtractionOperators{TSelf, TOther, TResult}.op_Subtraction(TSelf, TOther)" />
-    public static NativeCULong operator -(NativeCULong left, NativeCULong right) => new(left._value - right._value);
+    public static NativeCULong operator -(NativeCULong left, NativeCULong right) => new(unchecked(left._value - right._value));
 
     /// <inheritdoc cref="ISubtractionOperators{TSelf, TOther, TResult}.op_CheckedSubtraction(TSelf, TOther)" />
     public static NativeCULong operator checked -(NativeCULong left, NativeCULong right) => new(checked(left._value - right._value));
@@ -787,7 +818,7 @@ public readonly struct NativeCULong
     //
 
     /// <inheritdoc cref="IUnaryNegationOperators{TSelf, TResult}.op_UnaryNegation(TSelf)" />
-    static NativeCULong IUnaryNegationOperators<NativeCULong, NativeCULong>.operator -(NativeCULong value) => new(0 - value._value);
+    static NativeCULong IUnaryNegationOperators<NativeCULong, NativeCULong>.operator -(NativeCULong value) => new(unchecked(0 - value._value));
 
     /// <inheritdoc cref="IUnaryNegationOperators{TSelf, TResult}.op_CheckedUnaryNegation(TSelf)" />
     static NativeCULong IUnaryNegationOperators<NativeCULong, NativeCULong>.operator checked -(NativeCULong value) => new(checked(0 - value._value));

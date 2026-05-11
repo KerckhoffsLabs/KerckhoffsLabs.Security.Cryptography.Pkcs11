@@ -67,7 +67,7 @@ public static class ComparisonOperatorsHelper<TSelf, TOther, TResult>
 public static class DecrementOperatorsHelper<TSelf>
     where TSelf : IDecrementOperators<TSelf>
 {
-    public static TSelf op_Decrement(TSelf value) => --value;
+    public static TSelf op_Decrement(TSelf value) => unchecked(--value);
     public static TSelf op_CheckedDecrement(TSelf value) => checked(--value);
 }
 
@@ -164,7 +164,7 @@ public static class ShiftOperatorsHelper<TSelf, TOther, TResult>
 public static class SubtractionOperatorsHelper<TSelf, TOther, TResult>
     where TSelf : ISubtractionOperators<TSelf, TOther, TResult>
 {
-    public static TResult op_Subtraction(TSelf left, TOther right) => left - right;
+    public static TResult op_Subtraction(TSelf left, TOther right) => unchecked(left - right);
     public static TResult op_CheckedSubtraction(TSelf left, TOther right) => checked(left - right);
 }
 
