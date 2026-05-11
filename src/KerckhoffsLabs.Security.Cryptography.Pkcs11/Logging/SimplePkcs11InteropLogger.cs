@@ -10,7 +10,11 @@ public class SimplePkcs11InteropLogger : IPkcs11InteropLogger
     /// <summary>
     /// Static object for global trace/console/file access locking
     /// </summary>
+#if NET9_0_OR_GREATER
     private static readonly Lock _lockObject = new();
+#else
+    private static readonly object _lockObject = new();
+#endif
 
     /// <summary>
     /// Logger name

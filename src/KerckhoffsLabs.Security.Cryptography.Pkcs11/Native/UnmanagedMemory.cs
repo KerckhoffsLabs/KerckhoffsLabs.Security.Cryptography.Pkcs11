@@ -19,7 +19,11 @@ public static class UnmanagedMemory
     /// <summary>
     /// Lock object for list of all memory allocations
     /// </summary>
+#if NET9_0_OR_GREATER
     private static readonly Lock _allocationsLock = new();
+#else
+    private static readonly object _allocationsLock = new();
+#endif
 
     /// <summary>
     /// List of all memory allocations performed by this class

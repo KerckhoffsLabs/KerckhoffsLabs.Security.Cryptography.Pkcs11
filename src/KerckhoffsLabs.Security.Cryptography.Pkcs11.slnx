@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/Solution Items/" />
-  <Project Path="KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" Type="C#" />
-  <Properties Name="Configuration">
-    <Property Name="Debug|Any CPU" Value="Debug|Any CPU" />
-    <Property Name="Release|Any CPU" Value="Release|Any CPU" />
-  </Properties>
-</Solution>
