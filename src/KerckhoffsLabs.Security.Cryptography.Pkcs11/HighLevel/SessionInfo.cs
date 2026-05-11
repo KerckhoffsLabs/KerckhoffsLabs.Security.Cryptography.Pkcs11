@@ -21,7 +21,7 @@ public class SessionInfo
     {
         get
         {
-            return Convert.ToUInt64(_sessionId);
+            return (ulong)_sessionId;
         }
     }
 
@@ -37,7 +37,7 @@ public class SessionInfo
     {
         get
         {
-            return Convert.ToUInt64(_slotId);
+            return (ulong)_slotId;
         }
     }
 
@@ -85,7 +85,7 @@ public class SessionInfo
     {
         get
         {
-            return Convert.ToUInt64(_deviceError);
+            return (ulong)_deviceError;
         }
     }
 

@@ -40,7 +40,7 @@ public partial class Session
             if (_disposed)
                 throw new ObjectDisposedException(GetType().FullName);
 
-            return Convert.ToUInt64(_sessionId);
+            return (ulong)_sessionId;
         }
     }
 

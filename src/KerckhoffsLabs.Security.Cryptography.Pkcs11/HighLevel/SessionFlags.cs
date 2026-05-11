@@ -20,7 +20,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
         {
             get
             {
-                return Convert.ToUInt64(_flags);
+                return (ulong)_flags;
             }
         }
 

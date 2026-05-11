@@ -20,7 +20,7 @@ public class SlotFlags
     {
         get
         {
-            return Convert.ToUInt64(_flags);
+            return (ulong)_flags;
         }
     }
 

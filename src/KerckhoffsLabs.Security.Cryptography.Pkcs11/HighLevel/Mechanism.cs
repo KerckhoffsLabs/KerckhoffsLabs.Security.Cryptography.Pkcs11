@@ -28,7 +28,7 @@ public class Mechanism
             if (_disposed)
                 throw new ObjectDisposedException(GetType().FullName);
 
-            return Convert.ToUInt64(_ckMechanism.Mechanism);
+            return (ulong)_ckMechanism.Mechanism;
         }
     }
 
