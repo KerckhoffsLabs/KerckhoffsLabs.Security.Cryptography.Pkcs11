@@ -45,7 +45,10 @@ public sealed class ObjectAttribute : IDisposable
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            return (long)_ckAttribute.valueLen == -1L;
+            // Sentinel value from PKCS#11 spec: when valueLen has the bit pattern of "-1 cast to CK_LONG"
+            // (i.e., all bits set), the module is signaling that the attribute is sensitive or unextractable.
+            // The sentinel is nuint.MaxValue regardless of platform: 0xFFFFFFFF on Windows, 0xFFFFFFFFFFFFFFFF on Unix-LP64.
+            return _ckAttribute.valueLen.Value == nuint.MaxValue;
         }
     }
 
