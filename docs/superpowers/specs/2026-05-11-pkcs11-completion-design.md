@@ -66,6 +66,14 @@ build/
 ### Sync-only
 No `*Async` overloads. PKCS#11 is inherently synchronous. Documented in README; consumers wrap with `Task.Run` if they need it.
 
+### Buffer ergonomics — Span first
+
+Public methods that accept a buffer take `ReadOnlySpan<byte>`. The corresponding `byte[]` overloads remain (a `byte[]` argument implicitly converts to `ReadOnlySpan<byte>`, so the additional overload is non-breaking and lets callers pass either). Methods that produce a buffer offer a `Span<byte>`-writing variant returning `int` (bytes written) alongside the convenience `byte[]`-returning form. The specific name varies by context — e.g., `ObjectAttribute.CopyValueTo(Span<byte>)` for typed reads; `Session.Encrypt(ReadOnlySpan<byte> input, Span<byte> output)` for in-place operations.
+
+**`Span<byte>` is never exposed over unmanaged memory the library owns.** Outputs are either freshly allocated `byte[]` or copied into a caller-provided `Span<byte>`. This prevents the "span dangles after `Dispose`" footgun in classes like `ObjectAttribute` that own native buffers.
+
+Applies to: `ObjectAttribute` constructors (Phase 0a), `CK_MECHANISM.CreateMechanism` (Phase 0a), `Session.Encrypt` / `Decrypt` / `Sign` / `Verify` / `Digest` / `GenerateRandom` / `GetOperationState` / `SetOperationState` (Phases 1–4).
+
 ### Secure defaults
 
 Convenience helpers default to secure behavior:

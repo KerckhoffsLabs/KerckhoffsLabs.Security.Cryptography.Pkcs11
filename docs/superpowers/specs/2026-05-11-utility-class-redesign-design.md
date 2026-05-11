@@ -132,6 +132,7 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute(CKA type, ulong value);
     public ObjectAttribute(CKA type, string value);
     public ObjectAttribute(CKA type, byte[] value);
+    public ObjectAttribute(CKA type, ReadOnlySpan<byte> value);
     public ObjectAttribute(CKA type, DateTime value);
     public ObjectAttribute(CKA type, CKC value);
     public ObjectAttribute(CKA type, CKK value);
@@ -156,6 +157,8 @@ public sealed class ObjectAttribute : IDisposable
     public ulong  GetValueAsUlong();
     public string GetValueAsString();
     public byte[] GetValueAsByteArray();
+    public int    CopyValueTo(Span<byte> destination);   // zero-allocation variant; returns bytes written
+    public int    ValueLength { get; }                   // so callers can size their destination
     public DateTime? GetValueAsDateTime();
     public ObjectAttribute[] GetValueAsAttributeArray();
     public ulong[] GetValueAsUlongArray();
@@ -179,7 +182,7 @@ Wire formats are spec-mandated; we do not change them.
 | `ulong` and enums-as-`ulong` | `sizeof(NativeCULong)` bytes, little-endian |
 | `string` | UTF-8, **no null terminator** |
 | `DateTime` → `CK_DATE` | 8 bytes ASCII: `value.ToString("yyyyMMdd", CultureInfo.InvariantCulture)` |
-| `byte[]` | copy as-is |
+| `byte[]` / `ReadOnlySpan<byte>` | copy as-is into unmanaged memory |
 | `List<ObjectAttribute>` | contiguous unmanaged buffer of `CK_ATTRIBUTE` structs |
 | `List<ulong>` | contiguous array of `NativeCULong`-sized integers |
 | `List<CKM>` | same as `List<ulong>` after `mechanism.ToCULong()` per element |
@@ -190,6 +193,7 @@ Wire formats are spec-mandated; we do not change them.
 2. **`sealed`.** Today the class is open with no documented extension contract. Sealing prevents subclasses from violating handle-lifetime invariants.
 3. **`CannotBeRead` short-circuit.** Every `GetValueAs*` checks `CannotBeRead` first and throws `AttributeValueException("attribute is sensitive or unextractable")` instead of silently returning a zero/empty value (today's behavior on some paths).
 4. **Range-checked `valueLen`.** When reading length-prefixed data (`byte[]`, `string`, list types), the cast `(int)valueLen` is checked — `OverflowException` on absurd lengths instead of silent truncation.
+5. **Span-friendly buffer API.** Inputs accept `ReadOnlySpan<byte>` alongside `byte[]` (a `byte[]` argument implicitly converts to `ReadOnlySpan<byte>`, so the additional overload is non-breaking). Outputs offer `CopyValueTo(Span<byte> destination)` for zero-allocation reads, returning the number of bytes written. The pre-existing `GetValueAsByteArray()` stays as the convenience form. **`Span<byte>` is never exposed directly over the unmanaged buffer** — disposal would dangle it. The internal `_ckAttribute.value` pointer stays private.
 
 ### Lifetime model
 
@@ -216,6 +220,15 @@ A `ObjectAttribute[].ToCkAttributeArray()` extension snapshots the underlying `C
 ## CkmUtils — already replaced
 
 `Native/CK_MECHANISM.cs` already exposes `public static CK_MECHANISM CreateMechanism(CKM mechanism)`, `(CKM mechanism, byte[] parameter)`, and `(CKM mechanism, object parameterStructure)`. Local call sites of `CkmUtils.CreateMechanism(...)` (6 in total) rewrite to `CK_MECHANISM.CreateMechanism(...)`. The internal use of `ConvertUtils.UInt32ToInt32` inside that factory rewrites to `(int)nativeCULong`.
+
+Add one `ReadOnlySpan<byte>` overload for the parameter-bytes path, matching the `ObjectAttribute` precedent:
+
+```csharp
+public static CK_MECHANISM CreateMechanism(CKM mechanism, ReadOnlySpan<byte> parameter);
+public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, ReadOnlySpan<byte> parameter);
+```
+
+Internally these share the existing private `_CreateMechanism` helper, which moves from accepting `byte[]?` to accepting `ReadOnlySpan<byte>` (the `byte[]` overload passes its argument implicitly).
 
 ## ConvertUtils — deletion plan
 
@@ -269,7 +282,8 @@ Call-site substitutions (big-bang in a single PR; all of them mechanical):
 
 1. **`NativeCULongTests.Casts.cs`** in the existing `KerckhoffsLabs.Runtime.InteropServices.UnitTests` project. Round-trips every primitive ↔ `NativeCULong` operator on values across the supported ranges. Overflow tests: assert `OverflowException` from `(NativeCULong)(-1)` under the checked context; assert silent wrap inside an explicit `unchecked` block.
 2. **Hand-written sanity tests** for each enum's `ToCULong` round-trip and a representative `ToCKxChecked` failure case. These tests live in `NativeCULongTests` for Phase 0a (they don't need a new test project). They get migrated to a dedicated `Pkcs11.Tests` project in Phase 0b.
-3. **`ObjectAttribute` tests deferred to Phase 0b** — they require the dedicated test project plus pkcs11-mock's allocation counters to validate the `IDisposable` semantics end-to-end. Phase 0a verifies `ObjectAttribute` compiles. Inline unit testing of its private encoding/decoding helpers is out of scope for Phase 0a; if internals access is needed, Phase 0b adds an `InternalsVisibleTo` attribute on the main library targeting the dedicated test assembly.
+3. **Span overload smoke tests.** For each of `ObjectAttribute(CKA, ReadOnlySpan<byte>)` and `CK_MECHANISM.CreateMechanism(CKM, ReadOnlySpan<byte>)`, a single test confirms the span and the `byte[]` overload produce byte-identical unmanaged buffers (mock-free; uses `UnmanagedMemory.Read` to compare). For `ObjectAttribute.CopyValueTo(Span<byte>)`, a test confirms: (a) returns 0 for an empty attribute, (b) writes exactly `ValueLength` bytes for a populated attribute, (c) throws `ArgumentException` when destination is too small.
+4. **`ObjectAttribute` tests deferred to Phase 0b** — they require the dedicated test project plus pkcs11-mock's allocation counters to validate the `IDisposable` semantics end-to-end. Phase 0a verifies `ObjectAttribute` compiles. Inline unit testing of its private encoding/decoding helpers is out of scope for Phase 0a; if internals access is needed, Phase 0b adds an `InternalsVisibleTo` attribute on the main library targeting the dedicated test assembly.
 
 ## Phasing — revision of the original Phase 0
 
