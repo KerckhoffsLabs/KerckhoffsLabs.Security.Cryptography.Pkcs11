@@ -72,12 +72,31 @@ public partial class Session
         }
     }
 
+    /// <summary>Backing field for <see cref="AllowInsecure"/>.</summary>
+    protected bool _allowInsecure = false;
+
     /// <summary>
     /// When <c>true</c>, this session does not reject operations that use mechanisms flagged as
     /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, etc.). Default is <c>false</c>.
     /// Set explicitly per session; never set this globally.
     /// </summary>
-    public bool AllowInsecure { get; set; } = false;
+    public bool AllowInsecure
+    {
+        get
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
+
+            return _allowInsecure;
+        }
+        set
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
+
+            _allowInsecure = value;
+        }
+    }
 
     /// <summary>
     /// Initializes new instance of Session class
@@ -2938,6 +2957,36 @@ public partial class Session
             throw new Pkcs11Exception("C_CancelFunction", rv);
     }
 
+    /// <summary>
+    /// Checks the given mechanism against the insecure-mechanism set and throws
+    /// <see cref="InsecureOperationException"/> if it is insecure and <see cref="AllowInsecure"/>
+    /// is false.
+    /// </summary>
+    private void GuardMechanism(CKM mechanism)
+    {
+        if (AllowInsecure) return;
+
+        switch (mechanism)
+        {
+            case CKM.CKM_RSA_PKCS:
+                throw new InsecureOperationException(mechanism,
+                    "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks; use CKM_RSA_PKCS_OAEP instead.");
+            case CKM.CKM_DES_ECB:
+            case CKM.CKM_DES_CBC:
+            case CKM.CKM_DES_CBC_PAD:
+            case CKM.CKM_DES3_ECB:
+            case CKM.CKM_DES3_CBC:
+            case CKM.CKM_DES3_CBC_PAD:
+                throw new InsecureOperationException(mechanism,
+                    "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CBC_PAD) instead.");
+            case CKM.CKM_AES_ECB:
+                throw new InsecureOperationException(mechanism,
+                    "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
+            default:
+                return;
+        }
+    }
+
     #region IDisposable
 
     /// <summary>
@@ -2970,36 +3019,6 @@ public partial class Session
 
             // Dispose unmanaged objects
             _disposed = true;
-        }
-    }
-
-    /// <summary>
-    /// Checks the given mechanism against the insecure-mechanism set and throws
-    /// <see cref="InsecureOperationException"/> if it is insecure and <see cref="AllowInsecure"/>
-    /// is false.
-    /// </summary>
-    private void GuardMechanism(CKM mechanism)
-    {
-        if (AllowInsecure) return;
-
-        switch (mechanism)
-        {
-            case CKM.CKM_RSA_PKCS:
-                throw new InsecureOperationException(mechanism,
-                    "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks; use CKM_RSA_PKCS_OAEP instead.");
-            case CKM.CKM_DES_ECB:
-            case CKM.CKM_DES_CBC:
-            case CKM.CKM_DES_CBC_PAD:
-            case CKM.CKM_DES3_ECB:
-            case CKM.CKM_DES3_CBC:
-            case CKM.CKM_DES3_CBC_PAD:
-                throw new InsecureOperationException(mechanism,
-                    "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CBC_PAD) instead.");
-            case CKM.CKM_AES_ECB:
-                throw new InsecureOperationException(mechanism,
-                    "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
-            default:
-                return;
         }
     }
 
