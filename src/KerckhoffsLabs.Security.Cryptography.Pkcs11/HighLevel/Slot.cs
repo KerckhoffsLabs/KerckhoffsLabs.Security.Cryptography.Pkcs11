@@ -92,15 +92,15 @@ public class Slot
     {
         _logger.Debug("Slot({0})::GetMechanismList", _slotId);
 
-        NativeCULong mechanismCount = 0;
+        NativeCULong mechanismCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_GetMechanismList", rv);
 
-        if (mechanismCount < 1)
+        if (mechanismCount < (NativeCULong)1)
             return new List<CKM>();
 
-        CKM[] mechanismList = new CKM[mechanismCount];
+        CKM[] mechanismList = new CKM[(int)mechanismCount];
         rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, ref mechanismCount);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_GetMechanismList", rv);
@@ -138,7 +138,7 @@ public class Slot
         _logger.Debug("Slot({0})::InitToken1", _slotId);
 
         byte[] soPinValue = null;
-        NativeCULong soPinValueLen = 0;
+        NativeCULong soPinValueLen = (NativeCULong)0;
         if (soPin != null)
         {
             soPinValue = System.Text.Encoding.UTF8.GetBytes(soPin);
@@ -164,7 +164,7 @@ public class Slot
         _logger.Debug("Slot({0})::InitToken2", _slotId);
 
         byte[] soPinValue = null;
-        NativeCULong soPinValueLen = 0;
+        NativeCULong soPinValueLen = (NativeCULong)0;
         if (soPin != null)
         {
             soPinValue = soPin;
@@ -211,7 +211,7 @@ public class Slot
         if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
             _logger.Info("Opened {0} session {1} with token in slot {2}", Pkcs11InteropLogUtils.ToString(sessionType), sessionId, _slotId);
 
-        return new Session(_pkcs11Library, sessionId);
+        return new Session(_pkcs11Library, (ulong)sessionId);
     }
 
     /// <summary>
