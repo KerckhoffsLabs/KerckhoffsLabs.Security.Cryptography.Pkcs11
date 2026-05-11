@@ -41,7 +41,7 @@ public struct CK_MECHANISM
     /// <returns>Mechanism of given type with no parameter</returns>
     public static CK_MECHANISM CreateMechanism(NativeCULong mechanism)
     {
-        return _CreateMechanism(mechanism, null);
+        return CreateMechanism(mechanism, ReadOnlySpan<byte>.Empty);
     }
 
     /// <summary>
@@ -50,10 +50,8 @@ public struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with byte array parameter</returns>
-    public static CK_MECHANISM CreateMechanism(CKM mechanism, byte[] parameter)
-    {
-        return CreateMechanism(mechanism.ToCULong(), parameter);
-    }
+    public static CK_MECHANISM CreateMechanism(CKM mechanism, byte[]? parameter)
+        => CreateMechanism(mechanism.ToCULong(), (ReadOnlySpan<byte>)(parameter ?? Array.Empty<byte>()));
 
     /// <summary>
     /// Creates mechanism of given type with byte array parameter
@@ -61,9 +59,39 @@ public struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with byte array parameter</returns>
-    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, byte[] parameter)
+    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, byte[]? parameter)
+        => CreateMechanism(mechanism, (ReadOnlySpan<byte>)(parameter ?? Array.Empty<byte>()));
+
+    /// <summary>
+    /// Creates mechanism of given type with span parameter
+    /// </summary>
+    /// <param name="mechanism">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter</param>
+    /// <returns>Mechanism of given type with span parameter</returns>
+    public static CK_MECHANISM CreateMechanism(CKM mechanism, ReadOnlySpan<byte> parameter)
+        => CreateMechanism(mechanism.ToCULong(), parameter);
+
+    /// <summary>
+    /// Creates mechanism of given type with span parameter
+    /// </summary>
+    /// <param name="mechanism">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter</param>
+    /// <returns>Mechanism of given type with span parameter</returns>
+    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, ReadOnlySpan<byte> parameter)
     {
-        return _CreateMechanism(mechanism, parameter);
+        CK_MECHANISM mech = new() { Mechanism = mechanism };
+        if (parameter.Length > 0)
+        {
+            mech.Parameter = UnmanagedMemory.Allocate(parameter.Length);
+            UnmanagedMemory.Write(mech.Parameter, parameter);
+            mech.ParameterLen = (NativeCULong)parameter.Length;
+        }
+        else
+        {
+            mech.Parameter = IntPtr.Zero;
+            mech.ParameterLen = (NativeCULong)0;
+        }
+        return mech;
     }
 
     /// <summary>
@@ -78,7 +106,7 @@ public struct CK_MECHANISM
 
         return CreateMechanism(mechanism.ToCULong(), parameterStructure);
     }
-    
+
     /// <summary>
     /// Creates mechanism of given type with structure as parameter
     /// </summary>
@@ -88,44 +116,13 @@ public struct CK_MECHANISM
     public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, object parameterStructure)
     {
         ArgumentNullException.ThrowIfNull(parameterStructure);
-
-        CK_MECHANISM ckMechanism = new()
-        {
-            Mechanism = mechanism,
-            ParameterLen = new NativeCULong((uint)UnmanagedMemory.SizeOf(parameterStructure.GetType()))
-        };
-
-        ckMechanism.Parameter = UnmanagedMemory.Allocate(ConvertUtils.UInt32ToInt32(ckMechanism.ParameterLen));
-        UnmanagedMemory.Write(ckMechanism.Parameter, parameterStructure);
-
-        return ckMechanism;
-    }
-
-    /// <summary>
-    /// Creates mechanism of given type with parameter copied from managed byte array to the newly allocated unmanaged memory
-    /// </summary>
-    /// <param name="mechanism">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
-    /// <returns>Mechanism of given type with specified parameter</returns>
-    private static CK_MECHANISM _CreateMechanism(NativeCULong mechanism, byte[]? parameter)
-    {
         CK_MECHANISM mech = new()
         {
-            Mechanism = mechanism
+            Mechanism = mechanism,
+            ParameterLen = (NativeCULong)UnmanagedMemory.SizeOf(parameterStructure.GetType())
         };
-
-        if ((parameter != null) && (parameter.Length > 0))
-        {
-            mech.Parameter = UnmanagedMemory.Allocate(parameter.Length);
-            UnmanagedMemory.Write(mech.Parameter, parameter);
-            mech.ParameterLen = new NativeCULong((uint)parameter.Length);
-        }
-        else
-        {
-            mech.Parameter = IntPtr.Zero;
-            mech.ParameterLen = new (0);
-        }
-
+        mech.Parameter = UnmanagedMemory.Allocate((int)mech.ParameterLen);
+        UnmanagedMemory.Write(mech.Parameter, parameterStructure);
         return mech;
     }
 }
