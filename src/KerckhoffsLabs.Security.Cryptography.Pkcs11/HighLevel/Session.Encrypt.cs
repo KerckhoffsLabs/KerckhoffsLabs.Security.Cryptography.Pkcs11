@@ -6,6 +6,25 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 public partial class Session
 {
     /// <summary>
+    /// Encrypts <paramref name="data"/> using the given mechanism and key. Throws
+    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// </summary>
+    /// <param name="mechanism">The encryption mechanism to use.</param>
+    /// <param name="keyHandle">Handle of the key to encrypt with.</param>
+    /// <param name="data">Plaintext to encrypt.</param>
+    /// <returns>A freshly-allocated byte array containing the ciphertext.</returns>
+    public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(keyHandle);
+        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
+        // P/Invoke when perf profiling proves it matters.
+        byte[] buffer = data.ToArray();
+        return Encrypt(mechanism, keyHandle, buffer);
+    }
+
+    /// <summary>
     /// Encrypts single-part data
     /// </summary>
     /// <param name="mechanism">Encryption mechanism</param>
@@ -17,13 +36,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Encrypt1", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Encrypt1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -62,13 +83,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Encrypt2", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Encrypt2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -92,13 +115,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Encrypt3", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Encrypt3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
