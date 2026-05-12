@@ -59,52 +59,59 @@ public readonly struct NativeCULong
     /// </summary>
     public nuint Value => _value;
 
-    // ---- Explicit cast operators (range-checked when CheckForOverflowUnderflow is true) ----
+    // ---- Explicit cast operators ----
     //
-    // These let callers write idiomatic `(NativeCULong)x` and `(int)c` instead of
-    // verbose `new NativeCULong((uint)x)` / `(int)c.Value`. With project-wide
-    // CheckForOverflowUnderflow enabled, out-of-range conversions throw
-    // OverflowException. Callers wanting silent truncation use `unchecked { ... }`.
+    // Each lossy conversion ships as a pair: the plain `operator` wraps/truncates silently,
+    // and the paired `operator checked` throws OverflowException on out-of-range values.
+    // The C# compiler routes calls in a `checked` context — including the project-wide
+    // <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow> setting in the csproj —
+    // to the `operator checked` overload. Inside the `unchecked` body itself, the
+    // `unchecked(...)` literal makes the behavior explicit even when the call site is
+    // compiled `checked`.
     //
-    // The generic-math path remains available: NativeCULong.CreateChecked(int) and
-    // int.CreateChecked(nativeCULong) work today via INumberBase<T>.
+    // Conversions that are always exact on every supported platform (NativeCULong ← uint,
+    // NativeCULong → ulong, NativeCULong → nuint) only have the plain operator — no
+    // `operator checked` is needed.
+    //
+    // The generic-math path is also available: NativeCULong.CreateChecked(int) and
+    // int.CreateChecked(nativeCULong) work via INumberBase&lt;T&gt;.
 
-    /// <summary>Converts an <see cref="int"/> to a <see cref="NativeCULong"/>. Range-checked under <c>CheckForOverflowUnderflow=true</c>.</summary>
+    /// <summary>Converts an <see cref="int"/> to a <see cref="NativeCULong"/>. Negative values wrap silently; the paired <c>checked</c> operator throws.</summary>
     public static explicit operator NativeCULong(int   value) => new(unchecked((uint)value));
     /// <summary>Converts a <see cref="uint"/> to a <see cref="NativeCULong"/>. Always exact; widens to <see cref="nuint"/> storage on Unix.</summary>
     public static explicit operator NativeCULong(uint  value) => new(value);
-    /// <summary>Converts a <see cref="long"/> to a <see cref="NativeCULong"/>. Range-checked under <c>CheckForOverflowUnderflow=true</c>.</summary>
+    /// <summary>Converts a <see cref="long"/> to a <see cref="NativeCULong"/>. Out-of-range values wrap silently; the paired <c>checked</c> operator throws.</summary>
     public static explicit operator NativeCULong(long  value) => new(unchecked((nuint)value));
-    /// <summary>Converts a <see cref="ulong"/> to a <see cref="NativeCULong"/>. Range-checked under <c>CheckForOverflowUnderflow=true</c> on 32-bit storage platforms.</summary>
+    /// <summary>Converts a <see cref="ulong"/> to a <see cref="NativeCULong"/>. On Windows (32-bit storage), values above <see cref="uint.MaxValue"/> wrap silently; the paired <c>checked</c> operator throws. On Unix (64-bit storage), always exact.</summary>
     public static explicit operator NativeCULong(ulong value) => new(unchecked((nuint)value));
-    /// <summary>Converts an <see cref="nuint"/> to a <see cref="NativeCULong"/>. Range-checked under <c>CheckForOverflowUnderflow=true</c> on 32-bit storage platforms.</summary>
+    /// <summary>Converts an <see cref="nuint"/> to a <see cref="NativeCULong"/>. On Windows (32-bit storage), values above <see cref="uint.MaxValue"/> wrap silently. On Unix (64-bit storage), always exact.</summary>
     public static explicit operator NativeCULong(nuint value) => new(value);
 
-    /// <summary>Converts an <see cref="int"/> to a <see cref="NativeCULong"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts an <see cref="int"/> to a <see cref="NativeCULong"/>. Throws <see cref="System.OverflowException"/> on negative values.</summary>
     public static explicit operator checked NativeCULong(int   value) => new(checked((uint)value));
-    /// <summary>Converts a <see cref="long"/> to a <see cref="NativeCULong"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts a <see cref="long"/> to a <see cref="NativeCULong"/>. Throws <see cref="System.OverflowException"/> on out-of-range values.</summary>
     public static explicit operator checked NativeCULong(long  value) => new(checked((nuint)value));
-    /// <summary>Converts a <see cref="ulong"/> to a <see cref="NativeCULong"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts a <see cref="ulong"/> to a <see cref="NativeCULong"/>. On Windows (32-bit storage), throws <see cref="System.OverflowException"/> on values above <see cref="uint.MaxValue"/>. On Unix (64-bit storage), always succeeds.</summary>
     public static explicit operator checked NativeCULong(ulong value) => new(checked((nuint)value));
 
-    /// <summary>Converts a <see cref="NativeCULong"/> to an <see cref="int"/>. Range-checked under <c>CheckForOverflowUnderflow=true</c>.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to an <see cref="int"/>. Values above <see cref="int.MaxValue"/> wrap to negative silently; the paired <c>checked</c> operator throws.</summary>
     public static explicit operator int   (NativeCULong value) => unchecked((int)value._value);
-    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="uint"/>. Range-checked under <c>CheckForOverflowUnderflow=true</c> on 64-bit storage platforms.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="uint"/>. On Unix (64-bit storage), values above <see cref="uint.MaxValue"/> truncate silently; the paired <c>checked</c> operator throws. On Windows (32-bit storage), always exact.</summary>
     public static explicit operator uint  (NativeCULong value) => unchecked((uint)value._value);
-    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="long"/>. Always exact.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="long"/>. On Unix (64-bit storage), values above <see cref="long.MaxValue"/> wrap to negative silently; the paired <c>checked</c> operator throws. On Windows (32-bit storage), always exact.</summary>
     public static explicit operator long  (NativeCULong value) => unchecked((long)value._value);
     /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="ulong"/>. Always exact.</summary>
     public static explicit operator ulong (NativeCULong value) => unchecked((ulong)value._value);
     /// <summary>Converts a <see cref="NativeCULong"/> to an <see cref="nuint"/>. Always exact.</summary>
     public static explicit operator nuint (NativeCULong value) => value._value;
 
-    /// <summary>Converts a <see cref="NativeCULong"/> to an <see cref="int"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to an <see cref="int"/>. Throws <see cref="System.OverflowException"/> on values above <see cref="int.MaxValue"/>.</summary>
     public static explicit operator checked int   (NativeCULong value) => checked((int)value._value);
-    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="uint"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="uint"/>. On Unix (64-bit storage), throws <see cref="System.OverflowException"/> on values above <see cref="uint.MaxValue"/>. On Windows (32-bit storage), always succeeds.</summary>
     public static explicit operator checked uint  (NativeCULong value) => checked((uint)value._value);
-    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="long"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="long"/>. On Unix (64-bit storage), throws <see cref="System.OverflowException"/> on values above <see cref="long.MaxValue"/>. On Windows (32-bit storage), always succeeds.</summary>
     public static explicit operator checked long  (NativeCULong value) => checked((long)value._value);
-    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="ulong"/>. Always throws <see cref="System.OverflowException"/> on overflow.</summary>
+    /// <summary>Converts a <see cref="NativeCULong"/> to a <see cref="ulong"/>. Always succeeds (the conversion is exact on every supported platform).</summary>
     public static explicit operator checked ulong (NativeCULong value) => checked((ulong)value._value);
 
     /// <summary>
