@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
 
@@ -29,9 +30,22 @@ public partial class Session
     protected LowLevelPkcs11Library _pkcs11Library = null;
 
     /// <summary>
-    /// PKCS#11 handle of session
+    /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
+    /// calls <c>C_CloseSession</c> on release via its <c>ReleaseHandle</c> override.
+    /// Private because <see cref="Pkcs11SessionHandle"/> is internal; partials and subclasses
+    /// access the session ID through the protected <see cref="_sessionId"/> shim property.
     /// </summary>
-    protected NativeCULong _sessionId = CK.CK_INVALID_HANDLE;
+    private Pkcs11SessionHandle _sessionHandle = null!;
+
+    /// <summary>
+    /// Compatibility shim — returns the underlying session ID, or <see cref="CK.CK_INVALID_HANDLE"/>
+    /// if the session is not yet open or has been closed. Read-only; assignments go through
+    /// <see cref="_sessionHandle"/>.
+    /// </summary>
+    protected NativeCULong _sessionId
+    {
+        get => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
+    }
 
     /// <summary>
     /// PKCS#11 handle of session
@@ -112,7 +126,7 @@ public partial class Session
             throw new ArgumentException("Invalid handle specified", "sessionId");
 
         _pkcs11Library = pkcs11Library;
-        _sessionId = (NativeCULong)(sessionId);
+        _sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, (NativeCULong)sessionId);
     }
 
     /// <summary>
@@ -123,15 +137,16 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
+        if (_sessionHandle is null || _sessionHandle.IsInvalid)
+            return;
+
         _logger.Debug("Session({0})::CloseSession", _sessionId);
 
         _logger.Info("Closing session {0}", _sessionId);
 
-        CKR rv = _pkcs11Library.C_CloseSession(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_CloseSession", rv);
-
-        _sessionId = CK.CK_INVALID_HANDLE;
+        // SafeHandle.Dispose() calls ReleaseHandle, which invokes C_CloseSession on the library.
+        _sessionHandle.Dispose();
+        _sessionHandle = null!;
     }
 
     // -----------------------------------------------------------------------
@@ -593,23 +608,27 @@ public partial class Session
         {
             if (disposing)
             {
-                // Dispose managed objects
-                if (_sessionId != CK.CK_INVALID_HANDLE && _closeWhenDisposed == true)
-                    CloseSession();
+                // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
+                // Honour _closeWhenDisposed: only close if the caller wants automatic close on dispose.
+                if (_closeWhenDisposed)
+                {
+                    _sessionHandle?.Dispose();
+                    _sessionHandle = null!;
+                }
             }
 
-            // Dispose unmanaged objects
+            // No unmanaged resources owned by Session directly — Pkcs11SessionHandle owns the
+            // session ID, and Pkcs11ModuleHandle (held transitively via _pkcs11Library) owns the
+            // library module. Both are SafeHandles and run their own critical finalizers.
             _disposed = true;
         }
     }
 
-    /// <summary>
-    /// Class destructor that disposes object if caller forgot to do so
-    /// </summary>
-    ~Session()
-    {
-        Dispose(false);
-    }
+    // NOTE: ~Session() finalizer intentionally removed.
+    // Pkcs11SessionHandle is a SafeHandle (CriticalFinalizerObject) and runs its own critical
+    // finalizer after regular finalizers, which is exactly the correct order for native-handle
+    // cleanup.  The Pkcs11SessionHandle also holds a strong reference to LowLevelPkcs11Library,
+    // keeping the library's Pkcs11ModuleHandle reachable for as long as any session handle lives.
 
     #endregion
 }
