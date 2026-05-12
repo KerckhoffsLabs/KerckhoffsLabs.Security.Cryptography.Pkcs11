@@ -3,8 +3,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// <summary>
 /// Thrown when an operation uses a mechanism the library considers insecure by default,
 /// unless the caller has opted in via <c>Session.AllowInsecure = true</c>. Covers RSA
-/// PKCS#1 v1.5 padding, DES/3DES, AES-ECB, MD5/SHA-1 in signature contexts, and other
-/// mechanisms flagged in the parent design spec.
+/// PKCS#1 v1.5 padding (for both encryption and signature), MD5 and SHA-1 (raw and in RSA
+/// signature contexts), DES/3DES (encryption and MAC), and AES-ECB.
 /// </summary>
 public sealed class InsecureOperationException : Exception
 {

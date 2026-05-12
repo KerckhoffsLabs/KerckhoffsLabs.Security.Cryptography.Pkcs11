@@ -23,10 +23,9 @@ internal static class SmokeTestAssertions
 /// always present in the test output directory.
 /// </summary>
 [Collection("Mock")]
-public sealed class SmokeTests_Mock
+public sealed class SmokeTests_Mock(MockBackendFixture f)
 {
-    private readonly MockBackendFixture _backend;
-    public SmokeTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     [Fact]
     public void GetInfo_ReturnsNonEmptyManufacturerAndVersion()
@@ -38,10 +37,9 @@ public sealed class SmokeTests_Mock
 /// not installed on the host (library binary not found by <see cref="SoftHsmBackendFixture"/>).
 /// </summary>
 [Collection("SoftHsm")]
-public sealed class SmokeTests_SoftHsm
+public sealed class SmokeTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public SmokeTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

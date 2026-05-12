@@ -12,20 +12,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Encrypt;
 internal static class EncryptAesTestCases
 {
     // 32-byte AES-256 key material used across all AES tests.
-    private static readonly byte[] AesKey256 = new byte[32]
-    {
+    private static readonly byte[] AesKey256 =
+    [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
         0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
         0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    };
+    ];
 
     // 16-byte IV for CBC modes.
-    private static readonly byte[] Iv16 = new byte[16]
-    {
+    private static readonly byte[] Iv16 =
+    [
         0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8,
         0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xB0,
-    };
+    ];
 
     internal static void Assert_AesCbcPad_ProducesCiphertext(IPkcs11Backend backend)
     {
@@ -160,12 +160,11 @@ internal static class EncryptAesTestCases
 /// CreateObject, whereas its C_EncryptInit requires handle 2 (SECRET_KEY).
 /// </summary>
 [Collection("Mock")]
-public sealed class EncryptAesTests_Mock
+public sealed class EncryptAesTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public EncryptAesTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     // Crypto-correctness: needs a backend that actually implements AES-CBC-PAD.
     [ConditionalFact(nameof(SoftHsmAvailable))]
@@ -191,10 +190,9 @@ public sealed class EncryptAesTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class EncryptAesTests_SoftHsm
+public sealed class EncryptAesTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public EncryptAesTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

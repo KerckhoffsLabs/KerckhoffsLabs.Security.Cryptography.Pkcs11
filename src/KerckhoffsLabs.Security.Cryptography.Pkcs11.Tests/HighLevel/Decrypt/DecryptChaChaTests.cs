@@ -11,18 +11,18 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Decrypt;
 /// </summary>
 internal static class DecryptChaChaTestCases
 {
-    private static readonly byte[] ChaCha20Key32 = new byte[32]
-    {
+    private static readonly byte[] ChaCha20Key32 =
+    [
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
-    };
+    ];
 
-    private static readonly byte[] ValidNonce12 = new byte[12]
-    {
+    private static readonly byte[] ValidNonce12 =
+    [
         0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB,
-    };
+    ];
 
     /// <summary>
     /// Nonce that is not exactly 12 bytes must be rejected before P/Invoke.
@@ -143,12 +143,11 @@ internal static class DecryptChaChaTestCases
 /// SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
-public sealed class DecryptChaChaTests_Mock
+public sealed class DecryptChaChaTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public DecryptChaChaTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     [Fact]
     public void ChaCha20_RejectsWrongNonceLength_Mock()
@@ -169,10 +168,9 @@ public sealed class DecryptChaChaTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class DecryptChaChaTests_SoftHsm
+public sealed class DecryptChaChaTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public DecryptChaChaTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

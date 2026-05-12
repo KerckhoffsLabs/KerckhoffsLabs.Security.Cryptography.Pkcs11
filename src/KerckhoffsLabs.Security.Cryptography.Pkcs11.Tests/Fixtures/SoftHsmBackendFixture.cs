@@ -59,9 +59,7 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         try
         {
             var slots = Library.GetSlotList(SlotsType.WithTokenPresent);
-            Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel);
-            if (found is null)
-                throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
+            Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel) ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
             SlotId = (NativeCULong)found.SlotId;
         }
         catch
@@ -80,14 +78,14 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     private static string? SoftHsmDiscover()
     {
         string[] candidates =
-        {
+        [
             "/usr/lib/softhsm/libsofthsm2.so",
             "/usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so",
             "/usr/local/lib/softhsm/libsofthsm2.so",
             "/opt/homebrew/lib/softhsm/libsofthsm2.so",
             "/usr/local/Cellar/softhsm/2.6.1/lib/softhsm/libsofthsm2.so",
             @"C:\SoftHSM2\lib\softhsm2-x64.dll",
-        };
+        ];
         return candidates.FirstOrDefault(File.Exists);
     }
 

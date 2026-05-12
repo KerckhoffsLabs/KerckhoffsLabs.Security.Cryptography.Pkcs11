@@ -1367,6 +1367,12 @@ public enum CKM : uint
     /// </summary>
     CKM_RSA_AES_KEY_WRAP = 0x00001054,
 
+    /// <summary>EC Edwards key pair generation (for Ed25519/Ed448 keys). PKCS#11 v3.0 §2.3.</summary>
+    CKM_EC_EDWARDS_KEY_PAIR_GEN = 0x00001055,
+
+    /// <summary>EdDSA (Ed25519/Ed448) signing mechanism. PKCS#11 v3.0 §2.3.</summary>
+    CKM_EDDSA = 0x00001057,
+
     /// <summary>
     /// The JUNIPER key generation mechanism
     /// </summary>
