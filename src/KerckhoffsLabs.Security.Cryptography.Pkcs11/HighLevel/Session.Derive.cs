@@ -53,18 +53,21 @@ public partial class Session
 
     /// <summary>
     /// Performs ECDH1 key derivation using the caller's EC private key and the peer's public
-    /// point. The derived key is a session-only sensitive secret key suitable for use with
-    /// AES-GCM / ChaCha20-Poly1305 (default 32 bytes, KDF=SHA-256 — pass <paramref name="aesBitLength"/>
-    /// to change the output length).
+    /// point. The derived key is an AES secret key — session-only, sensitive, non-extractable,
+    /// non-modifiable — suitable for use with AES-GCM. Defaults to 32 bytes with the SHA-256 KDF;
+    /// pass <paramref name="aesBitLength"/> to change the AES key length.
     /// </summary>
     /// <param name="myPrivateKeyHandle">Handle of the caller's EC private key (CKA_DERIVE=true).</param>
-    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point.</param>
+    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> attribute value).</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
     /// <returns>Handle of the derived AES key.</returns>
     public ObjectHandle DeriveSharedSecretEcdh(ObjectHandle myPrivateKeyHandle, ReadOnlySpan<byte> peerPublicPoint, int aesBitLength = 256)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
+
+        if (myPrivateKeyHandle == null)
+            throw new ArgumentNullException(nameof(myPrivateKeyHandle));
 
         if (aesBitLength != 128 && aesBitLength != 192 && aesBitLength != 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
