@@ -333,16 +333,16 @@ public readonly struct NativeCULong
     // IComparisonOperators
     //
 
-    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther}.op_LessThan(TSelf, TOther)" />
+    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther, TResult}.op_LessThan(TSelf, TOther)" />
     public static bool operator <(NativeCULong left, NativeCULong right) => left._value < right._value;
 
-    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther}.op_LessThanOrEqual(TSelf, TOther)" />
+    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther, TResult}.op_LessThanOrEqual(TSelf, TOther)" />
     public static bool operator <=(NativeCULong left, NativeCULong right) => left._value <= right._value;
 
-    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther}.op_GreaterThan(TSelf, TOther)" />
+    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther, TResult}.op_GreaterThan(TSelf, TOther)" />
     public static bool operator >(NativeCULong left, NativeCULong right) => left._value > right._value;
 
-    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther}.op_GreaterThanOrEqual(TSelf, TOther)" />
+    /// <inheritdoc cref="IComparisonOperators{TSelf, TOther, TResult}.op_GreaterThanOrEqual(TSelf, TOther)" />
     public static bool operator >=(NativeCULong left, NativeCULong right) => left._value >= right._value;
 
     //
@@ -383,10 +383,10 @@ public readonly struct NativeCULong
     // IEqualityOperators
     //
 
-    /// <inheritdoc cref="IEqualityOperators{TSelf, TOther}.op_Equality(TSelf, TOther)" />
+    /// <inheritdoc cref="IEqualityOperators{TSelf, TOther, TResult}.op_Equality(TSelf, TOther)" />
     public static bool operator ==(NativeCULong left, NativeCULong right) => left._value == right._value;
 
-    /// <inheritdoc cref="IEqualityOperators{TSelf, TOther}.op_Inequality(TSelf, TOther)" />
+    /// <inheritdoc cref="IEqualityOperators{TSelf, TOther, TResult}.op_Inequality(TSelf, TOther)" />
     public static bool operator !=(NativeCULong left, NativeCULong right) => left._value != right._value;
 
     //
@@ -458,7 +458,9 @@ public readonly struct NativeCULong
     // INumber
     //
 
-    /// <inheritdoc cref="INumber{TSelf}.Abs(TSelf)" />
+    /// <summary>Returns the absolute value of <paramref name="value"/>. For the unsigned <see cref="NativeCULong"/> type this is the identity function.</summary>
+    /// <param name="value">The value.</param>
+    /// <returns><paramref name="value"/> unchanged.</returns>
     public static NativeCULong Abs(NativeCULong value) => value;
 
     /// <inheritdoc cref="INumber{TSelf}.Clamp(TSelf, TSelf, TSelf)" />
@@ -467,46 +469,75 @@ public readonly struct NativeCULong
     /// <inheritdoc cref="INumber{TSelf}.CopySign(TSelf, TSelf)" />
     public static NativeCULong CopySign(NativeCULong value, NativeCULong sign) => value;
 
-    /// <inheritdoc cref="INumber{TSelf}.CreateChecked{TOther}(TOther)" />
+    /// <summary>Converts <paramref name="value"/> to a <see cref="NativeCULong"/>, throwing <see cref="OverflowException"/> if the value is outside the representable range.</summary>
+    /// <typeparam name="TOther">The type of the source value.</typeparam>
+    /// <param name="value">The value to convert.</param>
+    /// <returns>The converted <see cref="NativeCULong"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static NativeCULong CreateChecked<TOther>(TOther value)
         where TOther : INumberBase<TOther> => new(NativeType.CreateChecked(value));
 
-    /// <inheritdoc cref="INumber{TSelf}.CreateSaturating{TOther}(TOther)" />
+    /// <summary>Converts <paramref name="value"/> to a <see cref="NativeCULong"/>, saturating at <see cref="MinValue"/> or <see cref="MaxValue"/> if the value is outside the representable range.</summary>
+    /// <typeparam name="TOther">The type of the source value.</typeparam>
+    /// <param name="value">The value to convert.</param>
+    /// <returns>The converted <see cref="NativeCULong"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static NativeCULong CreateSaturating<TOther>(TOther value)
         where TOther : INumberBase<TOther> => new(NativeType.CreateSaturating(value));
 
-    /// <inheritdoc cref="INumber{TSelf}.CreateTruncating{TOther}(TOther)" />
+    /// <summary>Converts <paramref name="value"/> to a <see cref="NativeCULong"/>, truncating any bits that do not fit in the representable range.</summary>
+    /// <typeparam name="TOther">The type of the source value.</typeparam>
+    /// <param name="value">The value to convert.</param>
+    /// <returns>The converted <see cref="NativeCULong"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static NativeCULong CreateTruncating<TOther>(TOther value)
         where TOther : INumberBase<TOther> => new(NativeType.CreateTruncating(value));
 
-    /// <inheritdoc cref="INumber{TSelf}.IsNegative(TSelf)" />
+    /// <summary>Always returns <c>false</c>; <see cref="NativeCULong"/> is an unsigned type and can never be negative.</summary>
+    /// <param name="value">The value (ignored).</param>
+    /// <returns><c>false</c>.</returns>
     public static bool IsNegative(NativeCULong value) => false;
 
     /// <inheritdoc cref="INumber{TSelf}.Max(TSelf, TSelf)" />
     public static NativeCULong Max(NativeCULong x, NativeCULong y) => new(NativeType.Max(x._value, y._value));
 
-    /// <inheritdoc cref="INumber{TSelf}.MaxMagnitude(TSelf, TSelf)" />
+    /// <summary>Returns the value with the larger magnitude. For the unsigned <see cref="NativeCULong"/> type this is equivalent to <see cref="Max(NativeCULong, NativeCULong)"/>.</summary>
+    /// <param name="x">The first value.</param>
+    /// <param name="y">The second value.</param>
+    /// <returns>The larger of <paramref name="x"/> and <paramref name="y"/>.</returns>
     public static NativeCULong MaxMagnitude(NativeCULong x, NativeCULong y) => Max(x, y);
 
     /// <inheritdoc cref="INumber{TSelf}.Min(TSelf, TSelf)" />
     public static NativeCULong Min(NativeCULong x, NativeCULong y) => new(NativeType.Min(x._value, y._value));
 
-    /// <inheritdoc cref="INumber{TSelf}.MinMagnitude(TSelf, TSelf)" />
+    /// <summary>Returns the value with the smaller magnitude. For the unsigned <see cref="NativeCULong"/> type this is equivalent to <see cref="Min(NativeCULong, NativeCULong)"/>.</summary>
+    /// <param name="x">The first value.</param>
+    /// <param name="y">The second value.</param>
+    /// <returns>The smaller of <paramref name="x"/> and <paramref name="y"/>.</returns>
     public static NativeCULong MinMagnitude(NativeCULong x, NativeCULong y) => Min(x, y);
 
-    /// <inheritdoc cref="INumber{TSelf}.Parse(string, NumberStyles, IFormatProvider?)" />
+    /// <summary>Parses a string representation of an integer into a <see cref="NativeCULong"/> using the specified <see cref="System.Globalization.NumberStyles"/> and format provider.</summary>
+    /// <param name="s">The string to parse.</param>
+    /// <param name="style">A bitwise combination of <see cref="System.Globalization.NumberStyles"/> values that indicates the permitted format of <paramref name="s"/>.</param>
+    /// <param name="provider">An object that supplies culture-specific formatting information.</param>
+    /// <returns>The parsed <see cref="NativeCULong"/>.</returns>
     public static NativeCULong Parse(string s, NumberStyles style, IFormatProvider? provider) => new(NativeType.Parse(s, style, provider));
 
-    /// <inheritdoc cref="INumber{TSelf}.Parse(ReadOnlySpan{char}, NumberStyles, IFormatProvider?)" />
+    /// <summary>Parses a span of characters representing an integer into a <see cref="NativeCULong"/> using the specified <see cref="System.Globalization.NumberStyles"/> and format provider.</summary>
+    /// <param name="s">The span to parse.</param>
+    /// <param name="style">A bitwise combination of <see cref="System.Globalization.NumberStyles"/> values that indicates the permitted format of <paramref name="s"/>.</param>
+    /// <param name="provider">An object that supplies culture-specific formatting information.</param>
+    /// <returns>The parsed <see cref="NativeCULong"/>.</returns>
     public static NativeCULong Parse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider) => new(NativeType.Parse(s, style, provider));
 
     /// <inheritdoc cref="INumber{TSelf}.Sign(TSelf)" />
     public static int Sign(NativeCULong value) => NativeType.Sign(value._value);
 
-    /// <inheritdoc cref="INumber{TSelf}.TryCreate{TOther}(TOther, out TSelf)" />
+    /// <summary>Attempts to convert <paramref name="value"/> to a <see cref="NativeCULong"/>. Returns <c>true</c> and sets <paramref name="result"/> on success; returns <c>false</c> and sets <paramref name="result"/> to <c>default</c> if the value is outside the representable range.</summary>
+    /// <typeparam name="TOther">The type of the source value.</typeparam>
+    /// <param name="value">The value to convert.</param>
+    /// <param name="result">When this method returns, contains the converted value on success, or <c>default</c> on failure.</param>
+    /// <returns><c>true</c> if the conversion succeeded; otherwise, <c>false</c>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TryCreate<TOther>(TOther value, out NativeCULong result)
         where TOther : INumber<TOther>
@@ -532,14 +563,24 @@ public readonly struct NativeCULong
 #endif
     }
 
-    /// <inheritdoc cref="INumber{TSelf}.TryParse(string?, NumberStyles, IFormatProvider?, out TSelf)" />
+    /// <summary>Attempts to parse a string as a <see cref="NativeCULong"/> using the specified <see cref="System.Globalization.NumberStyles"/> and format provider. Returns <c>true</c> and sets <paramref name="result"/> on success.</summary>
+    /// <param name="s">The string to parse.</param>
+    /// <param name="style">A bitwise combination of <see cref="System.Globalization.NumberStyles"/> values.</param>
+    /// <param name="provider">An object that supplies culture-specific formatting information.</param>
+    /// <param name="result">When this method returns, contains the parsed value on success, or <c>default</c> on failure.</param>
+    /// <returns><c>true</c> if <paramref name="s"/> was parsed successfully; otherwise, <c>false</c>.</returns>
     public static bool TryParse([NotNullWhen(true)] string? s, NumberStyles style, IFormatProvider? provider, out NativeCULong result)
     {
         Unsafe.SkipInit(out result);
         return NativeType.TryParse(s, style, provider, out Unsafe.As<NativeCULong, NativeType>(ref result));
     }
 
-    /// <inheritdoc cref="INumber{TSelf}.TryParse(ReadOnlySpan{char}, NumberStyles, IFormatProvider?, out TSelf)" />
+    /// <summary>Attempts to parse a span of characters as a <see cref="NativeCULong"/> using the specified <see cref="System.Globalization.NumberStyles"/> and format provider. Returns <c>true</c> and sets <paramref name="result"/> on success.</summary>
+    /// <param name="s">The span to parse.</param>
+    /// <param name="style">A bitwise combination of <see cref="System.Globalization.NumberStyles"/> values.</param>
+    /// <param name="provider">An object that supplies culture-specific formatting information.</param>
+    /// <param name="result">When this method returns, contains the parsed value on success, or <c>default</c> on failure.</param>
+    /// <returns><c>true</c> if <paramref name="s"/> was parsed successfully; otherwise, <c>false</c>.</returns>
     public static bool TryParse(ReadOnlySpan<char> s, NumberStyles style, IFormatProvider? provider, out NativeCULong result)
     {
         Unsafe.SkipInit(out result);
