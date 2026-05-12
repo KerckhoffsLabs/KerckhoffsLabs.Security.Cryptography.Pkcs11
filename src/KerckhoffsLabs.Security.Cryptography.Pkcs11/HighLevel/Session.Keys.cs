@@ -208,4 +208,147 @@ public partial class Session
 
         return new ObjectHandle((ulong)unwrappedKey);
     }
+
+    // === Secure-default key-generation helpers =============================
+
+    /// <summary>
+    /// Generates an AES key of the specified bit length as a session-only, non-extractable,
+    /// sensitive secret key. Defaults to 256-bit AES.
+    /// </summary>
+    /// <param name="bitLength">Key length in bits — 128, 192, or 256. Default 256.</param>
+    /// <param name="label">Optional CKA_LABEL value. Defaults to none.</param>
+    /// <param name="persistOnToken">If true, the key is created with CKA_TOKEN=true (persistent). Default false (session-only).</param>
+    /// <returns>Handle of the new AES key.</returns>
+    public ObjectHandle GenerateAesKey(int bitLength = 256, string? label = null, bool persistOnToken = false)
+    {
+        if (bitLength != 128 && bitLength != 192 && bitLength != 256)
+            throw new ArgumentOutOfRangeException(nameof(bitLength), "AES key length must be 128, 192, or 256 bits.");
+
+        using var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
+
+        using var attrClass     = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType   = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrValueLen  = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)(bitLength / 8));
+        using var attrToken     = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var attrExtract   = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var attrEncrypt   = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrDecrypt   = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var attrWrap      = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap    = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+
+        var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrValueLen, attrToken, attrSensitive, attrExtract, attrEncrypt, attrDecrypt, attrWrap, attrUnwrap };
+        if (label is not null)
+        {
+            using var attrLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            template.Add(attrLabel);
+            return GenerateKey(mechanism, template);
+        }
+
+        return GenerateKey(mechanism, template);
+    }
+
+    /// <summary>
+    /// Generates an RSA key pair as session objects (private key non-extractable + sensitive,
+    /// CKA_TOKEN=false). Defaults to RSA-2048 with the standard exponent 65537.
+    /// </summary>
+    /// <param name="modulusBits">Modulus length in bits — must be ≥ 2048 (PKCS#11 recommends ≥ 2048 since the 2014 update). Default 2048.</param>
+    /// <param name="label">Optional CKA_LABEL value applied to BOTH public and private key. Defaults to none.</param>
+    /// <param name="persistOnToken">If true, both keys created with CKA_TOKEN=true. Default false.</param>
+    /// <returns>(publicKeyHandle, privateKeyHandle) tuple.</returns>
+    public (ObjectHandle pub, ObjectHandle priv) GenerateRsaKeyPair(int modulusBits = 2048, string? label = null, bool persistOnToken = false)
+    {
+        if (modulusBits < 2048)
+            throw new ArgumentOutOfRangeException(nameof(modulusBits), "RSA modulus must be ≥ 2048 bits (NIST SP 800-131A).");
+
+        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+
+        using var pubClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var pubToken    = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var pubEncrypt  = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var pubVerify   = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubWrap     = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var pubModBits  = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)modulusBits);
+        using var pubExp      = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+
+        using var privClass     = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType   = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var privToken     = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privExtract   = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var privDecrypt   = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var privSign      = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privUnwrap    = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+
+        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubEncrypt, pubVerify, pubWrap, pubModBits, pubExp };
+        var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privExtract, privDecrypt, privSign, privUnwrap };
+
+        if (label is not null)
+        {
+            using var pubLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var privLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            pubTemplate.Add(pubLabel);
+            privTemplate.Add(privLabel);
+            GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
+            return (pub, priv);
+        }
+
+        GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub2, out var priv2);
+        return (pub2, priv2);
+    }
+
+    /// <summary>
+    /// Generates an EC key pair on the named curve as session objects (private key
+    /// non-extractable + sensitive, CKA_TOKEN=false).
+    /// </summary>
+    /// <param name="curve">Named curve — currently supports <see cref="EcCurve.P256"/>, <see cref="EcCurve.P384"/>, <see cref="EcCurve.P521"/>. Default P-256.</param>
+    /// <param name="label">Optional CKA_LABEL applied to both keys.</param>
+    /// <param name="persistOnToken">If true, both keys created with CKA_TOKEN=true. Default false.</param>
+    /// <returns>(publicKeyHandle, privateKeyHandle) tuple.</returns>
+    public (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(EcCurve curve = EcCurve.P256, string? label = null, bool persistOnToken = false)
+    {
+        byte[] ecParams = curve switch
+        {
+            // prime256v1 (P-256): 1.2.840.10045.3.1.7
+            EcCurve.P256 => new byte[] { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 },
+            // secp384r1 (P-384): 1.3.132.0.34
+            EcCurve.P384 => new byte[] { 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22 },
+            // secp521r1 (P-521): 1.3.132.0.35
+            EcCurve.P521 => new byte[] { 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23 },
+            _ => throw new ArgumentOutOfRangeException(nameof(curve), $"Unsupported curve: {curve}."),
+        };
+
+        using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+
+        using var pubClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var pubToken    = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var pubVerify   = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubParams   = new ObjectAttribute(CKA.CKA_EC_PARAMS, ecParams);
+
+        using var privClass     = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType   = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var privToken     = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privExtract   = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var privSign      = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privDerive    = new ObjectAttribute(CKA.CKA_DERIVE, true);
+
+        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
+        var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privExtract, privSign, privDerive };
+
+        if (label is not null)
+        {
+            using var pubLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            using var privLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+            pubTemplate.Add(pubLabel);
+            privTemplate.Add(privLabel);
+            GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
+            return (pub, priv);
+        }
+
+        GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub2, out var priv2);
+        return (pub2, priv2);
+    }
 }
