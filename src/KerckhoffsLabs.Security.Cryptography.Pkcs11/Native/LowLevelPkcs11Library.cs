@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -13,7 +14,7 @@ public class LowLevelPkcs11Library
      /// <summary>
     /// Handle to the PKCS#11 library
     /// </summary>
-    protected IntPtr _library = IntPtr.Zero;
+    private Pkcs11ModuleHandle _library = new Pkcs11ModuleHandle();
 
     /// <summary>
     /// Delegates for PKCS#11 functions
@@ -31,8 +32,8 @@ public class LowLevelPkcs11Library
         {
             if (!string.IsNullOrEmpty(libraryPath))
             {
-                _library = NativeLibrary.Load(libraryPath);
-                _delegates = new Delegates(_library, useGetFunctionList);
+                _library = new Pkcs11ModuleHandle(NativeLibrary.Load(libraryPath));
+                _delegates = new Delegates(_library.DangerousGetHandle(), useGetFunctionList);
             }
         }
         catch
@@ -1203,8 +1204,8 @@ public class LowLevelPkcs11Library
         {
             if (disposing)
             {
-                NativeLibrary.Free(_library);
-                _library = IntPtr.Zero;
+                _library.Dispose();
+                _library = new Pkcs11ModuleHandle();
             }
 
             _disposed = true;
