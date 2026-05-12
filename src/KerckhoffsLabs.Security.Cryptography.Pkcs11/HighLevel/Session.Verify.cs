@@ -18,6 +18,7 @@ public partial class Session
     /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] dataBuf = data.ToArray();
@@ -35,6 +36,7 @@ public partial class Session
     /// <param name="isValid">Flag indicating whether signature is valid</param>
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, byte[] signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -79,6 +81,7 @@ public partial class Session
     /// <param name="isValid">Flag indicating whether signature is valid</param>
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -112,6 +115,7 @@ public partial class Session
     /// <param name="bufferLength">Size of read buffer in bytes</param>
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -169,6 +173,7 @@ public partial class Session
     /// <returns>Data recovered from the signature</returns>
     public byte[] VerifyRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -224,6 +229,7 @@ public partial class Session
     /// <param name="isValid">Flag indicating whether signature is valid</param>
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, byte[] data, byte[] signature, out byte[] decryptedData, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -270,6 +276,7 @@ public partial class Session
     /// <param name="isValid">Flag indicating whether signature is valid</param>
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -316,6 +323,7 @@ public partial class Session
     /// <param name="bufferLength">Size of read buffer in bytes</param>
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -416,6 +424,7 @@ public partial class Session
     /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
     public void VerifyRsaPss(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         using var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
         using var mechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, p);
         Verify(mechanism, publicKeyHandle, data, signature, out isValid);
@@ -428,6 +437,7 @@ public partial class Session
     /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
     public void VerifyEcdsa(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
         Verify(mechanism, publicKeyHandle, data, signature, out isValid);
     }
@@ -439,6 +449,7 @@ public partial class Session
     /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
     public void VerifyEd25519(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_EDDSA);
         Verify(mechanism, publicKeyHandle, data, signature, out isValid);
     }
@@ -450,6 +461,7 @@ public partial class Session
     /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
     public void VerifyEd448(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_EDDSA);
         Verify(mechanism, publicKeyHandle, data, signature, out isValid);
     }
@@ -465,6 +477,7 @@ public partial class Session
               "Use VerifyRsaPss instead. If you must use it, set Session.AllowInsecure = true.")]
     public void VerifyRsaPkcs1V15(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
         Verify(mechanism, publicKeyHandle, data, signature, out isValid);
     }

@@ -15,6 +15,7 @@ public partial class Session
     /// <param name="seed">Entropy bytes to mix into the token RNG.</param>
     public void SeedRandom(ReadOnlySpan<byte> seed)
     {
+        using var _ = AcquireExclusive();
         byte[] buffer = seed.ToArray();
         SeedRandom(buffer);
     }
@@ -25,6 +26,7 @@ public partial class Session
     /// <param name="seed">Seed material</param>
     public void SeedRandom(byte[] seed)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -46,6 +48,7 @@ public partial class Session
     /// <returns>Number of bytes written (equal to <paramref name="destination"/>.Length).</returns>
     public int GenerateRandom(Span<byte> destination)
     {
+        using var _ = AcquireExclusive();
         if (destination.IsEmpty) return 0;
         byte[] random = GenerateRandom(destination.Length);
         random.CopyTo(destination);
@@ -59,6 +62,7 @@ public partial class Session
     /// <returns>Generated random or pseudo-random data</returns>
     public byte[] GenerateRandom(int length)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
