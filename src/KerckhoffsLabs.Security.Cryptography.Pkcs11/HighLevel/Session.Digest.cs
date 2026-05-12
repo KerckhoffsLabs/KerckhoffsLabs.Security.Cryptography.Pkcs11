@@ -549,4 +549,63 @@ public partial class Session
 
         return digest;
     }
+
+    // === Secure-default digest helpers =====================================
+
+    /// <summary>Computes a SHA-256 digest over <paramref name="data"/>. Output is 32 bytes.</summary>
+    /// <param name="data">Data to digest.</param>
+    /// <returns>32-byte SHA-256 digest.</returns>
+    public byte[] DigestSha256(ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_SHA256);
+        return Digest(mechanism, data);
+    }
+
+    /// <summary>Computes a SHA-384 digest over <paramref name="data"/>. Output is 48 bytes.</summary>
+    /// <param name="data">Data to digest.</param>
+    /// <returns>48-byte SHA-384 digest.</returns>
+    public byte[] DigestSha384(ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_SHA384);
+        return Digest(mechanism, data);
+    }
+
+    /// <summary>Computes a SHA-512 digest over <paramref name="data"/>. Output is 64 bytes.</summary>
+    /// <param name="data">Data to digest.</param>
+    /// <returns>64-byte SHA-512 digest.</returns>
+    public byte[] DigestSha512(ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_SHA512);
+        return Digest(mechanism, data);
+    }
+
+    // === Legacy named shortcuts (gated, compile-time warning) ==============
+
+    /// <summary>
+    /// Computes an MD5 digest. **Use <see cref="DigestSha256"/> instead.** Throws
+    /// <see cref="InsecureOperationException"/> at runtime unless
+    /// <see cref="AllowInsecure"/> is set on the session.
+    /// </summary>
+    [Obsolete("MD5 is a broken hash function with practical collisions. " +
+              "Use DigestSha256 (or stronger) instead. " +
+              "If you must use it, set Session.AllowInsecure = true.")]
+    public byte[] DigestMd5(ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_MD5);
+        return Digest(mechanism, data);
+    }
+
+    /// <summary>
+    /// Computes a SHA-1 digest. **Use <see cref="DigestSha256"/> instead.** Throws
+    /// <see cref="InsecureOperationException"/> at runtime unless
+    /// <see cref="AllowInsecure"/> is set on the session.
+    /// </summary>
+    [Obsolete("SHA-1 is broken (SHAttered demonstrated practical collisions). " +
+              "Use DigestSha256 (or stronger) instead. " +
+              "If you must use it, set Session.AllowInsecure = true.")]
+    public byte[] DigestSha1(ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_SHA_1);
+        return Digest(mechanism, data);
+    }
 }
