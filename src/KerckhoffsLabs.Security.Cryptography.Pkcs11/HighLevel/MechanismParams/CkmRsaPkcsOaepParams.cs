@@ -6,8 +6,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_RSA_PKCS_OAEP_PARAMS"/>. Owns the unmanaged
-/// buffer for the optional source data. Caller must dispose AFTER the
-/// <see cref="Mechanism"/> that references it.
+/// buffer for the optional source data. Dispose this instance AFTER the
+/// <see cref="Mechanism"/> that holds a reference to it has been disposed.
 /// </summary>
 public sealed class CkmRsaPkcsOaepParams : IMechanismParams
 {
@@ -51,6 +51,7 @@ public sealed class CkmRsaPkcsOaepParams : IMechanismParams
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _sourceData);
+        _lowLevelParams.SourceData = IntPtr.Zero;
         _disposed = true;
         GC.SuppressFinalize(this);
     }

@@ -220,6 +220,8 @@ public partial class Session
     {
         if (nonce.Length != 12)
             throw new ArgumentException("ChaCha20-Poly1305 nonce must be exactly 12 bytes (96 bits).", nameof(nonce));
+        if (ciphertextAndTag.Length < 16)
+            throw new ArgumentException("ChaCha20-Poly1305 ciphertext must include a 16-byte tag.", nameof(ciphertextAndTag));
 
         using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
         using var mechanism = new Mechanism(CKM.CKM_CHACHA20_POLY1305, p);

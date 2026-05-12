@@ -5,8 +5,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_SALSA20_CHACHA20_POLY1305_PARAMS"/>. Owns
-/// the unmanaged buffers for the nonce and AAD. Caller must dispose AFTER the
-/// <see cref="Mechanism"/> that references it.
+/// the unmanaged buffers for the nonce and AAD. Dispose this instance AFTER the
+/// <see cref="Mechanism"/> that holds a reference to it has been disposed.
 /// </summary>
 public sealed class CkmSalsa20ChaCha20Poly1305Params : IMechanismParams
 {
@@ -55,6 +55,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : IMechanismParams
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);
         UnmanagedMemory.Free(ref _aad);
+        _lowLevelParams.Nonce = IntPtr.Zero;
+        _lowLevelParams.AAD = IntPtr.Zero;
         _disposed = true;
         GC.SuppressFinalize(this);
     }
