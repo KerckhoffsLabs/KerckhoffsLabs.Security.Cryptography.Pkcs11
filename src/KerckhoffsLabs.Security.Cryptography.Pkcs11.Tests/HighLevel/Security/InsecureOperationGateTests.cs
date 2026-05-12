@@ -202,6 +202,61 @@ internal static class InsecureOperationGateTestCases
             try { session.CloseSession(); } catch { }
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // GenerateKey gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.GenerateKey(Mechanism, List{ObjectAttribute})"/> with an
+    /// insecure mechanism must throw <see cref="InsecureOperationException"/> when
+    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// code before any P/Invoke call, so no real token is needed.
+    /// </summary>
+    internal static void Assert_GenerateKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.GenerateKey(mech, new List<ObjectAttribute>()));
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // DeriveKey gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.DeriveKey(Mechanism, ObjectHandle, List{ObjectAttribute})"/>
+    /// with an insecure mechanism must throw <see cref="InsecureOperationException"/> when
+    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
+    /// </summary>
+    internal static void Assert_DeriveKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var fakeBase = new ObjectHandle(0);
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.DeriveKey(mech, fakeBase, new List<ObjectAttribute>()));
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -277,6 +332,23 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_SHA_1)]
     public void Digest_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Digest_InsecureMechanismThrows(_backend, mech);
+
+    // --- GenerateKey gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_DES_KEY_GEN)]
+    [InlineData((ulong)CKM.CKM_DES2_KEY_GEN)]
+    [InlineData((ulong)CKM.CKM_DES3_KEY_GEN)]
+    public void GenerateKey_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_GenerateKey_InsecureMechanismThrows(_backend, mech);
+
+    // --- DeriveKey gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_DES3_ECB_ENCRYPT_DATA)]
+    [InlineData((ulong)CKM.CKM_DES3_CBC_ENCRYPT_DATA)]
+    public void DeriveKey_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_DeriveKey_InsecureMechanismThrows(_backend, mech);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,4 +418,21 @@ public sealed class InsecureOperationGateTests_SoftHsm
     [InlineData((ulong)CKM.CKM_SHA_1)]
     public void Digest_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Digest_InsecureMechanismThrows(_backend, mech);
+
+    // --- GenerateKey gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_DES_KEY_GEN)]
+    [InlineData((ulong)CKM.CKM_DES2_KEY_GEN)]
+    [InlineData((ulong)CKM.CKM_DES3_KEY_GEN)]
+    public void GenerateKey_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_GenerateKey_InsecureMechanismThrows(_backend, mech);
+
+    // --- DeriveKey gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_DES3_ECB_ENCRYPT_DATA)]
+    [InlineData((ulong)CKM.CKM_DES3_CBC_ENCRYPT_DATA)]
+    public void DeriveKey_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_DeriveKey_InsecureMechanismThrows(_backend, mech);
 }
