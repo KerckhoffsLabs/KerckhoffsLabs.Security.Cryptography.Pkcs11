@@ -33,8 +33,15 @@ internal static class ObjectLifecycleTestCases
 
                 // GetAttributeValue retrieves the value.
                 var attrs = session.GetAttributeValue(found[0], new List<CKA> { CKA.CKA_VALUE });
-                Assert.Single(attrs);
-                Assert.Equal(value, attrs[0].GetValueAsByteArray());
+                try
+                {
+                    Assert.Single(attrs);
+                    Assert.Equal(value, attrs[0].GetValueAsByteArray());
+                }
+                finally
+                {
+                    foreach (var a in attrs) a.Dispose();
+                }
             }
             finally
             {
@@ -42,10 +49,12 @@ internal static class ObjectLifecycleTestCases
             }
 
             // After destroy, the same Find returns empty.
-            using var verifyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
-            using var verifyLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
-            var afterDestroy = session.FindAllObjects(new List<ObjectAttribute> { verifyClass, verifyLabel });
-            Assert.Empty(afterDestroy);
+            {
+                using var verifyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
+                using var verifyLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
+                var afterDestroy = session.FindAllObjects(new List<ObjectAttribute> { verifyClass, verifyLabel });
+                Assert.Empty(afterDestroy);
+            }
         }
         finally
         {
