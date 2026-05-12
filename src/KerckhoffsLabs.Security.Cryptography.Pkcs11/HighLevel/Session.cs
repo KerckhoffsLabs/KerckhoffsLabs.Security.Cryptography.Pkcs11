@@ -47,6 +47,70 @@ public partial class Session
     }
 
     /// <summary>
+    /// Lock object guarding concurrent native-call access to this <see cref="Session"/>.
+    /// PKCS#11 sessions are not safe for concurrent use; this lock detects cross-thread
+    /// attempts and throws <see cref="InvalidOperationException"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Monitor"/> (via <see cref="Monitor.TryEnter(object)"/>) is reentrant on the
+    /// same thread, which is required because secure helpers like <c>GenerateAesKey</c>
+    /// internally call the public <c>GenerateKey</c>. Re-entry from the same thread succeeds;
+    /// a different thread calling while the lock is held fails immediately and
+    /// <see cref="AcquireExclusive"/> throws.
+    /// </remarks>
+    private readonly object _busyLock = new();
+
+    /// <summary>Disposable token returned by <see cref="AcquireExclusive"/>. Releases the busy lock on dispose.</summary>
+    /// <remarks>
+    /// Implemented as <c>internal sealed class</c> (not <c>ref struct</c>) so the test suite can
+    /// invoke <see cref="AcquireExclusive"/> via <c>[InternalsVisibleTo]</c> and hold the lease
+    /// across a thread boundary. The one extra heap allocation per public method call is
+    /// negligible against the cost of crossing the P/Invoke boundary that follows.
+    /// </remarks>
+    internal sealed class ExclusiveLease : IDisposable
+    {
+        private readonly object _lock;
+        private bool _released;
+
+        internal ExclusiveLease(object lockObj)
+        {
+            _lock = lockObj;
+            _released = false;
+        }
+
+        public void Dispose()
+        {
+            if (_released) return;
+            _released = true;
+            Monitor.Exit(_lock);
+        }
+    }
+
+    /// <summary>
+    /// Acquires exclusive access to this session for the duration of the returned
+    /// <see cref="ExclusiveLease"/>. Throws <see cref="InvalidOperationException"/> if another
+    /// thread is already inside an exclusive section.
+    /// </summary>
+    /// <remarks>
+    /// Usage: <c>using var _ = AcquireExclusive(); ...</c>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if a different thread currently holds the lock. The message identifies the caller
+    /// via <see cref="System.Runtime.CompilerServices.CallerMemberNameAttribute"/>.
+    /// </exception>
+    internal ExclusiveLease AcquireExclusive([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
+    {
+        if (!Monitor.TryEnter(_busyLock))
+        {
+            throw new InvalidOperationException(
+                $"Concurrent access to a PKCS#11 Session is not supported. " +
+                $"Method '{caller ?? "<unknown>"}' was invoked while another operation is in progress " +
+                $"on a different thread. Use a separate Session per thread.");
+        }
+        return new ExclusiveLease(_busyLock);
+    }
+
+    /// <summary>
     /// PKCS#11 handle of session
     /// </summary>
     public ulong SessionId
@@ -133,6 +197,7 @@ public partial class Session
     /// </summary>
     public void CloseSession()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -158,6 +223,7 @@ public partial class Session
     /// <param name="userPin">Pin value</param>
     public void InitPin(SecurePin userPin)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(userPin);
 
         if (_disposed)
@@ -189,6 +255,7 @@ public partial class Session
     /// <param name="newPin">New PIN value</param>
     public void SetPin(SecurePin oldPin, SecurePin newPin)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(oldPin);
         ArgumentNullException.ThrowIfNull(newPin);
 
@@ -221,6 +288,7 @@ public partial class Session
     /// <returns>Information about a session</returns>
     public SessionInfo GetSessionInfo()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -240,6 +308,7 @@ public partial class Session
     /// <returns>Operations state of a session</returns>
     public byte[] GetOperationState()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -266,6 +335,7 @@ public partial class Session
     /// <param name="authenticationKey">CK_INVALID_HANDLE or handle to the key which will be used for an ongoing signature, MACing, or verification operation in the restored session</param>
     public void SetOperationState(byte[] state, ObjectHandle encryptionKey, ObjectHandle authenticationKey)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -296,6 +366,7 @@ public partial class Session
     /// <param name="pin">Pin of user</param>
     public void Login(CKU userType, SecurePin pin)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(pin);
 
         if (_disposed)
@@ -324,6 +395,7 @@ public partial class Session
     /// </summary>
     public void Logout()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -341,6 +413,7 @@ public partial class Session
     /// </summary>
     public void GetFunctionStatus()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -356,6 +429,7 @@ public partial class Session
     /// </summary>
     public void CancelFunction()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
