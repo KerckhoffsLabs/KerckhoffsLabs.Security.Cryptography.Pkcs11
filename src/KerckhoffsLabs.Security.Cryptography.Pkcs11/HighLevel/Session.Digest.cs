@@ -1,0 +1,509 @@
+using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+
+public partial class Session
+{
+    /// <summary>
+    /// Digests the value of a secret key
+    /// </summary>
+    /// <param name="mechanism">Digesting mechanism</param>
+    /// <param name="keyHandle">Handle of the secret key to be digested</param>
+    /// <returns>Digest</returns>
+    public byte[] DigestKey(Mechanism mechanism, ObjectHandle keyHandle)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DigestKey", _sessionId);
+
+        if (mechanism == null)
+            throw new ArgumentNullException("mechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestInit", rv);
+
+        rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestKey", rv);
+
+        NativeCULong digestLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        byte[] digest = new byte[(int)digestLen];
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
+
+        return digest;
+    }
+
+    /// <summary>
+    /// Digests single-part data
+    /// </summary>
+    /// <param name="mechanism">Digesting mechanism</param>
+    /// <param name="data">Data to be digested</param>
+    /// <returns>Digest</returns>
+    public byte[] Digest(Mechanism mechanism, byte[] data)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::Digest1", _sessionId);
+
+        if (mechanism == null)
+            throw new ArgumentNullException("mechanism");
+
+        if (data == null)
+            throw new ArgumentNullException("data");
+
+        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestInit", rv);
+
+        NativeCULong digestLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), null, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_Digest", rv);
+
+        byte[] digest = new byte[(int)digestLen];
+        rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), digest, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_Digest", rv);
+
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
+
+        return digest;
+    }
+
+    /// <summary>
+    /// Digests multi-part data
+    /// </summary>
+    /// <param name="mechanism">Digesting mechanism</param>
+    /// <param name="inputStream">Input stream from which data should be read</param>
+    /// <returns>Digest</returns>
+    public byte[] Digest(Mechanism mechanism, Stream inputStream)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::Digest2", _sessionId);
+
+        if (mechanism == null)
+            throw new ArgumentNullException("mechanism");
+
+        if (inputStream == null)
+            throw new ArgumentNullException("inputStream");
+
+        return Digest(mechanism, inputStream, 4096);
+    }
+
+    /// <summary>
+    /// Digests multi-part data
+    /// </summary>
+    /// <param name="mechanism">Digesting mechanism</param>
+    /// <param name="inputStream">Input stream from which data should be read</param>
+    /// <param name="bufferLength">Size of read buffer in bytes</param>
+    /// <returns>Digest</returns>
+    public byte[] Digest(Mechanism mechanism, Stream inputStream, int bufferLength)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::Digest3", _sessionId);
+
+        if (mechanism == null)
+            throw new ArgumentNullException("mechanism");
+
+        if (inputStream == null)
+            throw new ArgumentNullException("inputStream");
+
+        if (bufferLength < 1)
+            throw new ArgumentException("Value has to be positive number", "bufferLength");
+
+        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestInit", rv);
+
+        byte[] part = new byte[bufferLength];
+        int bytesRead = 0;
+
+        while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
+        {
+            rv = _pkcs11Library.C_DigestUpdate(_sessionId, part, (NativeCULong)(bytesRead));
+            if (rv != CKR.CKR_OK)
+                throw new Pkcs11Exception("C_DigestUpdate", rv);
+        }
+
+        NativeCULong digestLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        byte[] digest = new byte[(int)digestLen];
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
+
+        return digest;
+    }
+
+    /// <summary>
+    /// Digests and encrypts data
+    /// </summary>
+    /// <param name="digestingMechanism">Digesting mechanism</param>
+    /// <param name="encryptionMechanism">Encryption mechanism</param>
+    /// <param name="keyHandle">Handle of the encryption key</param>
+    /// <param name="data">Data to be processed</param>
+    /// <param name="digest">Digest</param>
+    /// <param name="encryptedData">Encrypted data</param>
+    public void DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] encryptedData)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DigestEncrypt1", _sessionId);
+
+        if (digestingMechanism == null)
+            throw new ArgumentNullException("digestingMechanism");
+
+        if (encryptionMechanism == null)
+            throw new ArgumentNullException("encryptionMechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        if (data == null)
+            throw new ArgumentNullException("data");
+
+        using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
+        {
+            digest = DigestEncrypt(digestingMechanism, encryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
+            encryptedData = outputMemorySteam.ToArray();
+        }
+    }
+
+    /// <summary>
+    /// Digests and encrypts data
+    /// </summary>
+    /// <param name="digestingMechanism">Digesting mechanism</param>
+    /// <param name="encryptionMechanism">Encryption mechanism</param>
+    /// <param name="keyHandle">Handle of the encryption key</param>
+    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
+    /// <param name="outputStream">Output stream where encrypted data should be written</param>
+    /// <returns>Digest</returns>
+    public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DigestEncrypt2", _sessionId);
+
+        if (digestingMechanism == null)
+            throw new ArgumentNullException("digestingMechanism");
+
+        if (encryptionMechanism == null)
+            throw new ArgumentNullException("encryptionMechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        if (inputStream == null)
+            throw new ArgumentNullException("inputStream");
+
+        if (outputStream == null)
+            throw new ArgumentNullException("outputStream");
+
+        return DigestEncrypt(digestingMechanism, encryptionMechanism, keyHandle, inputStream, outputStream, 4096);
+    }
+
+    /// <summary>
+    /// Digests and encrypts data
+    /// </summary>
+    /// <param name="digestingMechanism">Digesting mechanism</param>
+    /// <param name="encryptionMechanism">Encryption mechanism</param>
+    /// <param name="keyHandle">Handle of the encryption key</param>
+    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
+    /// <param name="outputStream">Output stream where encrypted data should be written</param>
+    /// <param name="bufferLength">Size of read buffer in bytes</param>
+    /// <returns>Digest</returns>
+    public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DigestEncrypt3", _sessionId);
+
+        if (digestingMechanism == null)
+            throw new ArgumentNullException("digestingMechanism");
+
+        if (encryptionMechanism == null)
+            throw new ArgumentNullException("encryptionMechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        if (inputStream == null)
+            throw new ArgumentNullException("inputStream");
+
+        if (outputStream == null)
+            throw new ArgumentNullException("outputStream");
+
+        if (bufferLength < 1)
+            throw new ArgumentException("Value has to be positive number", "bufferLength");
+
+        CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestInit", rv);
+
+        CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
+
+        rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_EncryptInit", rv);
+
+        byte[] part = new byte[bufferLength];
+        byte[] encryptedPart = new byte[bufferLength];
+        NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
+
+        int bytesRead = 0;
+        while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
+        {
+            encryptedPartLen = (NativeCULong)(encryptedPart.Length);
+            rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
+            if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+                throw new Pkcs11Exception("C_DigestEncryptUpdate", rv);
+
+            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+            {
+                encryptedPart = new byte[(int)encryptedPartLen];
+
+                rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
+                if (rv != CKR.CKR_OK)
+                    throw new Pkcs11Exception("C_DigestEncryptUpdate", rv);
+            }
+
+            outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
+        }
+
+        byte[] lastEncryptedPart = null;
+        NativeCULong lastEncryptedPartLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_EncryptFinal", rv);
+
+        lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
+        rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_EncryptFinal", rv);
+
+        if (lastEncryptedPartLen > (NativeCULong)0)
+            outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
+
+        NativeCULong digestLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        byte[] digest = new byte[(int)digestLen];
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
+
+        return digest;
+    }
+
+    /// <summary>
+    /// Digests and decrypts data
+    /// </summary>
+    /// <param name="digestingMechanism">Digesting mechanism</param>
+    /// <param name="decryptionMechanism">Decryption mechanism</param>
+    /// <param name="keyHandle">Handle of the decryption key</param>
+    /// <param name="data">Data to be processed</param>
+    /// <param name="digest">Digest</param>
+    /// <param name="decryptedData">Decrypted data</param>
+    public void DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] decryptedData)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DecryptDigest1", _sessionId);
+
+        if (digestingMechanism == null)
+            throw new ArgumentNullException("digestingMechanism");
+
+        if (decryptionMechanism == null)
+            throw new ArgumentNullException("decryptionMechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        if (data == null)
+            throw new ArgumentNullException("data");
+
+        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
+        digest = DecryptDigest(digestingMechanism, decryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
+        decryptedData = outputMemorySteam.ToArray();
+    }
+
+    /// <summary>
+    /// Digests and decrypts data
+    /// </summary>
+    /// <param name="digestingMechanism">Digesting mechanism</param>
+    /// <param name="decryptionMechanism">Decryption mechanism</param>
+    /// <param name="keyHandle">Handle of the decryption key</param>
+    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
+    /// <param name="outputStream">Output stream where decrypted data should be written</param>
+    /// <returns>Digest</returns>
+    public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DecryptDigest2", _sessionId);
+
+        if (digestingMechanism == null)
+            throw new ArgumentNullException("digestingMechanism");
+
+        if (decryptionMechanism == null)
+            throw new ArgumentNullException("decryptionMechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        if (inputStream == null)
+            throw new ArgumentNullException("inputStream");
+
+        if (outputStream == null)
+            throw new ArgumentNullException("outputStream");
+
+        return DecryptDigest(digestingMechanism, decryptionMechanism, keyHandle, inputStream, outputStream, 4096);
+    }
+
+    /// <summary>
+    /// Digests and decrypts data
+    /// </summary>
+    /// <param name="digestingMechanism">Digesting mechanism</param>
+    /// <param name="decryptionMechanism">Decryption mechanism</param>
+    /// <param name="keyHandle">Handle of the decryption key</param>
+    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
+    /// <param name="outputStream">Output stream where decrypted data should be written</param>
+    /// <param name="bufferLength">Size of read buffer in bytes</param>
+    /// <returns>Digest</returns>
+    public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::DecryptDigest3", _sessionId);
+
+        if (digestingMechanism == null)
+            throw new ArgumentNullException("digestingMechanism");
+
+        if (decryptionMechanism == null)
+            throw new ArgumentNullException("decryptionMechanism");
+
+        if (keyHandle == null)
+            throw new ArgumentNullException("keyHandle");
+
+        if (inputStream == null)
+            throw new ArgumentNullException("inputStream");
+
+        if (outputStream == null)
+            throw new ArgumentNullException("outputStream");
+
+        if (bufferLength < 1)
+            throw new ArgumentException("Value has to be positive number", "bufferLength");
+
+        CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestInit", rv);
+
+        CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
+
+        rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DecryptInit", rv);
+
+        byte[] encryptedPart = new byte[bufferLength];
+        byte[] part = new byte[bufferLength];
+        NativeCULong partLen = (NativeCULong)(part.Length);
+
+        int bytesRead = 0;
+        while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
+        {
+            partLen = (NativeCULong)(part.Length);
+            rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
+            if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+                throw new Pkcs11Exception("C_DecryptDigestUpdate", rv);
+
+            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+            {
+                part = new byte[(int)partLen];
+
+                rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
+                if (rv != CKR.CKR_OK)
+                    throw new Pkcs11Exception("C_DecryptDigestUpdate", rv);
+            }
+
+            outputStream.Write(part, 0, (int)(partLen));
+        }
+
+        byte[] lastPart = null;
+        NativeCULong lastPartLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DecryptFinal", rv);
+
+        lastPart = new byte[(int)lastPartLen];
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DecryptFinal", rv);
+
+        if (lastPartLen > (NativeCULong)0)
+            outputStream.Write(lastPart, 0, (int)(lastPartLen));
+
+        NativeCULong digestLen = (NativeCULong)0;
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        byte[] digest = new byte[(int)digestLen];
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_DigestFinal", rv);
+
+        if (digest.Length != (int)(digestLen))
+            Array.Resize(ref digest, (int)(digestLen));
+
+        return digest;
+    }
+}
