@@ -1,0 +1,210 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+using Microsoft.DotNet.XUnitExtensions;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Security;
+
+/// <summary>
+/// Shared test logic that parameterises the insecure-mechanism gate over multiple CKM values
+/// for both Encrypt and Decrypt. The guard fires in managed code before any P/Invoke call,
+/// so a fake <see cref="ObjectHandle"/> (id=0) is sufficient — no real key material is needed.
+/// </summary>
+internal static class InsecureOperationGateTestCases
+{
+    // ---------------------------------------------------------------------------
+    // Encrypt gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.Encrypt(Mechanism, ObjectHandle, byte[])"/> with an insecure
+    /// mechanism must throw <see cref="InsecureOperationException"/> when
+    /// <see cref="Session.AllowInsecure"/> is false (the default).
+    /// </summary>
+    internal static void Assert_Encrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mechanism = new Mechanism((CKM)mechanismId);
+            var fakeHandle = new ObjectHandle(0);
+
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.Encrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            session.CloseSession();
+        }
+    }
+
+    /// <summary>
+    /// With <see cref="Session.AllowInsecure"/> set to <c>true</c> the Encrypt gate is
+    /// bypassed. The backend may still throw for unrelated reasons (bad handle, etc.), but
+    /// MUST NOT throw <see cref="InsecureOperationException"/>.
+    /// </summary>
+    internal static void Assert_Encrypt_AllowInsecureBypassesGate(IPkcs11Backend backend)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        session.AllowInsecure = true;
+        try
+        {
+            using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            var fakeHandle = new ObjectHandle(0);
+
+            var ex = Record.Exception(() =>
+                session.Encrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+
+            Assert.False(ex is InsecureOperationException,
+                "Expected gate to be bypassed, but InsecureOperationException was still thrown.");
+        }
+        finally
+        {
+            session.CloseSession();
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Decrypt gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.Decrypt(Mechanism, ObjectHandle, byte[])"/> with an insecure
+    /// mechanism must throw <see cref="InsecureOperationException"/> when
+    /// <see cref="Session.AllowInsecure"/> is false (the default).
+    /// </summary>
+    internal static void Assert_Decrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mechanism = new Mechanism((CKM)mechanismId);
+            var fakeHandle = new ObjectHandle(0);
+
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.Decrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            session.CloseSession();
+        }
+    }
+
+    /// <summary>
+    /// With <see cref="Session.AllowInsecure"/> set to <c>true</c> the Decrypt gate is
+    /// bypassed. The backend may still throw for unrelated reasons, but MUST NOT throw
+    /// <see cref="InsecureOperationException"/>.
+    /// </summary>
+    internal static void Assert_Decrypt_AllowInsecureBypassesGate(IPkcs11Backend backend)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        session.AllowInsecure = true;
+        try
+        {
+            using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            var fakeHandle = new ObjectHandle(0);
+
+            var ex = Record.Exception(() =>
+                session.Decrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+
+            Assert.False(ex is InsecureOperationException,
+                "Expected gate to be bypassed, but InsecureOperationException was still thrown.");
+        }
+        finally
+        {
+            session.CloseSession();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Concrete test class: Mock backend
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Insecure-mechanism gate tests against pkcs11-mock.
+/// All tests run unconditionally: <see cref="InsecureOperationException"/> is thrown (or
+/// bypassed) in managed code before any P/Invoke call, so no real hardware or crypto is
+/// required.
+/// </summary>
+[Collection("Mock")]
+public sealed class InsecureOperationGateTests_Mock
+{
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+
+    private readonly MockBackendFixture _backend;
+    public InsecureOperationGateTests_Mock(MockBackendFixture f) { _backend = f; }
+
+    // --- Encrypt gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_AES_ECB)]
+    [InlineData((ulong)CKM.CKM_DES_CBC)]
+    [InlineData((ulong)CKM.CKM_DES3_CBC)]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    public void Encrypt_InsecureMechanismThrows_Mock(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Encrypt_InsecureMechanismThrows(_backend, mech);
+
+    [Fact]
+    public void Encrypt_AllowInsecure_BypassesGate_Mock()
+        => InsecureOperationGateTestCases.Assert_Encrypt_AllowInsecureBypassesGate(_backend);
+
+    // --- Decrypt gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_AES_ECB)]
+    [InlineData((ulong)CKM.CKM_DES_CBC)]
+    [InlineData((ulong)CKM.CKM_DES3_CBC)]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    public void Decrypt_InsecureMechanismThrows_Mock(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Decrypt_InsecureMechanismThrows(_backend, mech);
+
+    [Fact]
+    public void Decrypt_AllowInsecure_BypassesGate_Mock()
+        => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
+}
+
+// ---------------------------------------------------------------------------
+// Concrete test class: SoftHSM backend
+// ---------------------------------------------------------------------------
+
+[Collection("SoftHsm")]
+public sealed class InsecureOperationGateTests_SoftHsm
+{
+    private readonly SoftHsmBackendFixture _backend;
+    public InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+
+    // --- Encrypt gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_AES_ECB)]
+    [InlineData((ulong)CKM.CKM_DES_CBC)]
+    [InlineData((ulong)CKM.CKM_DES3_CBC)]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    public void Encrypt_InsecureMechanismThrows_SoftHsm(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Encrypt_InsecureMechanismThrows(_backend, mech);
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Encrypt_AllowInsecure_BypassesGate_SoftHsm()
+        => InsecureOperationGateTestCases.Assert_Encrypt_AllowInsecureBypassesGate(_backend);
+
+    // --- Decrypt gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_AES_ECB)]
+    [InlineData((ulong)CKM.CKM_DES_CBC)]
+    [InlineData((ulong)CKM.CKM_DES3_CBC)]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    public void Decrypt_InsecureMechanismThrows_SoftHsm(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Decrypt_InsecureMechanismThrows(_backend, mech);
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Decrypt_AllowInsecure_BypassesGate_SoftHsm()
+        => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
+}
