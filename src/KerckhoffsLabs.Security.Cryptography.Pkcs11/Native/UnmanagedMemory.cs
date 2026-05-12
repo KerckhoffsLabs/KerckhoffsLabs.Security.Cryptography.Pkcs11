@@ -51,6 +51,26 @@ public static class UnmanagedMemory
     }
 
     /// <summary>
+    /// Number of unmanaged allocations currently outstanding (allocated but not yet freed).
+    /// Only meaningful while <see cref="DebugModeEnabled"/> is <c>true</c>; returns <c>0</c>
+    /// otherwise because the allocation dictionary is only populated in debug mode.
+    /// </summary>
+    /// <remarks>
+    /// Intended for diagnostic and leak-detection tests. Production code must not depend on
+    /// this property's behavior outside of debug mode.
+    /// </remarks>
+    public static int OutstandingAllocationCount
+    {
+        get
+        {
+            lock (_allocationsLock)
+            {
+                return _allocations.Count;
+            }
+        }
+    }
+
+    /// <summary>
     /// Allocates unmanaged zero-filled memory
     /// </summary>
     /// <param name="size">Number of bytes required</param>
@@ -98,7 +118,7 @@ public static class UnmanagedMemory
 
         if (_debugModeEnabled)
         {
-            lock (_allocations)
+            lock (_allocationsLock)
             {
                 if (_allocations.ContainsKey(memory))
                 {

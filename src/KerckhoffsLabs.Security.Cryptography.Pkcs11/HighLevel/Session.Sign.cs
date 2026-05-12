@@ -81,6 +81,7 @@ public partial class Session
     /// <returns>Signature bytes (size depends on key + mechanism).</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(keyHandle);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
@@ -98,6 +99,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -118,6 +120,7 @@ public partial class Session
     /// <summary>String-keyPin variant — see <see cref="Sign(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/>.</summary>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, string keyPin, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] buffer = data.ToArray();
@@ -134,6 +137,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, string keyPin, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -154,6 +158,7 @@ public partial class Session
     /// <summary>byte[]-keyPin variant — see <see cref="Sign(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/>.</summary>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] keyPin, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] buffer = data.ToArray();
@@ -170,6 +175,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] keyPin, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -196,6 +202,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -223,6 +230,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, string keyPin, Stream inputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -250,6 +258,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] keyPin, Stream inputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -355,6 +364,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -386,6 +396,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, string keyPin, Stream inputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -417,6 +428,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] keyPin, Stream inputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -510,6 +522,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -537,6 +550,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignRecover(Mechanism mechanism, ObjectHandle keyHandle, string keyPin, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -564,6 +578,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] keyPin, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -593,6 +608,7 @@ public partial class Session
     /// <param name="encryptedData">Encrypted data</param>
     public void SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, byte[] data, out byte[] signature, out byte[] encryptedData)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -633,6 +649,7 @@ public partial class Session
     /// <param name="encryptedData">Encrypted data</param>
     public void SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, string signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, byte[] data, out byte[] signature, out byte[] encryptedData)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -673,6 +690,7 @@ public partial class Session
     /// <param name="encryptedData">Encrypted data</param>
     public void SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, byte[] signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, byte[] data, out byte[] signature, out byte[] encryptedData)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -712,6 +730,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -751,6 +770,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, string signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -790,6 +810,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, byte[] signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -954,6 +975,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -997,6 +1019,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, string signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -1040,6 +1063,7 @@ public partial class Session
     /// <returns>Signature</returns>
     public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, byte[] signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -1080,6 +1104,7 @@ public partial class Session
     /// <returns>Signature bytes (length = RSA modulus / 8).</returns>
     public byte[] SignRsaPss(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
         using var mechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, p);
         return Sign(mechanism, privateKeyHandle, data);
@@ -1094,6 +1119,7 @@ public partial class Session
     /// <returns>Signature bytes (2 × curve coordinate length; 64 bytes for P-256).</returns>
     public byte[] SignEcdsa(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
         return Sign(mechanism, privateKeyHandle, data);
     }
@@ -1107,6 +1133,7 @@ public partial class Session
     /// <returns>64-byte Ed25519 signature.</returns>
     public byte[] SignEd25519(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_EDDSA);
         return Sign(mechanism, privateKeyHandle, data);
     }
@@ -1120,6 +1147,7 @@ public partial class Session
     /// <returns>114-byte Ed448 signature.</returns>
     public byte[] SignEd448(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_EDDSA);
         return Sign(mechanism, privateKeyHandle, data);
     }
@@ -1135,6 +1163,7 @@ public partial class Session
               "Use SignRsaPss instead. If you must use it, set Session.AllowInsecure = true.")]
     public byte[] SignRsaPkcs1V15(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
         return Sign(mechanism, privateKeyHandle, data);
     }

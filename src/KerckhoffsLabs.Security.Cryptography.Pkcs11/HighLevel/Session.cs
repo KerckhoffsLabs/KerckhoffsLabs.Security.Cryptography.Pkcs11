@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
@@ -45,6 +44,70 @@ public partial class Session
     protected NativeCULong _sessionId
     {
         get => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
+    }
+
+    /// <summary>
+    /// Lock object guarding concurrent native-call access to this <see cref="Session"/>.
+    /// PKCS#11 sessions are not safe for concurrent use; this lock detects cross-thread
+    /// attempts and throws <see cref="InvalidOperationException"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Monitor"/> (via <see cref="Monitor.TryEnter(object)"/>) is reentrant on the
+    /// same thread, which is required because secure helpers like <c>GenerateAesKey</c>
+    /// internally call the public <c>GenerateKey</c>. Re-entry from the same thread succeeds;
+    /// a different thread calling while the lock is held fails immediately and
+    /// <see cref="AcquireExclusive"/> throws.
+    /// </remarks>
+    private readonly object _busyLock = new();
+
+    /// <summary>Disposable token returned by <see cref="AcquireExclusive"/>. Releases the busy lock on dispose.</summary>
+    /// <remarks>
+    /// Implemented as <c>internal sealed class</c> (not <c>ref struct</c>) so the test suite can
+    /// invoke <see cref="AcquireExclusive"/> via <c>[InternalsVisibleTo]</c> and hold the lease
+    /// across a thread boundary. The one extra heap allocation per public method call is
+    /// negligible against the cost of crossing the P/Invoke boundary that follows.
+    /// </remarks>
+    internal sealed class ExclusiveLease : IDisposable
+    {
+        private readonly object _lock;
+        private bool _released;
+
+        internal ExclusiveLease(object lockObj)
+        {
+            _lock = lockObj;
+            _released = false;
+        }
+
+        public void Dispose()
+        {
+            if (_released) return;
+            _released = true;
+            Monitor.Exit(_lock);
+        }
+    }
+
+    /// <summary>
+    /// Acquires exclusive access to this session for the duration of the returned
+    /// <see cref="ExclusiveLease"/>. Throws <see cref="InvalidOperationException"/> if another
+    /// thread is already inside an exclusive section.
+    /// </summary>
+    /// <remarks>
+    /// Usage: <c>using var _ = AcquireExclusive(); ...</c>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if a different thread currently holds the lock. The message identifies the caller
+    /// via <see cref="System.Runtime.CompilerServices.CallerMemberNameAttribute"/>.
+    /// </exception>
+    internal ExclusiveLease AcquireExclusive([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
+    {
+        if (!Monitor.TryEnter(_busyLock))
+        {
+            throw new InvalidOperationException(
+                $"Concurrent access to a PKCS#11 Session is not supported. " +
+                $"Method '{caller ?? "<unknown>"}' was invoked while another operation is in progress " +
+                $"on a different thread. Use a separate Session per thread.");
+        }
+        return new ExclusiveLease(_busyLock);
     }
 
     /// <summary>
@@ -134,6 +197,7 @@ public partial class Session
     /// </summary>
     public void CloseSession()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -150,17 +214,24 @@ public partial class Session
     }
 
     // -----------------------------------------------------------------------
-    // InitPin — core helper + SecurePin overload + obsolete legacy overloads
+    // InitPin — SecurePin overload (canonical) + obsolete legacy overloads
     // -----------------------------------------------------------------------
 
-    private void InitPinCore(ReadOnlySpan<byte> userPin)
+    /// <summary>
+    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
+    /// </summary>
+    /// <param name="userPin">Pin value</param>
+    public void InitPin(SecurePin userPin)
     {
+        using var _ = AcquireExclusive();
+        ArgumentNullException.ThrowIfNull(userPin);
+
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
         _logger.Debug("Session({0})::InitPin", _sessionId);
 
-        byte[] tmp = userPin.ToArray();
+        byte[] tmp = userPin.Pin.ToArray();
         try
         {
             CKR rv = _pkcs11Library.C_InitPIN(_sessionId, tmp, (NativeCULong)tmp.Length);
@@ -173,71 +244,28 @@ public partial class Session
         }
     }
 
-    /// <summary>
-    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
-    /// </summary>
-    /// <param name="userPin">Pin value</param>
-    public void InitPin(SecurePin userPin)
-    {
-        ArgumentNullException.ThrowIfNull(userPin);
-        InitPinCore(userPin.Pin);
-    }
-
-    /// <summary>
-    /// Initializes the normal user's PIN
-    /// </summary>
-    /// <param name="userPin">Pin value</param>
-    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
-              "and may be interned). string is allowed for backward compatibility.",
-              error: false)]
-    public void InitPin(string userPin)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::InitPin1", _sessionId);
-
-        if (userPin == null)
-        {
-            // Null-pin path preserved for backward compatibility.
-            CKR rv0 = _pkcs11Library.C_InitPIN(_sessionId, null, (NativeCULong)0);
-            if (rv0 != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_InitPIN", rv0);
-            return;
-        }
-
-        int byteCount = Encoding.UTF8.GetByteCount(userPin);
-        using var tmp = new SecureBuffer(byteCount);
-        Encoding.UTF8.GetBytes(userPin, tmp.Span);
-        InitPinCore(tmp.Span);
-    }
-
-    /// <summary>
-    /// Initializes the normal user's PIN
-    /// </summary>
-    /// <param name="userPin">Pin value</param>
-    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
-              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
-              error: false)]
-    public void InitPin(byte[] userPin)
-    {
-        ArgumentNullException.ThrowIfNull(userPin);
-        InitPinCore(userPin);
-    }
-
     // -----------------------------------------------------------------------
-    // SetPin — core helper + SecurePin overload + obsolete legacy overloads
+    // SetPin
     // -----------------------------------------------------------------------
 
-    private void SetPinCore(ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
+    /// <summary>
+    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
+    /// </summary>
+    /// <param name="oldPin">Old PIN value</param>
+    /// <param name="newPin">New PIN value</param>
+    public void SetPin(SecurePin oldPin, SecurePin newPin)
     {
+        using var _ = AcquireExclusive();
+        ArgumentNullException.ThrowIfNull(oldPin);
+        ArgumentNullException.ThrowIfNull(newPin);
+
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
         _logger.Debug("Session({0})::SetPin", _sessionId);
 
-        byte[] oldTmp = oldPin.ToArray();
-        byte[] newTmp = newPin.ToArray();
+        byte[] oldTmp = oldPin.Pin.ToArray();
+        byte[] newTmp = newPin.Pin.ToArray();
         try
         {
             CKR rv = _pkcs11Library.C_SetPIN(
@@ -255,85 +283,12 @@ public partial class Session
     }
 
     /// <summary>
-    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
-    /// </summary>
-    /// <param name="oldPin">Old PIN value</param>
-    /// <param name="newPin">New PIN value</param>
-    public void SetPin(SecurePin oldPin, SecurePin newPin)
-    {
-        ArgumentNullException.ThrowIfNull(oldPin);
-        ArgumentNullException.ThrowIfNull(newPin);
-        SetPinCore(oldPin.Pin, newPin.Pin);
-    }
-
-    /// <summary>
-    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
-    /// </summary>
-    /// <param name="oldPin">Old PIN value</param>
-    /// <param name="newPin">New PIN value</param>
-    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
-              "and may be interned). string is allowed for backward compatibility.",
-              error: false)]
-    public void SetPin(string oldPin, string newPin)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::SetPin1", _sessionId);
-
-        ReadOnlySpan<byte> oldSpan = ReadOnlySpan<byte>.Empty;
-        ReadOnlySpan<byte> newSpan = ReadOnlySpan<byte>.Empty;
-
-        SecureBuffer? oldBuf = null;
-        SecureBuffer? newBuf = null;
-        try
-        {
-            if (oldPin != null)
-            {
-                int oldCount = Encoding.UTF8.GetByteCount(oldPin);
-                oldBuf = new SecureBuffer(oldCount);
-                Encoding.UTF8.GetBytes(oldPin, oldBuf.Span);
-                oldSpan = oldBuf.Span;
-            }
-
-            if (newPin != null)
-            {
-                int newCount = Encoding.UTF8.GetByteCount(newPin);
-                newBuf = new SecureBuffer(newCount);
-                Encoding.UTF8.GetBytes(newPin, newBuf.Span);
-                newSpan = newBuf.Span;
-            }
-
-            SetPinCore(oldSpan, newSpan);
-        }
-        finally
-        {
-            oldBuf?.Dispose();
-            newBuf?.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
-    /// </summary>
-    /// <param name="oldPin">Old PIN value</param>
-    /// <param name="newPin">New PIN value</param>
-    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
-              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
-              error: false)]
-    public void SetPin(byte[] oldPin, byte[] newPin)
-    {
-        ArgumentNullException.ThrowIfNull(oldPin);
-        ArgumentNullException.ThrowIfNull(newPin);
-        SetPinCore(oldPin, newPin);
-    }
-
-    /// <summary>
     /// Obtains information about a session
     /// </summary>
     /// <returns>Information about a session</returns>
     public SessionInfo GetSessionInfo()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -353,6 +308,7 @@ public partial class Session
     /// <returns>Operations state of a session</returns>
     public byte[] GetOperationState()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -379,6 +335,7 @@ public partial class Session
     /// <param name="authenticationKey">CK_INVALID_HANDLE or handle to the key which will be used for an ongoing signature, MACing, or verification operation in the restored session</param>
     public void SetOperationState(byte[] state, ObjectHandle encryptionKey, ObjectHandle authenticationKey)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -399,11 +356,19 @@ public partial class Session
     }
 
     // -----------------------------------------------------------------------
-    // Login — core helper + SecurePin overload + obsolete legacy overloads
+    // Login — SecurePin overload (canonical) + obsolete legacy overloads
     // -----------------------------------------------------------------------
 
-    private void LoginCore(CKU userType, ReadOnlySpan<byte> pin)
+    /// <summary>
+    /// Logs a user into a token
+    /// </summary>
+    /// <param name="userType">Type of user</param>
+    /// <param name="pin">Pin of user</param>
+    public void Login(CKU userType, SecurePin pin)
     {
+        using var _ = AcquireExclusive();
+        ArgumentNullException.ThrowIfNull(pin);
+
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -412,7 +377,7 @@ public partial class Session
         if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
             _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
 
-        byte[] tmp = pin.ToArray();
+        byte[] tmp = pin.Pin.ToArray();
         try
         {
             CKR rv = _pkcs11Library.C_Login(_sessionId, userType, tmp, (NativeCULong)tmp.Length);
@@ -426,67 +391,11 @@ public partial class Session
     }
 
     /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    public void Login(CKU userType, SecurePin pin)
-    {
-        ArgumentNullException.ThrowIfNull(pin);
-        LoginCore(userType, pin.Pin);
-    }
-
-    /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
-              "and may be interned). string is allowed for backward compatibility.",
-              error: false)]
-    public void Login(CKU userType, string pin)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Login1", _sessionId);
-
-        if (pin == null)
-        {
-            // Null-pin path preserved for backward compatibility.
-            if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
-                _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
-            CKR rv0 = _pkcs11Library.C_Login(_sessionId, userType, null, (NativeCULong)0);
-            if (rv0 != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv0);
-            return;
-        }
-
-        int byteCount = Encoding.UTF8.GetByteCount(pin);
-        using var tmp = new SecureBuffer(byteCount);
-        Encoding.UTF8.GetBytes(pin, tmp.Span);
-        LoginCore(userType, tmp.Span);
-    }
-
-    /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
-              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
-              error: false)]
-    public void Login(CKU userType, byte[] pin)
-    {
-        ArgumentNullException.ThrowIfNull(pin);
-        LoginCore(userType, pin);
-    }
-
-    /// <summary>
     /// Logs a user out from a token
     /// </summary>
     public void Logout()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -504,6 +413,7 @@ public partial class Session
     /// </summary>
     public void GetFunctionStatus()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -519,6 +429,7 @@ public partial class Session
     /// </summary>
     public void CancelFunction()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 

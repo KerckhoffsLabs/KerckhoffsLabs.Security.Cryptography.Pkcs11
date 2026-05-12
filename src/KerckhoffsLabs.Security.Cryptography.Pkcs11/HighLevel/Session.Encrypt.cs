@@ -17,6 +17,7 @@ public partial class Session
     /// <returns>A freshly-allocated byte array containing the ciphertext.</returns>
     public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(keyHandle);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
@@ -34,6 +35,7 @@ public partial class Session
     /// <returns>Encrypted data</returns>
     public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -81,6 +83,7 @@ public partial class Session
     /// <param name="outputStream">Output stream where encrypted data should be written</param>
     public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -113,6 +116,7 @@ public partial class Session
     /// <param name="bufferLength">Size of read buffer in bytes</param>
     public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -198,6 +202,7 @@ public partial class Session
         ReadOnlySpan<byte> plaintext,
         ReadOnlySpan<byte> aad = default)
     {
+        using var _ = AcquireExclusive();
         if (iv.Length != 12)
             throw new ArgumentException("AES-GCM IV must be exactly 12 bytes (96 bits).", nameof(iv));
 
@@ -221,6 +226,7 @@ public partial class Session
         ReadOnlySpan<byte> plaintext,
         ReadOnlySpan<byte> aad = default)
     {
+        using var _ = AcquireExclusive();
         if (nonce.Length != 12)
             throw new ArgumentException("ChaCha20-Poly1305 nonce must be exactly 12 bytes (96 bits).", nameof(nonce));
 
@@ -239,6 +245,7 @@ public partial class Session
     /// <returns>RSA-OAEP encrypted ciphertext.</returns>
     public byte[] EncryptRsaOaep(ObjectHandle keyHandle, ReadOnlySpan<byte> plaintext)
     {
+        using var _ = AcquireExclusive();
         using var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256);
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, p);
         return Encrypt(mechanism, keyHandle, plaintext);
@@ -255,6 +262,7 @@ public partial class Session
               "If you must use it, set Session.AllowInsecure = true.")]
     public byte[] EncryptRsaPkcs1V15(ObjectHandle keyHandle, ReadOnlySpan<byte> plaintext)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
         return Encrypt(mechanism, keyHandle, plaintext);
     }

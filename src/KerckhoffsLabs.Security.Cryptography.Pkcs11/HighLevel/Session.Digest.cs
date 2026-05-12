@@ -14,6 +14,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] DigestKey(Mechanism mechanism, ObjectHandle keyHandle)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -63,6 +64,7 @@ public partial class Session
     /// <returns>Digest bytes (length depends on the mechanism — 32 for SHA-256, 48 for SHA-384, 64 for SHA-512).</returns>
     public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
         // P/Invoke when perf profiling proves it matters.
@@ -78,6 +80,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] Digest(Mechanism mechanism, byte[] data)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -121,6 +124,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] Digest(Mechanism mechanism, Stream inputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -146,6 +150,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] Digest(Mechanism mechanism, Stream inputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -205,6 +210,7 @@ public partial class Session
     /// <param name="encryptedData">Encrypted data</param>
     public void DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] encryptedData)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -243,6 +249,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -281,6 +288,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -384,6 +392,7 @@ public partial class Session
     /// <param name="decryptedData">Decrypted data</param>
     public void DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] decryptedData)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -420,6 +429,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -458,6 +468,7 @@ public partial class Session
     /// <returns>Digest</returns>
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -557,6 +568,7 @@ public partial class Session
     /// <returns>32-byte SHA-256 digest.</returns>
     public byte[] DigestSha256(ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_SHA256);
         return Digest(mechanism, data);
     }
@@ -566,6 +578,7 @@ public partial class Session
     /// <returns>48-byte SHA-384 digest.</returns>
     public byte[] DigestSha384(ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_SHA384);
         return Digest(mechanism, data);
     }
@@ -575,6 +588,7 @@ public partial class Session
     /// <returns>64-byte SHA-512 digest.</returns>
     public byte[] DigestSha512(ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_SHA512);
         return Digest(mechanism, data);
     }
@@ -591,6 +605,7 @@ public partial class Session
               "If you must use it, set Session.AllowInsecure = true.")]
     public byte[] DigestMd5(ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_MD5);
         return Digest(mechanism, data);
     }
@@ -605,6 +620,7 @@ public partial class Session
               "If you must use it, set Session.AllowInsecure = true.")]
     public byte[] DigestSha1(ReadOnlySpan<byte> data)
     {
+        using var _ = AcquireExclusive();
         using var mechanism = new Mechanism(CKM.CKM_SHA_1);
         return Digest(mechanism, data);
     }
