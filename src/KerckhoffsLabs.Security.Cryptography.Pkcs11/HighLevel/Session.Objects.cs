@@ -13,6 +13,7 @@ public partial class Session
     /// <returns>Handle of created object</returns>
     public ObjectHandle CreateObject(List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -46,6 +47,7 @@ public partial class Session
     /// <returns>Handle of copied object</returns>
     public ObjectHandle CopyObject(ObjectHandle objectHandle, List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -80,6 +82,7 @@ public partial class Session
     /// <param name="objectHandle">Handle of object to be destroyed</param>
     public void DestroyObject(ObjectHandle objectHandle)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -100,6 +103,7 @@ public partial class Session
     /// <returns>Size of an object in bytes</returns>
     public ulong GetObjectSize(ObjectHandle objectHandle)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -124,6 +128,7 @@ public partial class Session
     /// <returns>Object attributes</returns>
     public List<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<CKA> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -153,6 +158,7 @@ public partial class Session
     /// <returns>Object attributes</returns>
     public List<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<ulong> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -261,6 +267,7 @@ public partial class Session
     /// <param name="attributes">List of attributes that should be modified</param>
     public void SetAttributeValue(ObjectHandle objectHandle, List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -290,6 +297,7 @@ public partial class Session
     /// <param name="attributes">Attributes that should be matched</param>
     public void FindObjectsInit(List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -318,6 +326,7 @@ public partial class Session
     /// <returns>Found object handles</returns>
     public List<ObjectHandle> FindObjects(int objectCount)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -342,6 +351,7 @@ public partial class Session
     /// </summary>
     public void FindObjectsFinal()
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -359,6 +369,7 @@ public partial class Session
     /// <returns>Handles of found objects</returns>
     public List<ObjectHandle> FindAllObjects(List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 

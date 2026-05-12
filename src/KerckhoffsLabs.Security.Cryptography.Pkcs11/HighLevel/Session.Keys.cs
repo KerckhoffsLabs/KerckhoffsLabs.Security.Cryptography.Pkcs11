@@ -14,6 +14,7 @@ public partial class Session
     /// <returns>Handle of the new key or set of domain parameters</returns>
     public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -55,6 +56,7 @@ public partial class Session
     /// <param name="privateKeyHandle">Handle of the new private key</param>
     public void GenerateKeyPair(Mechanism mechanism, List<ObjectAttribute> publicKeyAttributes, List<ObjectAttribute> privateKeyAttributes, out ObjectHandle publicKeyHandle, out ObjectHandle privateKeyHandle)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -108,6 +110,7 @@ public partial class Session
     /// <returns>Wrapped key</returns>
     public byte[] WrapKey(Mechanism mechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -154,6 +157,7 @@ public partial class Session
     /// <returns>Handle of the newly unwrapped key.</returns>
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed) throw new ObjectDisposedException(GetType().FullName);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappingKeyHandle);
@@ -174,6 +178,7 @@ public partial class Session
     /// <returns>Handle of unwrapped key</returns>
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, byte[] wrappedKey, List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -222,6 +227,7 @@ public partial class Session
     /// <returns>Handle of the new AES key.</returns>
     public ObjectHandle GenerateAesKey(int bitLength = 256, string? label = null, bool persistOnToken = false)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -263,6 +269,7 @@ public partial class Session
     /// <returns>(publicKeyHandle, privateKeyHandle) tuple.</returns>
     public (ObjectHandle pub, ObjectHandle priv) GenerateRsaKeyPair(int modulusBits = 2048, string? label = null, bool persistOnToken = false)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -318,6 +325,7 @@ public partial class Session
     /// <returns>(publicKeyHandle, privateKeyHandle) tuple.</returns>
     public (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(EcCurve curve = EcCurve.P256, string? label = null, bool persistOnToken = false)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 

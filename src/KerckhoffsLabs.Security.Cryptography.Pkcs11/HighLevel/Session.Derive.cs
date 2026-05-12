@@ -16,6 +16,7 @@ public partial class Session
     /// <returns>Handle of derived key</returns>
     public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -63,6 +64,7 @@ public partial class Session
     /// <returns>Handle of the derived AES key.</returns>
     public ObjectHandle DeriveSharedSecretEcdh(ObjectHandle myPrivateKeyHandle, ReadOnlySpan<byte> peerPublicPoint, int aesBitLength = 256)
     {
+        using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
