@@ -34,6 +34,8 @@ public sealed class SecureBufferTests
     {
         var buf = new SecureBuffer(4);
         buf.Dispose();
+        // Span<byte> is a ref struct — accessing it via a statement-body lambda avoids
+        // the ref-struct-in-expression-discard compile error.
         Assert.Throws<ObjectDisposedException>(() => { Span<byte> _ = buf.Span; });
     }
 

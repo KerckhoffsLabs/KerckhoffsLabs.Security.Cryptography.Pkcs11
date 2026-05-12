@@ -42,6 +42,13 @@ internal sealed class SecureBuffer : IDisposable
     /// <summary>
     /// Read/write span over the buffer. Valid until <see cref="Dispose"/> is called.
     /// </summary>
+    /// <remarks>
+    /// Intentionally mutable — callers write data into this buffer (e.g., encoding a PIN into
+    /// UTF-8 bytes) before passing it on. Contrast with <see cref="SecurePin.Pin"/>, which is
+    /// read-only because the PIN is immutable after construction.
+    /// Do not retain a span across a disposal boundary; retained spans will silently read zeroes
+    /// rather than throwing.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
     public Span<byte> Span
     {
