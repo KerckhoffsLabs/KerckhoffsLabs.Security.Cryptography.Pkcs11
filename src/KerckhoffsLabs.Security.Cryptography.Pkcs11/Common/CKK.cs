@@ -227,6 +227,9 @@ public enum CKK : uint
     /// </summary>
     CKK_CHACHA20 = 0x00000033,
 
+    /// <summary>Edwards-curve key (Ed25519, Ed448). PKCS#11 v3.0 §10.7.</summary>
+    CKK_EC_EDWARDS = 0x00000040,
+
     /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
