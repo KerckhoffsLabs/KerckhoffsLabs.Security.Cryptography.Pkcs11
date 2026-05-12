@@ -119,6 +119,62 @@ internal static class InsecureOperationGateTestCases
             session.CloseSession();
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Sign gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.Sign(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/> with an
+    /// insecure mechanism must throw <see cref="InsecureOperationException"/> when
+    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
+    /// </summary>
+    internal static void Assert_Sign_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var fakeHandle = new ObjectHandle(0);
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.Sign(mech, fakeHandle, Array.Empty<byte>()));
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Verify gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.Verify(Mechanism, ObjectHandle, ReadOnlySpan{byte}, ReadOnlySpan{byte}, out bool)"/>
+    /// with an insecure mechanism must throw <see cref="InsecureOperationException"/> when
+    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
+    /// </summary>
+    internal static void Assert_Verify_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var fakeHandle = new ObjectHandle(0);
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>(), out _));
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +222,26 @@ public sealed class InsecureOperationGateTests_Mock
     [Fact]
     public void Decrypt_AllowInsecure_BypassesGate_Mock()
         => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
+
+    // --- Sign gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_DES_MAC)]
+    [InlineData((ulong)CKM.CKM_DES3_MAC)]
+    public void Sign_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Sign_InsecureMechanismThrows(_backend, mech);
+
+    // --- Verify gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
+    public void Verify_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Verify_InsecureMechanismThrows(_backend, mech);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,4 +283,24 @@ public sealed class InsecureOperationGateTests_SoftHsm
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void Decrypt_AllowInsecure_BypassesGate_SoftHsm()
         => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
+
+    // --- Sign gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_DES_MAC)]
+    [InlineData((ulong)CKM.CKM_DES3_MAC)]
+    public void Sign_InsecureMechanismThrows_SoftHsm(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Sign_InsecureMechanismThrows(_backend, mech);
+
+    // --- Verify gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
+    public void Verify_InsecureMechanismThrows_SoftHsm(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Verify_InsecureMechanismThrows(_backend, mech);
 }
