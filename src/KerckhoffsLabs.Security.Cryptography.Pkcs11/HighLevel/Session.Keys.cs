@@ -17,10 +17,12 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GenerateKey", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::GenerateKey", _sessionId);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -56,10 +58,12 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GenerateKeyPair", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::GenerateKeyPair", _sessionId);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -107,8 +111,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::WrapKey", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
@@ -117,6 +119,10 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::WrapKey", _sessionId);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -137,6 +143,27 @@ public partial class Session
     }
 
     /// <summary>
+    /// Unwraps a wrapped key using the given unwrapping key and mechanism. Throws
+    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// </summary>
+    /// <param name="mechanism">Key-unwrap mechanism.</param>
+    /// <param name="unwrappingKeyHandle">Handle of the unwrapping key (private RSA, AES-WRAP key, etc.).</param>
+    /// <param name="wrappedKey">Wrapped key bytes to unwrap.</param>
+    /// <param name="attributes">Template for the resulting unwrapped key.</param>
+    /// <returns>Handle of the newly unwrapped key.</returns>
+    public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(unwrappingKeyHandle);
+        ArgumentNullException.ThrowIfNull(attributes);
+        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
+        // P/Invoke when perf profiling proves it matters.
+        byte[] buffer = wrappedKey.ToArray();
+        return UnwrapKey(mechanism, unwrappingKeyHandle, buffer, attributes);
+    }
+
+    /// <summary>
     /// Unwraps (i.e. decrypts) a wrapped key, creating a new private key or secret key object
     /// </summary>
     /// <param name="mechanism">Unwrapping mechanism</param>
@@ -149,8 +176,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::UnwrapKey", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
@@ -159,6 +184,10 @@ public partial class Session
 
         if (wrappedKey == null)
             throw new ArgumentNullException("wrappedKey");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::UnwrapKey", _sessionId);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
