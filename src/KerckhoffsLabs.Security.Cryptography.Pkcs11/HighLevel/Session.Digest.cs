@@ -17,13 +17,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DigestKey", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::DigestKey", _sessionId);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -52,6 +54,23 @@ public partial class Session
     }
 
     /// <summary>
+    /// Computes a digest over <paramref name="data"/> using the given mechanism. Throws
+    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list (raw MD5 / SHA-1) and <see cref="AllowInsecure"/> is false.
+    /// </summary>
+    /// <param name="mechanism">The digest mechanism (typically <see cref="CKM.CKM_SHA256"/> or stronger).</param>
+    /// <param name="data">Data to digest.</param>
+    /// <returns>Digest bytes (length depends on the mechanism — 32 for SHA-256, 48 for SHA-384, 64 for SHA-512).</returns>
+    public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
+        // P/Invoke when perf profiling proves it matters.
+        byte[] buffer = data.ToArray();
+        return Digest(mechanism, buffer);
+    }
+
+    /// <summary>
     /// Digests single-part data
     /// </summary>
     /// <param name="mechanism">Digesting mechanism</param>
@@ -62,10 +81,12 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Digest1", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Digest1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -103,10 +124,12 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Digest2", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Digest2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -126,10 +149,12 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Digest3", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Digest3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -183,8 +208,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DigestEncrypt1", _sessionId);
-
         if (digestingMechanism == null)
             throw new ArgumentNullException("digestingMechanism");
 
@@ -193,6 +216,11 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)digestingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DigestEncrypt1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -218,8 +246,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DigestEncrypt2", _sessionId);
-
         if (digestingMechanism == null)
             throw new ArgumentNullException("digestingMechanism");
 
@@ -228,6 +254,11 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)digestingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DigestEncrypt2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -253,8 +284,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DigestEncrypt3", _sessionId);
-
         if (digestingMechanism == null)
             throw new ArgumentNullException("digestingMechanism");
 
@@ -263,6 +292,11 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)digestingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DigestEncrypt3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -353,8 +387,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DecryptDigest1", _sessionId);
-
         if (digestingMechanism == null)
             throw new ArgumentNullException("digestingMechanism");
 
@@ -363,6 +395,11 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)digestingMechanism.Type);
+        GuardMechanism((CKM)decryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DecryptDigest1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -386,8 +423,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DecryptDigest2", _sessionId);
-
         if (digestingMechanism == null)
             throw new ArgumentNullException("digestingMechanism");
 
@@ -396,6 +431,11 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)digestingMechanism.Type);
+        GuardMechanism((CKM)decryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DecryptDigest2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -421,8 +461,6 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DecryptDigest3", _sessionId);
-
         if (digestingMechanism == null)
             throw new ArgumentNullException("digestingMechanism");
 
@@ -431,6 +469,11 @@ public partial class Session
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)digestingMechanism.Type);
+        GuardMechanism((CKM)decryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DecryptDigest3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
