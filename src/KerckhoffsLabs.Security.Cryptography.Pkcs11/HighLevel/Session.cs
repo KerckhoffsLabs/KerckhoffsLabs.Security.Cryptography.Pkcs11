@@ -455,6 +455,15 @@ public partial class Session
             case CKM.CKM_DES3_MAC_GENERAL:
                 throw new InsecureOperationException(mechanism,
                     "DES/3DES MAC is weak; use CKM_AES_CMAC or CKM_SHA256_HMAC instead.");
+            case CKM.CKM_DES_KEY_GEN:
+            case CKM.CKM_DES2_KEY_GEN:
+            case CKM.CKM_DES3_KEY_GEN:
+                throw new InsecureOperationException(mechanism,
+                    "DES and 3DES key generation produces deprecated keys; use CKM_AES_KEY_GEN instead.");
+            case CKM.CKM_DES3_ECB_ENCRYPT_DATA:
+            case CKM.CKM_DES3_CBC_ENCRYPT_DATA:
+                throw new InsecureOperationException(mechanism,
+                    "DES3 key-derive mechanisms are weak; use CKM_SP800_108-family KDFs or CKM_AES_CBC_ENCRYPT_DATA on a strong base key instead.");
             case CKM.CKM_AES_ECB:
                 throw new InsecureOperationException(mechanism,
                     "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
