@@ -154,6 +154,7 @@ public partial class Session
     /// <returns>Handle of the newly unwrapped key.</returns>
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
     {
+        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappingKeyHandle);
         ArgumentNullException.ThrowIfNull(attributes);
