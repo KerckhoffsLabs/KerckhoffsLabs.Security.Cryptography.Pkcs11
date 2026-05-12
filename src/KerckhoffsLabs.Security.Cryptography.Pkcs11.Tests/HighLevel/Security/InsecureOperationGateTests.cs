@@ -175,6 +175,33 @@ internal static class InsecureOperationGateTestCases
             try { session.CloseSession(); } catch { }
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Digest gate
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Calling <see cref="Session.Digest(Mechanism, byte[])"/> with an insecure mechanism must
+    /// throw <see cref="InsecureOperationException"/> when <see cref="Session.AllowInsecure"/> is
+    /// false (the default). The guard fires in managed code before any P/Invoke call, so no real
+    /// key material is needed.
+    /// </summary>
+    internal static void Assert_Digest_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var ex = Assert.Throws<InsecureOperationException>(() =>
+                session.Digest(mech, Array.Empty<byte>()));
+            Assert.Equal((CKM)mechanismId, ex.Mechanism);
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +269,14 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
     public void Verify_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Verify_InsecureMechanismThrows(_backend, mech);
+
+    // --- Digest gate ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_MD5)]
+    [InlineData((ulong)CKM.CKM_SHA_1)]
+    public void Digest_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Digest_InsecureMechanismThrows(_backend, mech);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,4 +338,12 @@ public sealed class InsecureOperationGateTests_SoftHsm
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
     public void Verify_InsecureMechanismThrows_SoftHsm(ulong mech)
         => InsecureOperationGateTestCases.Assert_Verify_InsecureMechanismThrows(_backend, mech);
+
+    // --- Digest gate ---
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData((ulong)CKM.CKM_MD5)]
+    [InlineData((ulong)CKM.CKM_SHA_1)]
+    public void Digest_InsecureMechanismThrows(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Digest_InsecureMechanismThrows(_backend, mech);
 }

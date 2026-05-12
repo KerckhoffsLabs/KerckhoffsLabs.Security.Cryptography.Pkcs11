@@ -1,0 +1,77 @@
+using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+
+public partial class Session
+{
+    /// <summary>
+    /// Seeds the token's random number generator with caller-supplied entropy. Useful when
+    /// the host has access to high-quality entropy (e.g., another RNG) that the caller wants
+    /// to mix into the token's internal state. Most callers should rely solely on the token's
+    /// internal RNG and call <see cref="GenerateRandom(int)"/> directly.
+    /// </summary>
+    /// <param name="seed">Entropy bytes to mix into the token RNG.</param>
+    public void SeedRandom(ReadOnlySpan<byte> seed)
+    {
+        byte[] buffer = seed.ToArray();
+        SeedRandom(buffer);
+    }
+
+    /// <summary>
+    /// Mixes additional seed material into the token's random number generator
+    /// </summary>
+    /// <param name="seed">Seed material</param>
+    public void SeedRandom(byte[] seed)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::SeedRandom", _sessionId);
+
+        if (seed == null)
+            throw new ArgumentNullException("seed");
+
+        CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed, (NativeCULong)(seed.Length));
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_SeedRandom", rv);
+    }
+
+    /// <summary>
+    /// Fills <paramref name="destination"/> with random bytes from the token's RNG and
+    /// returns the number of bytes written.
+    /// </summary>
+    /// <param name="destination">Buffer to fill. The full length of <paramref name="destination"/> is filled.</param>
+    /// <returns>Number of bytes written (equal to <paramref name="destination"/>.Length).</returns>
+    public int GenerateRandom(Span<byte> destination)
+    {
+        if (destination.IsEmpty) return 0;
+        byte[] random = GenerateRandom(destination.Length);
+        random.CopyTo(destination);
+        return destination.Length;
+    }
+
+    /// <summary>
+    /// Generates random or pseudo-random data
+    /// </summary>
+    /// <param name="length">Length in bytes of the random or pseudo-random data to be generated</param>
+    /// <returns>Generated random or pseudo-random data</returns>
+    public byte[] GenerateRandom(int length)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::GenerateRandom", _sessionId);
+
+        if (length < 1)
+            throw new ArgumentException("Value has to be positive number", "length");
+
+        byte[] randomData = new byte[length];
+        CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, (NativeCULong)(length));
+        if (rv != CKR.CKR_OK)
+            throw new Pkcs11Exception("C_GenerateRandom", rv);
+
+        return randomData;
+    }
+}
