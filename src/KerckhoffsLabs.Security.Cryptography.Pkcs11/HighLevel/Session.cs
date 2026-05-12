@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
@@ -179,47 +178,8 @@ public partial class Session
         }
     }
 
-    /// <summary>
-    /// Initializes the normal user's PIN
-    /// </summary>
-    /// <param name="userPin">Pin value</param>
-    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
-              "and may be interned). string is allowed for backward compatibility.",
-              error: false)]
-    public void InitPin(string userPin)
-    {
-        if (userPin == null)
-        {
-            // Null-pin path preserved for backward compatibility.
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
-            _logger.Debug("Session({0})::InitPin1", _sessionId);
-            CKR rv0 = _pkcs11Library.C_InitPIN(_sessionId, null, (NativeCULong)0);
-            if (rv0 != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_InitPIN", rv0);
-            return;
-        }
-
-        using var sp = new SecurePin(userPin);
-        InitPin(sp);
-    }
-
-    /// <summary>
-    /// Initializes the normal user's PIN
-    /// </summary>
-    /// <param name="userPin">Pin value</param>
-    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
-              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
-              error: false)]
-    public void InitPin(byte[] userPin)
-    {
-        ArgumentNullException.ThrowIfNull(userPin);
-        using var sp = new SecurePin(userPin);
-        InitPin(sp);
-    }
-
     // -----------------------------------------------------------------------
-    // SetPin — SecurePin overload (canonical) + obsolete legacy overloads
+    // SetPin
     // -----------------------------------------------------------------------
 
     /// <summary>
@@ -253,66 +213,6 @@ public partial class Session
             CryptographicOperations.ZeroMemory(oldTmp);
             CryptographicOperations.ZeroMemory(newTmp);
         }
-    }
-
-    /// <summary>
-    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
-    /// </summary>
-    /// <param name="oldPin">Old PIN value</param>
-    /// <param name="newPin">New PIN value</param>
-    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
-              "and may be interned). string is allowed for backward compatibility.",
-              error: false)]
-    public void SetPin(string oldPin, string newPin)
-    {
-        // Null-pin paths preserved for backward compatibility — pass null/empty to native
-        // for either old or new (or both). SecurePin rejects null strings, so we bypass it
-        // when either argument is null and call the underlying P/Invoke directly.
-        if (oldPin == null || newPin == null)
-        {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
-
-            _logger.Debug("Session({0})::SetPin1", _sessionId);
-
-            byte[]? oldTmp = oldPin is null ? null : Encoding.UTF8.GetBytes(oldPin);
-            byte[]? newTmp = newPin is null ? null : Encoding.UTF8.GetBytes(newPin);
-            NativeCULong oldLen = oldTmp is null ? (NativeCULong)0 : (NativeCULong)oldTmp.Length;
-            NativeCULong newLen = newTmp is null ? (NativeCULong)0 : (NativeCULong)newTmp.Length;
-            try
-            {
-                CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldTmp, oldLen, newTmp, newLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_SetPIN", rv);
-            }
-            finally
-            {
-                if (oldTmp != null) CryptographicOperations.ZeroMemory(oldTmp);
-                if (newTmp != null) CryptographicOperations.ZeroMemory(newTmp);
-            }
-            return;
-        }
-
-        using var oldSp = new SecurePin(oldPin);
-        using var newSp = new SecurePin(newPin);
-        SetPin(oldSp, newSp);
-    }
-
-    /// <summary>
-    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
-    /// </summary>
-    /// <param name="oldPin">Old PIN value</param>
-    /// <param name="newPin">New PIN value</param>
-    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
-              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
-              error: false)]
-    public void SetPin(byte[] oldPin, byte[] newPin)
-    {
-        ArgumentNullException.ThrowIfNull(oldPin);
-        ArgumentNullException.ThrowIfNull(newPin);
-        using var oldSp = new SecurePin(oldPin);
-        using var newSp = new SecurePin(newPin);
-        SetPin(oldSp, newSp);
     }
 
     /// <summary>
@@ -417,49 +317,6 @@ public partial class Session
         {
             CryptographicOperations.ZeroMemory(tmp);
         }
-    }
-
-    /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
-              "and may be interned). string is allowed for backward compatibility.",
-              error: false)]
-    public void Login(CKU userType, string pin)
-    {
-        if (pin == null)
-        {
-            // Null-pin path preserved for backward compatibility.
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
-            _logger.Debug("Session({0})::Login1", _sessionId);
-            if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
-                _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
-            CKR rv0 = _pkcs11Library.C_Login(_sessionId, userType, null, (NativeCULong)0);
-            if (rv0 != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv0);
-            return;
-        }
-
-        using var sp = new SecurePin(pin);
-        Login(userType, sp);
-    }
-
-    /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
-              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
-              error: false)]
-    public void Login(CKU userType, byte[] pin)
-    {
-        ArgumentNullException.ThrowIfNull(pin);
-        using var sp = new SecurePin(pin);
-        Login(userType, sp);
     }
 
     /// <summary>
