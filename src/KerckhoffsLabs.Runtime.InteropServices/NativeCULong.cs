@@ -22,6 +22,14 @@ namespace KerckhoffsLabs.Runtime.InteropServices;
 /// This type has 32-bits of storage on all Windows platforms and 32-bit Unix-based platforms.
 /// It has 64-bits of storage on 64-bit Unix platforms.
 /// </summary>
+/// <remarks>
+/// The BCL ships <see cref="System.Runtime.InteropServices.CULong"/> (added in .NET 6) with the same
+/// 32-/64-bit platform contract, but it is a bare struct wrapper exposing only a <see cref="System.Runtime.InteropServices.CULong.Value"/>
+/// property — it does not implement <see cref="IBinaryInteger{TSelf}"/>, the generic-math interface
+/// hierarchy, or <see cref="ISpanFormattable"/>. <see cref="NativeCULong"/> implements all of those,
+/// so it can be used directly in generic numeric code (e.g. <c>T : IBinaryInteger&lt;T&gt;</c>) and in
+/// P/Invoke marshalling without an additional unwrap step.
+/// </remarks>
 [CLSCompliant(false)]
 public readonly struct NativeCULong
     : IEquatable<NativeCULong>,
@@ -117,9 +125,9 @@ public readonly struct NativeCULong
     /// <summary>
     /// Returns a value indicating whether this instance is equal to a specified object.
     /// </summary>
-    /// <param name="o">An object to compare with this instance.</param>
-    /// <returns><c>true</c> if <paramref name="o"/> is an instance of <see cref="NativeCULong"/> and equals the value of this instance; otherwise, <c>false</c>.</returns>
-    public override bool Equals([NotNullWhen(true)] object? o) => o is NativeCULong other && Equals(other);
+    /// <param name="obj">An object to compare with this instance.</param>
+    /// <returns><c>true</c> if <paramref name="obj"/> is an instance of <see cref="NativeCULong"/> and equals the value of this instance; otherwise, <c>false</c>.</returns>
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is NativeCULong other && Equals(other);
 
     /// <summary>
     /// Returns a value indicating whether this instance is equal to a specified <see cref="NativeCULong"/> value.
@@ -316,7 +324,7 @@ public readonly struct NativeCULong
         {
             return CompareTo(other);
         }
-        return (value is null) ? 1 : throw new ArgumentException("Object must be of type NativeCULong.");
+        return (value is null) ? 1 : throw new ArgumentException("Object must be of type NativeCULong.", nameof(value));
     }
 
     public int CompareTo(NativeCULong value) => _value.CompareTo(value._value);
@@ -741,13 +749,13 @@ public readonly struct NativeCULong
     // IShiftOperators
     //
 
-    /// <inheritdoc cref="IShiftOperators{TSelf, TResult}.op_LeftShift(TSelf, int)" />
+    /// <inheritdoc cref="IShiftOperators{TSelf, TOther, TResult}.op_LeftShift(TSelf, TOther)" />
     public static NativeCULong operator <<(NativeCULong value, int shiftAmount) => new(value._value << shiftAmount);
 
-    /// <inheritdoc cref="IShiftOperators{TSelf, TResult}.op_RightShift(TSelf, int)" />
+    /// <inheritdoc cref="IShiftOperators{TSelf, TOther, TResult}.op_RightShift(TSelf, TOther)" />
     public static NativeCULong operator >>(NativeCULong value, int shiftAmount) => new(value._value >> shiftAmount);
 
-    /// <inheritdoc cref="IShiftOperators{TSelf, TResult}.op_UnsignedRightShift(TSelf, int)" />
+    /// <inheritdoc cref="IShiftOperators{TSelf, TOther, TResult}.op_UnsignedRightShift(TSelf, TOther)" />
     public static NativeCULong operator >>>(NativeCULong value, int shiftAmount) => new(value._value >>> shiftAmount);
 
     //
