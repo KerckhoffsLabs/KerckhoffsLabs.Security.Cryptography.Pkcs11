@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
@@ -54,9 +55,8 @@ internal static class TestKeys
         var slot = backend.Library.GetSlotList(SlotsType.WithTokenPresent)
             .First(s => (NativeCULong)s.SlotId == backend.SlotId);
         var session = slot.OpenSession(SessionType.ReadWrite);
-#pragma warning disable CS0618 // byte[] overload kept for backward-compat; suppress in legacy call site
-        session.Login(CKU.CKU_USER, backend.UserPin.ToArray());
-#pragma warning restore CS0618
+        using var pin = new SecurePin(backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
         return session;
     }
 
