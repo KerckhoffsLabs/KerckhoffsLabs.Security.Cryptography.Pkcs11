@@ -15,8 +15,8 @@ internal static class GenerateEcKeyPairTestCases
             var (pub, priv) = session.GenerateEcKeyPair(curve: EcCurve.P256);
             try
             {
-                Assert.NotNull(pub);
-                Assert.NotNull(priv);
+                Assert.NotEqual(0UL, pub.ObjectId);
+                Assert.NotEqual(0UL, priv.ObjectId);
             }
             finally
             {
@@ -30,6 +30,29 @@ internal static class GenerateEcKeyPairTestCases
             session.CloseSession();
         }
     }
+
+    internal static void Assert_RejectsInvalidCurve(IPkcs11Backend backend)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateEcKeyPair(curve: (EcCurve)99));
+        }
+        finally
+        {
+            session.Logout();
+            session.CloseSession();
+        }
+    }
+}
+
+[Collection("Mock")]
+public sealed class GenerateEcKeyPairTests_Mock(MockBackendFixture f)
+{
+    private readonly MockBackendFixture _backend = f;
+
+    [Fact]
+    public void RejectsInvalidCurve() => GenerateEcKeyPairTestCases.Assert_RejectsInvalidCurve(_backend);
 }
 
 [Collection("SoftHsm")]
@@ -40,4 +63,7 @@ public sealed class GenerateEcKeyPairTests_SoftHsm(SoftHsmBackendFixture f)
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void GeneratesP256KeyPair() => GenerateEcKeyPairTestCases.Assert_GeneratesP256KeyPair(_backend);
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void RejectsInvalidCurve() => GenerateEcKeyPairTestCases.Assert_RejectsInvalidCurve(_backend);
 }

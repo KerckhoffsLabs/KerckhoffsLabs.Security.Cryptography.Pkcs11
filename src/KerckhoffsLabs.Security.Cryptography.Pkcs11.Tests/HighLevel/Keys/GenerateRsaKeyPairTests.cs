@@ -30,8 +30,8 @@ internal static class GenerateRsaKeyPairTestCases
             var (pub, priv) = session.GenerateRsaKeyPair(modulusBits: 2048);
             try
             {
-                Assert.NotNull(pub);
-                Assert.NotNull(priv);
+                Assert.NotEqual(0UL, pub.ObjectId);
+                Assert.NotEqual(0UL, priv.ObjectId);
             }
             finally
             {

@@ -31,7 +31,7 @@ internal static class GenerateAesKeyTestCases
             ObjectHandle key = session.GenerateAesKey(bitLength: 256);
             try
             {
-                Assert.NotNull(key);
+                Assert.NotEqual(0UL, key.ObjectId);
                 var attrs = session.GetAttributeValue(key, new List<CKA> { CKA.CKA_VALUE_LEN });
                 try
                 {
