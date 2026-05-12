@@ -1598,6 +1598,16 @@ public enum CKM : uint
     CKM_GOST28147_KEY_WRAP = 0x00001224,
 
     /// <summary>
+    /// ChaCha20-Poly1305 AEAD stream cipher and MAC (PKCS#11 v3.0)
+    /// </summary>
+    CKM_CHACHA20_POLY1305 = 0x00001250,
+
+    /// <summary>
+    /// Salsa20-Poly1305 AEAD stream cipher and MAC (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SALSA20_POLY1305 = 0x00001251,
+
+    /// <summary>
     /// The DSA domain parameter generation mechanism
     /// </summary>
     CKM_DSA_PARAMETER_GEN = 0x00002000,

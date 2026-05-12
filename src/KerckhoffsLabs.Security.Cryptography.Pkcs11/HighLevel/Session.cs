@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 /// <summary>
 /// Class representing a logical connection between an application and a token
 /// </summary>
-public class Session
+public partial class Session
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
@@ -40,7 +40,7 @@ public class Session
             if (_disposed)
                 throw new ObjectDisposedException(GetType().FullName);
 
-            return Convert.ToUInt64(_sessionId);
+            return (ulong)_sessionId;
         }
     }
 
@@ -69,6 +69,32 @@ public class Session
             _logger.Debug("Session({0})::CloseWhenDisposed", _sessionId);
 
             _closeWhenDisposed = value;
+        }
+    }
+
+    /// <summary>Backing field for <see cref="AllowInsecure"/>.</summary>
+    protected bool _allowInsecure = false;
+
+    /// <summary>
+    /// When <c>true</c>, this session does not reject operations that use mechanisms flagged as
+    /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, etc.). Default is <c>false</c>.
+    /// Set explicitly per session; never set this globally.
+    /// </summary>
+    public bool AllowInsecure
+    {
+        get
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
+
+            return _allowInsecure;
+        }
+        set
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
+
+            _allowInsecure = value;
         }
     }
 
@@ -760,304 +786,6 @@ public class Session
             throw new Pkcs11Exception("C_FindObjectsFinal", rv);
 
         return foundObjects;
-    }
-
-    /// <summary>
-    /// Encrypts single-part data
-    /// </summary>
-    /// <param name="mechanism">Encryption mechanism</param>
-    /// <param name="keyHandle">Handle of the encryption key</param>
-    /// <param name="data">Data to be encrypted</param>
-    /// <returns>Encrypted data</returns>
-    public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Encrypt1", _sessionId);
-
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
-
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
-
-        if (data == null)
-            throw new ArgumentNullException("data");
-
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
-
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptInit", rv);
-
-        NativeCULong encryptedDataLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), null, ref encryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Encrypt", rv);
-
-        byte[] encryptedData = new byte[(int)encryptedDataLen];
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), encryptedData, ref encryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Encrypt", rv);
-
-        if (encryptedData.Length != (int)(encryptedDataLen))
-            Array.Resize(ref encryptedData, (int)(encryptedDataLen));
-
-        return encryptedData;
-    }
-
-    /// <summary>
-    /// Encrypts multi-part data
-    /// </summary>
-    /// <param name="mechanism">Encryption mechanism</param>
-    /// <param name="keyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be encrypted should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Encrypt2", _sessionId);
-
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
-        
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
-        
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
-
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
-
-        Encrypt(mechanism, keyHandle, inputStream, outputStream, 4096);
-    }
-
-    /// <summary>
-    /// Encrypts multi-part data
-    /// </summary>
-    /// <param name="mechanism">Encryption mechanism</param>
-    /// <param name="keyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be encrypted should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <param name="bufferLength">Size of read buffer in bytes</param>
-    public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Encrypt3", _sessionId);
-
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
-        
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
-        
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
-        
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
-
-        if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
-
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
-
-        CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptInit", rv);
-
-        byte[] part = new byte[bufferLength];
-        byte[] encryptedPart = new byte[bufferLength];
-        NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
-        
-        int bytesRead = 0;
-        while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
-        {
-            encryptedPartLen = (NativeCULong)(encryptedPart.Length);
-            rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-            if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_EncryptUpdate", rv);
-
-            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-            {
-                encryptedPart = new byte[(int)encryptedPartLen];
-
-                rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_EncryptUpdate", rv);
-            }
-
-            outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
-        }
-
-        byte[] lastEncryptedPart = null;
-        NativeCULong lastEncryptedPartLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
-
-        lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
-        rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
-
-        if (lastEncryptedPartLen > (NativeCULong)0)
-            outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
-    }
-
-    /// <summary>
-    /// Decrypts single-part data
-    /// </summary>
-    /// <param name="mechanism">Decryption mechanism</param>
-    /// <param name="keyHandle">Handle of the decryption key</param>
-    /// <param name="encryptedData">Data to be decrypted</param>
-    /// <returns>Decrypted data</returns>
-    public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] encryptedData)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Decrypt1", _sessionId);
-
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
-        
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
-        
-        if (encryptedData == null)
-            throw new ArgumentNullException("encryptedData");
-
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
-
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptInit", rv);
-
-        NativeCULong decryptedDataLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), null, ref decryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Decrypt", rv);
-
-        byte[] decryptedData = new byte[(int)decryptedDataLen];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), decryptedData, ref decryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Decrypt", rv);
-
-        if (decryptedData.Length != (int)(decryptedDataLen))
-            Array.Resize(ref decryptedData, (int)(decryptedDataLen));
-
-        return decryptedData;
-    }
-
-    /// <summary>
-    /// Decrypts multi-part data
-    /// </summary>
-    /// <param name="mechanism">Decryption mechanism</param>
-    /// <param name="keyHandle">Handle of the decryption key</param>
-    /// <param name="inputStream">Input stream from which encrypted data should be read</param>
-    /// <param name="outputStream">Output stream where decrypted data should be written</param>
-    public void Decrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Decrypt2", _sessionId);
-
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
-        
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
-        
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
-        
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
-
-        Decrypt(mechanism, keyHandle, inputStream, outputStream, 4096);
-    }
-
-    /// <summary>
-    /// Decrypts multi-part data
-    /// </summary>
-    /// <param name="mechanism">Decryption mechanism</param>
-    /// <param name="keyHandle">Handle of the decryption key</param>
-    /// <param name="inputStream">Input stream from which encrypted data should be read</param>
-    /// <param name="outputStream">Output stream where decrypted data should be written</param>
-    /// <param name="bufferLength">Size of read buffer in bytes</param>
-    public void Decrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Decrypt3", _sessionId);
-
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
-        
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
-        
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
-        
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
-        
-        if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
-
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
-
-        CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptInit", rv);
-
-        byte[] encryptedPart = new byte[bufferLength];
-        byte[] part = new byte[bufferLength];
-        NativeCULong partLen = (NativeCULong)(part.Length);
-
-        int bytesRead = 0;
-        while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
-        {
-            partLen = (NativeCULong)(part.Length);
-            rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-            if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_DecryptUpdate", rv);
-
-            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-            {
-                part = new byte[(int)partLen];
-
-                rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_DecryptUpdate", rv);
-            }
-
-            outputStream.Write(part, 0, (int)(partLen));
-        }
-
-        byte[] lastPart = null;
-        NativeCULong lastPartLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
-
-        lastPart = new byte[(int)lastPartLen];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
-
-        if (lastPartLen > (NativeCULong)0)
-            outputStream.Write(lastPart, 0, (int)(lastPartLen));
     }
 
     /// <summary>
@@ -3227,6 +2955,36 @@ public class Session
         CKR rv = _pkcs11Library.C_CancelFunction(_sessionId);
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_CancelFunction", rv);
+    }
+
+    /// <summary>
+    /// Checks the given mechanism against the insecure-mechanism set and throws
+    /// <see cref="InsecureOperationException"/> if it is insecure and <see cref="AllowInsecure"/>
+    /// is false.
+    /// </summary>
+    private void GuardMechanism(CKM mechanism)
+    {
+        if (AllowInsecure) return;
+
+        switch (mechanism)
+        {
+            case CKM.CKM_RSA_PKCS:
+                throw new InsecureOperationException(mechanism,
+                    "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks; use CKM_RSA_PKCS_OAEP instead.");
+            case CKM.CKM_DES_ECB:
+            case CKM.CKM_DES_CBC:
+            case CKM.CKM_DES_CBC_PAD:
+            case CKM.CKM_DES3_ECB:
+            case CKM.CKM_DES3_CBC:
+            case CKM.CKM_DES3_CBC_PAD:
+                throw new InsecureOperationException(mechanism,
+                    "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CBC_PAD) instead.");
+            case CKM.CKM_AES_ECB:
+                throw new InsecureOperationException(mechanism,
+                    "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
+            default:
+                return;
+        }
     }
 
     #region IDisposable

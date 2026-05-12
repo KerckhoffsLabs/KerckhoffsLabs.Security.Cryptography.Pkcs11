@@ -37,7 +37,7 @@ public class MechanismInfo
     {
         get
         {
-            return Convert.ToUInt64(_minKeySize);
+            return (ulong)_minKeySize;
         }
     }
 
@@ -53,7 +53,7 @@ public class MechanismInfo
     {
         get
         {
-            return Convert.ToUInt64(_maxKeySize);
+            return (ulong)_maxKeySize;
         }
     }
 

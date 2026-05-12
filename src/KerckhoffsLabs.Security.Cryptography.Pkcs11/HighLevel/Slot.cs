@@ -32,7 +32,7 @@ public class Slot
     {
         get
         {
-            return Convert.ToUInt64(_slotId);
+            return (ulong)_slotId;
         }
     }
 

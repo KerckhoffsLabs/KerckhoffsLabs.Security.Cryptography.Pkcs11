@@ -20,7 +20,7 @@ public class MechanismFlags
     {
         get
         {
-            return Convert.ToUInt64(_flags);
+            return (ulong)_flags;
         }
     }
 

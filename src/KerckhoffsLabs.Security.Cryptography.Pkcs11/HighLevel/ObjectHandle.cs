@@ -20,7 +20,7 @@ public class ObjectHandle
     {
         get
         {
-            return Convert.ToUInt64(_objectId);
+            return (ulong)_objectId;
         }
     }
 

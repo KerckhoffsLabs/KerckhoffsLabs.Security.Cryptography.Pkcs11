@@ -1,38 +1,51 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
 
 /// <summary>
-/// End-to-end smoke check that the library loads pkcs11-mock and
-/// completes a minimal Cryptoki lifecycle: C_Initialize → C_GetInfo →
-/// C_Finalize.
-///
-/// This test is the bridge that proves the build, the marshalling,
-/// the project reference, and the mock-binary-copy MSBuild target
-/// are all wired correctly. Every later phase relies on it.
+/// Shared assertions for the smoke tests. Not an xUnit test class itself — concrete
+/// subclasses wire up the xUnit attributes so each backend can control skip logic.
 /// </summary>
-public class SmokeTests
+internal static class SmokeTestAssertions
 {
-    [Fact]
-    public void LoadInitializeFinalize_OnMock_Succeeds()
+    internal static void AssertGetInfo_ReturnsNonEmptyManufacturerAndVersion(IPkcs11Backend backend)
     {
-        string libPath = Settings.MockLibraryPath;
-
-        Assert.True(
-            File.Exists(libPath),
-            $"pkcs11-mock library not found at '{libPath}'. " +
-            $"Ensure the submodule is initialized and the build script has run. " +
-            $"From repo root: build/build-pkcs11-mock.sh <test-output-dir>");
-
-        using var library = new Pkcs11Library(libPath);
-
-        LibraryInfo info = library.GetInfo();
-
-        // pkcs11-mock identifies itself with the string "Pkcs11Interop Project".
-        // We assert manufacturer and cryptoki version are non-empty rather than
-        // checking exact strings, so a future mock-version bump doesn't break
-        // us spuriously.
+        LibraryInfo info = backend.Library.GetInfo();
         Assert.False(string.IsNullOrWhiteSpace(info.ManufacturerId));
         Assert.False(string.IsNullOrWhiteSpace(info.CryptokiVersion));
     }
+}
+
+/// <summary>
+/// End-to-end smoke check against pkcs11-mock. Always runs — the mock library is
+/// always present in the test output directory.
+/// </summary>
+[Collection("Mock")]
+public sealed class SmokeTests_Mock
+{
+    private readonly MockBackendFixture _backend;
+    public SmokeTests_Mock(MockBackendFixture f) { _backend = f; }
+
+    [Fact]
+    public void GetInfo_ReturnsNonEmptyManufacturerAndVersion()
+        => SmokeTestAssertions.AssertGetInfo_ReturnsNonEmptyManufacturerAndVersion(_backend);
+}
+
+/// <summary>
+/// End-to-end smoke check against SoftHSM2. Skipped automatically when SoftHSM2 is
+/// not installed on the host (library binary not found by <see cref="SoftHsmBackendFixture"/>).
+/// </summary>
+[Collection("SoftHsm")]
+public sealed class SmokeTests_SoftHsm
+{
+    private readonly SoftHsmBackendFixture _backend;
+    public SmokeTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void GetInfo_ReturnsNonEmptyManufacturerAndVersion()
+        => SmokeTestAssertions.AssertGetInfo_ReturnsNonEmptyManufacturerAndVersion(_backend);
 }

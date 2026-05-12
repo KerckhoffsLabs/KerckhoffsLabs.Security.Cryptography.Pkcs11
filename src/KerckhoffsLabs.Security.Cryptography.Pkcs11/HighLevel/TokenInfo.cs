@@ -21,7 +21,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_slotId);
+            return (ulong)_slotId;
         }
     }
 
@@ -117,7 +117,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_maxSessionCount);
+            return (ulong)_maxSessionCount;
         }
     }
 
@@ -133,7 +133,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_sessionCount);
+            return (ulong)_sessionCount;
         }
     }
 
@@ -149,7 +149,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_maxRwSessionCount);
+            return (ulong)_maxRwSessionCount;
         }
     }
 
@@ -165,7 +165,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_rwSessionCount);
+            return (ulong)_rwSessionCount;
         }
     }
 
@@ -181,7 +181,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_maxPinLen);
+            return (ulong)_maxPinLen;
         }
     }
 
@@ -197,7 +197,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_minPinLen);
+            return (ulong)_minPinLen;
         }
     }
 
@@ -213,7 +213,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_totalPublicMemory);
+            return (ulong)_totalPublicMemory;
         }
     }
 
@@ -229,7 +229,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_freePublicMemory);
+            return (ulong)_freePublicMemory;
         }
     }
 
@@ -245,7 +245,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_totalPrivateMemory);
+            return (ulong)_totalPrivateMemory;
         }
     }
 
@@ -261,7 +261,7 @@ public class TokenInfo
     {
         get
         {
-            return Convert.ToUInt64(_freePrivateMemory);
+            return (ulong)_freePrivateMemory;
         }
     }
 

@@ -16,7 +16,7 @@ internal delegate NativeCULong C_GetInfoDelegate(ref CK_INFO info);
 internal delegate NativeCULong C_GetFunctionListDelegate(out IntPtr functionList);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetSlotListDelegate([MarshalAs(UnmanagedType.U1)] bool tokenPresent, NativeCULong[] slotList, ref NativeCULong count);
+internal delegate NativeCULong C_GetSlotListDelegate([MarshalAs(UnmanagedType.U1)] bool tokenPresent, [In, Out] NativeCULong[] slotList, ref NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetSlotInfoDelegate(NativeCULong slotId, ref CK_SLOT_INFO info);
@@ -25,7 +25,7 @@ internal delegate NativeCULong C_GetSlotInfoDelegate(NativeCULong slotId, ref CK
 internal delegate NativeCULong C_GetTokenInfoDelegate(NativeCULong slotId, ref CK_TOKEN_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetMechanismListDelegate(NativeCULong slotId, NativeCULong[] mechanismList, ref NativeCULong count);
+internal delegate NativeCULong C_GetMechanismListDelegate(NativeCULong slotId, [In, Out] NativeCULong[] mechanismList, ref NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetMechanismInfoDelegate(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info);
@@ -52,7 +52,7 @@ internal delegate NativeCULong C_CloseAllSessionsDelegate(NativeCULong slotId);
 internal delegate NativeCULong C_GetSessionInfoDelegate(NativeCULong session, ref CK_SESSION_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetOperationStateDelegate(NativeCULong session, byte[] operationState, ref NativeCULong operationStateLen);
+internal delegate NativeCULong C_GetOperationStateDelegate(NativeCULong session, [In, Out] byte[] operationState, ref NativeCULong operationStateLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_SetOperationStateDelegate(NativeCULong session, byte[] operationState, NativeCULong operationStateLen, NativeCULong encryptionKey, NativeCULong authenticationKey);
@@ -85,7 +85,7 @@ internal delegate NativeCULong C_SetAttributeValueDelegate(NativeCULong session,
 internal delegate NativeCULong C_FindObjectsInitDelegate(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_FindObjectsDelegate(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
+internal delegate NativeCULong C_FindObjectsDelegate(NativeCULong session, [In, Out] NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FindObjectsFinalDelegate(NativeCULong session);
@@ -94,31 +94,31 @@ internal delegate NativeCULong C_FindObjectsFinalDelegate(NativeCULong session);
 internal delegate NativeCULong C_EncryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] encryptedData, ref NativeCULong encryptedDataLen);
+internal delegate NativeCULong C_EncryptDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] encryptedData, ref NativeCULong encryptedDataLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen);
+internal delegate NativeCULong C_EncryptUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen, [In, Out] byte[] encryptedPart, ref NativeCULong encryptedPartLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptFinalDelegate(NativeCULong session, byte[] lastEncryptedPart, ref NativeCULong lastEncryptedPartLen);
+internal delegate NativeCULong C_EncryptFinalDelegate(NativeCULong session, [In, Out] byte[] lastEncryptedPart, ref NativeCULong lastEncryptedPartLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_DecryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptDelegate(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[] data, ref NativeCULong dataLen);
+internal delegate NativeCULong C_DecryptDelegate(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, [In, Out] byte[] data, ref NativeCULong dataLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptUpdateDelegate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen);
+internal delegate NativeCULong C_DecryptUpdateDelegate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, [In, Out] byte[] part, ref NativeCULong partLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptFinalDelegate(NativeCULong session, byte[] lastPart, ref NativeCULong lastPartLen);
+internal delegate NativeCULong C_DecryptFinalDelegate(NativeCULong session, [In, Out] byte[] lastPart, ref NativeCULong lastPartLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_DigestInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DigestDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] digest, ref NativeCULong digestLen);
+internal delegate NativeCULong C_DigestDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] digest, ref NativeCULong digestLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_DigestUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen);
@@ -127,25 +127,25 @@ internal delegate NativeCULong C_DigestUpdateDelegate(NativeCULong session, byte
 internal delegate NativeCULong C_DigestKeyDelegate(NativeCULong session, NativeCULong key);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DigestFinalDelegate(NativeCULong session, byte[] digest, ref NativeCULong digestLen);
+internal delegate NativeCULong C_DigestFinalDelegate(NativeCULong session, [In, Out] byte[] digest, ref NativeCULong digestLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_SignInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
+internal delegate NativeCULong C_SignDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] signature, ref NativeCULong signatureLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_SignUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignFinalDelegate(NativeCULong session, byte[] signature, ref NativeCULong signatureLen);
+internal delegate NativeCULong C_SignFinalDelegate(NativeCULong session, [In, Out] byte[] signature, ref NativeCULong signatureLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_SignRecoverInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignRecoverDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
+internal delegate NativeCULong C_SignRecoverDelegate(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] signature, ref NativeCULong signatureLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_VerifyInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
@@ -163,19 +163,19 @@ internal delegate NativeCULong C_VerifyFinalDelegate(NativeCULong session, byte[
 internal delegate NativeCULong C_VerifyRecoverInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifyRecoverDelegate(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[] data, ref NativeCULong dataLen);
+internal delegate NativeCULong C_VerifyRecoverDelegate(NativeCULong session, byte[] signature, NativeCULong signatureLen, [In, Out] byte[] data, ref NativeCULong dataLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DigestEncryptUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen);
+internal delegate NativeCULong C_DigestEncryptUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen, [In, Out] byte[] encryptedPart, ref NativeCULong encryptedPartLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptDigestUpdateDelegate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen);
+internal delegate NativeCULong C_DecryptDigestUpdateDelegate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, [In, Out] byte[] part, ref NativeCULong partLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignEncryptUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen);
+internal delegate NativeCULong C_SignEncryptUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen, [In, Out] byte[] encryptedPart, ref NativeCULong encryptedPartLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptVerifyUpdateDelegate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen);
+internal delegate NativeCULong C_DecryptVerifyUpdateDelegate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, [In, Out] byte[] part, ref NativeCULong partLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GenerateKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong key);
@@ -184,7 +184,7 @@ internal delegate NativeCULong C_GenerateKeyDelegate(NativeCULong session, ref C
 internal delegate NativeCULong C_GenerateKeyPairDelegate(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, NativeCULong publicKeyAttributeCount, CK_ATTRIBUTE[] privateKeyTemplate, NativeCULong privateKeyAttributeCount, ref NativeCULong publicKey, ref NativeCULong privateKey);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_WrapKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
+internal delegate NativeCULong C_WrapKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_UnwrapKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key);
@@ -196,7 +196,7 @@ internal delegate NativeCULong C_DeriveKeyDelegate(NativeCULong session, ref CK_
 internal delegate NativeCULong C_SeedRandomDelegate(NativeCULong session, byte[] seed, NativeCULong seedLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GenerateRandomDelegate(NativeCULong session, byte[] randomData, NativeCULong randomLen);
+internal delegate NativeCULong C_GenerateRandomDelegate(NativeCULong session, [In, Out] byte[] randomData, NativeCULong randomLen);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetFunctionStatusDelegate(NativeCULong session);
@@ -230,7 +230,7 @@ internal partial class Delegates
         internal static extern NativeCULong C_GetFunctionList(out IntPtr functionList);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_GetSlotList([MarshalAs(UnmanagedType.U1)] bool tokenPresent, NativeCULong[] slotList, ref NativeCULong count);
+        internal static extern NativeCULong C_GetSlotList([MarshalAs(UnmanagedType.U1)] bool tokenPresent, [In, Out] NativeCULong[] slotList, ref NativeCULong count);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info);
@@ -239,7 +239,7 @@ internal partial class Delegates
         internal static extern NativeCULong C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_GetMechanismList(NativeCULong slotId, NativeCULong[] mechanismList, ref NativeCULong count);
+        internal static extern NativeCULong C_GetMechanismList(NativeCULong slotId, [In, Out] NativeCULong[] mechanismList, ref NativeCULong count);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info);
@@ -266,7 +266,7 @@ internal partial class Delegates
         internal static extern NativeCULong C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_GetOperationState(NativeCULong session, byte[] operationState, ref NativeCULong operationStateLen);
+        internal static extern NativeCULong C_GetOperationState(NativeCULong session, [In, Out] byte[] operationState, ref NativeCULong operationStateLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_SetOperationState(NativeCULong session, byte[] operationState, NativeCULong operationStateLen, NativeCULong encryptionKey, NativeCULong authenticationKey);
@@ -299,7 +299,7 @@ internal partial class Delegates
         internal static extern NativeCULong C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
+        internal static extern NativeCULong C_FindObjects(NativeCULong session, [In, Out] NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_FindObjectsFinal(NativeCULong session);
@@ -308,31 +308,31 @@ internal partial class Delegates
         internal static extern NativeCULong C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] encryptedData, ref NativeCULong encryptedDataLen);
+        internal static extern NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] encryptedData, ref NativeCULong encryptedDataLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_EncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen);
+        internal static extern NativeCULong C_EncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, [In, Out] byte[] encryptedPart, ref NativeCULong encryptedPartLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_EncryptFinal(NativeCULong session, byte[] lastEncryptedPart, ref NativeCULong lastEncryptedPartLen);
+        internal static extern NativeCULong C_EncryptFinal(NativeCULong session, [In, Out] byte[] lastEncryptedPart, ref NativeCULong lastEncryptedPartLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[] data, ref NativeCULong dataLen);
+        internal static extern NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, [In, Out] byte[] data, ref NativeCULong dataLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_DecryptUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen);
+        internal static extern NativeCULong C_DecryptUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, [In, Out] byte[] part, ref NativeCULong partLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_DecryptFinal(NativeCULong session, byte[] lastPart, ref NativeCULong lastPartLen);
+        internal static extern NativeCULong C_DecryptFinal(NativeCULong session, [In, Out] byte[] lastPart, ref NativeCULong lastPartLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] digest, ref NativeCULong digestLen);
+        internal static extern NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] digest, ref NativeCULong digestLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_DigestUpdate(NativeCULong session, byte[] part, NativeCULong partLen);
@@ -341,25 +341,25 @@ internal partial class Delegates
         internal static extern NativeCULong C_DigestKey(NativeCULong session, NativeCULong key);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_DigestFinal(NativeCULong session, byte[] digest, ref NativeCULong digestLen);
+        internal static extern NativeCULong C_DigestFinal(NativeCULong session, [In, Out] byte[] digest, ref NativeCULong digestLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
+        internal static extern NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] signature, ref NativeCULong signatureLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_SignUpdate(NativeCULong session, byte[] part, NativeCULong partLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_SignFinal(NativeCULong session, byte[] signature, ref NativeCULong signatureLen);
+        internal static extern NativeCULong C_SignFinal(NativeCULong session, [In, Out] byte[] signature, ref NativeCULong signatureLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_SignRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
+        internal static extern NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, [In, Out] byte[] signature, ref NativeCULong signatureLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
@@ -377,19 +377,19 @@ internal partial class Delegates
         internal static extern NativeCULong C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[] data, ref NativeCULong dataLen);
+        internal static extern NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, [In, Out] byte[] data, ref NativeCULong dataLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_DigestEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen);
+        internal static extern NativeCULong C_DigestEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, [In, Out] byte[] encryptedPart, ref NativeCULong encryptedPartLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_DecryptDigestUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen);
+        internal static extern NativeCULong C_DecryptDigestUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, [In, Out] byte[] part, ref NativeCULong partLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_SignEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen);
+        internal static extern NativeCULong C_SignEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, [In, Out] byte[] encryptedPart, ref NativeCULong encryptedPartLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_DecryptVerifyUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen);
+        internal static extern NativeCULong C_DecryptVerifyUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, [In, Out] byte[] part, ref NativeCULong partLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong key);
@@ -398,7 +398,7 @@ internal partial class Delegates
         internal static extern NativeCULong C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, NativeCULong publicKeyAttributeCount, CK_ATTRIBUTE[] privateKeyTemplate, NativeCULong privateKeyAttributeCount, ref NativeCULong publicKey, ref NativeCULong privateKey);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
+        internal static extern NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key);
@@ -410,7 +410,7 @@ internal partial class Delegates
         internal static extern NativeCULong C_SeedRandom(NativeCULong session, byte[] seed, NativeCULong seedLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen);
+        internal static extern NativeCULong C_GenerateRandom(NativeCULong session, [In, Out] byte[] randomData, NativeCULong randomLen);
 
         [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeCULong C_GetFunctionStatus(NativeCULong session);

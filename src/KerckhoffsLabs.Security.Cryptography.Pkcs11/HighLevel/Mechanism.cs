@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 /// <summary>
 /// Mechanism and its parameters (CK_MECHANISM alternative)
 /// </summary>
-public class Mechanism
+public class Mechanism : IDisposable
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
@@ -28,7 +28,7 @@ public class Mechanism
             if (_disposed)
                 throw new ObjectDisposedException(GetType().FullName);
 
-            return Convert.ToUInt64(_ckMechanism.Mechanism);
+            return (ulong)_ckMechanism.Mechanism;
         }
     }
 
@@ -47,7 +47,7 @@ public class Mechanism
     /// <summary>
     /// High level object with mechanism parameters
     /// </summary>
-    protected MechanismParams _mechanismParams = null;
+    protected IMechanismParams _mechanismParams = null;
 
     /// <summary>
     /// Creates mechanism of given type with no parameter
@@ -92,7 +92,7 @@ public class Mechanism
     /// </summary>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
-    public Mechanism(ulong type, MechanismParams parameter)
+    public Mechanism(ulong type, IMechanismParams parameter)
     {
         if (parameter == null)
             throw new ArgumentNullException("parameter");
@@ -109,7 +109,7 @@ public class Mechanism
     /// </summary>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
-    public Mechanism(CKM type, MechanismParams parameter)
+    public Mechanism(CKM type, IMechanismParams parameter)
     {
         if (parameter == null)
             throw new ArgumentNullException("parameter");
