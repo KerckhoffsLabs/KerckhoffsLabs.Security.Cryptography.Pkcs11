@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
@@ -177,5 +178,84 @@ public partial class Session
 
         if (lastEncryptedPartLen > (NativeCULong)0)
             outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
+    }
+
+    // === Secure-default encryption helpers =================================
+
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> using AES-GCM with a 96-bit IV and a 128-bit
+    /// authentication tag. Produces ciphertext concatenated with the tag (PKCS#11 standard
+    /// output format for AEAD).
+    /// </summary>
+    /// <param name="keyHandle">An AES key handle (must allow encryption).</param>
+    /// <param name="iv">12-byte (96-bit) nonce, MUST be unique per key.</param>
+    /// <param name="plaintext">Data to encrypt.</param>
+    /// <param name="aad">Additional Authenticated Data; default is empty.</param>
+    /// <returns>Ciphertext + 16-byte tag.</returns>
+    public byte[] EncryptAesGcm(
+        ObjectHandle keyHandle,
+        ReadOnlySpan<byte> iv,
+        ReadOnlySpan<byte> plaintext,
+        ReadOnlySpan<byte> aad = default)
+    {
+        if (iv.Length != 12)
+            throw new ArgumentException("AES-GCM IV must be exactly 12 bytes (96 bits).", nameof(iv));
+
+        using var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
+        using var mechanism = new Mechanism(CKM.CKM_AES_GCM, p);
+        return Encrypt(mechanism, keyHandle, plaintext);
+    }
+
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> using ChaCha20-Poly1305 with a 96-bit nonce.
+    /// Produces ciphertext concatenated with a 128-bit tag.
+    /// </summary>
+    /// <param name="keyHandle">A ChaCha20 key handle (must allow encryption).</param>
+    /// <param name="nonce">12-byte (96-bit) nonce, MUST be unique per key.</param>
+    /// <param name="plaintext">Data to encrypt.</param>
+    /// <param name="aad">Additional Authenticated Data; default is empty.</param>
+    /// <returns>Ciphertext + 16-byte tag.</returns>
+    public byte[] EncryptChaCha20Poly1305(
+        ObjectHandle keyHandle,
+        ReadOnlySpan<byte> nonce,
+        ReadOnlySpan<byte> plaintext,
+        ReadOnlySpan<byte> aad = default)
+    {
+        if (nonce.Length != 12)
+            throw new ArgumentException("ChaCha20-Poly1305 nonce must be exactly 12 bytes (96 bits).", nameof(nonce));
+
+        using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
+        using var mechanism = new Mechanism(CKM.CKM_CHACHA20_POLY1305, p);
+        return Encrypt(mechanism, keyHandle, plaintext);
+    }
+
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> using RSA-OAEP with SHA-256 and MGF1+SHA-256.
+    /// Suitable for wrapping symmetric keys; not for bulk data (plaintext must be smaller
+    /// than the RSA modulus minus 2*hashSize+2).
+    /// </summary>
+    /// <param name="keyHandle">An RSA public key handle (must allow encryption).</param>
+    /// <param name="plaintext">Data to encrypt.</param>
+    /// <returns>RSA-OAEP encrypted ciphertext.</returns>
+    public byte[] EncryptRsaOaep(ObjectHandle keyHandle, ReadOnlySpan<byte> plaintext)
+    {
+        using var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256);
+        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, p);
+        return Encrypt(mechanism, keyHandle, plaintext);
+    }
+
+    // === Legacy named shortcuts (gated, compile-time warning) ==============
+
+    /// <summary>
+    /// Encrypts using RSA PKCS#1 v1.5 padding. <b>Use <see cref="EncryptRsaOaep"/> instead.</b>
+    /// This method exists for compatibility only; it throws <see cref="InsecureOperationException"/>
+    /// at runtime unless <see cref="AllowInsecure"/> is set to <c>true</c> on the session.
+    /// </summary>
+    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use EncryptRsaOaep instead. " +
+              "If you must use it, set Session.AllowInsecure = true.")]
+    public byte[] EncryptRsaPkcs1V15(ObjectHandle keyHandle, ReadOnlySpan<byte> plaintext)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
+        return Encrypt(mechanism, keyHandle, plaintext);
     }
 }

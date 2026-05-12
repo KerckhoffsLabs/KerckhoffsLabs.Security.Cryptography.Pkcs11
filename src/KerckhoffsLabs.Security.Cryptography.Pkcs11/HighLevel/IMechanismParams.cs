@@ -3,7 +3,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 /// <summary>
 /// Interface for mechanism parameters
 /// </summary>
-public interface MechanismParams : IDisposable
+public interface IMechanismParams : IDisposable
 {
     /// <summary>
     /// Returns managed object that can be marshaled to an unmanaged block of memory
