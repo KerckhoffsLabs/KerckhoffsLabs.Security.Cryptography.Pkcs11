@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KerckhoffsLabs.Runtime.InteropServices\KerckhoffsLabs.Runtime.InteropServices.csproj" />
-    <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,9 +2,8 @@
 
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using Xunit;
 
-namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Common;
 
 /// <summary>
 /// Round-trip and *Checked-failure tests for the per-enum extension methods.

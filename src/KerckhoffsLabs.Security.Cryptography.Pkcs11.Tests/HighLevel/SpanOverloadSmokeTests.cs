@@ -1,12 +1,10 @@
 // Licensed under the MIT License
 
-using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using Xunit;
 
-namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
 
 public class SpanOverloadSmokeTests
 {
