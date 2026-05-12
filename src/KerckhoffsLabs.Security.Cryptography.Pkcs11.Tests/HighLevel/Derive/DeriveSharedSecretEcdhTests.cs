@@ -39,7 +39,10 @@ internal static class DeriveSharedSecretEcdhTestCases
                 try
                 {
                     // Encrypt the same plaintext with both derived keys and check the ciphertext+tag matches.
-                    // Use AES-GCM with a fixed IV so the encryption is deterministic per key.
+                    // All-zero IV is intentional and safe here: this is a test-only proof of key agreement,
+                    // not production code. Both encryptions use DIFFERENT keys (aliceKey, bobKey) so there
+                    // is no nonce reuse on a single key. The fixed IV is required to make the output
+                    // deterministic so the byte-equality check is meaningful. Never use a fixed IV in production.
                     byte[] iv = new byte[12];
                     byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a ECDH sanity check");
                     byte[] ctA = session.EncryptAesGcm(aliceKey, iv, plaintext);
