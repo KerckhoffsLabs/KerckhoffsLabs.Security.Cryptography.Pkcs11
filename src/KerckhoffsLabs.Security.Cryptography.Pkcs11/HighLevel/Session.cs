@@ -2970,7 +2970,15 @@ public partial class Session
         {
             case CKM.CKM_RSA_PKCS:
                 throw new InsecureOperationException(mechanism,
-                    "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks; use CKM_RSA_PKCS_OAEP instead.");
+                    "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks and fault attacks; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
+            case CKM.CKM_MD5_RSA_PKCS:
+            case CKM.CKM_SHA1_RSA_PKCS:
+                throw new InsecureOperationException(mechanism,
+                    "MD5/SHA-1 in RSA signature contexts is broken; use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256 instead.");
+            case CKM.CKM_MD5:
+            case CKM.CKM_SHA_1:
+                throw new InsecureOperationException(mechanism,
+                    "MD5 and SHA-1 are broken hash functions; use CKM_SHA256 or stronger.");
             case CKM.CKM_DES_ECB:
             case CKM.CKM_DES_CBC:
             case CKM.CKM_DES_CBC_PAD:
@@ -2979,6 +2987,10 @@ public partial class Session
             case CKM.CKM_DES3_CBC_PAD:
                 throw new InsecureOperationException(mechanism,
                     "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CBC_PAD) instead.");
+            case CKM.CKM_DES_MAC:
+            case CKM.CKM_DES3_MAC:
+                throw new InsecureOperationException(mechanism,
+                    "DES/3DES MAC is weak; use CKM_AES_CMAC or CKM_SHA256_HMAC instead.");
             case CKM.CKM_AES_ECB:
                 throw new InsecureOperationException(mechanism,
                     "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
