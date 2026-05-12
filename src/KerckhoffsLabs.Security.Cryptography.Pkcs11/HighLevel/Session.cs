@@ -150,17 +150,23 @@ public partial class Session
     }
 
     // -----------------------------------------------------------------------
-    // InitPin — core helper + SecurePin overload + obsolete legacy overloads
+    // InitPin — SecurePin overload (canonical) + obsolete legacy overloads
     // -----------------------------------------------------------------------
 
-    private void InitPinCore(ReadOnlySpan<byte> userPin)
+    /// <summary>
+    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
+    /// </summary>
+    /// <param name="userPin">Pin value</param>
+    public void InitPin(SecurePin userPin)
     {
+        ArgumentNullException.ThrowIfNull(userPin);
+
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
         _logger.Debug("Session({0})::InitPin", _sessionId);
 
-        byte[] tmp = userPin.ToArray();
+        byte[] tmp = userPin.Pin.ToArray();
         try
         {
             CKR rv = _pkcs11Library.C_InitPIN(_sessionId, tmp, (NativeCULong)tmp.Length);
@@ -174,16 +180,6 @@ public partial class Session
     }
 
     /// <summary>
-    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
-    /// </summary>
-    /// <param name="userPin">Pin value</param>
-    public void InitPin(SecurePin userPin)
-    {
-        ArgumentNullException.ThrowIfNull(userPin);
-        InitPinCore(userPin.Pin);
-    }
-
-    /// <summary>
     /// Initializes the normal user's PIN
     /// </summary>
     /// <param name="userPin">Pin value</param>
@@ -192,24 +188,20 @@ public partial class Session
               error: false)]
     public void InitPin(string userPin)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::InitPin1", _sessionId);
-
         if (userPin == null)
         {
             // Null-pin path preserved for backward compatibility.
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
+            _logger.Debug("Session({0})::InitPin1", _sessionId);
             CKR rv0 = _pkcs11Library.C_InitPIN(_sessionId, null, (NativeCULong)0);
             if (rv0 != CKR.CKR_OK)
                 throw new Pkcs11Exception("C_InitPIN", rv0);
             return;
         }
 
-        int byteCount = Encoding.UTF8.GetByteCount(userPin);
-        using var tmp = new SecureBuffer(byteCount);
-        Encoding.UTF8.GetBytes(userPin, tmp.Span);
-        InitPinCore(tmp.Span);
+        using var sp = new SecurePin(userPin);
+        InitPin(sp);
     }
 
     /// <summary>
@@ -222,22 +214,31 @@ public partial class Session
     public void InitPin(byte[] userPin)
     {
         ArgumentNullException.ThrowIfNull(userPin);
-        InitPinCore(userPin);
+        using var sp = new SecurePin(userPin);
+        InitPin(sp);
     }
 
     // -----------------------------------------------------------------------
-    // SetPin — core helper + SecurePin overload + obsolete legacy overloads
+    // SetPin — SecurePin overload (canonical) + obsolete legacy overloads
     // -----------------------------------------------------------------------
 
-    private void SetPinCore(ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
+    /// <summary>
+    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
+    /// </summary>
+    /// <param name="oldPin">Old PIN value</param>
+    /// <param name="newPin">New PIN value</param>
+    public void SetPin(SecurePin oldPin, SecurePin newPin)
     {
+        ArgumentNullException.ThrowIfNull(oldPin);
+        ArgumentNullException.ThrowIfNull(newPin);
+
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
         _logger.Debug("Session({0})::SetPin", _sessionId);
 
-        byte[] oldTmp = oldPin.ToArray();
-        byte[] newTmp = newPin.ToArray();
+        byte[] oldTmp = oldPin.Pin.ToArray();
+        byte[] newTmp = newPin.Pin.ToArray();
         try
         {
             CKR rv = _pkcs11Library.C_SetPIN(
@@ -259,58 +260,42 @@ public partial class Session
     /// </summary>
     /// <param name="oldPin">Old PIN value</param>
     /// <param name="newPin">New PIN value</param>
-    public void SetPin(SecurePin oldPin, SecurePin newPin)
-    {
-        ArgumentNullException.ThrowIfNull(oldPin);
-        ArgumentNullException.ThrowIfNull(newPin);
-        SetPinCore(oldPin.Pin, newPin.Pin);
-    }
-
-    /// <summary>
-    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
-    /// </summary>
-    /// <param name="oldPin">Old PIN value</param>
-    /// <param name="newPin">New PIN value</param>
     [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
               "and may be interned). string is allowed for backward compatibility.",
               error: false)]
     public void SetPin(string oldPin, string newPin)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::SetPin1", _sessionId);
-
-        ReadOnlySpan<byte> oldSpan = ReadOnlySpan<byte>.Empty;
-        ReadOnlySpan<byte> newSpan = ReadOnlySpan<byte>.Empty;
-
-        SecureBuffer? oldBuf = null;
-        SecureBuffer? newBuf = null;
-        try
+        // Null-pin paths preserved for backward compatibility — pass null/empty to native
+        // for either old or new (or both). SecurePin rejects null strings, so we bypass it
+        // when either argument is null and call the underlying P/Invoke directly.
+        if (oldPin == null || newPin == null)
         {
-            if (oldPin != null)
-            {
-                int oldCount = Encoding.UTF8.GetByteCount(oldPin);
-                oldBuf = new SecureBuffer(oldCount);
-                Encoding.UTF8.GetBytes(oldPin, oldBuf.Span);
-                oldSpan = oldBuf.Span;
-            }
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
 
-            if (newPin != null)
-            {
-                int newCount = Encoding.UTF8.GetByteCount(newPin);
-                newBuf = new SecureBuffer(newCount);
-                Encoding.UTF8.GetBytes(newPin, newBuf.Span);
-                newSpan = newBuf.Span;
-            }
+            _logger.Debug("Session({0})::SetPin1", _sessionId);
 
-            SetPinCore(oldSpan, newSpan);
+            byte[]? oldTmp = oldPin is null ? null : Encoding.UTF8.GetBytes(oldPin);
+            byte[]? newTmp = newPin is null ? null : Encoding.UTF8.GetBytes(newPin);
+            NativeCULong oldLen = oldTmp is null ? (NativeCULong)0 : (NativeCULong)oldTmp.Length;
+            NativeCULong newLen = newTmp is null ? (NativeCULong)0 : (NativeCULong)newTmp.Length;
+            try
+            {
+                CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldTmp, oldLen, newTmp, newLen);
+                if (rv != CKR.CKR_OK)
+                    throw new Pkcs11Exception("C_SetPIN", rv);
+            }
+            finally
+            {
+                if (oldTmp != null) CryptographicOperations.ZeroMemory(oldTmp);
+                if (newTmp != null) CryptographicOperations.ZeroMemory(newTmp);
+            }
+            return;
         }
-        finally
-        {
-            oldBuf?.Dispose();
-            newBuf?.Dispose();
-        }
+
+        using var oldSp = new SecurePin(oldPin);
+        using var newSp = new SecurePin(newPin);
+        SetPin(oldSp, newSp);
     }
 
     /// <summary>
@@ -325,7 +310,9 @@ public partial class Session
     {
         ArgumentNullException.ThrowIfNull(oldPin);
         ArgumentNullException.ThrowIfNull(newPin);
-        SetPinCore(oldPin, newPin);
+        using var oldSp = new SecurePin(oldPin);
+        using var newSp = new SecurePin(newPin);
+        SetPin(oldSp, newSp);
     }
 
     /// <summary>
@@ -399,11 +386,18 @@ public partial class Session
     }
 
     // -----------------------------------------------------------------------
-    // Login — core helper + SecurePin overload + obsolete legacy overloads
+    // Login — SecurePin overload (canonical) + obsolete legacy overloads
     // -----------------------------------------------------------------------
 
-    private void LoginCore(CKU userType, ReadOnlySpan<byte> pin)
+    /// <summary>
+    /// Logs a user into a token
+    /// </summary>
+    /// <param name="userType">Type of user</param>
+    /// <param name="pin">Pin of user</param>
+    public void Login(CKU userType, SecurePin pin)
     {
+        ArgumentNullException.ThrowIfNull(pin);
+
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
@@ -412,7 +406,7 @@ public partial class Session
         if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
             _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
 
-        byte[] tmp = pin.ToArray();
+        byte[] tmp = pin.Pin.ToArray();
         try
         {
             CKR rv = _pkcs11Library.C_Login(_sessionId, userType, tmp, (NativeCULong)tmp.Length);
@@ -430,30 +424,17 @@ public partial class Session
     /// </summary>
     /// <param name="userType">Type of user</param>
     /// <param name="pin">Pin of user</param>
-    public void Login(CKU userType, SecurePin pin)
-    {
-        ArgumentNullException.ThrowIfNull(pin);
-        LoginCore(userType, pin.Pin);
-    }
-
-    /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
     [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
               "and may be interned). string is allowed for backward compatibility.",
               error: false)]
     public void Login(CKU userType, string pin)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::Login1", _sessionId);
-
         if (pin == null)
         {
             // Null-pin path preserved for backward compatibility.
+            if (_disposed)
+                throw new ObjectDisposedException(GetType().FullName);
+            _logger.Debug("Session({0})::Login1", _sessionId);
             if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
                 _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
             CKR rv0 = _pkcs11Library.C_Login(_sessionId, userType, null, (NativeCULong)0);
@@ -462,10 +443,8 @@ public partial class Session
             return;
         }
 
-        int byteCount = Encoding.UTF8.GetByteCount(pin);
-        using var tmp = new SecureBuffer(byteCount);
-        Encoding.UTF8.GetBytes(pin, tmp.Span);
-        LoginCore(userType, tmp.Span);
+        using var sp = new SecurePin(pin);
+        Login(userType, sp);
     }
 
     /// <summary>
@@ -479,7 +458,8 @@ public partial class Session
     public void Login(CKU userType, byte[] pin)
     {
         ArgumentNullException.ThrowIfNull(pin);
-        LoginCore(userType, pin);
+        using var sp = new SecurePin(pin);
+        Login(userType, sp);
     }
 
     /// <summary>
