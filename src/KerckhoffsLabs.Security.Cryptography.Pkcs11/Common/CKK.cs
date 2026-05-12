@@ -223,6 +223,11 @@ public enum CKK : uint
     CKK_GOST28147 = 0x00000032,
 
     /// <summary>
+    /// ChaCha20 symmetric key (PKCS#11 v3.0 §10.7)
+    /// </summary>
+    CKK_CHACHA20 = 0x00000033,
+
+    /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
     CKK_VENDOR_DEFINED = 0x80000000
