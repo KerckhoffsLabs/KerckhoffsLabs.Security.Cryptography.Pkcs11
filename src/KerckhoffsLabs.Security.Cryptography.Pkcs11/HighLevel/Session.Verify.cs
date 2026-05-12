@@ -461,7 +461,7 @@ public partial class Session
     /// **Use <see cref="VerifyRsaPss"/> instead.** Throws <see cref="InsecureOperationException"/>
     /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 signing is vulnerable to fault attacks and is not recommended for new code. " +
+    [Obsolete("RSA PKCS#1 v1.5 signatures are vulnerable to fault attacks and are not recommended for new code. " +
               "Use VerifyRsaPss instead. If you must use it, set Session.AllowInsecure = true.")]
     public void VerifyRsaPkcs1V15(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
