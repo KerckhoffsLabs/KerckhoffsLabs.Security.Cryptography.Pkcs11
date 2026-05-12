@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
@@ -1066,5 +1067,75 @@ public partial class Session
             throw new ArgumentException("Value has to be positive number", "bufferLength");
 
         return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, bufferLength, true, signingKeyPin);
+    }
+
+    // === Secure-default signing helpers ====================================
+
+    /// <summary>
+    /// Signs <paramref name="data"/> using RSA-PSS with SHA-256, MGF1+SHA-256, and a 32-byte salt
+    /// (matching the hash output length per RFC 8017).
+    /// </summary>
+    /// <param name="privateKeyHandle">Handle of an RSA private key (CKA_SIGN=true).</param>
+    /// <param name="data">Data to sign.</param>
+    /// <returns>Signature bytes (length = RSA modulus / 8).</returns>
+    public byte[] SignRsaPss(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
+    {
+        using var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
+        using var mechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, p);
+        return Sign(mechanism, privateKeyHandle, data);
+    }
+
+    /// <summary>
+    /// Signs <paramref name="data"/> using ECDSA with SHA-256 — the standard modern ECDSA mode.
+    /// Output is the raw concatenated (r || s) form per PKCS#11 §2.3.6.
+    /// </summary>
+    /// <param name="privateKeyHandle">Handle of an EC private key on a strong curve (P-256+, secp256k1, P-384, P-521).</param>
+    /// <param name="data">Data to sign.</param>
+    /// <returns>Signature bytes (2 × curve coordinate length; 64 bytes for P-256).</returns>
+    public byte[] SignEcdsa(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
+        return Sign(mechanism, privateKeyHandle, data);
+    }
+
+    /// <summary>
+    /// Signs <paramref name="data"/> using Ed25519 (EdDSA over Curve25519).
+    /// Output is a fixed 64-byte signature.
+    /// </summary>
+    /// <param name="privateKeyHandle">Handle of an Ed25519 private key (CKK_EC_EDWARDS, CKA_EC_PARAMS=Ed25519 OID).</param>
+    /// <param name="data">Data to sign.</param>
+    /// <returns>64-byte Ed25519 signature.</returns>
+    public byte[] SignEd25519(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_EDDSA);
+        return Sign(mechanism, privateKeyHandle, data);
+    }
+
+    /// <summary>
+    /// Signs <paramref name="data"/> using Ed448 (EdDSA over Curve448).
+    /// Output is a fixed 114-byte signature.
+    /// </summary>
+    /// <param name="privateKeyHandle">Handle of an Ed448 private key (CKK_EC_EDWARDS, CKA_EC_PARAMS=Ed448 OID).</param>
+    /// <param name="data">Data to sign.</param>
+    /// <returns>114-byte Ed448 signature.</returns>
+    public byte[] SignEd448(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_EDDSA);
+        return Sign(mechanism, privateKeyHandle, data);
+    }
+
+    // === Legacy named shortcut (gated, compile-time warning) ===============
+
+    /// <summary>
+    /// Signs using RSA PKCS#1 v1.5 padding. **Use <see cref="SignRsaPss"/> instead.**
+    /// This method exists for compatibility; it throws <see cref="InsecureOperationException"/>
+    /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
+    /// </summary>
+    [Obsolete("RSA PKCS#1 v1.5 signing is vulnerable to fault attacks and is not recommended for new code. " +
+              "Use SignRsaPss instead. If you must use it, set Session.AllowInsecure = true.")]
+    public byte[] SignRsaPkcs1V15(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
+        return Sign(mechanism, privateKeyHandle, data);
     }
 }
