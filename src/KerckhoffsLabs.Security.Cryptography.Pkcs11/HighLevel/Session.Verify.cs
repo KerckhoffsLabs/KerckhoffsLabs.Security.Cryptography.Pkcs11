@@ -229,11 +229,11 @@ public partial class Session
         if (verificationMechanism == null)
             throw new ArgumentNullException("verificationMechanism");
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
-
         if (verificationKeyHandle == null)
             throw new ArgumentNullException("verificationKeyHandle");
+
+        if (decryptionMechanism == null)
+            throw new ArgumentNullException("decryptionMechanism");
 
         if (decryptionKeyHandle == null)
             throw new ArgumentNullException("decryptionKeyHandle");
@@ -275,11 +275,11 @@ public partial class Session
         if (verificationMechanism == null)
             throw new ArgumentNullException("verificationMechanism");
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
-
         if (verificationKeyHandle == null)
             throw new ArgumentNullException("verificationKeyHandle");
+
+        if (decryptionMechanism == null)
+            throw new ArgumentNullException("decryptionMechanism");
 
         if (decryptionKeyHandle == null)
             throw new ArgumentNullException("decryptionKeyHandle");
@@ -321,11 +321,11 @@ public partial class Session
         if (verificationMechanism == null)
             throw new ArgumentNullException("verificationMechanism");
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
-
         if (verificationKeyHandle == null)
             throw new ArgumentNullException("verificationKeyHandle");
+
+        if (decryptionMechanism == null)
+            throw new ArgumentNullException("decryptionMechanism");
 
         if (decryptionKeyHandle == null)
             throw new ArgumentNullException("decryptionKeyHandle");
