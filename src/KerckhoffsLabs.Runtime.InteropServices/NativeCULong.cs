@@ -24,8 +24,7 @@ namespace KerckhoffsLabs.Runtime.InteropServices;
 /// It has 64-bits of storage on 64-bit Unix platforms.
 /// </summary>
 [CLSCompliant(false)]
-[Intrinsic]
-public readonly struct NativeCULong 
+public readonly struct NativeCULong
     : IEquatable<NativeCULong>,
       IComparable,
       IComparable<NativeCULong>,
