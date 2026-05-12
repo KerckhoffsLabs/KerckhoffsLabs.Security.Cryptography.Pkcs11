@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
 
 #if WINDOWS
 using NativeType = System.UInt32;
@@ -29,7 +28,6 @@ public readonly struct NativeCULong
       IComparable,
       IComparable<NativeCULong>,
       ISpanFormattable,
-      ISerializable,
       IBinaryInteger<NativeCULong>,
       IMinMaxValue<NativeCULong>,
       IUnsignedNumber<NativeCULong>,
@@ -117,7 +115,7 @@ public readonly struct NativeCULong
     public override bool Equals([NotNullWhen(true)] object? o) => o is NativeCULong other && Equals(other);
 
     /// <summary>
-    /// Returns a value indicating whether this instance is equal to a specified <see cref="CLong"/> value.
+    /// Returns a value indicating whether this instance is equal to a specified <see cref="NativeCULong"/> value.
     /// </summary>
     /// <param name="other">A <see cref="NativeCULong"/> value to compare to this instance.</param>
     /// <returns><c>true</c> if <paramref name="other"/> has the same value as this instance; otherwise, <c>false</c>.</returns>
@@ -837,28 +835,4 @@ public readonly struct NativeCULong
 
     /// <inheritdoc cref="IUnaryPlusOperators{TSelf, TResult}.op_UnaryPlus(TSelf)" />
     public static NativeCULong operator +(NativeCULong value) => value;
-
-    //
-    // ISerializable
-    //
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="NativeCULong"/> struct from serialized data.
-    /// </summary>
-    /// <param name="info">The serialization info.</param>
-    /// <param name="context">The streaming context.</param>
-    private NativeCULong(SerializationInfo info, StreamingContext context)
-    {
-        ArgumentNullException.ThrowIfNull(info);
-
-        _value = (NativeType)info.GetValue(nameof(_value), typeof(NativeType))!;
-    }
-
-    /// <inheritdoc cref="ISerializable.GetObjectData(SerializationInfo, StreamingContext)" />
-    void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-    {
-        ArgumentNullException.ThrowIfNull(info);
-
-        info.AddValue(nameof(_value), _value);
-    }
 }
