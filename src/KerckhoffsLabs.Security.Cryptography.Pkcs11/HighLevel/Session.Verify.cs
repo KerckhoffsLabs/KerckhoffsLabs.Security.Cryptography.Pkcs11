@@ -6,6 +6,25 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 public partial class Session
 {
     /// <summary>
+    /// Verifies <paramref name="signature"/> over <paramref name="data"/> using the given
+    /// mechanism and key. Throws <see cref="InsecureOperationException"/> if
+    /// <paramref name="mechanism"/> is insecure-by-default and <see cref="AllowInsecure"/> is false.
+    /// </summary>
+    /// <param name="mechanism">Verification mechanism.</param>
+    /// <param name="keyHandle">Handle of the public/MAC key.</param>
+    /// <param name="data">Data the signature was computed over.</param>
+    /// <param name="signature">Signature bytes to verify.</param>
+    /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
+    public void Verify(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(keyHandle);
+        byte[] dataBuf = data.ToArray();
+        byte[] sigBuf = signature.ToArray();
+        Verify(mechanism, keyHandle, dataBuf, sigBuf, out isValid);
+    }
+
+    /// <summary>
     /// Verifies a signature of data, where the signature is an appendix to the data
     /// </summary>
     /// <param name="mechanism">Verification mechanism;</param>
@@ -18,13 +37,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Verify1", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Verify1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -60,13 +81,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Verify2", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Verify2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -91,13 +114,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Verify3", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Verify3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -146,13 +171,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::VerifyRecover", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::VerifyRecover", _sessionId);
 
         if (signature == null)
             throw new ArgumentNullException("signature");
@@ -199,19 +226,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DecryptVerify1", _sessionId);
-
         if (verificationMechanism == null)
             throw new ArgumentNullException("verificationMechanism");
-
-        if (verificationKeyHandle == null)
-            throw new ArgumentNullException("verificationKeyHandle");
 
         if (decryptionMechanism == null)
             throw new ArgumentNullException("decryptionMechanism");
 
+        if (verificationKeyHandle == null)
+            throw new ArgumentNullException("verificationKeyHandle");
+
         if (decryptionKeyHandle == null)
             throw new ArgumentNullException("decryptionKeyHandle");
+
+        GuardMechanism((CKM)verificationMechanism.Type);
+        GuardMechanism((CKM)decryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DecryptVerify1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -242,19 +272,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DecryptVerify2", _sessionId);
-
         if (verificationMechanism == null)
             throw new ArgumentNullException("verificationMechanism");
-
-        if (verificationKeyHandle == null)
-            throw new ArgumentNullException("verificationKeyHandle");
 
         if (decryptionMechanism == null)
             throw new ArgumentNullException("decryptionMechanism");
 
+        if (verificationKeyHandle == null)
+            throw new ArgumentNullException("verificationKeyHandle");
+
         if (decryptionKeyHandle == null)
             throw new ArgumentNullException("decryptionKeyHandle");
+
+        GuardMechanism((CKM)verificationMechanism.Type);
+        GuardMechanism((CKM)decryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DecryptVerify2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -285,19 +318,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DecryptVerify3", _sessionId);
-
         if (verificationMechanism == null)
             throw new ArgumentNullException("verificationMechanism");
-
-        if (verificationKeyHandle == null)
-            throw new ArgumentNullException("verificationKeyHandle");
 
         if (decryptionMechanism == null)
             throw new ArgumentNullException("decryptionMechanism");
 
+        if (verificationKeyHandle == null)
+            throw new ArgumentNullException("verificationKeyHandle");
+
         if (decryptionKeyHandle == null)
             throw new ArgumentNullException("decryptionKeyHandle");
+
+        GuardMechanism((CKM)verificationMechanism.Type);
+        GuardMechanism((CKM)decryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::DecryptVerify3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");

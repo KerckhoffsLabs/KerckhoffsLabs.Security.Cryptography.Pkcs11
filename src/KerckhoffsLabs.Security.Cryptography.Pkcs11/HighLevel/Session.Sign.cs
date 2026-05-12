@@ -19,13 +19,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign1", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -68,6 +70,25 @@ public partial class Session
     }
 
     /// <summary>
+    /// Signs <paramref name="data"/> using the given mechanism and key. Throws
+    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// </summary>
+    /// <param name="mechanism">Signing mechanism.</param>
+    /// <param name="keyHandle">Handle of the private/MAC key.</param>
+    /// <param name="data">Data to sign.</param>
+    /// <returns>Signature bytes (size depends on key + mechanism).</returns>
+    public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(keyHandle);
+        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
+        // P/Invoke when perf profiling proves it matters.
+        byte[] buffer = data.ToArray();
+        return Sign(mechanism, keyHandle, buffer);
+    }
+
+    /// <summary>
     /// Signs single-part data, where the signature is an appendix to the data
     /// </summary>
     /// <param name="mechanism">Signature mechanism</param>
@@ -79,18 +100,29 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign1a", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign1a", _sessionId);
+
         if (data == null)
             throw new ArgumentNullException("data");
 
         return Sign(mechanism, keyHandle, data, false, null);
+    }
+
+    /// <summary>String-keyPin variant — see <see cref="Sign(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/>.</summary>
+    public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, string keyPin, ReadOnlySpan<byte> data)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(keyHandle);
+        byte[] buffer = data.ToArray();
+        return Sign(mechanism, keyHandle, keyPin, buffer);
     }
 
     /// <summary>
@@ -106,18 +138,29 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign1b", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign1b", _sessionId);
+
         if (data == null)
             throw new ArgumentNullException("data");
 
         return Sign(mechanism, keyHandle, data, true, System.Text.Encoding.UTF8.GetBytes(keyPin));
+    }
+
+    /// <summary>byte[]-keyPin variant — see <see cref="Sign(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/>.</summary>
+    public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] keyPin, ReadOnlySpan<byte> data)
+    {
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(keyHandle);
+        byte[] buffer = data.ToArray();
+        return Sign(mechanism, keyHandle, keyPin, buffer);
     }
 
     /// <summary>
@@ -133,13 +176,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign1c", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign1c", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -159,13 +204,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign2a", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign2a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -186,13 +233,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign2b", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign2b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -213,13 +262,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign2c", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign2c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -242,13 +293,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign3", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -316,13 +369,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign3a", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign3a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -347,13 +402,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign3b", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign3b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -378,13 +435,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Sign3c", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::Sign3c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -409,13 +468,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignRecover1", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::SignRecover1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -469,13 +530,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignRecover1a", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::SignRecover1a", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -496,13 +559,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignRecover1b", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::SignRecover1b", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -523,13 +588,15 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignRecover1c", _sessionId);
-
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");
 
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.Debug("Session({0})::SignRecover1c", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -552,19 +619,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt1a", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt1a", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -592,19 +662,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt1b", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt1b", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -632,19 +705,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt1c", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt1c", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -671,19 +747,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt2a", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt2a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -710,19 +789,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt2b", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt2b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -749,19 +831,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt2c", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt2c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -790,19 +875,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt3", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -910,19 +998,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt3a", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt3a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -953,19 +1044,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt3b", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt3b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -996,19 +1090,22 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SignEncrypt3c", _sessionId);
-
         if (signingMechanism == null)
             throw new ArgumentNullException("signingMechanism");
-
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
 
         if (encryptionMechanism == null)
             throw new ArgumentNullException("encryptionMechanism");
 
+        if (signingKeyHandle == null)
+            throw new ArgumentNullException("signingKeyHandle");
+
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
+
+        GuardMechanism((CKM)signingMechanism.Type);
+        GuardMechanism((CKM)encryptionMechanism.Type);
+
+        _logger.Debug("Session({0})::SignEncrypt3c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
