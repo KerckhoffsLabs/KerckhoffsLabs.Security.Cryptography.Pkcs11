@@ -28,7 +28,15 @@ public sealed class SecurePin : IDisposable
         if (pin.IsEmpty) throw new ArgumentException("PIN must not be empty.", nameof(pin));
         _buffer = new byte[pin.Length];
         _pin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
-        pin.CopyTo(_buffer);
+        try
+        {
+            pin.CopyTo(_buffer);
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     /// <summary>Initializes a new <see cref="SecurePin"/> from a string using UTF-8 encoding.</summary>
@@ -52,7 +60,15 @@ public sealed class SecurePin : IDisposable
             Encoding.UTF8.GetBytes(pin, tmp);
             _buffer = new byte[byteCount];
             _pin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
-            Array.Copy(tmp, _buffer, byteCount);
+            try
+            {
+                Array.Copy(tmp, _buffer, byteCount);
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
         finally
         {

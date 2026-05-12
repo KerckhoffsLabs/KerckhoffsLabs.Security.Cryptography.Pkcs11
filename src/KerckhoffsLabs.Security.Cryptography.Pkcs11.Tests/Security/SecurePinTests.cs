@@ -27,6 +27,14 @@ public sealed class SecurePinTests
         => Assert.Throws<ArgumentNullException>(() => new SecurePin((string)null!));
 
     [Fact]
+    public void Constructor_FromSpan_RejectsEmpty()
+        => Assert.Throws<ArgumentException>(() => new SecurePin(ReadOnlySpan<byte>.Empty));
+
+    [Fact]
+    public void Constructor_FromString_RejectsEmpty()
+        => Assert.Throws<ArgumentException>(() => new SecurePin(""));
+
+    [Fact]
     public void Pin_AfterDispose_ThrowsObjectDisposed()
     {
         var pin = new SecurePin("hunter2");
