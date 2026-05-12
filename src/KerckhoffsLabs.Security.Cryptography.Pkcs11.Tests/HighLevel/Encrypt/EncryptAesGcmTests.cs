@@ -8,18 +8,18 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Encrypt;
 /// </summary>
 internal static class EncryptAesGcmTestCases
 {
-    private static readonly byte[] AesKey256 = new byte[32]
-    {
+    private static readonly byte[] AesKey256 =
+    [
         0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,
         0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
         0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,
         0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
-    };
+    ];
 
-    private static readonly byte[] ValidIv12 = new byte[12]
-    {
+    private static readonly byte[] ValidIv12 =
+    [
         0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB,
-    };
+    ];
 
     internal static void Assert_RejectsWrongIvLength(IPkcs11Backend backend)
     {
@@ -113,12 +113,11 @@ internal static class EncryptAesGcmTestCases
 /// mock does not implement — those stay SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
-public sealed class EncryptAesGcmTests_Mock
+public sealed class EncryptAesGcmTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public EncryptAesGcmTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     // Argument-validation: IV check fires in C# before any P/Invoke.
     [Fact]
@@ -140,10 +139,9 @@ public sealed class EncryptAesGcmTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class EncryptAesGcmTests_SoftHsm
+public sealed class EncryptAesGcmTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public EncryptAesGcmTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

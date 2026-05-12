@@ -87,12 +87,11 @@ internal static class DecryptRsaTestCases
 /// unconditionally. RSA-OAEP round-trip requires real crypto and stays SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
-public sealed class DecryptRsaTests_Mock
+public sealed class DecryptRsaTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public DecryptRsaTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     // Gate-enforcement: InsecureOperationException fires in C# before C_DecryptInit.
     [Fact]
@@ -110,10 +109,9 @@ public sealed class DecryptRsaTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class DecryptRsaTests_SoftHsm
+public sealed class DecryptRsaTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public DecryptRsaTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

@@ -9,18 +9,18 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Encrypt;
 /// </summary>
 internal static class EncryptChaChaTestCases
 {
-    private static readonly byte[] ChaCha20Key32 = new byte[32]
-    {
+    private static readonly byte[] ChaCha20Key32 =
+    [
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
-    };
+    ];
 
-    private static readonly byte[] ValidNonce12 = new byte[12]
-    {
+    private static readonly byte[] ValidNonce12 =
+    [
         0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB,
-    };
+    ];
 
     internal static void Assert_RejectsWrongNonceLength(IPkcs11Backend backend)
     {
@@ -102,12 +102,11 @@ internal static class EncryptChaChaTestCases
 /// that test stays SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
-public sealed class EncryptChaChaTests_Mock
+public sealed class EncryptChaChaTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public EncryptChaChaTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     // Argument-validation: nonce check fires in C# before any P/Invoke.
     [Fact]
@@ -125,10 +124,9 @@ public sealed class EncryptChaChaTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class EncryptChaChaTests_SoftHsm
+public sealed class EncryptChaChaTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public EncryptChaChaTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

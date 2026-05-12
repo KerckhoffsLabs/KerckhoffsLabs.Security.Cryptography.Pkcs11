@@ -32,8 +32,7 @@ public partial class Session
     /// <returns>Decrypted data</returns>
     public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] encryptedData)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (mechanism == null)
             throw new ArgumentNullException("mechanism");

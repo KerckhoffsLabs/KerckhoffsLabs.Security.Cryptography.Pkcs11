@@ -25,8 +25,7 @@ public class Mechanism : IDisposable
     {
         get
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             return (ulong)_ckMechanism.Mechanism;
         }

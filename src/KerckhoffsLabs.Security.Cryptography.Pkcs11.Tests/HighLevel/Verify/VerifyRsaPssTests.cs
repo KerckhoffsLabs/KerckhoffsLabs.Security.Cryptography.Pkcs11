@@ -57,10 +57,10 @@ internal static class VerifyRsaPssTestCases
 }
 
 [Collection("SoftHsm")]
-public sealed class VerifyRsaPssTests_SoftHsm
+public sealed class VerifyRsaPssTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public VerifyRsaPssTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
+
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     [ConditionalFact(nameof(SoftHsmAvailable))]

@@ -37,8 +37,7 @@ public partial class Session
     {
         get
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             return (ulong)_sessionId;
         }
@@ -56,15 +55,13 @@ public partial class Session
     {
         get
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             return _closeWhenDisposed;
         }
         set
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             _logger.Debug("Session({0})::CloseWhenDisposed", _sessionId);
 
@@ -84,15 +81,13 @@ public partial class Session
     {
         get
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             return _allowInsecure;
         }
         set
         {
-            if (_disposed)
-                throw new ObjectDisposedException(GetType().FullName);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             _allowInsecure = value;
         }

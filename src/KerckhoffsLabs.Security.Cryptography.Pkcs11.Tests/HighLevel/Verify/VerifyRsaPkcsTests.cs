@@ -38,10 +38,10 @@ public sealed class VerifyRsaPkcsTests_Mock
 }
 
 [Collection("SoftHsm")]
-public sealed class VerifyRsaPkcsTests_SoftHsm
+public sealed class VerifyRsaPkcsTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public VerifyRsaPkcsTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
+
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     [ConditionalFact(nameof(SoftHsmAvailable))]

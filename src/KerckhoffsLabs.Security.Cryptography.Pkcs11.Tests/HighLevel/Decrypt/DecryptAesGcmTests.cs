@@ -12,23 +12,23 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Decrypt;
 /// </summary>
 internal static class DecryptAesGcmTestCases
 {
-    private static readonly byte[] AesKey256 = new byte[32]
-    {
+    private static readonly byte[] AesKey256 =
+    [
         0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,
         0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
         0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,
         0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F,
-    };
+    ];
 
-    private static readonly byte[] ValidIv12 = new byte[12]
-    {
+    private static readonly byte[] ValidIv12 =
+    [
         0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB,
-    };
+    ];
 
-    private static readonly byte[] AltIv12 = new byte[12]
-    {
+    private static readonly byte[] AltIv12 =
+    [
         0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB,
-    };
+    ];
 
     /// <summary>
     /// ciphertextAndTag shorter than 16 bytes must be rejected before P/Invoke.
@@ -162,12 +162,11 @@ internal static class DecryptAesGcmTestCases
 /// because the mock does not validate authentication tags.
 /// </summary>
 [Collection("Mock")]
-public sealed class DecryptAesGcmTests_Mock
+public sealed class DecryptAesGcmTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public DecryptAesGcmTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     [Fact]
     public void AesGcm_RejectsTooShortCiphertext_Mock()
@@ -192,10 +191,9 @@ public sealed class DecryptAesGcmTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class DecryptAesGcmTests_SoftHsm
+public sealed class DecryptAesGcmTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public DecryptAesGcmTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

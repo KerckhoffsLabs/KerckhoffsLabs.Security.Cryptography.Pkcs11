@@ -32,10 +32,10 @@ internal static class VerifyEdDsaTestCases
 }
 
 [Collection("SoftHsm")]
-public sealed class VerifyEdDsaTests_SoftHsm
+public sealed class VerifyEdDsaTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public VerifyEdDsaTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
+
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     [ConditionalFact(nameof(SoftHsmAvailable))]

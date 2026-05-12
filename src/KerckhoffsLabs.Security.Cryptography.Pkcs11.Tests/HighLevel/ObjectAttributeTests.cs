@@ -91,7 +91,7 @@ public class ObjectAttributeTests
     [Fact]
     public void RoundTrip_ByteArray()
     {
-        byte[] source = { 0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE };
+        byte[] source = [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE];
         using var attr = new ObjectAttribute(CKA.CKA_VALUE, source);
         Assert.Equal(source, attr.GetValueAsByteArray());
         Assert.Equal(source.Length, attr.ValueLength);
@@ -108,7 +108,7 @@ public class ObjectAttributeTests
     [Fact]
     public void RoundTrip_ReadOnlySpan_MatchesByteArray()
     {
-        byte[] source = { 1, 2, 3, 4, 5 };
+        byte[] source = [1, 2, 3, 4, 5];
         using var fromArray = new ObjectAttribute(CKA.CKA_VALUE, source);
         using var fromSpan  = new ObjectAttribute(CKA.CKA_VALUE, (ReadOnlySpan<byte>)source);
         Assert.Equal(fromArray.GetValueAsByteArray(), fromSpan.GetValueAsByteArray());

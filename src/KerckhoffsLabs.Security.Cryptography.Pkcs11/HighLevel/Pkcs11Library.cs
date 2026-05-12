@@ -160,8 +160,7 @@ public class Pkcs11Library : IDisposable
     /// <param name="slotId">PKCS#11 handle of slot that the event occurred in</param>
     public void WaitForSlotEvent(WaitType waitType, out bool eventOccured, out ulong slotId)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.Debug("Pkcs11Library({0})::WaitForSlotEvent", _libraryPath);
 

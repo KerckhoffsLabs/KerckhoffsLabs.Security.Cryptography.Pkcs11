@@ -12,13 +12,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Decrypt;
 /// </summary>
 internal static class DecryptAesTestCases
 {
-    private static readonly byte[] AesKey256 = new byte[32]
-    {
+    private static readonly byte[] AesKey256 =
+    [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
         0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
         0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    };
+    ];
 
     /// <summary>
     /// Decrypt using CKM_AES_ECB should throw <see cref="InsecureOperationException"/>
@@ -97,12 +97,11 @@ internal static class DecryptAesTestCases
 /// is thrown (or bypassed) in managed code before any P/Invoke call.
 /// </summary>
 [Collection("Mock")]
-public sealed class DecryptAesTests_Mock
+public sealed class DecryptAesTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public DecryptAesTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     [Fact]
     public void AesEcb_ThrowsInsecureOperationException_ByDefault_Mock()
@@ -118,10 +117,9 @@ public sealed class DecryptAesTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class DecryptAesTests_SoftHsm
+public sealed class DecryptAesTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public DecryptAesTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 

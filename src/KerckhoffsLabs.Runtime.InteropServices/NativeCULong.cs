@@ -300,7 +300,7 @@ public readonly struct NativeCULong
     public static NativeCULong operator ^(NativeCULong left, NativeCULong right) => new(left._value ^ right._value);
 
     /// <inheritdoc cref="IBitwiseOperators{TSelf, TOther, TResult}.op_OnesComplement(TSelf)" />
-    public static NativeCULong operator ~(NativeCULong value) => new NativeCULong(~value._value);
+    public static NativeCULong operator ~(NativeCULong value) => new(~value._value);
 
     //
     // IComparable
@@ -508,7 +508,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #elif WINDOWS
         // .NET 6 on Windows: convert through ulong and check range
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
@@ -523,7 +522,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #else
         // Unix (any .NET version): convert through ulong to nuint
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
@@ -630,7 +628,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #elif WINDOWS
         // .NET 6 on Windows: convert through ulong with checked cast to uint
         if (TOther.TryConvertToChecked(value, out ulong tempUlong))
@@ -647,7 +644,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #else
         // Unix (any .NET version): convert through ulong with checked cast to nuint
         if (TOther.TryConvertToChecked(value, out ulong tempUlong))
@@ -680,7 +676,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #elif WINDOWS
         // .NET 6 on Windows: convert through ulong and saturate to uint.MaxValue
         if (TOther.TryConvertToSaturating(value, out ulong tempUlong))
@@ -691,7 +686,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #else
         // Unix (any .NET version): convert through ulong and saturate to nuint.MaxValue
         if (TOther.TryConvertToSaturating(value, out ulong tempUlong))
@@ -718,7 +712,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #elif WINDOWS
         // .NET 6 on Windows: convert through ulong and truncate to 32 bits
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
@@ -728,7 +721,6 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-
 #else
         // Unix (any .NET version): convert through ulong and truncate to platform size
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))

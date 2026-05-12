@@ -13,7 +13,7 @@ public class SpanOverloadSmokeTests
     [Fact]
     public void ObjectAttribute_SpanCtor_ProducesIdenticalBufferToByteArrayCtor()
     {
-        byte[] payload = new byte[] { 1, 2, 3, 4, 5 };
+        byte[] payload = [1, 2, 3, 4, 5];
 
         using var fromArray = new ObjectAttribute(CKA.CKA_VALUE, payload);
         using var fromSpan  = new ObjectAttribute(CKA.CKA_VALUE, (ReadOnlySpan<byte>)payload);
@@ -29,7 +29,7 @@ public class SpanOverloadSmokeTests
     [Fact]
     public void ObjectAttribute_CopyValueTo_WritesExactBytesAndReturnsCount()
     {
-        byte[] payload = new byte[] { 9, 8, 7 };
+        byte[] payload = [9, 8, 7];
         using var attr = new ObjectAttribute(CKA.CKA_VALUE, payload);
 
         Span<byte> destination = stackalloc byte[8];
@@ -42,7 +42,7 @@ public class SpanOverloadSmokeTests
     [Fact]
     public void ObjectAttribute_CopyValueTo_ThrowsWhenDestinationTooSmall()
     {
-        byte[] payload = new byte[] { 1, 2, 3, 4, 5 };
+        byte[] payload = [1, 2, 3, 4, 5];
         using var attr = new ObjectAttribute(CKA.CKA_VALUE, payload);
 
         byte[] tooSmall = new byte[3];
@@ -68,7 +68,7 @@ public class SpanOverloadSmokeTests
     [Fact]
     public void CKMechanism_SpanCtor_ProducesIdenticalBufferToByteArrayCtor()
     {
-        byte[] paramBytes = new byte[] { 0x10, 0x20, 0x30 };
+        byte[] paramBytes = [0x10, 0x20, 0x30];
 
         CK_MECHANISM fromArray = CK_MECHANISM.CreateMechanism(CKM.CKM_AES_GCM, paramBytes);
         CK_MECHANISM fromSpan  = CK_MECHANISM.CreateMechanism(CKM.CKM_AES_GCM, (ReadOnlySpan<byte>)paramBytes);

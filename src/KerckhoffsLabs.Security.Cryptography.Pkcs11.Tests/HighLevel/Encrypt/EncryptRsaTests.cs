@@ -78,12 +78,11 @@ internal static class EncryptRsaTestCases
 /// unconditionally. RSA-OAEP round-trip requires real crypto and stays SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
-public sealed class EncryptRsaTests_Mock
+public sealed class EncryptRsaTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public EncryptRsaTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     // Crypto-correctness: mock Xor-based encrypt does not implement RSA-OAEP.
     [ConditionalFact(nameof(SoftHsmAvailable))]
@@ -101,10 +100,9 @@ public sealed class EncryptRsaTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class EncryptRsaTests_SoftHsm
+public sealed class EncryptRsaTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public EncryptRsaTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
