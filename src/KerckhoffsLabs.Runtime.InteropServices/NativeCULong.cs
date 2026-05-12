@@ -496,8 +496,8 @@ public readonly struct NativeCULong
     public static bool TryCreate<TOther>(TOther value, out NativeCULong result)
         where TOther : INumber<TOther>
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryCreate
+#if WINDOWS
+        // Windows: use native uint.TryCreate
         if (uint.TryCreate(value, out uint temp))
         {
             result = new NativeCULong(temp);
@@ -505,22 +505,8 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-#elif WINDOWS
-        // .NET 6 on Windows: convert through ulong and check range
-        if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
-        {
-            if (tempUlong > uint.MaxValue)
-            {
-                result = default;
-                return false;
-            }
-            result = new NativeCULong((uint)tempUlong);
-            return true;
-        }
-        result = default;
-        return false;
 #else
-        // Unix (any .NET version): convert through ulong to nuint
+        // Unix: convert through ulong to nuint
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
         {
             result = new NativeCULong((nuint)tempUlong);
@@ -616,8 +602,8 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromChecked<TOther>(TOther value, out NativeCULong result)
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryConvertFromChecked
+#if WINDOWS
+        // Windows: use native uint.TryConvertFromChecked
         if (uint.TryConvertFromChecked(value, out uint temp))
         {
             result = new NativeCULong(temp);
@@ -625,24 +611,8 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-#elif WINDOWS
-        // .NET 6 on Windows: convert through ulong with checked cast to uint
-        if (TOther.TryConvertToChecked(value, out ulong tempUlong))
-        {
-            try
-            {
-                result = new NativeCULong(checked((uint)tempUlong));
-                return true;
-            }
-            catch (OverflowException)
-            {
-                // Value exceeds uint.MaxValue
-            }
-        }
-        result = default;
-        return false;
 #else
-        // Unix (any .NET version): convert through ulong with checked cast to nuint
+        // Unix: convert through ulong with checked cast to nuint
         if (TOther.TryConvertToChecked(value, out ulong tempUlong))
         {
             try
@@ -664,8 +634,8 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromSaturating<TOther>(TOther value, out NativeCULong result)
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryConvertFromSaturating
+#if WINDOWS
+        // Windows: use native uint.TryConvertFromSaturating
         if (uint.TryConvertFromSaturating(value, out uint temp))
         {
             result = new NativeCULong(temp);
@@ -673,18 +643,8 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-#elif WINDOWS
-        // .NET 6 on Windows: convert through ulong and saturate to uint.MaxValue
-        if (TOther.TryConvertToSaturating(value, out ulong tempUlong))
-        {
-            uint saturated = tempUlong > uint.MaxValue ? uint.MaxValue : (uint)tempUlong;
-            result = new NativeCULong(saturated);
-            return true;
-        }
-        result = default;
-        return false;
 #else
-        // Unix (any .NET version): convert through ulong and saturate to nuint.MaxValue
+        // Unix: convert through ulong and saturate to nuint.MaxValue
         if (TOther.TryConvertToSaturating(value, out ulong tempUlong))
         {
             nuint saturated = tempUlong > nuint.MaxValue ? nuint.MaxValue : (nuint)tempUlong;
@@ -700,8 +660,8 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromTruncating<TOther>(TOther value, out NativeCULong result)
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryConvertFromTruncating
+#if WINDOWS
+        // Windows: use native uint.TryConvertFromTruncating
         if (uint.TryConvertFromTruncating(value, out uint temp))
         {
             result = new NativeCULong(temp);
@@ -709,17 +669,8 @@ public readonly struct NativeCULong
         }
         result = default;
         return false;
-#elif WINDOWS
-        // .NET 6 on Windows: convert through ulong and truncate to 32 bits
-        if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
-        {
-            result = new NativeCULong((uint)tempUlong);
-            return true;
-        }
-        result = default;
-        return false;
 #else
-        // Unix (any .NET version): convert through ulong and truncate to platform size
+        // Unix: convert through ulong and truncate to platform size
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
         {
             result = new NativeCULong((nuint)tempUlong);
@@ -734,11 +685,11 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertToChecked<TOther>(NativeCULong value, [MaybeNullWhen(false)] out TOther result)
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryConvertToChecked
+#if WINDOWS
+        // Windows: use native uint.TryConvertToChecked
         return uint.TryConvertToChecked(value._value, out result);
 #else
-        // .NET 6 or Unix: convert _value to ulong, then to TOther
+        // Unix: convert _value to ulong, then to TOther
         return TOther.TryConvertFromChecked((ulong)value._value, out result);
 #endif
     }
@@ -747,11 +698,11 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertToSaturating<TOther>(NativeCULong value, [MaybeNullWhen(false)] out TOther result)
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryConvertToSaturating
+#if WINDOWS
+        // Windows: use native uint.TryConvertToSaturating
         return uint.TryConvertToSaturating(value._value, out result);
 #else
-        // .NET 6 or Unix: convert _value to ulong, then to TOther
+        // Unix: convert _value to ulong, then to TOther
         return TOther.TryConvertFromSaturating((ulong)value._value, out result);
 #endif
     }
@@ -760,11 +711,11 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertToTruncating<TOther>(NativeCULong value, [MaybeNullWhen(false)] out TOther result)
     {
-#if NET7_0_OR_GREATER && WINDOWS
-        // .NET 7+ on Windows: use native uint.TryConvertToTruncating
+#if WINDOWS
+        // Windows: use native uint.TryConvertToTruncating
         return uint.TryConvertToTruncating(value._value, out result);
 #else
-        // .NET 6 or Unix: convert _value to ulong, then to TOther
+        // Unix: convert _value to ulong, then to TOther
         return TOther.TryConvertFromTruncating((ulong)value._value, out result);
 #endif
     }
