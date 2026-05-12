@@ -94,25 +94,28 @@ internal static class EncryptChaChaTestCases
 // ---------------------------------------------------------------------------
 
 /// <summary>
-/// ChaCha20 tests against pkcs11-mock. All tests are marked [ConditionalFact(false)] because
-/// pkcs11-mock's C_OpenSession returns CKR_SLOT_ID_INVALID with our function-list path,
-/// and also because the mock predates PKCS#11 v3.0 (no ChaCha20-Poly1305 mechanism).
-/// These scenarios require SoftHSM v3+.
+/// ChaCha20 tests against pkcs11-mock.
+/// Nonce-length validation fires in managed code before C_EncryptInit and runs
+/// unconditionally (the test body already handles the case where the mock rejects the
+/// ChaCha20 key type via SkipTestException).
+/// Round-trip requires CKM_CHACHA20_POLY1305, which the mock does not recognise —
+/// that test stays SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
 public sealed class EncryptChaChaTests_Mock
 {
-    // MockSessionNotUsable = false causes all [ConditionalFact] tests to be reported as Skipped.
-    public static bool MockSessionNotUsable => false;
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private readonly MockBackendFixture _backend;
     public EncryptChaChaTests_Mock(MockBackendFixture f) { _backend = f; }
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Argument-validation: nonce check fires in C# before any P/Invoke.
+    [Fact]
     public void ChaCha20_RejectsWrongNonceLength_Mock()
         => EncryptChaChaTestCases.Assert_RejectsWrongNonceLength(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Crypto-correctness: mock doesn't implement ChaCha20-Poly1305.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void ChaCha20_RoundTrip_Mock()
         => EncryptChaChaTestCases.Assert_RoundTrip(_backend);
 }

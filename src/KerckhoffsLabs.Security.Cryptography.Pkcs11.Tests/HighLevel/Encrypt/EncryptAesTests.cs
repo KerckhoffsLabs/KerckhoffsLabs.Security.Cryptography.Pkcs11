@@ -152,34 +152,36 @@ internal static class EncryptAesTestCases
 // ---------------------------------------------------------------------------
 
 /// <summary>
-/// AES test class for pkcs11-mock. All tests are marked [ConditionalFact(false)] because
-/// pkcs11-mock's C_OpenSession returns CKR_SLOT_ID_INVALID with our function-list path
-/// (a known incompatibility between the mock's CK_FUNCTION_LIST layout and ours).
-/// These scenarios are fully covered by the SoftHSM backend class below.
+/// AES test class for pkcs11-mock.
+/// Gate-enforcement tests run unconditionally: <see cref="InsecureOperationException"/>
+/// is thrown in managed code before any P/Invoke call, so no real crypto is required.
+/// Crypto-correctness tests (round-trip, ciphertext-produces) are SoftHsm-only: the mock
+/// only recognises CKM_AES_CBC (not CKM_AES_CBC_PAD) and returns handle 1 (DATA) from
+/// CreateObject, whereas its C_EncryptInit requires handle 2 (SECRET_KEY).
 /// </summary>
 [Collection("Mock")]
 public sealed class EncryptAesTests_Mock
 {
-    // MockSessionNotUsable = false prevents [ConditionalFact] tests from running,
-    // which xUnit reports as Skipped (not Failed).
-    public static bool MockSessionNotUsable => false;
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private readonly MockBackendFixture _backend;
     public EncryptAesTests_Mock(MockBackendFixture f) { _backend = f; }
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Crypto-correctness: needs a backend that actually implements AES-CBC-PAD.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void AesCbcPad_ProducesCiphertext_Mock()
         => EncryptAesTestCases.Assert_AesCbcPad_ProducesCiphertext(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void AesCbcPad_RoundTrip_Mock()
         => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Gate-enforcement: InsecureOperationException fires in C# before C_EncryptInit.
+    [Fact]
     public void AesEcb_ThrowsInsecureOperationException_ByDefault_Mock()
         => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    [Fact]
     public void AesEcb_AllowedWhenAllowInsecureTrue_Mock()
         => EncryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

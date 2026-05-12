@@ -107,28 +107,30 @@ internal static class EncryptAesGcmTestCases
 // ---------------------------------------------------------------------------
 
 /// <summary>
-/// AES-GCM tests against pkcs11-mock. All tests are marked [ConditionalFact(false)] because
-/// pkcs11-mock's C_OpenSession returns CKR_SLOT_ID_INVALID with our function-list path.
-/// These scenarios are covered by the SoftHSM backend class below.
+/// AES-GCM tests against pkcs11-mock.
+/// IV-validation fires in managed code before C_EncryptInit and runs unconditionally.
+/// Length and round-trip tests depend on real GCM semantics (tag appended) which the
+/// mock does not implement — those stay SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
 public sealed class EncryptAesGcmTests_Mock
 {
-    // MockSessionNotUsable = false causes all [ConditionalFact] tests to be reported as Skipped.
-    public static bool MockSessionNotUsable => false;
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private readonly MockBackendFixture _backend;
     public EncryptAesGcmTests_Mock(MockBackendFixture f) { _backend = f; }
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Argument-validation: IV check fires in C# before any P/Invoke.
+    [Fact]
     public void AesGcm_RejectsWrongIvLength_Mock()
         => EncryptAesGcmTestCases.Assert_RejectsWrongIvLength(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Crypto-correctness: mock returns DataLen bytes (no tag appended); assertion fails.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void AesGcm_ProducesCiphertextOfExpectedLength_Mock()
         => EncryptAesGcmTestCases.Assert_ProducesCiphertextOfExpectedLength(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void AesGcm_RoundTrip_WithAad_Mock()
         => EncryptAesGcmTestCases.Assert_RoundTrip_WithAad(_backend);
 }

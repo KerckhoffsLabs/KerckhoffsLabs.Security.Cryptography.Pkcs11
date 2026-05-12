@@ -73,25 +73,25 @@ internal static class EncryptRsaTestCases
 // ---------------------------------------------------------------------------
 
 /// <summary>
-/// RSA tests against pkcs11-mock. All tests are marked [ConditionalFact(false)] because
-/// pkcs11-mock's C_OpenSession returns CKR_SLOT_ID_INVALID with our function-list path,
-/// and also because the mock doesn't perform real RSA crypto.
-/// These scenarios are covered by the SoftHSM backend class below.
+/// RSA tests against pkcs11-mock.
+/// The PKCS#1 v1.5 gate fires in managed code before C_EncryptInit and runs
+/// unconditionally. RSA-OAEP round-trip requires real crypto and stays SoftHsm-only.
 /// </summary>
 [Collection("Mock")]
 public sealed class EncryptRsaTests_Mock
 {
-    // MockSessionNotUsable = false causes all [ConditionalFact] tests to be reported as Skipped.
-    public static bool MockSessionNotUsable => false;
+    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private readonly MockBackendFixture _backend;
     public EncryptRsaTests_Mock(MockBackendFixture f) { _backend = f; }
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Crypto-correctness: mock Xor-based encrypt does not implement RSA-OAEP.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void RsaOaep_RoundTrips_Mock()
         => EncryptRsaTestCases.Assert_RsaOaep_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(MockSessionNotUsable))]
+    // Gate-enforcement: InsecureOperationException fires in C# before C_EncryptInit.
+    [Fact]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_Mock()
         => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }
