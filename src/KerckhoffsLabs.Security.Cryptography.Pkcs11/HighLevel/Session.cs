@@ -1,7 +1,11 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -26,9 +30,22 @@ public partial class Session
     protected LowLevelPkcs11Library _pkcs11Library = null;
 
     /// <summary>
-    /// PKCS#11 handle of session
+    /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
+    /// calls <c>C_CloseSession</c> on release via its <c>ReleaseHandle</c> override.
+    /// Private because <see cref="Pkcs11SessionHandle"/> is internal; partials and subclasses
+    /// access the session ID through the protected <see cref="_sessionId"/> shim property.
     /// </summary>
-    protected NativeCULong _sessionId = CK.CK_INVALID_HANDLE;
+    private Pkcs11SessionHandle _sessionHandle = null!;
+
+    /// <summary>
+    /// Compatibility shim — returns the underlying session ID, or <see cref="CK.CK_INVALID_HANDLE"/>
+    /// if the session is not yet open or has been closed. Read-only; assignments go through
+    /// <see cref="_sessionHandle"/>.
+    /// </summary>
+    protected NativeCULong _sessionId
+    {
+        get => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
+    }
 
     /// <summary>
     /// PKCS#11 handle of session
@@ -109,7 +126,7 @@ public partial class Session
             throw new ArgumentException("Invalid handle specified", "sessionId");
 
         _pkcs11Library = pkcs11Library;
-        _sessionId = (NativeCULong)(sessionId);
+        _sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, (NativeCULong)sessionId);
     }
 
     /// <summary>
@@ -120,21 +137,59 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
+        if (_sessionHandle is null || _sessionHandle.IsInvalid)
+            return;
+
         _logger.Debug("Session({0})::CloseSession", _sessionId);
 
         _logger.Info("Closing session {0}", _sessionId);
 
-        CKR rv = _pkcs11Library.C_CloseSession(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_CloseSession", rv);
+        // SafeHandle.Dispose() calls ReleaseHandle, which invokes C_CloseSession on the library.
+        _sessionHandle.Dispose();
+        _sessionHandle = null!;
+    }
 
-        _sessionId = CK.CK_INVALID_HANDLE;
+    // -----------------------------------------------------------------------
+    // InitPin — core helper + SecurePin overload + obsolete legacy overloads
+    // -----------------------------------------------------------------------
+
+    private void InitPinCore(ReadOnlySpan<byte> userPin)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.Debug("Session({0})::InitPin", _sessionId);
+
+        byte[] tmp = userPin.ToArray();
+        try
+        {
+            CKR rv = _pkcs11Library.C_InitPIN(_sessionId, tmp, (NativeCULong)tmp.Length);
+            if (rv != CKR.CKR_OK)
+                throw new Pkcs11Exception("C_InitPIN", rv);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(tmp);
+        }
+    }
+
+    /// <summary>
+    /// Initializes the normal user's PIN using a <see cref="SecurePin"/>.
+    /// </summary>
+    /// <param name="userPin">Pin value</param>
+    public void InitPin(SecurePin userPin)
+    {
+        ArgumentNullException.ThrowIfNull(userPin);
+        InitPinCore(userPin.Pin);
     }
 
     /// <summary>
     /// Initializes the normal user's PIN
     /// </summary>
     /// <param name="userPin">Pin value</param>
+    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
+              "and may be interned). string is allowed for backward compatibility.",
+              error: false)]
     public void InitPin(string userPin)
     {
         if (_disposed)
@@ -142,41 +197,61 @@ public partial class Session
 
         _logger.Debug("Session({0})::InitPin1", _sessionId);
 
-        byte[] pinValue = null;
-        NativeCULong pinValueLen = (NativeCULong)0;
-        if (userPin != null)
+        if (userPin == null)
         {
-            pinValue = System.Text.Encoding.UTF8.GetBytes(userPin);
-            pinValueLen = (NativeCULong)(pinValue.Length);
+            // Null-pin path preserved for backward compatibility.
+            CKR rv0 = _pkcs11Library.C_InitPIN(_sessionId, null, (NativeCULong)0);
+            if (rv0 != CKR.CKR_OK)
+                throw new Pkcs11Exception("C_InitPIN", rv0);
+            return;
         }
 
-        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, pinValue, pinValueLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_InitPIN", rv);
+        int byteCount = Encoding.UTF8.GetByteCount(userPin);
+        using var tmp = new SecureBuffer(byteCount);
+        Encoding.UTF8.GetBytes(userPin, tmp.Span);
+        InitPinCore(tmp.Span);
     }
 
     /// <summary>
     /// Initializes the normal user's PIN
     /// </summary>
     /// <param name="userPin">Pin value</param>
+    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
+              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
+              error: false)]
     public void InitPin(byte[] userPin)
+    {
+        ArgumentNullException.ThrowIfNull(userPin);
+        InitPinCore(userPin);
+    }
+
+    // -----------------------------------------------------------------------
+    // SetPin — core helper + SecurePin overload + obsolete legacy overloads
+    // -----------------------------------------------------------------------
+
+    private void SetPinCore(ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::InitPin2", _sessionId);
+        _logger.Debug("Session({0})::SetPin", _sessionId);
 
-        byte[] pinValue = null;
-        NativeCULong pinValueLen = (NativeCULong)0;
-        if (userPin != null)
+        byte[] oldTmp = oldPin.ToArray();
+        byte[] newTmp = newPin.ToArray();
+        try
         {
-            pinValue = userPin;
-            pinValueLen = (NativeCULong)(userPin.Length);
+            CKR rv = _pkcs11Library.C_SetPIN(
+                _sessionId,
+                oldTmp, (NativeCULong)oldTmp.Length,
+                newTmp, (NativeCULong)newTmp.Length);
+            if (rv != CKR.CKR_OK)
+                throw new Pkcs11Exception("C_SetPIN", rv);
         }
-        
-        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, pinValue, pinValueLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_InitPIN", rv);
+        finally
+        {
+            CryptographicOperations.ZeroMemory(oldTmp);
+            CryptographicOperations.ZeroMemory(newTmp);
+        }
     }
 
     /// <summary>
@@ -184,6 +259,21 @@ public partial class Session
     /// </summary>
     /// <param name="oldPin">Old PIN value</param>
     /// <param name="newPin">New PIN value</param>
+    public void SetPin(SecurePin oldPin, SecurePin newPin)
+    {
+        ArgumentNullException.ThrowIfNull(oldPin);
+        ArgumentNullException.ThrowIfNull(newPin);
+        SetPinCore(oldPin.Pin, newPin.Pin);
+    }
+
+    /// <summary>
+    /// Modifies the PIN of the user that is currently logged in, or the CKU_USER PIN if the session is not logged in.
+    /// </summary>
+    /// <param name="oldPin">Old PIN value</param>
+    /// <param name="newPin">New PIN value</param>
+    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
+              "and may be interned). string is allowed for backward compatibility.",
+              error: false)]
     public void SetPin(string oldPin, string newPin)
     {
         if (_disposed)
@@ -191,25 +281,36 @@ public partial class Session
 
         _logger.Debug("Session({0})::SetPin1", _sessionId);
 
-        byte[] oldPinValue = null;
-        NativeCULong oldPinValueLen = (NativeCULong)0;
-        if (oldPin != null)
-        {
-            oldPinValue = System.Text.Encoding.UTF8.GetBytes(oldPin);
-            oldPinValueLen = (NativeCULong)(oldPinValue.Length);
-        }
+        ReadOnlySpan<byte> oldSpan = ReadOnlySpan<byte>.Empty;
+        ReadOnlySpan<byte> newSpan = ReadOnlySpan<byte>.Empty;
 
-        byte[] newPinValue = null;
-        NativeCULong newPinValueLen = (NativeCULong)0;
-        if (newPin != null)
+        SecureBuffer? oldBuf = null;
+        SecureBuffer? newBuf = null;
+        try
         {
-            newPinValue = System.Text.Encoding.UTF8.GetBytes(newPin);
-            newPinValueLen = (NativeCULong)(newPinValue.Length);
-        }
+            if (oldPin != null)
+            {
+                int oldCount = Encoding.UTF8.GetByteCount(oldPin);
+                oldBuf = new SecureBuffer(oldCount);
+                Encoding.UTF8.GetBytes(oldPin, oldBuf.Span);
+                oldSpan = oldBuf.Span;
+            }
 
-        CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPinValue, oldPinValueLen, newPinValue, newPinValueLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SetPIN", rv);
+            if (newPin != null)
+            {
+                int newCount = Encoding.UTF8.GetByteCount(newPin);
+                newBuf = new SecureBuffer(newCount);
+                Encoding.UTF8.GetBytes(newPin, newBuf.Span);
+                newSpan = newBuf.Span;
+            }
+
+            SetPinCore(oldSpan, newSpan);
+        }
+        finally
+        {
+            oldBuf?.Dispose();
+            newBuf?.Dispose();
+        }
     }
 
     /// <summary>
@@ -217,32 +318,14 @@ public partial class Session
     /// </summary>
     /// <param name="oldPin">Old PIN value</param>
     /// <param name="newPin">New PIN value</param>
+    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
+              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
+              error: false)]
     public void SetPin(byte[] oldPin, byte[] newPin)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        _logger.Debug("Session({0})::SetPin2", _sessionId);
-
-        byte[] oldPinValue = null;
-        NativeCULong oldPinValueLen = (NativeCULong)0;
-        if (oldPin != null)
-        {
-            oldPinValue = oldPin;
-            oldPinValueLen = (NativeCULong)(oldPin.Length);
-        }
-        
-        byte[] newPinValue = null;
-        NativeCULong newPinValueLen = (NativeCULong)0;
-        if (newPin != null)
-        {
-            newPinValue = newPin;
-            newPinValueLen = (NativeCULong)(newPin.Length);
-        }
-        
-        CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPinValue, oldPinValueLen, newPinValue, newPinValueLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SetPIN", rv);
+        ArgumentNullException.ThrowIfNull(oldPin);
+        ArgumentNullException.ThrowIfNull(newPin);
+        SetPinCore(oldPin, newPin);
     }
 
     /// <summary>
@@ -315,32 +398,31 @@ public partial class Session
             throw new Pkcs11Exception("C_SetOperationState", rv);
     }
 
-    /// <summary>
-    /// Logs a user into a token
-    /// </summary>
-    /// <param name="userType">Type of user</param>
-    /// <param name="pin">Pin of user</param>
-    public void Login(CKU userType, string pin)
+    // -----------------------------------------------------------------------
+    // Login — core helper + SecurePin overload + obsolete legacy overloads
+    // -----------------------------------------------------------------------
+
+    private void LoginCore(CKU userType, ReadOnlySpan<byte> pin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Login1", _sessionId);
+        _logger.Debug("Session({0})::Login", _sessionId);
 
         if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
             _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
 
-        byte[] pinValue = null;
-        NativeCULong pinValueLen = (NativeCULong)0;
-        if (pin != null)
+        byte[] tmp = pin.ToArray();
+        try
         {
-            pinValue = System.Text.Encoding.UTF8.GetBytes(pin);
-            pinValueLen = (NativeCULong)(pinValue.Length);
+            CKR rv = _pkcs11Library.C_Login(_sessionId, userType, tmp, (NativeCULong)tmp.Length);
+            if (rv != CKR.CKR_OK)
+                throw new Pkcs11Exception("C_Login", rv);
         }
-
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pinValue, pinValueLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Login", rv);
+        finally
+        {
+            CryptographicOperations.ZeroMemory(tmp);
+        }
     }
 
     /// <summary>
@@ -348,27 +430,56 @@ public partial class Session
     /// </summary>
     /// <param name="userType">Type of user</param>
     /// <param name="pin">Pin of user</param>
-    public void Login(CKU userType, byte[] pin)
+    public void Login(CKU userType, SecurePin pin)
+    {
+        ArgumentNullException.ThrowIfNull(pin);
+        LoginCore(userType, pin.Pin);
+    }
+
+    /// <summary>
+    /// Logs a user into a token
+    /// </summary>
+    /// <param name="userType">Type of user</param>
+    /// <param name="pin">Pin of user</param>
+    [Obsolete("Use the SecurePin overload — string PINs cannot be zeroed (strings are immutable " +
+              "and may be interned). string is allowed for backward compatibility.",
+              error: false)]
+    public void Login(CKU userType, string pin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Login2", _sessionId);
+        _logger.Debug("Session({0})::Login1", _sessionId);
 
-        if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
-            _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
-
-        byte[] pinValue = null;
-        NativeCULong pinValueLen = (NativeCULong)0;
-        if (pin != null)
+        if (pin == null)
         {
-            pinValue = pin;
-            pinValueLen = (NativeCULong)(pin.Length);
+            // Null-pin path preserved for backward compatibility.
+            if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
+                _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
+            CKR rv0 = _pkcs11Library.C_Login(_sessionId, userType, null, (NativeCULong)0);
+            if (rv0 != CKR.CKR_OK)
+                throw new Pkcs11Exception("C_Login", rv0);
+            return;
         }
 
-        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pinValue, pinValueLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Login", rv);
+        int byteCount = Encoding.UTF8.GetByteCount(pin);
+        using var tmp = new SecureBuffer(byteCount);
+        Encoding.UTF8.GetBytes(pin, tmp.Span);
+        LoginCore(userType, tmp.Span);
+    }
+
+    /// <summary>
+    /// Logs a user into a token
+    /// </summary>
+    /// <param name="userType">Type of user</param>
+    /// <param name="pin">Pin of user</param>
+    [Obsolete("Use the SecurePin overload — byte[] PIN buffers cannot be reliably zeroed. " +
+              "byte[] is allowed for backward compatibility but does not pin or zero the PIN.",
+              error: false)]
+    public void Login(CKU userType, byte[] pin)
+    {
+        ArgumentNullException.ThrowIfNull(pin);
+        LoginCore(userType, pin);
     }
 
     /// <summary>
@@ -497,23 +608,27 @@ public partial class Session
         {
             if (disposing)
             {
-                // Dispose managed objects
-                if (_sessionId != CK.CK_INVALID_HANDLE && _closeWhenDisposed == true)
-                    CloseSession();
+                // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
+                // Honour _closeWhenDisposed: only close if the caller wants automatic close on dispose.
+                if (_closeWhenDisposed)
+                {
+                    _sessionHandle?.Dispose();
+                    _sessionHandle = null!;
+                }
             }
 
-            // Dispose unmanaged objects
+            // No unmanaged resources owned by Session directly — Pkcs11SessionHandle owns the
+            // session ID, and Pkcs11ModuleHandle (held transitively via _pkcs11Library) owns the
+            // library module. Both are SafeHandles and run their own critical finalizers.
             _disposed = true;
         }
     }
 
-    /// <summary>
-    /// Class destructor that disposes object if caller forgot to do so
-    /// </summary>
-    ~Session()
-    {
-        Dispose(false);
-    }
+    // NOTE: ~Session() finalizer intentionally removed.
+    // Pkcs11SessionHandle is a SafeHandle (CriticalFinalizerObject) and runs its own critical
+    // finalizer after regular finalizers, which is exactly the correct order for native-handle
+    // cleanup.  The Pkcs11SessionHandle also holds a strong reference to LowLevelPkcs11Library,
+    // keeping the library's Pkcs11ModuleHandle reachable for as long as any session handle lives.
 
     #endregion
 }

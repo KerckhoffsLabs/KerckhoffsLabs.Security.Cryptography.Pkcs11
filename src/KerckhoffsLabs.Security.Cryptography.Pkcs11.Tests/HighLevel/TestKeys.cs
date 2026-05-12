@@ -54,7 +54,9 @@ internal static class TestKeys
         var slot = backend.Library.GetSlotList(SlotsType.WithTokenPresent)
             .First(s => (NativeCULong)s.SlotId == backend.SlotId);
         var session = slot.OpenSession(SessionType.ReadWrite);
+#pragma warning disable CS0618 // byte[] overload kept for backward-compat; suppress in legacy call site
         session.Login(CKU.CKU_USER, backend.UserPin.ToArray());
+#pragma warning restore CS0618
         return session;
     }
 
