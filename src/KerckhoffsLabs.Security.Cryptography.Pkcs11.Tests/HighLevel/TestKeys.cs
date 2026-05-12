@@ -91,6 +91,34 @@ internal static class TestKeys
     }
 
     /// <summary>
+    /// Generates an RSA-2048 key pair configured for sign/verify (CKA_SIGN + CKA_VERIFY) as session objects.
+    /// Returns (publicHandle, privateHandle).
+    /// </summary>
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048SigningKeyPair(Session session)
+    {
+        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+
+        using var pubClass   = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var pubToken   = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubVerify  = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)2048);
+        using var pubExp     = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+
+        using var privClass     = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType   = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var privToken     = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privSign      = new ObjectAttribute(CKA.CKA_SIGN, true);
+
+        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubModBits, pubExp };
+        var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privSign };
+
+        session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
+        return (pub, priv);
+    }
+
+    /// <summary>
     /// Generates an EC key pair on the P-256 (secp256r1) curve as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
