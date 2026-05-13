@@ -2183,6 +2183,192 @@ public enum CKM : uint
     /// </summary>
     CKM_HSS = 0x00004033,
 
+    /// <summary>
+    /// ML-KEM (FIPS 203) key-pair generation (PKCS#11 v3.2)
+    /// </summary>
+    CKM_ML_KEM_KEY_PAIR_GEN = 0x0000000F,
+
+    /// <summary>
+    /// ML-KEM (FIPS 203) encapsulation / decapsulation mechanism (PKCS#11 v3.2)
+    /// </summary>
+    CKM_ML_KEM = 0x00000017,
+
+    /// <summary>
+    /// ML-DSA (FIPS 204) key-pair generation (PKCS#11 v3.2)
+    /// </summary>
+    CKM_ML_DSA_KEY_PAIR_GEN = 0x0000001C,
+
+    /// <summary>
+    /// ML-DSA (FIPS 204) signing / verification — pure mode (PKCS#11 v3.2)
+    /// </summary>
+    CKM_ML_DSA = 0x0000001D,
+
+    /// <summary>
+    /// ML-DSA HashML-DSA prehash variant; caller specifies hash via params (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA = 0x0000001F,
+
+    /// <summary>
+    /// HashML-DSA with SHA-224 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA224 = 0x00000023,
+
+    /// <summary>
+    /// HashML-DSA with SHA-256 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA256 = 0x00000024,
+
+    /// <summary>
+    /// HashML-DSA with SHA-384 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA384 = 0x00000025,
+
+    /// <summary>
+    /// HashML-DSA with SHA-512 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA512 = 0x00000026,
+
+    /// <summary>
+    /// HashML-DSA with SHA3-224 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA3_224 = 0x00000027,
+
+    /// <summary>
+    /// HashML-DSA with SHA3-256 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA3_256 = 0x00000028,
+
+    /// <summary>
+    /// HashML-DSA with SHA3-384 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA3_384 = 0x00000029,
+
+    /// <summary>
+    /// HashML-DSA with SHA3-512 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHA3_512 = 0x0000002A,
+
+    /// <summary>
+    /// HashML-DSA with SHAKE128 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHAKE128 = 0x0000002B,
+
+    /// <summary>
+    /// HashML-DSA with SHAKE256 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_ML_DSA_SHAKE256 = 0x0000002C,
+
+    /// <summary>
+    /// SLH-DSA (FIPS 205, stateless hash-based) key-pair generation (PKCS#11 v3.2)
+    /// </summary>
+    CKM_SLH_DSA_KEY_PAIR_GEN = 0x0000002D,
+
+    /// <summary>
+    /// SLH-DSA (FIPS 205) signing / verification — pure mode (PKCS#11 v3.2)
+    /// </summary>
+    CKM_SLH_DSA = 0x0000002E,
+
+    /// <summary>
+    /// HashSLH-DSA prehash variant; caller specifies hash via params (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA = 0x00000034,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA-224 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA224 = 0x00000036,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA-256 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA256 = 0x00000037,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA-384 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA384 = 0x00000038,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA-512 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA512 = 0x00000039,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA3-224 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA3_224 = 0x0000003A,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA3-256 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA3_256 = 0x0000003B,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA3-384 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA3_384 = 0x0000003C,
+
+    /// <summary>
+    /// HashSLH-DSA with SHA3-512 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHA3_512 = 0x0000003D,
+
+    /// <summary>
+    /// HashSLH-DSA with SHAKE128 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHAKE128 = 0x0000003E,
+
+    /// <summary>
+    /// HashSLH-DSA with SHAKE256 prehash (PKCS#11 v3.2)
+    /// </summary>
+    CKM_HASH_SLH_DSA_SHAKE256 = 0x0000003F,
+
+    /// <summary>
+    /// TLS 1.2 extended master key derivation per RFC 7627 (PKCS#11 v3.2)
+    /// </summary>
+    CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE = 0x00000056,
+
+    /// <summary>
+    /// TLS 1.2 extended master key derivation with DH (PKCS#11 v3.2)
+    /// </summary>
+    CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH = 0x00000057,
+
+    /// <summary>
+    /// XMSS (RFC 8391) stateful hash-based key-pair generation (PKCS#11 v3.2)
+    /// </summary>
+    CKM_XMSS_KEY_PAIR_GEN = 0x00004034,
+
+    /// <summary>
+    /// XMSSMT multi-tree variant key-pair generation (PKCS#11 v3.2)
+    /// </summary>
+    CKM_XMSSMT_KEY_PAIR_GEN = 0x00004035,
+
+    /// <summary>
+    /// XMSS signing / verification (PKCS#11 v3.2)
+    /// </summary>
+    CKM_XMSS = 0x00004036,
+
+    /// <summary>
+    /// XMSSMT signing / verification (PKCS#11 v3.2)
+    /// </summary>
+    CKM_XMSSMT = 0x00004037,
+
+    /// <summary>
+    /// ECDH-X (Montgomery curve) followed by AES key wrap (PKCS#11 v3.2)
+    /// </summary>
+    CKM_ECDH_X_AES_KEY_WRAP = 0x00004038,
+
+    /// <summary>
+    /// ECDH cofactor variant followed by AES key wrap (PKCS#11 v3.2)
+    /// </summary>
+    CKM_ECDH_COF_AES_KEY_WRAP = 0x00004039,
+
+    /// <summary>
+    /// Mechanism that derives a public key from an existing private key (PKCS#11 v3.2)
+    /// </summary>
+    CKM_PUB_KEY_FROM_PRIV_KEY = 0x0000403A,
+
+
 
     /// <summary>
     /// Permanently reserved for token vendors

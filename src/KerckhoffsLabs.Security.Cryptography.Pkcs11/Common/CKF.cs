@@ -276,4 +276,28 @@ public static class CKF
     /// True if the OTP returned shall be in a form suitable for human consumption
     /// </summary>
     public static readonly NativeCULong CKF_USER_FRIENDLY_OTP = new (0x00000020);
+
+    // === PKCS#11 v3.2 ===================================================
+
+    /// <summary>
+    /// Session flag: this session was opened with async-API semantics (PKCS#11 v3.2).
+    /// Crypto operations on the session may return <see cref="CKR.CKR_PENDING"/>;
+    /// caller retrieves results via C_AsyncComplete.
+    /// </summary>
+    public static readonly NativeCULong CKF_ASYNC_SESSION = new (0x00000008);
+
+    /// <summary>
+    /// Token-info flag: the token supports the async API (PKCS#11 v3.2).
+    /// </summary>
+    public static readonly NativeCULong CKF_ASYNC_SESSION_SUPPORTED = new (0x04000000);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism can be used with C_EncapsulateKey (PKCS#11 v3.2).
+    /// </summary>
+    public static readonly NativeCULong CKF_ENCAPSULATE = new (0x10000000);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism can be used with C_DecapsulateKey (PKCS#11 v3.2).
+    /// </summary>
+    public static readonly NativeCULong CKF_DECAPSULATE = new (0x20000000);
 }

@@ -498,6 +498,37 @@ public enum CKR : uint
     /// </summary>
     CKR_KEY_EXHAUSTED = 0x00000203,
 
+    /// <summary>
+    /// Asynchronous operation is in progress; retrieve result with C_AsyncComplete (PKCS#11 v3.2)
+    /// </summary>
+    CKR_PENDING = 0x00000204,
+
+    /// <summary>
+    /// Session does not support the async API (PKCS#11 v3.2)
+    /// </summary>
+    CKR_SESSION_ASYNC_NOT_SUPPORTED = 0x00000205,
+
+    /// <summary>
+    /// Operation requires C_SeedRandom to have been called (e.g. hedged signing without provided seed) (PKCS#11 v3.2)
+    /// </summary>
+    CKR_SEED_RANDOM_REQUIRED = 0x00000206,
+
+    /// <summary>
+    /// Operation is not permitted under the current validation profile (PKCS#11 v3.2)
+    /// </summary>
+    CKR_OPERATION_NOT_VALIDATED = 0x00000207,
+
+    /// <summary>
+    /// Token has not been initialized via C_InitToken (PKCS#11 v3.2)
+    /// </summary>
+    CKR_TOKEN_NOT_INITIALIZED = 0x00000208,
+
+    /// <summary>
+    /// Requested PQC parameter set (e.g. ML-DSA-87) is not supported by the token (PKCS#11 v3.2)
+    /// </summary>
+    CKR_PARAMETER_SET_NOT_SUPPORTED = 0x00000209,
+
+
 
     /// <summary>
     /// Permanently reserved for token vendors

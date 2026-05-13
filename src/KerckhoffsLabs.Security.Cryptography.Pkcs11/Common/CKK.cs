@@ -321,6 +321,22 @@ public enum CKK : uint
     /// </summary>
     CKK_HSS = 0x00000046,
 
+    /// <summary>
+    /// ML-KEM (FIPS 203) key type — Kyber-derived (PKCS#11 v3.2)
+    /// </summary>
+    CKK_ML_KEM = 0x00000049,
+
+    /// <summary>
+    /// ML-DSA (FIPS 204) key type — Dilithium-derived (PKCS#11 v3.2)
+    /// </summary>
+    CKK_ML_DSA = 0x0000004A,
+
+    /// <summary>
+    /// SLH-DSA (FIPS 205) key type — SPHINCS+-derived (PKCS#11 v3.2)
+    /// </summary>
+    CKK_SLH_DSA = 0x0000004B,
+
+
 
     /// <summary>
     /// Permanently reserved for token vendors

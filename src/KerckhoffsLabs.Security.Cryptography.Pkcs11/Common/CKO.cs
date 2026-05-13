@@ -58,6 +58,17 @@ public enum CKO : uint
     /// </summary>
     CKO_PROFILE = 0x00000009,
 
+    /// <summary>
+    /// Validation object describing certified / validated subsystems (PKCS#11 v3.2)
+    /// </summary>
+    CKO_VALIDATION = 0x0000000A,
+
+    /// <summary>
+    /// Trust object describing certificate-trust policy (PKCS#11 v3.2)
+    /// </summary>
+    CKO_TRUST = 0x0000000B,
+
+
 
     /// <summary>
     /// Reserved for token vendors.

@@ -663,6 +663,142 @@ public enum CKA : uint
     /// </summary>
     CKA_HSS_KEYS_REMAINING = 0x0000061C,
 
+    /// <summary>
+    /// PQC parameter-set identifier (e.g. ML-KEM-768, ML-DSA-65, SLH-DSA-SHAKE-128f) (PKCS#11 v3.2)
+    /// </summary>
+    CKA_PARAMETER_SET = 0x0000061D,
+
+    /// <summary>
+    /// Bit flags describing the validation state of an object (PKCS#11 v3.2)
+    /// </summary>
+    CKA_OBJECT_VALIDATION_FLAGS = 0x0000061E,
+
+    /// <summary>
+    /// Validation profile type (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_TYPE = 0x0000061F,
+
+    /// <summary>
+    /// Validation profile version (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_VERSION = 0x00000620,
+
+    /// <summary>
+    /// Validation level (e.g. FIPS 140-3 Level 2/3) (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_LEVEL = 0x00000621,
+
+    /// <summary>
+    /// Validation module identifier (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_MODULE_ID = 0x00000622,
+
+    /// <summary>
+    /// Per-validation-record flag (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_FLAG = 0x00000623,
+
+    /// <summary>
+    /// Validation-authority type (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_AUTHORITY_TYPE = 0x00000624,
+
+    /// <summary>
+    /// Validation country code (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_COUNTRY = 0x00000625,
+
+    /// <summary>
+    /// Validation certificate identifier (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_CERTIFICATE_IDENTIFIER = 0x00000626,
+
+    /// <summary>
+    /// Validation certificate URI (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_CERTIFICATE_URI = 0x00000627,
+
+    /// <summary>
+    /// Validation-vendor URI (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_VENDOR_URI = 0x00000628,
+
+    /// <summary>
+    /// Validation profile name (PKCS#11 v3.2)
+    /// </summary>
+    CKA_VALIDATION_PROFILE = 0x00000629,
+
+    /// <summary>
+    /// Template applied to encapsulated keys (PKCS#11 v3.2)
+    /// </summary>
+    CKA_ENCAPSULATE_TEMPLATE = 0x0000062A,
+
+    /// <summary>
+    /// Template applied to decapsulated keys (PKCS#11 v3.2)
+    /// </summary>
+    CKA_DECAPSULATE_TEMPLATE = 0x0000062B,
+
+    /// <summary>
+    /// Trust attribute: TLS server authentication (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_SERVER_AUTH = 0x0000062C,
+
+    /// <summary>
+    /// Trust attribute: TLS client authentication (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_CLIENT_AUTH = 0x0000062D,
+
+    /// <summary>
+    /// Trust attribute: code signing (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_CODE_SIGNING = 0x0000062E,
+
+    /// <summary>
+    /// Trust attribute: S/MIME email protection (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_EMAIL_PROTECTION = 0x0000062F,
+
+    /// <summary>
+    /// Trust attribute: IPsec / IKE (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_IPSEC_IKE = 0x00000630,
+
+    /// <summary>
+    /// Trust attribute: time stamping (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_TIME_STAMPING = 0x00000631,
+
+    /// <summary>
+    /// Trust attribute: OCSP responder signing (PKCS#11 v3.2)
+    /// </summary>
+    CKA_TRUST_OCSP_SIGNING = 0x00000632,
+
+    /// <summary>
+    /// True if the key supports encapsulation (e.g. ML-KEM public key) (PKCS#11 v3.2)
+    /// </summary>
+    CKA_ENCAPSULATE = 0x00000633,
+
+    /// <summary>
+    /// True if the key supports decapsulation (e.g. ML-KEM private key) (PKCS#11 v3.2)
+    /// </summary>
+    CKA_DECAPSULATE = 0x00000634,
+
+    /// <summary>
+    /// Pre-computed digest of the certificate body (PKCS#11 v3.2)
+    /// </summary>
+    CKA_HASH_OF_CERTIFICATE = 0x00000635,
+
+    /// <summary>
+    /// CRC-64 checksum of the public key for fast handle disambiguation (PKCS#11 v3.2)
+    /// </summary>
+    CKA_PUBLIC_CRC64_VALUE = 0x00000636,
+
+    /// <summary>
+    /// Deterministic seed used for hedged PQC signing or key generation (PKCS#11 v3.2)
+    /// </summary>
+    CKA_SEED = 0x00000637,
+
+
 
     /// <summary>
     /// Permanently reserved for token vendors
