@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 /// <summary>
 /// <see cref="SafeHandle"/> wrapper for a PKCS#11 native module loaded via

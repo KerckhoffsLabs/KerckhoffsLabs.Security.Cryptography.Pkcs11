@@ -1,4 +1,4 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 using System.Runtime.InteropServices;
 
