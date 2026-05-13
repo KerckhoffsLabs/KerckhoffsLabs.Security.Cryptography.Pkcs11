@@ -33,25 +33,17 @@ public class Pkcs11Library : IDisposable
     protected LowLevelPkcs11Library? _pkcs11Library = null;
 
     /// <summary>
-    /// Initializes new instance of Pkcs11Library class
+    /// Initializes new instance of Pkcs11Library class.
     /// </summary>
-    /// <param name="libraryPath">Library name or path</param>
-    public Pkcs11Library(string libraryPath) : this(libraryPath, AppType.SingleThreaded, InitType.WithFunctionList) { }
+    /// <param name="libraryPath">Library name or path.</param>
+    public Pkcs11Library(string libraryPath) : this(libraryPath, InitType.WithFunctionList) { }
 
     /// <summary>
-    /// Loads and initializes PCKS#11 library
+    /// Loads and initializes the PKCS#11 library.
     /// </summary>
-    /// <param name="libraryPath">Library name or path</param>
-    /// <param name="appType">Type of application that will be using PKCS#11 library</param>
-    public Pkcs11Library(string libraryPath, AppType appType) : this(libraryPath, appType, InitType.WithFunctionList) { }
-
-    /// <summary>
-    /// Loads and initializes PCKS#11 library
-    /// </summary>
-    /// <param name="libraryPath">Library name or path</param>
-    /// <param name="appType">Type of application that will be using PKCS#11 library</param>
-    /// <param name="initType">Source of PKCS#11 function pointers</param>
-    public Pkcs11Library(string libraryPath, AppType appType, InitType initType)
+    /// <param name="libraryPath">Library name or path.</param>
+    /// <param name="initType">Source of PKCS#11 function pointers.</param>
+    public Pkcs11Library(string libraryPath, InitType initType)
     {
         _logger.LogDebug("Pkcs11Library({LibraryPath})::ctor", libraryPath);
 
@@ -61,7 +53,7 @@ public class Pkcs11Library : IDisposable
         {
             _logger.LogInformation("Loading PKCS#11 library {LibraryPath}", _libraryPath);
             _pkcs11Library = new LowLevelPkcs11Library(_libraryPath, initType == InitType.WithFunctionList);
-            Initialize(appType);
+            Initialize();
         }
         catch
         {
@@ -77,26 +69,39 @@ public class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Initializes PCKS#11 library
+    /// Initializes the PKCS#11 library. Probes with <c>CKF_OS_LOCKING_OK</c>
+    /// first (the safe default for multi-threaded callers); falls back to a
+    /// null-args call if the token returns <c>CKR_CANT_LOCK</c>.
     /// </summary>
-    /// <param name="appType">Type of application that will be using PKCS#11 library</param>
-    protected void Initialize(AppType appType)
+    /// <remarks>
+    /// Per PKCS#11 v3.1 §5.4, a token may refuse <c>CKF_OS_LOCKING_OK</c>; the
+    /// spec calls out <c>CKR_CANT_LOCK</c> as the expected return code in that
+    /// case. The fallback path uses <c>pInitArgs = NULL</c>, which declares the
+    /// application will not access the library from multiple threads
+    /// concurrently — callers in that mode are responsible for serializing
+    /// access at the C# level.
+    /// </remarks>
+    protected void Initialize()
     {
         _logger.LogDebug("Pkcs11Library({LibraryPath})::Initialize", _libraryPath);
 
-        CK_C_INITIALIZE_ARGS initArgs = null;
-        if (appType == AppType.MultiThreaded)
+        var initArgs = new CK_C_INITIALIZE_ARGS { Flags = CKF.CKF_OS_LOCKING_OK };
+        CKR rv = _pkcs11Library.C_Initialize(initArgs);
+
+        // Another component already initialized the library — treat as success.
+        if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
+
+        // Token refused OS locking. Retry without — application is single-threaded
+        // from the library's perspective; caller must serialize at the C# layer.
+        if (rv == CKR.CKR_CANT_LOCK)
         {
-            initArgs = new CK_C_INITIALIZE_ARGS
-            {
-                Flags = CKF.CKF_OS_LOCKING_OK
-            };
+            _logger.LogWarning(
+                "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking",
+                _libraryPath);
+            rv = _pkcs11Library.C_Initialize(null);
+            if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
         }
 
-        CKR rv = _pkcs11Library.C_Initialize(initArgs);
-        // CKR_CRYPTOKI_ALREADY_INITIALIZED is acceptable — another component may have
-        // initialized the library before us. Treat as success.
-        if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
         Pkcs11Exception.ThrowIfError(rv, "C_Initialize");
     }
 

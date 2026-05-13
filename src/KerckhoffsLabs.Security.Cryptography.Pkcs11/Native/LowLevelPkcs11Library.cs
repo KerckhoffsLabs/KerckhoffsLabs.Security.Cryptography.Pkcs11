@@ -62,7 +62,7 @@ public class LowLevelPkcs11Library
             IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf(typeof(CK_C_INITIALIZE_ARGS)));
             try
             {
-                UnmanagedMemory.Write(pInitArgs, initArgs);
+                UnmanagedMemory.Write(pInitArgs, initArgs.Value);
                 NativeCULong rv = _delegates.C_Initialize(pInitArgs);
                 return rv.ToCKRChecked();
             }
