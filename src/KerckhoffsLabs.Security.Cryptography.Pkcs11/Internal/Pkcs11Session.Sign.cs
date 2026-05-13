@@ -525,266 +525,112 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>
-    /// Signs and encrypts data
+    /// Signs and encrypts <paramref name="data"/> in a single call, returning the signature
+    /// and the ciphertext. The signing key may require a context-specific PIN
+    /// (CKA_ALWAYS_AUTHENTICATE); pass it via <paramref name="signingKeyPin"/>.
     /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="data">Data to be processed</param>
-    /// <param name="signature">Signature</param>
-    /// <param name="encryptedData">Encrypted data</param>
-    public void SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, byte[] data, out byte[] signature, out byte[] encryptedData)
+    /// <param name="signingMechanism">Signing mechanism.</param>
+    /// <param name="signingKeyHandle">Handle of the signing key.</param>
+    /// <param name="encryptionMechanism">Encryption mechanism.</param>
+    /// <param name="encryptionKeyHandle">Handle of the encryption key.</param>
+    /// <param name="data">Data to be signed and encrypted.</param>
+    /// <param name="signature">Receives the signature.</param>
+    /// <param name="encryptedData">Receives the ciphertext.</param>
+    /// <param name="signingKeyPin">Optional context-specific PIN. <c>null</c> (the default)
+    /// performs no context-specific login. Caller retains ownership; bytes are copied into
+    /// a transient buffer and zeroed before the method returns.</param>
+    public void SignEncrypt(
+        Mechanism signingMechanism, ObjectHandle signingKeyHandle,
+        Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle,
+        byte[] data,
+        out byte[] signature, out byte[] encryptedData,
+        SecurePin? signingKeyPin = null)
     {
         using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt1a", _sessionId);
-
         ArgumentNullException.ThrowIfNull(data);
 
-        using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
-        {
-            signature = SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputMemoryStream, outputMemorySteam);
-            encryptedData = outputMemorySteam.ToArray();
-        }
+        _logger.LogDebug("Session({SessionId})::SignEncrypt(byte[])", _sessionId);
+
+        using MemoryStream input = new(data), output = new();
+        signature = SignEncrypt(
+            signingMechanism, signingKeyHandle,
+            encryptionMechanism, encryptionKeyHandle,
+            input, output, signingKeyPin);
+        encryptedData = output.ToArray();
     }
 
     /// <summary>
-    /// Signs and encrypts data
+    /// Streaming sign-then-encrypt. Reads from <paramref name="inputStream"/>, writes ciphertext
+    /// to <paramref name="outputStream"/>, and returns the signature. The signing key may
+    /// require a context-specific PIN (CKA_ALWAYS_AUTHENTICATE); pass it via
+    /// <paramref name="signingKeyPin"/>.
     /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="data">Data to be processed</param>
-    /// <param name="signature">Signature</param>
-    /// <param name="encryptedData">Encrypted data</param>
-    public void SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, string signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, byte[] data, out byte[] signature, out byte[] encryptedData)
+    /// <param name="signingMechanism">Signing mechanism.</param>
+    /// <param name="signingKeyHandle">Handle of the signing key.</param>
+    /// <param name="encryptionMechanism">Encryption mechanism.</param>
+    /// <param name="encryptionKeyHandle">Handle of the encryption key.</param>
+    /// <param name="inputStream">Source stream for plaintext.</param>
+    /// <param name="outputStream">Destination stream for ciphertext.</param>
+    /// <param name="signingKeyPin">Optional context-specific PIN. <c>null</c> (the default)
+    /// performs no context-specific login. Caller retains ownership; bytes are copied into
+    /// a transient buffer and zeroed before the method returns.</param>
+    /// <param name="bufferLength">Read buffer size in bytes (default 4096).</param>
+    /// <returns>Signature.</returns>
+    public byte[] SignEncrypt(
+        Mechanism signingMechanism, ObjectHandle signingKeyHandle,
+        Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle,
+        Stream inputStream, Stream outputStream,
+        SecurePin? signingKeyPin = null,
+        int bufferLength = 4096)
     {
         using var _ = AcquireExclusive();
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt1b", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(data);
-
-        using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
-        {
-            signature = SignEncrypt(signingMechanism, signingKeyHandle, signingKeyPin, encryptionMechanism, encryptionKeyHandle, inputMemoryStream, outputMemorySteam);
-            encryptedData = outputMemorySteam.ToArray();
-        }
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="data">Data to be processed</param>
-    /// <param name="signature">Signature</param>
-    /// <param name="encryptedData">Encrypted data</param>
-    public void SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, byte[] signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, byte[] data, out byte[] signature, out byte[] encryptedData)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt1c", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(data);
-
-        using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
-        {
-            signature = SignEncrypt(signingMechanism, signingKeyHandle, signingKeyPin, encryptionMechanism, encryptionKeyHandle, inputMemoryStream, outputMemorySteam);
-            encryptedData = outputMemorySteam.ToArray();
-        }
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <returns>Signature</returns>
-    public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt2a", _sessionId);
-
         ArgumentNullException.ThrowIfNull(inputStream);
-
         ArgumentNullException.ThrowIfNull(outputStream);
-
-        return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, 4096);
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <returns>Signature</returns>
-    public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, string signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt2b", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(inputStream);
-
-        ArgumentNullException.ThrowIfNull(outputStream);
-
-        return SignEncrypt(signingMechanism, signingKeyHandle, signingKeyPin, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, 4096);
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <returns>Signature</returns>
-    public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, byte[] signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt2c", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(inputStream);
-
-        ArgumentNullException.ThrowIfNull(outputStream);
-
-        return SignEncrypt(signingMechanism, signingKeyHandle, signingKeyPin, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, 4096);
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <param name="bufferLength">Size of read buffer in bytes</param>
-    /// <param name="performLogin">Flag indicating whether context specific login should be performed</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <returns>Signature</returns>
-    private byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength, bool performLogin, byte[] signingKeyPin)
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
+        if (bufferLength < 1)
+            throw new ArgumentException("Value has to be a positive number.", nameof(bufferLength));
 
         GuardMechanism((CKM)signingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::SignEncrypt3", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(inputStream);
-
-        ArgumentNullException.ThrowIfNull(outputStream);
-
-        if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
+        _logger.LogDebug("Session({SessionId})::SignEncrypt", _sessionId);
 
         CK_MECHANISM ckSigningMechanism = (CK_MECHANISM)signingMechanism.ToMarshalableStructure();
-
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckSigningMechanism, (NativeCULong)(signingKeyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_SignInit");
 
-        if (performLogin)
+        if (signingKeyPin is not null)
         {
-            byte[] pinValue = null;
-            NativeCULong pinValueLen = (NativeCULong)0;
-            if (signingKeyPin != null)
+            byte[] tmp = signingKeyPin.Pin.ToArray();
+            try
             {
-                pinValue = signingKeyPin;
-                pinValueLen = (NativeCULong)(signingKeyPin.Length);
+                rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, tmp, (NativeCULong)tmp.Length);
+                Pkcs11Exception.ThrowIfError(rv, "C_Login");
             }
-
-            rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_Login");
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(tmp);
+            }
         }
 
         CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
-
         rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(encryptionKeyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
-        NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
+        NativeCULong encryptedPartLen;
 
-        int bytesRead = 0;
+        int bytesRead;
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
             encryptedPartLen = (NativeCULong)(encryptedPart.Length);
@@ -796,7 +642,6 @@ internal sealed partial class Pkcs11Session
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 encryptedPart = new byte[(int)encryptedPartLen];
-
                 rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
                 Pkcs11Exception.ThrowIfError(rv, "C_SignEncryptUpdate");
             }
@@ -804,12 +649,11 @@ internal sealed partial class Pkcs11Session
             outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
         }
 
-        byte[] lastEncryptedPart = null;
         NativeCULong lastEncryptedPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
         Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
-        lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
+        byte[] lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
         Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
@@ -824,118 +668,12 @@ internal sealed partial class Pkcs11Session
         rv = _pkcs11Library.C_SignFinal(_sessionId, signature, ref signatureLen);
         Pkcs11Exception.ThrowIfError(rv, "C_SignFinal");
 
-        if (signature.Length != (int)(signatureLen))
-            Array.Resize(ref signature, (int)(signatureLen));
+        if (signature.Length != (int)signatureLen)
+            Array.Resize(ref signature, (int)signatureLen);
 
         return signature;
     }
 
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <param name="bufferLength">Size of read buffer in bytes</param>
-    /// <returns>Signature</returns>
-    public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt3a", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(inputStream);
-
-        ArgumentNullException.ThrowIfNull(outputStream);
-
-        if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
-
-        return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, bufferLength, false, null);
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <param name="bufferLength">Size of read buffer in bytes</param>
-    /// <returns>Signature</returns>
-    public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, string signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt3b", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(inputStream);
-
-        ArgumentNullException.ThrowIfNull(outputStream);
-
-        if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
-
-        return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, bufferLength, true, System.Text.Encoding.UTF8.GetBytes(signingKeyPin));
-    }
-
-    /// <summary>
-    /// Signs and encrypts data
-    /// </summary>
-    /// <param name="signingMechanism">Signing mechanism</param>
-    /// <param name="signingKeyHandle">Handle of the signing key</param>
-    /// <param name="signingKeyPin">Context specific signature pin</param>
-    /// <param name="encryptionMechanism">Encryption mechanism</param>
-    /// <param name="encryptionKeyHandle">Handle of the encryption key</param>
-    /// <param name="inputStream">Input stream from which data to be processed should be read</param>
-    /// <param name="outputStream">Output stream where encrypted data should be written</param>
-    /// <param name="bufferLength">Size of read buffer in bytes</param>
-    /// <returns>Signature</returns>
-    public byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, byte[] signingKeyPin, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength)
-    {
-        using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
-
-        ArgumentNullException.ThrowIfNull(signingMechanism);
-
-
-        ArgumentNullException.ThrowIfNull(encryptionMechanism);
-
-
-        _logger.LogDebug("Session({SessionId})::SignEncrypt3c", _sessionId);
-
-        ArgumentNullException.ThrowIfNull(inputStream);
-
-        ArgumentNullException.ThrowIfNull(outputStream);
-
-        if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
-
-        return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, bufferLength, true, signingKeyPin);
-    }
 
     // === Secure-default signing helpers ====================================
 
