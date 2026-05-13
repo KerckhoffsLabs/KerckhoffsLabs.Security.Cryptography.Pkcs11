@@ -151,6 +151,13 @@ public static class NumberBaseHelper<TSelf>
 
     public static TSelf MaxMagnitudeNumber(TSelf x, TSelf y) => TSelf.MaxMagnitudeNumber(x, y);
     public static TSelf MinMagnitudeNumber(TSelf x, TSelf y) => TSelf.MinMagnitudeNumber(x, y);
+
+    public static TSelf CreateChecked<TOther>(TOther value) where TOther : INumberBase<TOther>
+        => TSelf.CreateChecked(value);
+    public static TSelf CreateSaturating<TOther>(TOther value) where TOther : INumberBase<TOther>
+        => TSelf.CreateSaturating(value);
+    public static TSelf CreateTruncating<TOther>(TOther value) where TOther : INumberBase<TOther>
+        => TSelf.CreateTruncating(value);
 }
 
 public static class ShiftOperatorsHelper<TSelf, TOther, TResult>
@@ -171,7 +178,7 @@ public static class SubtractionOperatorsHelper<TSelf, TOther, TResult>
 public static class UnaryNegationOperatorsHelper<TSelf, TResult>
     where TSelf : IUnaryNegationOperators<TSelf, TResult>
 {
-    public static TResult op_UnaryNegation(TSelf value) => -value;
+    public static TResult op_UnaryNegation(TSelf value) => unchecked(-value);
     public static TResult op_CheckedUnaryNegation(TSelf value) => checked(-value);
 }
 

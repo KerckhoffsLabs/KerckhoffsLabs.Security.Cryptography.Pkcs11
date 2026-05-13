@@ -2,21 +2,18 @@
 // Adapted from dotnet/runtime UInt32Tests.GenericMath.cs for NativeCULong
 
 using System.Numerics;
-using Xunit;
+using static KerckhoffsLabs.Runtime.InteropServices.Tests.PlatformLayout;
 
 namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
-public class NativeCULongTests_GenericMath
+public partial class NativeCULongTests
 {
-    private static bool Has32BitStorage => IntPtr.Size == 4 || OperatingSystem.IsWindows();
-    private static bool Has64BitStorage => !Has32BitStorage;
-
     //
     // IAdditionOperators
     //
 
     [Fact]
-    public static void op_AdditionTest()
+    public void op_AdditionTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), AdditionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Addition(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000002), AdditionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Addition(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -30,13 +27,15 @@ public class NativeCULongTests_GenericMath
 #if !WINDOWS
         else
         {
+#pragma warning disable CS8778 // intentional 64-bit-storage literal; gated at runtime by Has32BitStorage
             Assert.Equal(new NativeCULong((nuint)0x0000000100000000UL), AdditionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Addition(new NativeCULong(0xFFFFFFFF), new NativeCULong(1)));
+#pragma warning restore CS8778
         }
 #endif
     }
 
     [Fact]
-    public static void op_CheckedAdditionTest()
+    public void op_CheckedAdditionTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), AdditionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedAddition(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000002), AdditionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedAddition(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -54,7 +53,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void AdditiveIdentityTest()
+    public void AdditiveIdentityTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), AdditiveIdentityHelper<NativeCULong, NativeCULong>.AdditiveIdentity);
     }
@@ -64,7 +63,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void DivRemTest()
+    public void DivRemTest()
     {
         Assert.Equal((new NativeCULong(0x00000000), new NativeCULong(0x00000000)), BinaryIntegerHelper<NativeCULong>.DivRem(new NativeCULong(0x00000000), new NativeCULong(2)));
         Assert.Equal((new NativeCULong(0x00000000), new NativeCULong(0x00000001)), BinaryIntegerHelper<NativeCULong>.DivRem(new NativeCULong(0x00000001), new NativeCULong(2)));
@@ -76,7 +75,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void LeadingZeroCountTest()
+    public void LeadingZeroCountTest()
     {
         if (Has32BitStorage)
         {
@@ -94,7 +93,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void PopCountTest()
+    public void PopCountTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), BinaryIntegerHelper<NativeCULong>.PopCount(new NativeCULong(0x00000000)));
         Assert.Equal(new NativeCULong(0x00000001), BinaryIntegerHelper<NativeCULong>.PopCount(new NativeCULong(0x00000001)));
@@ -104,7 +103,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void RotateLeftTest()
+    public void RotateLeftTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), BinaryIntegerHelper<NativeCULong>.RotateLeft(new NativeCULong(0x00000000), 1));
         Assert.Equal(new NativeCULong(0x00000002), BinaryIntegerHelper<NativeCULong>.RotateLeft(new NativeCULong(0x00000001), 1));
@@ -118,7 +117,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void RotateRightTest()
+    public void RotateRightTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), BinaryIntegerHelper<NativeCULong>.RotateRight(new NativeCULong(0x00000000), 1));
 
@@ -132,7 +131,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void TrailingZeroCountTest()
+    public void TrailingZeroCountTest()
     {
         if (Has32BitStorage)
         {
@@ -145,7 +144,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void GetByteCountTest()
+    public void GetByteCountTest()
     {
         if (Has32BitStorage)
         {
@@ -161,7 +160,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void GetShortestBitLengthTest()
+    public void GetShortestBitLengthTest()
     {
         Assert.Equal(0, BinaryIntegerHelper<NativeCULong>.GetShortestBitLength(new NativeCULong(0x00000000)));
         Assert.Equal(1, BinaryIntegerHelper<NativeCULong>.GetShortestBitLength(new NativeCULong(0x00000001)));
@@ -171,7 +170,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void TryReadBigEndianTest()
+    public void TryReadBigEndianTest()
     {
         NativeCULong result;
 
@@ -214,7 +213,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void TryReadLittleEndianTest()
+    public void TryReadLittleEndianTest()
     {
         NativeCULong result;
 
@@ -257,7 +256,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void TryWriteBigEndianTest()
+    public void TryWriteBigEndianTest()
     {
         if (Has32BitStorage)
         {
@@ -314,7 +313,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void TryWriteLittleEndianTest()
+    public void TryWriteLittleEndianTest()
     {
         if (Has32BitStorage)
         {
@@ -375,7 +374,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void IsPow2Test()
+    public void IsPow2Test()
     {
         Assert.False(BinaryNumberHelper<NativeCULong>.IsPow2(new NativeCULong(0x00000000)));
         Assert.True(BinaryNumberHelper<NativeCULong>.IsPow2(new NativeCULong(0x00000001)));
@@ -385,7 +384,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void Log2Test()
+    public void Log2Test()
     {
         Assert.Equal(new NativeCULong(0x00000000), BinaryNumberHelper<NativeCULong>.Log2(new NativeCULong(0x00000000)));
         Assert.Equal(new NativeCULong(0x00000000), BinaryNumberHelper<NativeCULong>.Log2(new NativeCULong(0x00000001)));
@@ -399,7 +398,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_BitwiseAndTest()
+    public void op_BitwiseAndTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_BitwiseAnd(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000001), BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_BitwiseAnd(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -409,7 +408,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_BitwiseOrTest()
+    public void op_BitwiseOrTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_BitwiseOr(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000001), BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_BitwiseOr(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -419,7 +418,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_ExclusiveOrTest()
+    public void op_ExclusiveOrTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_ExclusiveOr(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000000), BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_ExclusiveOr(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -429,7 +428,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_OnesComplementTest()
+    public void op_OnesComplementTest()
     {
         Assert.Equal(NativeCULong.MaxValue, BitwiseOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_OnesComplement(new NativeCULong(0x00000000)));
 
@@ -447,7 +446,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_GreaterThanTest()
+    public void op_GreaterThanTest()
     {
         Assert.False(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_GreaterThan(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.False(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_GreaterThan(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -457,7 +456,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_GreaterThanOrEqualTest()
+    public void op_GreaterThanOrEqualTest()
     {
         Assert.False(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_GreaterThanOrEqual(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.True(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_GreaterThanOrEqual(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -467,7 +466,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_LessThanTest()
+    public void op_LessThanTest()
     {
         Assert.True(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_LessThan(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.False(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_LessThan(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -477,7 +476,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_LessThanOrEqualTest()
+    public void op_LessThanOrEqualTest()
     {
         Assert.True(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_LessThanOrEqual(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.True(ComparisonOperatorsHelper<NativeCULong, NativeCULong, bool>.op_LessThanOrEqual(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -491,7 +490,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_DecrementTest()
+    public void op_DecrementTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), DecrementOperatorsHelper<NativeCULong>.op_Decrement(new NativeCULong(0x00000001)));
         Assert.Equal(new NativeCULong(0x7FFFFFFE), DecrementOperatorsHelper<NativeCULong>.op_Decrement(new NativeCULong(0x7FFFFFFF)));
@@ -501,7 +500,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_CheckedDecrementTest()
+    public void op_CheckedDecrementTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), DecrementOperatorsHelper<NativeCULong>.op_CheckedDecrement(new NativeCULong(0x00000001)));
         Assert.Equal(new NativeCULong(0x7FFFFFFE), DecrementOperatorsHelper<NativeCULong>.op_CheckedDecrement(new NativeCULong(0x7FFFFFFF)));
@@ -516,7 +515,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_DivisionTest()
+    public void op_DivisionTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Division(new NativeCULong(0x00000000), new NativeCULong(2)));
         Assert.Equal(new NativeCULong(0x00000000), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Division(new NativeCULong(0x00000001), new NativeCULong(2)));
@@ -527,12 +526,27 @@ public class NativeCULongTests_GenericMath
         Assert.Throws<DivideByZeroException>(() => DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Division(new NativeCULong(0x00000001), new NativeCULong(0)));
     }
 
+    [Fact]
+    public void op_CheckedDivisionTest()
+    {
+        // Unsigned division cannot overflow (the signed MinValue/-1 hazard does not apply),
+        // so the checked variant matches plain division for every valid divisor and still
+        // throws DivideByZeroException on a zero divisor.
+        Assert.Equal(new NativeCULong(0x00000000), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedDivision(new NativeCULong(0x00000000), new NativeCULong(2)));
+        Assert.Equal(new NativeCULong(0x00000000), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedDivision(new NativeCULong(0x00000001), new NativeCULong(2)));
+        Assert.Equal(new NativeCULong(0x3FFFFFFF), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedDivision(new NativeCULong(0x7FFFFFFF), new NativeCULong(2)));
+        Assert.Equal(new NativeCULong(0x40000000), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedDivision(new NativeCULong(0x80000000), new NativeCULong(2)));
+        Assert.Equal(new NativeCULong(0x7FFFFFFF), DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedDivision(new NativeCULong(0xFFFFFFFF), new NativeCULong(2)));
+
+        Assert.Throws<DivideByZeroException>(() => DivisionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedDivision(new NativeCULong(0x00000001), new NativeCULong(0)));
+    }
+
     //
     // IEqualityOperators
     //
 
     [Fact]
-    public static void op_EqualityTest()
+    public void op_EqualityTest()
     {
         Assert.True(EqualityOperatorsHelper<NativeCULong, NativeCULong, bool>.op_Equality(new NativeCULong(0x00000000), new NativeCULong(0)));
         Assert.True(EqualityOperatorsHelper<NativeCULong, NativeCULong, bool>.op_Equality(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -542,7 +556,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_InequalityTest()
+    public void op_InequalityTest()
     {
         Assert.False(EqualityOperatorsHelper<NativeCULong, NativeCULong, bool>.op_Inequality(new NativeCULong(0x00000000), new NativeCULong(0)));
         Assert.False(EqualityOperatorsHelper<NativeCULong, NativeCULong, bool>.op_Inequality(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -556,7 +570,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_IncrementTest()
+    public void op_IncrementTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), IncrementOperatorsHelper<NativeCULong>.op_Increment(new NativeCULong(0x00000000)));
         Assert.Equal(new NativeCULong(0x00000002), IncrementOperatorsHelper<NativeCULong>.op_Increment(new NativeCULong(0x00000001)));
@@ -570,13 +584,15 @@ public class NativeCULongTests_GenericMath
 #if !WINDOWS
         else
         {
+#pragma warning disable CS8778 // intentional 64-bit-storage literal; gated at runtime by Has32BitStorage
             Assert.Equal(new NativeCULong((nuint)0x0000000100000000UL), IncrementOperatorsHelper<NativeCULong>.op_Increment(new NativeCULong(0xFFFFFFFF)));
+#pragma warning restore CS8778
         }
 #endif
     }
 
     [Fact]
-    public static void op_CheckedIncrementTest()
+    public void op_CheckedIncrementTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), IncrementOperatorsHelper<NativeCULong>.op_CheckedIncrement(new NativeCULong(0x00000000)));
         Assert.Equal(new NativeCULong(0x00000002), IncrementOperatorsHelper<NativeCULong>.op_CheckedIncrement(new NativeCULong(0x00000001)));
@@ -594,7 +610,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_ModulusTest()
+    public void op_ModulusTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), ModulusOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Modulus(new NativeCULong(0x00000000), new NativeCULong(2)));
         Assert.Equal(new NativeCULong(0x00000001), ModulusOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Modulus(new NativeCULong(0x00000001), new NativeCULong(2)));
@@ -610,7 +626,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void MultiplicativeIdentityTest()
+    public void MultiplicativeIdentityTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), MultiplicativeIdentityHelper<NativeCULong, NativeCULong>.MultiplicativeIdentity);
     }
@@ -620,7 +636,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_MultiplyTest()
+    public void op_MultiplyTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Multiply(new NativeCULong(0x00000000), new NativeCULong(2)));
         Assert.Equal(new NativeCULong(0x00000002), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Multiply(new NativeCULong(0x00000001), new NativeCULong(2)));
@@ -634,15 +650,17 @@ public class NativeCULongTests_GenericMath
 #if !WINDOWS
         else
         {
+#pragma warning disable CS8778 // intentional 64-bit-storage literals; gated at runtime by Has32BitStorage
             Assert.Equal(new NativeCULong((nuint)0x00000000FFFFFFFEUL), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Multiply(new NativeCULong(0x7FFFFFFF), new NativeCULong(2)));
             Assert.Equal(new NativeCULong((nuint)0x0000000100000000UL), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Multiply(new NativeCULong(0x80000000), new NativeCULong(2)));
             Assert.Equal(new NativeCULong((nuint)0x00000001FFFFFFFEUL), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Multiply(new NativeCULong(0xFFFFFFFF), new NativeCULong(2)));
+#pragma warning restore CS8778
         }
 #endif
     }
 
     [Fact]
-    public static void op_CheckedMultiplyTest()
+    public void op_CheckedMultiplyTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedMultiply(new NativeCULong(0x00000000), new NativeCULong(2)));
         Assert.Equal(new NativeCULong(0x00000002), MultiplyOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedMultiply(new NativeCULong(0x00000001), new NativeCULong(2)));
@@ -660,7 +678,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void ClampTest()
+    public void ClampTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.Clamp(new NativeCULong(0x00000000), new NativeCULong(0x01), new NativeCULong(0x3F)));
         Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.Clamp(new NativeCULong(0x00000001), new NativeCULong(0x01), new NativeCULong(0x3F)));
@@ -670,7 +688,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void MaxTest()
+    public void MaxTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.Max(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.Max(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -680,7 +698,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void MinTest()
+    public void MinTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), NumberHelper<NativeCULong>.Min(new NativeCULong(0x00000000), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.Min(new NativeCULong(0x00000001), new NativeCULong(1)));
@@ -690,7 +708,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void SignTest()
+    public void SignTest()
     {
         Assert.Equal(0, NumberHelper<NativeCULong>.Sign(new NativeCULong(0x00000000)));
         Assert.Equal(1, NumberHelper<NativeCULong>.Sign(new NativeCULong(0x00000001)));
@@ -699,30 +717,61 @@ public class NativeCULongTests_GenericMath
         Assert.Equal(1, NumberHelper<NativeCULong>.Sign(new NativeCULong(0xFFFFFFFF)));
     }
 
+    [Fact]
+    public void AbsTest()
+    {
+        // Unsigned: Abs is the identity function.
+        Assert.Equal(new NativeCULong(0x00000000), NumberHelper<NativeCULong>.Abs(new NativeCULong(0x00000000)));
+        Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.Abs(new NativeCULong(0x00000001)));
+        Assert.Equal(new NativeCULong(0xFFFFFFFF), NumberHelper<NativeCULong>.Abs(new NativeCULong(0xFFFFFFFF)));
+    }
+
+    [Fact]
+    public void CopySignTest()
+    {
+        // Unsigned: sign is always +; CopySign preserves the magnitude.
+        Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.CopySign(new NativeCULong(0x00000001), new NativeCULong(0x00000005)));
+        Assert.Equal(new NativeCULong(0xFFFFFFFF), NumberHelper<NativeCULong>.CopySign(new NativeCULong(0xFFFFFFFF), new NativeCULong(0x00000000)));
+    }
+
+    [Fact]
+    public void MaxMagnitudeTest()
+    {
+        Assert.Equal(new NativeCULong(0xFFFFFFFF), NumberHelper<NativeCULong>.MaxMagnitude(new NativeCULong(0x00000000), new NativeCULong(0xFFFFFFFF)));
+        Assert.Equal(new NativeCULong(0xFFFFFFFF), NumberHelper<NativeCULong>.MaxMagnitude(new NativeCULong(0xFFFFFFFF), new NativeCULong(0x00000001)));
+    }
+
+    [Fact]
+    public void MinMagnitudeTest()
+    {
+        Assert.Equal(new NativeCULong(0x00000000), NumberHelper<NativeCULong>.MinMagnitude(new NativeCULong(0x00000000), new NativeCULong(0xFFFFFFFF)));
+        Assert.Equal(new NativeCULong(0x00000001), NumberHelper<NativeCULong>.MinMagnitude(new NativeCULong(0xFFFFFFFF), new NativeCULong(0x00000001)));
+    }
+
     //
     // INumberBase
     //
 
     [Fact]
-    public static void OneTest()
+    public void OneTest()
     {
         Assert.Equal(new NativeCULong(0x00000001), NumberBaseHelper<NativeCULong>.One);
     }
 
     [Fact]
-    public static void ZeroTest()
+    public void ZeroTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), NumberBaseHelper<NativeCULong>.Zero);
     }
 
     [Fact]
-    public static void RadixTest()
+    public void RadixTest()
     {
         Assert.Equal(2, NumberBaseHelper<NativeCULong>.Radix);
     }
 
     [Fact]
-    public static void IsCanonicalTest()
+    public void IsCanonicalTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsCanonical(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsCanonical(new NativeCULong(0x00000001)));
@@ -732,7 +781,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsComplexNumberTest()
+    public void IsComplexNumberTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsComplexNumber(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsComplexNumber(new NativeCULong(0x00000001)));
@@ -742,7 +791,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsEvenIntegerTest()
+    public void IsEvenIntegerTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsEvenInteger(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsEvenInteger(new NativeCULong(0x00000001)));
@@ -752,7 +801,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsFiniteTest()
+    public void IsFiniteTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsFinite(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsFinite(new NativeCULong(0x00000001)));
@@ -762,7 +811,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsImaginaryNumberTest()
+    public void IsImaginaryNumberTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsImaginaryNumber(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsImaginaryNumber(new NativeCULong(0x00000001)));
@@ -772,7 +821,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsInfinityTest()
+    public void IsInfinityTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsInfinity(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsInfinity(new NativeCULong(0x00000001)));
@@ -782,7 +831,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsIntegerTest()
+    public void IsIntegerTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsInteger(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsInteger(new NativeCULong(0x00000001)));
@@ -792,7 +841,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsNaNTest()
+    public void IsNaNTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsNaN(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsNaN(new NativeCULong(0x00000001)));
@@ -802,7 +851,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsNegativeTest()
+    public void IsNegativeTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsNegative(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsNegative(new NativeCULong(0x00000001)));
@@ -812,7 +861,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsNormalTest()
+    public void IsNormalTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsNormal(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsNormal(new NativeCULong(0x00000001)));
@@ -822,7 +871,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsOddIntegerTest()
+    public void IsOddIntegerTest()
     {
         Assert.False(NumberBaseHelper<NativeCULong>.IsOddInteger(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsOddInteger(new NativeCULong(0x00000001)));
@@ -832,7 +881,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsPositiveTest()
+    public void IsPositiveTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsPositive(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsPositive(new NativeCULong(0x00000001)));
@@ -842,7 +891,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsRealNumberTest()
+    public void IsRealNumberTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsRealNumber(new NativeCULong(0x00000000)));
         Assert.True(NumberBaseHelper<NativeCULong>.IsRealNumber(new NativeCULong(0x00000001)));
@@ -852,7 +901,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void IsZeroTest()
+    public void IsZeroTest()
     {
         Assert.True(NumberBaseHelper<NativeCULong>.IsZero(new NativeCULong(0x00000000)));
         Assert.False(NumberBaseHelper<NativeCULong>.IsZero(new NativeCULong(0x00000001)));
@@ -861,12 +910,51 @@ public class NativeCULongTests_GenericMath
         Assert.False(NumberBaseHelper<NativeCULong>.IsZero(new NativeCULong(0xFFFFFFFF)));
     }
 
+    [Fact]
+    public void IsSubnormalTest()
+    {
+        // Integer types have no subnormals.
+        Assert.False(NumberBaseHelper<NativeCULong>.IsSubnormal(new NativeCULong(0x00000000)));
+        Assert.False(NumberBaseHelper<NativeCULong>.IsSubnormal(new NativeCULong(0x00000001)));
+        Assert.False(NumberBaseHelper<NativeCULong>.IsSubnormal(new NativeCULong(0xFFFFFFFF)));
+    }
+
+    [Fact]
+    public void IsNegativeInfinityTest()
+    {
+        Assert.False(NumberBaseHelper<NativeCULong>.IsNegativeInfinity(new NativeCULong(0x00000000)));
+        Assert.False(NumberBaseHelper<NativeCULong>.IsNegativeInfinity(new NativeCULong(0x00000001)));
+        Assert.False(NumberBaseHelper<NativeCULong>.IsNegativeInfinity(new NativeCULong(0xFFFFFFFF)));
+    }
+
+    [Fact]
+    public void IsPositiveInfinityTest()
+    {
+        Assert.False(NumberBaseHelper<NativeCULong>.IsPositiveInfinity(new NativeCULong(0x00000000)));
+        Assert.False(NumberBaseHelper<NativeCULong>.IsPositiveInfinity(new NativeCULong(0x00000001)));
+        Assert.False(NumberBaseHelper<NativeCULong>.IsPositiveInfinity(new NativeCULong(0xFFFFFFFF)));
+    }
+
+    [Fact]
+    public void MaxMagnitudeNumberTest()
+    {
+        Assert.Equal(new NativeCULong(0xFFFFFFFF), NumberBaseHelper<NativeCULong>.MaxMagnitudeNumber(new NativeCULong(0x00000000), new NativeCULong(0xFFFFFFFF)));
+        Assert.Equal(new NativeCULong(0xFFFFFFFF), NumberBaseHelper<NativeCULong>.MaxMagnitudeNumber(new NativeCULong(0xFFFFFFFF), new NativeCULong(0x00000001)));
+    }
+
+    [Fact]
+    public void MinMagnitudeNumberTest()
+    {
+        Assert.Equal(new NativeCULong(0x00000000), NumberBaseHelper<NativeCULong>.MinMagnitudeNumber(new NativeCULong(0x00000000), new NativeCULong(0xFFFFFFFF)));
+        Assert.Equal(new NativeCULong(0x00000001), NumberBaseHelper<NativeCULong>.MinMagnitudeNumber(new NativeCULong(0xFFFFFFFF), new NativeCULong(0x00000001)));
+    }
+
     //
     // IShiftOperators
     //
 
     [Fact]
-    public static void op_LeftShiftTest()
+    public void op_LeftShiftTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_LeftShift(new NativeCULong(0x00000000), 1));
         Assert.Equal(new NativeCULong(0x00000002), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_LeftShift(new NativeCULong(0x00000001), 1));
@@ -880,15 +968,17 @@ public class NativeCULongTests_GenericMath
 #if !WINDOWS
         else
         {
+#pragma warning disable CS8778 // intentional 64-bit-storage literals; gated at runtime by Has32BitStorage
             Assert.Equal(new NativeCULong((nuint)0x00000000FFFFFFFEUL), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_LeftShift(new NativeCULong(0x7FFFFFFF), 1));
             Assert.Equal(new NativeCULong((nuint)0x0000000100000000UL), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_LeftShift(new NativeCULong(0x80000000), 1));
             Assert.Equal(new NativeCULong((nuint)0x00000001FFFFFFFEUL), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_LeftShift(new NativeCULong(0xFFFFFFFF), 1));
+#pragma warning restore CS8778
         }
 #endif
     }
 
     [Fact]
-    public static void op_RightShiftTest()
+    public void op_RightShiftTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_RightShift(new NativeCULong(0x00000000), 1));
         Assert.Equal(new NativeCULong(0x00000000), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_RightShift(new NativeCULong(0x00000001), 1));
@@ -898,7 +988,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_UnsignedRightShiftTest()
+    public void op_UnsignedRightShiftTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_UnsignedRightShift(new NativeCULong(0x00000000), 1));
         Assert.Equal(new NativeCULong(0x00000000), ShiftOperatorsHelper<NativeCULong, int, NativeCULong>.op_UnsignedRightShift(new NativeCULong(0x00000001), 1));
@@ -912,7 +1002,7 @@ public class NativeCULongTests_GenericMath
     //
 
     [Fact]
-    public static void op_SubtractionTest()
+    public void op_SubtractionTest()
     {
         if (Has32BitStorage)
         {
@@ -921,7 +1011,9 @@ public class NativeCULongTests_GenericMath
 #if !WINDOWS
         else
         {
+#pragma warning disable CS8778 // intentional 64-bit-storage literal; gated at runtime by Has32BitStorage
             Assert.Equal(new NativeCULong((nuint)0xFFFFFFFFFFFFFFFFUL), SubtractionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_Subtraction(new NativeCULong(0x00000000), new NativeCULong(1)));
+#pragma warning restore CS8778
         }
 #endif
 
@@ -932,7 +1024,7 @@ public class NativeCULongTests_GenericMath
     }
 
     [Fact]
-    public static void op_CheckedSubtractionTest()
+    public void op_CheckedSubtractionTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), SubtractionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedSubtraction(new NativeCULong(0x00000001), new NativeCULong(1)));
         Assert.Equal(new NativeCULong(0x7FFFFFFE), SubtractionOperatorsHelper<NativeCULong, NativeCULong, NativeCULong>.op_CheckedSubtraction(new NativeCULong(0x7FFFFFFF), new NativeCULong(1)));
@@ -943,11 +1035,34 @@ public class NativeCULongTests_GenericMath
     }
 
     //
+    // IUnaryNegationOperators
+    //
+    // NativeCULong is unsigned (mirrors the BCL byte/uint/ulong/nuint contract):
+    //   - plain negation wraps modulo 2^N (so -0 == 0 and -1 == MaxValue),
+    //   - checked negation throws OverflowException for any non-zero value.
+
+    [Fact]
+    public void op_UnaryNegationTest()
+    {
+        Assert.Equal(new NativeCULong(0x00000000), UnaryNegationOperatorsHelper<NativeCULong, NativeCULong>.op_UnaryNegation(new NativeCULong(0x00000000)));
+        Assert.Equal(NativeCULong.MaxValue,        UnaryNegationOperatorsHelper<NativeCULong, NativeCULong>.op_UnaryNegation(new NativeCULong(0x00000001)));
+        Assert.Equal(new NativeCULong(0x00000001), UnaryNegationOperatorsHelper<NativeCULong, NativeCULong>.op_UnaryNegation(NativeCULong.MaxValue));
+    }
+
+    [Fact]
+    public void op_CheckedUnaryNegationTest()
+    {
+        Assert.Equal(new NativeCULong(0x00000000), UnaryNegationOperatorsHelper<NativeCULong, NativeCULong>.op_CheckedUnaryNegation(new NativeCULong(0x00000000)));
+        Assert.Throws<OverflowException>(() => UnaryNegationOperatorsHelper<NativeCULong, NativeCULong>.op_CheckedUnaryNegation(new NativeCULong(0x00000001)));
+        Assert.Throws<OverflowException>(() => UnaryNegationOperatorsHelper<NativeCULong, NativeCULong>.op_CheckedUnaryNegation(NativeCULong.MaxValue));
+    }
+
+    //
     // IUnaryPlusOperators
     //
 
     [Fact]
-    public static void op_UnaryPlusTest()
+    public void op_UnaryPlusTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), UnaryPlusOperatorsHelper<NativeCULong, NativeCULong>.op_UnaryPlus(new NativeCULong(0x00000000)));
         Assert.Equal(new NativeCULong(0x00000001), UnaryPlusOperatorsHelper<NativeCULong, NativeCULong>.op_UnaryPlus(new NativeCULong(0x00000001)));

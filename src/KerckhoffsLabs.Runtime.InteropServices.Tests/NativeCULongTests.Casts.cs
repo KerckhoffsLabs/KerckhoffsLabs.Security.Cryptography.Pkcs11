@@ -1,11 +1,10 @@
 // Licensed under the MIT License
 
 using KerckhoffsLabs.Runtime.InteropServices;
-using Xunit;
 
 namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
-public class NativeCULongCastTests
+public partial class NativeCULongTests
 {
     // ---- Primitive -> NativeCULong (round-trip via Value) -------------------
 
@@ -113,10 +112,30 @@ public class NativeCULongCastTests
         }
     }
 
-    private static bool Has64BitStorage => !Has32BitStorage;
-    private static bool Has32BitStorage => IntPtr.Size == 4 || OperatingSystem.IsWindows();
+    [Fact]
+    public void Cast_FromNegativeLong_Throws_UnderCheckedContext()
+    {
+        Assert.Throws<System.OverflowException>(() =>
+        {
+            long negative = -1L;
+            NativeCULong _ = (NativeCULong)negative;
+        });
+    }
 
-    [ConditionalFact(nameof(Has64BitStorage))]
+    [Fact]
+    public void Cast_FromNegativeLong_Wraps_InsideUncheckedBlock()
+    {
+        unchecked
+        {
+            long negative = -1L;
+            NativeCULong c = (NativeCULong)negative;
+            // -1L wraps to all-bits-set in the storage width — matches MaxValue
+            // on both 32-bit and 64-bit NativeCULong storage.
+            Assert.Equal(NativeCULong.MaxValue, c);
+        }
+    }
+
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.Has64BitStorage))]
     public void Cast_ToInt_ThrowsOnUnix64WhenValueExceedsIntRange()
     {
         // On 64-bit Unix, NativeCULong is backed by nuint (64-bit), so it can hold
@@ -128,7 +147,7 @@ public class NativeCULongCastTests
         });
     }
 
-    [ConditionalFact(nameof(Has64BitStorage))]
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.Has64BitStorage))]
     public void Cast_ToInt_WrapsOnUnix64InUncheckedBlock()
     {
         NativeCULong tooBig = new NativeCULong((nuint)((long)int.MaxValue + 1));

@@ -2,17 +2,12 @@
 
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
-using Xunit;
+using static KerckhoffsLabs.Runtime.InteropServices.Tests.PlatformLayout;
 
 namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 
-public class NativeCULongTests
+public partial class NativeCULongTests
 {
-    private static bool Has64BitStorage => !Has32BitStorage;
-    private static bool Has32BitStorage => IntPtr.Size == 4 || OperatingSystem.IsWindows();
-    private static bool NativeIntConstructorCanOverflow => IntPtr.Size != 4 && Has32BitStorage;
-    private static bool NativeIntConstructorCannotOverflow => !NativeIntConstructorCanOverflow;
-
     [Fact]
     public void Ctor_Empty()
     {
@@ -34,13 +29,13 @@ public class NativeCULongTests
         Assert.Equal(42u, value.Value);
     }
 
-    [ConditionalFact(nameof(NativeIntConstructorCanOverflow))]
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.NativeIntConstructorCanOverflow))]
     public void Ctor_NUInt_OutOfRange()
     {
         Assert.Throws<OverflowException>(() => new NativeCULong(unchecked(((nuint)uint.MaxValue) + 1)));
     }
 
-    [ConditionalFact(nameof(NativeIntConstructorCannotOverflow))]
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.NativeIntConstructorCannotOverflow))]
     public void Ctor_NUInt_LargeValue()
     {
         nuint largeValue = unchecked(((nuint)uint.MaxValue) + 1);
@@ -53,30 +48,33 @@ public class NativeCULongTests
         yield return new object[] { new NativeCULong(789), new NativeCULong(789), true };
         yield return new object[] { new NativeCULong(789), new NativeCULong(0), false };
         yield return new object[] { new NativeCULong(0), new NativeCULong(0), true };
-        #pragma warning disable CS8625
-        yield return new object[] { new NativeCULong(789), null, false };
-        #pragma warning restore CS8625
+        yield return new object[] { new NativeCULong(789), null!, false };
         yield return new object[] { new NativeCULong(789), "789", false };
         yield return new object[] { new NativeCULong(789), 789u, false };
+        yield return new object[] { NativeCULong.MaxValue, NativeCULong.MaxValue, true };
+        // Note: cannot pair MaxValue with 0 here — the current EqualsTest also asserts
+        // GetHashCode inequality for unequal values, and on 64-bit storage MaxValue
+        // (0xFFFFFFFFFFFFFFFF) hashes to 0 (XOR-folded halves), colliding with 0's hash.
+        yield return new object[] { NativeCULong.MaxValue, new NativeCULong(1), false };
     }
 
     [Theory]
     [MemberData(nameof(EqualsData))]
-    public void EqualsTest(NativeCULong NativeCULong, object obj, bool expected)
+    public void EqualsTest(NativeCULong value, object obj, bool expected)
     {
-        if (obj is NativeCULong NativeCULong2)
+        if (obj is NativeCULong other)
         {
-            Assert.Equal(expected, NativeCULong.Equals(NativeCULong2));
-            Assert.Equal(expected, NativeCULong.GetHashCode().Equals(NativeCULong2.GetHashCode()));
+            Assert.Equal(expected, value.Equals(other));
+            Assert.Equal(expected, value.GetHashCode().Equals(other.GetHashCode()));
         }
-        Assert.Equal(expected, NativeCULong.Equals(obj));
+        Assert.Equal(expected, value.Equals(obj));
     }
 
     [Theory]
     [InlineData(0, "0")]
     [InlineData(4567, "4567")]
     [InlineData(uint.MaxValue, "4294967295")]
-    public static void ToStringTest(uint value, string expected)
+    public void ToStringTest(uint value, string expected)
     {
         NativeCULong NativeCULong = new NativeCULong(value);
 
@@ -94,13 +92,13 @@ public class NativeCULongTests
     }
 
     [Fact]
-    public static void MinValueTest()
+    public void MinValueTest()
     {
         Assert.Equal(new NativeCULong(0x00000000), NativeCULong.MinValue);
     }
 
     [Fact]
-    public static void MaxValueTest()
+    public void MaxValueTest()
     {
         if (!OperatingSystem.IsWindows() && Environment.Is64BitProcess)
         {

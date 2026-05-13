@@ -59,7 +59,13 @@ public readonly struct NativeCULong
     /// <exception cref="OverflowException"><paramref name="value"/> is outside the range of the underlying storage type.</exception>
     public NativeCULong(nuint value)
     {
-        _value = checked(value);
+#if WINDOWS
+        // 32-bit storage; throws when value exceeds uint.MaxValue (only possible on 64-bit Windows).
+        _value = checked((uint)value);
+#else
+        // Storage is nuint; no narrowing needed.
+        _value = value;
+#endif
     }
 
     /// <summary>
@@ -542,25 +548,16 @@ public readonly struct NativeCULong
     public static bool TryCreate<TOther>(TOther value, out NativeCULong result)
         where TOther : INumber<TOther>
     {
-#if WINDOWS
-        // Windows: use native uint.TryCreate
-        if (uint.TryCreate(value, out uint temp))
-        {
-            result = new NativeCULong(temp);
-            return true;
-        }
-        result = default;
-        return false;
-#else
-        // Unix: convert through ulong to nuint
+        // TryCreate has truncating semantics (its replacement, CreateChecked, is the
+        // throwing variant). Convert TOther → ulong via the BCL dispatch, then narrow
+        // to storage width without overflow checks.
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
         {
-            result = new NativeCULong((nuint)tempUlong);
+            result = new NativeCULong(unchecked((NativeType)tempUlong));
             return true;
         }
         result = default;
         return false;
-#endif
     }
 
     /// <summary>Attempts to parse a string as a <see cref="NativeCULong"/> using the specified <see cref="System.Globalization.NumberStyles"/> and format provider. Returns <c>true</c> and sets <paramref name="result"/> on success.</summary>
@@ -654,126 +651,111 @@ public readonly struct NativeCULong
     /// <inheritdoc cref="INumberBase{TSelf}.MinMagnitudeNumber(TSelf, TSelf)" />
     static NativeCULong INumberBase<NativeCULong>.MinMagnitudeNumber(NativeCULong x, NativeCULong y) => Min(x, y);
 
+    // The inbound TryConvertFrom* methods route TOther → ulong via the BCL's
+    // INumberBase dispatch (TOther.TryConvertToX), then narrow ulong → storage with
+    // the appropriate semantics. NativeType is uint on Windows (32-bit storage) and
+    // nuint on Unix; using it lets a single body cover both platforms.
+
     /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromChecked{TOther}(TOther, out TSelf)" />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromChecked<TOther>(TOther value, out NativeCULong result)
     {
-#if WINDOWS
-        // Windows: use native uint.TryConvertFromChecked
-        if (uint.TryConvertFromChecked(value, out uint temp))
+        if (TOther.TryConvertToChecked(value, out ulong tempUlong))
         {
-            result = new NativeCULong(temp);
+            // checked narrow throws OverflowException if value exceeds storage width.
+            result = new NativeCULong(checked((NativeType)tempUlong));
             return true;
         }
         result = default;
         return false;
-#else
-        // Unix: convert through ulong with checked cast to nuint
-        if (TOther.TryConvertToChecked(value, out ulong tempUlong))
-        {
-            try
-            {
-                result = new NativeCULong(checked((nuint)tempUlong));
-                return true;
-            }
-            catch (OverflowException)
-            {
-                // Value exceeds platform pointer size
-            }
-        }
-        result = default;
-        return false;
-#endif
     }
 
     /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromSaturating{TOther}(TOther, out TSelf)" />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromSaturating<TOther>(TOther value, out NativeCULong result)
     {
-#if WINDOWS
-        // Windows: use native uint.TryConvertFromSaturating
-        if (uint.TryConvertFromSaturating(value, out uint temp))
-        {
-            result = new NativeCULong(temp);
-            return true;
-        }
-        result = default;
-        return false;
-#else
-        // Unix: convert through ulong and saturate to nuint.MaxValue
         if (TOther.TryConvertToSaturating(value, out ulong tempUlong))
         {
-            nuint saturated = tempUlong > nuint.MaxValue ? nuint.MaxValue : (nuint)tempUlong;
+            NativeType saturated = tempUlong > NativeType.MaxValue
+                ? NativeType.MaxValue
+                : (NativeType)tempUlong;
             result = new NativeCULong(saturated);
             return true;
         }
         result = default;
         return false;
-#endif
     }
 
     /// <inheritdoc cref="INumberBase{TSelf}.TryConvertFromTruncating{TOther}(TOther, out TSelf)" />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromTruncating<TOther>(TOther value, out NativeCULong result)
     {
-#if WINDOWS
-        // Windows: use native uint.TryConvertFromTruncating
-        if (uint.TryConvertFromTruncating(value, out uint temp))
-        {
-            result = new NativeCULong(temp);
-            return true;
-        }
-        result = default;
-        return false;
-#else
-        // Unix: convert through ulong and truncate to platform size
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
         {
-            result = new NativeCULong((nuint)tempUlong);
+            result = new NativeCULong(unchecked((NativeType)tempUlong));
             return true;
         }
         result = default;
         return false;
-#endif
     }
+
+    // The outbound TryConvertTo* methods dispatch through TWO paths:
+    //   1) For narrowing toward a signed type (sbyte, short, int, long, nint, Int128)
+    //      we perform the cast ourselves. This is necessary because the BCL signed
+    //      types' TryConvertFromX tables don't list ulong as a recognized source —
+    //      e.g. int.TryConvertFromChecked<ulong> returns false, which would otherwise
+    //      cause CreateChecked to throw NotSupportedException for an in-range value.
+    //   2) For everything else (byte, ushort, uint, ulong, UInt128, nuint, char,
+    //      decimal, Half, float, double) we delegate to TOther.TryConvertFromX —
+    //      those types' From tables do recognize ulong as a source.
 
     /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToChecked{TOther}(TSelf, out TOther)" />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertToChecked<TOther>(NativeCULong value, [MaybeNullWhen(false)] out TOther result)
     {
-#if WINDOWS
-        // Windows: use native uint.TryConvertToChecked
-        return uint.TryConvertToChecked(value._value, out result);
-#else
-        // Unix: convert _value to ulong, then to TOther
-        return TOther.TryConvertFromChecked((ulong)value._value, out result);
-#endif
+        ulong v = (ulong)value._value;
+
+        if (typeof(TOther) == typeof(sbyte))  { sbyte  r = checked((sbyte)v);  result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(short))  { short  r = checked((short)v);  result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(int))    { int    r = checked((int)v);    result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(long))   { long   r = checked((long)v);   result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(nint))   { nint   r = checked((nint)v);   result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(Int128)) { Int128 r = v;                  result = (TOther)(object)r; return true; }
+
+        return TOther.TryConvertFromChecked(v, out result);
     }
 
     /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToSaturating{TOther}(TSelf, out TOther)" />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertToSaturating<TOther>(NativeCULong value, [MaybeNullWhen(false)] out TOther result)
     {
-#if WINDOWS
-        // Windows: use native uint.TryConvertToSaturating
-        return uint.TryConvertToSaturating(value._value, out result);
-#else
-        // Unix: convert _value to ulong, then to TOther
-        return TOther.TryConvertFromSaturating((ulong)value._value, out result);
-#endif
+        ulong v = (ulong)value._value;
+
+        // Ulong is non-negative, so only the upper bound can saturate.
+        if (typeof(TOther) == typeof(sbyte))  { sbyte  r = v > (ulong)sbyte.MaxValue ? sbyte.MaxValue : (sbyte)v; result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(short))  { short  r = v > (ulong)short.MaxValue ? short.MaxValue : (short)v; result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(int))    { int    r = v > int.MaxValue           ? int.MaxValue   : (int)v;   result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(long))   { long   r = v > long.MaxValue          ? long.MaxValue  : (long)v;  result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(nint))   { nint   r = v > (ulong)nint.MaxValue   ? nint.MaxValue  : (nint)v;  result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(Int128)) { Int128 r = v;                                                     result = (TOther)(object)r; return true; }
+
+        return TOther.TryConvertFromSaturating(v, out result);
     }
 
     /// <inheritdoc cref="INumberBase{TSelf}.TryConvertToTruncating{TOther}(TSelf, out TOther)" />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertToTruncating<TOther>(NativeCULong value, [MaybeNullWhen(false)] out TOther result)
     {
-#if WINDOWS
-        // Windows: use native uint.TryConvertToTruncating
-        return uint.TryConvertToTruncating(value._value, out result);
-#else
-        // Unix: convert _value to ulong, then to TOther
-        return TOther.TryConvertFromTruncating((ulong)value._value, out result);
-#endif
+        ulong v = (ulong)value._value;
+
+        if (typeof(TOther) == typeof(sbyte))  { sbyte  r = unchecked((sbyte)v);  result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(short))  { short  r = unchecked((short)v);  result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(int))    { int    r = unchecked((int)v);    result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(long))   { long   r = unchecked((long)v);   result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(nint))   { nint   r = unchecked((nint)v);   result = (TOther)(object)r; return true; }
+        if (typeof(TOther) == typeof(Int128)) { Int128 r = v;                    result = (TOther)(object)r; return true; }
+
+        return TOther.TryConvertFromTruncating(v, out result);
     }
 
     //
