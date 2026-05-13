@@ -206,19 +206,6 @@ public sealed class Pkcs11Slot
     }
 
     /// <summary>
-    /// Closes a session between an application and a token
-    /// </summary>
-    /// <param name="session">Session</param>
-    internal void CloseSession(Pkcs11Session session)
-    {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::CloseSession", _slotId);
-
-        ArgumentNullException.ThrowIfNull(session);
-
-        session.CloseSession();
-    }
-
-    /// <summary>
     /// Closes all sessions an application has with a token
     /// </summary>
     public void CloseAllSessions()
