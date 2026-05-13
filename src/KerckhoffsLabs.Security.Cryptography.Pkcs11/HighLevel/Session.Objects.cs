@@ -1,6 +1,8 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -17,7 +19,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::CreateObject", _sessionId);
+        _logger.LogDebug("Session({SessionId})::CreateObject", _sessionId);
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
@@ -51,7 +53,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::CopyObject", _sessionId);
+        _logger.LogDebug("Session({SessionId})::CopyObject", _sessionId);
 
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
@@ -86,7 +88,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::DestroyObject", _sessionId);
+        _logger.LogDebug("Session({SessionId})::DestroyObject", _sessionId);
 
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
@@ -107,7 +109,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GetObjectSize", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GetObjectSize", _sessionId);
 
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
@@ -132,7 +134,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GetAttributeValue1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GetAttributeValue1", _sessionId);
 
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
@@ -162,7 +164,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GetAttributeValue2", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GetAttributeValue2", _sessionId);
 
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
@@ -271,7 +273,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SetAttributeValue", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SetAttributeValue", _sessionId);
 
         if (objectHandle == null)
             throw new ArgumentNullException("objectHandle");
@@ -301,7 +303,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::FindObjectsInit", _sessionId);
+        _logger.LogDebug("Session({SessionId})::FindObjectsInit", _sessionId);
 
         CK_ATTRIBUTE[] template = null;
         NativeCULong templateLength = (NativeCULong)0;
@@ -330,7 +332,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::FindObjects", _sessionId);
+        _logger.LogDebug("Session({SessionId})::FindObjects", _sessionId);
 
         List<ObjectHandle> foundObjects = new List<ObjectHandle>();
 
@@ -355,7 +357,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::FindObjectsFinal", _sessionId);
+        _logger.LogDebug("Session({SessionId})::FindObjectsFinal", _sessionId);
 
         CKR rv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
         if (rv != CKR.CKR_OK)
@@ -373,7 +375,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::FindAllObjects", _sessionId);
+        _logger.LogDebug("Session({SessionId})::FindAllObjects", _sessionId);
 
         List<ObjectHandle> foundObjects = new List<ObjectHandle>();
 

@@ -1,6 +1,8 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -28,7 +30,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Sign1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -109,7 +111,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign1a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign1a", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -147,7 +149,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign1b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign1b", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -185,7 +187,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign1c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign1c", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -212,7 +214,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign2a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign2a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -240,7 +242,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign2b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign2b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -268,7 +270,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign2c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign2c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -299,7 +301,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Sign3", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -374,7 +376,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign3a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign3a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -406,7 +408,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign3b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign3b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -438,7 +440,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::Sign3c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Sign3c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -471,7 +473,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::SignRecover1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignRecover1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -532,7 +534,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::SignRecover1a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignRecover1a", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -560,7 +562,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::SignRecover1b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignRecover1b", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -588,7 +590,7 @@ public partial class Session
         if (keyHandle == null)
             throw new ArgumentNullException("keyHandle");
 
-        _logger.Debug("Session({0})::SignRecover1c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignRecover1c", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -624,7 +626,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt1a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt1a", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -665,7 +667,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt1b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt1b", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -706,7 +708,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt1c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt1c", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -746,7 +748,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt2a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt2a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -786,7 +788,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt2b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt2b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -826,7 +828,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt2c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt2c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -870,7 +872,7 @@ public partial class Session
         GuardMechanism((CKM)signingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
-        _logger.Debug("Session({0})::SignEncrypt3", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -991,7 +993,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt3a", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt3a", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -1035,7 +1037,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt3b", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt3b", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -1079,7 +1081,7 @@ public partial class Session
         if (encryptionKeyHandle == null)
             throw new ArgumentNullException("encryptionKeyHandle");
 
-        _logger.Debug("Session({0})::SignEncrypt3c", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SignEncrypt3c", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");

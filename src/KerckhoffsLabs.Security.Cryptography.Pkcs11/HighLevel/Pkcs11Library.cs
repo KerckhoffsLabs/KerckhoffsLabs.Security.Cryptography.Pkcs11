@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -18,7 +19,7 @@ public class Pkcs11Library : IDisposable
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private Pkcs11InteropLogger _logger = Pkcs11InteropLoggerFactory.GetLogger(typeof(Pkcs11Library));
+    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Library>();
 
     /// <summary>
     /// Library name or path
@@ -51,13 +52,13 @@ public class Pkcs11Library : IDisposable
     /// <param name="initType">Source of PKCS#11 function pointers</param>
     public Pkcs11Library(string libraryPath, AppType appType, InitType initType)
     {
-        _logger.Debug("Pkcs11Library({0})::ctor", libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::ctor", libraryPath);
 
         _libraryPath = libraryPath;
 
         try
         {
-            _logger.Info("Loading PKCS#11 library {0}", _libraryPath);
+            _logger.LogInformation("Loading PKCS#11 library {LibraryPath}", _libraryPath);
             _pkcs11Library = new LowLevelPkcs11Library(_libraryPath, initType == InitType.WithFunctionList);
             Initialize(appType);
         }
@@ -65,7 +66,7 @@ public class Pkcs11Library : IDisposable
         {
             if (_pkcs11Library != null)
             {
-                _logger.Info("Unloading PKCS#11 library {0}", _libraryPath);
+                _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
                 _pkcs11Library.Dispose();
                 _pkcs11Library = null;
             }
@@ -80,7 +81,7 @@ public class Pkcs11Library : IDisposable
     /// <param name="appType">Type of application that will be using PKCS#11 library</param>
     protected void Initialize(AppType appType)
     {
-        _logger.Debug("Pkcs11Library({0})::Initialize", _libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::Initialize", _libraryPath);
 
         CK_C_INITIALIZE_ARGS initArgs = null;
         if (appType == AppType.MultiThreaded)
@@ -104,7 +105,7 @@ public class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.Debug("Pkcs11Library({0})::GetInfo", _libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::GetInfo", _libraryPath);
 
         CK_INFO info = new();
         CKR rv = _pkcs11Library.C_GetInfo(ref info);
@@ -123,7 +124,7 @@ public class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.Debug("Pkcs11Library({0})::GetSlotList", _libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::GetSlotList", _libraryPath);
 
         NativeCULong slotCount = new (0);
         CKR rv = _pkcs11Library.C_GetSlotList(slotsType == SlotsType.WithTokenPresent, null, ref slotCount);
@@ -162,7 +163,7 @@ public class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.Debug("Pkcs11Library({0})::WaitForSlotEvent", _libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::WaitForSlotEvent", _libraryPath);
 
         NativeCULong flags = (waitType == WaitType.NonBlocking) ? CKF.CKF_DONT_BLOCK : new (0);
 
@@ -206,7 +207,7 @@ public class Pkcs11Library : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _logger.Debug("Pkcs11Library({0})::Dispose1", _libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose1", _libraryPath);
 
         Dispose(true);
         GC.SuppressFinalize(this);
@@ -218,7 +219,7 @@ public class Pkcs11Library : IDisposable
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
     protected virtual void Dispose(bool disposing)
     {
-        _logger.Debug("Pkcs11Library({0})::Dispose2", _libraryPath);
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose2", _libraryPath);
 
         if (!_disposed)
         {
@@ -229,7 +230,7 @@ public class Pkcs11Library : IDisposable
                 {
                     _pkcs11Library.C_Finalize(IntPtr.Zero);
 
-                    _logger.Info("Unloading PKCS#11 library {0}", _libraryPath);
+                    _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
                     _pkcs11Library.Dispose();
                     _pkcs11Library = null;
                 }

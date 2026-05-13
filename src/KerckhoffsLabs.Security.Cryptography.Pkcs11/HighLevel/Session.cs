@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -21,7 +22,7 @@ public partial class Session
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private Pkcs11InteropLogger _logger = Pkcs11InteropLoggerFactory.GetLogger(typeof(Session));
+    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Session>();
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -143,7 +144,7 @@ public partial class Session
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            _logger.Debug("Session({0})::CloseWhenDisposed", _sessionId);
+            _logger.LogDebug("Session({SessionId})::CloseWhenDisposed", _sessionId);
 
             _closeWhenDisposed = value;
         }
@@ -180,7 +181,7 @@ public partial class Session
     /// <param name="sessionId">PKCS#11 handle of session</param>
     protected internal Session(LowLevelPkcs11Library pkcs11Library, ulong sessionId)
     {
-        _logger.Debug("Session({0})::ctor", sessionId);
+        _logger.LogDebug("Session({SessionId})::ctor", sessionId);
 
         if (pkcs11Library == null)
             throw new ArgumentNullException("pkcs11Library");
@@ -204,9 +205,9 @@ public partial class Session
         if (_sessionHandle is null || _sessionHandle.IsInvalid)
             return;
 
-        _logger.Debug("Session({0})::CloseSession", _sessionId);
+        _logger.LogDebug("Session({SessionId})::CloseSession", _sessionId);
 
-        _logger.Info("Closing session {0}", _sessionId);
+        _logger.LogInformation("Closing session {SessionId}", _sessionId);
 
         // SafeHandle.Dispose() calls ReleaseHandle, which invokes C_CloseSession on the library.
         _sessionHandle.Dispose();
@@ -229,7 +230,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::InitPin", _sessionId);
+        _logger.LogDebug("Session({SessionId})::InitPin", _sessionId);
 
         byte[] tmp = userPin.Pin.ToArray();
         try
@@ -262,7 +263,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SetPin", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SetPin", _sessionId);
 
         byte[] oldTmp = oldPin.Pin.ToArray();
         byte[] newTmp = newPin.Pin.ToArray();
@@ -292,7 +293,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GetSessionInfo", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GetSessionInfo", _sessionId);
 
         CK_SESSION_INFO sessionInfo = new CK_SESSION_INFO();
         CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref sessionInfo);
@@ -312,7 +313,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GetOperationState", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GetOperationState", _sessionId);
 
         NativeCULong operationStateLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetOperationState(_sessionId, null, ref operationStateLen);
@@ -339,7 +340,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SetOperationState", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SetOperationState", _sessionId);
 
         if (state == null)
             throw new ArgumentNullException("state");
@@ -372,10 +373,10 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Login", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Login", _sessionId);
 
-        if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
-            _logger.Info("Logging as {0} into session {1}", Pkcs11InteropLogUtils.ToString(userType), _sessionId);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("Logging as {UserType} into session {SessionId}", Pkcs11LogUtils.ToString(userType), _sessionId);
 
         byte[] tmp = pin.Pin.ToArray();
         try
@@ -399,9 +400,9 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::Logout", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Logout", _sessionId);
 
-        _logger.Info("Logging out of session {0}", _sessionId);
+        _logger.LogInformation("Logging out of session {SessionId}", _sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);
         if (rv != CKR.CKR_OK)
@@ -417,7 +418,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GetFunctionStatus", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GetFunctionStatus", _sessionId);
 
         CKR rv = _pkcs11Library.C_GetFunctionStatus(_sessionId);
         if (rv != CKR.CKR_OK)
@@ -433,7 +434,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::CancelFunction", _sessionId);
+        _logger.LogDebug("Session({SessionId})::CancelFunction", _sessionId);
 
         CKR rv = _pkcs11Library.C_CancelFunction(_sessionId);
         if (rv != CKR.CKR_OK)
@@ -501,7 +502,7 @@ public partial class Session
     /// </summary>
     public void Dispose()
     {
-        _logger.Debug("Session({0})::Dispose1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Dispose1", _sessionId);
 
         Dispose(true);
         GC.SuppressFinalize(this);
@@ -513,7 +514,7 @@ public partial class Session
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
     protected virtual void Dispose(bool disposing)
     {
-        _logger.Debug("Session({0})::Dispose2", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Dispose2", _sessionId);
 
         if (!_disposed)
         {

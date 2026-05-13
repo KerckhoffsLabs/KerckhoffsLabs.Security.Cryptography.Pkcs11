@@ -1,6 +1,8 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -30,7 +32,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::SeedRandom", _sessionId);
+        _logger.LogDebug("Session({SessionId})::SeedRandom", _sessionId);
 
         if (seed == null)
             throw new ArgumentNullException("seed");
@@ -66,7 +68,7 @@ public partial class Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.Debug("Session({0})::GenerateRandom", _sessionId);
+        _logger.LogDebug("Session({SessionId})::GenerateRandom", _sessionId);
 
         if (length < 1)
             throw new ArgumentException("Value has to be positive number", "length");

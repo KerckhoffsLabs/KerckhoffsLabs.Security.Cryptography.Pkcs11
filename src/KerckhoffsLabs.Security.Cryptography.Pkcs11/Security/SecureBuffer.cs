@@ -83,4 +83,11 @@ internal sealed class SecureBuffer : IDisposable
 
     /// <summary>Finalizer safety net — zeroes and releases the pin even if Dispose was not called.</summary>
     ~SecureBuffer() => Dispose();
+
+    /// <summary>
+    /// Returns a non-revealing marker. Overridden so that accidentally formatting
+    /// a <see cref="SecureBuffer"/> into a log message cannot leak the buffer
+    /// contents. Length and contents are never disclosed.
+    /// </summary>
+    public override string ToString() => "SecureBuffer{redacted}";
 }

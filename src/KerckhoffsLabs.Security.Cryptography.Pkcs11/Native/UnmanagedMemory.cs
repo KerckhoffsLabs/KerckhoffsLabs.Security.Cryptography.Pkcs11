@@ -1,12 +1,17 @@
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
-/// Utility class that helps to manage unmanaged memory
+/// Utility class that helps to manage unmanaged memory. Internal to the assembly —
+/// callers needing this surface should expose the relevant lifecycle through a
+/// high-level type (see <c>SecureBuffer</c>, <c>Mechanism</c>, <c>ObjectAttribute</c>).
+/// Visible to the test assembly via <c>InternalsVisibleTo</c> for the leak-detection
+/// harness (<see cref="OutstandingAllocationCount"/>, <see cref="DebugModeEnabled"/>).
 /// </summary>
-public static class UnmanagedMemory
+internal static class UnmanagedMemory
 {
     /// <summary>Size in bytes of one CK_ULONG (NativeCULong) on the current platform: 4 on Windows, 8 on Unix-LP64.</summary>
     public static int NativeULongSize { get; } = Marshal.SizeOf<NativeCULong>();
@@ -14,7 +19,7 @@ public static class UnmanagedMemory
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private static readonly Pkcs11InteropLogger _logger = Pkcs11InteropLoggerFactory.GetLogger(typeof(UnmanagedMemory));
+    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger(typeof(UnmanagedMemory));
 
     /// <summary>
     /// Lock object for list of all memory allocations
@@ -95,7 +100,7 @@ public static class UnmanagedMemory
                 {
                     _allocations.Add(memory, size);
 
-                    _logger.Debug("Allocated {0} bytes at {1}. Allocations: {2}", size, memory, _allocations.Count);
+                    _logger.LogDebug("Allocated {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
                 }
                 else
                 {
@@ -125,7 +130,7 @@ public static class UnmanagedMemory
                     int size = _allocations[memory];
                     _allocations.Remove(memory);
 
-                    _logger.Debug("Freeing {0} bytes at {1}. Allocations: {2}", size, memory, _allocations.Count);
+                    _logger.LogDebug("Freeing {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
                 }
                 else
                 {

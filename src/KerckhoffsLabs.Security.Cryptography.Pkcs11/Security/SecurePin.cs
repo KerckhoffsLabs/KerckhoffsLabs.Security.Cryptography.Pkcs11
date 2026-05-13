@@ -109,4 +109,11 @@ public sealed class SecurePin : IDisposable
 
     /// <summary>Finalizer safety net — release pin even if Dispose was not called.</summary>
     ~SecurePin() => Dispose();
+
+    /// <summary>
+    /// Returns a non-revealing marker. Overridden so that accidentally formatting
+    /// a <see cref="SecurePin"/> into a log message (or any string template) cannot
+    /// leak the PIN bytes. Length and contents are never disclosed.
+    /// </summary>
+    public override string ToString() => "SecurePin{redacted}";
 }

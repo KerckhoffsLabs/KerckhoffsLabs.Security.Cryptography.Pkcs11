@@ -204,7 +204,7 @@ public partial class NativeCULongTests
     [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.Has64BitStorage))]
     public void Cast_ToUInt_Plain_TruncatesOn64BitStorage_InsideUncheckedBlock()
     {
-        NativeCULong tooBig = new NativeCULong((nuint)((ulong)uint.MaxValue + 1UL));
+        NativeCULong tooBig = new NativeCULong(unchecked((nuint)((ulong)uint.MaxValue + 1UL)));
         unchecked
         {
             uint wrapped = (uint)tooBig;

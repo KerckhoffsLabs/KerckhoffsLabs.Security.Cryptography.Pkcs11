@@ -1,6 +1,8 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -47,7 +49,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Encrypt1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Encrypt1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -95,7 +97,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Encrypt2", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Encrypt2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -128,7 +130,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Encrypt3", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Encrypt3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");

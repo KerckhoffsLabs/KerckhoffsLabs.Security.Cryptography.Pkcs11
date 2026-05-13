@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -13,7 +14,7 @@ public class Slot
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private Pkcs11InteropLogger _logger = Pkcs11InteropLoggerFactory.GetLogger(typeof(Slot));
+    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Slot>();
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -43,7 +44,7 @@ public class Slot
     /// <param name="slotId">PKCS#11 handle of slot</param>
     protected internal Slot(LowLevelPkcs11Library pkcs11Library, ulong slotId)
     {
-        _logger.Debug("Slot({0})::ctor", slotId);
+        _logger.LogDebug("Slot({SlotId})::ctor", slotId);
 
         if (pkcs11Library == null)
             throw new ArgumentNullException("pkcs11Library");
@@ -58,7 +59,7 @@ public class Slot
     /// <returns>Slot information</returns>
     public SlotInfo GetSlotInfo()
     {
-        _logger.Debug("Slot({0})::GetSlotInfo", _slotId);
+        _logger.LogDebug("Slot({SlotId})::GetSlotInfo", _slotId);
 
         CK_SLOT_INFO slotInfo = new();
         CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, ref slotInfo);
@@ -74,7 +75,7 @@ public class Slot
     /// <returns>Token information</returns>
     public TokenInfo GetTokenInfo()
     {
-        _logger.Debug("Slot({0})::GetTokenInfo", _slotId);
+        _logger.LogDebug("Slot({SlotId})::GetTokenInfo", _slotId);
 
         CK_TOKEN_INFO tokenInfo = new();
         CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, ref tokenInfo);
@@ -90,7 +91,7 @@ public class Slot
     /// <returns>List of mechanism types supported by a token</returns>
     public List<CKM> GetMechanismList()
     {
-        _logger.Debug("Slot({0})::GetMechanismList", _slotId);
+        _logger.LogDebug("Slot({SlotId})::GetMechanismList", _slotId);
 
         NativeCULong mechanismCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
@@ -118,7 +119,7 @@ public class Slot
     /// <returns>Information about mechanism</returns>
     public MechanismInfo GetMechanismInfo(CKM mechanism)
     {
-        _logger.Debug("Slot({0})::GetMechanismInfo", _slotId);
+        _logger.LogDebug("Slot({SlotId})::GetMechanismInfo", _slotId);
 
         CK_MECHANISM_INFO mechanismInfo = new CK_MECHANISM_INFO();
         CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, ref mechanismInfo);
@@ -135,7 +136,7 @@ public class Slot
     /// <param name="label">Label of the token</param>
     public void InitToken(string soPin, string label)
     {
-        _logger.Debug("Slot({0})::InitToken1", _slotId);
+        _logger.LogDebug("Slot({SlotId})::InitToken1", _slotId);
 
         byte[] soPinValue = null;
         NativeCULong soPinValueLen = (NativeCULong)0;
@@ -161,7 +162,7 @@ public class Slot
     /// <param name="label">Label of the token</param>
     public void InitToken(byte[] soPin, byte[] label)
     {
-        _logger.Debug("Slot({0})::InitToken2", _slotId);
+        _logger.LogDebug("Slot({SlotId})::InitToken2", _slotId);
 
         byte[] soPinValue = null;
         NativeCULong soPinValueLen = (NativeCULong)0;
@@ -197,7 +198,7 @@ public class Slot
     /// <returns>Session</returns>
     public Session OpenSession(SessionType sessionType)
     {
-        _logger.Debug("Slot({0})::OpenSession", _slotId);
+        _logger.LogDebug("Slot({SlotId})::OpenSession", _slotId);
 
         NativeCULong flags = CKF.CKF_SERIAL_SESSION;
         if (sessionType == SessionType.ReadWrite)
@@ -208,8 +209,8 @@ public class Slot
         if (rv != CKR.CKR_OK)
             throw new Pkcs11Exception("C_OpenSession", rv);
 
-        if (_logger.IsEnabled(Pkcs11InteropLogLevel.Info))
-            _logger.Info("Opened {0} session {1} with token in slot {2}", Pkcs11InteropLogUtils.ToString(sessionType), sessionId, _slotId);
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation("Opened {SessionType} session {SessionId} with token in slot {SlotId}", Pkcs11LogUtils.ToString(sessionType), sessionId, _slotId);
 
         return new Session(_pkcs11Library, (ulong)sessionId);
     }
@@ -220,7 +221,7 @@ public class Slot
     /// <param name="session">Session</param>
     public void CloseSession(Session session)
     {
-        _logger.Debug("Slot({0})::CloseSession", _slotId);
+        _logger.LogDebug("Slot({SlotId})::CloseSession", _slotId);
 
         if (session == null)
             throw new ArgumentNullException("session");
@@ -233,9 +234,9 @@ public class Slot
     /// </summary>
     public void CloseAllSessions()
     {
-        _logger.Debug("Slot({0})::CloseAllSessions", _slotId);
+        _logger.LogDebug("Slot({SlotId})::CloseAllSessions", _slotId);
 
-        _logger.Info("Closing all sessions with token in slot {0}", _slotId);
+        _logger.LogInformation("Closing all sessions with token in slot {SlotId}", _slotId);
 
         CKR rv = _pkcs11Library.C_CloseAllSessions(_slotId);
         if (rv != CKR.CKR_OK)

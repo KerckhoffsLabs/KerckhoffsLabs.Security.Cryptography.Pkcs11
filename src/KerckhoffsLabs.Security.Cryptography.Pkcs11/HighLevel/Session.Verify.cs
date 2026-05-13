@@ -1,6 +1,8 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
@@ -48,7 +50,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Verify1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Verify1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -93,7 +95,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Verify2", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Verify2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -127,7 +129,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::Verify3", _sessionId);
+        _logger.LogDebug("Session({SessionId})::Verify3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -185,7 +187,7 @@ public partial class Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.Debug("Session({0})::VerifyRecover", _sessionId);
+        _logger.LogDebug("Session({SessionId})::VerifyRecover", _sessionId);
 
         if (signature == null)
             throw new ArgumentNullException("signature");
@@ -248,7 +250,7 @@ public partial class Session
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.Debug("Session({0})::DecryptVerify1", _sessionId);
+        _logger.LogDebug("Session({SessionId})::DecryptVerify1", _sessionId);
 
         if (data == null)
             throw new ArgumentNullException("data");
@@ -295,7 +297,7 @@ public partial class Session
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.Debug("Session({0})::DecryptVerify2", _sessionId);
+        _logger.LogDebug("Session({SessionId})::DecryptVerify2", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
@@ -342,7 +344,7 @@ public partial class Session
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.Debug("Session({0})::DecryptVerify3", _sessionId);
+        _logger.LogDebug("Session({SessionId})::DecryptVerify3", _sessionId);
 
         if (inputStream == null)
             throw new ArgumentNullException("inputStream");
