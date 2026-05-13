@@ -2,7 +2,7 @@
 
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 /// <summary>
 /// Token-specific identifier for an object returned by the PKCS#11 module.
@@ -32,7 +32,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 /// <c>default</c> as a sentinel and check <see cref="IsInvalid"/>.
 /// </para>
 /// </remarks>
-public readonly record struct ObjectHandle
+internal readonly record struct ObjectHandle
 {
     /// <summary>
     /// PKCS#11 handle of the object.

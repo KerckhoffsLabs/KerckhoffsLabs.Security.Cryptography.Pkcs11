@@ -8,7 +8,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using Microsoft.Extensions.Logging;
 
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 internal sealed partial class Pkcs11Session

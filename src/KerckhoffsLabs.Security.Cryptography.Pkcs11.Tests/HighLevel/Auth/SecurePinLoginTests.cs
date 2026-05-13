@@ -1,6 +1,5 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Auth;

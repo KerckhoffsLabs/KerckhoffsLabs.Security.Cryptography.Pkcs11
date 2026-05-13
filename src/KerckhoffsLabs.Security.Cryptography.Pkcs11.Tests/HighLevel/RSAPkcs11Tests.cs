@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 using Microsoft.DotNet.XUnitExtensions;
@@ -108,8 +108,8 @@ public sealed class RSAPkcs11Tests_SoftHsm
     }
 
     private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace,
-        out KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.ObjectHandle pubH,
-        out KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.ObjectHandle privH)
+        out KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle pubH,
+        out KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle privH)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
         byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
@@ -128,8 +128,8 @@ public sealed class RSAPkcs11Tests_SoftHsm
     }
 
     private static void Cleanup(Pkcs11Workspace workspace,
-        KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.ObjectHandle pubH,
-        KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.ObjectHandle privH)
+        KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle pubH,
+        KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle privH)
     {
         if (!pubH.IsInvalid)  workspace.Session.DestroyObject(pubH);
         if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);

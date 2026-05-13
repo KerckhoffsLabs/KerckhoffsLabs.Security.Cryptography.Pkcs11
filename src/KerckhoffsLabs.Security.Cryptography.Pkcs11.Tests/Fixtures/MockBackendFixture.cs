@@ -1,5 +1,4 @@
 using KerckhoffsLabs.Runtime.InteropServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
