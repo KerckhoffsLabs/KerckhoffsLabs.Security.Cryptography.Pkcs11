@@ -536,6 +536,9 @@ internal sealed partial class Pkcs11Session
     /// <see cref="InsecureOperationException"/> at runtime unless
     /// <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
+    [Obsolete("MD5 is a broken hash function with practical collisions. " +
+              "Use DigestSha256 (or stronger) instead. " +
+              "If you must use it, set Session.AllowInsecure = true.")]
     public byte[] DigestMd5(ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
@@ -548,6 +551,9 @@ internal sealed partial class Pkcs11Session
     /// <see cref="InsecureOperationException"/> at runtime unless
     /// <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
+    [Obsolete("SHA-1 is broken (SHAttered demonstrated practical collisions). " +
+              "Use DigestSha256 (or stronger) instead. " +
+              "If you must use it, set Session.AllowInsecure = true.")]
     public byte[] DigestSha1(ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();

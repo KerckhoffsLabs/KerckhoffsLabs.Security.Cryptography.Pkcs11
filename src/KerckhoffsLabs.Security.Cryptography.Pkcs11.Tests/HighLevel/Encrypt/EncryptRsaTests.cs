@@ -51,8 +51,10 @@ internal static class EncryptRsaTestCases
             {
                 byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("RSA v1.5 test");
 
+#pragma warning disable CS0618 // EncryptRsaPkcs1V15 is intentionally Obsolete
                 Assert.Throws<InsecureOperationException>(() =>
                     session.EncryptRsaPkcs1V15(pub, plaintext));
+#pragma warning restore CS0618
             }
             finally
             {

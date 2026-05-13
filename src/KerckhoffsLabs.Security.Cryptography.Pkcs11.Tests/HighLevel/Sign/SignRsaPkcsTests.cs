@@ -23,8 +23,10 @@ internal static class SignRsaPkcsTestCases
         try
         {
             var fakeKey = new ObjectHandle(0);
+#pragma warning disable CS0618 // intentionally testing the obsolete API
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.SignRsaPkcs1V15(fakeKey, Array.Empty<byte>()));
+#pragma warning restore CS0618
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }
         finally
@@ -49,7 +51,9 @@ internal static class SignRsaPkcsTestCases
             var fakeKey = new ObjectHandle(0);
             try
             {
+#pragma warning disable CS0618 // intentionally testing the obsolete API
                 session.SignRsaPkcs1V15(fakeKey, Array.Empty<byte>());
+#pragma warning restore CS0618
             }
             catch (InsecureOperationException)
             {
