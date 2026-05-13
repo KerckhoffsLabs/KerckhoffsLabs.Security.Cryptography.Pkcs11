@@ -74,6 +74,21 @@ public sealed partial class Pkcs11Workspace
     }
 
     /// <summary>
+    /// Generates a new symmetric key using <c>C_GenerateKey</c> and returns it as a
+    /// <see cref="Pkcs11Key"/>. For asymmetric key generation, use the two-template
+    /// overload.
+    /// </summary>
+    public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(template);
+
+        var handle = _session.GenerateKey(mechanism, template.Attributes.ToList());
+        return HydrateKeyFromHandle(handle);
+    }
+
+    /// <summary>
     /// Hydrates an existing object handle into a Pkcs11Key (used after operations that
     /// produce a new on-token object — Unwrap, Derive).
     /// </summary>
