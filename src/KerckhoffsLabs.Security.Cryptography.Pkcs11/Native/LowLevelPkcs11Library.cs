@@ -379,6 +379,46 @@ internal sealed class LowLevelPkcs11Library
     }
 
     /// <summary>
+    /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0 §5.6.7).
+    /// </summary>
+    /// <param name="session">The session's handle.</param>
+    /// <param name="userType">The user type.</param>
+    /// <param name="pin">User's PIN bytes, or null for protected-authentication-path tokens.</param>
+    /// <param name="pinLen">Length of <paramref name="pin"/> in bytes.</param>
+    /// <param name="username">Username bytes (UTF-8), or null.</param>
+    /// <param name="usernameLen">Length of <paramref name="username"/> in bytes.</param>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_LoginUser(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_LoginUser is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_LoginUser(session, userType.ToCULong(), pin, pinLen, username, usernameLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Cancels operations in-flight on the session matching the given flags bitmask
+    /// (PKCS#11 v3.0 §5.6.8). The session remains open; only the targeted operations
+    /// are unwound.
+    /// </summary>
+    /// <param name="session">The session's handle.</param>
+    /// <param name="flags">Bitmask of operations to cancel (CKF_ENCRYPT, CKF_DECRYPT, CKF_SIGN, etc.).</param>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_SessionCancel(NativeCULong session, NativeCULong flags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_SessionCancel is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_SessionCancel(session, flags);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
     /// Logs a user out from a token
     /// </summary>
     /// <param name="session">The session's handle</param>

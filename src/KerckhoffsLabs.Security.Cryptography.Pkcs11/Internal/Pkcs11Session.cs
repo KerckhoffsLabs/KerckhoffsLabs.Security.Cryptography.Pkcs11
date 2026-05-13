@@ -378,6 +378,70 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>
+    /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0).
+    /// Use this overload for HSMs that support named user accounts beyond SO/User.
+    /// </summary>
+    /// <param name="userType">Type of user.</param>
+    /// <param name="pin">User's PIN. Caller retains ownership; the PIN bytes are copied
+    /// into a transient buffer and zeroed before the method returns.</param>
+    /// <param name="username">Account username (UTF-8 encoded). Must not be null or empty.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="pin"/> or <paramref name="username"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="username"/> is empty.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from C_LoginUser. <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> indicates the loaded library is v2.40 or otherwise does not export C_LoginUser.</exception>
+    public void LoginUser(CKU userType, SecurePin pin, string username)
+    {
+        using var _ = AcquireExclusive();
+        ArgumentNullException.ThrowIfNull(pin);
+        ArgumentNullException.ThrowIfNull(username);
+        if (username.Length == 0)
+            throw new ArgumentException("Username must not be empty.", nameof(username));
+
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.LogDebug("Session({SessionId})::LoginUser", _sessionId);
+
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation(
+                "Logging in as {UserType} (username supplied) on session {SessionId}",
+                Pkcs11LogUtils.ToString(userType), _sessionId);
+
+        byte[] pinTmp = pin.Pin.ToArray();
+        byte[] usernameBytes = System.Text.Encoding.UTF8.GetBytes(username);
+        try
+        {
+            CKR rv = _pkcs11Library.C_LoginUser(
+                _sessionId, userType,
+                pinTmp, (NativeCULong)pinTmp.Length,
+                usernameBytes, (NativeCULong)usernameBytes.Length);
+            Pkcs11Exception.ThrowIfError(rv, "C_LoginUser");
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(pinTmp);
+        }
+    }
+
+    /// <summary>
+    /// Cancels in-flight cryptographic operations on this session, identified by the
+    /// flags bitmask (e.g. CKF_ENCRYPT | CKF_DECRYPT). The session itself remains
+    /// open; only the targeted operations are unwound (PKCS#11 v3.0 §5.6.8).
+    /// </summary>
+    /// <param name="flags">Bitmask of operations to cancel.</param>
+    /// <exception cref="Pkcs11Exception">Propagated from C_SessionCancel. <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> indicates the loaded library is v2.40 or otherwise does not export C_SessionCancel.</exception>
+    public void CancelOperations(ulong flags)
+    {
+        using var _ = AcquireExclusive();
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        _logger.LogDebug("Session({SessionId})::CancelOperations flags=0x{Flags:X}", _sessionId, flags);
+
+        CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, (NativeCULong)flags);
+        Pkcs11Exception.ThrowIfError(rv, "C_SessionCancel");
+    }
+
+    /// <summary>
     /// Logs a user out from a token
     /// </summary>
     public void Logout()

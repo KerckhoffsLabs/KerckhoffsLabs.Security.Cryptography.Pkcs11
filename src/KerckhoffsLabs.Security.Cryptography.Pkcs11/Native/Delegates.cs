@@ -61,6 +61,20 @@ internal delegate NativeCULong C_SetOperationStateDelegate(NativeCULong session,
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_LoginDelegate(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen);
 
+/// <summary>
+/// C_LoginUser was added in PKCS#11 v3.0 — logs in by both user type and a free-form
+/// username, supporting HSMs with named user accounts beyond the SO/User dichotomy.
+/// </summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_LoginUserDelegate(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen);
+
+/// <summary>
+/// C_SessionCancel was added in PKCS#11 v3.0 — cancels in-flight operations on the
+/// session as identified by the flags bitmask (e.g. CKF_ENCRYPT, CKF_SIGN, etc.).
+/// </summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SessionCancelDelegate(NativeCULong session, NativeCULong flags);
+
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_LogoutDelegate(NativeCULong session);
 
@@ -569,6 +583,18 @@ internal partial class Delegates
     internal C_WaitForSlotEventDelegate? C_WaitForSlotEvent = null;
 
     /// <summary>
+    /// Delegate for C_LoginUser (PKCS#11 v3.0). Null if the loaded library is v2.40
+    /// or does not export the symbol.
+    /// </summary>
+    internal C_LoginUserDelegate? C_LoginUser = null;
+
+    /// <summary>
+    /// Delegate for C_SessionCancel (PKCS#11 v3.0). Null if the loaded library is v2.40
+    /// or does not export the symbol.
+    /// </summary>
+    internal C_SessionCancelDelegate? C_SessionCancel = null;
+
+    /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
     /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library
     /// when <paramref name="libraryHandle"/> is non-zero, or against the
@@ -579,9 +605,35 @@ internal partial class Delegates
     internal Delegates(IntPtr libraryHandle)
     {
         if (libraryHandle != IntPtr.Zero)
+        {
             InitializeWithGetFunctionList(libraryHandle);
+            // Best-effort load of v3.0 functions via direct symbol lookup. The full
+            // C_GetInterface-based loader path lives in Pkcs11Library / bucket E.
+            TryLoadV30Symbols(libraryHandle);
+        }
         else
+        {
             InitializeWithGetFunctionList();
+        }
+    }
+
+    /// <summary>
+    /// Best-effort: bind v3.0 function pointers obtained by direct symbol lookup
+    /// against the loaded library. Symbols missing from a v2.40 token are left
+    /// <see langword="null"/>; high-level methods then report
+    /// <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/>.
+    /// </summary>
+    private void TryLoadV30Symbols(IntPtr libraryHandle)
+    {
+        C_LoginUser = TryGetDelegate<C_LoginUserDelegate>(libraryHandle, "C_LoginUser");
+        C_SessionCancel = TryGetDelegate<C_SessionCancelDelegate>(libraryHandle, "C_SessionCancel");
+    }
+
+    private static T? TryGetDelegate<T>(IntPtr libraryHandle, string symbol) where T : class
+    {
+        if (NativeLibrary.TryGetExport(libraryHandle, symbol, out IntPtr fnPtr) && fnPtr != IntPtr.Zero)
+            return Marshal.GetDelegateForFunctionPointer<T>(fnPtr);
+        return null;
     }
 
     /// <summary>
