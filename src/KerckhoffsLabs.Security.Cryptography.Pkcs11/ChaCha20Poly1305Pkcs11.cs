@@ -22,6 +22,15 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
     private readonly Pkcs11Key _key;
     private bool _disposed;
 
+    /// <summary>
+    /// Wraps a PKCS#11 ChaCha20 key as a
+    /// <see cref="System.Security.Cryptography.ChaCha20Poly1305"/>-shaped AEAD provider.
+    /// Does not take ownership — disposing this provider does not dispose <paramref name="key"/>.
+    /// </summary>
+    /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
+    /// is <see cref="CKK.CKK_CHACHA20"/>.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not a ChaCha20 key.</exception>
     public ChaCha20Poly1305Pkcs11(Pkcs11Key key)
     {
         ArgumentNullException.ThrowIfNull(key);

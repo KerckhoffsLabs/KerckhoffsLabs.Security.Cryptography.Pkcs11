@@ -26,6 +26,14 @@ public sealed class ECDsaPkcs11 : ECDsa
 {
     private readonly Pkcs11Key _key;
 
+    /// <summary>
+    /// Wraps a PKCS#11 EC key as a BCL <see cref="ECDsa"/> instance. Does not take
+    /// ownership — disposing this provider does not dispose <paramref name="key"/>.
+    /// </summary>
+    /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
+    /// is <see cref="CKK.CKK_EC"/>.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an EC key.</exception>
     public ECDsaPkcs11(Pkcs11Key key)
     {
         ArgumentNullException.ThrowIfNull(key);
