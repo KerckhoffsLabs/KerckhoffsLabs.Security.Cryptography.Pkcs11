@@ -290,6 +290,54 @@ internal delegate NativeCULong C_VerifyMessageNextDelegate(NativeCULong session,
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_MessageVerifyFinalDelegate(NativeCULong session);
 
+/// <summary>ML-KEM-style key encapsulation (PKCS#11 v3.2 §5.18.10). Takes an encapsulating public key, returns ciphertext + a handle to the encapsulated shared-secret key.</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_EncapsulateKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, [In, Out] byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey);
+
+/// <summary>ML-KEM-style key decapsulation (PKCS#11 v3.2 §5.18.11). Reverses C_EncapsulateKey using the matching private key.</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DecapsulateKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey);
+
+/// <summary>Initialize a signature-only verify operation, supplying the signature up front (PKCS#11 v3.2 §5.16.10). Data is fed via C_VerifySignature(Update) and the final check happens in C_VerifySignatureFinal.</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifySignatureInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen);
+
+/// <summary>One-shot verify against the signature bound at init time (PKCS#11 v3.2 §5.16.11).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifySignatureDelegate(NativeCULong session, byte[] data, NativeCULong dataLen);
+
+/// <summary>Feed a data chunk to a streaming signature-only verify (PKCS#11 v3.2 §5.16.12).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifySignatureUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen);
+
+/// <summary>Conclude a streaming signature-only verify; returns CKR_OK on match, CKR_SIGNATURE_INVALID otherwise (PKCS#11 v3.2 §5.16.13).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifySignatureFinalDelegate(NativeCULong session);
+
+/// <summary>Reads the session's validation flags for the requested validation-state type (PKCS#11 v3.2 §5.6.10).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetSessionValidationFlagsDelegate(NativeCULong session, NativeCULong type, ref NativeCULong flags);
+
+/// <summary>Retrieve the result of a previously-pending async crypto operation (PKCS#11 v3.2 §5.20.2).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_AsyncCompleteDelegate(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA result);
+
+/// <summary>Obtain a persistent identifier for an async operation so it can be rejoined later (PKCS#11 v3.2 §5.20.3).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_AsyncGetIDDelegate(NativeCULong session, byte[] functionName, ref NativeCULong id);
+
+/// <summary>Reattach to a previously-issued async operation using its persistent ID (PKCS#11 v3.2 §5.20.4).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_AsyncJoinDelegate(NativeCULong session, byte[] functionName, NativeCULong id, byte[] data, NativeCULong dataLen);
+
+/// <summary>Wraps a key with authentication: the wrap is bound to the AAD bytes which must be supplied at unwrap (PKCS#11 v3.2 §5.18.12).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_WrapKeyAuthenticatedDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
+
+/// <summary>Unwrap counterpart to C_WrapKeyAuthenticated; verifies the AAD as part of the unwrap (PKCS#11 v3.2 §5.18.13).</summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_UnwrapKeyAuthenticatedDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key);
+
 /// <summary>
 /// Holds delegates for all PKCS#11 functions
 /// </summary>
@@ -722,6 +770,42 @@ internal partial class Delegates
     /// <summary>Delegate for C_MessageVerifyFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
     internal C_MessageVerifyFinalDelegate? C_MessageVerifyFinal = null;
 
+    /// <summary>Delegate for C_EncapsulateKey (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_EncapsulateKeyDelegate? C_EncapsulateKey = null;
+
+    /// <summary>Delegate for C_DecapsulateKey (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_DecapsulateKeyDelegate? C_DecapsulateKey = null;
+
+    /// <summary>Delegate for C_VerifySignatureInit (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_VerifySignatureInitDelegate? C_VerifySignatureInit = null;
+
+    /// <summary>Delegate for C_VerifySignature (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_VerifySignatureDelegate? C_VerifySignature = null;
+
+    /// <summary>Delegate for C_VerifySignatureUpdate (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_VerifySignatureUpdateDelegate? C_VerifySignatureUpdate = null;
+
+    /// <summary>Delegate for C_VerifySignatureFinal (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_VerifySignatureFinalDelegate? C_VerifySignatureFinal = null;
+
+    /// <summary>Delegate for C_GetSessionValidationFlags (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_GetSessionValidationFlagsDelegate? C_GetSessionValidationFlags = null;
+
+    /// <summary>Delegate for C_AsyncComplete (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_AsyncCompleteDelegate? C_AsyncComplete = null;
+
+    /// <summary>Delegate for C_AsyncGetID (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_AsyncGetIDDelegate? C_AsyncGetID = null;
+
+    /// <summary>Delegate for C_AsyncJoin (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_AsyncJoinDelegate? C_AsyncJoin = null;
+
+    /// <summary>Delegate for C_WrapKeyAuthenticated (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_WrapKeyAuthenticatedDelegate? C_WrapKeyAuthenticated = null;
+
+    /// <summary>Delegate for C_UnwrapKeyAuthenticated (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
+    internal C_UnwrapKeyAuthenticatedDelegate? C_UnwrapKeyAuthenticated = null;
+
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
     /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library
@@ -783,6 +867,18 @@ internal partial class Delegates
         C_VerifyMessageBegin = TryGetDelegate<C_VerifyMessageBeginDelegate>(libraryHandle, "C_VerifyMessageBegin");
         C_VerifyMessageNext = TryGetDelegate<C_VerifyMessageNextDelegate>(libraryHandle, "C_VerifyMessageNext");
         C_MessageVerifyFinal = TryGetDelegate<C_MessageVerifyFinalDelegate>(libraryHandle, "C_MessageVerifyFinal");
+        C_EncapsulateKey = TryGetDelegate<C_EncapsulateKeyDelegate>(libraryHandle, "C_EncapsulateKey");
+        C_DecapsulateKey = TryGetDelegate<C_DecapsulateKeyDelegate>(libraryHandle, "C_DecapsulateKey");
+        C_VerifySignatureInit = TryGetDelegate<C_VerifySignatureInitDelegate>(libraryHandle, "C_VerifySignatureInit");
+        C_VerifySignature = TryGetDelegate<C_VerifySignatureDelegate>(libraryHandle, "C_VerifySignature");
+        C_VerifySignatureUpdate = TryGetDelegate<C_VerifySignatureUpdateDelegate>(libraryHandle, "C_VerifySignatureUpdate");
+        C_VerifySignatureFinal = TryGetDelegate<C_VerifySignatureFinalDelegate>(libraryHandle, "C_VerifySignatureFinal");
+        C_GetSessionValidationFlags = TryGetDelegate<C_GetSessionValidationFlagsDelegate>(libraryHandle, "C_GetSessionValidationFlags");
+        C_AsyncComplete = TryGetDelegate<C_AsyncCompleteDelegate>(libraryHandle, "C_AsyncComplete");
+        C_AsyncGetID = TryGetDelegate<C_AsyncGetIDDelegate>(libraryHandle, "C_AsyncGetID");
+        C_AsyncJoin = TryGetDelegate<C_AsyncJoinDelegate>(libraryHandle, "C_AsyncJoin");
+        C_WrapKeyAuthenticated = TryGetDelegate<C_WrapKeyAuthenticatedDelegate>(libraryHandle, "C_WrapKeyAuthenticated");
+        C_UnwrapKeyAuthenticated = TryGetDelegate<C_UnwrapKeyAuthenticatedDelegate>(libraryHandle, "C_UnwrapKeyAuthenticated");
     }
 
     private static T? TryGetDelegate<T>(IntPtr libraryHandle, string symbol) where T : class

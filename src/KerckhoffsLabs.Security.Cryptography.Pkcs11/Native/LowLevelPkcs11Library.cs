@@ -732,6 +732,187 @@ internal sealed class LowLevelPkcs11Library
         return rv.ToCKRChecked();
     }
 
+    /// <summary>
+    /// ML-KEM-style key encapsulation (PKCS#11 v3.2 §5.18.10). Takes an encapsulating public key, returns ciphertext + a handle to the encapsulated shared-secret key.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_EncapsulateKey is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_EncapsulateKey(session, ref mechanism, publicKey, template, attributeCount, ciphertext, ref ciphertextLen, ref derivedKey);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// ML-KEM-style key decapsulation (PKCS#11 v3.2 §5.18.11). Reverses C_EncapsulateKey using the matching private key.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_DecapsulateKey is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_DecapsulateKey(session, ref mechanism, privateKey, template, attributeCount, ciphertext, ciphertextLen, ref derivedKey);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Initialize a signature-only verify operation, supplying the signature up front (PKCS#11 v3.2 §5.16.10). Data is fed via C_VerifySignature(Update) and the final check happens in C_VerifySignatureFinal.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifySignatureInit is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifySignatureInit(session, ref mechanism, key, signature, signatureLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// One-shot verify against the signature bound at init time (PKCS#11 v3.2 §5.16.11).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifySignature(NativeCULong session, byte[] data, NativeCULong dataLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifySignature is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifySignature(session, data, dataLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Feed a data chunk to a streaming signature-only verify (PKCS#11 v3.2 §5.16.12).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifySignatureUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifySignatureUpdate is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifySignatureUpdate(session, part, partLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Conclude a streaming signature-only verify; returns CKR_OK on match, CKR_SIGNATURE_INVALID otherwise (PKCS#11 v3.2 §5.16.13).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifySignatureFinal(NativeCULong session)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifySignatureFinal is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifySignatureFinal(session);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Reads the session's validation flags for the requested validation-state type (PKCS#11 v3.2 §5.6.10).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_GetSessionValidationFlags is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_GetSessionValidationFlags(session, type, ref flags);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Retrieve the result of a previously-pending async crypto operation (PKCS#11 v3.2 §5.20.2).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_AsyncComplete(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA result)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_AsyncComplete is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_AsyncComplete(session, functionName, ref result);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Obtain a persistent identifier for an async operation so it can be rejoined later (PKCS#11 v3.2 §5.20.3).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_AsyncGetID(NativeCULong session, byte[] functionName, ref NativeCULong id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_AsyncGetID is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_AsyncGetID(session, functionName, ref id);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Reattach to a previously-issued async operation using its persistent ID (PKCS#11 v3.2 §5.20.4).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_AsyncJoin(NativeCULong session, byte[] functionName, NativeCULong id, byte[] data, NativeCULong dataLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_AsyncJoin is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_AsyncJoin(session, functionName, id, data, dataLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Wraps a key with authentication: the wrap is bound to the AAD bytes which must be supplied at unwrap (PKCS#11 v3.2 §5.18.12).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_WrapKeyAuthenticated is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_WrapKeyAuthenticated(session, ref mechanism, wrappingKey, key, associatedData, associatedDataLen, wrappedKey, ref wrappedKeyLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Unwrap counterpart to C_WrapKeyAuthenticated; verifies the AAD as part of the unwrap (PKCS#11 v3.2 §5.18.13).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_UnwrapKeyAuthenticated is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_UnwrapKeyAuthenticated(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, associatedData, associatedDataLen, ref key);
+        return rv.ToCKRChecked();
+    }
+
+
 
     /// <summary>
     /// Logs a user out from a token
