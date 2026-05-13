@@ -22,18 +22,18 @@ internal sealed class LowLevelPkcs11Library
     private Delegates? _delegates = null;
 
     /// <summary>
-    /// Loads PCKS#11 library
+    /// Loads PKCS#11 library at <paramref name="libraryPath"/> and acquires function
+    /// pointers via <c>C_GetFunctionList</c>.
     /// </summary>
-    /// <param name="libraryPath">Library name or path</param>
-    /// <param name="useGetFunctionList">Flag indicating whether cryptoki function pointers should be acquired via C_GetFunctionList (true) or via platform native function (false)</param>
-    public LowLevelPkcs11Library(string libraryPath, bool useGetFunctionList = true)
+    /// <param name="libraryPath">Library name or path.</param>
+    public LowLevelPkcs11Library(string libraryPath)
     {
         try
         {
             if (!string.IsNullOrEmpty(libraryPath))
             {
                 _library = new Pkcs11ModuleHandle(NativeLibrary.Load(libraryPath));
-                _delegates = new Delegates(_library.DangerousGetHandle(), useGetFunctionList);
+                _delegates = new Delegates(_library.DangerousGetHandle());
             }
         }
         catch

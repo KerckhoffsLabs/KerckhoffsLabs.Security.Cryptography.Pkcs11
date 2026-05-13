@@ -764,34 +764,19 @@ internal partial class Delegates
     internal C_WaitForSlotEventDelegate? C_WaitForSlotEvent = null;
 
     /// <summary>
-    /// Initializes new instance of Delegates class
+    /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
+    /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library
+    /// when <paramref name="libraryHandle"/> is non-zero, or against the
+    /// statically-linked PKCS#11 symbols otherwise (iOS-style "__Internal" link).
     /// </summary>
-    /// <param name="libraryHandle">Handle to the PKCS#11 library</param>
-    /// <param name="useGetFunctionList">Flag indicating whether cryptoki function pointers should be acquired via C_GetFunctionList (true) or via platform native function (false)</param>
-    internal Delegates(IntPtr libraryHandle, bool useGetFunctionList)
+    /// <param name="libraryHandle">Handle to the dynamically loaded PKCS#11 library,
+    /// or <see cref="IntPtr.Zero"/> for a statically-linked library.</param>
+    internal Delegates(IntPtr libraryHandle)
     {
-        if (useGetFunctionList)
-        {
-            if (libraryHandle != IntPtr.Zero)
-            {
-                InitializeWithGetFunctionList(libraryHandle);
-            }
-            else
-            {
-                InitializeWithGetFunctionList();
-            }
-        }
+        if (libraryHandle != IntPtr.Zero)
+            InitializeWithGetFunctionList(libraryHandle);
         else
-        {
-            if (libraryHandle != IntPtr.Zero)
-            {
-                InitializeWithoutGetFunctionList(libraryHandle);
-            }
-            else
-            {
-                InitializeWithoutGetFunctionList();
-            }
-        }
+            InitializeWithGetFunctionList();
     }
 
     /// <summary>
@@ -832,161 +817,6 @@ internal partial class Delegates
         Initialize(funcList);
     }
 
-    /// <summary>
-    /// Get delegates without C_GetFunctionList function from the dynamically loaded shared PKCS#11 library
-    /// </summary>
-    /// <param name="libraryHandle">Handle to the PKCS#11 library</param>
-    private void InitializeWithoutGetFunctionList(IntPtr libraryHandle)
-    {
-        CK_FUNCTION_LIST funcList = new()
-        {
-            C_Initialize = NativeLibrary.GetExport(libraryHandle, "C_Initialize"),
-            C_Finalize = NativeLibrary.GetExport(libraryHandle, "C_Finalize"),
-            C_GetInfo = NativeLibrary.GetExport(libraryHandle, "C_GetInfo"),
-            C_GetFunctionList = NativeLibrary.GetExport(libraryHandle, "C_GetFunctionList"),
-            C_GetSlotList = NativeLibrary.GetExport(libraryHandle, "C_GetSlotList"),
-            C_GetSlotInfo = NativeLibrary.GetExport(libraryHandle, "C_GetSlotInfo"),
-            C_GetTokenInfo = NativeLibrary.GetExport(libraryHandle, "C_GetTokenInfo"),
-            C_GetMechanismList = NativeLibrary.GetExport(libraryHandle, "C_GetMechanismList"),
-            C_GetMechanismInfo = NativeLibrary.GetExport(libraryHandle, "C_GetMechanismInfo"),
-            C_InitToken = NativeLibrary.GetExport(libraryHandle, "C_InitToken"),
-            C_InitPIN = NativeLibrary.GetExport(libraryHandle, "C_InitPIN"),
-            C_SetPIN = NativeLibrary.GetExport(libraryHandle, "C_SetPIN"),
-            C_OpenSession = NativeLibrary.GetExport(libraryHandle, "C_OpenSession"),
-            C_CloseSession = NativeLibrary.GetExport(libraryHandle, "C_CloseSession"),
-            C_CloseAllSessions = NativeLibrary.GetExport(libraryHandle, "C_CloseAllSessions"),
-            C_GetSessionInfo = NativeLibrary.GetExport(libraryHandle, "C_GetSessionInfo"),
-            C_GetOperationState = NativeLibrary.GetExport(libraryHandle, "C_GetOperationState"),
-            C_SetOperationState = NativeLibrary.GetExport(libraryHandle, "C_SetOperationState"),
-            C_Login = NativeLibrary.GetExport(libraryHandle, "C_Login"),
-            C_Logout = NativeLibrary.GetExport(libraryHandle, "C_Logout"),
-            C_CreateObject = NativeLibrary.GetExport(libraryHandle, "C_CreateObject"),
-            C_CopyObject = NativeLibrary.GetExport(libraryHandle, "C_CopyObject"),
-            C_DestroyObject = NativeLibrary.GetExport(libraryHandle, "C_DestroyObject"),
-            C_GetObjectSize = NativeLibrary.GetExport(libraryHandle, "C_GetObjectSize"),
-            C_GetAttributeValue = NativeLibrary.GetExport(libraryHandle, "C_GetAttributeValue"),
-            C_SetAttributeValue = NativeLibrary.GetExport(libraryHandle, "C_SetAttributeValue"),
-            C_FindObjectsInit = NativeLibrary.GetExport(libraryHandle, "C_FindObjectsInit"),
-            C_FindObjects = NativeLibrary.GetExport(libraryHandle, "C_FindObjects"),
-            C_FindObjectsFinal = NativeLibrary.GetExport(libraryHandle, "C_FindObjectsFinal"),
-            C_EncryptInit = NativeLibrary.GetExport(libraryHandle, "C_EncryptInit"),
-            C_Encrypt = NativeLibrary.GetExport(libraryHandle, "C_Encrypt"),
-            C_EncryptUpdate = NativeLibrary.GetExport(libraryHandle, "C_EncryptUpdate"),
-            C_EncryptFinal = NativeLibrary.GetExport(libraryHandle, "C_EncryptFinal"),
-            C_DecryptInit = NativeLibrary.GetExport(libraryHandle, "C_DecryptInit"),
-            C_Decrypt = NativeLibrary.GetExport(libraryHandle, "C_Decrypt"),
-            C_DecryptUpdate = NativeLibrary.GetExport(libraryHandle, "C_DecryptUpdate"),
-            C_DecryptFinal = NativeLibrary.GetExport(libraryHandle, "C_DecryptFinal"),
-            C_DigestInit = NativeLibrary.GetExport(libraryHandle, "C_DigestInit"),
-            C_Digest = NativeLibrary.GetExport(libraryHandle, "C_Digest"),
-            C_DigestUpdate = NativeLibrary.GetExport(libraryHandle, "C_DigestUpdate"),
-            C_DigestKey = NativeLibrary.GetExport(libraryHandle, "C_DigestKey"),
-            C_DigestFinal = NativeLibrary.GetExport(libraryHandle, "C_DigestFinal"),
-            C_SignInit = NativeLibrary.GetExport(libraryHandle, "C_SignInit"),
-            C_Sign = NativeLibrary.GetExport(libraryHandle, "C_Sign"),
-            C_SignUpdate = NativeLibrary.GetExport(libraryHandle, "C_SignUpdate"),
-            C_SignFinal = NativeLibrary.GetExport(libraryHandle, "C_SignFinal"),
-            C_SignRecoverInit = NativeLibrary.GetExport(libraryHandle, "C_SignRecoverInit"),
-            C_SignRecover = NativeLibrary.GetExport(libraryHandle, "C_SignRecover"),
-            C_VerifyInit = NativeLibrary.GetExport(libraryHandle, "C_VerifyInit"),
-            C_Verify = NativeLibrary.GetExport(libraryHandle, "C_Verify"),
-            C_VerifyUpdate = NativeLibrary.GetExport(libraryHandle, "C_VerifyUpdate"),
-            C_VerifyFinal = NativeLibrary.GetExport(libraryHandle, "C_VerifyFinal"),
-            C_VerifyRecoverInit = NativeLibrary.GetExport(libraryHandle, "C_VerifyRecoverInit"),
-            C_VerifyRecover = NativeLibrary.GetExport(libraryHandle, "C_VerifyRecover"),
-            C_DigestEncryptUpdate = NativeLibrary.GetExport(libraryHandle, "C_DigestEncryptUpdate"),
-            C_DecryptDigestUpdate = NativeLibrary.GetExport(libraryHandle, "C_DecryptDigestUpdate"),
-            C_SignEncryptUpdate = NativeLibrary.GetExport(libraryHandle, "C_SignEncryptUpdate"),
-            C_DecryptVerifyUpdate = NativeLibrary.GetExport(libraryHandle, "C_DecryptVerifyUpdate"),
-            C_GenerateKey = NativeLibrary.GetExport(libraryHandle, "C_GenerateKey"),
-            C_GenerateKeyPair = NativeLibrary.GetExport(libraryHandle, "C_GenerateKeyPair"),
-            C_WrapKey = NativeLibrary.GetExport(libraryHandle, "C_WrapKey"),
-            C_UnwrapKey = NativeLibrary.GetExport(libraryHandle, "C_UnwrapKey"),
-            C_DeriveKey = NativeLibrary.GetExport(libraryHandle, "C_DeriveKey"),
-            C_SeedRandom = NativeLibrary.GetExport(libraryHandle, "C_SeedRandom"),
-            C_GenerateRandom = NativeLibrary.GetExport(libraryHandle, "C_GenerateRandom"),
-            C_GetFunctionStatus = NativeLibrary.GetExport(libraryHandle, "C_GetFunctionStatus"),
-            C_CancelFunction = NativeLibrary.GetExport(libraryHandle, "C_CancelFunction"),
-            C_WaitForSlotEvent = NativeLibrary.GetExport(libraryHandle, "C_WaitForSlotEvent")
-        };
-
-        Initialize(funcList);
-    }
-
-    /// <summary>
-    /// Get delegates without C_GetFunctionList function from the statically linked PKCS#11 library
-    /// </summary>
-    private void InitializeWithoutGetFunctionList()
-    {
-        C_Initialize = NativeMethods.C_Initialize;
-        C_Finalize = NativeMethods.C_Finalize;
-        C_GetInfo = NativeMethods.C_GetInfo;
-        C_GetFunctionList = NativeMethods.C_GetFunctionList;
-        C_GetSlotList = NativeMethods.C_GetSlotList;
-        C_GetSlotInfo = NativeMethods.C_GetSlotInfo;
-        C_GetTokenInfo = NativeMethods.C_GetTokenInfo;
-        C_GetMechanismList = NativeMethods.C_GetMechanismList;
-        C_GetMechanismInfo = NativeMethods.C_GetMechanismInfo;
-        C_InitToken = NativeMethods.C_InitToken;
-        C_InitPIN = NativeMethods.C_InitPIN;
-        C_SetPIN = NativeMethods.C_SetPIN;
-        C_OpenSession = NativeMethods.C_OpenSession;
-        C_CloseSession = NativeMethods.C_CloseSession;
-        C_CloseAllSessions = NativeMethods.C_CloseAllSessions;
-        C_GetSessionInfo = NativeMethods.C_GetSessionInfo;
-        C_GetOperationState = NativeMethods.C_GetOperationState;
-        C_SetOperationState = NativeMethods.C_SetOperationState;
-        C_Login = NativeMethods.C_Login;
-        C_Logout = NativeMethods.C_Logout;
-        C_CreateObject = NativeMethods.C_CreateObject;
-        C_CopyObject = NativeMethods.C_CopyObject;
-        C_DestroyObject = NativeMethods.C_DestroyObject;
-        C_GetObjectSize = NativeMethods.C_GetObjectSize;
-        C_GetAttributeValue = NativeMethods.C_GetAttributeValue;
-        C_SetAttributeValue = NativeMethods.C_SetAttributeValue;
-        C_FindObjectsInit = NativeMethods.C_FindObjectsInit;
-        C_FindObjects = NativeMethods.C_FindObjects;
-        C_FindObjectsFinal = NativeMethods.C_FindObjectsFinal;
-        C_EncryptInit = NativeMethods.C_EncryptInit;
-        C_Encrypt = NativeMethods.C_Encrypt;
-        C_EncryptUpdate = NativeMethods.C_EncryptUpdate;
-        C_EncryptFinal = NativeMethods.C_EncryptFinal;
-        C_DecryptInit = NativeMethods.C_DecryptInit;
-        C_Decrypt = NativeMethods.C_Decrypt;
-        C_DecryptUpdate = NativeMethods.C_DecryptUpdate;
-        C_DecryptFinal = NativeMethods.C_DecryptFinal;
-        C_DigestInit = NativeMethods.C_DigestInit;
-        C_Digest = NativeMethods.C_Digest;
-        C_DigestUpdate = NativeMethods.C_DigestUpdate;
-        C_DigestKey = NativeMethods.C_DigestKey;
-        C_DigestFinal = NativeMethods.C_DigestFinal;
-        C_SignInit = NativeMethods.C_SignInit;
-        C_Sign = NativeMethods.C_Sign;
-        C_SignUpdate = NativeMethods.C_SignUpdate;
-        C_SignFinal = NativeMethods.C_SignFinal;
-        C_SignRecoverInit = NativeMethods.C_SignRecoverInit;
-        C_SignRecover = NativeMethods.C_SignRecover;
-        C_VerifyInit = NativeMethods.C_VerifyInit;
-        C_Verify = NativeMethods.C_Verify;
-        C_VerifyUpdate = NativeMethods.C_VerifyUpdate;
-        C_VerifyFinal = NativeMethods.C_VerifyFinal;
-        C_VerifyRecoverInit = NativeMethods.C_VerifyRecoverInit;
-        C_VerifyRecover = NativeMethods.C_VerifyRecover;
-        C_DigestEncryptUpdate = NativeMethods.C_DigestEncryptUpdate;
-        C_DecryptDigestUpdate = NativeMethods.C_DecryptDigestUpdate;
-        C_SignEncryptUpdate = NativeMethods.C_SignEncryptUpdate;
-        C_DecryptVerifyUpdate = NativeMethods.C_DecryptVerifyUpdate;
-        C_GenerateKey = NativeMethods.C_GenerateKey;
-        C_GenerateKeyPair = NativeMethods.C_GenerateKeyPair;
-        C_WrapKey = NativeMethods.C_WrapKey;
-        C_UnwrapKey = NativeMethods.C_UnwrapKey;
-        C_DeriveKey = NativeMethods.C_DeriveKey;
-        C_SeedRandom = NativeMethods.C_SeedRandom;
-        C_GenerateRandom = NativeMethods.C_GenerateRandom;
-        C_GetFunctionStatus = NativeMethods.C_GetFunctionStatus;
-        C_CancelFunction = NativeMethods.C_CancelFunction;
-        C_WaitForSlotEvent = NativeMethods.C_WaitForSlotEvent;
-    }
 
     /// <summary>
     /// Get delegates from unmanaged function pointers

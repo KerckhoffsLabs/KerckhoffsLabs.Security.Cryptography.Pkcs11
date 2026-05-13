@@ -37,6 +37,6 @@ public sealed class Pkcs11SessionHandleTests(MockBackendFixture f)
 
     private LowLevelPkcs11Library GetLowLevelLibrary()
     {
-        return new LowLevelPkcs11Library(_backend.LibraryPath, useGetFunctionList: true);
+        return new LowLevelPkcs11Library(_backend.LibraryPath);
     }
 }
