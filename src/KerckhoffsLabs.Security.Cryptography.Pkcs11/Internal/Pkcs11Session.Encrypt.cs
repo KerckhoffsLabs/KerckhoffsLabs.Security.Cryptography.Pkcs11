@@ -43,18 +43,15 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Encrypt1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -88,21 +85,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Encrypt2", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         Encrypt(mechanism, keyHandle, inputStream, outputStream, 4096);
     }
@@ -121,21 +114,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Encrypt3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");

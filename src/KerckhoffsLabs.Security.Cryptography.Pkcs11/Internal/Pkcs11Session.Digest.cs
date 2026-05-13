@@ -22,11 +22,9 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -84,15 +82,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Digest1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -125,15 +121,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Digest2", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         return Digest(mechanism, inputStream, 4096);
     }
@@ -151,15 +145,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Digest3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -207,22 +199,18 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (digestingMechanism == null)
-            throw new ArgumentNullException("digestingMechanism");
+        ArgumentNullException.ThrowIfNull(digestingMechanism);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DigestEncrypt1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
         {
@@ -246,25 +234,20 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (digestingMechanism == null)
-            throw new ArgumentNullException("digestingMechanism");
+        ArgumentNullException.ThrowIfNull(digestingMechanism);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DigestEncrypt2", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         return DigestEncrypt(digestingMechanism, encryptionMechanism, keyHandle, inputStream, outputStream, 4096);
     }
@@ -285,25 +268,20 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (digestingMechanism == null)
-            throw new ArgumentNullException("digestingMechanism");
+        ArgumentNullException.ThrowIfNull(digestingMechanism);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DigestEncrypt3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -382,22 +360,18 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (digestingMechanism == null)
-            throw new ArgumentNullException("digestingMechanism");
+        ArgumentNullException.ThrowIfNull(digestingMechanism);
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
+        ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DecryptDigest1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
         digest = DecryptDigest(digestingMechanism, decryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
@@ -419,25 +393,20 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (digestingMechanism == null)
-            throw new ArgumentNullException("digestingMechanism");
+        ArgumentNullException.ThrowIfNull(digestingMechanism);
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
+        ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DecryptDigest2", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         return DecryptDigest(digestingMechanism, decryptionMechanism, keyHandle, inputStream, outputStream, 4096);
     }
@@ -458,25 +427,20 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (digestingMechanism == null)
-            throw new ArgumentNullException("digestingMechanism");
+        ArgumentNullException.ThrowIfNull(digestingMechanism);
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
+        ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DecryptDigest3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");

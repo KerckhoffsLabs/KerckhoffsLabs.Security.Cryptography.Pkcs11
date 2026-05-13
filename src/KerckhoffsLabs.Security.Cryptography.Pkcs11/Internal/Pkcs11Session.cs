@@ -183,8 +183,7 @@ internal sealed partial class Pkcs11Session
     {
         _logger.LogDebug("Session({SessionId})::ctor", sessionId);
 
-        if (pkcs11Library == null)
-            throw new ArgumentNullException("pkcs11Library");
+        ArgumentNullException.ThrowIfNull(pkcs11Library);
 
         if (sessionId == (ulong)CK.CK_INVALID_HANDLE)
             throw new ArgumentException("Invalid handle specified", "sessionId");
@@ -337,14 +336,11 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::SetOperationState", _sessionId);
 
-        if (state == null)
-            throw new ArgumentNullException("state");
+        ArgumentNullException.ThrowIfNull(state);
 
-        if (encryptionKey == null)
-            throw new ArgumentNullException("encryptionKey");
+        ArgumentNullException.ThrowIfNull(encryptionKey);
 
-        if (authenticationKey == null)
-            throw new ArgumentNullException("authenticationKey");
+        ArgumentNullException.ThrowIfNull(authenticationKey);
 
         CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(state.Length), (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_SetOperationState");

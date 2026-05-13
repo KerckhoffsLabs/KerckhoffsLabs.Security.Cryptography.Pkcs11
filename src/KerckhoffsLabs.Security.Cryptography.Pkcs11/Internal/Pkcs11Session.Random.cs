@@ -35,8 +35,7 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::SeedRandom", _sessionId);
 
-        if (seed == null)
-            throw new ArgumentNullException("seed");
+        ArgumentNullException.ThrowIfNull(seed);
 
         CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed, (NativeCULong)(seed.Length));
         Pkcs11Exception.ThrowIfError(rv, "C_SeedRandom");

@@ -49,8 +49,7 @@ public sealed class Pkcs11Slot
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::ctor", slotId);
 
-        if (pkcs11Library == null)
-            throw new ArgumentNullException("pkcs11Library");
+        ArgumentNullException.ThrowIfNull(pkcs11Library);
 
         _pkcs11Library = pkcs11Library;
         _slotId = (NativeCULong)(slotId);
@@ -214,8 +213,7 @@ public sealed class Pkcs11Slot
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::CloseSession", _slotId);
 
-        if (session == null)
-            throw new ArgumentNullException("session");
+        ArgumentNullException.ThrowIfNull(session);
 
         session.CloseSession();
     }

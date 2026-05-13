@@ -25,11 +25,9 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (baseKeyHandle == null)
-            throw new ArgumentNullException("baseKeyHandle");
+        ArgumentNullException.ThrowIfNull(baseKeyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 

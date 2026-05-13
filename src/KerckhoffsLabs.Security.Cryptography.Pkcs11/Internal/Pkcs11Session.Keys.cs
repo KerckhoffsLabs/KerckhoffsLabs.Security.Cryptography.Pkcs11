@@ -23,8 +23,7 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -64,8 +63,7 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -117,14 +115,11 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (wrappingKeyHandle == null)
-            throw new ArgumentNullException("wrappingKeyHandle");
+        ArgumentNullException.ThrowIfNull(wrappingKeyHandle);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -183,14 +178,11 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (unwrappingKeyHandle == null)
-            throw new ArgumentNullException("unwrappingKeyHandle");
+        ArgumentNullException.ThrowIfNull(unwrappingKeyHandle);
 
-        if (wrappedKey == null)
-            throw new ArgumentNullException("wrappedKey");
+        ArgumentNullException.ThrowIfNull(wrappedKey);
 
         GuardMechanism((CKM)mechanism.Type);
 

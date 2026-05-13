@@ -107,8 +107,7 @@ public sealed class Mechanism : IDisposable
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(ulong type, IMechanismParams parameter)
     {
-        if (parameter == null)
-            throw new ArgumentNullException("parameter");
+        ArgumentNullException.ThrowIfNull(parameter);
 
         // Keep reference to parameter so GC will not free it while mechanism exists
         _mechanismParams = parameter;
@@ -124,8 +123,7 @@ public sealed class Mechanism : IDisposable
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(CKM type, IMechanismParams parameter)
     {
-        if (parameter == null)
-            throw new ArgumentNullException("parameter");
+        ArgumentNullException.ThrowIfNull(parameter);
 
         // Keep reference to parameter so GC will not free it while mechanism exists
         _mechanismParams = parameter;

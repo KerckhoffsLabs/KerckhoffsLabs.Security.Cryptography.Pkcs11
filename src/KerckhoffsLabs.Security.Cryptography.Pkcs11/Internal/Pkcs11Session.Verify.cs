@@ -44,21 +44,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Verify1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -88,21 +84,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Verify2", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         Verify(mechanism, keyHandle, inputStream, signature, out isValid, 4096);
     }
@@ -122,21 +114,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Verify3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -178,18 +166,15 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::VerifyRecover", _sessionId);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -232,28 +217,22 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (verificationMechanism == null)
-            throw new ArgumentNullException("verificationMechanism");
+        ArgumentNullException.ThrowIfNull(verificationMechanism);
 
-        if (verificationKeyHandle == null)
-            throw new ArgumentNullException("verificationKeyHandle");
+        ArgumentNullException.ThrowIfNull(verificationKeyHandle);
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
+        ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        if (decryptionKeyHandle == null)
-            throw new ArgumentNullException("decryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(decryptionKeyHandle);
 
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DecryptVerify1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
         {
@@ -279,31 +258,24 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (verificationMechanism == null)
-            throw new ArgumentNullException("verificationMechanism");
+        ArgumentNullException.ThrowIfNull(verificationMechanism);
 
-        if (verificationKeyHandle == null)
-            throw new ArgumentNullException("verificationKeyHandle");
+        ArgumentNullException.ThrowIfNull(verificationKeyHandle);
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
+        ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        if (decryptionKeyHandle == null)
-            throw new ArgumentNullException("decryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(decryptionKeyHandle);
 
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DecryptVerify2", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputStream, outputStream, signature, out isValid, 4096);
     }
@@ -326,31 +298,24 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (verificationMechanism == null)
-            throw new ArgumentNullException("verificationMechanism");
+        ArgumentNullException.ThrowIfNull(verificationMechanism);
 
-        if (verificationKeyHandle == null)
-            throw new ArgumentNullException("verificationKeyHandle");
+        ArgumentNullException.ThrowIfNull(verificationKeyHandle);
 
-        if (decryptionMechanism == null)
-            throw new ArgumentNullException("decryptionMechanism");
+        ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        if (decryptionKeyHandle == null)
-            throw new ArgumentNullException("decryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(decryptionKeyHandle);
 
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::DecryptVerify3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
-        if (signature == null)
-            throw new ArgumentNullException("signature");
+        ArgumentNullException.ThrowIfNull(signature);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");

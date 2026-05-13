@@ -96,8 +96,7 @@ public class AttributeValueException : Exception
     protected AttributeValueException(SerializationInfo info, StreamingContext context)
         : base(info, context)
     {
-        if (info == null)
-            throw new ArgumentNullException("info");
+        ArgumentNullException.ThrowIfNull(info);
 
         _attribute = (CKA)info.GetUInt32("Attribute");
     }
@@ -109,8 +108,7 @@ public class AttributeValueException : Exception
     /// <param name="context">The destination for this serialization</param>
     public override void GetObjectData(SerializationInfo info, StreamingContext context)
     {
-        if (info == null)
-            throw new ArgumentNullException("info");
+        ArgumentNullException.ThrowIfNull(info);
 
         info.AddValue("Attribute", _attribute);
 

@@ -24,18 +24,15 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Sign1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -103,16 +100,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign1a", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         return Sign(mechanism, keyHandle, data, false, null);
     }
@@ -141,16 +135,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign1b", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         return Sign(mechanism, keyHandle, data, true, System.Text.Encoding.UTF8.GetBytes(keyPin));
     }
@@ -179,16 +170,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign1c", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         return Sign(mechanism, keyHandle, data, true, keyPin);
     }
@@ -206,16 +194,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign2a", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         return Sign(mechanism, keyHandle, inputStream, 4096);
     }
@@ -234,16 +219,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign2b", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         return Sign(mechanism, keyHandle, keyPin, inputStream, 4096);
     }
@@ -262,16 +244,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign2c", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         return Sign(mechanism, keyHandle, keyPin, inputStream, 4096);
     }
@@ -291,18 +270,15 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Sign3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -363,16 +339,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign3a", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -395,16 +368,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign3b", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -427,16 +397,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign3c", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -458,18 +425,15 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -517,16 +481,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1a", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         return SignRecover(mechanism, keyHandle, data, false, null);
     }
@@ -545,16 +506,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1b", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         return SignRecover(mechanism, keyHandle, data, true, System.Text.Encoding.UTF8.GetBytes(keyPin));
     }
@@ -573,16 +531,13 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (mechanism == null)
-            throw new ArgumentNullException("mechanism");
+        ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (keyHandle == null)
-            throw new ArgumentNullException("keyHandle");
+        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1c", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         return SignRecover(mechanism, keyHandle, data, true, keyPin);
     }
@@ -603,22 +558,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt1a", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
         {
@@ -644,22 +594,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt1b", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
         {
@@ -685,22 +630,17 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt1c", _sessionId);
 
-        if (data == null)
-            throw new ArgumentNullException("data");
+        ArgumentNullException.ThrowIfNull(data);
 
         using (MemoryStream inputMemoryStream = new MemoryStream(data), outputMemorySteam = new MemoryStream())
         {
@@ -725,25 +665,19 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt2a", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         return SignEncrypt(signingMechanism, signingKeyHandle, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, 4096);
     }
@@ -765,25 +699,19 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt2b", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         return SignEncrypt(signingMechanism, signingKeyHandle, signingKeyPin, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, 4096);
     }
@@ -805,25 +733,19 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt2c", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         return SignEncrypt(signingMechanism, signingKeyHandle, signingKeyPin, encryptionMechanism, encryptionKeyHandle, inputStream, outputStream, 4096);
     }
@@ -846,28 +768,22 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         GuardMechanism((CKM)signingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -963,25 +879,19 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3a", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -1007,25 +917,19 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3b", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
@@ -1051,25 +955,19 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        if (signingMechanism == null)
-            throw new ArgumentNullException("signingMechanism");
+        ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        if (signingKeyHandle == null)
-            throw new ArgumentNullException("signingKeyHandle");
+        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
-        if (encryptionMechanism == null)
-            throw new ArgumentNullException("encryptionMechanism");
+        ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        if (encryptionKeyHandle == null)
-            throw new ArgumentNullException("encryptionKeyHandle");
+        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3c", _sessionId);
 
-        if (inputStream == null)
-            throw new ArgumentNullException("inputStream");
+        ArgumentNullException.ThrowIfNull(inputStream);
 
-        if (outputStream == null)
-            throw new ArgumentNullException("outputStream");
+        ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be positive number", "bufferLength");
