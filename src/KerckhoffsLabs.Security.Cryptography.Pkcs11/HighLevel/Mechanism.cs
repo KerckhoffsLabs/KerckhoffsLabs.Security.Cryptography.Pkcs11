@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;

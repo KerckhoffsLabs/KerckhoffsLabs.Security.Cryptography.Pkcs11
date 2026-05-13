@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_GCM_PARAMS"/>. Owns the unmanaged buffers

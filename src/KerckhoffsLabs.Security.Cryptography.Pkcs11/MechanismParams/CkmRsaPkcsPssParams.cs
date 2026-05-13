@@ -2,7 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_RSA_PKCS_PSS_PARAMS"/>. Owns no unmanaged

@@ -3,7 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;

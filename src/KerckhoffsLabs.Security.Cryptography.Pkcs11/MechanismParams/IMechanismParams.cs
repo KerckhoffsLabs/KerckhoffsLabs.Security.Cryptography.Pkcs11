@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// Interface for mechanism parameters

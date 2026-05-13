@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_SALSA20_CHACHA20_POLY1305_PARAMS"/>. Owns
