@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Miscellaneous settings that operation of Pkcs11Interop library

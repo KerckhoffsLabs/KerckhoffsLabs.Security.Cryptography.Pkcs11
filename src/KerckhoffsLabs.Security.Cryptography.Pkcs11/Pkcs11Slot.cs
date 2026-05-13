@@ -1,21 +1,22 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Logical reader that potentially contains a token
 /// </summary>
-public class Slot
+public class Pkcs11Slot
 {
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Slot>();
+    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Slot>();
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -26,7 +27,7 @@ public class Slot
     /// PKCS#11 handle of slot
     /// </summary>
     protected NativeCULong _slotId = new (0);
-    
+
     /// <summary>
     /// PKCS#11 handle of slot
     /// </summary>
@@ -39,13 +40,13 @@ public class Slot
     }
 
     /// <summary>
-    /// Initializes new instance of Slot class
+    /// Initializes new instance of Pkcs11Slot class
     /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="slotId">PKCS#11 handle of slot</param>
-    protected internal Slot(LowLevelPkcs11Library pkcs11Library, ulong slotId)
+    protected internal Pkcs11Slot(LowLevelPkcs11Library pkcs11Library, ulong slotId)
     {
-        _logger.LogDebug("Slot({SlotId})::ctor", slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::ctor", slotId);
 
         if (pkcs11Library == null)
             throw new ArgumentNullException("pkcs11Library");
@@ -60,7 +61,7 @@ public class Slot
     /// <returns>Slot information</returns>
     public SlotInfo GetSlotInfo()
     {
-        _logger.LogDebug("Slot({SlotId})::GetSlotInfo", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::GetSlotInfo", _slotId);
 
         CK_SLOT_INFO slotInfo = new();
         CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, ref slotInfo);
@@ -75,7 +76,7 @@ public class Slot
     /// <returns>Token information</returns>
     public TokenInfo GetTokenInfo()
     {
-        _logger.LogDebug("Slot({SlotId})::GetTokenInfo", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::GetTokenInfo", _slotId);
 
         CK_TOKEN_INFO tokenInfo = new();
         CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, ref tokenInfo);
@@ -90,7 +91,7 @@ public class Slot
     /// <returns>List of mechanism types supported by a token</returns>
     public List<CKM> GetMechanismList()
     {
-        _logger.LogDebug("Slot({SlotId})::GetMechanismList", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::GetMechanismList", _slotId);
 
         NativeCULong mechanismCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
@@ -116,12 +117,12 @@ public class Slot
     /// <returns>Information about mechanism</returns>
     public MechanismInfo GetMechanismInfo(CKM mechanism)
     {
-        _logger.LogDebug("Slot({SlotId})::GetMechanismInfo", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::GetMechanismInfo", _slotId);
 
         CK_MECHANISM_INFO mechanismInfo = new CK_MECHANISM_INFO();
         CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, ref mechanismInfo);
         Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismInfo");
-        
+
         return new MechanismInfo(mechanism, mechanismInfo);
     }
 
@@ -132,7 +133,7 @@ public class Slot
     /// <param name="label">Label of the token</param>
     public void InitToken(string soPin, string label)
     {
-        _logger.LogDebug("Slot({SlotId})::InitToken1", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::InitToken1", _slotId);
 
         byte[] soPinValue = null;
         NativeCULong soPinValueLen = (NativeCULong)0;
@@ -157,7 +158,7 @@ public class Slot
     /// <param name="label">Label of the token</param>
     public void InitToken(byte[] soPin, byte[] label)
     {
-        _logger.LogDebug("Slot({SlotId})::InitToken2", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::InitToken2", _slotId);
 
         byte[] soPinValue = null;
         NativeCULong soPinValueLen = (NativeCULong)0;
@@ -173,14 +174,14 @@ public class Slot
         byte[] tokenLabel = new byte[32];
         for (int i = 0; i < tokenLabel.Length; i++)
             tokenLabel[i] = 0x20;
-        
+
         if (label != null)
         {
             if (label.Length > 32)
                 throw new Exception("Label too long");
             Array.Copy(label, 0, tokenLabel, 0, label.Length);
         }
-        
+
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPinValue, soPinValueLen, tokenLabel);
         Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
     }
@@ -192,7 +193,7 @@ public class Slot
     /// <returns>Session</returns>
     public Session OpenSession(SessionType sessionType)
     {
-        _logger.LogDebug("Slot({SlotId})::OpenSession", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::OpenSession", _slotId);
 
         NativeCULong flags = CKF.CKF_SERIAL_SESSION;
         if (sessionType == SessionType.ReadWrite)
@@ -214,7 +215,7 @@ public class Slot
     /// <param name="session">Session</param>
     public void CloseSession(Session session)
     {
-        _logger.LogDebug("Slot({SlotId})::CloseSession", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::CloseSession", _slotId);
 
         if (session == null)
             throw new ArgumentNullException("session");
@@ -227,7 +228,7 @@ public class Slot
     /// </summary>
     public void CloseAllSessions()
     {
-        _logger.LogDebug("Slot({SlotId})::CloseAllSessions", _slotId);
+        _logger.LogDebug("Pkcs11Slot({SlotId})::CloseAllSessions", _slotId);
 
         _logger.LogInformation("Closing all sessions with token in slot {SlotId}", _slotId);
 

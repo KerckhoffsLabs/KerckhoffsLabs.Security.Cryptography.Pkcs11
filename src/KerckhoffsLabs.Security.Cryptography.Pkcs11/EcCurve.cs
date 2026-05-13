@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Named curves supported by the <see cref="Session.GenerateEcKeyPair"/> secure helper.

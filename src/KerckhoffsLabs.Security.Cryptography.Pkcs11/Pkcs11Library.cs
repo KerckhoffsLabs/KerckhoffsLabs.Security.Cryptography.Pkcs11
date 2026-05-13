@@ -123,7 +123,7 @@ public class Pkcs11Library : IDisposable
     /// </summary>
     /// <param name="slotsType">Type of slots to be obtained</param>
     /// <returns>List of available slots</returns>
-    public List<Slot> GetSlotList(SlotsType slotsType)
+    public List<Pkcs11Slot> GetSlotList(SlotsType slotsType)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -146,9 +146,9 @@ public class Pkcs11Library : IDisposable
             if (new NativeCULong((uint)slotList.Length).Value != slotCount.Value)
                 Array.Resize(ref slotList, (int)(slotCount));
 
-            List<Slot> list = [];
+            List<Pkcs11Slot> list = [];
             foreach (NativeCULong slot in slotList)
-                list.Add(new Slot(_pkcs11Library, (ulong)slot));
+                list.Add(new Pkcs11Slot(_pkcs11Library, (ulong)slot));
 
             return list;
         }
@@ -222,7 +222,7 @@ public class Pkcs11Library : IDisposable
         ArgumentNullException.ThrowIfNull(slotLabel);
         ArgumentNullException.ThrowIfNull(pin);
 
-        Slot? matched = null;
+        Pkcs11Slot? matched = null;
         foreach (var slot in GetSlotList(SlotsType.WithTokenPresent))
         {
             if (slot.GetTokenInfo().Label.TrimEnd() == slotLabel)

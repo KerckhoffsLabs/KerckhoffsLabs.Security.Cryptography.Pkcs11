@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using KerckhoffsLabs.Runtime.InteropServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
@@ -59,7 +59,7 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         try
         {
             var slots = Library.GetSlotList(SlotsType.WithTokenPresent);
-            Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel) ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
+            Pkcs11Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel) ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
             SlotId = (NativeCULong)found.SlotId;
         }
         catch
