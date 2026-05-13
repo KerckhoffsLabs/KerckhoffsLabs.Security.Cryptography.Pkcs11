@@ -1,7 +1,7 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Handle wrapper over a PKCS#11 key object. Carries the workspace it belongs to, the
