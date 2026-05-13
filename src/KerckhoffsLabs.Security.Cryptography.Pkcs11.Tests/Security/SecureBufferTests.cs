@@ -1,4 +1,4 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Security;
 

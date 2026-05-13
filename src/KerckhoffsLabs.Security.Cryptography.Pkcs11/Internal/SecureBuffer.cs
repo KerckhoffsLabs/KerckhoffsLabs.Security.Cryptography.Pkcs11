@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 /// <summary>
 /// Internal transient buffer for sensitive bytes (PINs, key material intermediates).
