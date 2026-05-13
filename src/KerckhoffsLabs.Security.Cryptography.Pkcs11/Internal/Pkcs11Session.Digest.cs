@@ -24,7 +24,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -203,7 +202,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
@@ -238,7 +236,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
@@ -272,7 +269,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
@@ -364,7 +360,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
@@ -397,7 +392,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
@@ -431,7 +425,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);

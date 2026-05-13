@@ -27,7 +27,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(baseKeyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 

@@ -23,7 +23,6 @@ internal sealed partial class Pkcs11Session
     {
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(keyHandle);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
         // P/Invoke when perf profiling proves it matters.
         byte[] buffer = data.ToArray();
@@ -45,7 +44,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -87,7 +85,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -116,7 +113,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 

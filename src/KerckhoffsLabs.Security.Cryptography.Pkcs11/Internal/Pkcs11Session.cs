@@ -338,9 +338,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(state);
 
-        ArgumentNullException.ThrowIfNull(encryptionKey);
-
-        ArgumentNullException.ThrowIfNull(authenticationKey);
 
         CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(state.Length), (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_SetOperationState");

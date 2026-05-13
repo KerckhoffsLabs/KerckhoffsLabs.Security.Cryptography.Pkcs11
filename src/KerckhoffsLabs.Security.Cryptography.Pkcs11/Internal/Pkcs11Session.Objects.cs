@@ -56,7 +56,6 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::CopyObject", _sessionId);
 
-        ArgumentNullException.ThrowIfNull(objectHandle);
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
@@ -89,7 +88,6 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::DestroyObject", _sessionId);
 
-        ArgumentNullException.ThrowIfNull(objectHandle);
 
         CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_DestroyObject");
@@ -108,7 +106,6 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::GetObjectSize", _sessionId);
 
-        ArgumentNullException.ThrowIfNull(objectHandle);
 
         NativeCULong objectSize = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, (NativeCULong)(objectHandle.ObjectId), ref objectSize);
@@ -131,7 +128,6 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::GetAttributeValue1", _sessionId);
 
-        ArgumentNullException.ThrowIfNull(objectHandle);
 
         ArgumentNullException.ThrowIfNull(attributes);
 
@@ -159,7 +155,6 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::GetAttributeValue2", _sessionId);
 
-        ArgumentNullException.ThrowIfNull(objectHandle);
 
         ArgumentNullException.ThrowIfNull(attributes);
 
@@ -266,7 +261,6 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::SetAttributeValue", _sessionId);
 
-        ArgumentNullException.ThrowIfNull(objectHandle);
 
         ArgumentNullException.ThrowIfNull(attributes);
 

@@ -117,9 +117,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(wrappingKeyHandle);
-
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -156,7 +153,6 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         if (_disposed) throw new ObjectDisposedException(GetType().FullName);
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(unwrappingKeyHandle);
         ArgumentNullException.ThrowIfNull(attributes);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
         // P/Invoke when perf profiling proves it matters.
@@ -180,7 +176,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(unwrappingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(wrappedKey);
 

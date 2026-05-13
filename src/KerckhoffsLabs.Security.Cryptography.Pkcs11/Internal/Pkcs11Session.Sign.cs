@@ -26,7 +26,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -80,7 +79,6 @@ internal sealed partial class Pkcs11Session
     {
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(keyHandle);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
         // P/Invoke when perf profiling proves it matters.
         byte[] buffer = data.ToArray();
@@ -102,7 +100,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign1a", _sessionId);
 
@@ -116,7 +113,6 @@ internal sealed partial class Pkcs11Session
     {
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] buffer = data.ToArray();
         return Sign(mechanism, keyHandle, keyPin, buffer);
     }
@@ -137,7 +133,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign1b", _sessionId);
 
@@ -151,7 +146,6 @@ internal sealed partial class Pkcs11Session
     {
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] buffer = data.ToArray();
         return Sign(mechanism, keyHandle, keyPin, buffer);
     }
@@ -172,7 +166,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign1c", _sessionId);
 
@@ -196,7 +189,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign2a", _sessionId);
 
@@ -221,7 +213,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign2b", _sessionId);
 
@@ -246,7 +237,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign2c", _sessionId);
 
@@ -272,7 +262,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -341,7 +330,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign3a", _sessionId);
 
@@ -370,7 +358,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign3b", _sessionId);
 
@@ -399,7 +386,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::Sign3c", _sessionId);
 
@@ -427,7 +413,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -483,7 +468,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1a", _sessionId);
 
@@ -508,7 +492,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1b", _sessionId);
 
@@ -533,7 +516,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignRecover1c", _sessionId);
 
@@ -560,11 +542,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt1a", _sessionId);
 
@@ -596,11 +576,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt1b", _sessionId);
 
@@ -632,11 +610,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt1c", _sessionId);
 
@@ -667,11 +643,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt2a", _sessionId);
 
@@ -701,11 +675,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt2b", _sessionId);
 
@@ -735,11 +707,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt2c", _sessionId);
 
@@ -770,11 +740,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         GuardMechanism((CKM)signingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
@@ -881,11 +849,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3a", _sessionId);
 
@@ -919,11 +885,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3b", _sessionId);
 
@@ -957,11 +921,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signingMechanism);
 
-        ArgumentNullException.ThrowIfNull(signingKeyHandle);
 
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(encryptionKeyHandle);
 
         _logger.LogDebug("Session({SessionId})::SignEncrypt3c", _sessionId);
 

@@ -24,7 +24,6 @@ internal sealed partial class Pkcs11Session
     {
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] dataBuf = data.ToArray();
         byte[] sigBuf = signature.ToArray();
         Verify(mechanism, keyHandle, dataBuf, sigBuf, out isValid);
@@ -46,7 +45,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -86,7 +84,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -116,7 +113,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -168,7 +164,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -219,11 +214,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
-        ArgumentNullException.ThrowIfNull(verificationKeyHandle);
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(decryptionKeyHandle);
 
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
@@ -260,11 +253,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
-        ArgumentNullException.ThrowIfNull(verificationKeyHandle);
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(decryptionKeyHandle);
 
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
@@ -300,11 +291,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
-        ArgumentNullException.ThrowIfNull(verificationKeyHandle);
 
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
-        ArgumentNullException.ThrowIfNull(decryptionKeyHandle);
 
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);

@@ -23,7 +23,6 @@ internal sealed partial class Pkcs11Session
     {
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(keyHandle);
         byte[] buffer = encryptedData.ToArray();
         return Decrypt(mechanism, keyHandle, buffer);
     }
@@ -42,7 +41,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -84,7 +82,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -113,7 +110,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        ArgumentNullException.ThrowIfNull(keyHandle);
 
         GuardMechanism((CKM)mechanism.Type);
 
