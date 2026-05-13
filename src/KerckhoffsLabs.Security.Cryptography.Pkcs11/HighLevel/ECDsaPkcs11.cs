@@ -119,23 +119,37 @@ public sealed class ECDsaPkcs11 : ECDsa
         if (includePrivateParameters)
             throw new InsecureOperationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
+
+        // Path 1: private-only key with CKA_EC_POINT stored on the private object.
         var synth = _key.GetSynthesizedEcParameters();
         if (synth is not null) return synth.Value;
-        throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-            "ECDsaPkcs11.ExportParameters (synthesis unavailable; no public companion stored)");
+
+        // Path 2: key pair generated via GenerateKey — read CKA_EC_POINT + CKA_EC_PARAMS
+        // from the real public-key companion handle.
+        if (!_key.PublicHandle.IsInvalid)
+        {
+            var fromPublic = Pkcs11PublicKeyView.TrySynthesizeEc(
+                _key.Workspace.Session, _key.PublicHandle);
+            if (fromPublic is not null) return fromPublic.Value;
+        }
+
+        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+            "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be read from any available handle)");
     }
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
     public override ECParameters ExportExplicitParameters(bool includePrivateParameters)
         => throw new NotSupportedException(
-            "Explicit (non-named-curve) parameter export is not supported.");
+            "Explicit (non-named-curve) parameter export is not supported. " +
+            "Use ExportParameters(false) for named-curve parameters.");
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
     public override void ImportParameters(ECParameters parameters)
         => throw new NotSupportedException(
-            "ECDsaPkcs11 wraps a PKCS#11 key handle; importing managed parameters is not supported.");
+            "ECDsaPkcs11 wraps a PKCS#11 key handle; importing managed parameters is not supported. " +
+            "Use Pkcs11Workspace.ImportKey or GenerateKey instead.");
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>

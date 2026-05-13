@@ -43,6 +43,28 @@ public sealed class ECDsaPkcs11Tests_SoftHsm
         }
     }
 
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void ExportParameters_PublicOnly_FromPublicHandle_ReturnsPoint()
+    {
+        using var workspace = _backend.Library.OpenWorkspace(
+            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var key = GenerateP256Key(workspace, out var pubH, out var privH);
+        try
+        {
+            using var ec = new ECDsaPkcs11(key);
+            var p = ec.ExportParameters(includePrivateParameters: false);
+            Assert.Equal(ECCurve.NamedCurves.nistP256.Oid.Value, p.Curve.Oid.Value);
+            Assert.NotNull(p.Q.X);
+            Assert.NotNull(p.Q.Y);
+            Assert.Null(p.D); // private parts must not be set
+        }
+        finally
+        {
+            if (!pubH.IsInvalid)  workspace.Session.DestroyObject(pubH);
+            if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
+        }
+    }
+
     private static Pkcs11Key GenerateP256Key(Pkcs11Workspace workspace,
         out ObjectHandle pubH, out ObjectHandle privH)
     {
