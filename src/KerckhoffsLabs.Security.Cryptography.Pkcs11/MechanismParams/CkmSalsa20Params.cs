@@ -1,0 +1,61 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+
+/// <summary>
+/// High-level wrapper for <see cref="CK_SALSA20_PARAMS"/>. Used with the raw CKM_SALSA20 stream cipher mechanism (PKCS#11 v3.0).
+/// </summary>
+public sealed class CkmSalsa20Params : IMechanismParams
+{
+    private CK_SALSA20_PARAMS _lowLevelParams;
+    private IntPtr _blockCounter;
+    private IntPtr _nonce;
+    private bool _disposed;
+
+    /// <summary>
+    /// Initializes Salsa20 raw-mode parameters.
+    /// </summary>
+    /// <param name="blockCounter">Initial block counter (8 bytes).</param>
+    /// <param name="nonce">Nonce bytes (typically 8).</param>
+    /// <param name="nonceBits">Nonce length in bits (typically 64).</param>
+    public CkmSalsa20Params(ReadOnlySpan<byte> blockCounter, ReadOnlySpan<byte> nonce, int nonceBits)
+    {
+        if (blockCounter.IsEmpty) throw new ArgumentException("Block counter must not be empty.", nameof(blockCounter));
+        if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
+
+        _blockCounter = UnmanagedMemory.Allocate(blockCounter.Length);
+        UnmanagedMemory.Write(_blockCounter, blockCounter);
+        _nonce = UnmanagedMemory.Allocate(nonce.Length);
+        UnmanagedMemory.Write(_nonce, nonce);
+
+        _lowLevelParams = new CK_SALSA20_PARAMS
+        {
+            BlockCounter = _blockCounter,
+            Nonce = _nonce,
+            NonceBits = (NativeCULong)nonceBits,
+        };
+    }
+
+    /// <inheritdoc/>
+    public object ToMarshalableStructure()
+    {
+        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        UnmanagedMemory.Free(ref _blockCounter);
+        UnmanagedMemory.Free(ref _nonce);
+        _lowLevelParams.BlockCounter = IntPtr.Zero;
+        _lowLevelParams.Nonce = IntPtr.Zero;
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
+    ~CkmSalsa20Params() => Dispose();
+}
