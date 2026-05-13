@@ -15,7 +15,7 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
     public NativeCULong SlotId { get; }
     public ReadOnlyMemory<byte> SoPin { get; } = System.Text.Encoding.UTF8.GetBytes(Settings.SoPin);
     public ReadOnlyMemory<byte> UserPin { get; } = System.Text.Encoding.UTF8.GetBytes(Settings.UserPin);
-    public string TokenLabel { get; } = "Pkcs11Interop Mock Token";
+    public string TokenLabel { get; } = "Pkcs11Interop";
 
     public MockBackendFixture()
     {
