@@ -44,6 +44,26 @@ internal sealed class LowLevelPkcs11Library
     }
 
     /// <summary>
+    /// Binds to a statically-linked PKCS#11 implementation. The cryptoki symbols
+    /// are expected to be linked into the host executable (iOS-style
+    /// <c>DllImport("__Internal")</c>). The function-list pointer is acquired via
+    /// the statically-bound <c>C_GetFunctionList</c>; all subsequent calls go
+    /// through the returned function-pointer table, same as the dynamic-load path.
+    /// </summary>
+    internal LowLevelPkcs11Library()
+    {
+        try
+        {
+            _delegates = new Delegates(IntPtr.Zero);
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Initializes the Cryptoki library
     /// </summary>
     /// <param name="initArgs">CK_C_INITIALIZE_ARGS structure containing information on how the library should deal with multi-threaded access or null if an application will not be accessing Cryptoki through multiple threads simultaneously</param>

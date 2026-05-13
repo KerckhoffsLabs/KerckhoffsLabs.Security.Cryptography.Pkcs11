@@ -39,6 +39,24 @@ public class Pkcs11Library : IDisposable
     /// </summary>
     /// <param name="libraryPath">Library name or path.</param>
     public Pkcs11Library(string libraryPath)
+        : this(libraryPath, useStaticLink: false) { }
+
+    /// <summary>
+    /// Binds to a PKCS#11 implementation that is statically linked into the host
+    /// executable, rather than dynamically loaded from a path. Use this entry
+    /// point on platforms where dynamic library loading is unavailable or
+    /// restricted (iOS, Native AOT, single-file embedded builds).
+    /// </summary>
+    /// <remarks>
+    /// The host must export the cryptoki <c>C_GetFunctionList</c> symbol at link
+    /// time via <c>DllImport("__Internal")</c>. All subsequent PKCS#11 calls go
+    /// through the function-pointer table returned by that single call — no
+    /// other unmanaged bindings are required.
+    /// </remarks>
+    public static Pkcs11Library LoadStaticallyLinked()
+        => new Pkcs11Library(libraryPath: "<statically-linked>", useStaticLink: true);
+
+    private Pkcs11Library(string libraryPath, bool useStaticLink)
     {
         _logger.LogDebug("Pkcs11Library({LibraryPath})::ctor", libraryPath);
 
@@ -47,7 +65,9 @@ public class Pkcs11Library : IDisposable
         try
         {
             _logger.LogInformation("Loading PKCS#11 library {LibraryPath}", _libraryPath);
-            _pkcs11Library = new LowLevelPkcs11Library(_libraryPath);
+            _pkcs11Library = useStaticLink
+                ? new LowLevelPkcs11Library()
+                : new LowLevelPkcs11Library(_libraryPath);
             Initialize();
         }
         catch
