@@ -1607,12 +1607,12 @@ public enum CKM : uint
     /// <summary>
     /// ChaCha20-Poly1305 AEAD stream cipher and MAC (PKCS#11 v3.0)
     /// </summary>
-    CKM_CHACHA20_POLY1305 = 0x00001250,
+    CKM_CHACHA20_POLY1305 = 0x00004021,
 
     /// <summary>
     /// Salsa20-Poly1305 AEAD stream cipher and MAC (PKCS#11 v3.0)
     /// </summary>
-    CKM_SALSA20_POLY1305 = 0x00001251,
+    CKM_SALSA20_POLY1305 = 0x00004022,
 
     /// <summary>
     /// The DSA domain parameter generation mechanism
@@ -1683,6 +1683,506 @@ public enum CKM : uint
     /// Multi-purpose mechanism based on the RSA public-key cryptosystem and the OAEP block format defined in PKCS #1, with additional formatting defined in TCPA TPM Specification Version 1.1b
     /// </summary>
     CKM_RSA_PKCS_OAEP_TPM_1_1 = 0x00004002,
+
+    /// <summary>
+    /// DSA with SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_DSA_SHA3_224 = 0x00000018,
+
+    /// <summary>
+    /// DSA with SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_DSA_SHA3_256 = 0x00000019,
+
+    /// <summary>
+    /// DSA with SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_DSA_SHA3_384 = 0x0000001A,
+
+    /// <summary>
+    /// DSA with SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_DSA_SHA3_512 = 0x0000001B,
+
+    /// <summary>
+    /// RSA-PKCS#1 v1.5 with SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256_RSA_PKCS = 0x00000060,
+
+    /// <summary>
+    /// RSA-PKCS#1 v1.5 with SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384_RSA_PKCS = 0x00000061,
+
+    /// <summary>
+    /// RSA-PKCS#1 v1.5 with SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512_RSA_PKCS = 0x00000062,
+
+    /// <summary>
+    /// RSA-PSS with SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256_RSA_PKCS_PSS = 0x00000063,
+
+    /// <summary>
+    /// RSA-PSS with SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384_RSA_PKCS_PSS = 0x00000064,
+
+    /// <summary>
+    /// RSA-PSS with SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512_RSA_PKCS_PSS = 0x00000065,
+
+    /// <summary>
+    /// RSA-PKCS#1 v1.5 with SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224_RSA_PKCS = 0x00000066,
+
+    /// <summary>
+    /// RSA-PSS with SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224_RSA_PKCS_PSS = 0x00000067,
+
+    /// <summary>
+    /// SHA3-256 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256 = 0x000002B0,
+
+    /// <summary>
+    /// HMAC over SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256_HMAC = 0x000002B1,
+
+    /// <summary>
+    /// HMAC over SHA3-256, truncated to caller-supplied length (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256_HMAC_GENERAL = 0x000002B2,
+
+    /// <summary>
+    /// Generic secret key generation sized for SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256_KEY_GEN = 0x000002B3,
+
+    /// <summary>
+    /// SHA3-224 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224 = 0x000002B5,
+
+    /// <summary>
+    /// HMAC over SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224_HMAC = 0x000002B6,
+
+    /// <summary>
+    /// HMAC over SHA3-224, truncated to caller-supplied length (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224_HMAC_GENERAL = 0x000002B7,
+
+    /// <summary>
+    /// Generic secret key generation sized for SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224_KEY_GEN = 0x000002B8,
+
+    /// <summary>
+    /// SHA3-384 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384 = 0x000002C0,
+
+    /// <summary>
+    /// HMAC over SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384_HMAC = 0x000002C1,
+
+    /// <summary>
+    /// HMAC over SHA3-384, truncated to caller-supplied length (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384_HMAC_GENERAL = 0x000002C2,
+
+    /// <summary>
+    /// Generic secret key generation sized for SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384_KEY_GEN = 0x000002C3,
+
+    /// <summary>
+    /// SHA3-512 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512 = 0x000002D0,
+
+    /// <summary>
+    /// HMAC over SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512_HMAC = 0x000002D1,
+
+    /// <summary>
+    /// HMAC over SHA3-512, truncated to caller-supplied length (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512_HMAC_GENERAL = 0x000002D2,
+
+    /// <summary>
+    /// Generic secret key generation sized for SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512_KEY_GEN = 0x000002D3,
+
+    /// <summary>
+    /// Key derivation via SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_256_KEY_DERIVATION = 0x00000397,
+
+    /// <summary>
+    /// Key derivation via SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_224_KEY_DERIVATION = 0x00000398,
+
+    /// <summary>
+    /// Key derivation via SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_384_KEY_DERIVATION = 0x00000399,
+
+    /// <summary>
+    /// Key derivation via SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA3_512_KEY_DERIVATION = 0x0000039A,
+
+    /// <summary>
+    /// Key derivation via SHAKE128 XOF (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHAKE_128_KEY_DERIVATION = 0x0000039B,
+
+    /// <summary>
+    /// Key derivation via SHAKE256 XOF (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHAKE_256_KEY_DERIVATION = 0x0000039C,
+
+    /// <summary>
+    /// NIST SP 800-108 counter-mode KDF (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SP800_108_COUNTER_KDF = 0x000003AC,
+
+    /// <summary>
+    /// NIST SP 800-108 feedback-mode KDF (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SP800_108_FEEDBACK_KDF = 0x000003AD,
+
+    /// <summary>
+    /// NIST SP 800-108 double-pipeline KDF (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SP800_108_DOUBLE_PIPELINE_KDF = 0x000003AE,
+    /// <summary>
+    /// ECDSA with SHA3-224 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_ECDSA_SHA3_224 = 0x00001047,
+
+    /// <summary>
+    /// ECDSA with SHA3-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_ECDSA_SHA3_256 = 0x00001048,
+
+    /// <summary>
+    /// ECDSA with SHA3-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_ECDSA_SHA3_384 = 0x00001049,
+
+    /// <summary>
+    /// ECDSA with SHA3-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_ECDSA_SHA3_512 = 0x0000104A,
+
+    /// <summary>
+    /// Montgomery-curve (X25519/X448) key pair generation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_EC_MONTGOMERY_KEY_PAIR_GEN = 0x00001056,
+
+    /// <summary>
+    /// AES in XTS mode (PKCS#11 v3.0)
+    /// </summary>
+    CKM_AES_XTS = 0x00001071,
+
+    /// <summary>
+    /// AES-XTS key generation — returns a double-length AES key (PKCS#11 v3.0)
+    /// </summary>
+    CKM_AES_XTS_KEY_GEN = 0x00001072,
+
+    /// <summary>
+    /// EC key-pair generation with extra random bits in the private value (PKCS#11 v3.0)
+    /// </summary>
+    CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS = 0x0000140B,
+
+    /// <summary>
+    /// ChaCha20 key generation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_CHACHA20_KEY_GEN = 0x00001225,
+
+    /// <summary>
+    /// ChaCha20 stream cipher — raw mode, no Poly1305 tag (PKCS#11 v3.0)
+    /// </summary>
+    CKM_CHACHA20 = 0x00001226,
+
+    /// <summary>
+    /// Poly1305 MAC key generation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_POLY1305_KEY_GEN = 0x00001227,
+
+    /// <summary>
+    /// Poly1305 MAC (PKCS#11 v3.0)
+    /// </summary>
+    CKM_POLY1305 = 0x00001228,
+
+    /// <summary>
+    /// DSA domain parameter generation, probabilistic method (PKCS#11 v3.0)
+    /// </summary>
+    CKM_DSA_PROBABILISTIC_PARAMETER_GEN = 0x00002003,
+
+    /// <summary>
+    /// DSA generator (g) generation per FIPS 186 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_DSA_FIPS_G_GEN = 0x00002005,
+
+    /// <summary>
+    /// AES Key Wrap with Padding (KWP) per RFC 5649 / NIST SP 800-38F (PKCS#11 v3.0)
+    /// </summary>
+    CKM_AES_KEY_WRAP_KWP = 0x0000210B,
+
+    /// <summary>
+    /// AES Key Wrap with PKCS#7 padding (PKCS#11 v3.0)
+    /// </summary>
+    CKM_AES_KEY_WRAP_PKCS7 = 0x0000210C,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-1 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA_1_KEY_GEN = 0x00004003,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-224 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA224_KEY_GEN = 0x00004004,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-256 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA256_KEY_GEN = 0x00004005,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-384 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA384_KEY_GEN = 0x00004006,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-512 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA512_KEY_GEN = 0x00004007,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-512/224 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA512_224_KEY_GEN = 0x00004008,
+
+    /// <summary>
+    /// Generic-secret key generation sized for SHA-512/256 HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA512_256_KEY_GEN = 0x00004009,
+
+    /// <summary>
+    /// Generic-secret key generation sized for truncated SHA-512/T HMAC use (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SHA512_T_KEY_GEN = 0x0000400A,
+
+    /// <summary>
+    /// NULL mechanism — returns input as output (used in some KDF chains) (PKCS#11 v3.0)
+    /// </summary>
+    CKM_NULL = 0x0000400B,
+
+    /// <summary>
+    /// BLAKE2b-160 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_160 = 0x0000400C,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-160 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_160_HMAC = 0x0000400D,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-160, truncated (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_160_HMAC_GENERAL = 0x0000400E,
+
+    /// <summary>
+    /// Key derivation via BLAKE2b-160 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_160_KEY_DERIVE = 0x0000400F,
+
+    /// <summary>
+    /// Generic-secret key generation sized for BLAKE2b-160 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_160_KEY_GEN = 0x00004010,
+
+    /// <summary>
+    /// BLAKE2b-256 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_256 = 0x00004011,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_256_HMAC = 0x00004012,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-256, truncated (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_256_HMAC_GENERAL = 0x00004013,
+
+    /// <summary>
+    /// Key derivation via BLAKE2b-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_256_KEY_DERIVE = 0x00004014,
+
+    /// <summary>
+    /// Generic-secret key generation sized for BLAKE2b-256 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_256_KEY_GEN = 0x00004015,
+
+    /// <summary>
+    /// BLAKE2b-384 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_384 = 0x00004016,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_384_HMAC = 0x00004017,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-384, truncated (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_384_HMAC_GENERAL = 0x00004018,
+
+    /// <summary>
+    /// Key derivation via BLAKE2b-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_384_KEY_DERIVE = 0x00004019,
+
+    /// <summary>
+    /// Generic-secret key generation sized for BLAKE2b-384 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_384_KEY_GEN = 0x0000401A,
+
+    /// <summary>
+    /// BLAKE2b-512 digest (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_512 = 0x0000401B,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_512_HMAC = 0x0000401C,
+
+    /// <summary>
+    /// HMAC over BLAKE2b-512, truncated (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_512_HMAC_GENERAL = 0x0000401D,
+
+    /// <summary>
+    /// Key derivation via BLAKE2b-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_512_KEY_DERIVE = 0x0000401E,
+
+    /// <summary>
+    /// Generic-secret key generation sized for BLAKE2b-512 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_BLAKE2B_512_KEY_GEN = 0x0000401F,
+
+    /// <summary>
+    /// Salsa20 stream cipher — raw mode, no Poly1305 tag (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SALSA20 = 0x00004020,
+
+    /// <summary>
+    /// Signal X3DH key-agreement initiator (PKCS#11 v3.0)
+    /// </summary>
+    CKM_X3DH_INITIALIZE = 0x00004023,
+
+    /// <summary>
+    /// Signal X3DH key-agreement responder (PKCS#11 v3.0)
+    /// </summary>
+    CKM_X3DH_RESPOND = 0x00004024,
+
+    /// <summary>
+    /// Signal Double-Ratchet initialization (PKCS#11 v3.0)
+    /// </summary>
+    CKM_X2RATCHET_INITIALIZE = 0x00004025,
+
+    /// <summary>
+    /// Signal Double-Ratchet response (PKCS#11 v3.0)
+    /// </summary>
+    CKM_X2RATCHET_RESPOND = 0x00004026,
+
+    /// <summary>
+    /// Signal Double-Ratchet encrypt (PKCS#11 v3.0)
+    /// </summary>
+    CKM_X2RATCHET_ENCRYPT = 0x00004027,
+
+    /// <summary>
+    /// Signal Double-Ratchet decrypt (PKCS#11 v3.0)
+    /// </summary>
+    CKM_X2RATCHET_DECRYPT = 0x00004028,
+
+    /// <summary>
+    /// XEdDSA signature scheme (Signal protocol) (PKCS#11 v3.0)
+    /// </summary>
+    CKM_XEDDSA = 0x00004029,
+
+    /// <summary>
+    /// HKDF derive to produce a key per RFC 5869 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_HKDF_DERIVE = 0x0000402A,
+
+    /// <summary>
+    /// HKDF derive to produce data (non-key bytes) per RFC 5869 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_HKDF_DATA = 0x0000402B,
+
+    /// <summary>
+    /// HKDF input keying material generation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_HKDF_KEY_GEN = 0x0000402C,
+
+    /// <summary>
+    /// Salsa20 key generation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_SALSA20_KEY_GEN = 0x0000402D,
+
+    /// <summary>
+    /// IKEv2 PRF+ key derivation per RFC 7296 §2.13 (PKCS#11 v3.0)
+    /// </summary>
+    CKM_IKE2_PRF_PLUS_DERIVE = 0x0000402E,
+
+    /// <summary>
+    /// IKE PRF derivation (shared) (PKCS#11 v3.0)
+    /// </summary>
+    CKM_IKE_PRF_DERIVE = 0x0000402F,
+
+    /// <summary>
+    /// IKEv1 PRF key derivation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_IKE1_PRF_DERIVE = 0x00004030,
+
+    /// <summary>
+    /// IKEv1 extended key derivation (PKCS#11 v3.0)
+    /// </summary>
+    CKM_IKE1_EXTENDED_DERIVE = 0x00004031,
+
+    /// <summary>
+    /// HSS hash-based signature key-pair generation per RFC 8554 (PKCS#11 v3.1)
+    /// </summary>
+    CKM_HSS_KEY_PAIR_GEN = 0x00004032,
+
+    /// <summary>
+    /// HSS hash-based signature scheme per RFC 8554 (PKCS#11 v3.1)
+    /// </summary>
+    CKM_HSS = 0x00004033,
+
 
     /// <summary>
     /// Permanently reserved for token vendors

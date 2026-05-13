@@ -539,6 +539,132 @@ public enum CKA : uint
     CKA_ALLOWED_MECHANISMS = 0x40000000 | 0x00000600,
 
     /// <summary>
+    /// Token-assigned unique identifier for the object, stable across sessions (PKCS#11 v3.0)
+    /// </summary>
+    CKA_UNIQUE_ID = 0x00000004,
+
+    /// <summary>
+    /// Profile ID for CKO_PROFILE objects (PKCS#11 v3.0)
+    /// </summary>
+    CKA_PROFILE_ID = 0x00000601,
+
+    /// <summary>
+    /// X2 Ratchet — bag (Signal protocol state, PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_BAG = 0x00000602,
+
+    /// <summary>
+    /// X2 Ratchet — bag size (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_BAGSIZE = 0x00000603,
+
+    /// <summary>
+    /// X2 Ratchet — Bob’s first message flag (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_BOBS1STMSG = 0x00000604,
+
+    /// <summary>
+    /// X2 Ratchet — receiving chain key (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_CKR = 0x00000605,
+
+    /// <summary>
+    /// X2 Ratchet — sending chain key (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_CKS = 0x00000606,
+
+    /// <summary>
+    /// X2 Ratchet — DH peer public (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_DHP = 0x00000607,
+
+    /// <summary>
+    /// X2 Ratchet — DH receiving (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_DHR = 0x00000608,
+
+    /// <summary>
+    /// X2 Ratchet — DH sending (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_DHS = 0x00000609,
+
+    /// <summary>
+    /// X2 Ratchet — header key receiving (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_HKR = 0x0000060A,
+
+    /// <summary>
+    /// X2 Ratchet — header key sending (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_HKS = 0x0000060B,
+
+    /// <summary>
+    /// X2 Ratchet — role flag (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_ISALICE = 0x0000060C,
+
+    /// <summary>
+    /// X2 Ratchet — next header key receiving (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_NHKR = 0x0000060D,
+
+    /// <summary>
+    /// X2 Ratchet — next header key sending (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_NHKS = 0x0000060E,
+
+    /// <summary>
+    /// X2 Ratchet — receiving counter (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_NR = 0x0000060F,
+
+    /// <summary>
+    /// X2 Ratchet — sending counter (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_NS = 0x00000610,
+
+    /// <summary>
+    /// X2 Ratchet — previous sending counter (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_PNS = 0x00000611,
+
+    /// <summary>
+    /// X2 Ratchet — root key (PKCS#11 v3.0)
+    /// </summary>
+    CKA_X2RATCHET_RK = 0x00000612,
+
+    /// <summary>
+    /// HSS multi-tree levels per RFC 8554 (PKCS#11 v3.1)
+    /// </summary>
+    CKA_HSS_LEVELS = 0x00000617,
+
+    /// <summary>
+    /// HSS LMS algorithm type (PKCS#11 v3.1)
+    /// </summary>
+    CKA_HSS_LMS_TYPE = 0x00000618,
+
+    /// <summary>
+    /// HSS LM-OTS algorithm type (PKCS#11 v3.1)
+    /// </summary>
+    CKA_HSS_LMOTS_TYPE = 0x00000619,
+
+    /// <summary>
+    /// HSS per-level LMS algorithm types (array) (PKCS#11 v3.1)
+    /// </summary>
+    CKA_HSS_LMS_TYPES = 0x0000061A,
+
+    /// <summary>
+    /// HSS per-level LM-OTS algorithm types (array) (PKCS#11 v3.1)
+    /// </summary>
+    CKA_HSS_LMOTS_TYPES = 0x0000061B,
+
+    /// <summary>
+    /// HSS remaining one-time signing capacity (PKCS#11 v3.1)
+    /// </summary>
+    CKA_HSS_KEYS_REMAINING = 0x0000061C,
+
+
+    /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
     CKA_VENDOR_DEFINED = 0x80000000

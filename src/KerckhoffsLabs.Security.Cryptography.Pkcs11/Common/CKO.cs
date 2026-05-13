@@ -54,6 +54,12 @@ public enum CKO : uint
     CKO_OTP_KEY = 0x00000008,
 
     /// <summary>
+    /// Profile object describing supported features (PKCS#11 v3.0 §4.13)
+    /// </summary>
+    CKO_PROFILE = 0x00000009,
+
+
+    /// <summary>
     /// Reserved for token vendors.
     /// </summary>
     CKO_VENDOR_DEFINED = 0x80000000

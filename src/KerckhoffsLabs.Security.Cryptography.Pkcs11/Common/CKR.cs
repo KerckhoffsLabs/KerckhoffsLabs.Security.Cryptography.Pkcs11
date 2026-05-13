@@ -484,6 +484,22 @@ public enum CKR : uint
     CKR_TOKEN_RESOURCE_EXCEEDED = 0x00000201,
 
     /// <summary>
+    /// AEAD tag verification failed during C_Decrypt / C_DecryptFinal (PKCS#11 v3.0)
+    /// </summary>
+    CKR_AEAD_DECRYPT_FAILED = 0x00000042,
+
+    /// <summary>
+    /// C_SessionCancel was unable to cancel one or more requested operations (PKCS#11 v3.0)
+    /// </summary>
+    CKR_OPERATION_CANCEL_FAILED = 0x00000202,
+
+    /// <summary>
+    /// A stateful key has been used to its maximum signing capacity (e.g. HSS one-time signatures exhausted) (PKCS#11 v3.1)
+    /// </summary>
+    CKR_KEY_EXHAUSTED = 0x00000203,
+
+
+    /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
     CKR_VENDOR_DEFINED = 0x80000000

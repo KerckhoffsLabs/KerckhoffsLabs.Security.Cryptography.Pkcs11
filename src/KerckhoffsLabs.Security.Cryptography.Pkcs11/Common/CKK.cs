@@ -232,6 +232,97 @@ public enum CKK : uint
     CKK_EC_EDWARDS = 0x00000040,
 
     /// <summary>
+    /// Poly1305 MAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_POLY1305 = 0x00000034,
+
+    /// <summary>
+    /// AES-XTS double-length key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_AES_XTS = 0x00000035,
+
+    /// <summary>
+    /// SHA3-224 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA3_224_HMAC = 0x00000036,
+
+    /// <summary>
+    /// SHA3-256 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA3_256_HMAC = 0x00000037,
+
+    /// <summary>
+    /// SHA3-384 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA3_384_HMAC = 0x00000038,
+
+    /// <summary>
+    /// SHA3-512 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA3_512_HMAC = 0x00000039,
+
+    /// <summary>
+    /// BLAKE2b-160 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_BLAKE2B_160_HMAC = 0x0000003A,
+
+    /// <summary>
+    /// BLAKE2b-256 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_BLAKE2B_256_HMAC = 0x0000003B,
+
+    /// <summary>
+    /// BLAKE2b-384 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_BLAKE2B_384_HMAC = 0x0000003C,
+
+    /// <summary>
+    /// BLAKE2b-512 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_BLAKE2B_512_HMAC = 0x0000003D,
+
+    /// <summary>
+    /// Salsa20 stream cipher key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SALSA20 = 0x0000003E,
+
+    /// <summary>
+    /// Signal Double-Ratchet state key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_X2RATCHET = 0x0000003F,
+
+    /// <summary>
+    /// Montgomery-curve key (X25519, X448) (PKCS#11 v3.0)
+    /// </summary>
+    CKK_EC_MONTGOMERY = 0x00000041,
+
+    /// <summary>
+    /// HKDF input keying material (PKCS#11 v3.0)
+    /// </summary>
+    CKK_HKDF = 0x00000042,
+
+    /// <summary>
+    /// SHA-512/224 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA512_224_HMAC = 0x00000043,
+
+    /// <summary>
+    /// SHA-512/256 HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA512_256_HMAC = 0x00000044,
+
+    /// <summary>
+    /// Truncated SHA-512/T HMAC key (PKCS#11 v3.0)
+    /// </summary>
+    CKK_SHA512_T_HMAC = 0x00000045,
+
+    /// <summary>
+    /// HSS hash-based signature key per RFC 8554 (PKCS#11 v3.1)
+    /// </summary>
+    CKK_HSS = 0x00000046,
+
+
+    /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
     CKK_VENDOR_DEFINED = 0x80000000
