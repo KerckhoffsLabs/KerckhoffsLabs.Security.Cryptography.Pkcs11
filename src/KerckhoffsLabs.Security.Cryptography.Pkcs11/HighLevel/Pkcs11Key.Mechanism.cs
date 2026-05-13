@@ -62,6 +62,49 @@ public sealed partial class Pkcs11Key
             "Pkcs11Key.Verify (no public handle and synthesis unavailable)");
     }
 
+    /// <summary>
+    /// Encrypts <paramref name="plaintext"/> using this key. Symmetric keys use the
+    /// single handle; asymmetric public-side encryption (RSA-OAEP / RSA-PKCS) uses the
+    /// public handle.
+    /// </summary>
+    public byte[] Encrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+
+        ObjectHandle handle = IsAsymmetricKeyType(_keyType)
+            ? _publicHandle
+            : _privateHandle;
+
+        if (handle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Encrypt (handle unavailable)");
+
+        return _workspace.Session.Encrypt(mechanism, handle, plaintext);
+    }
+
+    /// <summary>
+    /// Decrypts <paramref name="ciphertext"/> using this key. Symmetric uses the single
+    /// handle; asymmetric uses the private handle.
+    /// </summary>
+    public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+
+        if (_privateHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Decrypt (no private handle)");
+
+        return _workspace.Session.Decrypt(mechanism, _privateHandle, ciphertext);
+    }
+
+    private static bool IsAsymmetricKeyType(CKK keyType) => keyType switch
+    {
+        CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_EC or CKK.CKK_EC_EDWARDS => true,
+        _ => false,
+    };
+
     private static bool VerifyRsaInManaged(
         Mechanism mechanism,
         System.Security.Cryptography.RSAParameters rsaParams,

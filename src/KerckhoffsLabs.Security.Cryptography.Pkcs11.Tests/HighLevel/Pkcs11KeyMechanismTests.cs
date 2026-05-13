@@ -8,6 +8,41 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
 
 internal static class Pkcs11KeyMechanismCases
 {
+    public static void Assert_AesCbcEncryptDecrypt_RoundTrips(Pkcs11Workspace workspace)
+    {
+        byte[] iv = new byte[16];
+        for (int i = 0; i < iv.Length; i++) iv[i] = (byte)i;
+        byte[] plaintext = new byte[32];
+        for (int i = 0; i < plaintext.Length; i++) plaintext[i] = (byte)(0x40 + i);
+
+        string label = $"aes-cbc-{Guid.NewGuid():N}";
+        using var labeledTpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build();
+        workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+            labeledTpl.Attributes.ToList());
+
+        try
+        {
+            using var key = workspace.OpenKey(label);
+            var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
+
+            byte[] ciphertext = key.Encrypt(mech, plaintext);
+            byte[] recovered = key.Decrypt(mech, ciphertext);
+
+            Assert.Equal(plaintext, recovered);
+        }
+        finally
+        {
+            using var filter = ObjectTemplate.Empty().Label(label).Build();
+            foreach (var k in workspace.FindKeys(filter))
+            {
+                var handle = k.PrivateHandle.IsInvalid ? k.PublicHandle : k.PrivateHandle;
+                workspace.Session.DestroyObject(handle);
+                k.Dispose();
+            }
+        }
+    }
+
     public static void Assert_RsaSignVerify_RoundTrips(Pkcs11Workspace workspace)
     {
         string label = $"sign-verify-{Guid.NewGuid():N}";
@@ -63,5 +98,12 @@ public sealed class Pkcs11KeyMechanismTests_SoftHsm
     {
         using var workspace = OpenWorkspace();
         Pkcs11KeyMechanismCases.Assert_RsaSignVerify_RoundTrips(workspace);
+    }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void AesCbc_EncryptDecrypt_RoundTrip()
+    {
+        using var workspace = OpenWorkspace();
+        Pkcs11KeyMechanismCases.Assert_AesCbcEncryptDecrypt_RoundTrips(workspace);
     }
 }
