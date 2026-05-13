@@ -58,7 +58,7 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         Library = new Pkcs11Library(LibraryPath);
         try
         {
-            var slots = Library.GetSlotList(SlotsType.WithTokenPresent);
+            var slots = Library.GetSlotList();
             Pkcs11Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel) ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
             SlotId = (NativeCULong)found.SlotId;
         }

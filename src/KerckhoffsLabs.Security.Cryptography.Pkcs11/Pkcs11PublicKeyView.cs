@@ -92,7 +92,7 @@ internal static class Pkcs11PublicKeyView
 
     private static ReadOnlySpan<byte> StripDerOctetString(byte[] der)
     {
-        if (der.Length < 2 || der[0] != 0x04) return ReadOnlySpan<byte>.Empty;
+        if (der.Length < 2 || der[0] != 0x04) return [];
 
         int offset = 2;
         int len = der[1];
@@ -120,12 +120,9 @@ internal static class Pkcs11PublicKeyView
         // OID 1.2.840.10045.3.1.7 = secp256r1 (P-256)
         // OID 1.3.132.0.34       = secp384r1 (P-384)
         // OID 1.3.132.0.35       = secp521r1 (P-521)
-        ReadOnlySpan<byte> p256 = new byte[]
-            { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
-        ReadOnlySpan<byte> p384 = new byte[]
-            { 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22 };
-        ReadOnlySpan<byte> p521 = new byte[]
-            { 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23 };
+        ReadOnlySpan<byte> p256 = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
+        ReadOnlySpan<byte> p384 = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22];
+        ReadOnlySpan<byte> p521 = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23];
 
         if (derOid.AsSpan().SequenceEqual(p256))
             return ECCurve.CreateFromFriendlyName("nistP256");

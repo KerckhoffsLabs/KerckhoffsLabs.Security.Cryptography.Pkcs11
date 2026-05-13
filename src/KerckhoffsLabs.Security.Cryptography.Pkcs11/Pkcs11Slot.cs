@@ -187,16 +187,20 @@ public class Pkcs11Slot
     }
 
     /// <summary>
-    /// Opens a session between an application and a token in a particular slot
+    /// Opens a session between an application and a token in a particular slot.
     /// </summary>
-    /// <param name="sessionType">Type of session to be opened</param>
-    /// <returns>Session</returns>
-    internal Pkcs11Session OpenSession(SessionType sessionType)
+    /// <param name="readWrite">
+    /// When <c>true</c> (the default), opens a read-write session
+    /// (<c>CKF_SERIAL_SESSION | CKF_RW_SESSION</c>). When <c>false</c>, opens a
+    /// read-only session — token-object creation will fail per PKCS#11 spec.
+    /// </param>
+    /// <returns>The opened session.</returns>
+    internal Pkcs11Session OpenSession(bool readWrite = true)
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::OpenSession", _slotId);
 
         NativeCULong flags = CKF.CKF_SERIAL_SESSION;
-        if (sessionType == SessionType.ReadWrite)
+        if (readWrite)
             flags = flags | CKF.CKF_RW_SESSION;
 
         NativeCULong sessionId = CK.CK_INVALID_HANDLE;
@@ -204,7 +208,9 @@ public class Pkcs11Slot
         Pkcs11Exception.ThrowIfError(rv, "C_OpenSession");
 
         if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation("Opened {SessionType} session {SessionId} with token in slot {SlotId}", Pkcs11LogUtils.ToString(sessionType), sessionId, _slotId);
+            _logger.LogInformation(
+                "Opened {SessionType} session {SessionId} with token in slot {SlotId}",
+                readWrite ? "read-write" : "read-only", sessionId, _slotId);
 
         return new Pkcs11Session(_pkcs11Library, (ulong)sessionId);
     }

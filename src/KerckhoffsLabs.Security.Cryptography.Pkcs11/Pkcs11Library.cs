@@ -118,18 +118,22 @@ public class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Obtains a list of slots in the system
+    /// Obtains a list of slots in the system.
     /// </summary>
-    /// <param name="slotsType">Type of slots to be obtained</param>
-    /// <returns>List of available slots</returns>
-    public List<Pkcs11Slot> GetSlotList(SlotsType slotsType)
+    /// <param name="tokenPresent">
+    /// When <c>true</c> (the default), returns only slots that currently have a token
+    /// inserted. When <c>false</c>, returns all slots regardless of token presence —
+    /// useful for diagnostic enumeration.
+    /// </param>
+    /// <returns>List of available slots.</returns>
+    public List<Pkcs11Slot> GetSlotList(bool tokenPresent = true)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Pkcs11Library({LibraryPath})::GetSlotList", _libraryPath);
 
         NativeCULong slotCount = new (0);
-        CKR rv = _pkcs11Library.C_GetSlotList(slotsType == SlotsType.WithTokenPresent, null, ref slotCount);
+        CKR rv = _pkcs11Library.C_GetSlotList(tokenPresent, null, ref slotCount);
         Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
         if (slotCount.Value == 0)
@@ -139,7 +143,7 @@ public class Pkcs11Library : IDisposable
         else
         {
             NativeCULong[] slotList = new NativeCULong[slotCount.Value];
-            rv = _pkcs11Library.C_GetSlotList(slotsType == SlotsType.WithTokenPresent, slotList, ref slotCount);
+            rv = _pkcs11Library.C_GetSlotList(tokenPresent, slotList, ref slotCount);
             Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
             if (new NativeCULong((uint)slotList.Length).Value != slotCount.Value)
@@ -207,7 +211,7 @@ public class Pkcs11Library : IDisposable
         ArgumentNullException.ThrowIfNull(pin);
 
         Pkcs11Slot? matched = null;
-        foreach (var slot in GetSlotList(SlotsType.WithTokenPresent))
+        foreach (var slot in GetSlotList())
         {
             if (slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
             {
@@ -220,7 +224,7 @@ public class Pkcs11Library : IDisposable
             throw new ArgumentException(
                 $"No slot found with token label '{slotLabel}'.", nameof(slotLabel));
 
-        var session = matched.OpenSession(SessionType.ReadWrite);
+        var session = matched.OpenSession();
         try
         {
             session.Login(userType, pin);

@@ -204,7 +204,7 @@ internal sealed partial class Pkcs11Session
         bool thirdCallNeeded = false;
         for (int i = 0; i < template.Length; i++)
         {
-            if (MiscSettings.AttributesWithNestedAttributes.ContainsKey((ulong)(template[i].type)))
+            if (IsNestedAttributeTemplate(template[i].type))
             {
                 // PKCS#11 v2.20 page 133:
                 // If the specified attribute (i.e., the attribute specified by the type field) for the object
@@ -417,4 +417,23 @@ internal sealed partial class Pkcs11Session
         => rv != CKR.CKR_OK
         && rv != CKR.CKR_ATTRIBUTE_SENSITIVE
         && rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID;
+
+    /// <summary>
+    /// True when the attribute type is one of the three PKCS#11 attributes whose
+    /// value is an array of nested <c>CK_ATTRIBUTE</c>s and therefore requires the
+    /// third <c>C_GetAttributeValue</c> pass to fill each inner buffer.
+    /// </summary>
+    /// <remarks>
+    /// The PKCS#11 <c>CKF_ARRAY_ATTRIBUTE</c> high bit (0x40000000) alone is not a
+    /// sufficient indicator — <c>CKA_ALLOWED_MECHANISMS</c> also carries that bit
+    /// but its value is an array of <c>CKM</c> ids, not nested attributes.
+    /// </remarks>
+    private static bool IsNestedAttributeTemplate(NativeCULong type)
+        => (CKA)(ulong)type switch
+        {
+            CKA.CKA_WRAP_TEMPLATE => true,
+            CKA.CKA_UNWRAP_TEMPLATE => true,
+            CKA.CKA_DERIVE_TEMPLATE => true,
+            _ => false,
+        };
 }

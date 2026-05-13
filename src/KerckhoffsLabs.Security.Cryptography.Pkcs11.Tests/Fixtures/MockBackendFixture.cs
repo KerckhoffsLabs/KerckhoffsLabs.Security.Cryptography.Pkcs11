@@ -27,7 +27,7 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
         Library = new Pkcs11Library(LibraryPath);
         try
         {
-            var slots = Library.GetSlotList(SlotsType.WithTokenPresent);
+            var slots = Library.GetSlotList();
             if (slots.Count == 0)
                 throw new InvalidOperationException("pkcs11-mock reported no slots with token present.");
 

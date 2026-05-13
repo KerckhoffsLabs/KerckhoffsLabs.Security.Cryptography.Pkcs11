@@ -21,15 +21,4 @@ internal static class Pkcs11LogUtils
         CKU.CKU_CONTEXT_SPECIFIC => "context specific user",
         _ => userType.ToString(),
     };
-
-    /// <summary>
-    /// Converts a <see cref="SessionType"/> enum value to a short label
-    /// (<c>"read-only"</c>, <c>"read-write"</c>).
-    /// </summary>
-    public static string ToString(SessionType sessionType) => sessionType switch
-    {
-        SessionType.ReadOnly => "read-only",
-        SessionType.ReadWrite => "read-write",
-        _ => sessionType.ToString(),
-    };
 }
