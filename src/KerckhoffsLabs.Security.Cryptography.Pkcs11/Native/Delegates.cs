@@ -222,6 +222,66 @@ internal delegate NativeCULong C_CancelFunctionDelegate(NativeCULong session);
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_WaitForSlotEventDelegate(NativeCULong flags, ref NativeCULong slot, IntPtr reserved);
 
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageEncryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_EncryptMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_EncryptMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_EncryptMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] plaintextPart, NativeCULong plaintextPartLen, byte[] ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageEncryptFinalDelegate(NativeCULong session);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageDecryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DecryptMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DecryptMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DecryptMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] ciphertextPart, NativeCULong ciphertextPartLen, byte[] plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageDecryptFinalDelegate(NativeCULong session);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageSignInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SignMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SignMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SignMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageSignFinalDelegate(NativeCULong session);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageVerifyInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifyMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifyMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifyMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageVerifyFinalDelegate(NativeCULong session);
+
 /// <summary>
 /// Holds delegates for all PKCS#11 functions
 /// </summary>
@@ -594,6 +654,66 @@ internal partial class Delegates
     /// </summary>
     internal C_SessionCancelDelegate? C_SessionCancel = null;
 
+    /// <summary>Delegate for C_MessageEncryptInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageEncryptInitDelegate? C_MessageEncryptInit = null;
+
+    /// <summary>Delegate for C_EncryptMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_EncryptMessageDelegate? C_EncryptMessage = null;
+
+    /// <summary>Delegate for C_EncryptMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_EncryptMessageBeginDelegate? C_EncryptMessageBegin = null;
+
+    /// <summary>Delegate for C_EncryptMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_EncryptMessageNextDelegate? C_EncryptMessageNext = null;
+
+    /// <summary>Delegate for C_MessageEncryptFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageEncryptFinalDelegate? C_MessageEncryptFinal = null;
+
+    /// <summary>Delegate for C_MessageDecryptInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageDecryptInitDelegate? C_MessageDecryptInit = null;
+
+    /// <summary>Delegate for C_DecryptMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_DecryptMessageDelegate? C_DecryptMessage = null;
+
+    /// <summary>Delegate for C_DecryptMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_DecryptMessageBeginDelegate? C_DecryptMessageBegin = null;
+
+    /// <summary>Delegate for C_DecryptMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_DecryptMessageNextDelegate? C_DecryptMessageNext = null;
+
+    /// <summary>Delegate for C_MessageDecryptFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageDecryptFinalDelegate? C_MessageDecryptFinal = null;
+
+    /// <summary>Delegate for C_MessageSignInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageSignInitDelegate? C_MessageSignInit = null;
+
+    /// <summary>Delegate for C_SignMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_SignMessageDelegate? C_SignMessage = null;
+
+    /// <summary>Delegate for C_SignMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_SignMessageBeginDelegate? C_SignMessageBegin = null;
+
+    /// <summary>Delegate for C_SignMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_SignMessageNextDelegate? C_SignMessageNext = null;
+
+    /// <summary>Delegate for C_MessageSignFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageSignFinalDelegate? C_MessageSignFinal = null;
+
+    /// <summary>Delegate for C_MessageVerifyInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageVerifyInitDelegate? C_MessageVerifyInit = null;
+
+    /// <summary>Delegate for C_VerifyMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_VerifyMessageDelegate? C_VerifyMessage = null;
+
+    /// <summary>Delegate for C_VerifyMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_VerifyMessageBeginDelegate? C_VerifyMessageBegin = null;
+
+    /// <summary>Delegate for C_VerifyMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_VerifyMessageNextDelegate? C_VerifyMessageNext = null;
+
+    /// <summary>Delegate for C_MessageVerifyFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    internal C_MessageVerifyFinalDelegate? C_MessageVerifyFinal = null;
+
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
     /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library
@@ -627,6 +747,26 @@ internal partial class Delegates
     {
         C_LoginUser = TryGetDelegate<C_LoginUserDelegate>(libraryHandle, "C_LoginUser");
         C_SessionCancel = TryGetDelegate<C_SessionCancelDelegate>(libraryHandle, "C_SessionCancel");
+        C_MessageEncryptInit = TryGetDelegate<C_MessageEncryptInitDelegate>(libraryHandle, "C_MessageEncryptInit");
+        C_EncryptMessage = TryGetDelegate<C_EncryptMessageDelegate>(libraryHandle, "C_EncryptMessage");
+        C_EncryptMessageBegin = TryGetDelegate<C_EncryptMessageBeginDelegate>(libraryHandle, "C_EncryptMessageBegin");
+        C_EncryptMessageNext = TryGetDelegate<C_EncryptMessageNextDelegate>(libraryHandle, "C_EncryptMessageNext");
+        C_MessageEncryptFinal = TryGetDelegate<C_MessageEncryptFinalDelegate>(libraryHandle, "C_MessageEncryptFinal");
+        C_MessageDecryptInit = TryGetDelegate<C_MessageDecryptInitDelegate>(libraryHandle, "C_MessageDecryptInit");
+        C_DecryptMessage = TryGetDelegate<C_DecryptMessageDelegate>(libraryHandle, "C_DecryptMessage");
+        C_DecryptMessageBegin = TryGetDelegate<C_DecryptMessageBeginDelegate>(libraryHandle, "C_DecryptMessageBegin");
+        C_DecryptMessageNext = TryGetDelegate<C_DecryptMessageNextDelegate>(libraryHandle, "C_DecryptMessageNext");
+        C_MessageDecryptFinal = TryGetDelegate<C_MessageDecryptFinalDelegate>(libraryHandle, "C_MessageDecryptFinal");
+        C_MessageSignInit = TryGetDelegate<C_MessageSignInitDelegate>(libraryHandle, "C_MessageSignInit");
+        C_SignMessage = TryGetDelegate<C_SignMessageDelegate>(libraryHandle, "C_SignMessage");
+        C_SignMessageBegin = TryGetDelegate<C_SignMessageBeginDelegate>(libraryHandle, "C_SignMessageBegin");
+        C_SignMessageNext = TryGetDelegate<C_SignMessageNextDelegate>(libraryHandle, "C_SignMessageNext");
+        C_MessageSignFinal = TryGetDelegate<C_MessageSignFinalDelegate>(libraryHandle, "C_MessageSignFinal");
+        C_MessageVerifyInit = TryGetDelegate<C_MessageVerifyInitDelegate>(libraryHandle, "C_MessageVerifyInit");
+        C_VerifyMessage = TryGetDelegate<C_VerifyMessageDelegate>(libraryHandle, "C_VerifyMessage");
+        C_VerifyMessageBegin = TryGetDelegate<C_VerifyMessageBeginDelegate>(libraryHandle, "C_VerifyMessageBegin");
+        C_VerifyMessageNext = TryGetDelegate<C_VerifyMessageNextDelegate>(libraryHandle, "C_VerifyMessageNext");
+        C_MessageVerifyFinal = TryGetDelegate<C_MessageVerifyFinalDelegate>(libraryHandle, "C_MessageVerifyFinal");
     }
 
     private static T? TryGetDelegate<T>(IntPtr libraryHandle, string symbol) where T : class

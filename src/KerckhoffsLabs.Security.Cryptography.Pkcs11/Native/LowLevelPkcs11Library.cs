@@ -419,6 +419,307 @@ internal sealed class LowLevelPkcs11Library
     }
 
     /// <summary>
+    /// Begins an AEAD encrypt-message sequence (PKCS#11 v3.0 §5.9.4). Pair with C_EncryptMessage or C_EncryptMessageBegin/Next + C_MessageEncryptFinal.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageEncryptInit is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageEncryptInit(session, ref mechanism, key);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// One-shot AEAD encrypt of a message (PKCS#11 v3.0 §5.9.5). parameter holds the per-message nonce/IV.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_EncryptMessage is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_EncryptMessage(session, parameter, parameterLen, associatedData, associatedDataLen, plaintext, plaintextLen, ciphertext, ref ciphertextLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins a streaming AEAD encrypt (PKCS#11 v3.0 §5.9.6); follow with C_EncryptMessageNext calls.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_EncryptMessageBegin is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_EncryptMessageBegin(session, parameter, parameterLen, associatedData, associatedDataLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Encrypts a plaintext chunk in a streaming AEAD encrypt (PKCS#11 v3.0 §5.9.7). Pass CKF_END_OF_MESSAGE in flags on the final chunk.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] plaintextPart, NativeCULong plaintextPartLen, byte[] ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_EncryptMessageNext is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_EncryptMessageNext(session, parameter, parameterLen, plaintextPart, plaintextPartLen, ciphertextPart, ref ciphertextPartLen, flags);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Ends an AEAD encrypt-message sequence on the session (PKCS#11 v3.0 §5.9.8).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageEncryptFinal(NativeCULong session)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageEncryptFinal is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageEncryptFinal(session);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins an AEAD decrypt-message sequence (PKCS#11 v3.0 §5.10.4).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageDecryptInit is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageDecryptInit(session, ref mechanism, key);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// One-shot AEAD decrypt of a message (PKCS#11 v3.0 §5.10.5). Returns CKR_AEAD_DECRYPT_FAILED on tag-verification failure.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_DecryptMessage is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_DecryptMessage(session, parameter, parameterLen, associatedData, associatedDataLen, ciphertext, ciphertextLen, plaintext, ref plaintextLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins a streaming AEAD decrypt (PKCS#11 v3.0 §5.10.6).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_DecryptMessageBegin is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_DecryptMessageBegin(session, parameter, parameterLen, associatedData, associatedDataLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Decrypts a ciphertext chunk in a streaming AEAD decrypt (PKCS#11 v3.0 §5.10.7). Pass CKF_END_OF_MESSAGE in flags on the final chunk.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] ciphertextPart, NativeCULong ciphertextPartLen, byte[] plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_DecryptMessageNext is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_DecryptMessageNext(session, parameter, parameterLen, ciphertextPart, ciphertextPartLen, plaintextPart, ref plaintextPartLen, flags);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Ends an AEAD decrypt-message sequence on the session (PKCS#11 v3.0 §5.10.8).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageDecryptFinal(NativeCULong session)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageDecryptFinal is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageDecryptFinal(session);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins a message-signing sequence (PKCS#11 v3.0 §5.13.6).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageSignInit is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageSignInit(session, ref mechanism, key);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// One-shot message sign (PKCS#11 v3.0 §5.13.7).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_SignMessage is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_SignMessage(session, parameter, parameterLen, data, dataLen, signature, ref signatureLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins a streaming message sign (PKCS#11 v3.0 §5.13.8).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_SignMessageBegin is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_SignMessageBegin(session, parameter, parameterLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Signs a data chunk in a streaming message sign (PKCS#11 v3.0 §5.13.9). signature is only written on the last call when end-of-message is signaled.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_SignMessageNext is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_SignMessageNext(session, parameter, parameterLen, data, dataLen, signature, ref signatureLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Ends a message-signing sequence on the session (PKCS#11 v3.0 §5.13.10).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageSignFinal(NativeCULong session)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageSignFinal is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageSignFinal(session);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins a message-verification sequence (PKCS#11 v3.0 §5.15.6).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageVerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageVerifyInit is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageVerifyInit(session, ref mechanism, key);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// One-shot message verify (PKCS#11 v3.0 §5.15.7). Returns CKR_SIGNATURE_INVALID on a bad signature.
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifyMessage is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifyMessage(session, parameter, parameterLen, data, dataLen, signature, signatureLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Begins a streaming message verify (PKCS#11 v3.0 §5.15.8).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifyMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifyMessageBegin is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifyMessageBegin(session, parameter, parameterLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Verifies a data chunk in a streaming verify (PKCS#11 v3.0 §5.15.9).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_VerifyMessageNext is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_VerifyMessageNext(session, parameter, parameterLen, data, dataLen, signature, signatureLen);
+        return rv.ToCKRChecked();
+    }
+
+    /// <summary>
+    /// Ends a message-verification sequence on the session (PKCS#11 v3.0 §5.15.10).
+    /// </summary>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_MessageVerifyFinal(NativeCULong session)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_delegates.C_MessageVerifyFinal is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        NativeCULong rv = _delegates.C_MessageVerifyFinal(session);
+        return rv.ToCKRChecked();
+    }
+
+
+    /// <summary>
     /// Logs a user out from a token
     /// </summary>
     /// <param name="session">The session's handle</param>
