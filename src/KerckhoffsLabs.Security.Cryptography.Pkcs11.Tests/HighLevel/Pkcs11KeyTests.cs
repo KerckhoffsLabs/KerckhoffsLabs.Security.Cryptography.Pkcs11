@@ -94,4 +94,40 @@ public sealed class Pkcs11KeyTests
         byte[] bytes = workspace.GenerateRandom(8);
         Assert.Equal(8, bytes.Length);
     }
+
+    [Fact]
+    public void Open_PathBased_NullPath_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            Pkcs11Key.Open(
+                libraryPath: null!,
+                slotLabel: "x",
+                userType: CKU.CKU_USER,
+                pin: new SecurePin("12345"u8),
+                keyLabel: "x"));
+    }
+
+    [Fact]
+    public void Open_PathBased_NullKeyLabel_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            Pkcs11Key.Open(
+                libraryPath: "x",
+                slotLabel: "x",
+                userType: CKU.CKU_USER,
+                pin: new SecurePin("12345"u8),
+                keyLabel: null!));
+    }
+
+    [Fact]
+    public void Open_LibraryBased_NullLibrary_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            Pkcs11Key.Open(
+                library: null!,
+                slotLabel: "x",
+                userType: CKU.CKU_USER,
+                pin: new SecurePin("12345"u8),
+                keyLabel: "x"));
+    }
 }

@@ -94,4 +94,107 @@ public sealed partial class Pkcs11Key : IDisposable
         _disposed = true;
         GC.SuppressFinalize(this);
     }
+
+    /// <summary>
+    /// One-shot factory: loads the PKCS#11 library at <paramref name="libraryPath"/>,
+    /// opens an authenticated workspace, looks up the key by label, and returns it. The
+    /// returned key owns the library and the workspace — disposing it tears down all
+    /// three.
+    /// </summary>
+    /// <param name="libraryPath">Path to the PKCS#11 native library.</param>
+    /// <param name="slotLabel">CKA_LABEL of the slot's token.</param>
+    /// <param name="userType">User type to log in as.</param>
+    /// <param name="pin">The PIN.</param>
+    /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
+    public static Pkcs11Key Open(
+        string libraryPath,
+        string slotLabel,
+        CKU userType,
+        Security.SecurePin pin,
+        string keyLabel)
+    {
+        ArgumentNullException.ThrowIfNull(libraryPath);
+        ArgumentNullException.ThrowIfNull(slotLabel);
+        ArgumentNullException.ThrowIfNull(pin);
+        ArgumentNullException.ThrowIfNull(keyLabel);
+
+        Pkcs11Library? library = null;
+        Pkcs11Workspace? workspace = null;
+        try
+        {
+            library = new Pkcs11Library(libraryPath);
+            workspace = library.OpenWorkspace(slotLabel, userType, pin);
+            return OpenKeyInternal(workspace, keyLabel, ownedLibrary: library, ownsWorkspace: true);
+        }
+        catch
+        {
+            workspace?.Dispose();
+            library?.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// One-shot factory taking a pre-loaded library: opens an authenticated workspace,
+    /// looks up the key, and returns it. The returned key owns the workspace but NOT the
+    /// library — the caller continues to own and dispose <paramref name="library"/>.
+    /// </summary>
+    /// <param name="library">A pre-loaded library. Caller retains ownership.</param>
+    /// <param name="slotLabel">CKA_LABEL of the slot's token.</param>
+    /// <param name="userType">User type to log in as.</param>
+    /// <param name="pin">The PIN.</param>
+    /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
+    public static Pkcs11Key Open(
+        Pkcs11Library library,
+        string slotLabel,
+        CKU userType,
+        Security.SecurePin pin,
+        string keyLabel)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+        ArgumentNullException.ThrowIfNull(slotLabel);
+        ArgumentNullException.ThrowIfNull(pin);
+        ArgumentNullException.ThrowIfNull(keyLabel);
+
+        Pkcs11Workspace? workspace = null;
+        try
+        {
+            workspace = library.OpenWorkspace(slotLabel, userType, pin);
+            return OpenKeyInternal(workspace, keyLabel, ownedLibrary: null, ownsWorkspace: true);
+        }
+        catch
+        {
+            workspace?.Dispose();
+            throw;
+        }
+    }
+
+    private static Pkcs11Key OpenKeyInternal(
+        Pkcs11Workspace workspace,
+        string keyLabel,
+        Pkcs11Library? ownedLibrary,
+        bool ownsWorkspace)
+    {
+        // Open the key through the workspace, then re-wrap with the ownership flags
+        // appropriate for the one-shot path. We can't rebind a Pkcs11Key in place, so
+        // pull the handles + metadata out of the workspace-owned key, dispose it, and
+        // build a new wrapper with the ownership cascade.
+        using var transient = workspace.OpenKey(keyLabel);
+
+        var label = transient.Label;
+        var idBytes = transient.Id.ToArray();
+        var keyType = transient.KeyType;
+        var privateHandle = transient.PrivateHandle;
+        var publicHandle = transient.PublicHandle;
+
+        return new Pkcs11Key(
+            workspace,
+            privateHandle,
+            publicHandle,
+            keyType,
+            label,
+            idBytes,
+            ownedLibrary,
+            ownsWorkspace);
+    }
 }
