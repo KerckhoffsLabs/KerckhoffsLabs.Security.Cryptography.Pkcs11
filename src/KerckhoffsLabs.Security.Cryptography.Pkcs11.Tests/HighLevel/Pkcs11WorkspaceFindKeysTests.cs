@@ -99,4 +99,33 @@ public sealed class Pkcs11WorkspaceFindKeysTests_SoftHsm
             }
         }
     }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void ImportKey_AesValue_RoundTrips()
+    {
+        using var workspace = OpenWorkspace();
+
+        byte[] keyMaterial = new byte[32];
+        for (int i = 0; i < keyMaterial.Length; i++) keyMaterial[i] = (byte)i;
+        string label = $"imported-{Guid.NewGuid():N}";
+
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(label)
+            .Value(keyMaterial)
+            .Encrypt()
+            .Decrypt()
+            .Build();
+
+        using Pkcs11Key key = workspace.ImportKey(template);
+
+        try
+        {
+            Assert.Equal(label, key.Label);
+            Assert.Equal(CKK.CKK_AES, key.KeyType);
+        }
+        finally
+        {
+            workspace.Session.DestroyObject(key.PrivateHandle);
+        }
+    }
 }

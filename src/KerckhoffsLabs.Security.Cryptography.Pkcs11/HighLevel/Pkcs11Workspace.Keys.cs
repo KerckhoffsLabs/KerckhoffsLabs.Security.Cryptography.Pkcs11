@@ -56,6 +56,23 @@ public sealed partial class Pkcs11Workspace
         return result;
     }
 
+    /// <summary>
+    /// Creates a new object on the token from the given template and returns it as a
+    /// <see cref="Pkcs11Key"/>. Used for importing pre-existing key material —
+    /// <see cref="ObjectTemplate.ForSecretKey(CKK)"/> with <c>.Value(...)</c> for
+    /// symmetric keys, or analogous templates for public/private RSA/EC keys.
+    /// </summary>
+    /// <param name="template">A fully-built template. Will not be modified.</param>
+    /// <returns>A new <see cref="Pkcs11Key"/> wrapping the created object.</returns>
+    public Pkcs11Key ImportKey(ObjectTemplate template)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(template);
+
+        var handle = _session.CreateObject(template.Attributes.ToList());
+        return HydrateKeyFromHandle(handle);
+    }
+
     private Pkcs11Key OpenKeyByFilter(ObjectTemplate filter, string queryDescription)
     {
         var handles = _session.FindAllObjects(filter.Attributes.ToList());
