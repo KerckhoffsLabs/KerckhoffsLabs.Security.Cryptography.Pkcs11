@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Security;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Holds a PIN value in a pinned byte buffer that is zeroed on disposal.

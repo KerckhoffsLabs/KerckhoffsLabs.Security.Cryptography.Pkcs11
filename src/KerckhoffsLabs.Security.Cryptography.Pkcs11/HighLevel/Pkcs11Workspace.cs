@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Construction is exclusively via <see cref="Pkcs11Library.OpenWorkspace(string, CKU, Security.SecurePin)"/>.
+/// Construction is exclusively via <see cref="Pkcs11Library.OpenWorkspace(string, CKU, SecurePin)"/>.
 /// The workspace does not own the library — callers continue to own and dispose the
 /// <see cref="Pkcs11Library"/>. The workspace owns the session it opened and closes it
 /// on <see cref="Dispose"/>; the session's own Dispose logs the user out before closing.

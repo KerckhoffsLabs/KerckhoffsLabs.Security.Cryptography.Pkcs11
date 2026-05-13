@@ -23,7 +23,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 /// <para>
 /// Loggers produced by this class respect the <c>{Name}</c> structured-logging
 /// convention (named placeholders rather than positional <c>{0}</c>). Avoid
-/// passing secret material into log calls — see <see cref="Security.SecurePin"/>
+/// passing secret material into log calls — see <see cref="SecurePin"/>
 /// and <c>SecureBuffer</c>, both of which override <see cref="object.ToString"/>
 /// to surface as a redacted marker rather than the underlying bytes.
 /// </para>

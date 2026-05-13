@@ -140,7 +140,7 @@ public sealed partial class Pkcs11Key : IDisposable
         string libraryPath,
         string slotLabel,
         CKU userType,
-        Security.SecurePin pin,
+        SecurePin pin,
         string keyLabel)
     {
         ArgumentNullException.ThrowIfNull(libraryPath);
@@ -178,7 +178,7 @@ public sealed partial class Pkcs11Key : IDisposable
         Pkcs11Library library,
         string slotLabel,
         CKU userType,
-        Security.SecurePin pin,
+        SecurePin pin,
         string keyLabel)
     {
         ArgumentNullException.ThrowIfNull(library);
