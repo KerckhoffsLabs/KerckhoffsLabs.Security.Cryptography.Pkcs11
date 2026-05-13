@@ -57,18 +57,15 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
 
         NativeCULong encryptedDataLen = (NativeCULong)0;
         rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), null, ref encryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Encrypt", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Encrypt");
 
         byte[] encryptedData = new byte[(int)encryptedDataLen];
         rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), encryptedData, ref encryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Encrypt", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Encrypt");
 
         if (encryptedData.Length != (int)(encryptedDataLen))
             Array.Resize(ref encryptedData, (int)(encryptedDataLen));
@@ -144,8 +141,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
@@ -157,15 +153,14 @@ public partial class Session
             encryptedPartLen = (NativeCULong)(encryptedPart.Length);
             rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_EncryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_EncryptUpdate");
 
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 encryptedPart = new byte[(int)encryptedPartLen];
 
                 rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_EncryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_EncryptUpdate");
             }
 
             outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
@@ -174,13 +169,11 @@ public partial class Session
         byte[] lastEncryptedPart = null;
         NativeCULong lastEncryptedPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
         lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
         if (lastEncryptedPartLen > (NativeCULong)0)
             outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));

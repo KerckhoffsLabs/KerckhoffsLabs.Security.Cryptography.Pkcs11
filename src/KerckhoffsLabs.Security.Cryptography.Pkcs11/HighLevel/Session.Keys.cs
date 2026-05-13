@@ -42,8 +42,7 @@ public partial class Session
 
         NativeCULong keyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GenerateKey", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GenerateKey");
 
         return new ObjectHandle((ulong)keyId);
     }
@@ -96,8 +95,7 @@ public partial class Session
         NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
         NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GenerateKeyPair", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GenerateKeyPair");
 
         publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
         privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
@@ -133,13 +131,11 @@ public partial class Session
 
         NativeCULong wrappedKeyLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), null, ref wrappedKeyLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_WrapKey", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_WrapKey");
 
         byte[] wrappedKey = new byte[(int)wrappedKeyLen];
         rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), wrappedKey, ref wrappedKeyLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_WrapKey", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_WrapKey");
 
         if (wrappedKey.Length != (int)(wrappedKeyLen))
             Array.Resize(ref wrappedKey, (int)(wrappedKeyLen));
@@ -211,8 +207,7 @@ public partial class Session
 
         NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_UnwrapKey", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_UnwrapKey");
 
         return new ObjectHandle((ulong)unwrappedKey);
     }

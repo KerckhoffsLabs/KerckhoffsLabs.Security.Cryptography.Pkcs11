@@ -35,8 +35,7 @@ public partial class Session
         }
 
         CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, templateLength, ref objectId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_CreateObject", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_CreateObject");
 
         return new ObjectHandle((ulong)objectId);
     }
@@ -72,8 +71,7 @@ public partial class Session
         }
 
         CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, templateLength, ref objectId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_CopyObject", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_CopyObject");
 
         return new ObjectHandle((ulong)objectId);
     }
@@ -94,8 +92,7 @@ public partial class Session
             throw new ArgumentNullException("objectHandle");
 
         CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DestroyObject", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DestroyObject");
     }
 
     /// <summary>
@@ -116,8 +113,7 @@ public partial class Session
 
         NativeCULong objectSize = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetObjectSize(_sessionId, (NativeCULong)(objectHandle.ObjectId), ref objectSize);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetObjectSize", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetObjectSize");
 
         return (ulong)(objectSize);
     }
@@ -182,8 +178,8 @@ public partial class Session
 
         // Determine size of attribute values
         CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-        if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_ATTRIBUTE_SENSITIVE) && (rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID))
-            throw new Pkcs11Exception("C_GetAttributeValue", rv);
+        if (IsGetAttributeValueFatal(rv))
+            Pkcs11Exception.ThrowIfError(rv, "C_GetAttributeValue");
 
         // Allocate memory for each attribute
         for (int i = 0; i < template.Length; i++)
@@ -199,8 +195,8 @@ public partial class Session
 
         // Read values of attributes
         rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-        if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_ATTRIBUTE_SENSITIVE) && (rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID))
-            throw new Pkcs11Exception("C_GetAttributeValue", rv);
+        if (IsGetAttributeValueFatal(rv))
+            Pkcs11Exception.ThrowIfError(rv, "C_GetAttributeValue");
 
         // Third call to C_GetAttributeValue is needed if any of the attributes is an array attribute
         bool thirdCallNeeded = false;
@@ -250,8 +246,8 @@ public partial class Session
         if (thirdCallNeeded)
         {
             rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-            if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_ATTRIBUTE_SENSITIVE) && (rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID))
-                throw new Pkcs11Exception("C_GetAttributeValue", rv);
+            if (IsGetAttributeValueFatal(rv))
+                Pkcs11Exception.ThrowIfError(rv, "C_GetAttributeValue");
         }
 
         // Convert CK_ATTRIBUTEs to ObjectAttributes
@@ -289,8 +285,7 @@ public partial class Session
             template[i] = attributes[i].CkAttribute;
 
         CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SetAttributeValue", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SetAttributeValue");
     }
 
     /// <summary>
@@ -317,8 +312,7 @@ public partial class Session
         }
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_FindObjectsInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsInit");
     }
 
     /// <summary>
@@ -339,8 +333,7 @@ public partial class Session
         NativeCULong[] objects = new NativeCULong[objectCount];
         NativeCULong foundObjectsCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, (NativeCULong)(objectCount), ref foundObjectsCount);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_FindObjects", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_FindObjects");
 
         for (int i = 0; i < (int)(foundObjectsCount); i++)
             foundObjects.Add(new ObjectHandle((ulong)objects[i]));
@@ -360,8 +353,7 @@ public partial class Session
         _logger.LogDebug("Session({SessionId})::FindObjectsFinal", _sessionId);
 
         CKR rv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_FindObjectsFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsFinal");
     }
 
     /// <summary>
@@ -391,8 +383,7 @@ public partial class Session
         }
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_FindObjectsInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsInit");
 
         NativeCULong objectsLength = (NativeCULong)256;
         NativeCULong[] objects = new NativeCULong[(int)objectsLength];
@@ -400,17 +391,28 @@ public partial class Session
         while (objectCount == objectsLength)
         {
             rv = _pkcs11Library.C_FindObjects(_sessionId, objects, objectsLength, ref objectCount);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_FindObjects", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_FindObjects");
 
             for (int i = 0; i < (int)(objectCount); i++)
                 foundObjects.Add(new ObjectHandle((ulong)objects[i]));
         }
 
         rv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_FindObjectsFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsFinal");
 
         return foundObjects;
     }
+
+    /// <summary>
+    /// Returns <c>true</c> when a <c>C_GetAttributeValue</c> return value should
+    /// terminate the read with an exception. The PKCS#11 spec defines
+    /// <c>CKR_ATTRIBUTE_SENSITIVE</c> ("the attribute exists but cannot be read") and
+    /// <c>CKR_ATTRIBUTE_TYPE_INVALID</c> ("the attribute does not apply to this object")
+    /// as non-fatal indicators that should be reported back to the caller via the
+    /// attribute's value-length sentinel rather than thrown.
+    /// </summary>
+    private static bool IsGetAttributeValueFatal(CKR rv)
+        => rv != CKR.CKR_OK
+        && rv != CKR.CKR_ATTRIBUTE_SENSITIVE
+        && rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID;
 }

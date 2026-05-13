@@ -61,8 +61,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_VerifyInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_VerifyInit");
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, (NativeCULong)(data.Length), signature, (NativeCULong)(signature.Length));
         if (rv == CKR.CKR_OK)
@@ -70,7 +69,7 @@ public partial class Session
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
             isValid = false;
         else
-            throw new Pkcs11Exception("C_Verify", rv);
+            throw Pkcs11Exception.Create(rv, "C_Verify");
     }
 
     /// <summary>
@@ -143,8 +142,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_VerifyInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_VerifyInit");
 
         byte[] part = new byte[bufferLength];
         int bytesRead = 0;
@@ -152,8 +150,7 @@ public partial class Session
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
             rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part, (NativeCULong)(bytesRead));
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_VerifyUpdate", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_VerifyUpdate");
         }
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
@@ -162,7 +159,7 @@ public partial class Session
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
             isValid = false;
         else
-            throw new Pkcs11Exception("C_VerifyFinal", rv);
+            throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
     }
 
     /// <summary>
@@ -195,13 +192,11 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_VerifyRecoverInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_VerifyRecoverInit");
 
         NativeCULong dataLen = (NativeCULong)0;
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), null, ref dataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_VerifyRecover", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_VerifyRecover");
 
         byte[] data = new byte[(int)dataLen];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), data, ref dataLen);
@@ -210,7 +205,7 @@ public partial class Session
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
             isValid = false;
         else
-            throw new Pkcs11Exception("C_VerifyRecover", rv);
+            throw Pkcs11Exception.Create(rv, "C_VerifyRecover");
 
         if (data.Length != (int)(dataLen))
             Array.Resize(ref data, (int)(dataLen));
@@ -361,14 +356,12 @@ public partial class Session
         CK_MECHANISM ckVerificationMechanism = (CK_MECHANISM)verificationMechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_VerifyInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_VerifyInit");
 
         CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
 
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
@@ -380,15 +373,14 @@ public partial class Session
             partLen = (NativeCULong)(part.Length);
             rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_DecryptVerifyUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptVerifyUpdate");
 
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 part = new byte[(int)partLen];
 
                 rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_DecryptVerifyUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptVerifyUpdate");
             }
 
             outputStream.Write(part, 0, (int)(partLen));
@@ -397,13 +389,11 @@ public partial class Session
         byte[] lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
 
         lastPart = new byte[(int)lastPartLen];
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
 
         if (lastPartLen > (NativeCULong)0)
             outputStream.Write(lastPart, 0, (int)(lastPartLen));
@@ -414,7 +404,7 @@ public partial class Session
         else if (rv == CKR.CKR_SIGNATURE_INVALID)
             isValid = false;
         else
-            throw new Pkcs11Exception("C_VerifyFinal", rv);
+            throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
     }
 
     // === Secure-default verification helpers ===============================

@@ -54,18 +54,15 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
 
         NativeCULong decryptedDataLen = (NativeCULong)0;
         rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), null, ref decryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Decrypt", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Decrypt");
 
         byte[] decryptedData = new byte[(int)decryptedDataLen];
         rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), decryptedData, ref decryptedDataLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Decrypt", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Decrypt");
 
         if (decryptedData.Length != (int)(decryptedDataLen))
             Array.Resize(ref decryptedData, (int)(decryptedDataLen));
@@ -141,8 +138,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
@@ -154,15 +150,14 @@ public partial class Session
             partLen = (NativeCULong)(part.Length);
             rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_DecryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptUpdate");
 
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 part = new byte[(int)partLen];
 
                 rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_DecryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptUpdate");
             }
 
             outputStream.Write(part, 0, (int)(partLen));
@@ -171,13 +166,11 @@ public partial class Session
         byte[] lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
 
         lastPart = new byte[(int)lastPartLen];
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
 
         if (lastPartLen > (NativeCULong)0)
             outputStream.Write(lastPart, 0, (int)(lastPartLen));

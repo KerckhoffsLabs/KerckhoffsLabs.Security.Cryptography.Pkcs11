@@ -63,8 +63,7 @@ public class Slot
 
         CK_SLOT_INFO slotInfo = new();
         CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, ref slotInfo);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetSlotInfo", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetSlotInfo");
 
         return new SlotInfo(_slotId, slotInfo);
     }
@@ -79,8 +78,7 @@ public class Slot
 
         CK_TOKEN_INFO tokenInfo = new();
         CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, ref tokenInfo);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetTokenInfo", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetTokenInfo");
 
         return new TokenInfo(_slotId, tokenInfo);
     }
@@ -95,16 +93,14 @@ public class Slot
 
         NativeCULong mechanismCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetMechanismList", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismList");
 
         if (mechanismCount < (NativeCULong)1)
             return new List<CKM>();
 
         CKM[] mechanismList = new CKM[(int)mechanismCount];
         rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, ref mechanismCount);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetMechanismList", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismList");
 
         if (mechanismList.Length != (int)(mechanismCount))
             Array.Resize(ref mechanismList, (int)(mechanismCount));
@@ -123,8 +119,7 @@ public class Slot
 
         CK_MECHANISM_INFO mechanismInfo = new CK_MECHANISM_INFO();
         CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, ref mechanismInfo);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetMechanismInfo", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismInfo");
         
         return new MechanismInfo(mechanism, mechanismInfo);
     }
@@ -151,8 +146,7 @@ public class Slot
         if (label != null) { byte[] _lb = System.Text.Encoding.UTF8.GetBytes(label); Array.Copy(_lb, 0, tokenLabel, 0, Math.Min(_lb.Length, 32)); }
 
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPinValue, soPinValueLen, tokenLabel);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_InitToken", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
     }
 
     /// <summary>
@@ -187,8 +181,7 @@ public class Slot
         }
         
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPinValue, soPinValueLen, tokenLabel);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_InitToken", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
     }
 
     /// <summary>
@@ -206,8 +199,7 @@ public class Slot
 
         NativeCULong sessionId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_OpenSession", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_OpenSession");
 
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Opened {SessionType} session {SessionId} with token in slot {SlotId}", Pkcs11LogUtils.ToString(sessionType), sessionId, _slotId);
@@ -239,7 +231,6 @@ public class Slot
         _logger.LogInformation("Closing all sessions with token in slot {SlotId}", _slotId);
 
         CKR rv = _pkcs11Library.C_CloseAllSessions(_slotId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_CloseAllSessions", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_CloseAllSessions");
     }
 }

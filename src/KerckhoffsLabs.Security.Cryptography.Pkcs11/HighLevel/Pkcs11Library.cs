@@ -93,8 +93,10 @@ public class Pkcs11Library : IDisposable
         }
 
         CKR rv = _pkcs11Library.C_Initialize(initArgs);
-        if ((rv != CKR.CKR_OK) && (rv != CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED))
-            throw new Pkcs11Exception("C_Initialize", rv);
+        // CKR_CRYPTOKI_ALREADY_INITIALIZED is acceptable — another component may have
+        // initialized the library before us. Treat as success.
+        if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
+        Pkcs11Exception.ThrowIfError(rv, "C_Initialize");
     }
 
     /// <summary>
@@ -109,8 +111,7 @@ public class Pkcs11Library : IDisposable
 
         CK_INFO info = new();
         CKR rv = _pkcs11Library.C_GetInfo(ref info);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetInfo", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetInfo");
 
         return new LibraryInfo(info);
     }
@@ -128,8 +129,7 @@ public class Pkcs11Library : IDisposable
 
         NativeCULong slotCount = new (0);
         CKR rv = _pkcs11Library.C_GetSlotList(slotsType == SlotsType.WithTokenPresent, null, ref slotCount);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetSlotList", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
         if (slotCount.Value == 0)
         {
@@ -139,8 +139,7 @@ public class Pkcs11Library : IDisposable
         {
             NativeCULong[] slotList = new NativeCULong[slotCount.Value];
             rv = _pkcs11Library.C_GetSlotList(slotsType == SlotsType.WithTokenPresent, slotList, ref slotCount);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_GetSlotList", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
             if (new NativeCULong((uint)slotList.Length).Value != slotCount.Value)
                 Array.Resize(ref slotList, (int)(slotCount));
@@ -169,6 +168,10 @@ public class Pkcs11Library : IDisposable
 
         NativeCULong slotId_ = new (0);
         CKR rv = _pkcs11Library.C_WaitForSlotEvent(flags, ref slotId_, IntPtr.Zero);
+        // Initialise out params so the compiler can see definite assignment on all code paths.
+        // The real values are set (or an exception is thrown) in the branches below.
+        eventOccured = false;
+        slotId = (ulong)slotId_;
         if (waitType == WaitType.NonBlocking)
         {
             if (rv == CKR.CKR_OK)
@@ -178,12 +181,12 @@ public class Pkcs11Library : IDisposable
             }
             else if (rv == CKR.CKR_NO_EVENT)
             {
-                eventOccured = false;
-                slotId = (ulong)slotId_;
+                // No event reported. The pre-assigned defaults (eventOccured = false,
+                // slotId = the native out value) already convey this — no further work needed.
             }
             else
             {
-                throw new Pkcs11Exception("C_WaitForSlotEvent", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_WaitForSlotEvent");
             }
         }
         else
@@ -195,7 +198,7 @@ public class Pkcs11Library : IDisposable
             }
             else
             {
-                throw new Pkcs11Exception("C_WaitForSlotEvent", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_WaitForSlotEvent");
             }
         }
     }

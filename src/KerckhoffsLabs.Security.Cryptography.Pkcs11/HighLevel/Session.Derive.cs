@@ -46,8 +46,7 @@ public partial class Session
 
         NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DeriveKey", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DeriveKey");
 
         return new ObjectHandle((ulong)derivedKey);
     }

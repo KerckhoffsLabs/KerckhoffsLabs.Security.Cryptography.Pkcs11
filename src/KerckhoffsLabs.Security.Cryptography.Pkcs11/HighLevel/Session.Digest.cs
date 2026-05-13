@@ -33,22 +33,18 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
 
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestKey", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestKey");
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));
@@ -99,18 +95,15 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), null, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Digest", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Digest");
 
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), digest, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Digest", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Digest");
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));
@@ -172,8 +165,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
 
         byte[] part = new byte[bufferLength];
         int bytesRead = 0;
@@ -181,19 +173,16 @@ public partial class Session
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
             rv = _pkcs11Library.C_DigestUpdate(_sessionId, part, (NativeCULong)(bytesRead));
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_DigestUpdate", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_DigestUpdate");
         }
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));
@@ -320,14 +309,12 @@ public partial class Session
         CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
 
         CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
 
         rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
@@ -339,15 +326,14 @@ public partial class Session
             encryptedPartLen = (NativeCULong)(encryptedPart.Length);
             rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_DigestEncryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DigestEncryptUpdate");
 
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 encryptedPart = new byte[(int)encryptedPartLen];
 
                 rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_DigestEncryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DigestEncryptUpdate");
             }
 
             outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
@@ -356,26 +342,22 @@ public partial class Session
         byte[] lastEncryptedPart = null;
         NativeCULong lastEncryptedPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
         lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
         if (lastEncryptedPartLen > (NativeCULong)0)
             outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));
@@ -500,14 +482,12 @@ public partial class Session
         CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
 
         CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
 
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
@@ -519,15 +499,14 @@ public partial class Session
             partLen = (NativeCULong)(part.Length);
             rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_DecryptDigestUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptDigestUpdate");
 
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 part = new byte[(int)partLen];
 
                 rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_DecryptDigestUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptDigestUpdate");
             }
 
             outputStream.Write(part, 0, (int)(partLen));
@@ -536,26 +515,22 @@ public partial class Session
         byte[] lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
 
         lastPart = new byte[(int)lastPartLen];
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DecryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
 
         if (lastPartLen > (NativeCULong)0)
             outputStream.Write(lastPart, 0, (int)(lastPartLen));
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_DigestFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));

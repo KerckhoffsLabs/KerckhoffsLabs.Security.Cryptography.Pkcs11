@@ -38,8 +38,7 @@ public partial class Session
             throw new ArgumentNullException("seed");
 
         CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed, (NativeCULong)(seed.Length));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SeedRandom", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SeedRandom");
     }
 
     /// <summary>
@@ -75,8 +74,7 @@ public partial class Session
 
         byte[] randomData = new byte[length];
         CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, (NativeCULong)(length));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GenerateRandom", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GenerateRandom");
 
         return randomData;
     }

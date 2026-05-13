@@ -478,6 +478,11 @@ public enum CKR : uint
     CKR_FUNCTION_REJECTED = 0x00000200,
 
     /// <summary>
+    /// Token resources have been exceeded
+    /// </summary>
+    CKR_TOKEN_RESOURCE_EXCEEDED = 0x00000201,
+
+    /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
     CKR_VENDOR_DEFINED = 0x80000000

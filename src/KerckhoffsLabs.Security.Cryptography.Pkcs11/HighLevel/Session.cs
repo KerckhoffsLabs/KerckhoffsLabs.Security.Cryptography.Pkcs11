@@ -236,8 +236,7 @@ public partial class Session
         try
         {
             CKR rv = _pkcs11Library.C_InitPIN(_sessionId, tmp, (NativeCULong)tmp.Length);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_InitPIN", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_InitPIN");
         }
         finally
         {
@@ -273,8 +272,7 @@ public partial class Session
                 _sessionId,
                 oldTmp, (NativeCULong)oldTmp.Length,
                 newTmp, (NativeCULong)newTmp.Length);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_SetPIN", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_SetPIN");
         }
         finally
         {
@@ -297,8 +295,7 @@ public partial class Session
 
         CK_SESSION_INFO sessionInfo = new CK_SESSION_INFO();
         CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref sessionInfo);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetSessionInfo", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetSessionInfo");
 
         return new SessionInfo(_sessionId, sessionInfo);
     }
@@ -317,13 +314,11 @@ public partial class Session
 
         NativeCULong operationStateLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetOperationState(_sessionId, null, ref operationStateLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetOperationState", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetOperationState");
 
         byte[] operationState = new byte[(int)operationStateLen];
         rv = _pkcs11Library.C_GetOperationState(_sessionId, operationState, ref operationStateLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetOperationState", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetOperationState");
 
         return operationState;
     }
@@ -352,8 +347,7 @@ public partial class Session
             throw new ArgumentNullException("authenticationKey");
 
         CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(state.Length), (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SetOperationState", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SetOperationState");
     }
 
     // -----------------------------------------------------------------------
@@ -382,8 +376,7 @@ public partial class Session
         try
         {
             CKR rv = _pkcs11Library.C_Login(_sessionId, userType, tmp, (NativeCULong)tmp.Length);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_Login");
         }
         finally
         {
@@ -405,8 +398,7 @@ public partial class Session
         _logger.LogInformation("Logging out of session {SessionId}", _sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Logout", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Logout");
     }
 
     /// <summary>
@@ -421,8 +413,7 @@ public partial class Session
         _logger.LogDebug("Session({SessionId})::GetFunctionStatus", _sessionId);
 
         CKR rv = _pkcs11Library.C_GetFunctionStatus(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_GetFunctionStatus", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetFunctionStatus");
     }
 
     /// <summary>
@@ -437,8 +428,7 @@ public partial class Session
         _logger.LogDebug("Session({SessionId})::CancelFunction", _sessionId);
 
         CKR rv = _pkcs11Library.C_CancelFunction(_sessionId);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_CancelFunction", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_CancelFunction");
     }
 
     /// <summary>

@@ -38,8 +38,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignInit");
 
         if (performLogin)
         {
@@ -52,19 +51,16 @@ public partial class Session
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_Login");
         }
 
         NativeCULong signatureLen = (NativeCULong)0;
         rv = _pkcs11Library.C_Sign(_sessionId, data, (NativeCULong)(data.Length), null, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Sign", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Sign");
 
         byte[] signature = new byte[(int)signatureLen];
         rv = _pkcs11Library.C_Sign(_sessionId, data, (NativeCULong)(data.Length), signature, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_Sign", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_Sign");
 
         if (signature.Length != (int)(signatureLen))
             Array.Resize(ref signature, (int)(signatureLen));
@@ -312,8 +308,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignInit");
 
         if (performLogin)
         {
@@ -326,8 +321,7 @@ public partial class Session
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_Login");
         }
 
         byte[] part = new byte[bufferLength];
@@ -336,19 +330,16 @@ public partial class Session
         while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
             rv = _pkcs11Library.C_SignUpdate(_sessionId, part, (NativeCULong)(bytesRead));
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_SignUpdate", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_SignUpdate");
         }
 
         NativeCULong signatureLen = (NativeCULong)0;
         rv = _pkcs11Library.C_SignFinal(_sessionId, null, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignFinal");
 
         byte[] signature = new byte[(int)signatureLen];
         rv = _pkcs11Library.C_SignFinal(_sessionId, signature, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignFinal");
 
         if (signature.Length != (int)(signatureLen))
             Array.Resize(ref signature, (int)(signatureLen));
@@ -481,8 +472,7 @@ public partial class Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_SignRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignRecoverInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignRecoverInit");
 
         if (performLogin)
         {
@@ -495,19 +485,16 @@ public partial class Session
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_Login");
         }
 
         NativeCULong signatureLen = (NativeCULong)0;
         rv = _pkcs11Library.C_SignRecover(_sessionId, data, (NativeCULong)(data.Length), null, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignRecover", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignRecover");
 
         byte[] signature = new byte[(int)signatureLen];
         rv = _pkcs11Library.C_SignRecover(_sessionId, data, (NativeCULong)(data.Length), signature, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignRecover", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignRecover");
 
         if (signature.Length != (int)(signatureLen))
             Array.Resize(ref signature, (int)(signatureLen));
@@ -886,8 +873,7 @@ public partial class Session
         CK_MECHANISM ckSigningMechanism = (CK_MECHANISM)signingMechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckSigningMechanism, (NativeCULong)(signingKeyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignInit");
 
         if (performLogin)
         {
@@ -900,15 +886,13 @@ public partial class Session
             }
 
             rv = _pkcs11Library.C_Login(_sessionId, CKU.CKU_CONTEXT_SPECIFIC, pinValue, pinValueLen);
-            if (rv != CKR.CKR_OK)
-                throw new Pkcs11Exception("C_Login", rv);
+            Pkcs11Exception.ThrowIfError(rv, "C_Login");
         }
 
         CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
 
         rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(encryptionKeyHandle.ObjectId));
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptInit", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
 
         byte[] part = new byte[bufferLength];
         byte[] encryptedPart = new byte[bufferLength];
@@ -919,16 +903,16 @@ public partial class Session
         {
             encryptedPartLen = (NativeCULong)(encryptedPart.Length);
             rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
+            // C_SignEncryptUpdate may signal CKR_BUFFER_TOO_SMALL; allocate and retry once.
             if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                throw new Pkcs11Exception("C_SignEncryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_SignEncryptUpdate");
 
             if (rv == CKR.CKR_BUFFER_TOO_SMALL)
             {
                 encryptedPart = new byte[(int)encryptedPartLen];
 
                 rv = _pkcs11Library.C_SignEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv != CKR.CKR_OK)
-                    throw new Pkcs11Exception("C_SignEncryptUpdate", rv);
+                Pkcs11Exception.ThrowIfError(rv, "C_SignEncryptUpdate");
             }
 
             outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
@@ -937,26 +921,22 @@ public partial class Session
         byte[] lastEncryptedPart = null;
         NativeCULong lastEncryptedPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
         lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
         rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_EncryptFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
 
         if (lastEncryptedPartLen > (NativeCULong)0)
             outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
 
         NativeCULong signatureLen = (NativeCULong)0;
         rv = _pkcs11Library.C_SignFinal(_sessionId, null, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignFinal");
 
         byte[] signature = new byte[(int)signatureLen];
         rv = _pkcs11Library.C_SignFinal(_sessionId, signature, ref signatureLen);
-        if (rv != CKR.CKR_OK)
-            throw new Pkcs11Exception("C_SignFinal", rv);
+        Pkcs11Exception.ThrowIfError(rv, "C_SignFinal");
 
         if (signature.Length != (int)(signatureLen))
             Array.Resize(ref signature, (int)(signatureLen));

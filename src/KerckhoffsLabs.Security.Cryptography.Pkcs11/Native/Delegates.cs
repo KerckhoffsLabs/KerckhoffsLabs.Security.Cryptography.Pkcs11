@@ -805,8 +805,10 @@ internal partial class Delegates
         IntPtr functionList = IntPtr.Zero;
 
         CKR returnValue = getFunctionList(out functionList).ToCKRChecked();
-        if (returnValue != CKR.CKR_OK || functionList == IntPtr.Zero)
-            throw new Pkcs11Exception("C_GetFunctionList", returnValue);
+        Pkcs11Exception.ThrowIfError(returnValue, "C_GetFunctionList");
+        if (functionList == IntPtr.Zero)
+            throw new InvalidOperationException(
+                "C_GetFunctionList succeeded but returned a null function-list pointer.");
 
         CK_FUNCTION_LIST funcList = (CK_FUNCTION_LIST)UnmanagedMemory.Read(functionList, typeof(CK_FUNCTION_LIST));
         Initialize(funcList);
@@ -820,8 +822,10 @@ internal partial class Delegates
         IntPtr functionList = IntPtr.Zero;
 
         CKR returnValue = NativeMethods.C_GetFunctionList(out functionList).ToCKRChecked();
-        if (returnValue != CKR.CKR_OK || functionList == IntPtr.Zero)
-            throw new Pkcs11Exception("C_GetFunctionList", returnValue);
+        Pkcs11Exception.ThrowIfError(returnValue, "C_GetFunctionList");
+        if (functionList == IntPtr.Zero)
+            throw new InvalidOperationException(
+                "C_GetFunctionList succeeded but returned a null function-list pointer.");
 
         CK_FUNCTION_LIST funcList = (CK_FUNCTION_LIST)UnmanagedMemory.Read(functionList, typeof(CK_FUNCTION_LIST));
         Initialize(funcList);
