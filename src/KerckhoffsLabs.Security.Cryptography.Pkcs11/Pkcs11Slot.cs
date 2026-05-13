@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -127,63 +128,53 @@ public class Pkcs11Slot
     }
 
     /// <summary>
-    /// Initializes a token
+    /// Initializes the token in this slot with the Security Officer PIN and a
+    /// human-readable label. After this call the token is in its factory state —
+    /// any prior keys, certificates, or user PIN are destroyed.
     /// </summary>
-    /// <param name="soPin">SO's initial PIN</param>
-    /// <param name="label">Label of the token</param>
-    public void InitToken(string soPin, string label)
+    /// <param name="soPin">Security Officer's initial PIN. Caller retains
+    /// ownership of the <see cref="SecurePin"/>; this method copies into a
+    /// transient buffer and zeroes it after the native call returns.</param>
+    /// <param name="label">Token label. Encoded as UTF-8; must encode to 32
+    /// bytes or fewer. PKCS#11 pads the label with ASCII spaces (0x20) to fill
+    /// the on-token 32-byte field; it must NOT be null-terminated.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="soPin"/>
+    /// or <paramref name="label"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="label"/>
+    /// encodes to more than 32 bytes of UTF-8.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying
+    /// <c>C_InitToken</c> call.</exception>
+    public void InitToken(SecurePin soPin, string label)
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::InitToken1", _slotId);
+        ArgumentNullException.ThrowIfNull(soPin);
+        ArgumentNullException.ThrowIfNull(label);
 
-        byte[] soPinValue = null;
-        NativeCULong soPinValueLen = (NativeCULong)0;
-        if (soPin != null)
-        {
-            soPinValue = System.Text.Encoding.UTF8.GetBytes(soPin);
-            soPinValueLen = (NativeCULong)(soPinValue.Length);
-        }
+        _logger.LogDebug("Pkcs11Slot({SlotId})::InitToken", _slotId);
 
+        // PKCS#11 v3.1 §11.5: pLabel points to a 32-byte field padded with
+        // ASCII spaces (0x20) and must not be null-terminated.
+        byte[] labelBytes = System.Text.Encoding.UTF8.GetBytes(label);
+        if (labelBytes.Length > 32)
+            throw new ArgumentException(
+                $"Token label must encode to 32 UTF-8 bytes or fewer (got {labelBytes.Length}).",
+                nameof(label));
         byte[] tokenLabel = new byte[32];
         Array.Fill(tokenLabel, (byte)0x20);
-        if (label != null) { byte[] _lb = System.Text.Encoding.UTF8.GetBytes(label); Array.Copy(_lb, 0, tokenLabel, 0, Math.Min(_lb.Length, 32)); }
+        Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
 
-        CKR rv = _pkcs11Library.C_InitToken(_slotId, soPinValue, soPinValueLen, tokenLabel);
-        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
-    }
-
-    /// <summary>
-    /// Initializes a token
-    /// </summary>
-    /// <param name="soPin">SO's initial PIN</param>
-    /// <param name="label">Label of the token</param>
-    public void InitToken(byte[] soPin, byte[] label)
-    {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::InitToken2", _slotId);
-
-        byte[] soPinValue = null;
-        NativeCULong soPinValueLen = (NativeCULong)0;
-        if (soPin != null)
+        // Copy the SecurePin into a transient buffer for the native call and
+        // zero it on the way out. Matches Pkcs11Session.Login's pattern.
+        byte[] pinBuffer = soPin.Pin.ToArray();
+        try
         {
-            soPinValue = soPin;
-            soPinValueLen = (NativeCULong)(soPin.Length);
+            CKR rv = _pkcs11Library.C_InitToken(
+                _slotId, pinBuffer, (NativeCULong)pinBuffer.Length, tokenLabel);
+            Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
         }
-
-        // PKCS#11 v2.20 page 113:
-        // pLabel points to the 32-byte label of the token (which must be padded with
-        // blank characters, and which must not be null-terminated).
-        byte[] tokenLabel = new byte[32];
-        for (int i = 0; i < tokenLabel.Length; i++)
-            tokenLabel[i] = 0x20;
-
-        if (label != null)
+        finally
         {
-            if (label.Length > 32)
-                throw new Exception("Label too long");
-            Array.Copy(label, 0, tokenLabel, 0, label.Length);
+            CryptographicOperations.ZeroMemory(pinBuffer);
         }
-
-        CKR rv = _pkcs11Library.C_InitToken(_slotId, soPinValue, soPinValueLen, tokenLabel);
-        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
     }
 
     /// <summary>
