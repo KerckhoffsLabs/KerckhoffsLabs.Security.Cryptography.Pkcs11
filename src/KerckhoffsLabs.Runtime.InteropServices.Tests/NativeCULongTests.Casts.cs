@@ -158,4 +158,70 @@ public partial class NativeCULongTests
             Assert.Equal(int.MinValue, wrapped);
         }
     }
+
+    // ---- Plain (non-checked) op_Explicit coverage ------------------------------
+    // The project-wide CheckForOverflowUnderflow=true routes bare casts to the
+    // `operator checked` overload, leaving the plain overloads dead. The
+    // `unchecked { ... }` block below forces the plain path.
+
+    [Fact]
+    public void Cast_FromULong_Plain_WithinRange_InsideUncheckedBlock()
+    {
+        unchecked
+        {
+            NativeCULong c = (NativeCULong)(ulong)42UL;
+            Assert.Equal(42u, (uint)c.Value);
+        }
+    }
+
+    [Fact]
+    public void Cast_ToULong_Plain_InsideUncheckedBlock()
+    {
+        // NativeCULong → ulong is always exact (ulong holds any NativeCULong value),
+        // so plain and checked produce identical results; this just exercises the
+        // plain operator path that the default-checked context bypasses.
+        NativeCULong c = new NativeCULong(42u);
+        unchecked
+        {
+            ulong v = (ulong)c;
+            Assert.Equal(42UL, v);
+        }
+    }
+
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.Has32BitStorage))]
+    public void Cast_FromULong_Plain_HighBitsTruncate_On32BitStorage()
+    {
+        unchecked
+        {
+            // 0x1_0000_0000 has the low 32 bits zero; on 32-bit storage the plain
+            // operator truncates without throwing (checked variant would throw).
+            ulong tooBig = (ulong)uint.MaxValue + 1UL;
+            NativeCULong c = (NativeCULong)tooBig;
+            Assert.Equal(0u, (uint)c.Value);
+        }
+    }
+
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.Has64BitStorage))]
+    public void Cast_ToUInt_Plain_TruncatesOn64BitStorage_InsideUncheckedBlock()
+    {
+        NativeCULong tooBig = new NativeCULong((nuint)((ulong)uint.MaxValue + 1UL));
+        unchecked
+        {
+            uint wrapped = (uint)tooBig;
+            // 0x1_0000_0000 truncated to uint = 0.
+            Assert.Equal(0u, wrapped);
+        }
+    }
+
+    [ConditionalFact(typeof(PlatformLayout), nameof(PlatformLayout.Has64BitStorage))]
+    public void Cast_ToLong_Plain_WrapsOn64BitStorage_InsideUncheckedBlock()
+    {
+        // Value > long.MaxValue: top bit set in 64-bit storage; plain cast reinterprets as negative.
+        NativeCULong huge = new NativeCULong(unchecked((nuint)0x8000_0000_0000_0000UL));
+        unchecked
+        {
+            long wrapped = (long)huge;
+            Assert.Equal(long.MinValue, wrapped);
+        }
+    }
 }

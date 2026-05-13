@@ -109,4 +109,30 @@ public partial class NativeCULongTests
             Assert.Equal(new NativeCULong(0xFFFFFFFF), NativeCULong.MaxValue);
         }
     }
+
+    //
+    // TryCreate (INumber<T> — deprecated in favor of CreateChecked; truncating semantics).
+    //
+
+    [Fact]
+    public void TryCreate_FromInt_PositiveRoundTrips()
+    {
+        Assert.True(NativeCULong.TryCreate(42, out NativeCULong result));
+        Assert.Equal(42u, (uint)result.Value);
+    }
+
+    [Fact]
+    public void TryCreate_FromInt_NegativeWrapsToMaxValue()
+    {
+        // Truncating: -1 has every bit set in two's complement, which wraps to all-ones (MaxValue).
+        Assert.True(NativeCULong.TryCreate(-1, out NativeCULong result));
+        Assert.Equal(NativeCULong.MaxValue, result);
+    }
+
+    [Fact]
+    public void TryCreate_FromULong_WithinUInt32Range_RoundTrips()
+    {
+        Assert.True(NativeCULong.TryCreate(0xFFFFFFFFUL, out NativeCULong result));
+        Assert.Equal(0xFFFFFFFFu, (uint)result.Value);
+    }
 }

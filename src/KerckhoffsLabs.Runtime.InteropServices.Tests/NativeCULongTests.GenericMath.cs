@@ -141,6 +141,13 @@ public partial class NativeCULongTests
             Assert.Equal(new NativeCULong(0x0000001F), BinaryIntegerHelper<NativeCULong>.TrailingZeroCount(new NativeCULong(0x80000000)));
             Assert.Equal(new NativeCULong(0x00000000), BinaryIntegerHelper<NativeCULong>.TrailingZeroCount(new NativeCULong(0xFFFFFFFF)));
         }
+        else
+        {
+            // 64-bit storage: same low-bit semantics, just a wider zero value.
+            Assert.Equal(new NativeCULong(0x00000040), BinaryIntegerHelper<NativeCULong>.TrailingZeroCount(new NativeCULong(0x00000000)));
+            Assert.Equal(new NativeCULong(0x00000000), BinaryIntegerHelper<NativeCULong>.TrailingZeroCount(new NativeCULong(0x00000001)));
+            Assert.Equal(new NativeCULong(0x0000001F), BinaryIntegerHelper<NativeCULong>.TrailingZeroCount(new NativeCULong(0x80000000)));
+        }
     }
 
     [Fact]
@@ -367,6 +374,41 @@ public partial class NativeCULongTests
             Assert.Equal(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00 }, destination.ToArray());
         }
 #endif
+    }
+
+    //
+    // IBinaryInteger Read/Write Endian — error paths.
+    // A 3-byte buffer is smaller than NativeCULong's storage on every platform
+    // (4 bytes on Windows/32-bit Unix, 8 bytes on 64-bit Unix), so it hits the
+    // < sizeof(NativeType) early-return branch in every implementation variant.
+    //
+
+    [Fact]
+    public void TryReadBigEndian_SourceTooShort_ReturnsFalse()
+    {
+        Assert.False(BinaryIntegerHelper<NativeCULong>.TryReadBigEndian(new byte[3], isUnsigned: true, out NativeCULong _));
+    }
+
+    [Fact]
+    public void TryReadLittleEndian_SourceTooShort_ReturnsFalse()
+    {
+        Assert.False(BinaryIntegerHelper<NativeCULong>.TryReadLittleEndian(new byte[3], isUnsigned: true, out NativeCULong _));
+    }
+
+    [Fact]
+    public void TryWriteBigEndian_DestinationTooSmall_ReturnsFalse()
+    {
+        Span<byte> tooSmall = stackalloc byte[3];
+        Assert.False(BinaryIntegerHelper<NativeCULong>.TryWriteBigEndian(new NativeCULong(42u), tooSmall, out int bytesWritten));
+        Assert.Equal(0, bytesWritten);
+    }
+
+    [Fact]
+    public void TryWriteLittleEndian_DestinationTooSmall_ReturnsFalse()
+    {
+        Span<byte> tooSmall = stackalloc byte[3];
+        Assert.False(BinaryIntegerHelper<NativeCULong>.TryWriteLittleEndian(new NativeCULong(42u), tooSmall, out int bytesWritten));
+        Assert.Equal(0, bytesWritten);
     }
 
     //

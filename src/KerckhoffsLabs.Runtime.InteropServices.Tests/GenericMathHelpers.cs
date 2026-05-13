@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Runtime.InteropServices.Tests;
 public static class AdditionOperatorsHelper<TSelf, TOther, TResult>
     where TSelf : IAdditionOperators<TSelf, TOther, TResult>
 {
-    public static TResult op_Addition(TSelf left, TOther right) => left + right;
+    public static TResult op_Addition(TSelf left, TOther right) => unchecked(left + right);
     public static TResult op_CheckedAddition(TSelf left, TOther right) => checked(left + right);
 }
 
@@ -88,7 +88,7 @@ public static class EqualityOperatorsHelper<TSelf, TOther, TResult>
 public static class IncrementOperatorsHelper<TSelf>
     where TSelf : IIncrementOperators<TSelf>
 {
-    public static TSelf op_Increment(TSelf value) => ++value;
+    public static TSelf op_Increment(TSelf value) => unchecked(++value);
     public static TSelf op_CheckedIncrement(TSelf value) => checked(++value);
 }
 
@@ -107,7 +107,7 @@ public static class MultiplicativeIdentityHelper<TSelf, TResult>
 public static class MultiplyOperatorsHelper<TSelf, TOther, TResult>
     where TSelf : IMultiplyOperators<TSelf, TOther, TResult>
 {
-    public static TResult op_Multiply(TSelf left, TOther right) => left * right;
+    public static TResult op_Multiply(TSelf left, TOther right) => unchecked(left * right);
     public static TResult op_CheckedMultiply(TSelf left, TOther right) => checked(left * right);
 }
 

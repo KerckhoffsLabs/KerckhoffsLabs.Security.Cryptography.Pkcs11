@@ -551,6 +551,15 @@ public readonly struct NativeCULong
         // TryCreate has truncating semantics (its replacement, CreateChecked, is the
         // throwing variant). Convert TOther → ulong via the BCL dispatch, then narrow
         // to storage width without overflow checks.
+        // Identity short-circuit: ulong.TryConvertToTruncating<ulong> returns false
+        // (BCL narrow-table omits identity); handle ulong source directly so the
+        // dispatch doesn't drop it.
+        if (typeof(TOther) == typeof(ulong))
+        {
+            ulong v = (ulong)(object)value!;
+            result = new NativeCULong(unchecked((NativeType)v));
+            return true;
+        }
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
         {
             result = new NativeCULong(unchecked((NativeType)tempUlong));
@@ -660,6 +669,12 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromChecked<TOther>(TOther value, out NativeCULong result)
     {
+        if (typeof(TOther) == typeof(ulong))
+        {
+            ulong v = (ulong)(object)value!;
+            result = new NativeCULong(checked((NativeType)v));
+            return true;
+        }
         if (TOther.TryConvertToChecked(value, out ulong tempUlong))
         {
             // checked narrow throws OverflowException if value exceeds storage width.
@@ -674,6 +689,13 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromSaturating<TOther>(TOther value, out NativeCULong result)
     {
+        if (typeof(TOther) == typeof(ulong))
+        {
+            ulong v = (ulong)(object)value!;
+            NativeType saturated = v > NativeType.MaxValue ? NativeType.MaxValue : (NativeType)v;
+            result = new NativeCULong(saturated);
+            return true;
+        }
         if (TOther.TryConvertToSaturating(value, out ulong tempUlong))
         {
             NativeType saturated = tempUlong > NativeType.MaxValue
@@ -690,6 +712,12 @@ public readonly struct NativeCULong
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool INumberBase<NativeCULong>.TryConvertFromTruncating<TOther>(TOther value, out NativeCULong result)
     {
+        if (typeof(TOther) == typeof(ulong))
+        {
+            ulong v = (ulong)(object)value!;
+            result = new NativeCULong(unchecked((NativeType)v));
+            return true;
+        }
         if (TOther.TryConvertToTruncating(value, out ulong tempUlong))
         {
             result = new NativeCULong(unchecked((NativeType)tempUlong));
