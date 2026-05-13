@@ -238,8 +238,6 @@ internal sealed partial class Pkcs11Session
     /// This method exists for compatibility only; it throws <see cref="InsecureOperationException"/>
     /// at runtime unless <see cref="AllowInsecure"/> is set to <c>true</c> on the session.
     /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use DecryptRsaOaep instead. " +
-              "If you must use it, set Session.AllowInsecure = true.")]
     public byte[] DecryptRsaPkcs1V15(ObjectHandle keyHandle, ReadOnlySpan<byte> ciphertext)
     {
         using var _ = AcquireExclusive();

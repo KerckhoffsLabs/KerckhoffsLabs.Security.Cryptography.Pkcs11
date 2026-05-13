@@ -118,8 +118,6 @@ internal sealed partial class Pkcs11Session
     /// This method exists for compatibility; it throws <see cref="InsecureOperationException"/>
     /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 signing is vulnerable to fault attacks and is not recommended for new code. " +
-              "Use SignRsaPss instead. If you must use it, set Session.AllowInsecure = true.")]
     public byte[] SignRsaPkcs1V15(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();

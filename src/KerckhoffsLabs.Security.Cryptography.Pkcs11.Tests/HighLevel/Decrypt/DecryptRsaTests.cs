@@ -14,8 +14,7 @@ internal static class DecryptRsaTestCases
 {
     /// <summary>
     /// <see cref="Session.DecryptRsaPkcs1V15"/> must throw <see cref="InsecureOperationException"/>
-    /// by default. The gate fires before C_DecryptInit, so only a session (no real key) is
-    /// needed. CS0618 is suppressed at the call site.
+    /// by default. The gate fires before C_DecryptInit, so only a session (no real key) is needed.
     /// </summary>
     internal static void Assert_RsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {
@@ -27,10 +26,8 @@ internal static class DecryptRsaTestCases
             {
                 byte[] fakeCiphertext = new byte[256]; // RSA-2048 output size
 
-#pragma warning disable CS0618 // DecryptRsaPkcs1V15 is intentionally Obsolete
                 Assert.Throws<InsecureOperationException>(() =>
                     session.DecryptRsaPkcs1V15(priv, fakeCiphertext));
-#pragma warning restore CS0618
             }
             finally
             {

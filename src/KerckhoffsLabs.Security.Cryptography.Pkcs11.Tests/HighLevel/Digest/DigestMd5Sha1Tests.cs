@@ -17,10 +17,8 @@ internal static class DigestMd5Sha1TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-#pragma warning disable CS0618
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.DigestMd5(Array.Empty<byte>()));
-#pragma warning restore CS0618
             Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
         }
         finally
@@ -35,10 +33,8 @@ internal static class DigestMd5Sha1TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-#pragma warning disable CS0618
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.DigestSha1(Array.Empty<byte>()));
-#pragma warning restore CS0618
             Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
         }
         finally
@@ -56,9 +52,7 @@ internal static class DigestMd5Sha1TestCases
         {
             try
             {
-#pragma warning disable CS0618
                 session.DigestMd5(Array.Empty<byte>());
-#pragma warning restore CS0618
             }
             catch (InsecureOperationException)
             {
