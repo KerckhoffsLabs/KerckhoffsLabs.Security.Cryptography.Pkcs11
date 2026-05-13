@@ -92,9 +92,6 @@ public sealed partial class Pkcs11Key : IDisposable
     /// path instead), or when synthesis is unavailable (non-RSA key type, or
     /// CKA_MODULUS/CKA_PUBLIC_EXPONENT marked sensitive).
     /// </summary>
-    /// <remarks>
-    /// EC synthesis is added in Task 8.
-    /// </remarks>
     internal System.Security.Cryptography.RSAParameters? GetSynthesizedRsaParameters()
     {
         if (_keyType != CKK.CKK_RSA) return null;
@@ -102,6 +99,20 @@ public sealed partial class Pkcs11Key : IDisposable
         if (_privateHandle.IsInvalid) return null;
 
         return Pkcs11PublicKeyView.TrySynthesizeRsa(_workspace.Session, _privateHandle);
+    }
+
+    /// <summary>
+    /// Returns the synthesized EC public parameters when this key is an EC private-only
+    /// key with readable CKA_EC_POINT + CKA_EC_PARAMS. Returns <c>null</c> when the
+    /// key is non-EC, a real public handle exists (caller should use that path), or
+    /// CKA_EC_POINT is sensitive/missing on the private object.
+    /// </summary>
+    internal System.Security.Cryptography.ECParameters? GetSynthesizedEcParameters()
+    {
+        if (_keyType != CKK.CKK_EC) return null;
+        if (!_publicHandle.IsInvalid) return null;
+        if (_privateHandle.IsInvalid) return null;
+        return Pkcs11PublicKeyView.TrySynthesizeEc(_workspace.Session, _privateHandle);
     }
 
     /// <inheritdoc/>
