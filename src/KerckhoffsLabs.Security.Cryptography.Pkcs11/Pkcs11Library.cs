@@ -154,54 +154,39 @@ public class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Waits for a slot event, such as token insertion or token removal, to occur
+    /// Waits for a slot event, such as token insertion or token removal, to occur.
     /// </summary>
-    /// <param name="waitType">Type of waiting for a slot event</param>
-    /// <param name="eventOccured">Flag indicating whether event occured</param>
-    /// <param name="slotId">PKCS#11 handle of slot that the event occurred in</param>
-    public void WaitForSlotEvent(WaitType waitType, out bool eventOccured, out ulong slotId)
+    /// <param name="nonBlocking">
+    /// When <c>true</c>, returns immediately even if no event is pending
+    /// (<paramref name="eventOccured"/> will be <c>false</c>). When <c>false</c>,
+    /// blocks until an event occurs.
+    /// </param>
+    /// <param name="eventOccured">True when a slot event was reported.</param>
+    /// <param name="slotId">PKCS#11 handle of the slot the event occurred in. Zero when no event.</param>
+    public void WaitForSlotEvent(bool nonBlocking, out bool eventOccured, out ulong slotId)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Pkcs11Library({LibraryPath})::WaitForSlotEvent", _libraryPath);
 
-        NativeCULong flags = (waitType == WaitType.NonBlocking) ? CKF.CKF_DONT_BLOCK : new (0);
+        NativeCULong flags = nonBlocking ? CKF.CKF_DONT_BLOCK : new(0);
+        NativeCULong slotIdOut = new(0);
+        CKR rv = _pkcs11Library.C_WaitForSlotEvent(flags, ref slotIdOut, IntPtr.Zero);
 
-        NativeCULong slotId_ = new (0);
-        CKR rv = _pkcs11Library.C_WaitForSlotEvent(flags, ref slotId_, IntPtr.Zero);
-        // Initialise out params so the compiler can see definite assignment on all code paths.
-        // The real values are set (or an exception is thrown) in the branches below.
+        if (rv == CKR.CKR_OK)
+        {
+            eventOccured = true;
+            slotId = (ulong)slotIdOut;
+            return;
+        }
+
         eventOccured = false;
-        slotId = (ulong)slotId_;
-        if (waitType == WaitType.NonBlocking)
-        {
-            if (rv == CKR.CKR_OK)
-            {
-                eventOccured = true;
-                slotId = (ulong)slotId_;
-            }
-            else if (rv == CKR.CKR_NO_EVENT)
-            {
-                // No event reported. The pre-assigned defaults (eventOccured = false,
-                // slotId = the native out value) already convey this — no further work needed.
-            }
-            else
-            {
-                Pkcs11Exception.ThrowIfError(rv, "C_WaitForSlotEvent");
-            }
-        }
-        else
-        {
-            if (rv == CKR.CKR_OK)
-            {
-                eventOccured = true;
-                slotId = (ulong)slotId_;
-            }
-            else
-            {
-                Pkcs11Exception.ThrowIfError(rv, "C_WaitForSlotEvent");
-            }
-        }
+        slotId = 0;
+
+        // CKR_NO_EVENT is expected in non-blocking mode when nothing's pending.
+        if (nonBlocking && rv == CKR.CKR_NO_EVENT) return;
+
+        Pkcs11Exception.ThrowIfError(rv, "C_WaitForSlotEvent");
     }
 
     /// <summary>
