@@ -17,7 +17,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Flag indicating whether instance has been disposed
     /// </summary>
-    protected bool _disposed = false;
+    private bool _disposed = false;
 
     /// <summary>
     /// Logger responsible for message logging
@@ -27,13 +27,13 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    protected LowLevelPkcs11Library _pkcs11Library = null;
+    private LowLevelPkcs11Library _pkcs11Library = null;
 
     /// <summary>
     /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
     /// calls <c>C_CloseSession</c> on release via its <c>ReleaseHandle</c> override.
     /// Private because <see cref="Pkcs11SessionHandle"/> is internal; partials and subclasses
-    /// access the session ID through the protected <see cref="_sessionId"/> shim property.
+    /// access the session ID through the <see cref="_sessionId"/> shim property.
     /// </summary>
     private Pkcs11SessionHandle _sessionHandle = null!;
 
@@ -42,7 +42,7 @@ internal sealed partial class Pkcs11Session
     /// if the session is not yet open or has been closed. Read-only; assignments go through
     /// <see cref="_sessionHandle"/>.
     /// </summary>
-    protected NativeCULong _sessionId
+    private NativeCULong _sessionId
     {
         get => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
     }
@@ -127,7 +127,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Flag indicating whether session should be closed when object is disposed
     /// </summary>
-    protected bool _closeWhenDisposed = true;
+    private bool _closeWhenDisposed = true;
 
     /// <summary>
     /// Flag indicating whether session should be closed when object is disposed
@@ -151,7 +151,7 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>Backing field for <see cref="AllowInsecure"/>.</summary>
-    protected bool _allowInsecure = false;
+    private bool _allowInsecure = false;
 
     /// <summary>
     /// When <c>true</c>, this session does not reject operations that use mechanisms flagged as
@@ -502,7 +502,7 @@ internal sealed partial class Pkcs11Session
     /// Disposes object
     /// </summary>
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    protected void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         _logger.LogDebug("Session({SessionId})::Dispose2", _sessionId);
 

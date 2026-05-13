@@ -4,12 +4,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-public class LowLevelPkcs11Library
+internal sealed class LowLevelPkcs11Library
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
     /// </summary>
-    protected bool _disposed = false;
+    private bool _disposed = false;
 
      /// <summary>
     /// Handle to the PKCS#11 library
@@ -1198,7 +1198,7 @@ public class LowLevelPkcs11Library
     /// Disposes object
     /// </summary>
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         if (!_disposed)
         {

@@ -19,7 +19,7 @@ internal sealed partial class Pkcs11Session
     /// <param name="performLogin">Flag indicating whether context specific login should be performed</param>
     /// <param name="keyPin">Context specific signature pin</param>
     /// <returns>Signature</returns>
-    protected byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, bool performLogin, byte[] keyPin)
+    private byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, bool performLogin, byte[] keyPin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
@@ -286,7 +286,7 @@ internal sealed partial class Pkcs11Session
     /// <param name="performLogin">Flag indicating whether context specific login should be performed</param>
     /// <param name="keyPin">Context specific signature pin</param>
     /// <returns>Signature</returns>
-    protected byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, int bufferLength, bool performLogin, byte[] keyPin)
+    private byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, int bufferLength, bool performLogin, byte[] keyPin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
@@ -453,7 +453,7 @@ internal sealed partial class Pkcs11Session
     /// <param name="performLogin">Flag indicating whether context specific login should be performed</param>
     /// <param name="keyPin">Context specific signature pin</param>
     /// <returns>Signature</returns>
-    protected byte[] SignRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, bool performLogin, byte[] keyPin)
+    private byte[] SignRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, bool performLogin, byte[] keyPin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
@@ -841,7 +841,7 @@ internal sealed partial class Pkcs11Session
     /// <param name="performLogin">Flag indicating whether context specific login should be performed</param>
     /// <param name="signingKeyPin">Context specific signature pin</param>
     /// <returns>Signature</returns>
-    protected byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength, bool performLogin, byte[] signingKeyPin)
+    private byte[] SignEncrypt(Mechanism signingMechanism, ObjectHandle signingKeyHandle, Mechanism encryptionMechanism, ObjectHandle encryptionKeyHandle, Stream inputStream, Stream outputStream, int bufferLength, bool performLogin, byte[] signingKeyPin)
     {
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);

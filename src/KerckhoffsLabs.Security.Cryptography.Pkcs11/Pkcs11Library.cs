@@ -30,7 +30,7 @@ public class Pkcs11Library : IDisposable
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    protected LowLevelPkcs11Library? _pkcs11Library = null;
+    private LowLevelPkcs11Library? _pkcs11Library = null;
 
     /// <summary>
     /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
