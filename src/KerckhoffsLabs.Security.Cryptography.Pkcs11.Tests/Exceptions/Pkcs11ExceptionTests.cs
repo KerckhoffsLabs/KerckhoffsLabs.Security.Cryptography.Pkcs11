@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Exceptions;
 
 public class Pkcs11ExceptionTests
 {

@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.LowLevel.SafeHandles;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal.SafeHandles;
 
 [Collection("Mock")]
 public sealed class Pkcs11SessionHandleTests(MockBackendFixture f)

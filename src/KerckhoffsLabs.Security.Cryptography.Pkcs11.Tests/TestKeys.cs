@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 
 /// <summary>
 /// Helpers for creating ephemeral session-only test keys without depending on

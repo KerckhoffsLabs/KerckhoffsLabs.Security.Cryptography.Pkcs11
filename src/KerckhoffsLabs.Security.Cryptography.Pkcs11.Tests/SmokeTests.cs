@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 using Microsoft.DotNet.XUnitExtensions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 
 /// <summary>
 /// Shared assertions for the smoke tests. Not an xUnit test class itself — concrete

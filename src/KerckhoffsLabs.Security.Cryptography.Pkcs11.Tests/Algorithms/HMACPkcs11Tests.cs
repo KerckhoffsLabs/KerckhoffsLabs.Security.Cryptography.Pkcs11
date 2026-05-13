@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 using Microsoft.DotNet.XUnitExtensions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 public sealed class HMACPkcs11ArgumentTests
 {

@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Security;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
 
 public sealed class SecureBufferTests
 {
