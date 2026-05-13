@@ -23,7 +23,7 @@ Your primary goals:
 
 ## C# and interop style
 
-- **Language level:** Use modern C# (10+) and .NET (6+) patterns where reasonable.
+- **Language level:** Use modern C# and .NET. Production projects multi-target `net8.0;net9.0` with `<LangVersion>latest</LangVersion>` — C# 12+ features (collection expressions, primary constructors, etc.) are fair game.
 - **Interop:**
   - Prefer **safe wrappers** around P/Invoke rather than exposing raw `IntPtr` and unmanaged buffers.
   - Use `SafeHandle`-like patterns for sessions, objects, and other PKCS#11 handles.

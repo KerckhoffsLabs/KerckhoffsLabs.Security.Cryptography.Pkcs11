@@ -2,16 +2,12 @@
 
 Modern, secure-by-default PKCS#11 v3.1 interop for .NET.
 
-> **Status:** Phase 0b (build scaffolding). API surface and full test
-> coverage land in subsequent phases — see `docs/superpowers/specs/` for
-> the design and `docs/superpowers/plans/` for the phased plans.
-
 ## Building
 
 ```bash
 git clone --recurse-submodules <repo-url>
 cd PKCS11.NET
-dotnet build src/src.sln
+dotnet build src/KerckhoffsLabs.sln
 ```
 
 If you already cloned without `--recurse-submodules`:
@@ -23,7 +19,7 @@ git submodule update --init --recursive
 ## Running tests
 
 ```bash
-dotnet test src/src.sln
+dotnet test src/KerckhoffsLabs.sln
 ```
 
 Tests load `pkcs11-mock` (built from `third-party/pkcs11-mock` as a

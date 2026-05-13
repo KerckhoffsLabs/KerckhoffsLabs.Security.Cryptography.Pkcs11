@@ -43,13 +43,13 @@ jobs:
         continue-on-error: true
 
       - name: Restore
-        run: dotnet restore src/src.sln
+        run: dotnet restore src/KerckhoffsLabs.sln
 
       - name: Build
-        run: dotnet build src/src.sln --configuration Release --no-restore
+        run: dotnet build src/KerckhoffsLabs.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test src/src.sln --configuration Release --no-build --logger trx --results-directory TestResults
+        run: dotnet test src/KerckhoffsLabs.sln --configuration Release --no-build --logger trx --results-directory TestResults
 
       - name: Upload test results
         if: always()
