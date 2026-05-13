@@ -248,4 +248,95 @@ internal sealed partial class Pkcs11Session
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
         return Encrypt(mechanism, keyHandle, plaintext);
     }
+
+    /// <summary>
+    /// True when the loaded PKCS#11 library exposes the v3.0 message-based AEAD API
+    /// (<see cref="MessageEncrypt"/> / <see cref="MessageDecrypt"/> use it). False on
+    /// v2.40 libraries — callers must use <see cref="Encrypt"/> / <see cref="Decrypt"/>
+    /// with the legacy CK_GCM_PARAMS / CK_CCM_PARAMS / CK_SALSA20_CHACHA20_POLY1305_PARAMS
+    /// instead.
+    /// </summary>
+    public bool SupportsMessageApi => _pkcs11Library.IsMessageApiSupported;
+
+    /// <summary>
+    /// One-shot AEAD encrypt via the PKCS#11 v3.0 message-based API
+    /// (C_MessageEncryptInit + C_EncryptMessage + C_MessageEncryptFinal). The per-message
+    /// nonce / IV / tag flow lives entirely in <paramref name="messageParams"/>; the
+    /// authentication tag is read back through the wrapper's <c>CopyTagTo</c> /
+    /// <c>CopyMacTo</c> method after this call.
+    /// </summary>
+    /// <param name="mechanism">AEAD mechanism (CKM_AES_GCM / CKM_AES_CCM / CKM_CHACHA20_POLY1305 / CKM_SALSA20_POLY1305).</param>
+    /// <param name="keyHandle">Symmetric key handle.</param>
+    /// <param name="messageParams">Per-message parameters (e.g. <see cref="CkmGcmMessageParams"/>).</param>
+    /// <param name="associatedData">Optional Additional Authenticated Data.</param>
+    /// <param name="plaintext">Bytes to encrypt.</param>
+    /// <returns>Ciphertext (without the tag — tag is in <paramref name="messageParams"/>).</returns>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> when the loaded library is v2.40.</exception>
+    public byte[] MessageEncrypt(
+        Mechanism mechanism,
+        ObjectHandle keyHandle,
+        IMechanismParams messageParams,
+        ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> plaintext)
+    {
+        using var _ = AcquireExclusive();
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(messageParams);
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.LogDebug("Session({SessionId})::MessageEncrypt", _sessionId);
+
+        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
+        Pkcs11Exception.ThrowIfError(rv, "C_MessageEncryptInit");
+
+        try
+        {
+            object paramsStruct = messageParams.ToMarshalableStructure();
+            int paramsSize = UnmanagedMemory.SizeOf(paramsStruct.GetType());
+            IntPtr paramsPtr = UnmanagedMemory.Allocate(paramsSize);
+            try
+            {
+                UnmanagedMemory.Write(paramsPtr, paramsStruct);
+
+                byte[] aad = associatedData.IsEmpty ? Array.Empty<byte>() : associatedData.ToArray();
+                byte[] pt = plaintext.ToArray();
+
+                NativeCULong ctLen = (NativeCULong)0;
+                rv = _pkcs11Library.C_EncryptMessage(
+                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                    aad, (NativeCULong)aad.Length,
+                    pt, (NativeCULong)pt.Length,
+                    null!, ref ctLen);
+                Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
+
+                byte[] ct = new byte[(int)ctLen];
+                rv = _pkcs11Library.C_EncryptMessage(
+                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                    aad, (NativeCULong)aad.Length,
+                    pt, (NativeCULong)pt.Length,
+                    ct, ref ctLen);
+                Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage");
+
+                if (ct.Length != (int)ctLen)
+                    Array.Resize(ref ct, (int)ctLen);
+
+                return ct;
+            }
+            finally
+            {
+                UnmanagedMemory.Free(ref paramsPtr);
+            }
+        }
+        finally
+        {
+            CKR finalRv = _pkcs11Library.C_MessageEncryptFinal(_sessionId);
+            if (finalRv != CKR.CKR_OK)
+                _logger.LogWarning("C_MessageEncryptFinal returned {Rv}", finalRv);
+        }
+    }
 }

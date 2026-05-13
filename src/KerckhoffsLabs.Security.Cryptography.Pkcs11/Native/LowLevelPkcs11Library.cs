@@ -379,6 +379,20 @@ internal sealed class LowLevelPkcs11Library
     }
 
     /// <summary>
+    /// True when the loaded PKCS#11 library exposes the v3.0 message-based AEAD
+    /// functions (C_MessageEncryptInit / C_EncryptMessage / C_MessageEncryptFinal +
+    /// matching Decrypt variants). False on v2.40 libraries.
+    /// </summary>
+    public bool IsMessageApiSupported
+        => _delegates is not null
+           && _delegates.C_MessageEncryptInit is not null
+           && _delegates.C_EncryptMessage is not null
+           && _delegates.C_MessageEncryptFinal is not null
+           && _delegates.C_MessageDecryptInit is not null
+           && _delegates.C_DecryptMessage is not null
+           && _delegates.C_MessageDecryptFinal is not null;
+
+    /// <summary>
     /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0 §5.6.7).
     /// </summary>
     /// <param name="session">The session's handle.</param>

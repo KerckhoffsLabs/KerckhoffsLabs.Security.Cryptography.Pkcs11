@@ -246,4 +246,85 @@ internal sealed partial class Pkcs11Session
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
         return Decrypt(mechanism, keyHandle, ciphertext);
     }
+
+    /// <summary>
+    /// One-shot AEAD decrypt via the PKCS#11 v3.0 message-based API
+    /// (C_MessageDecryptInit + C_DecryptMessage + C_MessageDecryptFinal). The tag is
+    /// supplied through <paramref name="messageParams"/> (constructed via the matching
+    /// <c>ForDecrypt</c> factory) and verified by the token.
+    /// </summary>
+    /// <param name="mechanism">AEAD mechanism.</param>
+    /// <param name="keyHandle">Symmetric key handle.</param>
+    /// <param name="messageParams">Per-message parameters carrying the nonce and tag.</param>
+    /// <param name="associatedData">Optional AAD that was bound at encrypt time.</param>
+    /// <param name="ciphertext">Ciphertext bytes (without the tag).</param>
+    /// <returns>Plaintext.</returns>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> on tag-verification failure.</exception>
+    public byte[] MessageDecrypt(
+        Mechanism mechanism,
+        ObjectHandle keyHandle,
+        IMechanismParams messageParams,
+        ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> ciphertext)
+    {
+        using var _ = AcquireExclusive();
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().FullName);
+
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(messageParams);
+
+        GuardMechanism((CKM)mechanism.Type);
+
+        _logger.LogDebug("Session({SessionId})::MessageDecrypt", _sessionId);
+
+        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
+        Pkcs11Exception.ThrowIfError(rv, "C_MessageDecryptInit");
+
+        try
+        {
+            object paramsStruct = messageParams.ToMarshalableStructure();
+            int paramsSize = UnmanagedMemory.SizeOf(paramsStruct.GetType());
+            IntPtr paramsPtr = UnmanagedMemory.Allocate(paramsSize);
+            try
+            {
+                UnmanagedMemory.Write(paramsPtr, paramsStruct);
+
+                byte[] aad = associatedData.IsEmpty ? Array.Empty<byte>() : associatedData.ToArray();
+                byte[] ct = ciphertext.ToArray();
+
+                NativeCULong ptLen = (NativeCULong)0;
+                rv = _pkcs11Library.C_DecryptMessage(
+                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                    aad, (NativeCULong)aad.Length,
+                    ct, (NativeCULong)ct.Length,
+                    null!, ref ptLen);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
+
+                byte[] pt = new byte[(int)ptLen];
+                rv = _pkcs11Library.C_DecryptMessage(
+                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                    aad, (NativeCULong)aad.Length,
+                    ct, (NativeCULong)ct.Length,
+                    pt, ref ptLen);
+                Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage");
+
+                if (pt.Length != (int)ptLen)
+                    Array.Resize(ref pt, (int)ptLen);
+
+                return pt;
+            }
+            finally
+            {
+                UnmanagedMemory.Free(ref paramsPtr);
+            }
+        }
+        finally
+        {
+            CKR finalRv = _pkcs11Library.C_MessageDecryptFinal(_sessionId);
+            if (finalRv != CKR.CKR_OK)
+                _logger.LogWarning("C_MessageDecryptFinal returned {Rv}", finalRv);
+        }
+    }
 }

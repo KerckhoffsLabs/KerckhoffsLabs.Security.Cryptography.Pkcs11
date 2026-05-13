@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -323,6 +324,70 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.Decrypt (no private handle)");
 
         return _workspace.Session.Decrypt(mechanism, _privateHandle, ciphertext);
+    }
+
+    /// <summary>
+    /// True when the loaded PKCS#11 library exposes the v3.0 message-based AEAD API.
+    /// When false, callers should use <see cref="Encrypt"/> / <see cref="Decrypt"/>
+    /// with the legacy CK_GCM_PARAMS / CK_CCM_PARAMS / CK_SALSA20_CHACHA20_POLY1305_PARAMS.
+    /// </summary>
+    public bool SupportsMessageApi
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _workspace.Session.SupportsMessageApi;
+        }
+    }
+
+    /// <summary>
+    /// One-shot AEAD encrypt using the v3.0 message-based API. The per-message tag
+    /// is filled into <paramref name="messageParams"/>; read it back via the wrapper's
+    /// <c>CopyTagTo</c> / <c>CopyMacTo</c> after this call.
+    /// </summary>
+    /// <param name="mechanism">AEAD mechanism (mechanism parameter is empty in message mode).</param>
+    /// <param name="messageParams">Per-message parameters (nonce + tag buffer).</param>
+    /// <param name="associatedData">Optional AAD.</param>
+    /// <param name="plaintext">Bytes to encrypt.</param>
+    /// <returns>Ciphertext (tag is in <paramref name="messageParams"/>).</returns>
+    public byte[] MessageEncrypt(
+        Mechanism mechanism,
+        IMechanismParams messageParams,
+        ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> plaintext)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(messageParams);
+
+        ObjectHandle handle = IsAsymmetricKeyType(_keyType) ? _publicHandle : _privateHandle;
+        if (handle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.MessageEncrypt (handle unavailable)");
+
+        return _workspace.Session.MessageEncrypt(mechanism, handle, messageParams, associatedData, plaintext);
+    }
+
+    /// <summary>
+    /// One-shot AEAD decrypt using the v3.0 message-based API. Supply the tag through
+    /// <paramref name="messageParams"/> constructed via its <c>ForDecrypt</c> factory.
+    /// </summary>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> when authentication fails.</exception>
+    public byte[] MessageDecrypt(
+        Mechanism mechanism,
+        IMechanismParams messageParams,
+        ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> ciphertext)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(messageParams);
+
+        if (_privateHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.MessageDecrypt (no private handle)");
+
+        return _workspace.Session.MessageDecrypt(mechanism, _privateHandle, messageParams, associatedData, ciphertext);
     }
 
     /// <summary>
