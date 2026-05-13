@@ -977,6 +977,39 @@ internal partial class Delegates
         if (v30.C_MessageVerifyFinal != IntPtr.Zero)
             C_MessageVerifyFinal = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyFinalDelegate>(v30.C_MessageVerifyFinal);
 
+        // v3.2 token: re-read the function table as CK_FUNCTION_LIST_3_2 and bind
+        // the 12 v3.2 additions on top of the v3.0 bindings.
+        if (version.Minor is not null && version.Minor.Length > 0 && version.Minor[0] >= 2)
+        {
+            CK_FUNCTION_LIST_3_2 v32 = (CK_FUNCTION_LIST_3_2)UnmanagedMemory.Read(
+                iface.FunctionList, typeof(CK_FUNCTION_LIST_3_2));
+
+            if (v32.C_EncapsulateKey != IntPtr.Zero)
+                C_EncapsulateKey = Marshal.GetDelegateForFunctionPointer<C_EncapsulateKeyDelegate>(v32.C_EncapsulateKey);
+            if (v32.C_DecapsulateKey != IntPtr.Zero)
+                C_DecapsulateKey = Marshal.GetDelegateForFunctionPointer<C_DecapsulateKeyDelegate>(v32.C_DecapsulateKey);
+            if (v32.C_VerifySignatureInit != IntPtr.Zero)
+                C_VerifySignatureInit = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureInitDelegate>(v32.C_VerifySignatureInit);
+            if (v32.C_VerifySignature != IntPtr.Zero)
+                C_VerifySignature = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureDelegate>(v32.C_VerifySignature);
+            if (v32.C_VerifySignatureUpdate != IntPtr.Zero)
+                C_VerifySignatureUpdate = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureUpdateDelegate>(v32.C_VerifySignatureUpdate);
+            if (v32.C_VerifySignatureFinal != IntPtr.Zero)
+                C_VerifySignatureFinal = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureFinalDelegate>(v32.C_VerifySignatureFinal);
+            if (v32.C_GetSessionValidationFlags != IntPtr.Zero)
+                C_GetSessionValidationFlags = Marshal.GetDelegateForFunctionPointer<C_GetSessionValidationFlagsDelegate>(v32.C_GetSessionValidationFlags);
+            if (v32.C_AsyncComplete != IntPtr.Zero)
+                C_AsyncComplete = Marshal.GetDelegateForFunctionPointer<C_AsyncCompleteDelegate>(v32.C_AsyncComplete);
+            if (v32.C_AsyncGetID != IntPtr.Zero)
+                C_AsyncGetID = Marshal.GetDelegateForFunctionPointer<C_AsyncGetIDDelegate>(v32.C_AsyncGetID);
+            if (v32.C_AsyncJoin != IntPtr.Zero)
+                C_AsyncJoin = Marshal.GetDelegateForFunctionPointer<C_AsyncJoinDelegate>(v32.C_AsyncJoin);
+            if (v32.C_WrapKeyAuthenticated != IntPtr.Zero)
+                C_WrapKeyAuthenticated = Marshal.GetDelegateForFunctionPointer<C_WrapKeyAuthenticatedDelegate>(v32.C_WrapKeyAuthenticated);
+            if (v32.C_UnwrapKeyAuthenticated != IntPtr.Zero)
+                C_UnwrapKeyAuthenticated = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyAuthenticatedDelegate>(v32.C_UnwrapKeyAuthenticated);
+        }
+
         return true;
     }
 
