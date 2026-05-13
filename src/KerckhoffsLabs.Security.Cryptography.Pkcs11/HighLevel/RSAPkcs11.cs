@@ -178,6 +178,9 @@ public sealed class RSAPkcs11 : RSA
     /// </summary>
     private static Mechanism SignMechanismFor(HashAlgorithmName hash, RSASignaturePadding padding)
     {
+        // CKM_SHA*_RSA_PKCS is intentionally not gated: Bleichenbacher applies to PKCS#1 v1.5
+        // *encryption*, not combined hash-and-sign; these mechanisms are widely deployed (JWT RS256 etc.)
+        // and are left available for interop. Prefer PSS for new code.
         if (padding == RSASignaturePadding.Pkcs1)
             return Pkcs11MechanismMap.RsaPkcs1Sign(hash);
         if (padding.Mode == RSASignaturePaddingMode.Pss)
@@ -187,6 +190,8 @@ public sealed class RSAPkcs11 : RSA
 
     private static Mechanism EncryptMechanismFor(RSAEncryptionPadding padding)
     {
+        // CKM_RSA_PKCS is gated by Session.GuardMechanism — Encrypt/Decrypt will throw
+        // InsecureOperationException unless the caller opts in via AllowInsecure.
         if (padding == RSAEncryptionPadding.Pkcs1)
             return new Mechanism(CKM.CKM_RSA_PKCS);
         if (padding.Mode == RSAEncryptionPaddingMode.Oaep)
