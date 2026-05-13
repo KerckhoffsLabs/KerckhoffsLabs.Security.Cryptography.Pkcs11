@@ -84,6 +84,47 @@ internal static class Pkcs11MechanismMap
     };
 
     /// <summary>
+    /// Returns a <see cref="Mechanism"/> for pure ML-DSA signing (CKM_ML_DSA, PKCS#11 v3.2)
+    /// with the supplied context bytes and hedge mode. The mechanism takes ownership of the
+    /// underlying parameter struct — dispose the returned <see cref="Mechanism"/> when done.
+    /// </summary>
+    /// <param name="hedgeVariant">Hedge mode. Default is <see cref="CkhHedge.CKH_HEDGE_PREFERRED"/> (per FIPS 204).</param>
+    /// <param name="context">Optional context bytes (max 255 per FIPS 204 §5.2.1).</param>
+    public static Mechanism MlDsaSign(
+        CkhHedge hedgeVariant = CkhHedge.CKH_HEDGE_PREFERRED,
+        ReadOnlySpan<byte> context = default)
+        => new(CKM.CKM_ML_DSA, new CkmPqcSignParams(hedgeVariant, context));
+
+    /// <summary>
+    /// Returns a <see cref="Mechanism"/> for HashML-DSA signing (CKM_HASH_ML_DSA_*,
+    /// PKCS#11 v3.2). Maps the BCL hash name to the matching combined-hash mechanism.
+    /// </summary>
+    /// <param name="hash">BCL hash algorithm name (SHA256, SHA384, SHA512, SHA3_256, SHA3_384, SHA3_512, SHAKE128, SHAKE256).</param>
+    /// <param name="hedgeVariant">Hedge mode.</param>
+    /// <param name="context">Optional context bytes (max 255).</param>
+    /// <exception cref="NotSupportedException">Unsupported hash.</exception>
+    public static Mechanism MlDsaHashSign(
+        HashAlgorithmName hash,
+        CkhHedge hedgeVariant = CkhHedge.CKH_HEDGE_PREFERRED,
+        ReadOnlySpan<byte> context = default)
+    {
+        var (ckm, innerHash) = hash.Name switch
+        {
+            "SHA224"    => (CKM.CKM_HASH_ML_DSA_SHA224,   CKM.CKM_SHA224),
+            "SHA256"    => (CKM.CKM_HASH_ML_DSA_SHA256,   CKM.CKM_SHA256),
+            "SHA384"    => (CKM.CKM_HASH_ML_DSA_SHA384,   CKM.CKM_SHA384),
+            "SHA512"    => (CKM.CKM_HASH_ML_DSA_SHA512,   CKM.CKM_SHA512),
+            "SHA3-224"  => (CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224),
+            "SHA3-256"  => (CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256),
+            "SHA3-384"  => (CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384),
+            "SHA3-512"  => (CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512),
+            _ => throw new NotSupportedException(
+                $"HashML-DSA does not support hash {hash.Name}."),
+        };
+        return new Mechanism(ckm, new CkmHashPqcSignParams(innerHash, hedgeVariant, context));
+    }
+
+    /// <summary>
     /// Returns a <see cref="Mechanism"/> for fixed-length HMAC (<c>CKM_SHA*_HMAC</c>) with the given hash.
     /// </summary>
     /// <remarks>

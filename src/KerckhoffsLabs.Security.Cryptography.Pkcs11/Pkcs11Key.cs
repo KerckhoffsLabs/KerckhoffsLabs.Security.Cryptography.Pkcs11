@@ -442,6 +442,55 @@ public sealed class Pkcs11Key : IDisposable
     }
 
     /// <summary>
+    /// Encapsulates a fresh shared-secret key against this key's public handle
+    /// (PKCS#11 v3.2 §5.18.10). Typically used with <see cref="CKM.CKM_ML_KEM"/>.
+    /// </summary>
+    /// <param name="mechanism">Encapsulation mechanism.</param>
+    /// <param name="sharedSecretTemplate">Template applied to the freshly-derived shared-secret key.</param>
+    /// <returns>Tuple of (ciphertext to send to the decapsulator, on-token <see cref="Pkcs11Key"/> wrapping the shared secret).</returns>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries, or <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable.</exception>
+    public (byte[] Ciphertext, Pkcs11Key SharedSecret) EncapsulateKey(
+        Mechanism mechanism,
+        ObjectTemplate sharedSecretTemplate)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
+
+        if (_publicHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.EncapsulateKey (no public handle)");
+
+        var (ct, sharedHandle) = _workspace.Session.EncapsulateKey(
+            mechanism, _publicHandle, sharedSecretTemplate.Attributes.ToList());
+        return (ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
+    }
+
+    /// <summary>
+    /// Decapsulates the shared-secret key from <paramref name="ciphertext"/> using this
+    /// key's private handle (PKCS#11 v3.2 §5.18.11).
+    /// </summary>
+    /// <returns>An on-token <see cref="Pkcs11Key"/> wrapping the recovered shared secret.</returns>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries, or <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no private handle is reachable.</exception>
+    public Pkcs11Key DecapsulateKey(
+        Mechanism mechanism,
+        ReadOnlySpan<byte> ciphertext,
+        ObjectTemplate sharedSecretTemplate)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
+
+        if (_privateHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.DecapsulateKey (no private handle)");
+
+        ObjectHandle sharedHandle = _workspace.Session.DecapsulateKey(
+            mechanism, _privateHandle, ciphertext, sharedSecretTemplate.Attributes.ToList());
+        return _workspace.HydrateExistingHandleAsKey(sharedHandle);
+    }
+
+    /// <summary>
     /// Derives a new key from this key.
     /// </summary>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
@@ -462,7 +511,8 @@ public sealed class Pkcs11Key : IDisposable
 
     private static bool IsAsymmetricKeyType(CKK keyType) => keyType switch
     {
-        CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_EC or CKK.CKK_EC_EDWARDS => true,
+        CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_EC or CKK.CKK_EC_EDWARDS
+            or CKK.CKK_ML_KEM or CKK.CKK_ML_DSA or CKK.CKK_SLH_DSA => true,
         _ => false,
     };
 

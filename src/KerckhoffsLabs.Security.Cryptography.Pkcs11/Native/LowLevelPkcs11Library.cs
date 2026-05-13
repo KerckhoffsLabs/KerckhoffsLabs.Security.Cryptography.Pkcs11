@@ -393,6 +393,21 @@ internal sealed class LowLevelPkcs11Library
            && _delegates.C_MessageDecryptFinal is not null;
 
     /// <summary>
+    /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
+    /// encapsulate/decapsulate, authenticated wrap/unwrap, signature-only verify, and
+    /// validation-flags inspection). False on v2.40 / v3.0 / v3.1 libraries.
+    /// </summary>
+    public bool IsV32ApiSupported
+        => _delegates is not null
+           && _delegates.C_EncapsulateKey is not null
+           && _delegates.C_DecapsulateKey is not null
+           && _delegates.C_WrapKeyAuthenticated is not null
+           && _delegates.C_UnwrapKeyAuthenticated is not null
+           && _delegates.C_VerifySignatureInit is not null
+           && _delegates.C_VerifySignature is not null
+           && _delegates.C_GetSessionValidationFlags is not null;
+
+    /// <summary>
     /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0 §5.6.7).
     /// </summary>
     /// <param name="session">The session's handle.</param>
