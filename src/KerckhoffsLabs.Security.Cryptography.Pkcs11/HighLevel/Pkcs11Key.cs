@@ -85,6 +85,25 @@ public sealed partial class Pkcs11Key : IDisposable
     /// <summary>Internal accessor for the public handle. <see cref="ObjectHandle.Invalid"/> when no companion exists and synthesis is unavailable.</summary>
     internal ObjectHandle PublicHandle => _publicHandle;
 
+    /// <summary>
+    /// Returns the synthesized RSA public parameters for this key when its public side
+    /// is reachable via attributes on the private-key object. Returns <c>null</c> if
+    /// the key already has a real <see cref="PublicHandle"/> (caller should use that
+    /// path instead), or when synthesis is unavailable (non-RSA key type, or
+    /// CKA_MODULUS/CKA_PUBLIC_EXPONENT marked sensitive).
+    /// </summary>
+    /// <remarks>
+    /// EC synthesis is added in Task 8.
+    /// </remarks>
+    internal System.Security.Cryptography.RSAParameters? GetSynthesizedRsaParameters()
+    {
+        if (_keyType != CKK.CKK_RSA) return null;
+        if (!_publicHandle.IsInvalid) return null;
+        if (_privateHandle.IsInvalid) return null;
+
+        return Pkcs11PublicKeyView.TrySynthesizeRsa(_workspace.Session, _privateHandle);
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
