@@ -77,15 +77,27 @@ public sealed class AesGcmPkcs11 : IDisposable
         if (ciphertext.Length != plaintext.Length)
             throw new ArgumentException("ciphertext length must equal plaintext length.", nameof(ciphertext));
 
-        using var mech = new Mechanism(CKM.CKM_AES_GCM,
-            new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
+        if (_key.SupportsMessageApi)
+        {
+            // PKCS#11 v3.0 message-mode path — tag is returned via params, not appended.
+            using var msgParams = CkmGcmMessageParams.ForEncrypt(nonce, tag.Length);
+            using var mech = new Mechanism(CKM.CKM_AES_GCM);
+            byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
+            if (ct.Length != plaintext.Length)
+                throw new InvalidOperationException(
+                    $"AES-GCM message encrypt returned {ct.Length} bytes; expected {plaintext.Length}.");
+            ct.CopyTo(ciphertext);
+            msgParams.CopyTagTo(tag);
+            return;
+        }
 
-        // Session.Encrypt returns ciphertext || tag concatenated.
-        byte[] result = _key.Encrypt(mech, plaintext);
+        // v2.40 fallback: ciphertext || tag concatenated.
+        using var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
+            new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
+        byte[] result = _key.Encrypt(legacyMech, plaintext);
         if (result.Length != plaintext.Length + tag.Length)
             throw new InvalidOperationException(
                 $"AES-GCM encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
-
         result.AsSpan(0, plaintext.Length).CopyTo(ciphertext);
         result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
     }
@@ -102,15 +114,25 @@ public sealed class AesGcmPkcs11 : IDisposable
         if (plaintext.Length != ciphertext.Length)
             throw new ArgumentException("plaintext length must equal ciphertext length.", nameof(plaintext));
 
-        using var mech = new Mechanism(CKM.CKM_AES_GCM,
-            new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
+        if (_key.SupportsMessageApi)
+        {
+            using var msgParams = CkmGcmMessageParams.ForDecrypt(nonce, tag);
+            using var mech = new Mechanism(CKM.CKM_AES_GCM);
+            byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
+            if (pt.Length != plaintext.Length)
+                throw new InvalidOperationException(
+                    $"AES-GCM message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
+            pt.CopyTo(plaintext);
+            return;
+        }
 
-        // PKCS#11 expects ciphertext || tag concatenated.
+        // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
+        using var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
+            new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
         byte[] combined = new byte[ciphertext.Length + tag.Length];
         ciphertext.CopyTo(combined);
         tag.CopyTo(combined.AsSpan(ciphertext.Length));
-
-        byte[] result = _key.Decrypt(mech, combined);
+        byte[] result = _key.Decrypt(legacyMech, combined);
         if (result.Length != plaintext.Length)
             throw new InvalidOperationException(
                 $"AES-GCM decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
