@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <summary>
 /// Logical reader that potentially contains a token
 /// </summary>
-public class Pkcs11Slot
+public sealed class Pkcs11Slot
 {
     /// <summary>
     /// Logger responsible for message logging

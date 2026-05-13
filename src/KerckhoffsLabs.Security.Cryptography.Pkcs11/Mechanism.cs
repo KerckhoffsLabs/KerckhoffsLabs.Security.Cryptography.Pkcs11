@@ -7,17 +7,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <summary>
 /// Mechanism and its parameters (CK_MECHANISM alternative)
 /// </summary>
-public class Mechanism : IDisposable
+public sealed class Mechanism : IDisposable
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
     /// </summary>
-    protected bool _disposed = false;
+    private bool _disposed = false;
 
     /// <summary>
     /// Low level mechanism structure
     /// </summary>
-    protected CK_MECHANISM _ckMechanism;
+    private CK_MECHANISM _ckMechanism;
 
     /// <summary>
     /// The type of mechanism
@@ -60,7 +60,7 @@ public class Mechanism : IDisposable
     /// <summary>
     /// High level object with mechanism parameters
     /// </summary>
-    protected IMechanismParams _mechanismParams = null;
+    private IMechanismParams _mechanismParams = null;
 
     /// <summary>
     /// Creates mechanism of given type with no parameter
@@ -149,7 +149,7 @@ public class Mechanism : IDisposable
     /// Disposes object
     /// </summary>
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         if (!_disposed)
         {

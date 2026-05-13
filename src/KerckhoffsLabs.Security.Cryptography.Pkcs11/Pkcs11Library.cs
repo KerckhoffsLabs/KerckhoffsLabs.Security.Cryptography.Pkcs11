@@ -10,12 +10,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <summary>
 /// High level PKCS#11 wrapper
 /// </summary>
-public class Pkcs11Library : IDisposable
+public sealed class Pkcs11Library : IDisposable
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
     /// </summary>
-    protected bool _disposed = false;
+    private bool _disposed = false;
 
     /// <summary>
     /// Logger responsible for message logging
@@ -25,7 +25,7 @@ public class Pkcs11Library : IDisposable
     /// <summary>
     /// Library name or path
     /// </summary>
-    protected string? _libraryPath = null;
+    private string? _libraryPath = null;
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -96,7 +96,7 @@ public class Pkcs11Library : IDisposable
     /// concurrently — callers in that mode are responsible for serializing
     /// access at the C# level.
     /// </remarks>
-    protected void Initialize()
+    private void Initialize()
     {
         _logger.LogDebug("Pkcs11Library({LibraryPath})::Initialize", _libraryPath);
 
@@ -274,7 +274,7 @@ public class Pkcs11Library : IDisposable
     /// Disposes object
     /// </summary>
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose2", _libraryPath);
 
