@@ -219,7 +219,7 @@ internal sealed partial class Pkcs11Session
                 int nestedAttrCountMod = (int)(template[i].valueLen) % ckAttributeSize;
 
                 if (nestedAttrCountMod != 0)
-                    throw new Exception("Unable to read attribute value as attribute array");
+                    throw new AttributeValueException((ulong)template[i].type);
 
                 if (nestedAttrCount == 0)
                 {

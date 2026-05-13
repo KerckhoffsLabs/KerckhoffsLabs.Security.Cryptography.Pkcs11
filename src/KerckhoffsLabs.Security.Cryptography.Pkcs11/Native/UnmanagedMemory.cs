@@ -104,7 +104,8 @@ internal static class UnmanagedMemory
                 }
                 else
                 {
-                    throw new Exception(string.Format("Already allocated {0} bytes at {1}", _allocations[memory], memory));
+                    throw new InvalidOperationException(
+                        $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
                 }
             }
         }
@@ -134,7 +135,8 @@ internal static class UnmanagedMemory
                 }
                 else
                 {
-                    throw new Exception(string.Format("Unable to free previously unallocated memory at {0}", memory));
+                    throw new InvalidOperationException(
+                        $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
                 }
             }
         }
