@@ -43,15 +43,15 @@ internal static class EncryptChaChaTestCases
 
             byte[] badNonce = new byte[8]; // must be 12
             byte[] plaintext = new byte[16];
-            ObjectHandle key = keyHandle;
+            ObjectHandle key = keyHandle.Value;
 
             Assert.Throws<ArgumentException>(() =>
                 session.EncryptChaCha20Poly1305(key, badNonce, plaintext));
         }
         finally
         {
-            if (keyHandle != null)
-                session.DestroyObject(keyHandle);
+            if (keyHandle.HasValue)
+                session.DestroyObject(keyHandle.Value);
             session.CloseSession();
         }
     }

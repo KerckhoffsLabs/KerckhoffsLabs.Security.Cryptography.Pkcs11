@@ -48,15 +48,15 @@ internal static class DecryptChaChaTestCases
 
             byte[] badNonce = new byte[8]; // must be 12
             byte[] ciphertextAndTag = new byte[32]; // plausible size
-            ObjectHandle key = keyHandle;
+            ObjectHandle key = keyHandle.Value;
 
             Assert.Throws<ArgumentException>(() =>
                 session.DecryptChaCha20Poly1305(key, badNonce, ciphertextAndTag));
         }
         finally
         {
-            if (keyHandle != null)
-                session.DestroyObject(keyHandle);
+            if (keyHandle.HasValue)
+                session.DestroyObject(keyHandle.Value);
             session.CloseSession();
         }
     }
@@ -81,15 +81,15 @@ internal static class DecryptChaChaTestCases
             }
 
             byte[] tooShort = new byte[15]; // one short of the minimum 16-byte tag
-            ObjectHandle key = keyHandle;
+            ObjectHandle key = keyHandle.Value;
 
             Assert.Throws<ArgumentException>(() =>
                 session.DecryptChaCha20Poly1305(key, ValidNonce12, tooShort));
         }
         finally
         {
-            if (keyHandle != null)
-                session.DestroyObject(keyHandle);
+            if (keyHandle.HasValue)
+                session.DestroyObject(keyHandle.Value);
             session.CloseSession();
         }
     }
