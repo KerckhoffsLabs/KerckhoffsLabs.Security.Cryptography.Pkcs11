@@ -89,6 +89,61 @@ public sealed partial class Pkcs11Workspace
     }
 
     /// <summary>
+    /// Generates a new asymmetric key pair using <c>C_GenerateKeyPair</c> and returns
+    /// it as a single <see cref="Pkcs11Key"/> carrying both handles.
+    /// </summary>
+    /// <param name="mechanism">Key-pair generation mechanism (e.g. <see cref="CKM.CKM_RSA_PKCS_KEY_PAIR_GEN"/>).</param>
+    /// <param name="privateTemplate">Template for the private key half.</param>
+    /// <param name="publicTemplate">Template for the public key half.</param>
+    public Pkcs11Key GenerateKey(
+        Mechanism mechanism,
+        ObjectTemplate privateTemplate,
+        ObjectTemplate publicTemplate)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(privateTemplate);
+        ArgumentNullException.ThrowIfNull(publicTemplate);
+
+        _session.GenerateKeyPair(
+            mechanism,
+            publicTemplate.Attributes.ToList(),
+            privateTemplate.Attributes.ToList(),
+            out var publicHandle,
+            out var privateHandle);
+
+        // Read identifying metadata off the private side — we already have both
+        // handles in hand so we bypass the companion-discovery lookup.
+        var attrs = _session.GetAttributeValue(privateHandle, new List<CKA>
+        {
+            CKA.CKA_KEY_TYPE,
+            CKA.CKA_LABEL,
+            CKA.CKA_ID,
+        });
+
+        try
+        {
+            var keyType = (CKK)attrs[0].GetValueAsUlong();
+            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+            byte[] id = attrs[2].CannotBeRead ? Array.Empty<byte>() : attrs[2].GetValueAsByteArray();
+
+            return new Pkcs11Key(
+                workspace: this,
+                privateHandle: privateHandle,
+                publicHandle: publicHandle,
+                keyType: keyType,
+                label: label,
+                id: id,
+                ownedLibrary: null,
+                ownsWorkspace: false);
+        }
+        finally
+        {
+            foreach (var a in attrs) a.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Hydrates an existing object handle into a Pkcs11Key (used after operations that
     /// produce a new on-token object — Unwrap, Derive).
     /// </summary>
