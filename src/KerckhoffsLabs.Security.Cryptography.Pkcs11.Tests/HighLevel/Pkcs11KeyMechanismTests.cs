@@ -80,6 +80,57 @@ internal static class Pkcs11KeyMechanismCases
             workspace.Session.DestroyObject(privHandle);
         }
     }
+
+    public static void Assert_AesKeyWrapUnwrap_RoundTrips(Pkcs11Workspace workspace)
+    {
+        string wrapperLabel = $"wrapper-{Guid.NewGuid():N}";
+        using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(wrapperLabel).ValueLen(32).Wrap().Unwrap().OnToken().Build())
+        {
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+                t.Attributes.ToList());
+        }
+
+        string targetLabel = $"target-{Guid.NewGuid():N}";
+        using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(targetLabel).ValueLen(16).Encrypt().Decrypt().Extractable().OnToken().Build())
+        {
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
+                t.Attributes.ToList());
+        }
+
+        try
+        {
+            using var wrapper = workspace.OpenKey(wrapperLabel);
+            using var target = workspace.OpenKey(targetLabel);
+
+            byte[] wrapped = wrapper.Wrap(new Mechanism(CKM.CKM_AES_KEY_WRAP), target);
+
+            using var unwrapTpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+                .Extractable().Encrypt().Decrypt().Build();
+            using var unwrapped = wrapper.Unwrap(
+                new Mechanism(CKM.CKM_AES_KEY_WRAP), wrapped, unwrapTpl);
+
+            Assert.False(unwrapped.PrivateHandle.IsInvalid);
+            Assert.Equal(CKK.CKK_AES, unwrapped.KeyType);
+        }
+        finally
+        {
+            CleanupByLabel(workspace, wrapperLabel);
+            CleanupByLabel(workspace, targetLabel);
+        }
+    }
+
+    private static void CleanupByLabel(Pkcs11Workspace workspace, string label)
+    {
+        using var filter = ObjectTemplate.Empty().Label(label).Build();
+        foreach (var k in workspace.FindKeys(filter))
+        {
+            var handle = k.PrivateHandle.IsInvalid ? k.PublicHandle : k.PrivateHandle;
+            workspace.Session.DestroyObject(handle);
+            k.Dispose();
+        }
+    }
 }
 
 [Collection("SoftHsm")]
@@ -105,5 +156,12 @@ public sealed class Pkcs11KeyMechanismTests_SoftHsm
     {
         using var workspace = OpenWorkspace();
         Pkcs11KeyMechanismCases.Assert_AesCbcEncryptDecrypt_RoundTrips(workspace);
+    }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void AesKeyWrap_WrapUnwrap_RoundTrip()
+    {
+        using var workspace = OpenWorkspace();
+        Pkcs11KeyMechanismCases.Assert_AesKeyWrapUnwrap_RoundTrips(workspace);
     }
 }

@@ -73,6 +73,13 @@ public sealed partial class Pkcs11Workspace
         return HydrateKeyFromHandle(handle);
     }
 
+    /// <summary>
+    /// Hydrates an existing object handle into a Pkcs11Key (used after operations that
+    /// produce a new on-token object — Unwrap, Derive).
+    /// </summary>
+    internal Pkcs11Key HydrateExistingHandleAsKey(ObjectHandle handle)
+        => HydrateKeyFromHandle(handle);
+
     private Pkcs11Key OpenKeyByFilter(ObjectTemplate filter, string queryDescription)
     {
         var handles = _session.FindAllObjects(filter.Attributes.ToList());

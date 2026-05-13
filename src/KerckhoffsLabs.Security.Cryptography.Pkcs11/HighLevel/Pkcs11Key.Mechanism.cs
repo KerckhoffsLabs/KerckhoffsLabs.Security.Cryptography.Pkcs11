@@ -99,6 +99,76 @@ public sealed partial class Pkcs11Key
         return _workspace.Session.Decrypt(mechanism, _privateHandle, ciphertext);
     }
 
+    /// <summary>
+    /// Wraps <paramref name="targetKey"/> with this key. This key is the wrapper; the
+    /// target's private (or symmetric) handle is consumed by the wrap operation.
+    /// </summary>
+    /// <param name="mechanism">The wrap mechanism (e.g. <see cref="CKM.CKM_AES_KEY_WRAP"/>).</param>
+    /// <param name="targetKey">The key being wrapped. Must carry a private/symmetric handle.</param>
+    /// <returns>The wrapped key bytes — opaque blob to be transported / stored.</returns>
+    public byte[] Wrap(Mechanism mechanism, Pkcs11Key targetKey)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(targetKey);
+
+        ObjectHandle wrapHandle = IsAsymmetricKeyType(_keyType) ? _publicHandle : _privateHandle;
+        if (wrapHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Wrap (wrapping-key handle unavailable)");
+
+        ObjectHandle targetHandle = targetKey._privateHandle.IsInvalid
+            ? targetKey._publicHandle
+            : targetKey._privateHandle;
+        if (targetHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Wrap (target-key handle unavailable)");
+
+        return _workspace.Session.WrapKey(mechanism, wrapHandle, targetHandle);
+    }
+
+    /// <summary>
+    /// Unwraps the byte blob <paramref name="wrappedBytes"/> using this key as the
+    /// unwrapping key, into a new on-token object described by
+    /// <paramref name="template"/>.
+    /// </summary>
+    /// <returns>A new <see cref="Pkcs11Key"/> wrapping the unwrapped object.</returns>
+    public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(template);
+
+        ObjectHandle unwrapHandle = _privateHandle.IsInvalid ? _publicHandle : _privateHandle;
+        if (unwrapHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Unwrap (unwrapping-key handle unavailable)");
+
+        ObjectHandle resulting = _workspace.Session.UnwrapKey(
+            mechanism, unwrapHandle, wrappedBytes, template.Attributes.ToList());
+
+        return _workspace.HydrateExistingHandleAsKey(resulting);
+    }
+
+    /// <summary>
+    /// Derives a new key from this key.
+    /// </summary>
+    public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        ArgumentNullException.ThrowIfNull(template);
+
+        ObjectHandle baseHandle = _privateHandle.IsInvalid ? _publicHandle : _privateHandle;
+        if (baseHandle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.Derive (base-key handle unavailable)");
+
+        ObjectHandle resulting = _workspace.Session.DeriveKey(
+            mechanism, baseHandle, template.Attributes.ToList());
+        return _workspace.HydrateExistingHandleAsKey(resulting);
+    }
+
     private static bool IsAsymmetricKeyType(CKK keyType) => keyType switch
     {
         CKK.CKK_RSA or CKK.CKK_DSA or CKK.CKK_EC or CKK.CKK_EC_EDWARDS => true,
