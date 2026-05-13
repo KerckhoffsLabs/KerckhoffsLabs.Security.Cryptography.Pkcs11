@@ -203,6 +203,50 @@ public class Pkcs11Library : IDisposable
         }
     }
 
+    /// <summary>
+    /// Opens an authenticated workspace against the slot whose token label matches
+    /// <paramref name="slotLabel"/>.
+    /// </summary>
+    /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
+    /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
+    /// <param name="userType">The PKCS#11 user type to log in as.</param>
+    /// <param name="pin">The PIN. The workspace does not retain the PIN past construction.</param>
+    /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
+    public Pkcs11Workspace OpenWorkspace(string slotLabel, CKU userType, Security.SecurePin pin)
+    {
+        ArgumentNullException.ThrowIfNull(slotLabel);
+        ArgumentNullException.ThrowIfNull(pin);
+
+        Slot? matched = null;
+        foreach (var slot in GetSlotList(SlotsType.WithTokenPresent))
+        {
+            if (slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
+            {
+                matched = slot;
+                break;
+            }
+        }
+
+        if (matched is null)
+            throw new ArgumentException(
+                $"No slot found with token label '{slotLabel}'.", nameof(slotLabel));
+
+        var session = matched.OpenSession(SessionType.ReadWrite);
+        try
+        {
+            session.Login(userType, pin);
+            return new Pkcs11Workspace(this, matched, session);
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
+    }
+
     #region IDisposable
 
     /// <summary>
