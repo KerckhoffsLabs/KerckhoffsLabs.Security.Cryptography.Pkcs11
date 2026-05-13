@@ -38,6 +38,21 @@ public sealed class AesGcmPkcs11 : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private static void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, int tagLength)
+    {
+        var nonceSizes = NonceByteSizes;
+        if (nonce.Length < nonceSizes.MinSize || nonce.Length > nonceSizes.MaxSize)
+            throw new ArgumentException(
+                $"Nonce length must be between {nonceSizes.MinSize} and {nonceSizes.MaxSize} bytes; got {nonce.Length}.",
+                nameof(nonce));
+
+        var tagSizes = TagByteSizes;
+        if (tagLength < tagSizes.MinSize || tagLength > tagSizes.MaxSize)
+            throw new ArgumentException(
+                $"Tag length must be between {tagSizes.MinSize} and {tagSizes.MaxSize} bytes; got {tagLength}.",
+                nameof(tagLength));
+    }
+
     public void Encrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> plaintext,
@@ -46,6 +61,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         ReadOnlySpan<byte> associatedData = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ValidateNonceAndTag(nonce, tag.Length);
         if (ciphertext.Length != plaintext.Length)
             throw new ArgumentException("ciphertext length must equal plaintext length.", nameof(ciphertext));
 
@@ -70,6 +86,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         ReadOnlySpan<byte> associatedData = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ValidateNonceAndTag(nonce, tag.Length);
         if (plaintext.Length != ciphertext.Length)
             throw new ArgumentException("plaintext length must equal ciphertext length.", nameof(plaintext));
 
