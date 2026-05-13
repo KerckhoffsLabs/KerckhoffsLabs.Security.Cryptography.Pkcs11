@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 /// <summary>
 /// An immutable, owning collection of <see cref="ObjectAttribute"/> values describing a

@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 /// <summary>
 /// Fluent builder for a data-object template (CKO_DATA).

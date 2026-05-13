@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 /// <summary>
 /// Fluent builder for an empty <see cref="ObjectTemplate"/> with no preset attributes.
