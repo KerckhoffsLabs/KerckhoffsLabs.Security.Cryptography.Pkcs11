@@ -135,6 +135,42 @@ public sealed class AesCcmPkcs11Tests_SoftHsm
     }
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Encrypt_TagWrongStep_Throws()
+    {
+        using var workspace = _backend.Library.OpenWorkspace(
+            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+
+        string label = $"ccm-tagstep-{Guid.NewGuid():N}";
+        using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
+        {
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t.Attributes.ToList());
+        }
+        try
+        {
+            using var key = workspace.OpenKey(label);
+            using var ccm = new AesCcmPkcs11(key);
+
+            byte[] nonce = new byte[12];
+            byte[] plaintext = new byte[8];
+            byte[] ciphertext = new byte[8];
+            byte[] oddTag = new byte[5]; // 5 bytes — in [4,16] but violates SkipSize=2
+
+            Assert.Throws<ArgumentException>(() =>
+                ccm.Encrypt(nonce, plaintext, ciphertext, oddTag));
+        }
+        finally
+        {
+            using var f = ObjectTemplate.Empty().Label(label).Build();
+            foreach (var k in workspace.FindKeys(f))
+            {
+                workspace.Session.DestroyObject(k.PrivateHandle);
+                k.Dispose();
+            }
+        }
+    }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
     public void Decrypt_TamperedTag_Throws()
     {
         using var workspace = _backend.Library.OpenWorkspace(

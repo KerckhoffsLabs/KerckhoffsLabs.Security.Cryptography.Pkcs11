@@ -34,22 +34,25 @@ public sealed class AesCcmPkcs11 : IDisposable
     /// </summary>
     public void Dispose()
     {
+        if (_disposed) return;
         _disposed = true;
         GC.SuppressFinalize(this);
     }
 
     private static void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, int tagLength)
     {
-        var nonceSizes = NonceByteSizes;
-        if (nonce.Length < nonceSizes.MinSize || nonce.Length > nonceSizes.MaxSize)
+        var ns = NonceByteSizes;
+        if (nonce.Length < ns.MinSize || nonce.Length > ns.MaxSize
+            || (ns.SkipSize > 0 && (nonce.Length - ns.MinSize) % ns.SkipSize != 0))
             throw new ArgumentException(
-                $"Nonce length must be between {nonceSizes.MinSize} and {nonceSizes.MaxSize} bytes; got {nonce.Length}.",
+                $"Nonce length must be between {ns.MinSize} and {ns.MaxSize} bytes (step {ns.SkipSize}); got {nonce.Length}.",
                 nameof(nonce));
 
-        var tagSizes = TagByteSizes;
-        if (tagLength < tagSizes.MinSize || tagLength > tagSizes.MaxSize)
+        var ts = TagByteSizes;
+        if (tagLength < ts.MinSize || tagLength > ts.MaxSize
+            || (ts.SkipSize > 0 && (tagLength - ts.MinSize) % ts.SkipSize != 0))
             throw new ArgumentException(
-                $"Tag length must be between {tagSizes.MinSize} and {tagSizes.MaxSize} bytes; got {tagLength}.",
+                $"Tag length must be between {ts.MinSize} and {ts.MaxSize} bytes (step {ts.SkipSize}); got {tagLength}.",
                 nameof(tagLength));
     }
 
