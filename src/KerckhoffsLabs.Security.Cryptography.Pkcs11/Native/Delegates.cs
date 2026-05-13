@@ -62,6 +62,14 @@ internal delegate NativeCULong C_SetOperationStateDelegate(NativeCULong session,
 internal delegate NativeCULong C_LoginDelegate(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen);
 
 /// <summary>
+/// C_GetInterface was added in PKCS#11 v3.0 — returns a typed function-list interface
+/// the application can use, allowing the token to expose newer or vendor-specific
+/// function tables independently of the legacy C_GetFunctionList path.
+/// </summary>
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetInterfaceDelegate(byte[]? interfaceName, IntPtr version, out IntPtr interfacePtr, NativeCULong flags);
+
+/// <summary>
 /// C_LoginUser was added in PKCS#11 v3.0 — logs in by both user type and a free-form
 /// username, supporting HSMs with named user accounts beyond the SO/User dichotomy.
 /// </summary>
@@ -738,13 +746,21 @@ internal partial class Delegates
     }
 
     /// <summary>
-    /// Best-effort: bind v3.0 function pointers obtained by direct symbol lookup
-    /// against the loaded library. Symbols missing from a v2.40 token are left
-    /// <see langword="null"/>; high-level methods then report
-    /// <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/>.
+    /// Best-effort: bind v3.0 function pointers. Preferred path is C_GetInterface
+    /// (v3.0 §5.4.5) which yields a typed CK_FUNCTION_LIST_3_0 carrying every v2.40
+    /// pointer plus the v3.0 additions. Fallback path: per-symbol NativeLibrary lookup
+    /// against the dynamically loaded library — handles v2.40 tokens (delegates stay
+    /// <see langword="null"/>) and v3.0 tokens that export individual symbols but
+    /// don't publish the interface table.
     /// </summary>
     private void TryLoadV30Symbols(IntPtr libraryHandle)
     {
+        // Preferred: ask the library for its v3.0 interface table.
+        if (TryLoadFromGetInterface(libraryHandle))
+            return;
+
+        // Fallback: per-symbol lookup. Works for libraries that export the v3.0
+        // functions as plain symbols even though they don't expose C_GetInterface.
         C_LoginUser = TryGetDelegate<C_LoginUserDelegate>(libraryHandle, "C_LoginUser");
         C_SessionCancel = TryGetDelegate<C_SessionCancelDelegate>(libraryHandle, "C_SessionCancel");
         C_MessageEncryptInit = TryGetDelegate<C_MessageEncryptInitDelegate>(libraryHandle, "C_MessageEncryptInit");
@@ -774,6 +790,98 @@ internal partial class Delegates
         if (NativeLibrary.TryGetExport(libraryHandle, symbol, out IntPtr fnPtr) && fnPtr != IntPtr.Zero)
             return Marshal.GetDelegateForFunctionPointer<T>(fnPtr);
         return null;
+    }
+
+    /// <summary>
+    /// Tries the preferred v3.0 loader path: call C_GetInterface to obtain the default
+    /// "PKCS 11" interface, then read its function table as <see cref="CK_FUNCTION_LIST_3_0"/>
+    /// and bind every v3.0 delegate from the table. Returns true on success, false if
+    /// C_GetInterface is unavailable / fails / returns a non-3.x version, leaving the
+    /// caller to use the per-symbol fallback.
+    /// </summary>
+    private bool TryLoadFromGetInterface(IntPtr libraryHandle)
+    {
+        var getInterface = TryGetDelegate<C_GetInterfaceDelegate>(libraryHandle, "C_GetInterface");
+        if (getInterface is null) return false;
+
+        // Request the default interface: null name, null version, flags = 0.
+        IntPtr interfacePtr;
+        NativeCULong rv;
+        try
+        {
+            rv = getInterface(null, IntPtr.Zero, out interfacePtr, new NativeCULong(0));
+        }
+        catch
+        {
+            return false;
+        }
+
+        if (rv.ToCKRChecked() != CKR.CKR_OK || interfacePtr == IntPtr.Zero)
+            return false;
+
+        CK_INTERFACE iface = (CK_INTERFACE)UnmanagedMemory.Read(interfacePtr, typeof(CK_INTERFACE));
+        if (iface.FunctionList == IntPtr.Zero)
+            return false;
+
+        // The function-list pointer can be either CK_FUNCTION_LIST (v2.40) or
+        // CK_FUNCTION_LIST_3_0 (v3.0+). The CK_VERSION header at offset 0 distinguishes
+        // them. Read just the version first to decide.
+        CK_VERSION version = (CK_VERSION)UnmanagedMemory.Read(iface.FunctionList, typeof(CK_VERSION));
+        if (version.Major is null || version.Major.Length == 0 || version.Major[0] < 3) return false;
+
+        CK_FUNCTION_LIST_3_0 v30 = (CK_FUNCTION_LIST_3_0)UnmanagedMemory.Read(
+            iface.FunctionList, typeof(CK_FUNCTION_LIST_3_0));
+
+        if (v30.C_LoginUser != IntPtr.Zero)
+            C_LoginUser = Marshal.GetDelegateForFunctionPointer<C_LoginUserDelegate>(v30.C_LoginUser);
+        if (v30.C_SessionCancel != IntPtr.Zero)
+            C_SessionCancel = Marshal.GetDelegateForFunctionPointer<C_SessionCancelDelegate>(v30.C_SessionCancel);
+
+        if (v30.C_MessageEncryptInit != IntPtr.Zero)
+            C_MessageEncryptInit = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptInitDelegate>(v30.C_MessageEncryptInit);
+        if (v30.C_EncryptMessage != IntPtr.Zero)
+            C_EncryptMessage = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageDelegate>(v30.C_EncryptMessage);
+        if (v30.C_EncryptMessageBegin != IntPtr.Zero)
+            C_EncryptMessageBegin = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageBeginDelegate>(v30.C_EncryptMessageBegin);
+        if (v30.C_EncryptMessageNext != IntPtr.Zero)
+            C_EncryptMessageNext = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageNextDelegate>(v30.C_EncryptMessageNext);
+        if (v30.C_MessageEncryptFinal != IntPtr.Zero)
+            C_MessageEncryptFinal = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptFinalDelegate>(v30.C_MessageEncryptFinal);
+
+        if (v30.C_MessageDecryptInit != IntPtr.Zero)
+            C_MessageDecryptInit = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptInitDelegate>(v30.C_MessageDecryptInit);
+        if (v30.C_DecryptMessage != IntPtr.Zero)
+            C_DecryptMessage = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageDelegate>(v30.C_DecryptMessage);
+        if (v30.C_DecryptMessageBegin != IntPtr.Zero)
+            C_DecryptMessageBegin = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageBeginDelegate>(v30.C_DecryptMessageBegin);
+        if (v30.C_DecryptMessageNext != IntPtr.Zero)
+            C_DecryptMessageNext = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageNextDelegate>(v30.C_DecryptMessageNext);
+        if (v30.C_MessageDecryptFinal != IntPtr.Zero)
+            C_MessageDecryptFinal = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptFinalDelegate>(v30.C_MessageDecryptFinal);
+
+        if (v30.C_MessageSignInit != IntPtr.Zero)
+            C_MessageSignInit = Marshal.GetDelegateForFunctionPointer<C_MessageSignInitDelegate>(v30.C_MessageSignInit);
+        if (v30.C_SignMessage != IntPtr.Zero)
+            C_SignMessage = Marshal.GetDelegateForFunctionPointer<C_SignMessageDelegate>(v30.C_SignMessage);
+        if (v30.C_SignMessageBegin != IntPtr.Zero)
+            C_SignMessageBegin = Marshal.GetDelegateForFunctionPointer<C_SignMessageBeginDelegate>(v30.C_SignMessageBegin);
+        if (v30.C_SignMessageNext != IntPtr.Zero)
+            C_SignMessageNext = Marshal.GetDelegateForFunctionPointer<C_SignMessageNextDelegate>(v30.C_SignMessageNext);
+        if (v30.C_MessageSignFinal != IntPtr.Zero)
+            C_MessageSignFinal = Marshal.GetDelegateForFunctionPointer<C_MessageSignFinalDelegate>(v30.C_MessageSignFinal);
+
+        if (v30.C_MessageVerifyInit != IntPtr.Zero)
+            C_MessageVerifyInit = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyInitDelegate>(v30.C_MessageVerifyInit);
+        if (v30.C_VerifyMessage != IntPtr.Zero)
+            C_VerifyMessage = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageDelegate>(v30.C_VerifyMessage);
+        if (v30.C_VerifyMessageBegin != IntPtr.Zero)
+            C_VerifyMessageBegin = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageBeginDelegate>(v30.C_VerifyMessageBegin);
+        if (v30.C_VerifyMessageNext != IntPtr.Zero)
+            C_VerifyMessageNext = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageNextDelegate>(v30.C_VerifyMessageNext);
+        if (v30.C_MessageVerifyFinal != IntPtr.Zero)
+            C_MessageVerifyFinal = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyFinalDelegate>(v30.C_MessageVerifyFinal);
+
+        return true;
     }
 
     /// <summary>
