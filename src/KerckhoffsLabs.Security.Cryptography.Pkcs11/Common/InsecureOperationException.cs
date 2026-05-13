@@ -22,4 +22,15 @@ public sealed class InsecureOperationException : Exception
     {
         Mechanism = mechanism;
     }
+
+    /// <summary>
+    /// Initializes a new <see cref="InsecureOperationException"/> for operation-level security
+    /// refusals that are not tied to a specific PKCS#11 mechanism (e.g. refusing to export
+    /// private key material from a non-extractable key).
+    /// </summary>
+    /// <param name="message">Human-readable explanation of why the operation was refused.</param>
+    public InsecureOperationException(string message)
+        : base(message)
+    {
+    }
 }
