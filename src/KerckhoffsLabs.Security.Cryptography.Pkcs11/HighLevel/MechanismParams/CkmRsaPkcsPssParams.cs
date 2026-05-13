@@ -48,6 +48,15 @@ public sealed class CkmRsaPkcsPssParams : IMechanismParams
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>Hash algorithm used in the PSS encoding.</summary>
+    public CKM HashAlg => _lowLevelParams.HashAlg.ToCKM();
+
+    /// <summary>Mask generation function.</summary>
+    public CKG Mgf => _lowLevelParams.Mgf.ToCKG();
+
+    /// <summary>Salt length in bytes.</summary>
+    public int SaltLength => (int)(ulong)_lowLevelParams.Len;
+
     /// <summary>No-op finalizer for symmetry with the other params wrappers; this type owns no unmanaged memory.</summary>
     ~CkmRsaPkcsPssParams() => Dispose();
 }

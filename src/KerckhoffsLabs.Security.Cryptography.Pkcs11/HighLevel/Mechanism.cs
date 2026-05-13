@@ -32,6 +32,19 @@ public class Mechanism : IDisposable
     }
 
     /// <summary>
+    /// Exposes the high-level mechanism parameters for test inspection (visible to the test assembly via InternalsVisibleTo).
+    /// Returns <c>null</c> when the mechanism was constructed without parameters.
+    /// </summary>
+    internal IMechanismParams? Parameters
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _mechanismParams;
+        }
+    }
+
+    /// <summary>
     /// Returns managed object corresponding to CK_MECHANISM structure that can be marshaled to an unmanaged block of memory
     /// </summary>
     /// <returns>A managed object holding the data to be marshaled. This object must be an instance of a formatted class.</returns>

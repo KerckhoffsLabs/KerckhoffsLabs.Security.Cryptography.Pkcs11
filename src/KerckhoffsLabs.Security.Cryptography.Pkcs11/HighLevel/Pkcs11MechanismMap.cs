@@ -84,11 +84,15 @@ internal static class Pkcs11MechanismMap
     };
 
     /// <summary>
-    /// Returns a <see cref="Mechanism"/> for HMAC with the given hash.
+    /// Returns a <see cref="Mechanism"/> for fixed-length HMAC (<c>CKM_SHA*_HMAC</c>) with the given hash.
     /// </summary>
+    /// <remarks>
+    /// This returns the fixed-output-length variant. For the variable-length variant
+    /// (<c>CKM_SHA*_HMAC_GENERAL</c>), use a different overload that accepts a truncation length.
+    /// </remarks>
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA256, SHA384, SHA512).</param>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
-    public static Mechanism HmacGeneral(HashAlgorithmName hash) => hash.Name switch
+    public static Mechanism Hmac(HashAlgorithmName hash) => hash.Name switch
     {
         "SHA1"   => new Mechanism(CKM.CKM_SHA_1_HMAC),
         "SHA256" => new Mechanism(CKM.CKM_SHA256_HMAC),

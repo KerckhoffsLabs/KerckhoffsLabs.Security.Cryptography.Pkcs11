@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel.MechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
 
@@ -29,6 +30,36 @@ public sealed class Pkcs11MechanismMapTests
     }
 
     [Theory]
+    [InlineData("SHA1",   CKM.CKM_SHA_1,  CKG.CKG_MGF1_SHA1,   20)]
+    [InlineData("SHA256", CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32)]
+    [InlineData("SHA384", CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, 48)]
+    [InlineData("SHA512", CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, 64)]
+    public void RsaPss_DefaultSalt_PssParamsAreCorrect(
+        string hashName, CKM expectedInnerHash, CKG expectedMgf, int expectedSalt)
+    {
+        using var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
+        var pssParams = Assert.IsType<CkmRsaPkcsPssParams>(mech.Parameters);
+        Assert.Equal(expectedInnerHash, pssParams.HashAlg);
+        Assert.Equal(expectedMgf,       pssParams.Mgf);
+        Assert.Equal(expectedSalt,      pssParams.SaltLength);
+    }
+
+    [Theory]
+    [InlineData("SHA1",   CKM.CKM_SHA_1,  CKG.CKG_MGF1_SHA1)]
+    [InlineData("SHA256", CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)]
+    [InlineData("SHA384", CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384)]
+    [InlineData("SHA512", CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512)]
+    public void RsaOaep_HashToCkm_ReturnsExpectedWithParams(
+        string hashName, CKM expectedInnerHash, CKG expectedMgf)
+    {
+        using var mech = Pkcs11MechanismMap.RsaOaep(new HashAlgorithmName(hashName));
+        Assert.Equal((ulong)CKM.CKM_RSA_PKCS_OAEP, mech.Type);
+        var oaepParams = Assert.IsType<CkmRsaPkcsOaepParams>(mech.Parameters);
+        Assert.Equal(expectedInnerHash, oaepParams.HashAlg);
+        Assert.Equal(expectedMgf,       oaepParams.Mgf);
+    }
+
+    [Theory]
     [InlineData("SHA1",   (ulong)CKM.CKM_ECDSA_SHA1)]
     [InlineData("SHA256", (ulong)CKM.CKM_ECDSA_SHA256)]
     [InlineData("SHA384", (ulong)CKM.CKM_ECDSA_SHA384)]
@@ -47,16 +78,9 @@ public sealed class Pkcs11MechanismMapTests
     }
 
     [Fact]
-    public void RsaOaep_BuildsMechanismWithParams()
-    {
-        using var mech = Pkcs11MechanismMap.RsaOaep(HashAlgorithmName.SHA256);
-        Assert.Equal((ulong)CKM.CKM_RSA_PKCS_OAEP, mech.Type);
-    }
-
-    [Fact]
     public void HmacHash_HashToCkm_ReturnsExpected()
     {
-        using var mech = Pkcs11MechanismMap.HmacGeneral(HashAlgorithmName.SHA256);
+        using var mech = Pkcs11MechanismMap.Hmac(HashAlgorithmName.SHA256);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, mech.Type);
     }
 }

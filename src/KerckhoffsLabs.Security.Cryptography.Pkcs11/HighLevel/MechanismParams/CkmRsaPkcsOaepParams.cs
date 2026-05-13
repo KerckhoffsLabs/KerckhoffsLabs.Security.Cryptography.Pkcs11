@@ -56,6 +56,12 @@ public sealed class CkmRsaPkcsOaepParams : IMechanismParams
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>Hash algorithm used in the OAEP encoding.</summary>
+    public CKM HashAlg => _lowLevelParams.HashAlg.ToCKM();
+
+    /// <summary>Mask generation function.</summary>
+    public CKG Mgf => _lowLevelParams.Mgf.ToCKG();
+
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
     ~CkmRsaPkcsOaepParams() => Dispose();
 }
