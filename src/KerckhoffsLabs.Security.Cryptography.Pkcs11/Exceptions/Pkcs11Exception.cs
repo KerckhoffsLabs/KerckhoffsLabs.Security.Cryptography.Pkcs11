@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Base type for exceptions raised in response to a non-CKR_OK return value from a

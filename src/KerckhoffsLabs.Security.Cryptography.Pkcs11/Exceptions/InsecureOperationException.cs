@@ -1,4 +1,5 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Thrown when an operation uses a mechanism the library considers insecure by default,

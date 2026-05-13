@@ -1,4 +1,7 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 /// <summary>
 /// Routes a non-CKR_OK return value to the typed <see cref="Pkcs11Exception"/> subclass

@@ -1,4 +1,5 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Raised when a PKCS#11 call fails with a token- or device-related return value

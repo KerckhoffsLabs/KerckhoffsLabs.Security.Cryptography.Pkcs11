@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 // Licensed under the MIT License
 
 using KerckhoffsLabs.Runtime.InteropServices;

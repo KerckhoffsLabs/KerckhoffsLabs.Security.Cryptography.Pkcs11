@@ -1,4 +1,4 @@
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Thrown when a raw integer value coming from a PKCS#11 module cannot be

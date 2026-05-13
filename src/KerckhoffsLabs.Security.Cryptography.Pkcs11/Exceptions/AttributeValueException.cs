@@ -1,6 +1,7 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using System.Runtime.Serialization;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Exception with the name of PKCS#11 attribute whose value could not be read or converted
