@@ -3,7 +3,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Thrown when an operation uses a mechanism the library considers insecure by default,
-/// unless the caller has opted in via <c>Session.AllowInsecure = true</c>. Covers RSA
+/// unless the caller has opted in via <c>Pkcs11Session.AllowInsecure = true</c>. Covers RSA
 /// PKCS#1 v1.5 padding (for both encryption and signature), MD5 and SHA-1 (raw and in RSA
 /// signature contexts), DES/3DES (encryption and MAC), and AES-ECB.
 /// </summary>
@@ -19,7 +19,7 @@ public sealed class InsecureOperationException : Exception
     /// <param name="suggestion">A short pointer to the modern alternative, included in the message.</param>
     public InsecureOperationException(CKM mechanism, string suggestion)
         : base($"Mechanism {mechanism} is disallowed by default. {suggestion} " +
-               $"To bypass, set Session.AllowInsecure = true before invoking the operation.")
+               $"To bypass, set Pkcs11Session.AllowInsecure = true before invoking the operation.")
     {
         Mechanism = mechanism;
     }

@@ -7,9 +7,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
-public partial class Session
+internal sealed partial class Pkcs11Session
 {
     /// <summary>
     /// Generates a secret key or set of domain parameters, creating a new object

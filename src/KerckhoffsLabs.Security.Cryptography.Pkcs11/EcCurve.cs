@@ -1,8 +1,8 @@
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Named curves supported by the <see cref="Session.GenerateEcKeyPair"/> secure helper.
-/// Vendor-specific or less common curves can still be generated via <see cref="Session.GenerateKeyPair"/>
+/// Named curves supported by the <see cref="Pkcs11Workspace.GenerateEcKeyPair"/> secure helper.
+/// Vendor-specific or less common curves can still be generated via <see cref="Pkcs11Workspace.GenerateKeyPair"/>
 /// with an explicit <c>CKA_EC_PARAMS</c> attribute.
 /// </summary>
 public enum EcCurve

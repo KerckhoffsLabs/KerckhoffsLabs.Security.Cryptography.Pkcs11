@@ -8,9 +8,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
-public partial class Session
+internal sealed partial class Pkcs11Session
 {
     /// <summary>
     /// Derives a key from a base key, creating a new key object

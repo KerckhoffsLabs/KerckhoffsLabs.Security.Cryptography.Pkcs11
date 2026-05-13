@@ -1,5 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -191,7 +191,7 @@ public class Pkcs11Slot
     /// </summary>
     /// <param name="sessionType">Type of session to be opened</param>
     /// <returns>Session</returns>
-    public Session OpenSession(SessionType sessionType)
+    internal Pkcs11Session OpenSession(SessionType sessionType)
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::OpenSession", _slotId);
 
@@ -206,14 +206,14 @@ public class Pkcs11Slot
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Opened {SessionType} session {SessionId} with token in slot {SlotId}", Pkcs11LogUtils.ToString(sessionType), sessionId, _slotId);
 
-        return new Session(_pkcs11Library, (ulong)sessionId);
+        return new Pkcs11Session(_pkcs11Library, (ulong)sessionId);
     }
 
     /// <summary>
     /// Closes a session between an application and a token
     /// </summary>
     /// <param name="session">Session</param>
-    public void CloseSession(Session session)
+    internal void CloseSession(Pkcs11Session session)
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::CloseSession", _slotId);
 

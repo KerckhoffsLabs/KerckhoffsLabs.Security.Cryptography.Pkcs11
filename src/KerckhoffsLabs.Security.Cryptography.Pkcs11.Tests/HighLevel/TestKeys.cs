@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
@@ -13,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel;
 /// </summary>
 internal static class TestKeys
 {
-    public static ObjectHandle CreateAes256Key(Session session, byte[] rawKey)
+    public static ObjectHandle CreateAes256Key(Pkcs11Session session, byte[] rawKey)
     {
         if (rawKey.Length != 32)
             throw new ArgumentException("AES-256 key must be 32 bytes.", nameof(rawKey));
@@ -30,7 +31,7 @@ internal static class TestKeys
         return session.CreateObject(template);
     }
 
-    public static ObjectHandle CreateChaCha20Key(Session session, byte[] rawKey)
+    public static ObjectHandle CreateChaCha20Key(Pkcs11Session session, byte[] rawKey)
     {
         if (rawKey.Length != 32)
             throw new ArgumentException("ChaCha20 key must be 32 bytes.", nameof(rawKey));
@@ -50,7 +51,7 @@ internal static class TestKeys
     /// <summary>
     /// Opens a R/W session on the backend's slot, logs in as USER, returns it. Caller disposes.
     /// </summary>
-    public static Session OpenLoggedInSession(IPkcs11Backend backend)
+    public static Pkcs11Session OpenLoggedInSession(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList(SlotsType.WithTokenPresent)
             .First(s => (NativeCULong)s.SlotId == backend.SlotId);
@@ -64,7 +65,7 @@ internal static class TestKeys
     /// Generates an RSA-2048 key pair as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048KeyPair(Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048KeyPair(Pkcs11Session session)
     {
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
@@ -96,7 +97,7 @@ internal static class TestKeys
     /// Generates an RSA-2048 key pair configured for sign/verify (CKA_SIGN + CKA_VERIFY) as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048SigningKeyPair(Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048SigningKeyPair(Pkcs11Session session)
     {
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
@@ -124,7 +125,7 @@ internal static class TestKeys
     /// Generates an EC key pair on the P-256 (secp256r1) curve as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcP256KeyPair(Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcP256KeyPair(Pkcs11Session session)
     {
         using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
 
@@ -155,7 +156,7 @@ internal static class TestKeys
     /// Generates an Ed25519 key pair as session objects.
     /// Returns (publicHandle, privateHandle). Requires SoftHSM2 2.6+; not supported by pkcs11-mock.
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd25519KeyPair(Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd25519KeyPair(Pkcs11Session session)
     {
         using var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
 
@@ -186,7 +187,7 @@ internal static class TestKeys
     /// Generates an Ed448 key pair as session objects.
     /// Returns (publicHandle, privateHandle). Requires SoftHSM2 2.6+; not supported by pkcs11-mock.
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd448KeyPair(Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd448KeyPair(Pkcs11Session session)
     {
         using var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
 

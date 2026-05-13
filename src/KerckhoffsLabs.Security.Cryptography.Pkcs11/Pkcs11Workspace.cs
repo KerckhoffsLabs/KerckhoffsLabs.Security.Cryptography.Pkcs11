@@ -1,5 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -23,10 +23,10 @@ public sealed partial class Pkcs11Workspace : IDisposable
 {
     private readonly Pkcs11Library _library;
     private readonly Pkcs11Slot _slot;
-    private readonly Session _session;
+    private readonly Pkcs11Session _session;
     private bool _disposed;
 
-    internal Pkcs11Workspace(Pkcs11Library library, Pkcs11Slot slot, Session session)
+    internal Pkcs11Workspace(Pkcs11Library library, Pkcs11Slot slot, Pkcs11Session session)
     {
         _library = library;
         _slot = slot;
@@ -40,7 +40,7 @@ public sealed partial class Pkcs11Workspace : IDisposable
     public Pkcs11Library Library => _library;
 
     /// <summary>Internal accessor for the underlying session. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
-    internal Session Session => _session;
+    internal Pkcs11Session Session => _session;
 
     /// <inheritdoc/>
     public void Dispose()

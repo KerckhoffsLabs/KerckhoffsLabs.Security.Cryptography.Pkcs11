@@ -7,12 +7,13 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.LowLevel.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 /// <summary>
 /// Class representing a logical connection between an application and a token
 /// </summary>
-public partial class Session
+internal sealed partial class Pkcs11Session
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
@@ -22,7 +23,7 @@ public partial class Session
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Session>();
+    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Session>();
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -48,7 +49,7 @@ public partial class Session
     }
 
     /// <summary>
-    /// Lock object guarding concurrent native-call access to this <see cref="Session"/>.
+    /// Lock object guarding concurrent native-call access to this <see cref="Pkcs11Session"/>.
     /// PKCS#11 sessions are not safe for concurrent use; this lock detects cross-thread
     /// attempts and throws <see cref="InvalidOperationException"/>.
     /// </summary>
@@ -179,7 +180,7 @@ public partial class Session
     /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="sessionId">PKCS#11 handle of session</param>
-    protected internal Session(LowLevelPkcs11Library pkcs11Library, ulong sessionId)
+    internal Pkcs11Session(LowLevelPkcs11Library pkcs11Library, ulong sessionId)
     {
         _logger.LogDebug("Session({SessionId})::ctor", sessionId);
 
@@ -502,7 +503,7 @@ public partial class Session
     /// Disposes object
     /// </summary>
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    protected virtual void Dispose(bool disposing)
+    protected void Dispose(bool disposing)
     {
         _logger.LogDebug("Session({SessionId})::Dispose2", _sessionId);
 
