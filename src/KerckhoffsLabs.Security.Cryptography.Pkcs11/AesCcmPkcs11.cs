@@ -1,25 +1,26 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.HighLevel;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// BCL-aligned <see cref="System.Security.Cryptography.AesGcm"/>-shaped wrapper over a
-/// PKCS#11 AES key. AesGcm is sealed in the BCL so this is a wrapper, not a subclass.
+/// BCL-aligned <see cref="System.Security.Cryptography.AesCcm"/>-shaped wrapper over a
+/// PKCS#11 AES key. AesCcm is sealed in the BCL so this is a wrapper, not a subclass.
 /// Method shapes mirror the BCL.
 /// </summary>
-public sealed class AesGcmPkcs11 : IDisposable
+public sealed class AesCcmPkcs11 : IDisposable
 {
-    public static System.Security.Cryptography.KeySizes TagByteSizes
-        => System.Security.Cryptography.AesGcm.TagByteSizes;
-
     public static System.Security.Cryptography.KeySizes NonceByteSizes
-        => System.Security.Cryptography.AesGcm.NonceByteSizes;
+        => System.Security.Cryptography.AesCcm.NonceByteSizes;
+
+    public static System.Security.Cryptography.KeySizes TagByteSizes
+        => System.Security.Cryptography.AesCcm.TagByteSizes;
 
     private readonly Pkcs11Key _key;
     private bool _disposed;
 
-    public AesGcmPkcs11(Pkcs11Key key)
+    public AesCcmPkcs11(Pkcs11Key key)
     {
         ArgumentNullException.ThrowIfNull(key);
         if (key.KeyType != CKK.CKK_AES)
@@ -30,7 +31,7 @@ public sealed class AesGcmPkcs11 : IDisposable
 
     /// <summary>
     /// Does not dispose the underlying <see cref="Pkcs11Key"/> — the caller retains
-    /// ownership. Provided for API symmetry with <see cref="System.Security.Cryptography.AesGcm"/>.
+    /// ownership. Provided for API symmetry with <see cref="System.Security.Cryptography.AesCcm"/>.
     /// </summary>
     public void Dispose()
     {
@@ -68,14 +69,14 @@ public sealed class AesGcmPkcs11 : IDisposable
         if (ciphertext.Length != plaintext.Length)
             throw new ArgumentException("ciphertext length must equal plaintext length.", nameof(ciphertext));
 
-        using var mech = new Mechanism(CKM.CKM_AES_GCM,
-            new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
+        using var mech = new Mechanism(CKM.CKM_AES_CCM,
+            new CkmAesCcmParams(plaintext.Length, nonce, associatedData, macLen: tag.Length));
 
         // Session.Encrypt returns ciphertext || tag concatenated.
         byte[] result = _key.Encrypt(mech, plaintext);
         if (result.Length != plaintext.Length + tag.Length)
             throw new InvalidOperationException(
-                $"AES-GCM encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
+                $"AES-CCM encrypt returned {result.Length} bytes; expected {plaintext.Length + tag.Length}.");
 
         result.AsSpan(0, plaintext.Length).CopyTo(ciphertext);
         result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
@@ -93,8 +94,8 @@ public sealed class AesGcmPkcs11 : IDisposable
         if (plaintext.Length != ciphertext.Length)
             throw new ArgumentException("plaintext length must equal ciphertext length.", nameof(plaintext));
 
-        using var mech = new Mechanism(CKM.CKM_AES_GCM,
-            new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
+        using var mech = new Mechanism(CKM.CKM_AES_CCM,
+            new CkmAesCcmParams(ciphertext.Length, nonce, associatedData, macLen: tag.Length));
 
         // PKCS#11 expects ciphertext || tag concatenated.
         byte[] combined = new byte[ciphertext.Length + tag.Length];
@@ -104,7 +105,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         byte[] result = _key.Decrypt(mech, combined);
         if (result.Length != plaintext.Length)
             throw new InvalidOperationException(
-                $"AES-GCM decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
+                $"AES-CCM decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
         result.CopyTo(plaintext);
     }
 }
