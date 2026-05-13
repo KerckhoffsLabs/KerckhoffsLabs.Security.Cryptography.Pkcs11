@@ -33,17 +33,12 @@ public class Pkcs11Library : IDisposable
     protected LowLevelPkcs11Library? _pkcs11Library = null;
 
     /// <summary>
-    /// Initializes new instance of Pkcs11Library class.
+    /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
+    /// Function pointers are acquired via <c>C_GetFunctionList</c> (the PKCS#11
+    /// v2.20+ recommended path).
     /// </summary>
     /// <param name="libraryPath">Library name or path.</param>
-    public Pkcs11Library(string libraryPath) : this(libraryPath, InitType.WithFunctionList) { }
-
-    /// <summary>
-    /// Loads and initializes the PKCS#11 library.
-    /// </summary>
-    /// <param name="libraryPath">Library name or path.</param>
-    /// <param name="initType">Source of PKCS#11 function pointers.</param>
-    public Pkcs11Library(string libraryPath, InitType initType)
+    public Pkcs11Library(string libraryPath)
     {
         _logger.LogDebug("Pkcs11Library({LibraryPath})::ctor", libraryPath);
 
@@ -52,7 +47,7 @@ public class Pkcs11Library : IDisposable
         try
         {
             _logger.LogInformation("Loading PKCS#11 library {LibraryPath}", _libraryPath);
-            _pkcs11Library = new LowLevelPkcs11Library(_libraryPath, initType == InitType.WithFunctionList);
+            _pkcs11Library = new LowLevelPkcs11Library(_libraryPath);
             Initialize();
         }
         catch
