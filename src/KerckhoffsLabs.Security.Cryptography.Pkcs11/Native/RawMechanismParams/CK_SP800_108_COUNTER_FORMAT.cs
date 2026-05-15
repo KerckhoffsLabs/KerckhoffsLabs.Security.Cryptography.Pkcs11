@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Sub-struct describing the counter encoding for SP800-108 KDFs (PKCS#11 v3.0).
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SP800_108_COUNTER_FORMAT
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SP800_108_COUNTER_FORMAT
 {
     /// <summary>
     /// True for little-endian byte order; false for big-endian.

@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_KEA_DERIVE mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_KEA_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_KEA_DERIVE_PARAMS
 {
     /// <summary>
     /// Option for generating the key (called a TEK). True if the sender (originator) generates the TEK, false if the recipient is regenerating the TEK.

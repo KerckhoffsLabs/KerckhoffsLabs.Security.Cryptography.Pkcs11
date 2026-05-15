@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_AES_GCM mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_GCM_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_GCM_PARAMS
 {
     /// <summary>
     /// Pointer to initialization vector

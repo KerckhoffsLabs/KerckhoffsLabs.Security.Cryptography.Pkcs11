@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Provides information about a slot
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SLOT_INFO
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SLOT_INFO
 {
     /// <summary>
     /// Character-string description of the slot. Must be padded with the blank character (‘ ‘). Should not be null-terminated.

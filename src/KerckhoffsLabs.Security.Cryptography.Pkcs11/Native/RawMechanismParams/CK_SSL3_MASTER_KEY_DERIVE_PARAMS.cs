@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_SSL3_MASTER_KEY_DERIVE and CKM_SSL3_MASTER_KEY_DERIVE_DH mechanisms
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SSL3_MASTER_KEY_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SSL3_MASTER_KEY_DERIVE_PARAMS
 {
     /// <summary>
     /// Client's and server's random data information

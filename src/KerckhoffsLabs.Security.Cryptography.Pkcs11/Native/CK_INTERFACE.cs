@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Versioned interface descriptor returned by C_GetInterface (PKCS#11 v3.0 §5.4.5).
 /// </summary>
-[PlatformSpecificPack]
-internal struct CK_INTERFACE
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+internal partial struct CK_INTERFACE
 {
     /// <summary>Pointer to a null-terminated UTF-8 interface name (typically "PKCS 11").</summary>
     public IntPtr InterfaceName;

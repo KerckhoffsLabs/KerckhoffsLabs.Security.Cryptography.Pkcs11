@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_HKDF_DERIVE / CKM_HKDF_DATA / CKM_HKDF_KEY_GEN mechanisms (PKCS#11 v3.0).
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_HKDF_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_HKDF_PARAMS
 {
     /// <summary>
     /// True to perform the HKDF-Extract step.

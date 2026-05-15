@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_SP800_108_FEEDBACK_KDF mechanism (PKCS#11 v3.0). Identical to CK_SP800_108_KDF_PARAMS plus an IV.
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SP800_108_FEEDBACK_KDF_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SP800_108_FEEDBACK_KDF_PARAMS
 {
     /// <summary>
     /// The PRF mechanism (a CKM_*_HMAC variant or CKM_AES_CMAC).

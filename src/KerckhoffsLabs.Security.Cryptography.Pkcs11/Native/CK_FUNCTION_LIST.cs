@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Structure which contains a Cryptoki version and a function pointer to each function in the Cryptoki API
 /// </summary>
-[PlatformSpecificPack]
-internal struct CK_FUNCTION_LIST
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+internal partial struct CK_FUNCTION_LIST
 {
     /// <summary>
     /// Cryptoki version

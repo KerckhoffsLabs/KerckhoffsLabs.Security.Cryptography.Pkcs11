@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Describes an additional key to be derived in a single SP800-108 KDF call (PKCS#11 v3.0).
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_DERIVED_KEY
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_DERIVED_KEY
 {
     /// <summary>
     /// Pointer to an array of CK_ATTRIBUTE describing the derived key.

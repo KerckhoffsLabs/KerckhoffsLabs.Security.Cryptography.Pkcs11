@@ -7,8 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// library fills this struct on completion of a previously-pending crypto operation
 /// kicked off on a CKF_ASYNC_SESSION-flagged session.
 /// </summary>
-[PlatformSpecificPack]
-internal struct CK_ASYNC_DATA
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+internal partial struct CK_ASYNC_DATA
 {
     /// <summary>Struct version for forward compatibility.</summary>
     public NativeCULong Version;

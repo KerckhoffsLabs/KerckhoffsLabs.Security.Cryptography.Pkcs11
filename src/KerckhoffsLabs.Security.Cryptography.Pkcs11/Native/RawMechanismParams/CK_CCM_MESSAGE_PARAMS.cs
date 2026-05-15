@@ -7,8 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// AEAD API. Like GCM but with a plaintext-length-must-be-known-up-front constraint
 /// (<see cref="DataLen"/>) and the MAC separated via <see cref="Mac"/>.
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_CCM_MESSAGE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_CCM_MESSAGE_PARAMS
 {
     /// <summary>Length of the plaintext (or expected plaintext on decrypt) in bytes. Required up front in CCM.</summary>
     public NativeCULong DataLen;

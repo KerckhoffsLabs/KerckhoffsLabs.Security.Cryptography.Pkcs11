@@ -6,8 +6,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Specifies a particular mechanism and any parameters it requires
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_MECHANISM
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_MECHANISM
 {
     /// <summary>
     /// The type of mechanism

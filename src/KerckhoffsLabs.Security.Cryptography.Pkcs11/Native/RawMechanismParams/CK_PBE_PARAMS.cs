@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure which provides all of the necessary information required by the CKM_PBE mechanisms and the CKM_PBA_SHA1_WITH_SHA1_HMAC mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_PBE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_PBE_PARAMS
 {
     /// <summary>
     /// Pointer to the location that receives the 8-byte initialization vector (IV), if an IV is required

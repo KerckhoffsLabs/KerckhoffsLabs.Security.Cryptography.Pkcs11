@@ -7,8 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// (PKCS#11 v3.2). Like <see cref="CK_SIGN_ADDITIONAL_CONTEXT"/> plus the hash mechanism
 /// applied to the input before signing.
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_HASH_SIGN_ADDITIONAL_CONTEXT
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_HASH_SIGN_ADDITIONAL_CONTEXT
 {
     /// <summary>Hedge variant.</summary>
     public NativeCULong HedgeVariant;

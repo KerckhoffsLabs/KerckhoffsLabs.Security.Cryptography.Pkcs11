@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_RSA_PKCS_OAEP mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_RSA_PKCS_OAEP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_RSA_PKCS_OAEP_PARAMS
 {
     /// <summary>
     /// Mechanism ID of the message digest algorithm used to calculate the digest of the encoding parameter (CKM)

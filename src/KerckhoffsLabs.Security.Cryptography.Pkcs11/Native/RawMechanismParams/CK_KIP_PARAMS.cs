@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to CKM_KIP_DERIVE, CKM_KIP_WRAP and CKM_KIP_MAC mechanisms
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_KIP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_KIP_PARAMS
 {
     /// <summary>
     /// Pointer to the underlying cryptographic mechanism (CKM)

@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_GOSTR3410_DERIVE mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_GOSTR3410_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_GOSTR3410_DERIVE_PARAMS
 {
     /// <summary>
     /// Additional key diversification algorithm (CKD)

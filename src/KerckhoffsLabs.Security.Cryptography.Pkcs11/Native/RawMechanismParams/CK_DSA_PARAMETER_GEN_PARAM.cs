@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides and returns parameters for the CKM_DSA_PROBABLISTIC_PARAMETER_GEN, CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN a CKM_DSA_FIPS_G_GEN mechanisms
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_DSA_PARAMETER_GEN_PARAM
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_DSA_PARAMETER_GEN_PARAM
 {
     /// <summary>
     /// Mechanism value for the base hash used in PQG generation (CKM)

@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure, which provides the parameters to the CKM_TLS_PRF mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_TLS_PRF_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_TLS_PRF_PARAMS
 {
     /// <summary>
     /// Pointer to the input seed

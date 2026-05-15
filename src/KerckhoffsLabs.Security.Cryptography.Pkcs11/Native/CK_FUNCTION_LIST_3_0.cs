@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
@@ -7,8 +9,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// (C_GetInterfaceList, C_GetInterface, C_LoginUser, C_SessionCancel,
 /// followed by the 16 message-based AEAD functions).
 /// </summary>
-[PlatformSpecificPack]
-internal struct CK_FUNCTION_LIST_3_0
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+internal partial struct CK_FUNCTION_LIST_3_0
 {
     /// <summary>Cryptoki version, expected to be {3, 0} or higher.</summary>
     internal CK_VERSION version;

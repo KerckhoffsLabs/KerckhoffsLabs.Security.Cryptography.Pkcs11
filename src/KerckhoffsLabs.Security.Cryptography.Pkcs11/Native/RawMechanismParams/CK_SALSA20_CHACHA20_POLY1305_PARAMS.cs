@@ -6,8 +6,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// Structure that provides the parameters to the CKM_CHACHA20_POLY1305 and
 /// CKM_SALSA20_POLY1305 mechanisms (PKCS#11 v3.0).
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SALSA20_CHACHA20_POLY1305_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SALSA20_CHACHA20_POLY1305_PARAMS
 {
     /// <summary>Pointer to nonce data.</summary>
     public IntPtr Nonce;

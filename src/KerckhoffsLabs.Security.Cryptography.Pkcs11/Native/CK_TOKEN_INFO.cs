@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Provides information about a token
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_TOKEN_INFO
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_TOKEN_INFO
 {
     /// <summary>
     /// Application-defined label, assigned during token initialization. Must be padded with the blank character (‘ ‘). Should not be null-terminated.

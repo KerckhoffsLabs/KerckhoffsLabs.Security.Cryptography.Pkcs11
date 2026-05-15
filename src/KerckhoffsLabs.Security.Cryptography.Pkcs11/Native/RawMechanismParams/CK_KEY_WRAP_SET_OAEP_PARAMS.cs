@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_KEY_WRAP_SET_OAEP mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_KEY_WRAP_SET_OAEP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_KEY_WRAP_SET_OAEP_PARAMS
 {
     /// <summary>
     /// Block contents byte

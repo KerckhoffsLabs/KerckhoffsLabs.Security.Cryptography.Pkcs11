@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
@@ -6,8 +8,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// declaration order (encapsulate/decapsulate, signature-only verify streaming,
 /// validation-flags getter, async API, authenticated wrap).
 /// </summary>
-[PlatformSpecificPack]
-internal struct CK_FUNCTION_LIST_3_2
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+internal partial struct CK_FUNCTION_LIST_3_2
 {
     /// <summary>Cryptoki version, expected to be {3, 2} or higher.</summary>
     internal CK_VERSION version;

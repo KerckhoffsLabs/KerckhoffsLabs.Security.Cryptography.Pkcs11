@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Defines the type, value, and length of an attribute
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_ATTRIBUTE
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_ATTRIBUTE
 {
     /// <summary>
     /// The attribute type

@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that includes the type, value and length of an OTP parameter
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_OTP_PARAM
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_OTP_PARAM
 {
     /// <summary>
     /// Parameter type

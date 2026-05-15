@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_EDDSA mechanism (PKCS#11 v3.1). Used for Ed25519ph/Ed448ph prehash modes and contextualized variants.
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_EDDSA_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_EDDSA_PARAMS
 {
     /// <summary>
     /// True selects the prehash variant (Ed25519ph / Ed448ph). False selects pure Ed25519 / Ed448.

@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure, which provides information about the random data of a client and a server in a WTLS context
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_WTLS_RANDOM_DATA
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_WTLS_RANDOM_DATA
 {
     /// <summary>
     /// Pointer to the client's random data

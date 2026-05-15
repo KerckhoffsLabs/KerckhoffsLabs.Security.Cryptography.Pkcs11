@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_TLS12_KEY_AND_MAC_DERIVE mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_TLS12_KEY_MAT_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_TLS12_KEY_MAT_PARAMS
 {
     /// <summary>
     /// The length (in bits) of the MACing keys agreed upon during the protocol handshake phase

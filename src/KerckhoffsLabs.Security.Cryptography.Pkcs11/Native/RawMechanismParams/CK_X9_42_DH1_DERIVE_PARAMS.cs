@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_X9_42_DH_DERIVE key derivation mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_X9_42_DH1_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_X9_42_DH1_DERIVE_PARAMS
 {
     /// <summary>
     /// Key derivation function used on the shared secret value (CKD)

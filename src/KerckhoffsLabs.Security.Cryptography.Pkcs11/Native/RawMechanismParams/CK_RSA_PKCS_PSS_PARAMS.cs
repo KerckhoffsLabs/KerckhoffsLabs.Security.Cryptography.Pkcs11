@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_RSA_PKCS_PSS mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_RSA_PKCS_PSS_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_RSA_PKCS_PSS_PARAMS
 {
     /// <summary>
     /// Hash algorithm used in the PSS encoding (CKM)

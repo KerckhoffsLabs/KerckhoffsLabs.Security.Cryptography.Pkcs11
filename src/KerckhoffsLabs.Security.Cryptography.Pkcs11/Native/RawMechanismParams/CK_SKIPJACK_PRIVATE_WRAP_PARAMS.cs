@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_SKIPJACK_PRIVATE_WRAP mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SKIPJACK_PRIVATE_WRAP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SKIPJACK_PRIVATE_WRAP_PARAMS
 {
     /// <summary>
     /// Length of the password

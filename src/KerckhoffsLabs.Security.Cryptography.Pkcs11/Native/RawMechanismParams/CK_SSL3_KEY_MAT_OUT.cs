@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that contains the resulting key handles and initialization vectors after performing a C_DeriveKey function with the CKM_SSL3_KEY_AND_MAC_DERIVE mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_SSL3_KEY_MAT_OUT
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_SSL3_KEY_MAT_OUT
 {
     /// <summary>
     /// Key handle for the resulting Client MAC Secret key

@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure, which provides the parameters to the CKM_WTLS_MASTER_KEY_DERIVE mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_WTLS_MASTER_KEY_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_WTLS_MASTER_KEY_DERIVE_PARAMS
 {
     /// <summary>
     /// Digest mechanism to be used (CKM)

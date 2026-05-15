@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Parameters for AES key wrap with CCM (PKCS#11 v3.2).
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_CCM_WRAP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_CCM_WRAP_PARAMS
 {
     /// <summary>Length of the wrapped-key data in bytes (required up front for CCM).</summary>
     public NativeCULong DataLen;

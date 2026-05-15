@@ -6,8 +6,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// Parameters for AES key wrap with GCM (PKCS#11 v3.2). Same shape as
 /// <see cref="CK_GCM_MESSAGE_PARAMS"/> but used at the wrap call site.
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_GCM_WRAP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_GCM_WRAP_PARAMS
 {
     /// <summary>Pointer to IV bytes (or a buffer the library fills when ivGenerator generates).</summary>
     public IntPtr Iv;

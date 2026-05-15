@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_RC2_MAC_GENERAL mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_RC2_MAC_GENERAL_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_RC2_MAC_GENERAL_PARAMS
 {
     /// <summary>
     /// The effective number of bits in the RC2 search space

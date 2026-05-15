@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 ///  Structure that provides the parameters to the CKM_ECMQV_DERIVE mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_ECDH2_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_ECDH2_DERIVE_PARAMS
 {
     /// <summary>
     /// Key derivation function used on the shared secret value (CKD)

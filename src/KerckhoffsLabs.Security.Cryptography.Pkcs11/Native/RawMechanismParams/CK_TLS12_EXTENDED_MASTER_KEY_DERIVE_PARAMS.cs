@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Parameters for CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE (PKCS#11 v3.2 / RFC 7627).
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_TLS12_EXTENDED_MASTER_KEY_DERIVE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_TLS12_EXTENDED_MASTER_KEY_DERIVE_PARAMS
 {
     /// <summary>PRF mechanism (e.g. CKM_SHA256).</summary>
     public NativeCULong PrfHashMechanism;

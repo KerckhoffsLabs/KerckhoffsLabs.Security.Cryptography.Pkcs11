@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_CAMELLIA_CBC_ENCRYPT_DATA mechanism
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS
 {
     /// <summary>
     /// 16-octet initialization vector

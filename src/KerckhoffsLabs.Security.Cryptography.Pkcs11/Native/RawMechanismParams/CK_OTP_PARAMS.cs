@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that is used to provide parameters for OTP mechanisms in a generic fashion
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_OTP_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_OTP_PARAMS
 {
     /// <summary>
     /// Pointer to an array of OTP parameters (CK_OTP_PARAM structures)

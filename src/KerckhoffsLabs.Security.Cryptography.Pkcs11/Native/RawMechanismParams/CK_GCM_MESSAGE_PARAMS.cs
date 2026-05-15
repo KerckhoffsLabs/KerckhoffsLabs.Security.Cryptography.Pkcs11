@@ -7,8 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// AEAD API (C_EncryptMessage / C_DecryptMessage). Tag bytes are read or written through
 /// the <see cref="Tag"/> pointer rather than appended to the ciphertext.
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_GCM_MESSAGE_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_GCM_MESSAGE_PARAMS
 {
     /// <summary>Pointer to the IV / nonce.</summary>
     public IntPtr Iv;

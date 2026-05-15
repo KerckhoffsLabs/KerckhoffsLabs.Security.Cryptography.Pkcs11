@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// <summary>
 /// Structure that provides the parameters to the CKM_RC5_CBC and CKM_RC5_CBC_PAD mechanisms
 /// </summary>
-[PlatformSpecificPack]
-public struct CK_RC5_CBC_PARAMS
+[StructLayout(LayoutKind.Sequential)]
+[PackedForPkcs11]
+public partial struct CK_RC5_CBC_PARAMS
 {
     /// <summary>
     /// Wordsize of RC5 cipher in bytes
