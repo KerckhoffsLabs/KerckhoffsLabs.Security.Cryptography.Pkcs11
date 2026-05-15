@@ -75,31 +75,55 @@ public sealed class Pkcs11MlDsa : MLDsa
     }
 
     // -----------------------------------------------------------------------
-    // Sign / verify — HashML-DSA (CKM_HASH_ML_DSA_*) — caller pre-hashes
+    // Sign / verify — HashML-DSA — not implementable on PKCS#11 v3.2
     // -----------------------------------------------------------------------
+    //
+    // The BCL SignPreHash / VerifyPreHash contracts pass the pre-computed digest of the
+    // message; the implementation is expected to produce / verify a HashML-DSA signature
+    // (FIPS 204 §5.4) over that digest. PKCS#11 v3.2 offers two relevant mechanisms:
+    //
+    //  - CKM_ML_DSA: signs M' = 0x00 || len(ctx) || ctx || M (pure ML-DSA with the 0x00
+    //    domain prefix). Cannot produce a HashML-DSA signature because the domain
+    //    prefix is structurally 0x00, never 0x01.
+    //  - CKM_HASH_ML_DSA_<H>: signs M' = 0x01 || len(ctx) || ctx || OID(H) || H(M).
+    //    The mechanism's input is the MESSAGE — it hashes internally. Feeding it the
+    //    caller's pre-computed hash would sign H(H(M)) instead of the FIPS 204 value
+    //    over the message; the resulting signature is well-formed but interoperates
+    //    with nothing.
+    //
+    // No PKCS#11 v3.2 mechanism accepts a caller-supplied pre-hash. Throw rather than
+    // silently produce non-interoperable signatures. Consumers that need HashML-DSA can
+    // hash the message themselves and sign with another implementation, or — when the
+    // message is available — let CKM_HASH_ML_DSA_<H> handle the full operation by
+    // adding a non-virtual SignDataHashed helper here (out of scope for this fix).
 
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// Always thrown. PKCS#11 v3.2 has no mechanism that accepts a caller-supplied
+    /// pre-hash for HashML-DSA; <c>CKM_HASH_ML_DSA_*</c> hashes its own input.
+    /// </exception>
     protected override void SignPreHashCore(
         ReadOnlySpan<byte> hash,
         ReadOnlySpan<byte> context,
         string hashAlgorithmOid,
         Span<byte> destination)
-    {
-        using var mech = HashSignMechanismFor(hashAlgorithmOid, context);
-        byte[] sig = _key.Sign(mech, hash);
-        CopyExact(sig, destination, Algorithm.SignatureSizeInBytes);
-    }
+        => throw new NotSupportedException(
+            "HashML-DSA pre-hash signing is not supported by PKCS#11 v3.2: " +
+            "CKM_HASH_ML_DSA_* hashes its own input, and CKM_ML_DSA uses the 0x00 (pure) " +
+            "domain prefix rather than 0x01 (HashML-DSA). " +
+            "Use SignData(message, context) with CKM_ML_DSA instead, or sign the digest " +
+            "with another HashML-DSA implementation.");
 
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">Always thrown. See <see cref="SignPreHashCore"/>.</exception>
     protected override bool VerifyPreHashCore(
         ReadOnlySpan<byte> hash,
         ReadOnlySpan<byte> context,
         string hashAlgorithmOid,
         ReadOnlySpan<byte> signature)
-    {
-        using var mech = HashSignMechanismFor(hashAlgorithmOid, context);
-        return _key.Verify(mech, hash, signature);
-    }
+        => throw new NotSupportedException(
+            "HashML-DSA pre-hash verification is not supported by PKCS#11 v3.2. " +
+            "See SignPreHashCore for details.");
 
     // -----------------------------------------------------------------------
     // External-mu sign / verify — not supported by PKCS#11 v3.2.
@@ -202,15 +226,6 @@ public sealed class Pkcs11MlDsa : MLDsa
         {
             foreach (var a in attrs) a.Dispose();
         }
-    }
-
-    private static Mechanism HashSignMechanismFor(string hashAlgorithmOid, ReadOnlySpan<byte> context)
-    {
-        if (context.Length > 255)
-            throw new ArgumentException("ML-DSA context must be at most 255 bytes.", nameof(context));
-
-        HashAlgorithmName hashName = HashAlgorithmName.FromOid(hashAlgorithmOid);
-        return Pkcs11MechanismMap.MlDsaHashSign(hashName, context: context);
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)

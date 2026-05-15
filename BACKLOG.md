@@ -6,9 +6,8 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 1 | **High:** 27 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 27 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
-  - **Silent crypto wrongness in `Pkcs11MlDsa.SignPreHashCore`.** The BCL `SignPreHash` contract passes a pre-computed digest; the override forwards it to `CKM_HASH_ML_DSA_*`, which hashes its input again. Produces non-interoperable signatures with no error.
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
 
@@ -46,6 +45,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-002] `Pkcs11MlDsa.SignPreHashCore` / `VerifyPreHashCore` double-hash via `CKM_HASH_ML_DSA_*`
 
+- **Status: Resolved (2026-05-15)** — `SignPreHashCore` / `VerifyPreHashCore` now throw `NotSupportedException` with a precise rationale. PKCS#11 v3.2 offers no mechanism that accepts a caller-supplied pre-hash: `CKM_ML_DSA` is structurally pure ML-DSA (domain prefix 0x00, never 0x01), and `CKM_HASH_ML_DSA_<H>` hashes its own input — there is no way to produce a spec-compliant HashML-DSA signature from a digest. Removed the dead `HashSignMechanismFor` helper. `Pkcs11MechanismMap.MlDsaHashSign` is retained because it remains valid for message-based HashML-DSA workflows added later (out of scope here).
 - **Area:** Cryptography
 - **Severity:** Critical
 - **Effort:** M
