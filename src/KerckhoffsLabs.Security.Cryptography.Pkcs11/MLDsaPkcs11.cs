@@ -26,7 +26,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// handle, which holds the FIPS 204 standard public-key encoding.
 /// </para>
 /// </remarks>
-public sealed class Pkcs11MlDsa : MLDsa
+public sealed class MLDsaPkcs11 : MLDsa
 {
     private readonly Pkcs11Key _key;
 
@@ -37,7 +37,7 @@ public sealed class Pkcs11MlDsa : MLDsa
     /// <param name="key">A token-resident ML-DSA key (<see cref="CKK.CKK_ML_DSA"/>).</param>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-DSA key, or its parameter set is unrecognized / unreadable.</exception>
-    public Pkcs11MlDsa(Pkcs11Key key)
+    public MLDsaPkcs11(Pkcs11Key key)
         : base(ResolveAlgorithm(key))
     {
         _key = key;
@@ -152,7 +152,7 @@ public sealed class Pkcs11MlDsa : MLDsa
     {
         if (_key.PublicHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11MlDsa.ExportMLDsaPublicKey (no public handle)");
+                "MLDsaPkcs11.ExportMLDsaPublicKey (no public handle)");
 
         var session = _key.Workspace.Session;
         var attrs = session.GetAttributeValue(_key.PublicHandle, new List<CKA> { CKA.CKA_VALUE });
@@ -160,7 +160,7 @@ public sealed class Pkcs11MlDsa : MLDsa
         {
             if (attrs[0].CannotBeRead)
                 throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "Pkcs11MlDsa.ExportMLDsaPublicKey (CKA_VALUE unreadable)");
+                    "MLDsaPkcs11.ExportMLDsaPublicKey (CKA_VALUE unreadable)");
 
             byte[] value = attrs[0].GetValueAsByteArray();
             CopyExact(value, destination, Algorithm.PublicKeySizeInBytes);
