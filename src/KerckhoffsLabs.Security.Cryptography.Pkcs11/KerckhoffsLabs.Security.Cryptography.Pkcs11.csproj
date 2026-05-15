@@ -43,7 +43,7 @@
 
   <ItemGroup>
     <ProjectReference
-      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGen\KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGen.csproj"
+      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false" />
   </ItemGroup>

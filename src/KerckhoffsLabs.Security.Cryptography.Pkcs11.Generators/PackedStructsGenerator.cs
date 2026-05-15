@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGen;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 
 [Generator(LanguageNames.CSharp)]
 public sealed class PackedStructsGenerator : IIncrementalGenerator

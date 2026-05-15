@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cry
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests", "KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj", "{1BF65904-C5E3-473C-8D0E-60086E5499D8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGen", "KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGen\KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGen.csproj", "{DBD8E7D0-E284-41AD-9C7C-1296D012967E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators", "KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj", "{DBD8E7D0-E284-41AD-9C7C-1296D012967E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
