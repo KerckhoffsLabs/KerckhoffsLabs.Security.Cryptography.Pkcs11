@@ -31,7 +31,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
 /// public handle.</para>
 /// </remarks>
-public sealed class Pkcs11MlKem : MLKem
+public sealed class MLKemPkcs11 : MLKem
 {
     private readonly Pkcs11Key _key;
 
@@ -42,7 +42,7 @@ public sealed class Pkcs11MlKem : MLKem
     /// <param name="key">A token-resident ML-KEM key (<see cref="CKK.CKK_ML_KEM"/>).</param>
     /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-KEM key, or its parameter set is unrecognized / unreadable.</exception>
-    public Pkcs11MlKem(Pkcs11Key key)
+    public MLKemPkcs11(Pkcs11Key key)
         : base(ResolveAlgorithm(key))
     {
         _key = key;
@@ -64,7 +64,7 @@ public sealed class Pkcs11MlKem : MLKem
 
         if (_key.PublicHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11MlKem.Encapsulate (no public handle)");
+                "MLKemPkcs11.Encapsulate (no public handle)");
 
         var session = _key.Workspace.Session;
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
@@ -93,7 +93,7 @@ public sealed class Pkcs11MlKem : MLKem
 
         if (_key.PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11MlKem.Decapsulate (no private handle)");
+                "MLKemPkcs11.Decapsulate (no private handle)");
 
         var session = _key.Workspace.Session;
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
@@ -123,7 +123,7 @@ public sealed class Pkcs11MlKem : MLKem
     {
         if (_key.PublicHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11MlKem.ExportEncapsulationKey (no public handle)");
+                "MLKemPkcs11.ExportEncapsulationKey (no public handle)");
 
         var session = _key.Workspace.Session;
         var attrs = session.GetAttributeValue(_key.PublicHandle, new List<CKA> { CKA.CKA_VALUE });
@@ -131,7 +131,7 @@ public sealed class Pkcs11MlKem : MLKem
         {
             if (attrs[0].CannotBeRead)
                 throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "Pkcs11MlKem.ExportEncapsulationKey (CKA_VALUE unreadable)");
+                    "MLKemPkcs11.ExportEncapsulationKey (CKA_VALUE unreadable)");
 
             byte[] value = attrs[0].GetValueAsByteArray();
             CopyExact(value, destination, Algorithm.EncapsulationKeySizeInBytes);
@@ -170,7 +170,7 @@ public sealed class Pkcs11MlKem : MLKem
 
         string verb = encapsulating ? "Encapsulate" : "Decapsulate";
         throw new InsecureOperationException(
-            $"Pkcs11MlKem.{verb} extracts the shared-secret bytes from the token. " +
+            $"MLKemPkcs11.{verb} extracts the shared-secret bytes from the token. " +
             $"This violates the non-extractable-by-default posture. Use Pkcs11Key.{verb}Key " +
             $"for the on-token-only path, or set Pkcs11Session.AllowInsecure = true to opt in.");
     }
@@ -226,7 +226,7 @@ public sealed class Pkcs11MlKem : MLKem
         {
             if (attrs[0].CannotBeRead)
                 throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "Pkcs11MlKem (shared-secret CKA_VALUE unreadable; token rejected the extractable template)");
+                    "MLKemPkcs11 (shared-secret CKA_VALUE unreadable; token rejected the extractable template)");
 
             value = attrs[0].GetValueAsByteArray();
             value.CopyTo(destination);
