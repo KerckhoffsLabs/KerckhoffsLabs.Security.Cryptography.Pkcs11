@@ -4,10 +4,10 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
+
 - **Total items:** 55
-- **Critical:** 4 | **High:** 28 | **Medium:** 17 | **Low:** 6
+- **Critical:** 3 | **High:** 28 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
-  - **`[PlatformSpecificPack]` is functionally dead and architecturally cannot work as designed.** `[StructLayout(Pack=…)]` on the attribute class doesn't propagate to decorated structs, the `#if WINDOWS` symbol never gets defined on a `net10.0` target, and even if both were fixed the IL `Pack` value is baked at compile time — a single cross-platform NuGet `.dll` cannot vary `Pack` by the consumer's OS at runtime. **Empirically the library is correct on Linux/macOS x64** (CLR default Pack=0 happens to match OASIS `pkcs11.h`'s non-Windows ABI — confirmed against SoftHSM's bundled header). **On Windows it would mismarshal every OASIS-compliant module** today; currently invisible only because Windows CI never actually runs SoftHSM (see BL-049). The user's design goal (one struct set + `NativeCULong` + `[PlatformSpecificPack]`) collapses two ABI axes correctly via `NativeCULong` but cannot collapse Pack the same way — see BL-001 for three concrete fix options ranging from "narrow supported platforms" to "Pkcs11Interop-style four-tree dispatch".
   - **Silent crypto wrongness in `Pkcs11MlDsa.SignPreHashCore`.** The BCL `SignPreHash` contract passes a pre-computed digest; the override forwards it to `CKM_HASH_ML_DSA_*`, which hashes its input again. Produces non-interoperable signatures with no error.
   - **Multi-part stream operations and `FindAllObjects` wedge the session on exception.** No `try/finally` around `*_Update` / `*_Final` and `C_FindObjects*` calls. After any mid-operation throw the session is unusable until closed.
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
@@ -22,6 +22,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-001] `[PlatformSpecificPack]` is functionally dead; Windows OASIS-compliant modules will marshal at wrong offsets
 
+- **Status: Resolved (2026-05-15)** via Option B — source generator emits `T_Windows` siblings with `Pack=1` for every `[PackedForPkcs11]`-marked struct; `Pkcs11Marshal` + `UnmanagedMemory` + `LowLevelPkcs11Library` runtime-dispatch on Windows via parallel `_Windows` delegates that target the same native function pointers. `MarshalSizeOfTests` pins both unified (Linux/macOS) and `_Windows` sibling sizes; Windows CI now hard-fails if SoftHSM isn't installed (closes BL-049 in the same branch). See `docs/superpowers/plans/2026-05-15-pkcs11-struct-packing-source-gen.md` for the full implementation.
 - **Area:** P/Invoke
 - **Severity:** Critical (for Windows OASIS-compliant modules); currently latent because Linux is the only platform actually exercised
 - **Effort:** M (Option A) — L (Option B, Pkcs11Interop-style)
