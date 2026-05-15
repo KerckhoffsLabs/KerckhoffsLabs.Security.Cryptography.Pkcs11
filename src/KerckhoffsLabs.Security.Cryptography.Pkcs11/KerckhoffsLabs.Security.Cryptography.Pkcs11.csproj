@@ -31,10 +31,6 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetPlatformIdentifier)' == 'windows'">
-    <DefineConstants>WINDOWS</DefineConstants>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
