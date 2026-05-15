@@ -338,6 +338,93 @@ internal delegate NativeCULong C_WrapKeyAuthenticatedDelegate(NativeCULong sessi
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_UnwrapKeyAuthenticatedDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key);
 
+// ── Windows-layout variants ──────────────────────────────────────────────────
+// Each delegate below is a platform-specific twin of the unified delegate above.
+// Both target the SAME native function pointer; only the managed-side struct
+// layout differs (Pack = 1 vs the platform default).  Used on Windows where the
+// PKCS#11 ABI uses packed structs.
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetInfoDelegate_Windows(ref CK_INFO_Windows info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetSlotInfoDelegate_Windows(NativeCULong slotId, ref CK_SLOT_INFO_Windows info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetTokenInfoDelegate_Windows(NativeCULong slotId, ref CK_TOKEN_INFO_Windows info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetMechanismInfoDelegate_Windows(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO_Windows info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetSessionInfoDelegate_Windows(NativeCULong session, ref CK_SESSION_INFO_Windows info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_EncryptInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DecryptInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DigestInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SignInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SignRecoverInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifyInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifyRecoverInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GenerateKeyDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GenerateKeyPairDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, CK_ATTRIBUTE_Windows[] publicKeyTemplate, NativeCULong publicKeyAttributeCount, CK_ATTRIBUTE_Windows[] privateKeyTemplate, NativeCULong privateKeyAttributeCount, ref NativeCULong publicKey, ref NativeCULong privateKey);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_WrapKeyDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_UnwrapKeyDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, ref NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DeriveKeyDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong baseKey, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, ref NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageEncryptInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageDecryptInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageSignInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_MessageVerifyInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_EncapsulateKeyDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong publicKey, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, [In, Out] byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_DecapsulateKeyDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong privateKey, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_VerifySignatureInitDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_AsyncCompleteDelegate_Windows(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA_Windows result);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_WrapKeyAuthenticatedDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_UnwrapKeyAuthenticatedDelegate_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key);
+
 /// <summary>
 /// Holds delegates for all PKCS#11 functions
 /// </summary>
@@ -806,6 +893,38 @@ internal partial class Delegates
     /// <summary>Delegate for C_UnwrapKeyAuthenticated (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
     internal C_UnwrapKeyAuthenticatedDelegate? C_UnwrapKeyAuthenticated = null;
 
+    // ── Windows-layout delegate fields ───────────────────────────────────────
+    // Populated from the same function pointer as their unified twin; used only
+    // on Windows where packed struct layout is required.
+
+    internal C_GetInfoDelegate_Windows? C_GetInfo_Windows;
+    internal C_GetSlotInfoDelegate_Windows? C_GetSlotInfo_Windows;
+    internal C_GetTokenInfoDelegate_Windows? C_GetTokenInfo_Windows;
+    internal C_GetMechanismInfoDelegate_Windows? C_GetMechanismInfo_Windows;
+    internal C_GetSessionInfoDelegate_Windows? C_GetSessionInfo_Windows;
+    internal C_EncryptInitDelegate_Windows? C_EncryptInit_Windows;
+    internal C_DecryptInitDelegate_Windows? C_DecryptInit_Windows;
+    internal C_DigestInitDelegate_Windows? C_DigestInit_Windows;
+    internal C_SignInitDelegate_Windows? C_SignInit_Windows;
+    internal C_SignRecoverInitDelegate_Windows? C_SignRecoverInit_Windows;
+    internal C_VerifyInitDelegate_Windows? C_VerifyInit_Windows;
+    internal C_VerifyRecoverInitDelegate_Windows? C_VerifyRecoverInit_Windows;
+    internal C_GenerateKeyDelegate_Windows? C_GenerateKey_Windows;
+    internal C_GenerateKeyPairDelegate_Windows? C_GenerateKeyPair_Windows;
+    internal C_WrapKeyDelegate_Windows? C_WrapKey_Windows;
+    internal C_UnwrapKeyDelegate_Windows? C_UnwrapKey_Windows;
+    internal C_DeriveKeyDelegate_Windows? C_DeriveKey_Windows;
+    internal C_MessageEncryptInitDelegate_Windows? C_MessageEncryptInit_Windows;
+    internal C_MessageDecryptInitDelegate_Windows? C_MessageDecryptInit_Windows;
+    internal C_MessageSignInitDelegate_Windows? C_MessageSignInit_Windows;
+    internal C_MessageVerifyInitDelegate_Windows? C_MessageVerifyInit_Windows;
+    internal C_EncapsulateKeyDelegate_Windows? C_EncapsulateKey_Windows;
+    internal C_DecapsulateKeyDelegate_Windows? C_DecapsulateKey_Windows;
+    internal C_VerifySignatureInitDelegate_Windows? C_VerifySignatureInit_Windows;
+    internal C_AsyncCompleteDelegate_Windows? C_AsyncComplete_Windows;
+    internal C_WrapKeyAuthenticatedDelegate_Windows? C_WrapKeyAuthenticated_Windows;
+    internal C_UnwrapKeyAuthenticatedDelegate_Windows? C_UnwrapKeyAuthenticated_Windows;
+
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
     /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library
@@ -848,37 +967,47 @@ internal partial class Delegates
         C_LoginUser = TryGetDelegate<C_LoginUserDelegate>(libraryHandle, "C_LoginUser");
         C_SessionCancel = TryGetDelegate<C_SessionCancelDelegate>(libraryHandle, "C_SessionCancel");
         C_MessageEncryptInit = TryGetDelegate<C_MessageEncryptInitDelegate>(libraryHandle, "C_MessageEncryptInit");
+        C_MessageEncryptInit_Windows = TryGetDelegate<C_MessageEncryptInitDelegate_Windows>(libraryHandle, "C_MessageEncryptInit");
         C_EncryptMessage = TryGetDelegate<C_EncryptMessageDelegate>(libraryHandle, "C_EncryptMessage");
         C_EncryptMessageBegin = TryGetDelegate<C_EncryptMessageBeginDelegate>(libraryHandle, "C_EncryptMessageBegin");
         C_EncryptMessageNext = TryGetDelegate<C_EncryptMessageNextDelegate>(libraryHandle, "C_EncryptMessageNext");
         C_MessageEncryptFinal = TryGetDelegate<C_MessageEncryptFinalDelegate>(libraryHandle, "C_MessageEncryptFinal");
         C_MessageDecryptInit = TryGetDelegate<C_MessageDecryptInitDelegate>(libraryHandle, "C_MessageDecryptInit");
+        C_MessageDecryptInit_Windows = TryGetDelegate<C_MessageDecryptInitDelegate_Windows>(libraryHandle, "C_MessageDecryptInit");
         C_DecryptMessage = TryGetDelegate<C_DecryptMessageDelegate>(libraryHandle, "C_DecryptMessage");
         C_DecryptMessageBegin = TryGetDelegate<C_DecryptMessageBeginDelegate>(libraryHandle, "C_DecryptMessageBegin");
         C_DecryptMessageNext = TryGetDelegate<C_DecryptMessageNextDelegate>(libraryHandle, "C_DecryptMessageNext");
         C_MessageDecryptFinal = TryGetDelegate<C_MessageDecryptFinalDelegate>(libraryHandle, "C_MessageDecryptFinal");
         C_MessageSignInit = TryGetDelegate<C_MessageSignInitDelegate>(libraryHandle, "C_MessageSignInit");
+        C_MessageSignInit_Windows = TryGetDelegate<C_MessageSignInitDelegate_Windows>(libraryHandle, "C_MessageSignInit");
         C_SignMessage = TryGetDelegate<C_SignMessageDelegate>(libraryHandle, "C_SignMessage");
         C_SignMessageBegin = TryGetDelegate<C_SignMessageBeginDelegate>(libraryHandle, "C_SignMessageBegin");
         C_SignMessageNext = TryGetDelegate<C_SignMessageNextDelegate>(libraryHandle, "C_SignMessageNext");
         C_MessageSignFinal = TryGetDelegate<C_MessageSignFinalDelegate>(libraryHandle, "C_MessageSignFinal");
         C_MessageVerifyInit = TryGetDelegate<C_MessageVerifyInitDelegate>(libraryHandle, "C_MessageVerifyInit");
+        C_MessageVerifyInit_Windows = TryGetDelegate<C_MessageVerifyInitDelegate_Windows>(libraryHandle, "C_MessageVerifyInit");
         C_VerifyMessage = TryGetDelegate<C_VerifyMessageDelegate>(libraryHandle, "C_VerifyMessage");
         C_VerifyMessageBegin = TryGetDelegate<C_VerifyMessageBeginDelegate>(libraryHandle, "C_VerifyMessageBegin");
         C_VerifyMessageNext = TryGetDelegate<C_VerifyMessageNextDelegate>(libraryHandle, "C_VerifyMessageNext");
         C_MessageVerifyFinal = TryGetDelegate<C_MessageVerifyFinalDelegate>(libraryHandle, "C_MessageVerifyFinal");
         C_EncapsulateKey = TryGetDelegate<C_EncapsulateKeyDelegate>(libraryHandle, "C_EncapsulateKey");
+        C_EncapsulateKey_Windows = TryGetDelegate<C_EncapsulateKeyDelegate_Windows>(libraryHandle, "C_EncapsulateKey");
         C_DecapsulateKey = TryGetDelegate<C_DecapsulateKeyDelegate>(libraryHandle, "C_DecapsulateKey");
+        C_DecapsulateKey_Windows = TryGetDelegate<C_DecapsulateKeyDelegate_Windows>(libraryHandle, "C_DecapsulateKey");
         C_VerifySignatureInit = TryGetDelegate<C_VerifySignatureInitDelegate>(libraryHandle, "C_VerifySignatureInit");
+        C_VerifySignatureInit_Windows = TryGetDelegate<C_VerifySignatureInitDelegate_Windows>(libraryHandle, "C_VerifySignatureInit");
         C_VerifySignature = TryGetDelegate<C_VerifySignatureDelegate>(libraryHandle, "C_VerifySignature");
         C_VerifySignatureUpdate = TryGetDelegate<C_VerifySignatureUpdateDelegate>(libraryHandle, "C_VerifySignatureUpdate");
         C_VerifySignatureFinal = TryGetDelegate<C_VerifySignatureFinalDelegate>(libraryHandle, "C_VerifySignatureFinal");
         C_GetSessionValidationFlags = TryGetDelegate<C_GetSessionValidationFlagsDelegate>(libraryHandle, "C_GetSessionValidationFlags");
         C_AsyncComplete = TryGetDelegate<C_AsyncCompleteDelegate>(libraryHandle, "C_AsyncComplete");
+        C_AsyncComplete_Windows = TryGetDelegate<C_AsyncCompleteDelegate_Windows>(libraryHandle, "C_AsyncComplete");
         C_AsyncGetID = TryGetDelegate<C_AsyncGetIDDelegate>(libraryHandle, "C_AsyncGetID");
         C_AsyncJoin = TryGetDelegate<C_AsyncJoinDelegate>(libraryHandle, "C_AsyncJoin");
         C_WrapKeyAuthenticated = TryGetDelegate<C_WrapKeyAuthenticatedDelegate>(libraryHandle, "C_WrapKeyAuthenticated");
+        C_WrapKeyAuthenticated_Windows = TryGetDelegate<C_WrapKeyAuthenticatedDelegate_Windows>(libraryHandle, "C_WrapKeyAuthenticated");
         C_UnwrapKeyAuthenticated = TryGetDelegate<C_UnwrapKeyAuthenticatedDelegate>(libraryHandle, "C_UnwrapKeyAuthenticated");
+        C_UnwrapKeyAuthenticated_Windows = TryGetDelegate<C_UnwrapKeyAuthenticatedDelegate_Windows>(libraryHandle, "C_UnwrapKeyAuthenticated");
     }
 
     private static T? TryGetDelegate<T>(IntPtr libraryHandle, string symbol) where T : class
@@ -934,7 +1063,10 @@ internal partial class Delegates
             C_SessionCancel = Marshal.GetDelegateForFunctionPointer<C_SessionCancelDelegate>(v30.C_SessionCancel);
 
         if (v30.C_MessageEncryptInit != IntPtr.Zero)
+        {
             C_MessageEncryptInit = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptInitDelegate>(v30.C_MessageEncryptInit);
+            C_MessageEncryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptInitDelegate_Windows>(v30.C_MessageEncryptInit);
+        }
         if (v30.C_EncryptMessage != IntPtr.Zero)
             C_EncryptMessage = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageDelegate>(v30.C_EncryptMessage);
         if (v30.C_EncryptMessageBegin != IntPtr.Zero)
@@ -945,7 +1077,10 @@ internal partial class Delegates
             C_MessageEncryptFinal = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptFinalDelegate>(v30.C_MessageEncryptFinal);
 
         if (v30.C_MessageDecryptInit != IntPtr.Zero)
+        {
             C_MessageDecryptInit = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptInitDelegate>(v30.C_MessageDecryptInit);
+            C_MessageDecryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptInitDelegate_Windows>(v30.C_MessageDecryptInit);
+        }
         if (v30.C_DecryptMessage != IntPtr.Zero)
             C_DecryptMessage = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageDelegate>(v30.C_DecryptMessage);
         if (v30.C_DecryptMessageBegin != IntPtr.Zero)
@@ -956,7 +1091,10 @@ internal partial class Delegates
             C_MessageDecryptFinal = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptFinalDelegate>(v30.C_MessageDecryptFinal);
 
         if (v30.C_MessageSignInit != IntPtr.Zero)
+        {
             C_MessageSignInit = Marshal.GetDelegateForFunctionPointer<C_MessageSignInitDelegate>(v30.C_MessageSignInit);
+            C_MessageSignInit_Windows = Marshal.GetDelegateForFunctionPointer<C_MessageSignInitDelegate_Windows>(v30.C_MessageSignInit);
+        }
         if (v30.C_SignMessage != IntPtr.Zero)
             C_SignMessage = Marshal.GetDelegateForFunctionPointer<C_SignMessageDelegate>(v30.C_SignMessage);
         if (v30.C_SignMessageBegin != IntPtr.Zero)
@@ -967,7 +1105,10 @@ internal partial class Delegates
             C_MessageSignFinal = Marshal.GetDelegateForFunctionPointer<C_MessageSignFinalDelegate>(v30.C_MessageSignFinal);
 
         if (v30.C_MessageVerifyInit != IntPtr.Zero)
+        {
             C_MessageVerifyInit = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyInitDelegate>(v30.C_MessageVerifyInit);
+            C_MessageVerifyInit_Windows = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyInitDelegate_Windows>(v30.C_MessageVerifyInit);
+        }
         if (v30.C_VerifyMessage != IntPtr.Zero)
             C_VerifyMessage = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageDelegate>(v30.C_VerifyMessage);
         if (v30.C_VerifyMessageBegin != IntPtr.Zero)
@@ -985,11 +1126,20 @@ internal partial class Delegates
                 iface.FunctionList, typeof(CK_FUNCTION_LIST_3_2));
 
             if (v32.C_EncapsulateKey != IntPtr.Zero)
+            {
                 C_EncapsulateKey = Marshal.GetDelegateForFunctionPointer<C_EncapsulateKeyDelegate>(v32.C_EncapsulateKey);
+                C_EncapsulateKey_Windows = Marshal.GetDelegateForFunctionPointer<C_EncapsulateKeyDelegate_Windows>(v32.C_EncapsulateKey);
+            }
             if (v32.C_DecapsulateKey != IntPtr.Zero)
+            {
                 C_DecapsulateKey = Marshal.GetDelegateForFunctionPointer<C_DecapsulateKeyDelegate>(v32.C_DecapsulateKey);
+                C_DecapsulateKey_Windows = Marshal.GetDelegateForFunctionPointer<C_DecapsulateKeyDelegate_Windows>(v32.C_DecapsulateKey);
+            }
             if (v32.C_VerifySignatureInit != IntPtr.Zero)
+            {
                 C_VerifySignatureInit = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureInitDelegate>(v32.C_VerifySignatureInit);
+                C_VerifySignatureInit_Windows = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureInitDelegate_Windows>(v32.C_VerifySignatureInit);
+            }
             if (v32.C_VerifySignature != IntPtr.Zero)
                 C_VerifySignature = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureDelegate>(v32.C_VerifySignature);
             if (v32.C_VerifySignatureUpdate != IntPtr.Zero)
@@ -999,15 +1149,24 @@ internal partial class Delegates
             if (v32.C_GetSessionValidationFlags != IntPtr.Zero)
                 C_GetSessionValidationFlags = Marshal.GetDelegateForFunctionPointer<C_GetSessionValidationFlagsDelegate>(v32.C_GetSessionValidationFlags);
             if (v32.C_AsyncComplete != IntPtr.Zero)
+            {
                 C_AsyncComplete = Marshal.GetDelegateForFunctionPointer<C_AsyncCompleteDelegate>(v32.C_AsyncComplete);
+                C_AsyncComplete_Windows = Marshal.GetDelegateForFunctionPointer<C_AsyncCompleteDelegate_Windows>(v32.C_AsyncComplete);
+            }
             if (v32.C_AsyncGetID != IntPtr.Zero)
                 C_AsyncGetID = Marshal.GetDelegateForFunctionPointer<C_AsyncGetIDDelegate>(v32.C_AsyncGetID);
             if (v32.C_AsyncJoin != IntPtr.Zero)
                 C_AsyncJoin = Marshal.GetDelegateForFunctionPointer<C_AsyncJoinDelegate>(v32.C_AsyncJoin);
             if (v32.C_WrapKeyAuthenticated != IntPtr.Zero)
+            {
                 C_WrapKeyAuthenticated = Marshal.GetDelegateForFunctionPointer<C_WrapKeyAuthenticatedDelegate>(v32.C_WrapKeyAuthenticated);
+                C_WrapKeyAuthenticated_Windows = Marshal.GetDelegateForFunctionPointer<C_WrapKeyAuthenticatedDelegate_Windows>(v32.C_WrapKeyAuthenticated);
+            }
             if (v32.C_UnwrapKeyAuthenticated != IntPtr.Zero)
+            {
                 C_UnwrapKeyAuthenticated = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyAuthenticatedDelegate>(v32.C_UnwrapKeyAuthenticated);
+                C_UnwrapKeyAuthenticated_Windows = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyAuthenticatedDelegate_Windows>(v32.C_UnwrapKeyAuthenticated);
+            }
         }
 
         return true;
@@ -1061,12 +1220,16 @@ internal partial class Delegates
         C_Initialize = Marshal.GetDelegateForFunctionPointer<C_InitializeDelegate>(funcList.C_Initialize);
         C_Finalize = Marshal.GetDelegateForFunctionPointer<C_FinalizeDelegate>(funcList.C_Finalize);
         C_GetInfo = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate>(funcList.C_GetInfo);
+        C_GetInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate_Windows>(funcList.C_GetInfo);
         C_GetFunctionList = Marshal.GetDelegateForFunctionPointer<C_GetFunctionListDelegate>(funcList.C_GetFunctionList);
         C_GetSlotList = Marshal.GetDelegateForFunctionPointer<C_GetSlotListDelegate>(funcList.C_GetSlotList);
         C_GetSlotInfo = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate>(funcList.C_GetSlotInfo);
+        C_GetSlotInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate_Windows>(funcList.C_GetSlotInfo);
         C_GetTokenInfo = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate>(funcList.C_GetTokenInfo);
+        C_GetTokenInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate_Windows>(funcList.C_GetTokenInfo);
         C_GetMechanismList = Marshal.GetDelegateForFunctionPointer<C_GetMechanismListDelegate>(funcList.C_GetMechanismList);
         C_GetMechanismInfo = Marshal.GetDelegateForFunctionPointer<C_GetMechanismInfoDelegate>(funcList.C_GetMechanismInfo);
+        C_GetMechanismInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetMechanismInfoDelegate_Windows>(funcList.C_GetMechanismInfo);
         C_InitToken = Marshal.GetDelegateForFunctionPointer<C_InitTokenDelegate>(funcList.C_InitToken);
         C_InitPIN = Marshal.GetDelegateForFunctionPointer<C_InitPINDelegate>(funcList.C_InitPIN);
         C_SetPIN = Marshal.GetDelegateForFunctionPointer<C_SetPINDelegate>(funcList.C_SetPIN);
@@ -1074,6 +1237,7 @@ internal partial class Delegates
         C_CloseSession = Marshal.GetDelegateForFunctionPointer<C_CloseSessionDelegate>(funcList.C_CloseSession);
         C_CloseAllSessions = Marshal.GetDelegateForFunctionPointer<C_CloseAllSessionsDelegate>(funcList.C_CloseAllSessions);
         C_GetSessionInfo = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate>(funcList.C_GetSessionInfo);
+        C_GetSessionInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate_Windows>(funcList.C_GetSessionInfo);
         C_GetOperationState = Marshal.GetDelegateForFunctionPointer<C_GetOperationStateDelegate>(funcList.C_GetOperationState);
         C_SetOperationState = Marshal.GetDelegateForFunctionPointer<C_SetOperationStateDelegate>(funcList.C_SetOperationState);
         C_Login = Marshal.GetDelegateForFunctionPointer<C_LoginDelegate>(funcList.C_Login);
@@ -1088,39 +1252,51 @@ internal partial class Delegates
         C_FindObjects = Marshal.GetDelegateForFunctionPointer<C_FindObjectsDelegate>(funcList.C_FindObjects);
         C_FindObjectsFinal = Marshal.GetDelegateForFunctionPointer<C_FindObjectsFinalDelegate>(funcList.C_FindObjectsFinal);
         C_EncryptInit = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate>(funcList.C_EncryptInit);
+        C_EncryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate_Windows>(funcList.C_EncryptInit);
         C_Encrypt = Marshal.GetDelegateForFunctionPointer<C_EncryptDelegate>(funcList.C_Encrypt);
         C_EncryptUpdate = Marshal.GetDelegateForFunctionPointer<C_EncryptUpdateDelegate>(funcList.C_EncryptUpdate);
         C_EncryptFinal = Marshal.GetDelegateForFunctionPointer<C_EncryptFinalDelegate>(funcList.C_EncryptFinal);
         C_DecryptInit = Marshal.GetDelegateForFunctionPointer<C_DecryptInitDelegate>(funcList.C_DecryptInit);
+        C_DecryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_DecryptInitDelegate_Windows>(funcList.C_DecryptInit);
         C_Decrypt = Marshal.GetDelegateForFunctionPointer<C_DecryptDelegate>(funcList.C_Decrypt);
         C_DecryptUpdate = Marshal.GetDelegateForFunctionPointer<C_DecryptUpdateDelegate>(funcList.C_DecryptUpdate);
         C_DecryptFinal = Marshal.GetDelegateForFunctionPointer<C_DecryptFinalDelegate>(funcList.C_DecryptFinal);
         C_DigestInit = Marshal.GetDelegateForFunctionPointer<C_DigestInitDelegate>(funcList.C_DigestInit);
+        C_DigestInit_Windows = Marshal.GetDelegateForFunctionPointer<C_DigestInitDelegate_Windows>(funcList.C_DigestInit);
         C_Digest = Marshal.GetDelegateForFunctionPointer<C_DigestDelegate>(funcList.C_Digest);
         C_DigestUpdate = Marshal.GetDelegateForFunctionPointer<C_DigestUpdateDelegate>(funcList.C_DigestUpdate);
         C_DigestKey = Marshal.GetDelegateForFunctionPointer<C_DigestKeyDelegate>(funcList.C_DigestKey);
         C_DigestFinal = Marshal.GetDelegateForFunctionPointer<C_DigestFinalDelegate>(funcList.C_DigestFinal);
         C_SignInit = Marshal.GetDelegateForFunctionPointer<C_SignInitDelegate>(funcList.C_SignInit);
+        C_SignInit_Windows = Marshal.GetDelegateForFunctionPointer<C_SignInitDelegate_Windows>(funcList.C_SignInit);
         C_Sign = Marshal.GetDelegateForFunctionPointer<C_SignDelegate>(funcList.C_Sign);
         C_SignUpdate = Marshal.GetDelegateForFunctionPointer<C_SignUpdateDelegate>(funcList.C_SignUpdate);
         C_SignFinal = Marshal.GetDelegateForFunctionPointer<C_SignFinalDelegate>(funcList.C_SignFinal);
         C_SignRecoverInit = Marshal.GetDelegateForFunctionPointer<C_SignRecoverInitDelegate>(funcList.C_SignRecoverInit);
+        C_SignRecoverInit_Windows = Marshal.GetDelegateForFunctionPointer<C_SignRecoverInitDelegate_Windows>(funcList.C_SignRecoverInit);
         C_SignRecover = Marshal.GetDelegateForFunctionPointer<C_SignRecoverDelegate>(funcList.C_SignRecover);
         C_VerifyInit = Marshal.GetDelegateForFunctionPointer<C_VerifyInitDelegate>(funcList.C_VerifyInit);
+        C_VerifyInit_Windows = Marshal.GetDelegateForFunctionPointer<C_VerifyInitDelegate_Windows>(funcList.C_VerifyInit);
         C_Verify = Marshal.GetDelegateForFunctionPointer<C_VerifyDelegate>(funcList.C_Verify);
         C_VerifyUpdate = Marshal.GetDelegateForFunctionPointer<C_VerifyUpdateDelegate>(funcList.C_VerifyUpdate);
         C_VerifyFinal = Marshal.GetDelegateForFunctionPointer<C_VerifyFinalDelegate>(funcList.C_VerifyFinal);
         C_VerifyRecoverInit = Marshal.GetDelegateForFunctionPointer<C_VerifyRecoverInitDelegate>(funcList.C_VerifyRecoverInit);
+        C_VerifyRecoverInit_Windows = Marshal.GetDelegateForFunctionPointer<C_VerifyRecoverInitDelegate_Windows>(funcList.C_VerifyRecoverInit);
         C_VerifyRecover = Marshal.GetDelegateForFunctionPointer<C_VerifyRecoverDelegate>(funcList.C_VerifyRecover);
         C_DigestEncryptUpdate = Marshal.GetDelegateForFunctionPointer<C_DigestEncryptUpdateDelegate>(funcList.C_DigestEncryptUpdate);
         C_DecryptDigestUpdate = Marshal.GetDelegateForFunctionPointer<C_DecryptDigestUpdateDelegate>(funcList.C_DecryptDigestUpdate);
         C_SignEncryptUpdate = Marshal.GetDelegateForFunctionPointer<C_SignEncryptUpdateDelegate>(funcList.C_SignEncryptUpdate);
         C_DecryptVerifyUpdate = Marshal.GetDelegateForFunctionPointer<C_DecryptVerifyUpdateDelegate>(funcList.C_DecryptVerifyUpdate);
         C_GenerateKey = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyDelegate>(funcList.C_GenerateKey);
+        C_GenerateKey_Windows = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyDelegate_Windows>(funcList.C_GenerateKey);
         C_GenerateKeyPair = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyPairDelegate>(funcList.C_GenerateKeyPair);
+        C_GenerateKeyPair_Windows = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyPairDelegate_Windows>(funcList.C_GenerateKeyPair);
         C_WrapKey = Marshal.GetDelegateForFunctionPointer<C_WrapKeyDelegate>(funcList.C_WrapKey);
+        C_WrapKey_Windows = Marshal.GetDelegateForFunctionPointer<C_WrapKeyDelegate_Windows>(funcList.C_WrapKey);
         C_UnwrapKey = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyDelegate>(funcList.C_UnwrapKey);
+        C_UnwrapKey_Windows = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyDelegate_Windows>(funcList.C_UnwrapKey);
         C_DeriveKey = Marshal.GetDelegateForFunctionPointer<C_DeriveKeyDelegate>(funcList.C_DeriveKey);
+        C_DeriveKey_Windows = Marshal.GetDelegateForFunctionPointer<C_DeriveKeyDelegate_Windows>(funcList.C_DeriveKey);
         C_SeedRandom = Marshal.GetDelegateForFunctionPointer<C_SeedRandomDelegate>(funcList.C_SeedRandom);
         C_GenerateRandom = Marshal.GetDelegateForFunctionPointer<C_GenerateRandomDelegate>(funcList.C_GenerateRandom);
         C_GetFunctionStatus = Marshal.GetDelegateForFunctionPointer<C_GetFunctionStatusDelegate>(funcList.C_GetFunctionStatus);
