@@ -127,22 +127,34 @@ internal sealed partial class Pkcs11Session
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_VerifyInit");
 
-        byte[] part = new byte[bufferLength];
-        int bytesRead = 0;
-
-        while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
+        bool finalized = false;
+        try
         {
-            rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part, (NativeCULong)(bytesRead));
-            Pkcs11Exception.ThrowIfError(rv, "C_VerifyUpdate");
-        }
+            byte[] part = new byte[bufferLength];
+            int bytesRead = 0;
 
-        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
-        if (rv == CKR.CKR_OK)
-            isValid = true;
-        else if (rv == CKR.CKR_SIGNATURE_INVALID)
-            isValid = false;
-        else
-            throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
+            while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
+            {
+                rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part, (NativeCULong)(bytesRead));
+                Pkcs11Exception.ThrowIfError(rv, "C_VerifyUpdate");
+            }
+
+            rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
+            // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
+            // the call failed with any other CKR — the verify operation is consumed.
+            finalized = true;
+            if (rv == CKR.CKR_OK)
+                isValid = true;
+            else if (rv == CKR.CKR_SIGNATURE_INVALID)
+                isValid = false;
+            else
+                throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
+        }
+        finally
+        {
+            if (!finalized)
+                TryCancelOperation(CKF.CKF_VERIFY, "Verify");
+        }
     }
 
     /// <summary>

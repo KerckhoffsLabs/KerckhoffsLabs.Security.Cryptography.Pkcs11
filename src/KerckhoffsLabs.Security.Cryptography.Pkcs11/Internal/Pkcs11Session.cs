@@ -465,6 +465,34 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>
+    /// Best-effort cancel of one or more in-flight operations. Intended for the unwind path
+    /// of multi-part stream methods so a mid-operation exception cannot leave the session
+    /// wedged in active-operation state. Tries <c>C_SessionCancel</c> (PKCS#11 v3.0+); on
+    /// v2.40 modules that return <c>CKR_FUNCTION_NOT_SUPPORTED</c> the operation may stay
+    /// active, but the caller's exception is the appropriate signal to the consumer.
+    /// Errors are logged and swallowed so the original exception is never masked on unwind.
+    /// </summary>
+    private void TryCancelOperation(NativeCULong flags, string operationName)
+    {
+        try
+        {
+            CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, flags);
+            if (rv != CKR.CKR_OK && rv != CKR.CKR_FUNCTION_NOT_SUPPORTED)
+            {
+                _logger.LogWarning(
+                    "Session({SessionId})::{Operation}: C_SessionCancel returned {Rv} during cleanup",
+                    _sessionId, operationName, rv);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Session({SessionId})::{Operation}: C_SessionCancel threw during cleanup",
+                _sessionId, operationName);
+        }
+    }
+
+    /// <summary>
     /// Logs a user out from a token
     /// </summary>
     public void Logout()

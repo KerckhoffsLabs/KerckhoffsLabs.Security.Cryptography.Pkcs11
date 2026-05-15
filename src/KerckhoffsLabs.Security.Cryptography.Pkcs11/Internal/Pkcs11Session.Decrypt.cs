@@ -130,40 +130,50 @@ internal sealed partial class Pkcs11Session
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
 
-        byte[] encryptedPart = new byte[bufferLength];
-        byte[] part = new byte[bufferLength];
-        NativeCULong partLen = (NativeCULong)(part.Length);
-
-        int bytesRead = 0;
-        while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
+        bool finalized = false;
+        try
         {
-            partLen = (NativeCULong)(part.Length);
-            rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-            if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
-                Pkcs11Exception.ThrowIfError(rv, "C_DecryptUpdate");
+            byte[] encryptedPart = new byte[bufferLength];
+            byte[] part = new byte[bufferLength];
+            NativeCULong partLen = (NativeCULong)(part.Length);
 
-            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+            int bytesRead = 0;
+            while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
             {
-                part = new byte[(int)partLen];
-
+                partLen = (NativeCULong)(part.Length);
                 rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                Pkcs11Exception.ThrowIfError(rv, "C_DecryptUpdate");
+                if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+                    Pkcs11Exception.ThrowIfError(rv, "C_DecryptUpdate");
+
+                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+                {
+                    part = new byte[(int)partLen];
+
+                    rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
+                    Pkcs11Exception.ThrowIfError(rv, "C_DecryptUpdate");
+                }
+
+                outputStream.Write(part, 0, (int)(partLen));
             }
 
-            outputStream.Write(part, 0, (int)(partLen));
+            byte[] lastPart = null;
+            NativeCULong lastPartLen = (NativeCULong)0;
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
+            Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+
+            lastPart = new byte[(int)lastPartLen];
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
+            Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+            finalized = true;
+
+            if (lastPartLen > (NativeCULong)0)
+                outputStream.Write(lastPart, 0, (int)(lastPartLen));
         }
-
-        byte[] lastPart = null;
-        NativeCULong lastPartLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
-
-        lastPart = new byte[(int)lastPartLen];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
-
-        if (lastPartLen > (NativeCULong)0)
-            outputStream.Write(lastPart, 0, (int)(lastPartLen));
+        finally
+        {
+            if (!finalized)
+                TryCancelOperation(CKF.CKF_DECRYPT, "Decrypt");
+        }
     }
 
     // === Secure-default decryption helpers =================================

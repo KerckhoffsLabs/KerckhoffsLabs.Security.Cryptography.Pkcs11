@@ -6,10 +6,9 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 2 | **High:** 27 | **Medium:** 17 | **Low:** 6
+- **Critical:** 1 | **High:** 27 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Silent crypto wrongness in `Pkcs11MlDsa.SignPreHashCore`.** The BCL `SignPreHash` contract passes a pre-computed digest; the override forwards it to `CKM_HASH_ML_DSA_*`, which hashes its input again. Produces non-interoperable signatures with no error.
-  - **Multi-part stream operations and `FindAllObjects` wedge the session on exception.** No `try/finally` around `*_Update` / `*_Final` and `C_FindObjects*` calls. After any mid-operation throw the session is unusable until closed.
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
 
@@ -59,6 +58,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-003] Multi-part stream operations leave session in active-operation state on exception
 
+- **Status: Resolved (2026-05-15)** — wrapped each stream-based `*_Init → loop → *_Final` in `try/finally` with a `finalized` flag that is set only after `ThrowIfError` returns. On the exception path the new `Pkcs11Session.TryCancelOperation` helper invokes `C_SessionCancel` with the appropriate `CKF_*` flag(s) and swallows errors (including `CKR_FUNCTION_NOT_SUPPORTED` from v2.40 libraries) so the original exception is never masked. Applied to stream-based `Encrypt`, `Decrypt`, `Verify`, `Digest`, `DigestEncrypt`, and `DecryptDigest`. Combined-op methods compose the cancel flags from independent `*Inited`/`*Finalized` markers so only the still-live sub-operations are cancelled.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Critical
 - **Effort:** M
