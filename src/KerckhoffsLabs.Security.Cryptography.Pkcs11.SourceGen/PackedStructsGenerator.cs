@@ -7,6 +7,10 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Placeholder — real generator lands in Task 6.
+        context.RegisterPostInitializationOutput(static ctx =>
+        {
+            ctx.AddSource("__PackedStructsGenerator.SmokeTest.g.cs",
+                "// PackedStructsGenerator: smoke output\n");
+        });
     }
 }
