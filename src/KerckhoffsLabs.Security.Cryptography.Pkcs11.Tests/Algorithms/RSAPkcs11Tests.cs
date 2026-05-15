@@ -131,7 +131,7 @@ public sealed class RSAPkcs11Tests_SoftHsm
         KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle pubH,
         KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle privH)
     {
-        if (!pubH.IsInvalid)  workspace.Session.DestroyObject(pubH);
+        if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
         if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
     }
 }

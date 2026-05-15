@@ -218,16 +218,16 @@ internal sealed partial class Pkcs11Session
 
         using var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
 
-        using var attrClass      = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-        using var attrKeyType    = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-        using var attrValueLen   = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)(bitLength / 8));
-        using var attrToken      = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
-        using var attrSensitive  = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var attrExtract    = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
-        using var attrEncrypt    = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-        using var attrDecrypt    = new ObjectAttribute(CKA.CKA_DECRYPT, true);
-        using var attrWrap       = new ObjectAttribute(CKA.CKA_WRAP, true);
-        using var attrUnwrap     = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)(bitLength / 8));
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var attrExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
         using var attrModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
 
         var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrValueLen, attrToken, attrSensitive, attrExtract, attrEncrypt, attrDecrypt, attrWrap, attrUnwrap, attrModifiable };
@@ -259,27 +259,27 @@ internal sealed partial class Pkcs11Session
 
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
-        using var pubClass       = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-        using var pubKeyType     = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
-        using var pubToken       = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
-        using var pubEncrypt     = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-        using var pubVerify      = new ObjectAttribute(CKA.CKA_VERIFY, true);
-        using var pubWrap        = new ObjectAttribute(CKA.CKA_WRAP, true);
-        using var pubModBits     = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)modulusBits);
-        using var pubExp         = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
-        using var pubModifiable  = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var pubEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)modulusBits);
+        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+        using var pubModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
 
-        using var privClass      = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType    = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
-        using var privToken      = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
-        using var privSensitive  = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privExtract    = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
-        using var privDecrypt    = new ObjectAttribute(CKA.CKA_DECRYPT, true);
-        using var privSign       = new ObjectAttribute(CKA.CKA_SIGN, true);
-        using var privUnwrap     = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var privDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
         using var privModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
 
-        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubEncrypt, pubVerify, pubWrap, pubModBits, pubExp, pubModifiable };
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubEncrypt, pubVerify, pubWrap, pubModBits, pubExp, pubModifiable };
         var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privExtract, privDecrypt, privSign, privUnwrap, privModifiable };
 
         if (label is not null)
@@ -322,25 +322,25 @@ internal sealed partial class Pkcs11Session
 
         using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
 
-        using var pubClass       = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-        using var pubKeyType     = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
-        using var pubToken       = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
-        using var pubVerify      = new ObjectAttribute(CKA.CKA_VERIFY, true);
-        using var pubParams      = new ObjectAttribute(CKA.CKA_EC_PARAMS, ecParams);
-        using var pubModifiable  = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
-        using var pubEncrypt     = new ObjectAttribute(CKA.CKA_ENCRYPT, false);
-        using var pubWrap        = new ObjectAttribute(CKA.CKA_WRAP, false);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, ecParams);
+        using var pubModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
+        using var pubEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, false);
+        using var pubWrap = new ObjectAttribute(CKA.CKA_WRAP, false);
 
-        using var privClass      = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType    = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
-        using var privToken      = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
-        using var privSensitive  = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privExtract    = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
-        using var privSign       = new ObjectAttribute(CKA.CKA_SIGN, true);
-        using var privDerive     = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, persistOnToken);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privDerive = new ObjectAttribute(CKA.CKA_DERIVE, true);
         using var privModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
 
-        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams, pubModifiable, pubEncrypt, pubWrap };
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams, pubModifiable, pubEncrypt, pubWrap };
         var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privExtract, privSign, privDerive, privModifiable };
 
         if (label is not null)

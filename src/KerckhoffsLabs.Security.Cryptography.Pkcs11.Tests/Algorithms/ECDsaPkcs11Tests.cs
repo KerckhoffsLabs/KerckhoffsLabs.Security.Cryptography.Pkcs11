@@ -39,7 +39,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm
         }
         finally
         {
-            if (!pubH.IsInvalid)  workspace.Session.DestroyObject(pubH);
+            if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
             if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
         }
     }
@@ -61,7 +61,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm
         }
         finally
         {
-            if (!pubH.IsInvalid)  workspace.Session.DestroyObject(pubH);
+            if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
             if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
         }
     }

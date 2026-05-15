@@ -32,7 +32,7 @@ public enum CKA : uint
     /// Description of the application that manages the object [string]
     /// </summary>
     CKA_APPLICATION = 0x00000010,
-    
+
     /// <summary>
     /// Value of the object [byte array]
     /// </summary>
@@ -87,7 +87,7 @@ public enum CKA : uint
     /// Java MIDP security domain [uint]
     /// </summary>
     CKA_JAVA_MIDP_SECURITY_DOMAIN = 0x00000088,
-    
+
     /// <summary>
     /// If not empty this attribute gives the URL where the complete certificate can be obtained [string]
     /// </summary>
@@ -182,7 +182,7 @@ public enum CKA : uint
     /// Start date for the certificate/key [DateTime]
     /// </summary>
     CKA_START_DATE = 0x00000110,
-    
+
     /// <summary>
     /// End date for the certificate/key [DateTime]
     /// </summary>
@@ -207,27 +207,27 @@ public enum CKA : uint
     /// Private exponent d [byte array]
     /// </summary>
     CKA_PRIVATE_EXPONENT = 0x00000123,
-    
+
     /// <summary>
     /// Prime p [byte array]
     /// </summary>
     CKA_PRIME_1 = 0x00000124,
-    
+
     /// <summary>
     /// Prime q [byte array]
     /// </summary>
     CKA_PRIME_2 = 0x00000125,
-    
+
     /// <summary>
     /// Private exponent d modulo p-1 [byte array]
     /// </summary>
     CKA_EXPONENT_1 = 0x00000126,
-    
+
     /// <summary>
     /// Private exponent d modulo q-1 [byte array]
     /// </summary>
     CKA_EXPONENT_2 = 0x00000127,
-    
+
     /// <summary>
     /// CRT coefficient q^-1 mod p [byte array]
     /// </summary>
@@ -242,17 +242,17 @@ public enum CKA : uint
     /// Prime p (512 to 1024 bits, in steps of 64 bits) [byte array]
     /// </summary>
     CKA_PRIME = 0x00000130,
-    
+
     /// <summary>
     /// Subprime q (160 bits) [byte array]
     /// </summary>
     CKA_SUBPRIME = 0x00000131,
-    
+
     /// <summary>
     /// Base g [byte array]
     /// </summary>
     CKA_BASE = 0x00000132,
-    
+
     /// <summary>
     /// Length of the prime value [uint]
     /// </summary>
@@ -267,7 +267,7 @@ public enum CKA : uint
     /// Length in bits of private value x [uint]
     /// </summary>
     CKA_VALUE_BITS = 0x00000160,
-    
+
     /// <summary>
     /// Length in bytes of key value [uint]
     /// </summary>
@@ -282,7 +282,7 @@ public enum CKA : uint
     /// True only if key was either generated locally (i.e., on the token) or created as a copy of a key which had its CKA_LOCAL attribute set to true [bool]
     /// </summary>
     CKA_LOCAL = 0x00000163,
-    
+
     /// <summary>
     /// True if key has never had the CKA_EXTRACTABLE attribute set to true [bool]
     /// </summary>
@@ -292,12 +292,12 @@ public enum CKA : uint
     /// True if key has always had the CKA_SENSITIVE attribute set to true [bool]
     /// </summary>
     CKA_ALWAYS_SENSITIVE = 0x00000165,
-    
+
     /// <summary>
     /// Identifier of the mechanism used to generate the key material [CKM/uint]
     /// </summary>
     CKA_KEY_GEN_MECHANISM = 0x00000166,
-    
+
     /// <summary>
     /// True if object can be modified [bool]
     /// </summary>

@@ -152,7 +152,7 @@ public enum CKM : uint
     /// PKCS #1 v1.5 RSA signature with SHA-256 mechanism
     /// </summary>
     CKM_SHA256_RSA_PKCS = 0x00000040,
-    
+
     /// <summary>
     /// PKCS #1 v1.5 RSA signature with SHA-384 mechanism
     /// </summary>
@@ -267,7 +267,7 @@ public enum CKM : uint
     /// Special case of general-length RC2-MAC mechanism
     /// </summary>
     CKM_RC2_MAC = 0x00000103,
-    
+
     /// <summary>
     /// General-length RC2-MAC mechanism based on data authentication as defined in FIPS PUB 113
     /// </summary>
@@ -312,7 +312,7 @@ public enum CKM : uint
     /// General-length DES-MAC mechanism based on data authentication as defined in FIPS PUB 113
     /// </summary>
     CKM_DES_MAC_GENERAL = 0x00000124,
-    
+
     /// <summary>
     /// DES-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
@@ -322,7 +322,7 @@ public enum CKM : uint
     /// Double-length DES key generation mechanism
     /// </summary>
     CKM_DES2_KEY_GEN = 0x00000130,
-    
+
     /// <summary>
     /// Triple-length DES key generation mechanism
     /// </summary>
@@ -582,7 +582,7 @@ public enum CKM : uint
     /// CAST key generation mechanism
     /// </summary>
     CKM_CAST_KEY_GEN = 0x00000300,
-    
+
     /// <summary>
     /// CAST-ECB encryption mechanism with electronic codebook mode (ECB)
     /// </summary>
@@ -607,7 +607,7 @@ public enum CKM : uint
     /// CAST-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_CAST_CBC_PAD = 0x00000305,
-    
+
     /// <summary>
     /// CAST3 key generation mechanism
     /// </summary>
@@ -622,7 +622,7 @@ public enum CKM : uint
     /// CAST3-CBC encryption mechanism with cipher-block chaining mode (CBC)
     /// </summary>
     CKM_CAST3_CBC = 0x00000312,
-    
+
     /// <summary>
     /// Special case of general-length CAST3-MAC mechanism
     /// </summary>
@@ -637,7 +637,7 @@ public enum CKM : uint
     /// CAST3-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_CAST3_CBC_PAD = 0x00000315,
-    
+
     /// <summary>
     /// CAST128 key generation mechanism
     /// </summary>
@@ -697,7 +697,7 @@ public enum CKM : uint
     /// CAST128-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_CAST128_CBC_PAD = 0x00000325,
-    
+
     /// <summary>
     /// RC5 key generation mechanism
     /// </summary>
@@ -727,7 +727,7 @@ public enum CKM : uint
     /// RC5-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_RC5_CBC_PAD = 0x00000335,
-    
+
     /// <summary>
     /// IDEA key generation mechanism
     /// </summary>
@@ -757,7 +757,7 @@ public enum CKM : uint
     /// IDEA-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_IDEA_CBC_PAD = 0x00000345,
-    
+
     /// <summary>
     /// The generic secret key generation mechanism
     /// </summary>
@@ -792,7 +792,7 @@ public enum CKM : uint
     /// Mechanism for pre_master key generation in SSL 3.0
     /// </summary>
     CKM_SSL3_PRE_MASTER_KEY_GEN = 0x00000370,
-    
+
     /// <summary>
     /// Mechanism for master key derivation in SSL 3.0
     /// </summary>
@@ -862,17 +862,17 @@ public enum CKM : uint
     /// SHA-256 key derivation mechanism
     /// </summary>
     CKM_SHA256_KEY_DERIVATION = 0x00000393,
-    
+
     /// <summary>
     /// SHA-384 key derivation mechanism
     /// </summary>
     CKM_SHA384_KEY_DERIVATION = 0x00000394,
-    
+
     /// <summary>
     /// SHA-512 key derivation mechanism
     /// </summary>
     CKM_SHA512_KEY_DERIVATION = 0x00000395,
-    
+
     /// <summary>
     /// SHA-224 key derivation mechanism
     /// </summary>
@@ -1062,12 +1062,12 @@ public enum CKM : uint
     /// The CT-KIP key wrap and unwrap mechanism
     /// </summary>
     CKM_KIP_WRAP = 0x00000511,
-    
+
     /// <summary>
     /// The CT-KIP signature (MAC) mechanism
     /// </summary>
     CKM_KIP_MAC = 0x00000512,
-    
+
     /// <summary>
     /// The Camellia key generation mechanism
     /// </summary>
@@ -1097,7 +1097,7 @@ public enum CKM : uint
     /// Camellia-CBC encryption mechanism with cipher-block chaining mode (CBC) and PKCS#7 padding
     /// </summary>
     CKM_CAMELLIA_CBC_PAD = 0x00000555,
-    
+
     /// <summary>
     /// Key derivation mechanism based on Camellia-ECB encryption mechanism with electronic codebook mode (ECB)
     /// </summary>
@@ -1112,7 +1112,7 @@ public enum CKM : uint
     /// Camellia-CTR mechanism for encryption and decryption with CAMELLIA in counter mode
     /// </summary>
     CKM_CAMELLIA_CTR = 0x00000558,
-    
+
     /// <summary>
     /// The ARIA key generation mechanism
     /// </summary>
@@ -1267,7 +1267,7 @@ public enum CKM : uint
     /// The FORTEZZA timestamp mechanism
     /// </summary>
     CKM_FORTEZZA_TIMESTAMP = 0x00001020,
-    
+
     /// <summary>
     /// The BATON key generation mechanism
     /// </summary>
@@ -1302,7 +1302,7 @@ public enum CKM : uint
     /// BATON mechanism for wrapping and unwrapping of secret keys (MEK)
     /// </summary>
     CKM_BATON_WRAP = 0x00001036,
-    
+
     /// <summary>
     /// The EC (also related to ECDSA) key pair generation mechanism
     /// </summary>

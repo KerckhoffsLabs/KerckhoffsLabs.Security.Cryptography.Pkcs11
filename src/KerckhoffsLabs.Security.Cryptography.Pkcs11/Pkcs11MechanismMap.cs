@@ -18,7 +18,7 @@ internal static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism RsaPkcs1Sign(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1"   => new Mechanism(CKM.CKM_SHA1_RSA_PKCS),
+        "SHA1" => new Mechanism(CKM.CKM_SHA1_RSA_PKCS),
         "SHA256" => new Mechanism(CKM.CKM_SHA256_RSA_PKCS),
         "SHA384" => new Mechanism(CKM.CKM_SHA384_RSA_PKCS),
         "SHA512" => new Mechanism(CKM.CKM_SHA512_RSA_PKCS),
@@ -39,7 +39,7 @@ internal static class Pkcs11MechanismMap
     {
         var (ckm, innerHash, mgf, effectiveSalt) = hash.Name switch
         {
-            "SHA1"   => (CKM.CKM_SHA1_RSA_PKCS_PSS,   CKM.CKM_SHA_1,  CKG.CKG_MGF1_SHA1,   saltLength < 0 ? 20 : saltLength),
+            "SHA1" => (CKM.CKM_SHA1_RSA_PKCS_PSS, CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1, saltLength < 0 ? 20 : saltLength),
             "SHA256" => (CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength < 0 ? 32 : saltLength),
             "SHA384" => (CKM.CKM_SHA384_RSA_PKCS_PSS, CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, saltLength < 0 ? 48 : saltLength),
             "SHA512" => (CKM.CKM_SHA512_RSA_PKCS_PSS, CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, saltLength < 0 ? 64 : saltLength),
@@ -58,7 +58,7 @@ internal static class Pkcs11MechanismMap
     {
         var (innerHash, mgf) = hash.Name switch
         {
-            "SHA1"   => (CKM.CKM_SHA_1,  CKG.CKG_MGF1_SHA1),
+            "SHA1" => (CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1),
             "SHA256" => (CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256),
             "SHA384" => (CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384),
             "SHA512" => (CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512),
@@ -75,7 +75,7 @@ internal static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism EcdsaSign(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1"   => new Mechanism(CKM.CKM_ECDSA_SHA1),
+        "SHA1" => new Mechanism(CKM.CKM_ECDSA_SHA1),
         "SHA256" => new Mechanism(CKM.CKM_ECDSA_SHA256),
         "SHA384" => new Mechanism(CKM.CKM_ECDSA_SHA384),
         "SHA512" => new Mechanism(CKM.CKM_ECDSA_SHA512),
@@ -110,14 +110,14 @@ internal static class Pkcs11MechanismMap
     {
         var (ckm, innerHash) = hash.Name switch
         {
-            "SHA224"    => (CKM.CKM_HASH_ML_DSA_SHA224,   CKM.CKM_SHA224),
-            "SHA256"    => (CKM.CKM_HASH_ML_DSA_SHA256,   CKM.CKM_SHA256),
-            "SHA384"    => (CKM.CKM_HASH_ML_DSA_SHA384,   CKM.CKM_SHA384),
-            "SHA512"    => (CKM.CKM_HASH_ML_DSA_SHA512,   CKM.CKM_SHA512),
-            "SHA3-224"  => (CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224),
-            "SHA3-256"  => (CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256),
-            "SHA3-384"  => (CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384),
-            "SHA3-512"  => (CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512),
+            "SHA224" => (CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_SHA224),
+            "SHA256" => (CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256),
+            "SHA384" => (CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384),
+            "SHA512" => (CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512),
+            "SHA3-224" => (CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224),
+            "SHA3-256" => (CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256),
+            "SHA3-384" => (CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384),
+            "SHA3-512" => (CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512),
             _ => throw new NotSupportedException(
                 $"HashML-DSA does not support hash {hash.Name}."),
         };
@@ -135,7 +135,7 @@ internal static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism Hmac(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1"   => new Mechanism(CKM.CKM_SHA_1_HMAC),
+        "SHA1" => new Mechanism(CKM.CKM_SHA_1_HMAC),
         "SHA256" => new Mechanism(CKM.CKM_SHA256_HMAC),
         "SHA384" => new Mechanism(CKM.CKM_SHA384_HMAC),
         "SHA512" => new Mechanism(CKM.CKM_SHA512_HMAC),

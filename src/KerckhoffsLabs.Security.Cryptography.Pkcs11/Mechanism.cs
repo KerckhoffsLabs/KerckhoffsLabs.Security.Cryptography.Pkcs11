@@ -132,7 +132,7 @@ public sealed class Mechanism : IDisposable
     }
 
     #region IDisposable
-    
+
     /// <summary>
     /// Disposes object
     /// </summary>
@@ -141,7 +141,7 @@ public sealed class Mechanism : IDisposable
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// Disposes object
     /// </summary>
@@ -154,15 +154,15 @@ public sealed class Mechanism : IDisposable
             {
                 // Dispose managed objects
             }
-            
+
             // Dispose unmanaged objects
             UnmanagedMemory.Free(ref _ckMechanism.Parameter);
-            _ckMechanism.ParameterLen = new (0);
-            
+            _ckMechanism.ParameterLen = new(0);
+
             _disposed = true;
         }
     }
-    
+
     /// <summary>
     /// Class destructor that disposes object if caller forgot to do so
     /// </summary>
@@ -170,6 +170,6 @@ public sealed class Mechanism : IDisposable
     {
         Dispose(false);
     }
-    
+
     #endregion
 }

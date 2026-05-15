@@ -544,7 +544,7 @@ public sealed class Pkcs11Key : IDisposable
     private static (System.Security.Cryptography.HashAlgorithmName, System.Security.Cryptography.RSASignaturePadding)
         MapRsaSignMechanism(Mechanism mechanism) => (CKM)mechanism.Type switch
         {
-            CKM.CKM_SHA1_RSA_PKCS   => (System.Security.Cryptography.HashAlgorithmName.SHA1,   System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            CKM.CKM_SHA1_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
@@ -556,7 +556,7 @@ public sealed class Pkcs11Key : IDisposable
     private static System.Security.Cryptography.HashAlgorithmName MapEcdsaMechanism(Mechanism mechanism)
         => (CKM)mechanism.Type switch
         {
-            CKM.CKM_ECDSA_SHA1   => System.Security.Cryptography.HashAlgorithmName.SHA1,
+            CKM.CKM_ECDSA_SHA1 => System.Security.Cryptography.HashAlgorithmName.SHA1,
             CKM.CKM_ECDSA_SHA256 => System.Security.Cryptography.HashAlgorithmName.SHA256,
             CKM.CKM_ECDSA_SHA384 => System.Security.Cryptography.HashAlgorithmName.SHA384,
             CKM.CKM_ECDSA_SHA512 => System.Security.Cryptography.HashAlgorithmName.SHA512,

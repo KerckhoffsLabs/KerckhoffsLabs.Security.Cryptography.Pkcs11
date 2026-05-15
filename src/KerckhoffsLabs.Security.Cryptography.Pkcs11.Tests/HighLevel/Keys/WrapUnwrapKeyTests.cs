@@ -18,14 +18,14 @@ internal static class WrapUnwrapKeyTestCases
 
             // Data key MUST be extractable to be wrappable. The secure-default
             // helper sets CKA_EXTRACTABLE=false, so build the template manually here.
-            using var dkClass     = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-            using var dkKeyType   = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-            using var dkValueLen  = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
-            using var dkToken     = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var dkClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var dkKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var dkValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+            using var dkToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
             using var dkSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
-            using var dkExtract   = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
-            using var dkEncrypt   = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-            using var dkDecrypt   = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+            using var dkExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+            using var dkEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+            using var dkDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
             var dkTemplate = new List<ObjectAttribute> { dkClass, dkKeyType, dkValueLen, dkToken, dkSensitive, dkExtract, dkEncrypt, dkDecrypt };
             using var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
             ObjectHandle dataKey = session.GenerateKey(keyGenMech, dkTemplate);
@@ -43,11 +43,11 @@ internal static class WrapUnwrapKeyTestCases
 
                 // Unwrap into a fresh handle — extractable+encrypt+decrypt so we can
                 // verify the key material survived by decrypting the ciphertext.
-                using var attrClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-                using var attrKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-                using var attrToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-                using var attrEncrypt  = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-                using var attrDecrypt  = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+                using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+                using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+                using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+                using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+                using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
                 var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrToken, attrEncrypt, attrDecrypt };
 
                 ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);

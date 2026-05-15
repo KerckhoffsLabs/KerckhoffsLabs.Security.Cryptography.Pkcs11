@@ -76,14 +76,14 @@ internal sealed partial class Pkcs11Session
         using var p = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, peerPublicPoint);
         using var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
 
-        using var attrClass      = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-        using var attrKeyType    = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-        using var attrValueLen   = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)(aesBitLength / 8));
-        using var attrToken      = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrSensitive  = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var attrExtract    = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
-        using var attrEncrypt    = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-        using var attrDecrypt    = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)(aesBitLength / 8));
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var attrExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
+        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
         using var attrModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
 
         var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrValueLen, attrToken, attrSensitive, attrExtract, attrEncrypt, attrDecrypt, attrModifiable };

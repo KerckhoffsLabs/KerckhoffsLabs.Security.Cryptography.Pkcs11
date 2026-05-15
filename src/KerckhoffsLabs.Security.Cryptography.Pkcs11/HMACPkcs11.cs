@@ -88,7 +88,7 @@ public sealed class HMACPkcs11 : HMAC
 
     private static int HashSizeFromName(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1"   => 20,
+        "SHA1" => 20,
         "SHA256" => 32,
         "SHA384" => 48,
         "SHA512" => 64,

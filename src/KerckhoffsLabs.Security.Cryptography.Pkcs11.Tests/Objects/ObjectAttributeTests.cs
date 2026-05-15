@@ -111,7 +111,7 @@ public class ObjectAttributeTests
     {
         byte[] source = [1, 2, 3, 4, 5];
         using var fromArray = new ObjectAttribute(CKA.CKA_VALUE, source);
-        using var fromSpan  = new ObjectAttribute(CKA.CKA_VALUE, (ReadOnlySpan<byte>)source);
+        using var fromSpan = new ObjectAttribute(CKA.CKA_VALUE, (ReadOnlySpan<byte>)source);
         Assert.Equal(fromArray.GetValueAsByteArray(), fromSpan.GetValueAsByteArray());
     }
 

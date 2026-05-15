@@ -22,7 +22,7 @@ public struct CK_KIP_PARAMS
     /// Pointer to an input seed
     /// </summary>
     public IntPtr Seed;
-    
+
     /// <summary>
     /// Length in bytes of the input seed
     /// </summary>

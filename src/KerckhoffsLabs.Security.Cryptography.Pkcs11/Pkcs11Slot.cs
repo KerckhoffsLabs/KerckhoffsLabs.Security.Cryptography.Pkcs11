@@ -27,7 +27,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// PKCS#11 handle of slot
     /// </summary>
-    private NativeCULong _slotId = new (0);
+    private NativeCULong _slotId = new(0);
 
     /// <summary>
     /// PKCS#11 handle of slot
@@ -53,7 +53,7 @@ public sealed class Pkcs11Slot
 
         _pkcs11Library = pkcs11Library;
         _slotId = (NativeCULong)(slotId);
-        }
+    }
 
     /// <summary>
     /// Obtains information about a particular slot in the system

@@ -12,7 +12,7 @@ public struct CK_CAMELLIA_CTR_PARAMS
     /// Specifies the number of bits in the counter block (cb) that shall be incremented
     /// </summary>
     public NativeCULong CounterBits;
-    
+
     /// <summary>
     /// Specifies the counter block
     /// </summary>

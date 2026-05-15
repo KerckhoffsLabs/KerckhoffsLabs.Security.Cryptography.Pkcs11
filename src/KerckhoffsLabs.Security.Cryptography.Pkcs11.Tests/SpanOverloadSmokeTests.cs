@@ -14,12 +14,12 @@ public class SpanOverloadSmokeTests
         byte[] payload = [1, 2, 3, 4, 5];
 
         using var fromArray = new ObjectAttribute(CKA.CKA_VALUE, payload);
-        using var fromSpan  = new ObjectAttribute(CKA.CKA_VALUE, (ReadOnlySpan<byte>)payload);
+        using var fromSpan = new ObjectAttribute(CKA.CKA_VALUE, (ReadOnlySpan<byte>)payload);
 
         Assert.Equal(fromArray.ValueLength, fromSpan.ValueLength);
 
         byte[] readBackArray = fromArray.GetValueAsByteArray();
-        byte[] readBackSpan  = fromSpan.GetValueAsByteArray();
+        byte[] readBackSpan = fromSpan.GetValueAsByteArray();
         Assert.Equal(readBackArray, readBackSpan);
         Assert.Equal(payload, readBackArray);
     }
@@ -69,7 +69,7 @@ public class SpanOverloadSmokeTests
         byte[] paramBytes = [0x10, 0x20, 0x30];
 
         CK_MECHANISM fromArray = CK_MECHANISM.CreateMechanism(CKM.CKM_AES_GCM, paramBytes);
-        CK_MECHANISM fromSpan  = CK_MECHANISM.CreateMechanism(CKM.CKM_AES_GCM, (ReadOnlySpan<byte>)paramBytes);
+        CK_MECHANISM fromSpan = CK_MECHANISM.CreateMechanism(CKM.CKM_AES_GCM, (ReadOnlySpan<byte>)paramBytes);
 
         try
         {

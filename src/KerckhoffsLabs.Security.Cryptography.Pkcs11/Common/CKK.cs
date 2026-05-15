@@ -22,7 +22,7 @@ public enum CKK : uint
     /// DH (Diffie-Hellman) key
     /// </summary>
     CKK_DH = 0x00000002,
-    
+
     /// <summary>
     /// EC (Elliptic Curve) key
     /// </summary>
@@ -72,7 +72,7 @@ public enum CKK : uint
     /// Triple-length DES key
     /// </summary>
     CKK_DES3 = 0x00000015,
-    
+
     /// <summary>
     /// CAST key
     /// </summary>
@@ -92,7 +92,7 @@ public enum CKK : uint
     /// CAST128 key
     /// </summary>
     CKK_CAST128 = 0x00000018,
-    
+
     /// <summary>
     /// RC5 key
     /// </summary>
@@ -157,7 +157,7 @@ public enum CKK : uint
     /// Camellia key
     /// </summary>
     CKK_CAMELLIA = 0x00000025,
-    
+
     /// <summary>
     /// ARIA key
     /// </summary>

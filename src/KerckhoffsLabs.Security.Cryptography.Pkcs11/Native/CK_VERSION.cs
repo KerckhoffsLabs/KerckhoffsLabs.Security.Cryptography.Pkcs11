@@ -13,7 +13,7 @@ public struct CK_VERSION
     /// </summary>
     [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
     public byte[] Major;
-    
+
     /// <summary>
     /// Minor version number (the hundredths portion of the version)
     /// </summary>

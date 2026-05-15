@@ -19,13 +19,13 @@ internal static class DeriveSharedSecretEcdhTestCases
             {
                 // Extract each peer's public point (CKA_EC_POINT is a DER-encoded OCTET STRING).
                 var aliceAttrs = session.GetAttributeValue(alicePub, new List<CKA> { CKA.CKA_EC_POINT });
-                var bobAttrs   = session.GetAttributeValue(bobPub,   new List<CKA> { CKA.CKA_EC_POINT });
+                var bobAttrs = session.GetAttributeValue(bobPub, new List<CKA> { CKA.CKA_EC_POINT });
                 byte[] alicePoint;
                 byte[] bobPoint;
                 try
                 {
                     alicePoint = aliceAttrs[0].GetValueAsByteArray();
-                    bobPoint   = bobAttrs[0].GetValueAsByteArray();
+                    bobPoint = bobAttrs[0].GetValueAsByteArray();
                 }
                 finally
                 {
@@ -35,7 +35,7 @@ internal static class DeriveSharedSecretEcdhTestCases
 
                 // Both parties derive AES-256 keys from the shared secret.
                 ObjectHandle aliceKey = session.DeriveSharedSecretEcdh(alicePriv, bobPoint);
-                ObjectHandle bobKey   = session.DeriveSharedSecretEcdh(bobPriv,   alicePoint);
+                ObjectHandle bobKey = session.DeriveSharedSecretEcdh(bobPriv, alicePoint);
                 try
                 {
                     // Encrypt the same plaintext with both derived keys and check the ciphertext+tag matches.
@@ -46,7 +46,7 @@ internal static class DeriveSharedSecretEcdhTestCases
                     byte[] iv = new byte[12];
                     byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a ECDH sanity check");
                     byte[] ctA = session.EncryptAesGcm(aliceKey, iv, plaintext);
-                    byte[] ctB = session.EncryptAesGcm(bobKey,   iv, plaintext);
+                    byte[] ctB = session.EncryptAesGcm(bobKey, iv, plaintext);
                     Assert.Equal(ctA, ctB);
                 }
                 finally

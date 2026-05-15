@@ -152,7 +152,7 @@ public sealed class Pkcs11Library : IDisposable
 
         _logger.LogDebug("Pkcs11Library({LibraryPath})::GetSlotList", _libraryPath);
 
-        NativeCULong slotCount = new (0);
+        NativeCULong slotCount = new(0);
         CKR rv = _pkcs11Library.C_GetSlotList(tokenPresent, null, ref slotCount);
         Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 

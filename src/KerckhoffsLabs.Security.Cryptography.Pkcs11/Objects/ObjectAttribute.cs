@@ -74,9 +74,9 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute of the given vendor-defined attribute id with no value.</summary>
-    public ObjectAttribute(ulong type)             { _ckAttribute = _CreateAttribute((NativeCULong)type, ReadOnlySpan<byte>.Empty); }
+    public ObjectAttribute(ulong type) { _ckAttribute = _CreateAttribute((NativeCULong)type, ReadOnlySpan<byte>.Empty); }
     /// <summary>Creates an attribute of the given <see cref="CKA"/> type with no value.</summary>
-    public ObjectAttribute(CKA   type)             : this((ulong)type) { }
+    public ObjectAttribute(CKA type) : this((ulong)type) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a <see cref="ulong"/> value (encoded as CK_ULONG on the wire).</summary>
     public ObjectAttribute(ulong type, ulong value)
@@ -86,13 +86,13 @@ public sealed class ObjectAttribute : IDisposable
         _ckAttribute = _CreateAttribute((NativeCULong)type, buf[..UnmanagedMemory.NativeULongSize]);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="ulong"/> value (encoded as CK_ULONG on the wire).</summary>
-    public ObjectAttribute(CKA type, ulong value)  : this((ulong)type, value) { }
+    public ObjectAttribute(CKA type, ulong value) : this((ulong)type, value) { }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="CKC"/> enum value.</summary>
-    public ObjectAttribute(CKA type, CKC   value)  : this((ulong)type, (ulong)value) { }
+    public ObjectAttribute(CKA type, CKC value) : this((ulong)type, (ulong)value) { }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="CKK"/> enum value.</summary>
-    public ObjectAttribute(CKA type, CKK   value)  : this((ulong)type, (ulong)value) { }
+    public ObjectAttribute(CKA type, CKK value) : this((ulong)type, (ulong)value) { }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="CKO"/> enum value.</summary>
-    public ObjectAttribute(CKA type, CKO   value)  : this((ulong)type, (ulong)value) { }
+    public ObjectAttribute(CKA type, CKO value) : this((ulong)type, (ulong)value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
     public ObjectAttribute(ulong type, bool value)
@@ -102,7 +102,7 @@ public sealed class ObjectAttribute : IDisposable
         _ckAttribute = _CreateAttribute((NativeCULong)type, buf);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
-    public ObjectAttribute(CKA type, bool value)   : this((ulong)type, value) { }
+    public ObjectAttribute(CKA type, bool value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a UTF-8 string with no null terminator.</summary>
     public ObjectAttribute(ulong type, string value)

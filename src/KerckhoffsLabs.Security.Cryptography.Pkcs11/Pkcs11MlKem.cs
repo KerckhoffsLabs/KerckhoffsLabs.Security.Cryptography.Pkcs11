@@ -197,8 +197,8 @@ public sealed class Pkcs11MlKem : MLKem
 
             return (CkpMlKem)attrs[0].GetValueAsUlong() switch
             {
-                CkpMlKem.CKP_ML_KEM_512  => MLKemAlgorithm.MLKem512,
-                CkpMlKem.CKP_ML_KEM_768  => MLKemAlgorithm.MLKem768,
+                CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
+                CkpMlKem.CKP_ML_KEM_768 => MLKemAlgorithm.MLKem768,
                 CkpMlKem.CKP_ML_KEM_1024 => MLKemAlgorithm.MLKem1024,
                 var unknown => throw new ArgumentException(
                     $"Unrecognized ML-KEM parameter set 0x{(ulong)unknown:X}.", nameof(key)),

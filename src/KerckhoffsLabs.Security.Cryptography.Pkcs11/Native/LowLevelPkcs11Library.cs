@@ -11,7 +11,7 @@ internal sealed class LowLevelPkcs11Library
     /// </summary>
     private bool _disposed = false;
 
-     /// <summary>
+    /// <summary>
     /// Handle to the PKCS#11 library
     /// </summary>
     private Pkcs11ModuleHandle _library = new Pkcs11ModuleHandle();

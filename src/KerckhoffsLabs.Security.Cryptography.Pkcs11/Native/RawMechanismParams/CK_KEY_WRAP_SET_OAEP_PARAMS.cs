@@ -17,7 +17,7 @@ public struct CK_KEY_WRAP_SET_OAEP_PARAMS
     /// Concatenation of hash of plaintext data (if present) and extra data (if present)
     /// </summary>
     public IntPtr X;
-    
+
     /// <summary>
     /// Length in bytes of concatenation of hash of plaintext data (if present) and extra data (if present) or 0 if neither is present
     /// </summary>

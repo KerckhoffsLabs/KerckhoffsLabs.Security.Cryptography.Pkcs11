@@ -18,12 +18,12 @@ internal static class TestKeys
         if (rawKey.Length != 32)
             throw new ArgumentException("AES-256 key must be 32 bytes.", nameof(rawKey));
 
-        using var attrClass   = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-        using var attrToken   = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
         using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
-        using var attrValue   = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
 
         var template = new List<ObjectAttribute>
             { attrClass, attrKeyType, attrToken, attrEncrypt, attrDecrypt, attrValue };
@@ -35,12 +35,12 @@ internal static class TestKeys
         if (rawKey.Length != 32)
             throw new ArgumentException("ChaCha20 key must be 32 bytes.", nameof(rawKey));
 
-        using var attrClass   = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_CHACHA20);
-        using var attrToken   = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
         using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
-        using var attrValue   = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
 
         var template = new List<ObjectAttribute>
             { attrClass, attrKeyType, attrToken, attrEncrypt, attrDecrypt, attrValue };
@@ -68,20 +68,20 @@ internal static class TestKeys
     {
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
-        using var pubClass   = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
-        using var pubToken   = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var pubEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-        using var pubWrap    = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var pubWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
         using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)2048);
-        using var pubExp     = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
 
-        using var privClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
-        using var privToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var privSensitive= new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privDecrypt  = new ObjectAttribute(CKA.CKA_DECRYPT, true);
-        using var privUnwrap   = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var privUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
 
         var pubTemplate = new List<ObjectAttribute>
             { pubClass, pubKeyType, pubToken, pubEncrypt, pubWrap, pubModBits, pubExp };
@@ -100,20 +100,20 @@ internal static class TestKeys
     {
         using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
-        using var pubClass   = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
-        using var pubToken   = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var pubVerify  = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
         using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)2048);
-        using var pubExp     = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
 
-        using var privClass     = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType   = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
-        using var privToken     = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privSign      = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
 
-        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubModBits, pubExp };
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubModBits, pubExp };
         var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privSign };
 
         session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
@@ -132,19 +132,19 @@ internal static class TestKeys
         // 06 08 2A 86 48 CE 3D 03 01 07
         byte[] p256Params = new byte[] { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
 
-        using var pubClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-        using var pubKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
-        using var pubToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var pubVerify   = new ObjectAttribute(CKA.CKA_VERIFY, true);
-        using var pubParams   = new ObjectAttribute(CKA.CKA_EC_PARAMS, p256Params);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, p256Params);
 
-        using var privClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
-        using var privToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var privSensitive= new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privSign     = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
 
-        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
         var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privSign };
 
         session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
@@ -163,19 +163,19 @@ internal static class TestKeys
         // 06 03 2B 65 70
         byte[] ed25519Params = new byte[] { 0x06, 0x03, 0x2B, 0x65, 0x70 };
 
-        using var pubClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-        using var pubKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
-        using var pubToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var pubVerify   = new ObjectAttribute(CKA.CKA_VERIFY, true);
-        using var pubParams   = new ObjectAttribute(CKA.CKA_EC_PARAMS, ed25519Params);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, ed25519Params);
 
-        using var privClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
-        using var privToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var privSensitive= new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privSign     = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
 
-        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
         var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privSign };
 
         session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
@@ -194,19 +194,19 @@ internal static class TestKeys
         // 06 03 2B 65 71
         byte[] ed448Params = new byte[] { 0x06, 0x03, 0x2B, 0x65, 0x71 };
 
-        using var pubClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
-        using var pubKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
-        using var pubToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var pubVerify   = new ObjectAttribute(CKA.CKA_VERIFY, true);
-        using var pubParams   = new ObjectAttribute(CKA.CKA_EC_PARAMS, ed448Params);
+        using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
+        using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var pubParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, ed448Params);
 
-        using var privClass    = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
-        using var privKeyType  = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
-        using var privToken    = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var privSensitive= new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var privSign     = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
+        using var privToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var privSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var privSign = new ObjectAttribute(CKA.CKA_SIGN, true);
 
-        var pubTemplate  = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
+        var pubTemplate = new List<ObjectAttribute> { pubClass, pubKeyType, pubToken, pubVerify, pubParams };
         var privTemplate = new List<ObjectAttribute> { privClass, privKeyType, privToken, privSensitive, privSign };
 
         session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);

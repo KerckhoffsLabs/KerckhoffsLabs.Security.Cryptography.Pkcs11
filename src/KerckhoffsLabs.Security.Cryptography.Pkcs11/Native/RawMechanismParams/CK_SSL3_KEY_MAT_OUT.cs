@@ -12,7 +12,7 @@ public struct CK_SSL3_KEY_MAT_OUT
     /// Key handle for the resulting Client MAC Secret key
     /// </summary>
     public NativeCULong ClientMacSecret;
-    
+
     /// <summary>
     /// Key handle for the resulting Server MAC Secret key
     /// </summary>

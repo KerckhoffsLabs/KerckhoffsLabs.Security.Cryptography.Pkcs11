@@ -17,17 +17,17 @@ public struct CK_RSA_PKCS_OAEP_PARAMS
     /// Mask generation function to use on the encoded block (CKG)
     /// </summary>
     public NativeCULong Mgf;
-    
+
     /// <summary>
     /// Source of the encoding parameter (CKZ)
     /// </summary>
     public NativeCULong Source;
-    
+
     /// <summary>
     /// Data used as the input for the encoding parameter source
     /// </summary>
     public IntPtr SourceData;
-    
+
     /// <summary>
     /// Length of the encoding parameter source input
     /// </summary>

@@ -133,7 +133,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     private static byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data) =>
         hashAlgorithm.Name switch
         {
-            "SHA1"   => System.Security.Cryptography.SHA1.HashData(data),
+            "SHA1" => System.Security.Cryptography.SHA1.HashData(data),
             "SHA256" => System.Security.Cryptography.SHA256.HashData(data),
             "SHA384" => System.Security.Cryptography.SHA384.HashData(data),
             "SHA512" => System.Security.Cryptography.SHA512.HashData(data),

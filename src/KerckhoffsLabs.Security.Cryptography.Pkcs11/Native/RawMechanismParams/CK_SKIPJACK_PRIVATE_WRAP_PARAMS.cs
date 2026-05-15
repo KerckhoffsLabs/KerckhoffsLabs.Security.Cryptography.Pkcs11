@@ -12,7 +12,7 @@ public struct CK_SKIPJACK_PRIVATE_WRAP_PARAMS
     /// Length of the password
     /// </summary>
     public NativeCULong PasswordLen;
-    
+
     /// <summary>
     /// Pointer to the buffer which contains the user-supplied password
     /// </summary>
@@ -27,7 +27,7 @@ public struct CK_SKIPJACK_PRIVATE_WRAP_PARAMS
     /// Pointer to other party's key exchange public key value
     /// </summary>
     public IntPtr PublicData;
-    
+
     /// <summary>
     /// Length of prime and base values
     /// </summary>
