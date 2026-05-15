@@ -152,8 +152,9 @@ public sealed class MarshalSizeOfTests
     [InlineData("CK_INFO_Windows", 76)]
     public void WindowsSiblingStructSize(string typeName, int expectedSize)
     {
-        var t = typeof(CK_INFO).Assembly.GetType(
-            "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native." + typeName);
+        var asm = typeof(CK_INFO).Assembly;
+        var t = asm.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native." + typeName)
+            ?? asm.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams." + typeName);
         Assert.NotNull(t);
         Assert.Equal(expectedSize, Marshal.SizeOf(t!));
     }
