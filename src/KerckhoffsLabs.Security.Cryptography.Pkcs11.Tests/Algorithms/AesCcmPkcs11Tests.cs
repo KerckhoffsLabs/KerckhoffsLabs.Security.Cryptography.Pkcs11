@@ -19,8 +19,9 @@ public sealed class AesCcmPkcs11Tests_SoftHsm
     private readonly SoftHsmBackendFixture _backend;
     public AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend) => _backend = backend;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsAesCcm => SoftHsmBackendFixture.SoftHsmSupportsAesCcm;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsAesCcm))]
     public void EncryptDecrypt_RoundTrips_WithAad()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -170,7 +171,7 @@ public sealed class AesCcmPkcs11Tests_SoftHsm
         }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsAesCcm))]
     public void Decrypt_TamperedTag_Throws()
     {
         using var workspace = _backend.Library.OpenWorkspace(

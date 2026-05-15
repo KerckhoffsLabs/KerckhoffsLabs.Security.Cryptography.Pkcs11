@@ -24,6 +24,7 @@ public sealed class RSAPkcs11Tests_SoftHsm
     private readonly SoftHsmBackendFixture _backend;
     public RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend) => _backend = backend;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsOaepSha256 => SoftHsmBackendFixture.SoftHsmSupportsOaepSha256;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
@@ -61,7 +62,7 @@ public sealed class RSAPkcs11Tests_SoftHsm
         finally { Cleanup(workspace, pubH, privH); }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsOaepSha256))]
     public void EncryptDecrypt_OaepSha256_RoundTrips()
     {
         using var workspace = OpenWorkspace();

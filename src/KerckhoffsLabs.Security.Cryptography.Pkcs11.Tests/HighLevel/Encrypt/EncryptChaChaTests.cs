@@ -129,12 +129,13 @@ public sealed class EncryptChaChaTests_SoftHsm(SoftHsmBackendFixture f)
     private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsChaCha20KeyType => SoftHsmBackendFixture.SoftHsmSupportsChaCha20KeyType;
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void ChaCha20_RejectsWrongNonceLength_SoftHsm()
         => EncryptChaChaTestCases.Assert_RejectsWrongNonceLength(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsChaCha20KeyType))]
     public void ChaCha20_RoundTrip_SoftHsm()
         => EncryptChaChaTestCases.Assert_RoundTrip(_backend);
 }

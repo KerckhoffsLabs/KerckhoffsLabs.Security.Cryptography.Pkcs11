@@ -76,7 +76,8 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsEcdh1WithKdf => SoftHsmBackendFixture.SoftHsmSupportsEcdh1WithKdf;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsEcdh1WithKdf))]
     public void Ecdh_BothPartiesDeriveSameSecret() => DeriveSharedSecretEcdhTestCases.Assert_Ecdh_BothPartiesDeriveSameSecret(_backend);
 }

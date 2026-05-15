@@ -19,6 +19,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm
     private readonly SoftHsmBackendFixture _backend;
     public ChaCha20Poly1305Pkcs11Tests_SoftHsm(SoftHsmBackendFixture backend) => _backend = backend;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsChaCha20Poly1305 => SoftHsmBackendFixture.SoftHsmSupportsChaCha20Poly1305;
 
     // Helper: generate a ChaCha20 key under a unique label and return the label.
     // Caller is responsible for cleanup. Uses CKM_GENERIC_SECRET_KEY_GEN because
@@ -42,7 +43,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm
         }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsChaCha20Poly1305))]
     public void EncryptDecrypt_RoundTrips_WithAad()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -74,7 +75,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm
         }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsChaCha20Poly1305))]
     public void Decrypt_TamperedTag_Throws()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -106,7 +107,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm
         }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsChaCha20Poly1305))]
     public void Encrypt_NonceWrongLength_Throws()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -133,7 +134,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm
         }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsChaCha20Poly1305))]
     public void Encrypt_TagWrongLength_Throws()
     {
         using var workspace = _backend.Library.OpenWorkspace(

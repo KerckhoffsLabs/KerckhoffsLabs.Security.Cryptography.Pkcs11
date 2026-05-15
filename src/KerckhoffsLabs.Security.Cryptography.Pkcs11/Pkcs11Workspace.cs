@@ -240,6 +240,16 @@ public sealed class Pkcs11Workspace : IDisposable
     internal Pkcs11Key HydrateExistingHandleAsKey(ObjectHandle handle)
         => HydrateKeyFromHandle(handle);
 
+    private ObjectHandle FindCompanion(CKO companionClass, byte[] id)
+    {
+        using var filter = ObjectTemplate.Empty()
+            .Attribute(CKA.CKA_CLASS, (ulong)companionClass)
+            .Id(id)
+            .Build();
+        var handles = _session.FindAllObjects(filter.Attributes.ToList());
+        return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
+    }
+
     private Pkcs11Key OpenKeyByFilter(ObjectTemplate filter, string queryDescription)
     {
         var handles = _session.FindAllObjects(filter.Attributes.ToList());
@@ -280,19 +290,16 @@ public sealed class Pkcs11Workspace : IDisposable
                 privateHandle = handle;
                 // Search for public companion by CKA_ID. Empty ID disables the lookup.
                 if (id.Length > 0)
-                {
-                    using var companionFilter = ObjectTemplate.Empty()
-                        .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PUBLIC_KEY)
-                        .Id(id)
-                        .Build();
-                    var companionHandles = _session.FindAllObjects(companionFilter.Attributes.ToList());
-                    if (companionHandles.Count > 0)
-                        publicHandle = companionHandles[0];
-                }
+                    publicHandle = FindCompanion(CKO.CKO_PUBLIC_KEY, id);
             }
             else if (objectClass == CKO.CKO_PUBLIC_KEY)
             {
                 publicHandle = handle;
+                // Mirror the private-side lookup. FindAllObjects orders pub/priv arbitrarily
+                // — if the public came back first, we must still hydrate the private half so
+                // Sign/Decrypt work. Empty ID disables the lookup (no reliable way to match).
+                if (id.Length > 0)
+                    privateHandle = FindCompanion(CKO.CKO_PRIVATE_KEY, id);
             }
             else // CKO_SECRET_KEY or other
             {

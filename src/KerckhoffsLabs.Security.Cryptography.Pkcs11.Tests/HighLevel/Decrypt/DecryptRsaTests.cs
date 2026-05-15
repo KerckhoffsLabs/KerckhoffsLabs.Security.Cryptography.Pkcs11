@@ -115,12 +115,13 @@ public sealed class DecryptRsaTests_SoftHsm(SoftHsmBackendFixture f)
     private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsOaepSha256 => SoftHsmBackendFixture.SoftHsmSupportsOaepSha256;
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_SoftHsm()
         => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsOaepSha256))]
     public void RsaOaep_RoundTrip_SoftHsm()
         => DecryptRsaTestCases.Assert_RsaOaep_RoundTrip(_backend);
 }

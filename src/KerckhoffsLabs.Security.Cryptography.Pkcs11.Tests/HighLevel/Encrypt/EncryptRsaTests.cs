@@ -106,8 +106,9 @@ public sealed class EncryptRsaTests_SoftHsm(SoftHsmBackendFixture f)
     private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsOaepSha256 => SoftHsmBackendFixture.SoftHsmSupportsOaepSha256;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsOaepSha256))]
     public void RsaOaep_RoundTrips_SoftHsm()
         => EncryptRsaTestCases.Assert_RsaOaep_RoundTrips(_backend);
 

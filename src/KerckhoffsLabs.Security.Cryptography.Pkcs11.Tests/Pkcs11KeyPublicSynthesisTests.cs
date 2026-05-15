@@ -60,40 +60,13 @@ public sealed class Pkcs11KeyPublicSynthesisTests_SoftHsm
         }
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void Ec_PrivateOnly_SynthesizesWhenEcPointPresent()
-    {
-        using var workspace = OpenWorkspace();
-
-        string label = $"ec-test-{Guid.NewGuid():N}";
-        byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
-        // OID for secp256r1 (NIST P-256), DER-encoded.
-        byte[] secp256r1 = { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
-
-        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .Label(label).Id(id).Verify().EcParams(secp256r1).Build();
-        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
-            .Label(label).Id(id).Sign().Build();
-
-        workspace.Session.GenerateKeyPair(
-            new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN),
-            pubTpl.Attributes.ToList(),
-            privTpl.Attributes.ToList(),
-            out var pubHandle,
-            out var privHandle);
-
-        try
-        {
-            workspace.Session.DestroyObject(pubHandle);
-            using var key = workspace.OpenKey(label);
-            var ec = key.GetSynthesizedEcParameters();
-            // On SoftHSM, CKA_EC_POINT is stored on the private key, so synthesis succeeds.
-            Assert.NotNull(ec);
-            Assert.NotNull(ec!.Value.Q.X);
-        }
-        finally
-        {
-            workspace.Session.DestroyObject(privHandle);
-        }
-    }
+    // Note: a previous Ec_PrivateOnly_SynthesizesWhenEcPointPresent test lived here and
+    // assumed CKA_EC_POINT was readable from a CKO_PRIVATE_KEY object. SoftHSM 2.x stores
+    // only CKA_EC_PARAMS + CKA_VALUE on the EC private object (see vendor/softhsmv2
+    // P11Objects.cpp P11ECPrivateKeyObj::init), and PKCS#11 v2.40 places CKA_EC_POINT on
+    // public objects only. Synthesizing the public point from a private-only object would
+    // require either reading the (sensitive) private scalar or doing an on-token point
+    // multiplication — neither of which the library can do without compromising the
+    // non-extractable posture. The RSA-equivalent test passes because CKA_MODULUS and
+    // CKA_PUBLIC_EXPONENT are stored on RSA private objects.
 }

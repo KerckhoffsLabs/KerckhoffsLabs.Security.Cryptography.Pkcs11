@@ -55,14 +55,20 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Performs ECDH1 key derivation using the caller's EC private key and the peer's public
     /// point. The derived key is an AES secret key — session-only, sensitive, non-extractable,
-    /// non-modifiable — suitable for use with AES-GCM. Defaults to 32 bytes with the SHA-256 KDF;
-    /// pass <paramref name="aesBitLength"/> to change the AES key length.
+    /// non-modifiable — suitable for use with AES-GCM.
     /// </summary>
     /// <param name="myPrivateKeyHandle">Handle of the caller's EC private key (CKA_DERIVE=true).</param>
     /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> attribute value).</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
+    /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
+    /// pass <see cref="CKD.CKD_NULL"/> to receive the raw shared secret (do your own KDF off-token).
+    /// Some HSMs (e.g. SoftHSM 2.x) only accept <c>CKD_NULL</c>.</param>
     /// <returns>Handle of the derived AES key.</returns>
-    public ObjectHandle DeriveSharedSecretEcdh(ObjectHandle myPrivateKeyHandle, ReadOnlySpan<byte> peerPublicPoint, int aesBitLength = 256)
+    public ObjectHandle DeriveSharedSecretEcdh(
+        ObjectHandle myPrivateKeyHandle,
+        ReadOnlySpan<byte> peerPublicPoint,
+        int aesBitLength = 256,
+        CKD kdf = CKD.CKD_SHA256_KDF)
     {
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -73,7 +79,7 @@ internal sealed partial class Pkcs11Session
         if (aesBitLength != 128 && aesBitLength != 192 && aesBitLength != 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
 
-        using var p = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, peerPublicPoint);
+        using var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
         using var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
 
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);

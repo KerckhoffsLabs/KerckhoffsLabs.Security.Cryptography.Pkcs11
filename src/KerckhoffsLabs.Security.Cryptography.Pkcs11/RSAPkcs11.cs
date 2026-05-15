@@ -13,13 +13,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <c>RSA</c> is accepted (e.g. <c>RSACertificateExtensions</c>, ASP.NET Core signing).
 /// </para>
 /// <para>
-/// The BCL dispatch chain for the non-virtual <c>SignData(byte[], ...)</c> and
-/// <c>VerifyData(byte[], ...)</c> overloads ultimately calls the virtual
-/// <c>TrySignData</c> and <c>VerifyData(ReadOnlySpan, ...)</c> overloads, which
-/// this class overrides. The full data bytes are therefore forwarded to PKCS#11 intact,
-/// allowing the token to perform hashing + signing in a single <c>C_Sign</c> call using
-/// the combined mechanism (e.g. <c>CKM_SHA256_RSA_PKCS</c>). This avoids using the
-/// blocked <c>CKM_RSA_PKCS</c> raw-sign mechanism.
+/// On .NET 10, the BCL splits its sign/verify dispatch by entry-point overload:
+/// the <c>byte[]</c> path goes through <c>SignData(byte[], int, int, …)</c> /
+/// <c>VerifyData(byte[], int, int, byte[], …)</c>, while the span path goes through
+/// <c>TrySignData(ReadOnlySpan, …)</c> / <c>VerifyData(ReadOnlySpan, ReadOnlySpan, …)</c>.
+/// Neither path routes through the other, so we override both. All overrides forward
+/// the full data bytes to PKCS#11 via the combined hash+sign mechanism (e.g.
+/// <c>CKM_SHA256_RSA_PKCS</c>) — the token hashes and signs in a single <c>C_Sign</c> call,
+/// avoiding the gated <c>CKM_RSA_PKCS</c> raw-sign mechanism.
 /// </para>
 /// </remarks>
 public sealed class RSAPkcs11 : RSA
@@ -49,10 +50,9 @@ public sealed class RSAPkcs11 : RSA
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Overrides the virtual span entry-point so the BCL non-virtual
-    /// <c>SignData(byte[], HashAlgorithmName, RSASignaturePadding)</c> dispatches here
-    /// with the complete, un-hashed data. The PKCS#11 mechanism performs hashing
-    /// on-token (e.g. <c>CKM_SHA256_RSA_PKCS</c> for PKCS#1 / SHA-256).
+    /// Span entry-point — the .NET 10 BCL routes <c>SignData(ReadOnlySpan&lt;byte&gt;, …)</c>
+    /// here. The full un-hashed data is forwarded to PKCS#11; the token hashes and signs
+    /// in one <c>C_Sign</c> call.
     /// </remarks>
     public override bool TrySignData(
         ReadOnlySpan<byte> data,
@@ -74,15 +74,37 @@ public sealed class RSAPkcs11 : RSA
         return true;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Byte-array entry-point — the .NET 10 BCL routes <c>SignData(byte[], …)</c> through
+    /// here, NOT through <see cref="TrySignData"/>. Without this override the default
+    /// implementation calls the unimplemented <c>SignHash(byte[], …)</c> and throws
+    /// <see cref="NotImplementedException"/>.
+    /// </remarks>
+    public override byte[] SignData(
+        byte[] data,
+        int offset,
+        int count,
+        HashAlgorithmName hashAlgorithm,
+        RSASignaturePadding padding)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(padding);
+        if (offset < 0 || count < 0 || offset + count > data.Length)
+            throw new ArgumentOutOfRangeException(nameof(offset));
+
+        using var mech = SignMechanismFor(hashAlgorithm, padding);
+        return _key.Sign(mech, data.AsSpan(offset, count));
+    }
+
     // -----------------------------------------------------------------------
     // Verification — forward full data to PKCS#11 using combined hash+verify mechanism
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Overrides the virtual span entry-point so the BCL non-virtual
-    /// <c>VerifyData(byte[], byte[], HashAlgorithmName, RSASignaturePadding)</c>
-    /// dispatches here with the complete, un-hashed data.
+    /// Span entry-point — the .NET 10 BCL routes <c>VerifyData(ReadOnlySpan, ReadOnlySpan, …)</c>
+    /// here.
     /// </remarks>
     public override bool VerifyData(
         ReadOnlySpan<byte> data,
@@ -93,6 +115,29 @@ public sealed class RSAPkcs11 : RSA
         ArgumentNullException.ThrowIfNull(padding);
         using var mech = SignMechanismFor(hashAlgorithm, padding);
         return _key.Verify(mech, data, signature);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Byte-array entry-point — the .NET 10 BCL routes
+    /// <c>VerifyData(byte[], byte[], …)</c> through here, NOT through the span overload.
+    /// </remarks>
+    public override bool VerifyData(
+        byte[] data,
+        int offset,
+        int count,
+        byte[] signature,
+        HashAlgorithmName hashAlgorithm,
+        RSASignaturePadding padding)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(signature);
+        ArgumentNullException.ThrowIfNull(padding);
+        if (offset < 0 || count < 0 || offset + count > data.Length)
+            throw new ArgumentOutOfRangeException(nameof(offset));
+
+        using var mech = SignMechanismFor(hashAlgorithm, padding);
+        return _key.Verify(mech, data.AsSpan(offset, count), signature);
     }
 
     // -----------------------------------------------------------------------

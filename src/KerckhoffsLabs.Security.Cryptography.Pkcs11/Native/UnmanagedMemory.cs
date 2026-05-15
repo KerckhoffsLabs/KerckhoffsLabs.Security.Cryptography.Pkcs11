@@ -36,12 +36,17 @@ internal static class UnmanagedMemory
     private static readonly Dictionary<IntPtr, int> _allocations = [];
 
     /// <summary>
-    /// Flag indicating whether all memory allocations should be logged
+    /// Flag indicating whether per-allocation messages should be written to the
+    /// debug log. The allocation dictionary is populated <em>unconditionally</em>
+    /// (independent of this flag); only the log output is gated. Toggling this at
+    /// runtime is therefore safe — pointers allocated with the flag off can still
+    /// be freed after it is turned on without tripping the untracked-memory check.
     /// </summary>
     private static bool _debugModeEnabled = false;
 
     /// <summary>
-    /// Flag indicating whether all memory allocations should be logged
+    /// When <c>true</c>, every <see cref="Allocate"/> / <see cref="Free"/> writes a
+    /// debug log line. The allocation tracker itself is always on (see <see cref="OutstandingAllocationCount"/>).
     /// </summary>
     public static bool DebugModeEnabled
     {
@@ -57,12 +62,14 @@ internal static class UnmanagedMemory
 
     /// <summary>
     /// Number of unmanaged allocations currently outstanding (allocated but not yet freed).
-    /// Only meaningful while <see cref="DebugModeEnabled"/> is <c>true</c>; returns <c>0</c>
-    /// otherwise because the allocation dictionary is only populated in debug mode.
+    /// Always accurate — the tracker dictionary is populated unconditionally so finalizer-time
+    /// frees of objects created before <see cref="DebugModeEnabled"/> was toggled are still
+    /// recognized as ours.
     /// </summary>
     /// <remarks>
-    /// Intended for diagnostic and leak-detection tests. Production code must not depend on
-    /// this property's behavior outside of debug mode.
+    /// Intended for diagnostic and leak-detection tests. To measure leaks across a workload,
+    /// snapshot this value before and after; do not assume it is zero between tests, since
+    /// other in-process allocations may be outstanding.
     /// </remarks>
     public static int OutstandingAllocationCount
     {
@@ -92,22 +99,18 @@ internal static class UnmanagedMemory
         memory = Marshal.AllocHGlobal(size);
         Write(memory, new byte[size]);
 
-        if (_debugModeEnabled)
+        lock (_allocationsLock)
         {
-            lock (_allocationsLock)
+            if (!_allocations.TryAdd(memory, size))
             {
-                if (!_allocations.ContainsKey(memory))
-                {
-                    _allocations.Add(memory, size);
-
-                    _logger.LogDebug("Allocated {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
-                }
+                // AllocHGlobal handed us a pointer the tracker thinks is already live —
+                // would mean a missed Free somewhere upstream.
+                throw new InvalidOperationException(
+                    $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
             }
+
+            if (_debugModeEnabled)
+                _logger.LogDebug("Allocated {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
         }
 
         return memory;
@@ -122,23 +125,16 @@ internal static class UnmanagedMemory
         if (memory == IntPtr.Zero)
             return;
 
-        if (_debugModeEnabled)
+        lock (_allocationsLock)
         {
-            lock (_allocationsLock)
+            if (!_allocations.Remove(memory, out int size))
             {
-                if (_allocations.ContainsKey(memory))
-                {
-                    int size = _allocations[memory];
-                    _allocations.Remove(memory);
-
-                    _logger.LogDebug("Freeing {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
-                }
+                throw new InvalidOperationException(
+                    $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
             }
+
+            if (_debugModeEnabled)
+                _logger.LogDebug("Freeing {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
         }
 
         Marshal.FreeHGlobal(memory);

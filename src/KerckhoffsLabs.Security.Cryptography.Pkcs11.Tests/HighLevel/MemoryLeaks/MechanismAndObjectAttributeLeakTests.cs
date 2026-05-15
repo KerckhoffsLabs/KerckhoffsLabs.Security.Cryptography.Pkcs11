@@ -14,6 +14,12 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
     {
         _wasDebug = UnmanagedMemory.DebugModeEnabled;
         UnmanagedMemory.DebugModeEnabled = true;
+        // Settle any pending finalizers from prior tests so they can't drift
+        // OutstandingAllocationCount mid-test (UnmanagedMemory's tracker is
+        // process-wide and now always populated regardless of the debug flag).
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     public void Dispose() => UnmanagedMemory.DebugModeEnabled = _wasDebug;

@@ -173,6 +173,7 @@ public sealed class DecryptChaChaTests_SoftHsm(SoftHsmBackendFixture f)
     private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
+    public static bool SoftHsmSupportsChaCha20KeyType => SoftHsmBackendFixture.SoftHsmSupportsChaCha20KeyType;
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void ChaCha20_RejectsWrongNonceLength_SoftHsm()
@@ -182,7 +183,7 @@ public sealed class DecryptChaChaTests_SoftHsm(SoftHsmBackendFixture f)
     public void ChaCha20_RejectsTooShortCiphertext_SoftHsm()
         => DecryptChaChaTestCases.Assert_RejectsTooShortCiphertext(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsChaCha20KeyType))]
     public void ChaCha20_RoundTrip_SoftHsm()
         => DecryptChaChaTestCases.Assert_RoundTrip(_backend);
 }

@@ -13,6 +13,14 @@ public sealed class MechanismParamsLeakTests : IDisposable
     {
         _wasDebug = UnmanagedMemory.DebugModeEnabled;
         UnmanagedMemory.DebugModeEnabled = true;
+        // Settle any pending finalizers from prior tests so they can't fire
+        // between the per-test baseline snapshot and the final assertion and
+        // drift OutstandingAllocationCount downward. UnmanagedMemory's tracking
+        // is process-wide, so allocations from other tests are also in the
+        // dictionary and decrement the count on finalization.
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     public void Dispose() => UnmanagedMemory.DebugModeEnabled = _wasDebug;
