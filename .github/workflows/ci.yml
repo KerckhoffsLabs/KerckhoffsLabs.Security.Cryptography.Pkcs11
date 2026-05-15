@@ -37,9 +37,19 @@ jobs:
 
       - name: Install SoftHSM2 (Windows)
         if: runner.os == 'Windows'
-        run: choco install -y softhsm
         shell: pwsh
-        continue-on-error: true
+        run: |
+          choco install -y softhsm --no-progress
+          if (-not (Get-Command softhsm2-util.exe -ErrorAction SilentlyContinue))
+          {
+              $candidate = (Get-ChildItem -Path 'C:\Program Files\SoftHSM2\bin\softhsm2-util.exe' -ErrorAction SilentlyContinue)
+              if (-not $candidate) {
+                  Write-Error "SoftHSM2 install did not produce softhsm2-util.exe"
+                  exit 1
+              }
+              echo "$($candidate.DirectoryName)" >> $env:GITHUB_PATH
+          }
+          softhsm2-util.exe --version
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
