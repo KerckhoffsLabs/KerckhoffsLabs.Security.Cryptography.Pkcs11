@@ -46,6 +46,11 @@
         "resolved": "3.1.5",
         "contentHash": "tKi7dSTwP4m5m9eXPM2Ime4Kn7xNf4x4zT9sdLO/G4hZVnQCRiMTWoSZqI/pYTVeI27oPPqHBKYI/DjJ9GsYgA=="
       },
+      "KerckhoffsLabs.Runtime.InteropServices": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "wZjYCo2ezp8GNzD5DfXZNtoo6fnbA1hmHMZ2laVLpW5zJLNOhCZFh1A3gXvR8BC5GhjneDGCMJ3wIm8zVbd+4A=="
+      },
       "Microsoft.CodeCoverage": {
         "type": "Transitive",
         "resolved": "18.0.1",
@@ -123,13 +128,10 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
-      "kerckhoffslabs.runtime.interopservices": {
-        "type": "Project"
-      },
       "kerckhoffslabs.security.cryptography.pkcs11": {
         "type": "Project",
         "dependencies": {
-          "KerckhoffsLabs.Runtime.InteropServices": "[0.1.0, )",
+          "KerckhoffsLabs.Runtime.InteropServices": "[1.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )"
         }
       }

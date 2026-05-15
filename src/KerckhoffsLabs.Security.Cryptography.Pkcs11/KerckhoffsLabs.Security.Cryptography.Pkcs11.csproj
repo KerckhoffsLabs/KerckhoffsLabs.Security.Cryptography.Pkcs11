@@ -40,12 +40,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="KerckhoffsLabs.Runtime.InteropServices" Version="1.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\KerckhoffsLabs.Runtime.InteropServices\KerckhoffsLabs.Runtime.InteropServices.csproj" />
   </ItemGroup>
 
   <ItemGroup>

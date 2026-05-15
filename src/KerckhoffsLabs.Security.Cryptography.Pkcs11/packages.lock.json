@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "KerckhoffsLabs.Runtime.InteropServices": {
+        "type": "Direct",
+        "requested": "[1.0.0, )",
+        "resolved": "1.0.0",
+        "contentHash": "wZjYCo2ezp8GNzD5DfXZNtoo6fnbA1hmHMZ2laVLpW5zJLNOhCZFh1A3gXvR8BC5GhjneDGCMJ3wIm8zVbd+4A=="
+      },
       "Microsoft.Extensions.Logging.Abstractions": {
         "type": "Direct",
         "requested": "[10.0.0, )",
@@ -35,9 +41,6 @@
         "type": "Transitive",
         "resolved": "8.0.0",
         "contentHash": "dk9JPxTCIevS75HyEQ0E4OVAFhB2N+V9ShCXf8Q6FkUQZDkgLI12y679Nym1YqsiSysuQskT7Z+6nUf3yab6Vw=="
-      },
-      "kerckhoffslabs.runtime.interopservices": {
-        "type": "Project"
       }
     },
     "net10.0/linux-arm64": {},
