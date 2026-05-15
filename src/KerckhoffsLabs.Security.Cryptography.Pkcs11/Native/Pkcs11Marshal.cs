@@ -17,6 +17,42 @@ internal static class Pkcs11Marshal
 
     public static int SizeOf<T>() where T : struct => SiblingCache<T>.Size;
 
+    /// <summary>
+    /// Marshals <paramref name="value"/> into the unmanaged buffer at <paramref name="ptr"/>,
+    /// using the Windows-packed sibling layout when running on Windows and a sibling exists.
+    /// The buffer must already be allocated and at least <see cref="SizeOf{T}"/> bytes.
+    /// </summary>
+    public static void WriteStructure<T>(IntPtr ptr, in T value) where T : struct
+    {
+        if (IsWindows && SiblingCache<T>.WindowsType is not null && SiblingCache<T>.FromUnified is not null)
+        {
+            object windowsBoxed = SiblingCache<T>.FromUnified.Invoke(null, [value])!;
+            Marshal.StructureToPtr(windowsBoxed, ptr, fDeleteOld: false);
+        }
+        else
+        {
+            Marshal.StructureToPtr<T>(value, ptr, fDeleteOld: false);
+        }
+    }
+
+    /// <summary>
+    /// Reads a struct of type <typeparamref name="T"/> from the unmanaged buffer at
+    /// <paramref name="ptr"/>, dispatching to the Windows-packed sibling layout on Windows
+    /// and round-tripping back to the unified type via <c>ToUnified()</c>.
+    /// </summary>
+    public static T ReadStructure<T>(IntPtr ptr) where T : struct
+    {
+        if (IsWindows && SiblingCache<T>.WindowsType is not null && SiblingCache<T>.ToUnified is not null)
+        {
+            object? windowsBoxed = Marshal.PtrToStructure(ptr, SiblingCache<T>.WindowsType);
+            if (windowsBoxed is null)
+                throw new InvalidOperationException(
+                    $"Marshal.PtrToStructure returned null for {SiblingCache<T>.WindowsType}.");
+            return (T)SiblingCache<T>.ToUnified.Invoke(windowsBoxed, null)!;
+        }
+        return Marshal.PtrToStructure<T>(ptr);
+    }
+
     private static class SiblingCache<T> where T : struct
     {
         public static readonly Type? WindowsType;
