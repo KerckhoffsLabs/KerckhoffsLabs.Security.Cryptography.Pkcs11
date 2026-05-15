@@ -45,4 +45,5 @@ appsettings.Development.local.json
 src/**/runtimes/**/native/
 
 # Submodule build trees (kept separate from submodule sources)
-third-party/*/build/
+vendor/*/build/
+vendor/*/_cmake_build/

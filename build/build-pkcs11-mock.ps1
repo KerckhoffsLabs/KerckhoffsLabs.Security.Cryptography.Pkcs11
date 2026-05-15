@@ -15,7 +15,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-$mockDir  = Join-Path $repoRoot 'third-party\pkcs11-mock'
+$mockDir  = Join-Path $repoRoot 'vendor\pkcs11-mock'
 
 if (-not (Test-Path $mockDir)) {
     Write-Error "pkcs11-mock submodule missing at $mockDir. Run: git submodule update --init --recursive"

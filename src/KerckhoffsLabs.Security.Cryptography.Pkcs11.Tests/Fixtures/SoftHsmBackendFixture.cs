@@ -1,15 +1,18 @@
 using System.Diagnostics;
+using System.Reflection;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
 /// <summary>
-/// xUnit collection fixture wrapping SoftHSM2. Creates a fresh token directory
-/// per test run, initializes a token with a deterministic SO/USER PIN, loads
-/// libsofthsm2.so, and exposes the resulting slot through <see cref="IPkcs11Backend"/>.
-/// Tests using this fixture must use <see cref="SoftHsmAvailable"/> as a [ConditionalFact]
-/// gate to skip when SoftHSM2 isn't installed.
+/// xUnit collection fixture wrapping SoftHSM2. Prefers the library built from
+/// the third-party/softhsmv2 submodule (placed next to the test assembly by the
+/// BuildSoftHsmV2 MSBuild target); falls back to a system-installed copy when
+/// the built artifact is absent.
+///
+/// Each fixture instance creates an isolated token directory so runs never
+/// interfere with the host's SoftHSM2 configuration.
 /// </summary>
 public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
 {
@@ -22,37 +25,40 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
 
     private readonly string _tokenDir;
     private readonly string _configPath;
+    private readonly string _utilPath;
 
     public static bool SoftHsmAvailable =>
-        (Settings.SoftHsmLibraryPath is { } p && File.Exists(p)) || SoftHsmDiscover() is not null;
+        (Settings.SoftHsmLibraryPath is { } p && File.Exists(p)) ||
+        BuiltLibraryPath() is not null ||
+        SystemLibraryPath() is not null;
 
     public SoftHsmBackendFixture()
     {
-        string? libPath = Settings.SoftHsmLibraryPath ?? SoftHsmDiscover();
+        string? libPath = Settings.SoftHsmLibraryPath
+            ?? BuiltLibraryPath()
+            ?? SystemLibraryPath();
+
         if (libPath is null)
         {
-            // Not available — leave fields in a benign state. Tests gate on SoftHsmAvailable.
             LibraryPath = string.Empty;
-            _tokenDir = _configPath = string.Empty;
+            _tokenDir = _configPath = _utilPath = string.Empty;
             return;
         }
 
         LibraryPath = libPath;
+        _utilPath = ResolveUtil(libPath);
 
-        // Use the config that libsofthsm2.so will read at C_Initialize time.
-        // The library reads SOFTHSM2_CONF once when the .so is loaded into the
-        // process; a temp-dir config set afterwards is invisible to it.
-        _configPath = Environment.GetEnvironmentVariable("SOFTHSM2_CONF")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                            ".config", "softhsm2", "softhsm2.conf");
+        // Always use a fresh isolated token directory so we never touch the
+        // host's SoftHSM2 state.
+        _tokenDir = Path.Combine(Path.GetTempPath(), "pkcs11net-softhsm-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_tokenDir);
 
-        // Derive tokendir from the config file so we can clean up afterwards.
-        _tokenDir = ResolveTokenDir(_configPath);
+        _configPath = Path.Combine(_tokenDir, "softhsm2.conf");
+        File.WriteAllText(_configPath,
+            $"directories.tokendir = {_tokenDir}\n" +
+            "objectstore.backend = file\n" +
+            "log.level = ERROR\n");
 
-        // Delete any leftover token with the same label from a previous run.
-        RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true);
-
-        // Initialize a fresh token via softhsm2-util.
         RunUtil($"--init-token --free " +
                 $"--label \"{TokenLabel}\" " +
                 $"--so-pin \"{Settings.SoPin}\" " +
@@ -62,7 +68,8 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         try
         {
             var slots = Library.GetSlotList();
-            Pkcs11Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel) ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
+            Pkcs11Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel)
+                ?? throw new InvalidOperationException($"SoftHSM2 token '{TokenLabel}' did not appear in slot list.");
             SlotId = (NativeCULong)found.SlotId;
         }
         catch
@@ -74,11 +81,28 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
 
     public void Dispose()
     {
-        try { Library?.Dispose(); } catch { /* ignore teardown errors */ }
-        try { RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true); } catch { }
+        try { Library?.Dispose(); } catch { }
+        try { if (Directory.Exists(_tokenDir)) Directory.Delete(_tokenDir, recursive: true); } catch { }
     }
 
-    private static string? SoftHsmDiscover()
+    // -----------------------------------------------------------------------
+    // Path resolution
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the libsofthsm2 built by the BuildSoftHsmV2 MSBuild target,
+    /// placed in runtimes/&lt;rid&gt;/native/ next to the test assembly.
+    /// </summary>
+    private static string? BuiltLibraryPath()
+    {
+        string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
+        string ext = OperatingSystem.IsMacOS() ? "dylib" : "so";
+        string rid = GetRid();
+        string candidate = Path.Combine(asmDir, "runtimes", rid, "native", $"libsofthsm2.{ext}");
+        return File.Exists(candidate) ? candidate : null;
+    }
+
+    private static string? SystemLibraryPath()
     {
         string[] candidates =
         [
@@ -86,15 +110,41 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
             "/usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so",
             "/usr/local/lib/softhsm/libsofthsm2.so",
             "/opt/homebrew/lib/softhsm/libsofthsm2.so",
-            "/usr/local/Cellar/softhsm/2.6.1/lib/softhsm/libsofthsm2.so",
-            @"C:\SoftHSM2\lib\softhsm2-x64.dll",
         ];
         return candidates.FirstOrDefault(File.Exists);
     }
 
+    /// <summary>
+    /// Resolves softhsm2-util: prefers the one built alongside the library,
+    /// then falls back to PATH.
+    /// </summary>
+    private static string ResolveUtil(string libPath)
+    {
+        string builtUtil = Path.Combine(Path.GetDirectoryName(libPath)!, "softhsm2-util");
+        if (File.Exists(builtUtil)) return builtUtil;
+        return "softhsm2-util"; // rely on PATH
+    }
+
+    private static string GetRid()
+    {
+        if (OperatingSystem.IsLinux())
+            return System.Runtime.InteropServices.RuntimeInformation.OSArchitecture ==
+                   System.Runtime.InteropServices.Architecture.Arm64
+                ? "linux-arm64" : "linux-x64";
+        if (OperatingSystem.IsMacOS())
+            return System.Runtime.InteropServices.RuntimeInformation.OSArchitecture ==
+                   System.Runtime.InteropServices.Architecture.Arm64
+                ? "osx-arm64" : "osx-x64";
+        return "linux-x64";
+    }
+
+    // -----------------------------------------------------------------------
+    // softhsm2-util runner
+    // -----------------------------------------------------------------------
+
     private void RunUtil(string args, bool ignoreFailure = false)
     {
-        var psi = new ProcessStartInfo("softhsm2-util", args)
+        var psi = new ProcessStartInfo(_utilPath, args)
         {
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -105,21 +155,6 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         p.WaitForExit();
         if (!ignoreFailure && p.ExitCode != 0)
             throw new InvalidOperationException($"softhsm2-util failed (exit {p.ExitCode}): {err}");
-    }
-
-    private static string ResolveTokenDir(string configPath)
-    {
-        if (!File.Exists(configPath)) return string.Empty;
-        foreach (var line in File.ReadAllLines(configPath))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("directories.tokendir", StringComparison.OrdinalIgnoreCase))
-            {
-                var idx = trimmed.IndexOf('=');
-                if (idx >= 0) return trimmed[(idx + 1)..].Trim();
-            }
-        }
-        return string.Empty;
     }
 }
 

@@ -24,7 +24,7 @@ fi
 
 OUT_BASE="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MOCK_DIR="${REPO_ROOT}/third-party/pkcs11-mock"
+MOCK_DIR="${REPO_ROOT}/vendor/pkcs11-mock"
 
 if [[ ! -d "${MOCK_DIR}" ]]; then
   echo "pkcs11-mock submodule missing at ${MOCK_DIR}." >&2

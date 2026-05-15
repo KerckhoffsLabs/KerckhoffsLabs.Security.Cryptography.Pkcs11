@@ -41,4 +41,13 @@
       IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
+  <Target Name="BuildSoftHsmV2" BeforeTargets="PrepareForBuild" Condition="'$(SkipSoftHsmV2Build)' != 'true' and !$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <_SoftHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_SoftHsmOutputDir>
+    </PropertyGroup>
+    <Exec
+      Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-softhsmv2.sh&quot; &quot;$(_SoftHsmOutputDir)&quot;"
+      IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
 </Project>

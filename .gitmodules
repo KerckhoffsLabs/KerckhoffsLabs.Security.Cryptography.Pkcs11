@@ -1,3 +1,6 @@
-[submodule "third-party/pkcs11-mock"]
-	path = third-party/pkcs11-mock
+[submodule "vendor/pkcs11-mock"]
+	path = vendor/pkcs11-mock
 	url = https://github.com/Pkcs11Interop/pkcs11-mock.git
+[submodule "vendor/softhsmv2"]
+	path = vendor/softhsmv2
+	url = https://github.com/softhsm/SoftHSMv2
