@@ -22,8 +22,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -66,8 +65,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle DeriveSharedSecretEcdh(ObjectHandle myPrivateKeyHandle, ReadOnlySpan<byte> peerPublicPoint, int aesBitLength = 256)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (myPrivateKeyHandle == null)
             throw new ArgumentNullException(nameof(myPrivateKeyHandle));

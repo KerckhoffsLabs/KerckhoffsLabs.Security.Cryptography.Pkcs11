@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -60,13 +61,8 @@ public sealed class ECDsaPkcs11 : ECDsa
         HashAlgorithmName hashAlgorithm,
         out int bytesWritten)
     {
-        using var mech = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        byte[] sig = _key.Sign(mech, data);
-        if (sig.Length > destination.Length)
-        {
-            bytesWritten = 0;
-            return false;
-        }
+        byte[] sig = SignDataInternal(data, hashAlgorithm);
+        if (sig.Length > destination.Length) { bytesWritten = 0; return false; }
         sig.CopyTo(destination);
         bytesWritten = sig.Length;
         return true;
@@ -87,8 +83,16 @@ public sealed class ECDsaPkcs11 : ECDsa
         ReadOnlySpan<byte> signature,
         HashAlgorithmName hashAlgorithm)
     {
-        using var mech = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        return _key.Verify(mech, data, signature);
+        var session = _key.Workspace.Session;
+        var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
+        if (session.SupportsMechanism((CKM)combined.Type))
+        {
+            return _key.Verify(combined, data, signature);
+        }
+        combined.Dispose();
+        byte[] hash = HashData(hashAlgorithm, data);
+        using var raw = new Mechanism(CKM.CKM_ECDSA);
+        return _key.Verify(raw, hash, signature);
     }
 
     // -----------------------------------------------------------------------
@@ -113,6 +117,28 @@ public sealed class ECDsaPkcs11 : ECDsa
         using var mech = new Mechanism(CKM.CKM_ECDSA);
         return _key.Verify(mech, hash, signature);
     }
+
+    private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
+    {
+        var session = _key.Workspace.Session;
+        var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
+        if (session.SupportsMechanism((CKM)combined.Type))
+            return _key.Sign(combined, data);
+        combined.Dispose();
+        byte[] hash = HashData(hashAlgorithm, data);
+        using var raw = new Mechanism(CKM.CKM_ECDSA);
+        return _key.Sign(raw, hash);
+    }
+
+    private static byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data) =>
+        hashAlgorithm.Name switch
+        {
+            "SHA1"   => System.Security.Cryptography.SHA1.HashData(data),
+            "SHA256" => System.Security.Cryptography.SHA256.HashData(data),
+            "SHA384" => System.Security.Cryptography.SHA384.HashData(data),
+            "SHA512" => System.Security.Cryptography.SHA512.HashData(data),
+            _ => throw new NotSupportedException($"ECDSA does not support hash {hashAlgorithm.Name}.")
+        };
 
     // -----------------------------------------------------------------------
     // Key material

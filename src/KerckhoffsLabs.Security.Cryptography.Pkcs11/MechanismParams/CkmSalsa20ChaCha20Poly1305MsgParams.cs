@@ -51,7 +51,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : IMechanismParams
     /// <summary>Copies the 16-byte tag (output of encrypt) into the caller's buffer.</summary>
     public void CopyTagTo(Span<byte> destination)
     {
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < Poly1305TagLen)
             throw new ArgumentException($"Destination must be at least {Poly1305TagLen} bytes.", nameof(destination));
         unsafe { fixed (byte* d = destination) Buffer.MemoryCopy((void*)_tag, d, destination.Length, Poly1305TagLen); }
@@ -60,7 +60,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : IMechanismParams
     /// <inheritdoc/>
     public object ToMarshalableStructure()
     {
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 

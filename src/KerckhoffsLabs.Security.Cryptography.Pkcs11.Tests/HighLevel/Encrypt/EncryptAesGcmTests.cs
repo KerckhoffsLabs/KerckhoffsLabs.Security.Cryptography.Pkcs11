@@ -125,11 +125,11 @@ public sealed class EncryptAesGcmTests_Mock(MockBackendFixture f)
         => EncryptAesGcmTestCases.Assert_RejectsWrongIvLength(_backend);
 
     // Crypto-correctness: mock returns DataLen bytes (no tag appended); assertion fails.
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [Fact(Skip = "Mock does not implement CKM_AES_GCM.")]
     public void AesGcm_ProducesCiphertextOfExpectedLength_Mock()
         => EncryptAesGcmTestCases.Assert_ProducesCiphertextOfExpectedLength(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [Fact(Skip = "Mock does not implement CKM_AES_GCM.")]
     public void AesGcm_RoundTrip_WithAad_Mock()
         => EncryptAesGcmTestCases.Assert_RoundTrip_WithAad(_backend);
 }

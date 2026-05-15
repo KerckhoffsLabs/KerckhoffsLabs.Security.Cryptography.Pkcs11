@@ -19,8 +19,7 @@ internal sealed partial class Pkcs11Session
     public byte[] DigestKey(Mechanism mechanism, ObjectHandle keyHandle)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -78,8 +77,7 @@ internal sealed partial class Pkcs11Session
     public byte[] Digest(Mechanism mechanism, byte[] data)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -117,8 +115,7 @@ internal sealed partial class Pkcs11Session
     public byte[] Digest(Mechanism mechanism, Stream inputStream)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -141,8 +138,7 @@ internal sealed partial class Pkcs11Session
     public byte[] Digest(Mechanism mechanism, Stream inputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -195,8 +191,7 @@ internal sealed partial class Pkcs11Session
     public void DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] encryptedData)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -229,8 +224,7 @@ internal sealed partial class Pkcs11Session
     public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -262,8 +256,7 @@ internal sealed partial class Pkcs11Session
     public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -353,8 +346,7 @@ internal sealed partial class Pkcs11Session
     public void DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] decryptedData)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -385,8 +377,7 @@ internal sealed partial class Pkcs11Session
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -418,8 +409,7 @@ internal sealed partial class Pkcs11Session
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 

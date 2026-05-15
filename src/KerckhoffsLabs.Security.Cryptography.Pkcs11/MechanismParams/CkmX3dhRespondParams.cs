@@ -64,7 +64,7 @@ public sealed class CkmX3dhRespondParams : IMechanismParams
     /// <inheritdoc/>
     public object ToMarshalableStructure()
     {
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 

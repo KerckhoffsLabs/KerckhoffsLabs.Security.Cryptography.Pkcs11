@@ -53,7 +53,7 @@ public sealed class CkmGcmMessageParams : IMechanismParams
     /// <summary>Copies the tag bytes (output of encrypt) into the caller's buffer.</summary>
     public void CopyTagTo(Span<byte> destination)
     {
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _tagLen)
             throw new ArgumentException($"Destination must be at least {_tagLen} bytes.", nameof(destination));
         unsafe { fixed (byte* d = destination) Buffer.MemoryCopy((void*)_tag, d, destination.Length, _tagLen); }
@@ -62,7 +62,7 @@ public sealed class CkmGcmMessageParams : IMechanismParams
     /// <inheritdoc/>
     public object ToMarshalableStructure()
     {
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 

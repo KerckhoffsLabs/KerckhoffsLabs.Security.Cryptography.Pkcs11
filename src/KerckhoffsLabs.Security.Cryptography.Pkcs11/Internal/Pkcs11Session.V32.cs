@@ -42,7 +42,7 @@ internal sealed partial class Pkcs11Session
         List<ObjectAttribute> sharedKeyTemplate)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
@@ -91,7 +91,7 @@ internal sealed partial class Pkcs11Session
         List<ObjectAttribute> sharedKeyTemplate)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
@@ -131,7 +131,7 @@ internal sealed partial class Pkcs11Session
         ReadOnlySpan<byte> associatedData)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism((CKM)mechanism.Type);
@@ -172,7 +172,7 @@ internal sealed partial class Pkcs11Session
         List<ObjectAttribute> unwrappedKeyTemplate)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
@@ -215,7 +215,7 @@ internal sealed partial class Pkcs11Session
         ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism((CKM)mechanism.Type);
@@ -251,7 +251,7 @@ internal sealed partial class Pkcs11Session
         int bufferLength = 4096)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(inputStream);
@@ -295,7 +295,7 @@ internal sealed partial class Pkcs11Session
     public ulong GetSessionValidationFlags(ulong validationType)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetSessionValidationFlags type=0x{Type:X}", _sessionId, validationType);
 

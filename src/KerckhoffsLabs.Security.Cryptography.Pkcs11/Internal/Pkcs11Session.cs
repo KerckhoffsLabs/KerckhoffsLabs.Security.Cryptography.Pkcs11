@@ -175,8 +175,39 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>
-    /// Initializes new instance of Session class
+    /// Lazy-cached set of mechanism types supported by the token in this session's slot.
+    /// Populated on first access via C_GetSessionInfo + C_GetMechanismList.
     /// </summary>
+    private HashSet<CKM>? _supportedMechanisms;
+
+    /// <summary>
+    /// Returns true if the token in this session's slot supports the given mechanism.
+    /// Result is cached after the first call.
+    /// </summary>
+    internal bool SupportsMechanism(CKM mechanism)
+    {
+        if (_supportedMechanisms is null)
+        {
+            CK_SESSION_INFO info = new();
+            CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref info);
+            if (rv != CKR.CKR_OK) return false;
+
+            NativeCULong count = new(0);
+            rv = _pkcs11Library.C_GetMechanismList(info.SlotId, null, ref count);
+            if (rv != CKR.CKR_OK || count.Value == 0)
+            {
+                _supportedMechanisms = [];
+                return false;
+            }
+
+            CKM[] list = new CKM[(int)count.Value];
+            rv = _pkcs11Library.C_GetMechanismList(info.SlotId, list, ref count);
+            _supportedMechanisms = rv == CKR.CKR_OK ? [.. list] : [];
+        }
+        return _supportedMechanisms.Contains(mechanism);
+    }
+
+    /// <summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="sessionId">PKCS#11 handle of session</param>
     internal Pkcs11Session(LowLevelPkcs11Library pkcs11Library, ulong sessionId)
@@ -198,8 +229,7 @@ internal sealed partial class Pkcs11Session
     public void CloseSession()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_sessionHandle is null || _sessionHandle.IsInvalid)
             return;
@@ -226,8 +256,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(userPin);
 
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::InitPin", _sessionId);
 
@@ -258,8 +287,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(oldPin);
         ArgumentNullException.ThrowIfNull(newPin);
 
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::SetPin", _sessionId);
 
@@ -287,8 +315,7 @@ internal sealed partial class Pkcs11Session
     public SessionInfo GetSessionInfo()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetSessionInfo", _sessionId);
 
@@ -306,8 +333,7 @@ internal sealed partial class Pkcs11Session
     public byte[] GetOperationState()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetOperationState", _sessionId);
 
@@ -331,8 +357,7 @@ internal sealed partial class Pkcs11Session
     public void SetOperationState(byte[] state, ObjectHandle encryptionKey, ObjectHandle authenticationKey)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::SetOperationState", _sessionId);
 
@@ -396,8 +421,7 @@ internal sealed partial class Pkcs11Session
         if (username.Length == 0)
             throw new ArgumentException("Username must not be empty.", nameof(username));
 
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::LoginUser", _sessionId);
 
@@ -432,8 +456,7 @@ internal sealed partial class Pkcs11Session
     public void CancelOperations(ulong flags)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::CancelOperations flags=0x{Flags:X}", _sessionId, flags);
 
@@ -447,8 +470,7 @@ internal sealed partial class Pkcs11Session
     public void Logout()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::Logout", _sessionId);
 
@@ -464,8 +486,7 @@ internal sealed partial class Pkcs11Session
     public void GetFunctionStatus()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetFunctionStatus", _sessionId);
 
@@ -479,8 +500,7 @@ internal sealed partial class Pkcs11Session
     public void CancelFunction()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::CancelFunction", _sessionId);
 

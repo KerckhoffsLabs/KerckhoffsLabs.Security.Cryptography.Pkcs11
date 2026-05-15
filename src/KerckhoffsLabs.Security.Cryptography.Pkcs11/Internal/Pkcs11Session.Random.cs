@@ -30,8 +30,7 @@ internal sealed partial class Pkcs11Session
     public void SeedRandom(byte[] seed)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::SeedRandom", _sessionId);
 
@@ -64,8 +63,7 @@ internal sealed partial class Pkcs11Session
     public byte[] GenerateRandom(int length)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GenerateRandom", _sessionId);
 

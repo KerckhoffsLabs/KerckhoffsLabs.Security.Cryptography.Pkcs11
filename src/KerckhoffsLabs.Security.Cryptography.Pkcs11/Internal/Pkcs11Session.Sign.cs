@@ -22,8 +22,7 @@ internal sealed partial class Pkcs11Session
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism((CKM)mechanism.Type);
@@ -79,8 +78,15 @@ internal sealed partial class Pkcs11Session
     public byte[] SignEcdsa(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
-        return Sign(mechanism, privateKeyHandle, data);
+        if (SupportsMechanism(CKM.CKM_ECDSA_SHA256))
+        {
+            using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
+            return Sign(mechanism, privateKeyHandle, data);
+        }
+        // Fallback: pre-hash in managed code and use raw CKM_ECDSA.
+        byte[] hash = System.Security.Cryptography.SHA256.HashData(data);
+        using var rawMechanism = new Mechanism(CKM.CKM_ECDSA);
+        return Sign(rawMechanism, privateKeyHandle, hash);
     }
 
     /// <summary>

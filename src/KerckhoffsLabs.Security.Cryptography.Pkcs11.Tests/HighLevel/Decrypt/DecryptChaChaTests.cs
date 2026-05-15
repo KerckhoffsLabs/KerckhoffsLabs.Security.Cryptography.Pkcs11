@@ -158,7 +158,7 @@ public sealed class DecryptChaChaTests_Mock(MockBackendFixture f)
         => DecryptChaChaTestCases.Assert_RejectsTooShortCiphertext(_backend);
 
     // Round-trip: mock doesn't implement ChaCha20-Poly1305.
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [Fact(Skip = "Mock does not implement CKM_CHACHA20_POLY1305.")]
     public void ChaCha20_RoundTrip_Mock()
         => DecryptChaChaTestCases.Assert_RoundTrip(_backend);
 }

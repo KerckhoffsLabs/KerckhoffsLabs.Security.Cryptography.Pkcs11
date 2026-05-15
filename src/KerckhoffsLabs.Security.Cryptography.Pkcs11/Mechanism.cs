@@ -51,8 +51,7 @@ public sealed class Mechanism : IDisposable
     /// <returns>A managed object holding the data to be marshaled. This object must be an instance of a formatted class.</returns>
     public object ToMarshalableStructure()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         return _ckMechanism;
     }

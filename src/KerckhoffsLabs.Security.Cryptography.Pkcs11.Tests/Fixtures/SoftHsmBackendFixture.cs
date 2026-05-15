@@ -39,17 +39,20 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
 
         LibraryPath = libPath;
 
-        _tokenDir = Path.Combine(Path.GetTempPath(), "pkcs11net-softhsm-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_tokenDir);
+        // Use the config that libsofthsm2.so will read at C_Initialize time.
+        // The library reads SOFTHSM2_CONF once when the .so is loaded into the
+        // process; a temp-dir config set afterwards is invisible to it.
+        _configPath = Environment.GetEnvironmentVariable("SOFTHSM2_CONF")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            ".config", "softhsm2", "softhsm2.conf");
 
-        _configPath = Path.Combine(_tokenDir, "softhsm2.conf");
-        File.WriteAllText(_configPath,
-            $"directories.tokendir = {_tokenDir}\n" +
-            "objectstore.backend = file\n" +
-            "log.level = ERROR\n");
-        Environment.SetEnvironmentVariable("SOFTHSM2_CONF", _configPath);
+        // Derive tokendir from the config file so we can clean up afterwards.
+        _tokenDir = ResolveTokenDir(_configPath);
 
-        // Initialize a token via softhsm2-util.
+        // Delete any leftover token with the same label from a previous run.
+        RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true);
+
+        // Initialize a fresh token via softhsm2-util.
         RunUtil($"--init-token --free " +
                 $"--label \"{TokenLabel}\" " +
                 $"--so-pin \"{Settings.SoPin}\" " +
@@ -72,7 +75,7 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     public void Dispose()
     {
         try { Library?.Dispose(); } catch { /* ignore teardown errors */ }
-        try { if (Directory.Exists(_tokenDir)) Directory.Delete(_tokenDir, recursive: true); } catch { }
+        try { RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true); } catch { }
     }
 
     private static string? SoftHsmDiscover()
@@ -89,7 +92,7 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         return candidates.FirstOrDefault(File.Exists);
     }
 
-    private void RunUtil(string args)
+    private void RunUtil(string args, bool ignoreFailure = false)
     {
         var psi = new ProcessStartInfo("softhsm2-util", args)
         {
@@ -100,8 +103,23 @@ public sealed class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         using var p = Process.Start(psi) ?? throw new InvalidOperationException("Could not start softhsm2-util.");
         string err = p.StandardError.ReadToEnd();
         p.WaitForExit();
-        if (p.ExitCode != 0)
+        if (!ignoreFailure && p.ExitCode != 0)
             throw new InvalidOperationException($"softhsm2-util failed (exit {p.ExitCode}): {err}");
+    }
+
+    private static string ResolveTokenDir(string configPath)
+    {
+        if (!File.Exists(configPath)) return string.Empty;
+        foreach (var line in File.ReadAllLines(configPath))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("directories.tokendir", StringComparison.OrdinalIgnoreCase))
+            {
+                var idx = trimmed.IndexOf('=');
+                if (idx >= 0) return trimmed[(idx + 1)..].Trim();
+            }
+        }
+        return string.Empty;
     }
 }
 

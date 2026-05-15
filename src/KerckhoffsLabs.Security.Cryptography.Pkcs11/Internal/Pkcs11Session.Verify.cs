@@ -40,8 +40,7 @@ internal sealed partial class Pkcs11Session
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -79,8 +78,7 @@ internal sealed partial class Pkcs11Session
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -108,8 +106,7 @@ internal sealed partial class Pkcs11Session
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -159,8 +156,7 @@ internal sealed partial class Pkcs11Session
     public byte[] VerifyRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -209,8 +205,7 @@ internal sealed partial class Pkcs11Session
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, byte[] data, byte[] signature, out byte[] decryptedData, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
@@ -248,8 +243,7 @@ internal sealed partial class Pkcs11Session
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
@@ -286,8 +280,7 @@ internal sealed partial class Pkcs11Session
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
@@ -386,8 +379,16 @@ internal sealed partial class Pkcs11Session
     public void VerifyEcdsa(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
-        Verify(mechanism, publicKeyHandle, data, signature, out isValid);
+        if (SupportsMechanism(CKM.CKM_ECDSA_SHA256))
+        {
+            using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
+            Verify(mechanism, publicKeyHandle, data, signature, out isValid);
+            return;
+        }
+        // Fallback: pre-hash in managed code and use raw CKM_ECDSA.
+        byte[] hash = System.Security.Cryptography.SHA256.HashData(data);
+        using var rawMechanism = new Mechanism(CKM.CKM_ECDSA);
+        Verify(rawMechanism, publicKeyHandle, hash, signature, out isValid);
     }
 
     /// <summary>Verifies an Ed25519 signature.</summary>

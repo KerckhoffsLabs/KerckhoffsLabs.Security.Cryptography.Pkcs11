@@ -41,7 +41,6 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-
         GuardMechanism((CKM)mechanism.Type);
 
         _logger.LogDebug("Session({SessionId})::Decrypt1", _sessionId);
@@ -53,16 +52,24 @@ internal sealed partial class Pkcs11Session
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
 
-        NativeCULong decryptedDataLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), null, ref decryptedDataLen);
+        // Use input length as the initial output buffer size — avoids a null-probe call
+        // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
+        // an opaque error instead of the plaintext length. Resize via CKR_BUFFER_TOO_SMALL
+        // if the token needs more space (e.g. padding expansion on some mechanisms).
+        NativeCULong decryptedDataLen = (NativeCULong)encryptedData.Length;
+        byte[] decryptedData = new byte[encryptedData.Length];
+        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, decryptedData, ref decryptedDataLen);
+
+        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+        {
+            decryptedData = new byte[(int)decryptedDataLen];
+            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, decryptedData, ref decryptedDataLen);
+        }
+
         Pkcs11Exception.ThrowIfError(rv, "C_Decrypt");
 
-        byte[] decryptedData = new byte[(int)decryptedDataLen];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)(encryptedData.Length), decryptedData, ref decryptedDataLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_Decrypt");
-
-        if (decryptedData.Length != (int)(decryptedDataLen))
-            Array.Resize(ref decryptedData, (int)(decryptedDataLen));
+        if (decryptedData.Length != (int)decryptedDataLen)
+            Array.Resize(ref decryptedData, (int)decryptedDataLen);
 
         return decryptedData;
     }
@@ -77,11 +84,9 @@ internal sealed partial class Pkcs11Session
     public void Decrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
-
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -105,11 +110,9 @@ internal sealed partial class Pkcs11Session
     public void Decrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
-
 
         GuardMechanism((CKM)mechanism.Type);
 
@@ -268,8 +271,7 @@ internal sealed partial class Pkcs11Session
         ReadOnlySpan<byte> ciphertext)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);

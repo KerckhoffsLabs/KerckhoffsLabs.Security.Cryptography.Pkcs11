@@ -1,0 +1,7 @@
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <SOFTHSM2_CONF>/home/alexandre/.config/softhsm2/softhsm2.conf</SOFTHSM2_CONF>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

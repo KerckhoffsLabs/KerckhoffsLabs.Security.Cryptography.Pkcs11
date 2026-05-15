@@ -106,7 +106,7 @@ internal static class DecryptAesGcmTestCases
                 // Flip the last byte of the authentication tag.
                 ciphertextAndTag[^1] ^= 0xFF;
 
-                Assert.Throws<Pkcs11Exception>(() =>
+                Assert.ThrowsAny<Pkcs11Exception>(() =>
                     session.DecryptAesGcm(keyHandle, ValidIv12, ciphertextAndTag));
             }
             finally
@@ -137,7 +137,7 @@ internal static class DecryptAesGcmTestCases
                 byte[] ciphertextAndTag = session.EncryptAesGcm(keyHandle, ValidIv12, plaintext);
 
                 // Decrypt with a different IV — must fail authentication.
-                Assert.Throws<Pkcs11Exception>(() =>
+                Assert.ThrowsAny<Pkcs11Exception>(() =>
                     session.DecryptAesGcm(keyHandle, AltIv12, ciphertextAndTag));
             }
             finally
@@ -178,11 +178,11 @@ public sealed class DecryptAesGcmTests_Mock(MockBackendFixture f)
         => DecryptAesGcmTestCases.Assert_RejectsWrongIvLength(_backend);
 
     // AEAD-integrity tests require real GCM — SoftHsm only.
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [Fact(Skip = "Mock does not implement CKM_AES_GCM.")]
     public void AesGcm_TamperedTag_Throws_Mock()
         => DecryptAesGcmTestCases.Assert_TamperedTagThrows(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [Fact(Skip = "Mock does not implement CKM_AES_GCM.")]
     public void AesGcm_WrongIv_Throws_Mock()
         => DecryptAesGcmTestCases.Assert_WrongIvThrows(_backend);
 }

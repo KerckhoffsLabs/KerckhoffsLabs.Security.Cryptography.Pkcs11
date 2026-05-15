@@ -39,8 +39,7 @@ internal sealed partial class Pkcs11Session
     public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -56,16 +55,23 @@ internal sealed partial class Pkcs11Session
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
 
-        NativeCULong encryptedDataLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), null, ref encryptedDataLen);
+        // Use input length as the initial output buffer size — avoids a null-probe call
+        // that can cause AEAD tokens to run full tag verification on the probe.
+        // Resize via CKR_BUFFER_TOO_SMALL if the token needs more space (e.g. AEAD tag appended).
+        NativeCULong encryptedDataLen = (NativeCULong)data.Length;
+        byte[] encryptedData = new byte[data.Length];
+        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+
+        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+        {
+            encryptedData = new byte[(int)encryptedDataLen];
+            rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+        }
+
         Pkcs11Exception.ThrowIfError(rv, "C_Encrypt");
 
-        byte[] encryptedData = new byte[(int)encryptedDataLen];
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)(data.Length), encryptedData, ref encryptedDataLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_Encrypt");
-
-        if (encryptedData.Length != (int)(encryptedDataLen))
-            Array.Resize(ref encryptedData, (int)(encryptedDataLen));
+        if (encryptedData.Length != (int)encryptedDataLen)
+            Array.Resize(ref encryptedData, (int)encryptedDataLen);
 
         return encryptedData;
     }
@@ -80,8 +86,7 @@ internal sealed partial class Pkcs11Session
     public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -108,8 +113,7 @@ internal sealed partial class Pkcs11Session
     public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -280,8 +284,7 @@ internal sealed partial class Pkcs11Session
         ReadOnlySpan<byte> plaintext)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);

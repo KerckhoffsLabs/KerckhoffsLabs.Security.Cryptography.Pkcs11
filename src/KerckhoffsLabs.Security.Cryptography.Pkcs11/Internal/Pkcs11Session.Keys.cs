@@ -20,8 +20,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -60,8 +59,7 @@ internal sealed partial class Pkcs11Session
     public void GenerateKeyPair(Mechanism mechanism, List<ObjectAttribute> publicKeyAttributes, List<ObjectAttribute> privateKeyAttributes, out ObjectHandle publicKeyHandle, out ObjectHandle privateKeyHandle)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -112,8 +110,7 @@ internal sealed partial class Pkcs11Session
     public byte[] WrapKey(Mechanism mechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -151,7 +148,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed) throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(attributes);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
@@ -171,8 +168,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, byte[] wrappedKey, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -215,8 +211,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle GenerateAesKey(int bitLength = 256, string? label = null, bool persistOnToken = false)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (bitLength != 128 && bitLength != 192 && bitLength != 256)
             throw new ArgumentOutOfRangeException(nameof(bitLength), "AES key length must be 128, 192, or 256 bits.");
@@ -257,8 +252,7 @@ internal sealed partial class Pkcs11Session
     public (ObjectHandle pub, ObjectHandle priv) GenerateRsaKeyPair(int modulusBits = 2048, string? label = null, bool persistOnToken = false)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (modulusBits < 2048)
             throw new ArgumentOutOfRangeException(nameof(modulusBits), "RSA modulus must be ≥ 2048 bits (NIST SP 800-131A).");
@@ -313,8 +307,7 @@ internal sealed partial class Pkcs11Session
     public (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(EcCurve curve = EcCurve.P256, string? label = null, bool persistOnToken = false)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         byte[] ecParams = curve switch
         {

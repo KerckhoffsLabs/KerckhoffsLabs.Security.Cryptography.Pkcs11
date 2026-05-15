@@ -18,8 +18,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle CreateObject(List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::CreateObject", _sessionId);
 
@@ -51,8 +50,7 @@ internal sealed partial class Pkcs11Session
     public ObjectHandle CopyObject(ObjectHandle objectHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::CopyObject", _sessionId);
 
@@ -83,8 +81,7 @@ internal sealed partial class Pkcs11Session
     public void DestroyObject(ObjectHandle objectHandle)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::DestroyObject", _sessionId);
 
@@ -101,8 +98,7 @@ internal sealed partial class Pkcs11Session
     public ulong GetObjectSize(ObjectHandle objectHandle)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetObjectSize", _sessionId);
 
@@ -123,8 +119,7 @@ internal sealed partial class Pkcs11Session
     public List<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<CKA> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetAttributeValue1", _sessionId);
 
@@ -150,8 +145,7 @@ internal sealed partial class Pkcs11Session
     public List<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<ulong> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::GetAttributeValue2", _sessionId);
 
@@ -256,8 +250,7 @@ internal sealed partial class Pkcs11Session
     public void SetAttributeValue(ObjectHandle objectHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::SetAttributeValue", _sessionId);
 
@@ -282,8 +275,7 @@ internal sealed partial class Pkcs11Session
     public void FindObjectsInit(List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::FindObjectsInit", _sessionId);
 
@@ -310,8 +302,7 @@ internal sealed partial class Pkcs11Session
     public List<ObjectHandle> FindObjects(int objectCount)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::FindObjects", _sessionId);
 
@@ -334,8 +325,7 @@ internal sealed partial class Pkcs11Session
     public void FindObjectsFinal()
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::FindObjectsFinal", _sessionId);
 
@@ -351,8 +341,7 @@ internal sealed partial class Pkcs11Session
     public List<ObjectHandle> FindAllObjects(List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         _logger.LogDebug("Session({SessionId})::FindAllObjects", _sessionId);
 

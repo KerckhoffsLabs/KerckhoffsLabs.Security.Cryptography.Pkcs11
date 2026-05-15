@@ -114,7 +114,7 @@ public sealed class EncryptChaChaTests_Mock(MockBackendFixture f)
         => EncryptChaChaTestCases.Assert_RejectsWrongNonceLength(_backend);
 
     // Crypto-correctness: mock doesn't implement ChaCha20-Poly1305.
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [Fact(Skip = "Mock does not implement CKM_CHACHA20_POLY1305.")]
     public void ChaCha20_RoundTrip_Mock()
         => EncryptChaChaTestCases.Assert_RoundTrip(_backend);
 }
