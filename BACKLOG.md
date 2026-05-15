@@ -6,12 +6,11 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 2 | **High:** 28 | **Medium:** 17 | **Low:** 6
+- **Critical:** 2 | **High:** 27 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Silent crypto wrongness in `Pkcs11MlDsa.SignPreHashCore`.** The BCL `SignPreHash` contract passes a pre-computed digest; the override forwards it to `CKM_HASH_ML_DSA_*`, which hashes its input again. Produces non-interoperable signatures with no error.
   - **Multi-part stream operations and `FindAllObjects` wedge the session on exception.** No `try/finally` around `*_Update` / `*_Final` and `C_FindObjects*` calls. After any mid-operation throw the session is unusable until closed.
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
-  - **Single `net10.0` target locks out the entire .NET 8 LTS audience.**
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
 
 - **Release-readiness assessment:** The library is **not ready for a 1.0 release.** The four Critical items are silent failures that would damage trust on first contact (Windows users see crashes / wrong attributes; pre-hash ML-DSA users produce signatures no other implementation can verify; any exception inside a multi-part operation leaves the session permanently broken). Past those, the public API surface itself needs scoping before 1.0 — exposing the raw P/Invoke types and a single-target net10.0 are SemVer-major changes after 1.0, so they have to land beforehand. The cryptographic correctness work, public-API redesign, P/Invoke layout fixes, and release-pipeline gaps together represent roughly 4-8 weeks of focused work before a defensible 1.0. The library has excellent bones: clean exception hierarchy, well-designed `SecurePin`/`SecureBuffer`, sound secure-by-default mechanism gating architecture, comprehensive enum coverage of v3.2, and a healthy test suite — but the pre-1.0 polish layer is missing.
@@ -101,6 +100,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-006] Single `net10.0` target locks out .NET 8 LTS consumers
 
+- **Status: Won't Fix (2026-05-15)** — .NET 8 LTS ends November 2026 (~6 months away). The support window doesn't justify the multi-target maintenance burden (extra TFM in CI, `#if NET10_0_OR_GREATER` guards around every BCL ML-DSA/ML-KEM/SLH-DSA adapter, two NuGet builds to validate). New consumers should be on .NET 10 by the time we reach 1.0.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** M
