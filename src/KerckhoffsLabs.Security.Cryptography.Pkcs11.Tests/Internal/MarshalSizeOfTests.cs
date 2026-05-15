@@ -150,6 +150,7 @@ public sealed class MarshalSizeOfTests
     // BEGIN PROBED Windows InlineData — Pack=1, Linux x64 probe
     [InlineData("CK_ASYNC_DATA_Windows", 40)]
     [InlineData("CK_ATTRIBUTE_Windows", 24)]
+    [InlineData("CK_C_INITIALIZE_ARGS_Windows", 48)]
     [InlineData("CK_FUNCTION_LIST_3_0_Windows", 738)]
     [InlineData("CK_FUNCTION_LIST_3_2_Windows", 834)]
     [InlineData("CK_FUNCTION_LIST_Windows", 546)]
