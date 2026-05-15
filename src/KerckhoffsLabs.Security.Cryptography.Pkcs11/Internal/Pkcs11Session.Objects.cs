@@ -361,20 +361,31 @@ internal sealed partial class Pkcs11Session
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
         Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsInit");
 
-        NativeCULong objectsLength = (NativeCULong)256;
-        NativeCULong[] objects = new NativeCULong[(int)objectsLength];
-        NativeCULong objectCount = objectsLength;
-        while (objectCount == objectsLength)
+        try
         {
-            rv = _pkcs11Library.C_FindObjects(_sessionId, objects, objectsLength, ref objectCount);
-            Pkcs11Exception.ThrowIfError(rv, "C_FindObjects");
+            NativeCULong objectsLength = (NativeCULong)256;
+            NativeCULong[] objects = new NativeCULong[(int)objectsLength];
+            NativeCULong objectCount = objectsLength;
+            while (objectCount == objectsLength)
+            {
+                rv = _pkcs11Library.C_FindObjects(_sessionId, objects, objectsLength, ref objectCount);
+                Pkcs11Exception.ThrowIfError(rv, "C_FindObjects");
 
-            for (int i = 0; i < (int)(objectCount); i++)
-                foundObjects.Add(new ObjectHandle((ulong)objects[i]));
+                for (int i = 0; i < (int)(objectCount); i++)
+                    foundObjects.Add(new ObjectHandle((ulong)objects[i]));
+            }
         }
-
-        rv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
-        Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsFinal");
+        finally
+        {
+            // Best-effort finalize. Always runs so a mid-search exception cannot leave the
+            // session wedged in "find active" state — the next C_FindObjectsInit would
+            // otherwise fail with CKR_OPERATION_ACTIVE. Tolerate the rv: on the exception
+            // unwind path we must not mask the original exception, and the session may
+            // already be in a state where finalize fails harmlessly.
+            CKR finalRv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
+            if (finalRv != CKR.CKR_OK)
+                _logger.LogWarning("Session({SessionId})::FindAllObjects: C_FindObjectsFinal returned {Rv}", _sessionId, finalRv);
+        }
 
         return foundObjects;
     }

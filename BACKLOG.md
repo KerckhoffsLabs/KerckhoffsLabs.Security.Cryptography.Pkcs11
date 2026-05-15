@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 3 | **High:** 28 | **Medium:** 17 | **Low:** 6
+- **Critical:** 2 | **High:** 28 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Silent crypto wrongness in `Pkcs11MlDsa.SignPreHashCore`.** The BCL `SignPreHash` contract passes a pre-computed digest; the override forwards it to `CKM_HASH_ML_DSA_*`, which hashes its input again. Produces non-interoperable signatures with no error.
   - **Multi-part stream operations and `FindAllObjects` wedge the session on exception.** No `try/finally` around `*_Update` / `*_Final` and `C_FindObjects*` calls. After any mid-operation throw the session is unusable until closed.
@@ -72,6 +72,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-004] `FindAllObjects` leaves search active on `C_FindObjects` exception
 
+- **Status: Resolved (2026-05-15)** — wrapped the `C_FindObjects` loop in `try/finally` so `C_FindObjectsFinal` always runs (`Pkcs11Session.Objects.cs:341-391`). The cleanup tolerates the rv and logs a warning rather than throwing so a mid-search exception is not masked on the unwind path.
 - **Area:** PKCS#11 Conformance
 - **Severity:** Critical
 - **Effort:** S
