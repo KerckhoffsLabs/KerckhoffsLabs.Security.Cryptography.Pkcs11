@@ -1044,6 +1044,11 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        if (Pkcs11Marshal.IsWindows && _delegates!.C_CreateObject_Windows is { } winFn)
+        {
+            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+            return (CKR)(ulong)winFn(session, winTpl, count, ref objectId);
+        }
         NativeCULong rv = _delegates.C_CreateObject(session, template, count, ref objectId);
         return rv.ToCKRChecked();
     }
@@ -1061,6 +1066,11 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        if (Pkcs11Marshal.IsWindows && _delegates!.C_CopyObject_Windows is { } winFn)
+        {
+            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+            return (CKR)(ulong)winFn(session, objectId, winTpl, count, ref newObjectId);
+        }
         NativeCULong rv = _delegates.C_CopyObject(session, objectId, template, count, ref newObjectId);
         return rv.ToCKRChecked();
     }
@@ -1106,8 +1116,19 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong rv = _delegates.C_GetAttributeValue(session, objectId, template, count);
-        return rv.ToCKRChecked();
+        if (Pkcs11Marshal.IsWindows && _delegates!.C_GetAttributeValue_Windows is { } winFn)
+        {
+            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+            var rv = winFn(session, objectId, winTpl, count);
+            if (winTpl is not null && template is not null)
+            {
+                for (int i = 0; i < winTpl.Length; i++)
+                    template[i] = winTpl[i].ToUnified();
+            }
+            return (CKR)(ulong)rv;
+        }
+        NativeCULong rv2 = _delegates.C_GetAttributeValue(session, objectId, template, count);
+        return rv2.ToCKRChecked();
     }
 
     /// <summary>
@@ -1122,6 +1143,11 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        if (Pkcs11Marshal.IsWindows && _delegates!.C_SetAttributeValue_Windows is { } winFn)
+        {
+            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+            return (CKR)(ulong)winFn(session, objectId, winTpl, count);
+        }
         NativeCULong rv = _delegates.C_SetAttributeValue(session, objectId, template, count);
         return rv.ToCKRChecked();
     }
@@ -1137,6 +1163,11 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        if (Pkcs11Marshal.IsWindows && _delegates!.C_FindObjectsInit_Windows is { } winFn)
+        {
+            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+            return (CKR)(ulong)winFn(session, winTpl, count);
+        }
         NativeCULong rv = _delegates.C_FindObjectsInit(session, template, count);
         return rv.ToCKRChecked();
     }

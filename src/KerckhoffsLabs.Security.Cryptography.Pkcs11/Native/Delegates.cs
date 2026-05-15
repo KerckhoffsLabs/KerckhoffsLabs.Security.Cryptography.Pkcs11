@@ -90,7 +90,13 @@ internal delegate NativeCULong C_LogoutDelegate(NativeCULong session);
 internal delegate NativeCULong C_CreateObjectDelegate(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong objectId);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_CreateObjectDelegate_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong objectId);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_CopyObjectDelegate(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong newObjectId);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_CopyObjectDelegate_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong newObjectId);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_DestroyObjectDelegate(NativeCULong session, NativeCULong objectId);
@@ -102,10 +108,19 @@ internal delegate NativeCULong C_GetObjectSizeDelegate(NativeCULong session, Nat
 internal delegate NativeCULong C_GetAttributeValueDelegate(NativeCULong session, NativeCULong objectId, [In, Out] CK_ATTRIBUTE[] template, NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetAttributeValueDelegate_Windows(NativeCULong session, NativeCULong objectId, [In, Out] CK_ATTRIBUTE_Windows[] template, NativeCULong count);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_SetAttributeValueDelegate(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_SetAttributeValueDelegate_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FindObjectsInitDelegate(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_FindObjectsInitDelegate_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FindObjectsDelegate(NativeCULong session, [In, Out] NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
@@ -924,6 +939,11 @@ internal partial class Delegates
     internal C_AsyncCompleteDelegate_Windows? C_AsyncComplete_Windows;
     internal C_WrapKeyAuthenticatedDelegate_Windows? C_WrapKeyAuthenticated_Windows;
     internal C_UnwrapKeyAuthenticatedDelegate_Windows? C_UnwrapKeyAuthenticated_Windows;
+    internal C_CreateObjectDelegate_Windows? C_CreateObject_Windows;
+    internal C_CopyObjectDelegate_Windows? C_CopyObject_Windows;
+    internal C_GetAttributeValueDelegate_Windows? C_GetAttributeValue_Windows;
+    internal C_SetAttributeValueDelegate_Windows? C_SetAttributeValue_Windows;
+    internal C_FindObjectsInitDelegate_Windows? C_FindObjectsInit_Windows;
 
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
@@ -1243,12 +1263,17 @@ internal partial class Delegates
         C_Login = Marshal.GetDelegateForFunctionPointer<C_LoginDelegate>(funcList.C_Login);
         C_Logout = Marshal.GetDelegateForFunctionPointer<C_LogoutDelegate>(funcList.C_Logout);
         C_CreateObject = Marshal.GetDelegateForFunctionPointer<C_CreateObjectDelegate>(funcList.C_CreateObject);
+        C_CreateObject_Windows = Marshal.GetDelegateForFunctionPointer<C_CreateObjectDelegate_Windows>(funcList.C_CreateObject);
         C_CopyObject = Marshal.GetDelegateForFunctionPointer<C_CopyObjectDelegate>(funcList.C_CopyObject);
+        C_CopyObject_Windows = Marshal.GetDelegateForFunctionPointer<C_CopyObjectDelegate_Windows>(funcList.C_CopyObject);
         C_DestroyObject = Marshal.GetDelegateForFunctionPointer<C_DestroyObjectDelegate>(funcList.C_DestroyObject);
         C_GetObjectSize = Marshal.GetDelegateForFunctionPointer<C_GetObjectSizeDelegate>(funcList.C_GetObjectSize);
         C_GetAttributeValue = Marshal.GetDelegateForFunctionPointer<C_GetAttributeValueDelegate>(funcList.C_GetAttributeValue);
+        C_GetAttributeValue_Windows = Marshal.GetDelegateForFunctionPointer<C_GetAttributeValueDelegate_Windows>(funcList.C_GetAttributeValue);
         C_SetAttributeValue = Marshal.GetDelegateForFunctionPointer<C_SetAttributeValueDelegate>(funcList.C_SetAttributeValue);
+        C_SetAttributeValue_Windows = Marshal.GetDelegateForFunctionPointer<C_SetAttributeValueDelegate_Windows>(funcList.C_SetAttributeValue);
         C_FindObjectsInit = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate>(funcList.C_FindObjectsInit);
+        C_FindObjectsInit_Windows = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate_Windows>(funcList.C_FindObjectsInit);
         C_FindObjects = Marshal.GetDelegateForFunctionPointer<C_FindObjectsDelegate>(funcList.C_FindObjects);
         C_FindObjectsFinal = Marshal.GetDelegateForFunctionPointer<C_FindObjectsFinalDelegate>(funcList.C_FindObjectsFinal);
         C_EncryptInit = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate>(funcList.C_EncryptInit);
