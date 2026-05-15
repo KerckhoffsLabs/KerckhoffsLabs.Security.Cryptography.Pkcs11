@@ -154,7 +154,7 @@ public sealed class ObjectAttribute : IDisposable
                 for (int i = 0; i < value.Count; i++)
                 {
                     IntPtr slot = new IntPtr(basePtr.ToInt64() + (long)i * stride);
-                    Marshal.StructureToPtr<CK_ATTRIBUTE>(value[i]._ckAttribute, slot, false);
+                    UnmanagedMemory.Write(slot, value[i]._ckAttribute);
                 }
             }
         }

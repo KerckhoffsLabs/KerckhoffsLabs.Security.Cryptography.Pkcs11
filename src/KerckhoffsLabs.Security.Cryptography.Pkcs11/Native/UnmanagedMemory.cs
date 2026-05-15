@@ -149,7 +149,10 @@ internal static class UnmanagedMemory
     public static int SizeOf(Type structureType)
     {
         ArgumentNullException.ThrowIfNull(structureType);
-
+        // For [PackedForPkcs11]-marked types, dispatch to the platform-appropriate sibling.
+        // For all other types, fall through to Marshal.SizeOf.
+        if (structureType.IsValueType && IsPackedForPkcs11(structureType))
+            return SizeOfPacked(structureType);
         return Marshal.SizeOf(structureType);
     }
 
@@ -188,12 +191,13 @@ internal static class UnmanagedMemory
     /// <param name="structure">Structure to copy from</param>
     public static void Write(IntPtr memory, object structure)
     {
-        if (memory == IntPtr.Zero)
-            throw new ArgumentNullException(nameof(memory));
-
+        if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         ArgumentNullException.ThrowIfNull(structure);
 
-        Marshal.StructureToPtr(structure, memory, false);
+        if (IsPackedForPkcs11(structure.GetType()))
+            WritePacked(memory, structure);
+        else
+            Marshal.StructureToPtr(structure, memory, false);
     }
 
     /// <summary>
@@ -251,11 +255,11 @@ internal static class UnmanagedMemory
     /// <returns>Structure of requested type</returns>
     public static object? Read(IntPtr memory, Type structureType)
     {
-        if (memory == IntPtr.Zero)
-            throw new ArgumentNullException(nameof(memory));
-
+        if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         ArgumentNullException.ThrowIfNull(structureType);
 
+        if (structureType.IsValueType && IsPackedForPkcs11(structureType))
+            return ReadPacked(memory, structureType);
         return Marshal.PtrToStructure(memory, structureType);
     }
 
@@ -272,5 +276,55 @@ internal static class UnmanagedMemory
         ArgumentNullException.ThrowIfNull(structure);
 
         Marshal.PtrToStructure(memory, structure);
+    }
+
+    // ---- Packed-struct dispatch helpers ----
+
+    private static bool IsPackedForPkcs11(Type t) =>
+        t.IsDefined(typeof(PackedForPkcs11Attribute), inherit: false);
+
+    private static int SizeOfPacked(Type t)
+    {
+        var winType = Pkcs11Marshal.IsWindows
+            ? t.Assembly.GetType(t.FullName + "_Windows")
+            : null;
+        return Marshal.SizeOf(winType ?? t);
+    }
+
+    private static void WritePacked(IntPtr memory, object structure)
+    {
+        if (Pkcs11Marshal.IsWindows)
+        {
+            var winType = structure.GetType().Assembly.GetType(structure.GetType().FullName + "_Windows");
+            if (winType is not null)
+            {
+                var fromUnified = winType.GetMethod("FromUnified",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (fromUnified is not null)
+                {
+                    object windowsBoxed = fromUnified.Invoke(null, [structure])!;
+                    Marshal.StructureToPtr(windowsBoxed, memory, false);
+                    return;
+                }
+            }
+        }
+        Marshal.StructureToPtr(structure, memory, false);
+    }
+
+    private static object? ReadPacked(IntPtr memory, Type t)
+    {
+        if (Pkcs11Marshal.IsWindows)
+        {
+            var winType = t.Assembly.GetType(t.FullName + "_Windows");
+            if (winType is not null)
+            {
+                object? winBoxed = Marshal.PtrToStructure(memory, winType);
+                if (winBoxed is null) return null;
+                var toUnified = winType.GetMethod("ToUnified",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                return toUnified?.Invoke(winBoxed, null);
+            }
+        }
+        return Marshal.PtrToStructure(memory, t);
     }
 }
