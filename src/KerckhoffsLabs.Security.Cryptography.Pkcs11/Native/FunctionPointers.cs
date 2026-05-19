@@ -207,4 +207,92 @@ internal sealed unsafe class FunctionPointers
 
     /// <summary>Cryptoki <c>CK_RV C_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hBaseKey, CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount, CK_OBJECT_HANDLE_PTR phKey)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong> C_DeriveKey;
+
+    // ── Windows-layout variants (Pack=1) ─────────────────────────────────────────
+    // Each fptr below is the Pack=1 twin of its unified sibling above.
+    // Both are cast from the SAME native function-list entry; only the managed
+    // struct layout differs. Used on Windows where the PKCS#11 ABI uses packed
+    // structs. Functions whose structs are non-blittable (CK_*_INFO_Windows) are
+    // kept as delegates and are not listed here.
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_CreateObject</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong> C_CreateObject_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_CopyObject</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong> C_CopyObject_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_GetAttributeValue</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong> C_GetAttributeValue_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_SetAttributeValue</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong> C_SetAttributeValue_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_FindObjectsInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong> C_FindObjectsInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_EncryptInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_EncryptInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_DecryptInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_DecryptInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_DigestInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong> C_DigestInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_SignInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_SignInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_SignRecoverInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_SignRecoverInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_VerifyInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_VerifyInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_VerifyRecoverInit</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_VerifyRecoverInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_GenerateKey</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong> C_GenerateKey_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_GenerateKeyPair</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, CK_ATTRIBUTE_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong*, NativeCULong> C_GenerateKeyPair_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_WrapKey</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong*, NativeCULong> C_WrapKey_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_UnwrapKey</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong> C_UnwrapKey_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_DeriveKey</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong> C_DeriveKey_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_MessageEncryptInit</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_MessageEncryptInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_MessageDecryptInit</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_MessageDecryptInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_MessageSignInit</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_MessageSignInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_MessageVerifyInit</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong> C_MessageVerifyInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_EncapsulateKey</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong> C_EncapsulateKey_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_DecapsulateKey</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong> C_DecapsulateKey_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_VerifySignatureInit</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong> C_VerifySignatureInit_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_AsyncComplete</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong> C_AsyncComplete_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_WrapKeyAuthenticated</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong> C_WrapKeyAuthenticated_Windows;
+
+    /// <summary>Windows-layout (Pack=1) twin of <c>C_UnwrapKeyAuthenticated</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong> C_UnwrapKeyAuthenticated_Windows;
 }
