@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 23 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 22 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -261,6 +261,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-019] `GetSlotList`/`GetMechanismList` return concrete `List<T>` — exposes implementation
 
+- **Status: Resolved (2026-05-19)** — Both methods now return `IReadOnlyList<T>`. `GetMechanismList` returns the underlying `CKM[]` directly (arrays satisfy `IReadOnlyList<T>`, no allocator churn from a wrapper). `GetSlotList` keeps its `List<Pkcs11Slot>` accumulator but exposes it via the read-only interface. The binary-compat change must land before 1.0; this is that landing. Internal callers (the `MockBackendFixture`, `SoftHsmBackendFixture`, several tests) all use indexing, foreach, or `new HashSet<CKM>(...)` patterns — none rely on the `List<T>` API surface, so no consumer churn.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** S

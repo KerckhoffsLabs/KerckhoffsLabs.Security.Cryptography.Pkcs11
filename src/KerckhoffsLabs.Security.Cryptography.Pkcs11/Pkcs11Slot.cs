@@ -86,10 +86,16 @@ public sealed class Pkcs11Slot
     }
 
     /// <summary>
-    /// Obtains a list of mechanism types supported by a token
+    /// Obtains a list of mechanism types supported by a token.
     /// </summary>
-    /// <returns>List of mechanism types supported by a token</returns>
-    public List<CKM> GetMechanismList()
+    /// <remarks>
+    /// Vendor-defined mechanisms (values <c>≥ CKM_VENDOR_DEFINED = 0x80000000</c>) that
+    /// don't have a <see cref="CKM"/> enum member are dropped from the result — they can't
+    /// be represented as <see cref="CKM"/> values. A future overload returning raw
+    /// <see cref="ulong"/> values may surface them; see BL-014.
+    /// </remarks>
+    /// <returns>Read-only list of mechanism types supported by a token.</returns>
+    public IReadOnlyList<CKM> GetMechanismList()
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::GetMechanismList", _slotId);
 
@@ -98,7 +104,7 @@ public sealed class Pkcs11Slot
         Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismList");
 
         if (mechanismCount < (NativeCULong)1)
-            return new List<CKM>();
+            return Array.Empty<CKM>();
 
         CKM[] mechanismList = new CKM[(int)mechanismCount];
         rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, ref mechanismCount);
@@ -107,7 +113,7 @@ public sealed class Pkcs11Slot
         if (mechanismList.Length != (int)(mechanismCount))
             Array.Resize(ref mechanismList, (int)(mechanismCount));
 
-        return new List<CKM>(mechanismList);
+        return mechanismList;
     }
 
     /// <summary>

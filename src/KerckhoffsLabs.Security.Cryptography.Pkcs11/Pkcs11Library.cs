@@ -169,8 +169,8 @@ public sealed class Pkcs11Library : IDisposable
     /// inserted. When <c>false</c>, returns all slots regardless of token presence —
     /// useful for diagnostic enumeration.
     /// </param>
-    /// <returns>List of available slots.</returns>
-    public List<Pkcs11Slot> GetSlotList(bool tokenPresent = true)
+    /// <returns>Read-only list of available slots.</returns>
+    public IReadOnlyList<Pkcs11Slot> GetSlotList(bool tokenPresent = true)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
