@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 27 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 26 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -137,6 +137,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-009] `UnmanagedMemory.Free` does not zero before `Marshal.FreeHGlobal` — IVs/AAD/key material leak in unmanaged heap
 
+- **Status: Resolved (2026-05-19)** — `UnmanagedMemory.Free` now zeroes the buffer (using the tracked size and `CryptographicOperations.ZeroMemory` over a `Span<byte>` constructed from the pointer — guaranteed not to be elided by the JIT) before calling `Marshal.FreeHGlobal`. Extracted as an internal `Zeroize(IntPtr, int)` seam for direct regression testing. Two new tests in `UnmanagedMemoryHarnessTests` pin the behavior: `Zeroize_ClearsSentinelBytes` and `Zeroize_IsNoopOnZeroPointerOrZeroSize`. Mirrors the established `SecureBuffer` / `SecurePin` zeroize pattern.
 - **Area:** Cryptography
 - **Severity:** High
 - **Effort:** S

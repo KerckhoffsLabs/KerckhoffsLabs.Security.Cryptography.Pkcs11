@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -117,7 +118,11 @@ internal static class UnmanagedMemory
     }
 
     /// <summary>
-    /// Frees previously allocated unmanaged memory
+    /// Frees previously allocated unmanaged memory. Zeroes the buffer before releasing
+    /// it so that IVs, nonces, AAD, context bytes, attribute values, and CKA_VALUE reads
+    /// (including the ML-KEM extract-and-destroy path) do not linger in the unmanaged
+    /// heap after the allocator reuses the block. Mirrors the
+    /// <see cref="Internal.SecureBuffer"/> / <see cref="SecurePin"/> zeroize pattern.
     /// </summary>
     /// <param name="memory">Pointer to the previously allocated unmanaged memory</param>
     public static void Free(ref IntPtr memory)
@@ -125,9 +130,10 @@ internal static class UnmanagedMemory
         if (memory == IntPtr.Zero)
             return;
 
+        int size;
         lock (_allocationsLock)
         {
-            if (!_allocations.Remove(memory, out int size))
+            if (!_allocations.Remove(memory, out size))
             {
                 throw new InvalidOperationException(
                     $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
@@ -137,8 +143,24 @@ internal static class UnmanagedMemory
                 _logger.LogDebug("Freeing {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
         }
 
+        Zeroize(memory, size);
         Marshal.FreeHGlobal(memory);
         memory = IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Zeroes <paramref name="size"/> bytes of unmanaged memory at <paramref name="memory"/>
+    /// using <see cref="CryptographicOperations.ZeroMemory(Span{byte})"/> — guaranteed not to
+    /// be elided by the JIT.
+    /// </summary>
+    /// <remarks>
+    /// Internal seam exposed for the zero-on-free regression test; production code should go
+    /// through <see cref="Free"/>.
+    /// </remarks>
+    internal static void Zeroize(IntPtr memory, int size)
+    {
+        if (memory == IntPtr.Zero || size <= 0) return;
+        unsafe { CryptographicOperations.ZeroMemory(new Span<byte>((void*)memory, size)); }
     }
 
     /// <summary>
