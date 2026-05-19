@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 25 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 24 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -211,6 +211,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-015] `Pkcs11Library.Dispose` calls `C_Finalize` unconditionally even when it didn't initialize
 
+- **Status: Resolved (2026-05-19)** — Added `_weInitialized` field, set only when `C_Initialize` returns `CKR_OK` (left false on `CKR_CRYPTOKI_ALREADY_INITIALIZED`). `Dispose` now gates `C_Finalize` on the flag. Behavioral regression test in `Pkcs11LibraryAlreadyInitializedTests` opens a second `Pkcs11Library` against the same path (the OS loader refcounts the same image so pkcs11-mock returns `CKR_CRYPTOKI_ALREADY_INITIALIZED`), disposes it, and verifies the first instance is still usable. Test fails without the fix (`Pkcs11Exception: CKR_CRYPTOKI_NOT_INITIALIZED`), passes with it.
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** S

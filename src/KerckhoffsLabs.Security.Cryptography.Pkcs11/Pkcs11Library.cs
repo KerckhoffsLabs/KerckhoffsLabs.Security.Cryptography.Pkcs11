@@ -33,6 +33,15 @@ public sealed class Pkcs11Library : IDisposable
     private LowLevelPkcs11Library? _pkcs11Library = null;
 
     /// <summary>
+    /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>.
+    /// Stays false when another <see cref="Pkcs11Library"/> instance (or a different
+    /// component in the same process) had already initialized the library and we observed
+    /// <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>. <see cref="Dispose(bool)"/> gates
+    /// <c>C_Finalize</c> on this flag so we never tear down another owner's state.
+    /// </summary>
+    private bool _weInitialized = false;
+
+    /// <summary>
     /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
     /// Function pointers are acquired via <c>C_GetFunctionList</c> (the PKCS#11
     /// v2.20+ recommended path).
@@ -103,7 +112,8 @@ public sealed class Pkcs11Library : IDisposable
         var initArgs = new CK_C_INITIALIZE_ARGS { Flags = CKF.CKF_OS_LOCKING_OK };
         CKR rv = _pkcs11Library.C_Initialize(initArgs);
 
-        // Another component already initialized the library — treat as success.
+        // Another component already initialized the library — treat as success but
+        // leave _weInitialized = false so Dispose doesn't tear down their state.
         if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
 
         // Token refused OS locking. Retry without — application is single-threaded
@@ -118,6 +128,7 @@ public sealed class Pkcs11Library : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, "C_Initialize");
+        _weInitialized = true;
     }
 
     /// <summary>
@@ -285,7 +296,11 @@ public sealed class Pkcs11Library : IDisposable
                 // Dispose managed objects
                 if (_pkcs11Library != null)
                 {
-                    _pkcs11Library.C_Finalize(IntPtr.Zero);
+                    // Only call C_Finalize if THIS instance drove the C_Initialize to CKR_OK.
+                    // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
+                    // responsible for finalization — calling it here would tear down their state.
+                    if (_weInitialized)
+                        _pkcs11Library.C_Finalize(IntPtr.Zero);
 
                     _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
                     _pkcs11Library.Dispose();
