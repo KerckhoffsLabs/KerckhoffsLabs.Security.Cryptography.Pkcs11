@@ -1064,18 +1064,17 @@ internal partial class Delegates
         if (rv.ToCKRChecked() != CKR.CKR_OK || interfacePtr == IntPtr.Zero)
             return false;
 
-        CK_INTERFACE iface = (CK_INTERFACE)UnmanagedMemory.Read(interfacePtr, typeof(CK_INTERFACE));
+        CK_INTERFACE iface = UnmanagedMemory.Read<CK_INTERFACE>(interfacePtr);
         if (iface.FunctionList == IntPtr.Zero)
             return false;
 
         // The function-list pointer can be either CK_FUNCTION_LIST (v2.40) or
         // CK_FUNCTION_LIST_3_0 (v3.0+). The CK_VERSION header at offset 0 distinguishes
         // them. Read just the version first to decide.
-        CK_VERSION version = (CK_VERSION)UnmanagedMemory.Read(iface.FunctionList, typeof(CK_VERSION));
+        CK_VERSION version = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
         if (version.Major is null || version.Major.Length == 0 || version.Major[0] < 3) return false;
 
-        CK_FUNCTION_LIST_3_0 v30 = (CK_FUNCTION_LIST_3_0)UnmanagedMemory.Read(
-            iface.FunctionList, typeof(CK_FUNCTION_LIST_3_0));
+        CK_FUNCTION_LIST_3_0 v30 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(iface.FunctionList);
 
         if (v30.C_LoginUser != IntPtr.Zero)
             C_LoginUser = Marshal.GetDelegateForFunctionPointer<C_LoginUserDelegate>(v30.C_LoginUser);
@@ -1142,8 +1141,7 @@ internal partial class Delegates
         // the 12 v3.2 additions on top of the v3.0 bindings.
         if (version.Minor is not null && version.Minor.Length > 0 && version.Minor[0] >= 2)
         {
-            CK_FUNCTION_LIST_3_2 v32 = (CK_FUNCTION_LIST_3_2)UnmanagedMemory.Read(
-                iface.FunctionList, typeof(CK_FUNCTION_LIST_3_2));
+            CK_FUNCTION_LIST_3_2 v32 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(iface.FunctionList);
 
             if (v32.C_EncapsulateKey != IntPtr.Zero)
             {
@@ -1209,7 +1207,7 @@ internal partial class Delegates
             throw new InvalidOperationException(
                 "C_GetFunctionList succeeded but returned a null function-list pointer.");
 
-        CK_FUNCTION_LIST funcList = (CK_FUNCTION_LIST)UnmanagedMemory.Read(functionList, typeof(CK_FUNCTION_LIST));
+        CK_FUNCTION_LIST funcList = UnmanagedMemory.Read<CK_FUNCTION_LIST>(functionList);
         Initialize(funcList);
     }
 
@@ -1226,7 +1224,7 @@ internal partial class Delegates
             throw new InvalidOperationException(
                 "C_GetFunctionList succeeded but returned a null function-list pointer.");
 
-        CK_FUNCTION_LIST funcList = (CK_FUNCTION_LIST)UnmanagedMemory.Read(functionList, typeof(CK_FUNCTION_LIST));
+        CK_FUNCTION_LIST funcList = UnmanagedMemory.Read<CK_FUNCTION_LIST>(functionList);
         Initialize(funcList);
     }
 

@@ -143,7 +143,7 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute(ulong type, List<ObjectAttribute> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        int stride = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
+        int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         byte[] flat = new byte[stride * value.Count];
         // Marshal each child's CK_ATTRIBUTE into the flat buffer.
         unsafe
@@ -154,7 +154,7 @@ public sealed class ObjectAttribute : IDisposable
                 for (int i = 0; i < value.Count; i++)
                 {
                     IntPtr slot = new IntPtr(basePtr.ToInt64() + (long)i * stride);
-                    UnmanagedMemory.Write(slot, value[i]._ckAttribute);
+                    UnmanagedMemory.Write(slot, in value[i]._ckAttribute);
                 }
             }
         }
@@ -295,7 +295,7 @@ public sealed class ObjectAttribute : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (CannotBeRead) throw new AttributeValueException(Type);
         int total = (int)_ckAttribute.valueLen;
-        int stride = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
+        int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         int n = total / stride;
         if (total % stride != 0)
             throw new AttributeValueException(Type);
@@ -303,7 +303,7 @@ public sealed class ObjectAttribute : IDisposable
         for (int i = 0; i < n; i++)
         {
             IntPtr slot = new IntPtr(_ckAttribute.value.ToInt64() + (long)i * stride);
-            CK_ATTRIBUTE attr = (CK_ATTRIBUTE)UnmanagedMemory.Read(slot, typeof(CK_ATTRIBUTE))!;
+            CK_ATTRIBUTE attr = UnmanagedMemory.Read<CK_ATTRIBUTE>(slot);
             result[i] = new ObjectAttribute(attr);
         }
         return result;

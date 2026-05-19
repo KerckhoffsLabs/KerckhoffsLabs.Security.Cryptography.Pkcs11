@@ -196,7 +196,7 @@ internal sealed partial class Pkcs11Session
                 if (template[i].valueLen.Value == nuint.MaxValue)
                     continue;
 
-                int ckAttributeSize = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
+                int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
                 int nestedAttrCount = (int)(template[i].valueLen) / ckAttributeSize;
                 int nestedAttrCountMod = (int)(template[i].valueLen) % ckAttributeSize;
 
@@ -215,12 +215,12 @@ internal sealed partial class Pkcs11Session
                     for (int j = 0; j < nestedAttrCount; j++)
                     {
                         IntPtr tempPointer = new IntPtr(template[i].value.ToInt64() + (j * ckAttributeSize));
-                        CK_ATTRIBUTE tempAttribute = (CK_ATTRIBUTE)UnmanagedMemory.Read(tempPointer, typeof(CK_ATTRIBUTE));
+                        CK_ATTRIBUTE tempAttribute = UnmanagedMemory.Read<CK_ATTRIBUTE>(tempPointer);
 
                         if (tempAttribute.valueLen.Value != nuint.MaxValue)
                             tempAttribute.value = UnmanagedMemory.Allocate((int)(tempAttribute.valueLen));
 
-                        UnmanagedMemory.Write(tempPointer, tempAttribute);
+                        UnmanagedMemory.Write(tempPointer, in tempAttribute);
                     }
                 }
             }

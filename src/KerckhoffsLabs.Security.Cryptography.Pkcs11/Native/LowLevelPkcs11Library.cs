@@ -175,10 +175,11 @@ internal sealed class LowLevelPkcs11Library
         }
         else
         {
-            IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf(typeof(CK_C_INITIALIZE_ARGS)));
+            IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf<CK_C_INITIALIZE_ARGS>());
             try
             {
-                UnmanagedMemory.Write(pInitArgs, initArgs.Value);
+                CK_C_INITIALIZE_ARGS initArgsValue = initArgs.Value;
+                UnmanagedMemory.Write(pInitArgs, in initArgsValue);
                 NativeCULong rv = _delegates.C_Initialize(pInitArgs);
                 return rv.ToCKRChecked();
             }
