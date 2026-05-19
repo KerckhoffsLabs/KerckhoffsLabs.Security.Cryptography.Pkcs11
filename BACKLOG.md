@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 24 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 23 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -224,6 +224,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-016] `Pkcs11Library.Dispose` does not invalidate open sessions before `C_Finalize`
 
+- **Status: Resolved (2026-05-19)** — `LowLevelPkcs11Library` now tracks every `Pkcs11SessionHandle` via a `List<WeakReference<Pkcs11SessionHandle>>` (the weak reference avoids preventing GC of normally-disposed sessions). `Pkcs11SessionHandle` registers itself in its constructor and unregisters in `ReleaseHandle`. `Pkcs11Library.Dispose` now calls `LowLevelPkcs11Library.CloseAllTrackedSessions()` before `C_Finalize`, which iterates the live tracked handles and disposes each (closing them gracefully while the function table is still valid). The class doc spells out the ownership contract: library must outlive every session it produced — disposal-with-open-sessions is a safety net, not the intended flow. Regression tests in `Pkcs11LibrarySessionTrackingTests` cover four cases: opening a session adds to the tracker, disposing the session removes it, disposing the library with an open session drains the tracker and closes the session without throwing, and disposing the library with no live sessions no-ops.
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** M

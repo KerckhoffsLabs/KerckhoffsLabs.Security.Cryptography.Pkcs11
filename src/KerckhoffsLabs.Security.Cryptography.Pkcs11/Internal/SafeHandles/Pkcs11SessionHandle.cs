@@ -28,6 +28,9 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
     {
         _library = library ?? throw new ArgumentNullException(nameof(library));
         SetHandle((IntPtr)(ulong)sessionId);
+        // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
+        // unloads the function table (BL-016).
+        _library.RegisterSession(this);
     }
 
     /// <summary>The underlying PKCS#11 session handle.</summary>
@@ -48,6 +51,12 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         catch
         {
             return false;
+        }
+        finally
+        {
+            // Best-effort: prune our tracker entry so the library's tracker doesn't grow
+            // unbounded for long-running consumers that open/close many sessions.
+            try { _library.UnregisterSession(this); } catch { /* tracker may already be torn down */ }
         }
     }
 }

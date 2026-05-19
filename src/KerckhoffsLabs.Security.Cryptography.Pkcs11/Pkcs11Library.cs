@@ -8,8 +8,15 @@ using Microsoft.Extensions.Logging;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// High level PKCS#11 wrapper
+/// High level PKCS#11 wrapper.
 /// </summary>
+/// <remarks>
+/// <para><b>Lifetime contract:</b> the <see cref="Pkcs11Library"/> must outlive every
+/// <c>Pkcs11Session</c> and <see cref="Pkcs11Workspace"/> it produces. Disposing the library
+/// while sessions are open is supported as a safety net — <see cref="Dispose()"/> closes
+/// every tracked session before <c>C_Finalize</c> — but is not a substitute for orderly
+/// cleanup. Failure to dispose sessions first is a caller bug that delays graceful release.</para>
+/// </remarks>
 public sealed class Pkcs11Library : IDisposable
 {
     /// <summary>
@@ -40,6 +47,12 @@ public sealed class Pkcs11Library : IDisposable
     /// <c>C_Finalize</c> on this flag so we never tear down another owner's state.
     /// </summary>
     private bool _weInitialized = false;
+
+    /// <summary>
+    /// Test seam: access to the underlying low-level wrapper for regression checks on
+    /// session tracking (BL-016). Not exposed publicly.
+    /// </summary>
+    internal LowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
     /// <summary>
     /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
@@ -296,6 +309,14 @@ public sealed class Pkcs11Library : IDisposable
                 // Dispose managed objects
                 if (_pkcs11Library != null)
                 {
+                    // Close any session handles still alive against this library before
+                    // C_Finalize tears down the cryptoki state — otherwise a stray
+                    // Pkcs11SessionHandle finalizer would call C_CloseSession through a
+                    // function table whose backing module has been unmapped (BL-016). The
+                    // ownership contract is: the library MUST outlive every session it
+                    // produced. This is the safety net for callers that violate it.
+                    _pkcs11Library.CloseAllTrackedSessions();
+
                     // Only call C_Finalize if THIS instance drove the C_Initialize to CKR_OK.
                     // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
                     // responsible for finalization — calling it here would tear down their state.
