@@ -21,5 +21,26 @@ internal sealed unsafe class FunctionPointers
     /// <summary>Cryptoki <c>CK_RV C_Finalize(CK_VOID_PTR pReserved)</c>.</summary>
     public delegate* unmanaged[Cdecl]<IntPtr, NativeCULong> C_Finalize;
 
+    /// <summary>Cryptoki <c>CK_RV C_CloseSession(CK_SESSION_HANDLE hSession)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_CloseSession;
+
+    /// <summary>Cryptoki <c>CK_RV C_CloseAllSessions(CK_SLOT_ID slotID)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_CloseAllSessions;
+
+    /// <summary>Cryptoki <c>CK_RV C_Logout(CK_SESSION_HANDLE hSession)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_Logout;
+
+    /// <summary>Cryptoki <c>CK_RV C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong> C_DestroyObject;
+
+    /// <summary>Cryptoki <c>CK_RV C_FindObjectsFinal(CK_SESSION_HANDLE hSession)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_FindObjectsFinal;
+
+    /// <summary>Cryptoki <c>CK_RV C_SessionCancel(CK_SESSION_HANDLE hSession, CK_FLAGS flags)</c> (v3.0+).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong> C_SessionCancel;
+
+    /// <summary>Cryptoki <c>CK_RV C_CancelFunction(CK_SESSION_HANDLE hSession)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_CancelFunction;
+
     // Additional fields are added one group at a time in subsequent tasks.
 }

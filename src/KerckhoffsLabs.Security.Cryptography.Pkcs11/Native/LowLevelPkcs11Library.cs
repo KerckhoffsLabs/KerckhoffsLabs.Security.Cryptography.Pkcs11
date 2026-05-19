@@ -572,7 +572,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_SessionCancel is null)
+        if (!_delegates.IsC_SessionCancelSupported)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SessionCancel(session, flags);

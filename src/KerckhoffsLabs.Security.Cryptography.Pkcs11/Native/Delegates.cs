@@ -40,11 +40,6 @@ internal delegate NativeCULong C_SetPINDelegate(NativeCULong session, byte[] old
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_OpenSessionDelegate(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session);
 
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_CloseSessionDelegate(NativeCULong session);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_CloseAllSessionsDelegate(NativeCULong slotId);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetSessionInfoDelegate(NativeCULong session, ref CK_SESSION_INFO info);
@@ -73,15 +68,7 @@ internal delegate NativeCULong C_GetInterfaceDelegate(byte[]? interfaceName, Int
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_LoginUserDelegate(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen);
 
-/// <summary>
-/// C_SessionCancel was added in PKCS#11 v3.0 — cancels in-flight operations on the
-/// session as identified by the flags bitmask (e.g. CKF_ENCRYPT, CKF_SIGN, etc.).
-/// </summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SessionCancelDelegate(NativeCULong session, NativeCULong flags);
 
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_LogoutDelegate(NativeCULong session);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_CreateObjectDelegate(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong objectId);
@@ -95,8 +82,6 @@ internal delegate NativeCULong C_CopyObjectDelegate(NativeCULong session, Native
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_CopyObjectDelegate_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong newObjectId);
 
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DestroyObjectDelegate(NativeCULong session, NativeCULong objectId);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetObjectSizeDelegate(NativeCULong session, NativeCULong objectId, ref NativeCULong size);
@@ -122,8 +107,6 @@ internal delegate NativeCULong C_FindObjectsInitDelegate_Windows(NativeCULong se
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FindObjectsDelegate(NativeCULong session, [In, Out] NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
 
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_FindObjectsFinalDelegate(NativeCULong session);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_EncryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
@@ -236,8 +219,6 @@ internal delegate NativeCULong C_GenerateRandomDelegate(NativeCULong session, [I
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetFunctionStatusDelegate(NativeCULong session);
 
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_CancelFunctionDelegate(NativeCULong session);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_WaitForSlotEventDelegate(NativeCULong flags, ref NativeCULong slot, IntPtr reserved);
@@ -533,15 +514,21 @@ internal partial class Delegates
     /// </summary>
     internal C_OpenSessionDelegate? C_OpenSession = null;
 
-    /// <summary>
-    /// Delegate for C_CloseSession
-    /// </summary>
-    internal C_CloseSessionDelegate? C_CloseSession = null;
+    /// <summary>Wrapper for <c>C_CloseSession</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_CloseSession(NativeCULong session)
+    {
+        if (_fp.C_CloseSession is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CloseSession");
+        return _fp.C_CloseSession(session);
+    }
 
-    /// <summary>
-    /// Delegate for C_CloseAllSessions
-    /// </summary>
-    internal C_CloseAllSessionsDelegate? C_CloseAllSessions = null;
+    /// <summary>Wrapper for <c>C_CloseAllSessions</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_CloseAllSessions(NativeCULong slotId)
+    {
+        if (_fp.C_CloseAllSessions is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CloseAllSessions");
+        return _fp.C_CloseAllSessions(slotId);
+    }
 
     /// <summary>
     /// Delegate for C_GetSessionInfo
@@ -563,10 +550,13 @@ internal partial class Delegates
     /// </summary>
     internal C_LoginDelegate? C_Login = null;
 
-    /// <summary>
-    /// Delegate for C_Logout
-    /// </summary>
-    internal C_LogoutDelegate? C_Logout = null;
+    /// <summary>Wrapper for <c>C_Logout</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_Logout(NativeCULong session)
+    {
+        if (_fp.C_Logout is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Logout");
+        return _fp.C_Logout(session);
+    }
 
     /// <summary>
     /// Delegate for C_CreateObject
@@ -578,10 +568,13 @@ internal partial class Delegates
     /// </summary>
     internal C_CopyObjectDelegate? C_CopyObject = null;
 
-    /// <summary>
-    /// Delegate for C_DestroyObject
-    /// </summary>
-    internal C_DestroyObjectDelegate? C_DestroyObject = null;
+    /// <summary>Wrapper for <c>C_DestroyObject</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_DestroyObject(NativeCULong session, NativeCULong objectId)
+    {
+        if (_fp.C_DestroyObject is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DestroyObject");
+        return _fp.C_DestroyObject(session, objectId);
+    }
 
     /// <summary>
     /// Delegate for C_GetObjectSize
@@ -608,10 +601,13 @@ internal partial class Delegates
     /// </summary>
     internal C_FindObjectsDelegate? C_FindObjects = null;
 
-    /// <summary>
-    /// Delegate for C_FindObjectsFinal
-    /// </summary>
-    internal C_FindObjectsFinalDelegate? C_FindObjectsFinal = null;
+    /// <summary>Wrapper for <c>C_FindObjectsFinal</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_FindObjectsFinal(NativeCULong session)
+    {
+        if (_fp.C_FindObjectsFinal is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjectsFinal");
+        return _fp.C_FindObjectsFinal(session);
+    }
 
     /// <summary>
     /// Delegate for C_EncryptInit
@@ -798,10 +794,13 @@ internal partial class Delegates
     /// </summary>
     internal C_GetFunctionStatusDelegate? C_GetFunctionStatus = null;
 
-    /// <summary>
-    /// Delegate for C_CancelFunction
-    /// </summary>
-    internal C_CancelFunctionDelegate? C_CancelFunction = null;
+    /// <summary>Wrapper for <c>C_CancelFunction</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_CancelFunction(NativeCULong session)
+    {
+        if (_fp.C_CancelFunction is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CancelFunction");
+        return _fp.C_CancelFunction(session);
+    }
 
     /// <summary>
     /// Delegate for C_WaitForSlotEvent
@@ -814,11 +813,16 @@ internal partial class Delegates
     /// </summary>
     internal C_LoginUserDelegate? C_LoginUser = null;
 
-    /// <summary>
-    /// Delegate for C_SessionCancel (PKCS#11 v3.0). Null if the loaded library is v2.40
-    /// or does not export the symbol.
-    /// </summary>
-    internal C_SessionCancelDelegate? C_SessionCancel = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SessionCancel</c> (PKCS#11 v3.0+).</summary>
+    public unsafe bool IsC_SessionCancelSupported => _fp.C_SessionCancel is not null;
+
+    /// <summary>Wrapper for <c>C_SessionCancel</c> (PKCS#11 v3.0). Throws <see cref="Pkcs11Exception"/> if the loaded library is v2.40 or does not export the symbol.</summary>
+    public unsafe NativeCULong C_SessionCancel(NativeCULong session, NativeCULong flags)
+    {
+        if (_fp.C_SessionCancel is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SessionCancel");
+        return _fp.C_SessionCancel(session, flags);
+    }
 
     /// <summary>Delegate for C_MessageEncryptInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
     internal C_MessageEncryptInitDelegate? C_MessageEncryptInit = null;
@@ -993,7 +997,8 @@ internal partial class Delegates
         // Fallback: per-symbol lookup. Works for libraries that export the v3.0
         // functions as plain symbols even though they don't expose C_GetInterface.
         C_LoginUser = TryGetDelegate<C_LoginUserDelegate>(libraryHandle, "C_LoginUser");
-        C_SessionCancel = TryGetDelegate<C_SessionCancelDelegate>(libraryHandle, "C_SessionCancel");
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_SessionCancel", out IntPtr sessionCancelPtr) && sessionCancelPtr != IntPtr.Zero)
+            unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)sessionCancelPtr; }
         C_MessageEncryptInit = TryGetDelegate<C_MessageEncryptInitDelegate>(libraryHandle, "C_MessageEncryptInit");
         C_MessageEncryptInit_Windows = TryGetDelegate<C_MessageEncryptInitDelegate_Windows>(libraryHandle, "C_MessageEncryptInit");
         C_EncryptMessage = TryGetDelegate<C_EncryptMessageDelegate>(libraryHandle, "C_EncryptMessage");
@@ -1087,7 +1092,7 @@ internal partial class Delegates
         if (v30.C_LoginUser != IntPtr.Zero)
             C_LoginUser = Marshal.GetDelegateForFunctionPointer<C_LoginUserDelegate>(v30.C_LoginUser);
         if (v30.C_SessionCancel != IntPtr.Zero)
-            C_SessionCancel = Marshal.GetDelegateForFunctionPointer<C_SessionCancelDelegate>(v30.C_SessionCancel);
+            unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)v30.C_SessionCancel; }
 
         if (v30.C_MessageEncryptInit != IntPtr.Zero)
         {
@@ -1260,19 +1265,19 @@ internal partial class Delegates
         C_InitPIN = Marshal.GetDelegateForFunctionPointer<C_InitPINDelegate>(funcList.C_InitPIN);
         C_SetPIN = Marshal.GetDelegateForFunctionPointer<C_SetPINDelegate>(funcList.C_SetPIN);
         C_OpenSession = Marshal.GetDelegateForFunctionPointer<C_OpenSessionDelegate>(funcList.C_OpenSession);
-        C_CloseSession = Marshal.GetDelegateForFunctionPointer<C_CloseSessionDelegate>(funcList.C_CloseSession);
-        C_CloseAllSessions = Marshal.GetDelegateForFunctionPointer<C_CloseAllSessionsDelegate>(funcList.C_CloseAllSessions);
+        unsafe { _fp.C_CloseSession = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CloseSession; }
+        unsafe { _fp.C_CloseAllSessions = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CloseAllSessions; }
         C_GetSessionInfo = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate>(funcList.C_GetSessionInfo);
         C_GetSessionInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate_Windows>(funcList.C_GetSessionInfo);
         C_GetOperationState = Marshal.GetDelegateForFunctionPointer<C_GetOperationStateDelegate>(funcList.C_GetOperationState);
         C_SetOperationState = Marshal.GetDelegateForFunctionPointer<C_SetOperationStateDelegate>(funcList.C_SetOperationState);
         C_Login = Marshal.GetDelegateForFunctionPointer<C_LoginDelegate>(funcList.C_Login);
-        C_Logout = Marshal.GetDelegateForFunctionPointer<C_LogoutDelegate>(funcList.C_Logout);
+        unsafe { _fp.C_Logout = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_Logout; }
         C_CreateObject = Marshal.GetDelegateForFunctionPointer<C_CreateObjectDelegate>(funcList.C_CreateObject);
         C_CreateObject_Windows = Marshal.GetDelegateForFunctionPointer<C_CreateObjectDelegate_Windows>(funcList.C_CreateObject);
         C_CopyObject = Marshal.GetDelegateForFunctionPointer<C_CopyObjectDelegate>(funcList.C_CopyObject);
         C_CopyObject_Windows = Marshal.GetDelegateForFunctionPointer<C_CopyObjectDelegate_Windows>(funcList.C_CopyObject);
-        C_DestroyObject = Marshal.GetDelegateForFunctionPointer<C_DestroyObjectDelegate>(funcList.C_DestroyObject);
+        unsafe { _fp.C_DestroyObject = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)funcList.C_DestroyObject; }
         C_GetObjectSize = Marshal.GetDelegateForFunctionPointer<C_GetObjectSizeDelegate>(funcList.C_GetObjectSize);
         C_GetAttributeValue = Marshal.GetDelegateForFunctionPointer<C_GetAttributeValueDelegate>(funcList.C_GetAttributeValue);
         C_GetAttributeValue_Windows = Marshal.GetDelegateForFunctionPointer<C_GetAttributeValueDelegate_Windows>(funcList.C_GetAttributeValue);
@@ -1281,7 +1286,7 @@ internal partial class Delegates
         C_FindObjectsInit = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate>(funcList.C_FindObjectsInit);
         C_FindObjectsInit_Windows = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate_Windows>(funcList.C_FindObjectsInit);
         C_FindObjects = Marshal.GetDelegateForFunctionPointer<C_FindObjectsDelegate>(funcList.C_FindObjects);
-        C_FindObjectsFinal = Marshal.GetDelegateForFunctionPointer<C_FindObjectsFinalDelegate>(funcList.C_FindObjectsFinal);
+        unsafe { _fp.C_FindObjectsFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_FindObjectsFinal; }
         C_EncryptInit = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate>(funcList.C_EncryptInit);
         C_EncryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate_Windows>(funcList.C_EncryptInit);
         C_Encrypt = Marshal.GetDelegateForFunctionPointer<C_EncryptDelegate>(funcList.C_Encrypt);
@@ -1331,7 +1336,7 @@ internal partial class Delegates
         C_SeedRandom = Marshal.GetDelegateForFunctionPointer<C_SeedRandomDelegate>(funcList.C_SeedRandom);
         C_GenerateRandom = Marshal.GetDelegateForFunctionPointer<C_GenerateRandomDelegate>(funcList.C_GenerateRandom);
         C_GetFunctionStatus = Marshal.GetDelegateForFunctionPointer<C_GetFunctionStatusDelegate>(funcList.C_GetFunctionStatus);
-        C_CancelFunction = Marshal.GetDelegateForFunctionPointer<C_CancelFunctionDelegate>(funcList.C_CancelFunction);
+        unsafe { _fp.C_CancelFunction = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CancelFunction; }
         C_WaitForSlotEvent = Marshal.GetDelegateForFunctionPointer<C_WaitForSlotEventDelegate>(funcList.C_WaitForSlotEvent);
     }
 }
