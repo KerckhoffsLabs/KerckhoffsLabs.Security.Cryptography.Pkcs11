@@ -1,6 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot;IsAotCompatible">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Roslyn analyzers target netstandard2.0, which does not support AOT publish.
+         TreatAsLocalProperty overrides any global PublishAot=true propagated by a
+         consuming project so that the SDK's ProcessFrameworkReferences task does not
+         emit NETSDK1207 when the smoke project (or any AOT-publish consumer) is built. -->
+    <PublishAot>false</PublishAot>
+    <IsAotCompatible>false</IsAotCompatible>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <IsRoslynComponent>true</IsRoslynComponent>

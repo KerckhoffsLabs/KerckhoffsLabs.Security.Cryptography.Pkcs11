@@ -17,6 +17,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
         }
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[10.0.7, )",
+        "resolved": "10.0.7",
+        "contentHash": "PN3aMJ9WZWTFj90BKG642M7Mo2FHcyYynYXnx3/UhodFQ/WQs02U6zERCo4d0ZNrfYc81GTMIXGIn2ag2cXHCg=="
+      },
       "Microsoft.SourceLink.GitHub": {
         "type": "Direct",
         "requested": "[8.0.0, )",
