@@ -8,16 +8,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal delegate NativeCULong C_GetInfoDelegate(ref CK_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetSlotListDelegate([MarshalAs(UnmanagedType.U1)] bool tokenPresent, [In, Out] NativeCULong[] slotList, ref NativeCULong count);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetSlotInfoDelegate(NativeCULong slotId, ref CK_SLOT_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetTokenInfoDelegate(NativeCULong slotId, ref CK_TOKEN_INFO info);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetMechanismListDelegate(NativeCULong slotId, [In, Out] NativeCULong[] mechanismList, ref NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetMechanismInfoDelegate(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info);
@@ -80,10 +74,6 @@ internal delegate NativeCULong C_FindObjectsInitDelegate(NativeCULong session, C
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FindObjectsInitDelegate_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_FindObjectsDelegate(NativeCULong session, [In, Out] NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
-
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_EncryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
@@ -384,10 +374,15 @@ internal partial class Delegates
         return rv;
     }
 
-    /// <summary>
-    /// Delegate for C_GetSlotList
-    /// </summary>
-    internal C_GetSlotListDelegate? C_GetSlotList = null;
+    /// <summary>Wrapper for <c>C_GetSlotList</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
+    {
+        if (_fp.C_GetSlotList is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotList");
+        fixed (NativeCULong* slotPtr = slotList)
+        fixed (NativeCULong* countPtr = &count)
+            return _fp.C_GetSlotList((byte)(tokenPresent ? 1 : 0), slotPtr, countPtr);
+    }
 
     /// <summary>
     /// Delegate for C_GetSlotInfo
@@ -399,10 +394,15 @@ internal partial class Delegates
     /// </summary>
     internal C_GetTokenInfoDelegate? C_GetTokenInfo = null;
 
-    /// <summary>
-    /// Delegate for C_GetMechanismList
-    /// </summary>
-    internal C_GetMechanismListDelegate? C_GetMechanismList = null;
+    /// <summary>Wrapper for <c>C_GetMechanismList</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetMechanismList(NativeCULong slotId, NativeCULong[]? mechanismList, ref NativeCULong count)
+    {
+        if (_fp.C_GetMechanismList is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetMechanismList");
+        fixed (NativeCULong* mechPtr = mechanismList)
+        fixed (NativeCULong* countPtr = &count)
+            return _fp.C_GetMechanismList(slotId, mechPtr, countPtr);
+    }
 
     /// <summary>
     /// Delegate for C_GetMechanismInfo
@@ -538,10 +538,15 @@ internal partial class Delegates
     /// </summary>
     internal C_FindObjectsInitDelegate? C_FindObjectsInit = null;
 
-    /// <summary>
-    /// Delegate for C_FindObjects
-    /// </summary>
-    internal C_FindObjectsDelegate? C_FindObjects = null;
+    /// <summary>Wrapper for <c>C_FindObjects</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
+    {
+        if (_fp.C_FindObjects is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjects");
+        fixed (NativeCULong* objPtr = objectId)
+        fixed (NativeCULong* countPtr = &objectCount)
+            return _fp.C_FindObjects(session, objPtr, maxObjectCount, countPtr);
+    }
 
     /// <summary>Wrapper for <c>C_FindObjectsFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_FindObjectsFinal(NativeCULong session)
@@ -1319,12 +1324,12 @@ internal partial class Delegates
         C_GetInfo = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate>(funcList.C_GetInfo);
         C_GetInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate_Windows>(funcList.C_GetInfo);
         unsafe { _fp.C_GetFunctionList = (delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)funcList.C_GetFunctionList; }
-        C_GetSlotList = Marshal.GetDelegateForFunctionPointer<C_GetSlotListDelegate>(funcList.C_GetSlotList);
+        unsafe { _fp.C_GetSlotList = (delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong>)funcList.C_GetSlotList; }
         C_GetSlotInfo = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate>(funcList.C_GetSlotInfo);
         C_GetSlotInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate_Windows>(funcList.C_GetSlotInfo);
         C_GetTokenInfo = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate>(funcList.C_GetTokenInfo);
         C_GetTokenInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate_Windows>(funcList.C_GetTokenInfo);
-        C_GetMechanismList = Marshal.GetDelegateForFunctionPointer<C_GetMechanismListDelegate>(funcList.C_GetMechanismList);
+        unsafe { _fp.C_GetMechanismList = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong*, NativeCULong>)funcList.C_GetMechanismList; }
         C_GetMechanismInfo = Marshal.GetDelegateForFunctionPointer<C_GetMechanismInfoDelegate>(funcList.C_GetMechanismInfo);
         C_GetMechanismInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetMechanismInfoDelegate_Windows>(funcList.C_GetMechanismInfo);
         unsafe { _fp.C_InitToken = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong>)funcList.C_InitToken; }
@@ -1351,7 +1356,7 @@ internal partial class Delegates
         C_SetAttributeValue_Windows = Marshal.GetDelegateForFunctionPointer<C_SetAttributeValueDelegate_Windows>(funcList.C_SetAttributeValue);
         C_FindObjectsInit = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate>(funcList.C_FindObjectsInit);
         C_FindObjectsInit_Windows = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate_Windows>(funcList.C_FindObjectsInit);
-        C_FindObjects = Marshal.GetDelegateForFunctionPointer<C_FindObjectsDelegate>(funcList.C_FindObjects);
+        unsafe { _fp.C_FindObjects = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_FindObjects; }
         unsafe { _fp.C_FindObjectsFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_FindObjectsFinal; }
         C_EncryptInit = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate>(funcList.C_EncryptInit);
         C_EncryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate_Windows>(funcList.C_EncryptInit);
