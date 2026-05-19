@@ -8,9 +8,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal delegate NativeCULong C_InitializeDelegate(IntPtr pInitArgs);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_FinalizeDelegate(IntPtr reserved);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetInfoDelegate(ref CK_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -446,6 +443,14 @@ internal delegate NativeCULong C_UnwrapKeyAuthenticatedDelegate_Windows(NativeCU
 internal partial class Delegates
 {
     /// <summary>
+    /// Typed function pointer table. Populated by Initialize / TryLoadV30Symbols /
+    /// TryLoadFromGetInterface alongside the legacy delegate fields. Migration target
+    /// for BL-025 — every delegate field is being replaced by an entry here plus a
+    /// wrapper method on this class.
+    /// </summary>
+    private readonly FunctionPointers _fp = new();
+
+    /// <summary>
     /// Definition of unmanaged methods (used on iOS)
     /// </summary>
     private static partial class NativeMethods
@@ -465,10 +470,13 @@ internal partial class Delegates
     /// </summary>
     internal C_InitializeDelegate? C_Initialize = null;
 
-    /// <summary>
-    /// Delegate for C_Finalize
-    /// </summary>
-    internal C_FinalizeDelegate? C_Finalize = null;
+    /// <summary>Wrapper for <c>C_Finalize</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_Finalize(IntPtr reserved)
+    {
+        if (_fp.C_Finalize is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Finalize");
+        return _fp.C_Finalize(reserved);
+    }
 
     /// <summary>
     /// Delegate for C_GetInfo
@@ -1238,7 +1246,7 @@ internal partial class Delegates
     private void Initialize(CK_FUNCTION_LIST funcList)
     {
         C_Initialize = Marshal.GetDelegateForFunctionPointer<C_InitializeDelegate>(funcList.C_Initialize);
-        C_Finalize = Marshal.GetDelegateForFunctionPointer<C_FinalizeDelegate>(funcList.C_Finalize);
+        unsafe { _fp.C_Finalize = (delegate* unmanaged[Cdecl]<IntPtr, NativeCULong>)funcList.C_Finalize; }
         C_GetInfo = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate>(funcList.C_GetInfo);
         C_GetInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate_Windows>(funcList.C_GetInfo);
         C_GetFunctionList = Marshal.GetDelegateForFunctionPointer<C_GetFunctionListDelegate>(funcList.C_GetFunctionList);
