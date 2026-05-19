@@ -42,13 +42,7 @@ internal delegate NativeCULong C_LoginUserDelegate(NativeCULong session, NativeC
 
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_CreateObjectDelegate(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong objectId);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_CreateObjectDelegate_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong objectId);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_CopyObjectDelegate(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong newObjectId);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_CopyObjectDelegate_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong newObjectId);
@@ -58,58 +52,13 @@ internal delegate NativeCULong C_CopyObjectDelegate_Windows(NativeCULong session
 internal delegate NativeCULong C_GetObjectSizeDelegate(NativeCULong session, NativeCULong objectId, ref NativeCULong size);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetAttributeValueDelegate(NativeCULong session, NativeCULong objectId, [In, Out] CK_ATTRIBUTE[] template, NativeCULong count);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetAttributeValueDelegate_Windows(NativeCULong session, NativeCULong objectId, [In, Out] CK_ATTRIBUTE_Windows[] template, NativeCULong count);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SetAttributeValueDelegate(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_SetAttributeValueDelegate_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_FindObjectsInitDelegate(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_FindObjectsInitDelegate_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DigestInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignRecoverInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifyInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifyRecoverInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GenerateKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GenerateKeyPairDelegate(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, NativeCULong publicKeyAttributeCount, CK_ATTRIBUTE[] privateKeyTemplate, NativeCULong privateKeyAttributeCount, ref NativeCULong publicKey, ref NativeCULong privateKey);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_WrapKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_UnwrapKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DeriveKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key);
 
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -500,15 +449,23 @@ internal partial class Delegates
         return _fp.C_Logout(session);
     }
 
-    /// <summary>
-    /// Delegate for C_CreateObject
-    /// </summary>
-    internal C_CreateObjectDelegate? C_CreateObject = null;
+    /// <summary>Wrapper for <c>C_CreateObject</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_CreateObject(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong objectId)
+    {
+        if (_fp.C_CreateObject is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CreateObject");
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (NativeCULong* idPtr = &objectId)
+            return _fp.C_CreateObject(session, t, count, idPtr);
+    }
 
-    /// <summary>
-    /// Delegate for C_CopyObject
-    /// </summary>
-    internal C_CopyObjectDelegate? C_CopyObject = null;
+    /// <summary>Wrapper for <c>C_CopyObject</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong newObjectId)
+    {
+        if (_fp.C_CopyObject is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CopyObject");
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (NativeCULong* idPtr = &newObjectId)
+            return _fp.C_CopyObject(session, objectId, t, count, idPtr);
+    }
 
     /// <summary>Wrapper for <c>C_DestroyObject</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DestroyObject(NativeCULong session, NativeCULong objectId)
@@ -523,20 +480,29 @@ internal partial class Delegates
     /// </summary>
     internal C_GetObjectSizeDelegate? C_GetObjectSize = null;
 
-    /// <summary>
-    /// Delegate for C_GetAttributeValue
-    /// </summary>
-    internal C_GetAttributeValueDelegate? C_GetAttributeValue = null;
+    /// <summary>Wrapper for <c>C_GetAttributeValue</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+    {
+        if (_fp.C_GetAttributeValue is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetAttributeValue");
+        fixed (CK_ATTRIBUTE* t = template)
+            return _fp.C_GetAttributeValue(session, objectId, t, count);
+    }
 
-    /// <summary>
-    /// Delegate for C_SetAttributeValue
-    /// </summary>
-    internal C_SetAttributeValueDelegate? C_SetAttributeValue = null;
+    /// <summary>Wrapper for <c>C_SetAttributeValue</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_SetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+    {
+        if (_fp.C_SetAttributeValue is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SetAttributeValue");
+        fixed (CK_ATTRIBUTE* t = template)
+            return _fp.C_SetAttributeValue(session, objectId, t, count);
+    }
 
-    /// <summary>
-    /// Delegate for C_FindObjectsInit
-    /// </summary>
-    internal C_FindObjectsInitDelegate? C_FindObjectsInit = null;
+    /// <summary>Wrapper for <c>C_FindObjectsInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count)
+    {
+        if (_fp.C_FindObjectsInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjectsInit");
+        fixed (CK_ATTRIBUTE* t = template)
+            return _fp.C_FindObjectsInit(session, t, count);
+    }
 
     /// <summary>Wrapper for <c>C_FindObjects</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
@@ -556,10 +522,12 @@ internal partial class Delegates
         return _fp.C_FindObjectsFinal(session);
     }
 
-    /// <summary>
-    /// Delegate for C_EncryptInit
-    /// </summary>
-    internal C_EncryptInitDelegate? C_EncryptInit = null;
+    /// <summary>Wrapper for <c>C_EncryptInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_EncryptInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_EncryptInit(session, m, key);
+    }
 
     /// <summary>Wrapper for <c>C_Encrypt</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] encryptedData, ref NativeCULong encryptedDataLen)
@@ -593,10 +561,12 @@ internal partial class Delegates
             return _fp.C_EncryptFinal(session, partPtr, lenPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_DecryptInit
-    /// </summary>
-    internal C_DecryptInitDelegate? C_DecryptInit = null;
+    /// <summary>Wrapper for <c>C_DecryptInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_DecryptInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_DecryptInit(session, m, key);
+    }
 
     /// <summary>Wrapper for <c>C_Decrypt</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[] data, ref NativeCULong dataLen)
@@ -630,10 +600,12 @@ internal partial class Delegates
             return _fp.C_DecryptFinal(session, partPtr, lenPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_DigestInit
-    /// </summary>
-    internal C_DigestInitDelegate? C_DigestInit = null;
+    /// <summary>Wrapper for <c>C_DigestInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism)
+    {
+        if (_fp.C_DigestInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_DigestInit(session, m);
+    }
 
     /// <summary>Wrapper for <c>C_Digest</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] digest, ref NativeCULong digestLen)
@@ -673,10 +645,12 @@ internal partial class Delegates
             return _fp.C_DigestFinal(session, digestPtr, lenPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_SignInit
-    /// </summary>
-    internal C_SignInitDelegate? C_SignInit = null;
+    /// <summary>Wrapper for <c>C_SignInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_SignInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_SignInit(session, m, key);
+    }
 
     /// <summary>Wrapper for <c>C_Sign</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
@@ -708,10 +682,12 @@ internal partial class Delegates
             return _fp.C_SignFinal(session, sigPtr, lenPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_SignRecoverInit
-    /// </summary>
-    internal C_SignRecoverInitDelegate? C_SignRecoverInit = null;
+    /// <summary>Wrapper for <c>C_SignRecoverInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_SignRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_SignRecoverInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignRecoverInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_SignRecoverInit(session, m, key);
+    }
 
     /// <summary>Wrapper for <c>C_SignRecover</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
@@ -724,10 +700,12 @@ internal partial class Delegates
             return _fp.C_SignRecover(session, dataPtr, dataLen, sigPtr, lenPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_VerifyInit
-    /// </summary>
-    internal C_VerifyInitDelegate? C_VerifyInit = null;
+    /// <summary>Wrapper for <c>C_VerifyInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_VerifyInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_VerifyInit(session, m, key);
+    }
 
     /// <summary>Wrapper for <c>C_Verify</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Verify(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
@@ -757,10 +735,12 @@ internal partial class Delegates
             return _fp.C_VerifyFinal(session, sigPtr, signatureLen);
     }
 
-    /// <summary>
-    /// Delegate for C_VerifyRecoverInit
-    /// </summary>
-    internal C_VerifyRecoverInitDelegate? C_VerifyRecoverInit = null;
+    /// <summary>Wrapper for <c>C_VerifyRecoverInit</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_VerifyRecoverInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyRecoverInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_VerifyRecoverInit(session, m, key);
+    }
 
     /// <summary>Wrapper for <c>C_VerifyRecover</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[] data, ref NativeCULong dataLen)
@@ -817,30 +797,61 @@ internal partial class Delegates
             return _fp.C_DecryptVerifyUpdate(session, encPartPtr, encryptedPartLen, partPtr, lenPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_GenerateKey
-    /// </summary>
-    internal C_GenerateKeyDelegate? C_GenerateKey = null;
+    /// <summary>Wrapper for <c>C_GenerateKey</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong key)
+    {
+        if (_fp.C_GenerateKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKey");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (NativeCULong* kPtr = &key)
+            return _fp.C_GenerateKey(session, m, t, count, kPtr);
+    }
 
-    /// <summary>
-    /// Delegate for C_GenerateKeyPair
-    /// </summary>
-    internal C_GenerateKeyPairDelegate? C_GenerateKeyPair = null;
+    /// <summary>Wrapper for <c>C_GenerateKeyPair</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism,
+        CK_ATTRIBUTE[] publicKeyTemplate, NativeCULong publicKeyAttributeCount,
+        CK_ATTRIBUTE[] privateKeyTemplate, NativeCULong privateKeyAttributeCount,
+        ref NativeCULong publicKey, ref NativeCULong privateKey)
+    {
+        if (_fp.C_GenerateKeyPair is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKeyPair");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (CK_ATTRIBUTE* pub = publicKeyTemplate)
+        fixed (CK_ATTRIBUTE* priv = privateKeyTemplate)
+        fixed (NativeCULong* pubK = &publicKey)
+        fixed (NativeCULong* privK = &privateKey)
+            return _fp.C_GenerateKeyPair(session, m, pub, publicKeyAttributeCount, priv, privateKeyAttributeCount, pubK, privK);
+    }
 
-    /// <summary>
-    /// Delegate for C_WrapKey
-    /// </summary>
-    internal C_WrapKeyDelegate? C_WrapKey = null;
+    /// <summary>Wrapper for <c>C_WrapKey</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    {
+        if (_fp.C_WrapKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKey");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (byte* wkPtr = wrappedKey)
+        fixed (NativeCULong* lenPtr = &wrappedKeyLen)
+            return _fp.C_WrapKey(session, m, wrappingKey, key, wkPtr, lenPtr);
+    }
 
-    /// <summary>
-    /// Delegate for C_UnwrapKey
-    /// </summary>
-    internal C_UnwrapKeyDelegate? C_UnwrapKey = null;
+    /// <summary>Wrapper for <c>C_UnwrapKey</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key)
+    {
+        if (_fp.C_UnwrapKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKey");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (byte* wkPtr = wrappedKey)
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (NativeCULong* kPtr = &key)
+            return _fp.C_UnwrapKey(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, kPtr);
+    }
 
-    /// <summary>
-    /// Delegate for C_DeriveKey
-    /// </summary>
-    internal C_DeriveKeyDelegate? C_DeriveKey = null;
+    /// <summary>Wrapper for <c>C_DeriveKey</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key)
+    {
+        if (_fp.C_DeriveKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DeriveKey");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (NativeCULong* kPtr = &key)
+            return _fp.C_DeriveKey(session, m, baseKey, t, attributeCount, kPtr);
+    }
 
     /// <summary>Wrapper for <c>C_SeedRandom</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SeedRandom(NativeCULong session, byte[] seed, NativeCULong seedLen)
@@ -1344,65 +1355,65 @@ internal partial class Delegates
         unsafe { _fp.C_SetOperationState = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong, NativeCULong, NativeCULong>)funcList.C_SetOperationState; }
         unsafe { _fp.C_Login = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_Login; }
         unsafe { _fp.C_Logout = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_Logout; }
-        C_CreateObject = Marshal.GetDelegateForFunctionPointer<C_CreateObjectDelegate>(funcList.C_CreateObject);
+        unsafe { _fp.C_CreateObject = (delegate* unmanaged[Cdecl]<NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_CreateObject; }
         C_CreateObject_Windows = Marshal.GetDelegateForFunctionPointer<C_CreateObjectDelegate_Windows>(funcList.C_CreateObject);
-        C_CopyObject = Marshal.GetDelegateForFunctionPointer<C_CopyObjectDelegate>(funcList.C_CopyObject);
+        unsafe { _fp.C_CopyObject = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_CopyObject; }
         C_CopyObject_Windows = Marshal.GetDelegateForFunctionPointer<C_CopyObjectDelegate_Windows>(funcList.C_CopyObject);
         unsafe { _fp.C_DestroyObject = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)funcList.C_DestroyObject; }
         C_GetObjectSize = Marshal.GetDelegateForFunctionPointer<C_GetObjectSizeDelegate>(funcList.C_GetObjectSize);
-        C_GetAttributeValue = Marshal.GetDelegateForFunctionPointer<C_GetAttributeValueDelegate>(funcList.C_GetAttributeValue);
+        unsafe { _fp.C_GetAttributeValue = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong>)funcList.C_GetAttributeValue; }
         C_GetAttributeValue_Windows = Marshal.GetDelegateForFunctionPointer<C_GetAttributeValueDelegate_Windows>(funcList.C_GetAttributeValue);
-        C_SetAttributeValue = Marshal.GetDelegateForFunctionPointer<C_SetAttributeValueDelegate>(funcList.C_SetAttributeValue);
+        unsafe { _fp.C_SetAttributeValue = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong>)funcList.C_SetAttributeValue; }
         C_SetAttributeValue_Windows = Marshal.GetDelegateForFunctionPointer<C_SetAttributeValueDelegate_Windows>(funcList.C_SetAttributeValue);
-        C_FindObjectsInit = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate>(funcList.C_FindObjectsInit);
+        unsafe { _fp.C_FindObjectsInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong>)funcList.C_FindObjectsInit; }
         C_FindObjectsInit_Windows = Marshal.GetDelegateForFunctionPointer<C_FindObjectsInitDelegate_Windows>(funcList.C_FindObjectsInit);
         unsafe { _fp.C_FindObjects = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_FindObjects; }
         unsafe { _fp.C_FindObjectsFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_FindObjectsFinal; }
-        C_EncryptInit = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate>(funcList.C_EncryptInit);
+        unsafe { _fp.C_EncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)funcList.C_EncryptInit; }
         C_EncryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_EncryptInitDelegate_Windows>(funcList.C_EncryptInit);
         unsafe { _fp.C_Encrypt = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_Encrypt; }
         unsafe { _fp.C_EncryptUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_EncryptUpdate; }
         unsafe { _fp.C_EncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_EncryptFinal; }
-        C_DecryptInit = Marshal.GetDelegateForFunctionPointer<C_DecryptInitDelegate>(funcList.C_DecryptInit);
+        unsafe { _fp.C_DecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)funcList.C_DecryptInit; }
         C_DecryptInit_Windows = Marshal.GetDelegateForFunctionPointer<C_DecryptInitDelegate_Windows>(funcList.C_DecryptInit);
         unsafe { _fp.C_Decrypt = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_Decrypt; }
         unsafe { _fp.C_DecryptUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_DecryptUpdate; }
         unsafe { _fp.C_DecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_DecryptFinal; }
-        C_DigestInit = Marshal.GetDelegateForFunctionPointer<C_DigestInitDelegate>(funcList.C_DigestInit);
+        unsafe { _fp.C_DigestInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong>)funcList.C_DigestInit; }
         C_DigestInit_Windows = Marshal.GetDelegateForFunctionPointer<C_DigestInitDelegate_Windows>(funcList.C_DigestInit);
         unsafe { _fp.C_Digest = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_Digest; }
         unsafe { _fp.C_DigestUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_DigestUpdate; }
         unsafe { _fp.C_DigestKey = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)funcList.C_DigestKey; }
         unsafe { _fp.C_DigestFinal = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_DigestFinal; }
-        C_SignInit = Marshal.GetDelegateForFunctionPointer<C_SignInitDelegate>(funcList.C_SignInit);
+        unsafe { _fp.C_SignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)funcList.C_SignInit; }
         C_SignInit_Windows = Marshal.GetDelegateForFunctionPointer<C_SignInitDelegate_Windows>(funcList.C_SignInit);
         unsafe { _fp.C_Sign = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_Sign; }
         unsafe { _fp.C_SignUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_SignUpdate; }
         unsafe { _fp.C_SignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_SignFinal; }
-        C_SignRecoverInit = Marshal.GetDelegateForFunctionPointer<C_SignRecoverInitDelegate>(funcList.C_SignRecoverInit);
+        unsafe { _fp.C_SignRecoverInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)funcList.C_SignRecoverInit; }
         C_SignRecoverInit_Windows = Marshal.GetDelegateForFunctionPointer<C_SignRecoverInitDelegate_Windows>(funcList.C_SignRecoverInit);
         unsafe { _fp.C_SignRecover = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_SignRecover; }
-        C_VerifyInit = Marshal.GetDelegateForFunctionPointer<C_VerifyInitDelegate>(funcList.C_VerifyInit);
+        unsafe { _fp.C_VerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)funcList.C_VerifyInit; }
         C_VerifyInit_Windows = Marshal.GetDelegateForFunctionPointer<C_VerifyInitDelegate_Windows>(funcList.C_VerifyInit);
         unsafe { _fp.C_Verify = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_Verify; }
         unsafe { _fp.C_VerifyUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_VerifyUpdate; }
         unsafe { _fp.C_VerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_VerifyFinal; }
-        C_VerifyRecoverInit = Marshal.GetDelegateForFunctionPointer<C_VerifyRecoverInitDelegate>(funcList.C_VerifyRecoverInit);
+        unsafe { _fp.C_VerifyRecoverInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)funcList.C_VerifyRecoverInit; }
         C_VerifyRecoverInit_Windows = Marshal.GetDelegateForFunctionPointer<C_VerifyRecoverInitDelegate_Windows>(funcList.C_VerifyRecoverInit);
         unsafe { _fp.C_VerifyRecover = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_VerifyRecover; }
         unsafe { _fp.C_DigestEncryptUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_DigestEncryptUpdate; }
         unsafe { _fp.C_DecryptDigestUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_DecryptDigestUpdate; }
         unsafe { _fp.C_SignEncryptUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_SignEncryptUpdate; }
         unsafe { _fp.C_DecryptVerifyUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_DecryptVerifyUpdate; }
-        C_GenerateKey = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyDelegate>(funcList.C_GenerateKey);
+        unsafe { _fp.C_GenerateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_GenerateKey; }
         C_GenerateKey_Windows = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyDelegate_Windows>(funcList.C_GenerateKey);
-        C_GenerateKeyPair = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyPairDelegate>(funcList.C_GenerateKeyPair);
+        unsafe { _fp.C_GenerateKeyPair = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, CK_ATTRIBUTE*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong*, NativeCULong>)funcList.C_GenerateKeyPair; }
         C_GenerateKeyPair_Windows = Marshal.GetDelegateForFunctionPointer<C_GenerateKeyPairDelegate_Windows>(funcList.C_GenerateKeyPair);
-        C_WrapKey = Marshal.GetDelegateForFunctionPointer<C_WrapKeyDelegate>(funcList.C_WrapKey);
+        unsafe { _fp.C_WrapKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong*, NativeCULong>)funcList.C_WrapKey; }
         C_WrapKey_Windows = Marshal.GetDelegateForFunctionPointer<C_WrapKeyDelegate_Windows>(funcList.C_WrapKey);
-        C_UnwrapKey = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyDelegate>(funcList.C_UnwrapKey);
+        unsafe { _fp.C_UnwrapKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_UnwrapKey; }
         C_UnwrapKey_Windows = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyDelegate_Windows>(funcList.C_UnwrapKey);
-        C_DeriveKey = Marshal.GetDelegateForFunctionPointer<C_DeriveKeyDelegate>(funcList.C_DeriveKey);
+        unsafe { _fp.C_DeriveKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_DeriveKey; }
         C_DeriveKey_Windows = Marshal.GetDelegateForFunctionPointer<C_DeriveKeyDelegate_Windows>(funcList.C_DeriveKey);
         unsafe { _fp.C_SeedRandom = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_SeedRandom; }
         unsafe { _fp.C_GenerateRandom = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_GenerateRandom; }
