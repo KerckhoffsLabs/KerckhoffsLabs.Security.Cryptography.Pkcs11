@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_DERIVED_KEY
+internal partial struct CK_DERIVED_KEY
 {
     /// <summary>
     /// Pointer to an array of CK_ATTRIBUTE describing the derived key.

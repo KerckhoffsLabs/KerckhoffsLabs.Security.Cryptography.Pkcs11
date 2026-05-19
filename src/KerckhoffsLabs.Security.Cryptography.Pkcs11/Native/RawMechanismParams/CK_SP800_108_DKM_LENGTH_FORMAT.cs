@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_SP800_108_DKM_LENGTH_FORMAT
+internal partial struct CK_SP800_108_DKM_LENGTH_FORMAT
 {
     /// <summary>
     /// Method for encoding DKM length: CK_SP800_108_DKM_LENGTH_SUM_OF_KEYS (1) or CK_SP800_108_DKM_LENGTH_SUM_OF_SEGMENTS (2).

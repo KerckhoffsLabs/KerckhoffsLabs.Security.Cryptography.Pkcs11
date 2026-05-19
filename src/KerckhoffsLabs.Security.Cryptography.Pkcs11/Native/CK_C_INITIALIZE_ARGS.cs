@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_C_INITIALIZE_ARGS
+internal partial struct CK_C_INITIALIZE_ARGS
 {
     /// <summary>Pointer to a function to use for creating mutex objects (not supported).</summary>
     public IntPtr CreateMutex;

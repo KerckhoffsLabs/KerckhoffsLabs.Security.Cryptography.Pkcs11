@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_CCM_MESSAGE_PARAMS
+internal partial struct CK_CCM_MESSAGE_PARAMS
 {
     /// <summary>Length of the plaintext (or expected plaintext on decrypt) in bytes. Required up front in CCM.</summary>
     public NativeCULong DataLen;

@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_EDDSA_PARAMS
+internal partial struct CK_EDDSA_PARAMS
 {
     /// <summary>
     /// True selects the prehash variant (Ed25519ph / Ed448ph). False selects pure Ed25519 / Ed448.

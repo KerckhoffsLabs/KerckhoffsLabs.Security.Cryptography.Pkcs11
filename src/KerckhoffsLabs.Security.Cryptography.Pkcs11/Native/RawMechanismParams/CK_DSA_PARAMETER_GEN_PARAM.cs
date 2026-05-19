@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_DSA_PARAMETER_GEN_PARAM
+internal partial struct CK_DSA_PARAMETER_GEN_PARAM
 {
     /// <summary>
     /// Mechanism value for the base hash used in PQG generation (CKM)

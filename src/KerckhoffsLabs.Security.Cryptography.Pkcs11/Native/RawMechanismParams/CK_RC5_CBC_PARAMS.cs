@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_RC5_CBC_PARAMS
+internal partial struct CK_RC5_CBC_PARAMS
 {
     /// <summary>
     /// Wordsize of RC5 cipher in bytes

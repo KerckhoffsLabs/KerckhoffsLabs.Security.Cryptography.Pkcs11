@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_SSL3_MASTER_KEY_DERIVE_PARAMS
+internal partial struct CK_SSL3_MASTER_KEY_DERIVE_PARAMS
 {
     /// <summary>
     /// Client's and server's random data information

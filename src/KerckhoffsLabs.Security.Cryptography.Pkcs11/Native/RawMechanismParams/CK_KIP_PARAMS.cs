@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_KIP_PARAMS
+internal partial struct CK_KIP_PARAMS
 {
     /// <summary>
     /// Pointer to the underlying cryptographic mechanism (CKM)

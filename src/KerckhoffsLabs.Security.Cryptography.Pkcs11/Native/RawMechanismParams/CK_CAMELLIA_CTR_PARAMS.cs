@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_CAMELLIA_CTR_PARAMS
+internal partial struct CK_CAMELLIA_CTR_PARAMS
 {
     /// <summary>
     /// Specifies the number of bits in the counter block (cb) that shall be incremented

@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_PBE_PARAMS
+internal partial struct CK_PBE_PARAMS
 {
     /// <summary>
     /// Pointer to the location that receives the 8-byte initialization vector (IV), if an IV is required

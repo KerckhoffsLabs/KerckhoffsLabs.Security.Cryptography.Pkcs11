@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_SIGN_ADDITIONAL_CONTEXT
+internal partial struct CK_SIGN_ADDITIONAL_CONTEXT
 {
     /// <summary>Hedge variant: CKH_HEDGE_PREFERRED (default), CKH_HEDGE_REQUIRED, or CKH_DETERMINISTIC_REQUIRED.</summary>
     public NativeCULong HedgeVariant;

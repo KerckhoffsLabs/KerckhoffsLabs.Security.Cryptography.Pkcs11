@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_RSA_AES_KEY_WRAP_PARAMS
+internal partial struct CK_RSA_AES_KEY_WRAP_PARAMS
 {
     /// <summary>
     /// Length of the temporary AES key in bits

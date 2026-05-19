@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_GCM_WRAP_PARAMS
+internal partial struct CK_GCM_WRAP_PARAMS
 {
     /// <summary>Pointer to IV bytes (or a buffer the library fills when ivGenerator generates).</summary>
     public IntPtr Iv;

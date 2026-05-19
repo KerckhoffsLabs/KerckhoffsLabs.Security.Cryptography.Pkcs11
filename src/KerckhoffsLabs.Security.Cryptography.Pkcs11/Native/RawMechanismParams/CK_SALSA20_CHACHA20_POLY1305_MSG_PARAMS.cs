@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
+internal partial struct CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
 {
     /// <summary>Pointer to the nonce.</summary>
     public IntPtr Nonce;

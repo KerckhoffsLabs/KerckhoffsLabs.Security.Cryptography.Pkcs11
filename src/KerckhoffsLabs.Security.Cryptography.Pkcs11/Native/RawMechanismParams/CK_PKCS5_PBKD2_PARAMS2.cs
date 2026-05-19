@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_PKCS5_PBKD2_PARAMS2
+internal partial struct CK_PKCS5_PBKD2_PARAMS2
 {
     /// <summary>
     /// Source of the salt value (CKZ)

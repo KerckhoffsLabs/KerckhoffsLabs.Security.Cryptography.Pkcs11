@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_GOSTR3410_KEY_WRAP_PARAMS
+internal partial struct CK_GOSTR3410_KEY_WRAP_PARAMS
 {
     /// <summary>
     /// Pointer to a data with DER-encoding of the object identifier indicating the data object type of GOST 28147-89

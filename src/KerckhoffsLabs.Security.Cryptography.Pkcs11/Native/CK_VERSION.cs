@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_VERSION
+internal partial struct CK_VERSION
 {
     /// <summary>
     /// Major version number (the integer portion of the version)

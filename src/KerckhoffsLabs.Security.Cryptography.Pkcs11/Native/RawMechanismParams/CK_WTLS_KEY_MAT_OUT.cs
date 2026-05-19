@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_WTLS_KEY_MAT_OUT
+internal partial struct CK_WTLS_KEY_MAT_OUT
 {
     /// <summary>
     /// Key handle for the resulting MAC secret key

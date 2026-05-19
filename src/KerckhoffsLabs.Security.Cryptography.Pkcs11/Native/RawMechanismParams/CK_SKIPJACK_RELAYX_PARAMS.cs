@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_SKIPJACK_RELAYX_PARAMS
+internal partial struct CK_SKIPJACK_RELAYX_PARAMS
 {
     /// <summary>
     /// Length of old wrapped key in bytes

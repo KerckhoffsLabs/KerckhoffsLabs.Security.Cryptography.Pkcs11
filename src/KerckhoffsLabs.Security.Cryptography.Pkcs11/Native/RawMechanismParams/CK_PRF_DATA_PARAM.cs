@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_PRF_DATA_PARAM
+internal partial struct CK_PRF_DATA_PARAM
 {
     /// <summary>
     /// Data-type tag: CK_SP800_108_BYTE_ARRAY (1), CK_SP800_108_COUNTER (2), CK_SP800_108_DKM_LENGTH (4), CK_SP800_108_BYTE_ARRAY (8), or CK_SP800_108_COUNTER_FORMAT/DKM_LENGTH_FORMAT pointer types.

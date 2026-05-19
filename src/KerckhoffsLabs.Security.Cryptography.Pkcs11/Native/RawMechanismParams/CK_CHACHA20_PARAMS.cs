@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_CHACHA20_PARAMS
+internal partial struct CK_CHACHA20_PARAMS
 {
     /// <summary>
     /// Pointer to the block counter (typically 4 bytes little-endian, initial value 0 or 1 per protocol).

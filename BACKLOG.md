@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 21 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 20 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -299,6 +299,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-022] ~85 raw `CK_*` structs in `Native/` and `Native/RawMechanismParams/` are `public`
 
+- **Status: Resolved (2026-05-19)** — All 94 `public partial struct CK_*` declarations under `Native/` and `Native/RawMechanismParams/` demoted to `internal partial struct`. No public API surface referenced these types (verified by grep): every cross-namespace consumer was either an `internal` constructor (`LibraryInfo`, `MechanismInfo`, `SlotInfo`, `TokenInfo`, `SessionInfo`, `ObjectAttribute`), an `internal` field (`Mechanism._ckMechanism`, `ObjectAttribute._ckAttribute`), or a local variable inside a method. `CK_VERSION` was demoted alongside the rest — `LibraryInfo` already exposes the version as a string property, so the raw struct doesn't need to be public. Source generator already emitted siblings as `internal partial struct CK_X_Windows`, so the access modifiers are now consistent across the unified and Windows pairs. All 565 tests still pass (the test assembly reaches `Native/` via `[InternalsVisibleTo]`).
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** L

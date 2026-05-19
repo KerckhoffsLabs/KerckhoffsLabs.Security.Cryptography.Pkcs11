@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_RC2_MAC_GENERAL_PARAMS
+internal partial struct CK_RC2_MAC_GENERAL_PARAMS
 {
     /// <summary>
     /// The effective number of bits in the RC2 search space

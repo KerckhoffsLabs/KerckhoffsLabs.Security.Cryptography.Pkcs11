@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_ATTRIBUTE
+internal partial struct CK_ATTRIBUTE
 {
     /// <summary>
     /// The attribute type

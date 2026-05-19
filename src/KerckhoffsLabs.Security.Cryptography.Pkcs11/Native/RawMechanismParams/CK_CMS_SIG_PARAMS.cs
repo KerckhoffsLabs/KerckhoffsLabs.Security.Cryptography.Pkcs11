@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_CMS_SIG_PARAMS
+internal partial struct CK_CMS_SIG_PARAMS
 {
     /// <summary>
     /// Object handle for a certificate associated with the signing key

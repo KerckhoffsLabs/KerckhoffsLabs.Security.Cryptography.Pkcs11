@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-public partial struct CK_MECHANISM
+internal partial struct CK_MECHANISM
 {
     /// <summary>
     /// The type of mechanism
