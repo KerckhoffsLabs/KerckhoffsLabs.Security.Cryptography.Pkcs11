@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 20 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 19 | **Medium:** 18 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -336,6 +336,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-025] Function dispatch via `Marshal.GetDelegateForFunctionPointer<T>` blocks Native AOT
 
+- **Status: Resolved (2026-05-19)** — Empirical baseline (captured before any change at `docs/superpowers/notes/2026-05-19-bl025-aot-baseline.txt`) showed the AOT analyzer does NOT flag `Marshal.GetDelegateForFunctionPointer<TDelegate>` when `TDelegate` carries `[UnmanagedFunctionPointer]` in .NET 10 — the runtime can pre-generate the marshalling thunk when the delegate signature is statically known. The premise of this BL was partly incorrect on that point. All 21 actual analyzer warnings came from reflection-based packed-struct dispatch in `Pkcs11Marshal.cs` / `UnmanagedMemory.cs` (`SiblingCache<T>` lookup, `Marshal.PtrToStructure(IntPtr, Type)`, `Marshal.SizeOf(Type)`, `Assembly.GetType(string)`, unannotated `T` on generic Marshal calls). Fix: extended `PackedStructsGenerator` to emit a `PackedDispatch.g.cs` with a `typeof(T) == typeof(...)` chain (one branch per `[PackedForPkcs11]` type — 99 branches) plus per-type `_WindowsSiblings` helpers, all using `Marshal.SizeOf<T>` / `Marshal.PtrToStructure<T>` / `Marshal.StructureToPtr<T>` with concrete sibling types. The JIT/AOT compiler folds the typeof comparisons per generic instantiation, so callers pay one direct call — no reflection. Deleted `Pkcs11Marshal.SiblingCache<T>` and the `Type`-accepting `UnmanagedMemory` overloads. Migrated all callsites to generic forms. Enabled `<IsAotCompatible>true</IsAotCompatible>` + `<EnableAotAnalyzer>` + `<EnableTrimAnalyzer>` permanently; build is now zero-warning. Added `tests/AotSmoke/` project that publishes with `PublishAot=true` and prints the cryptoki manufacturer when run against pkcs11-mock (verified end-to-end). Delegate→fptr migration is filed separately as BL-051 (the empirical evidence says it isn't AOT-mandatory; it's a future runtime-cost improvement). See `docs/superpowers/plans/2026-05-19-pkcs11-function-pointer-dispatch-aot.md` for the design preserved for that follow-up.
 - **Area:** P/Invoke
 - **Severity:** High
 - **Effort:** L
@@ -651,6 +652,18 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Problem:** All-caps enum names + all-caps members violate .NET Framework Design Guidelines. Likely a deliberate choice for spec correspondence but undocumented; appears in every IntelliSense pop-up.
 - **Proposed action:** Document the deliberate deviation in a project-style note. Optionally add PascalCase aliases marked `[EditorBrowsable(EditorBrowsableState.Advanced)]`. Decide before 1.0 — switching after is a SemVer-major change.
 - **Raised by:** .NET Engineer A
+
+### [BL-060] Migrate cryptoki dispatch from `[UnmanagedFunctionPointer]` delegates to `delegate* unmanaged[Cdecl]` function pointers
+
+- **Area:** P/Invoke
+- **Severity:** Medium
+- **Effort:** L
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/Delegates.cs` (~135 delegate types + matching fields + populators)
+- **Problem:** The PKCS#11 dispatch table is currently built from ~135 `[UnmanagedFunctionPointer(CallingConvention.Cdecl)]` delegate types bound via `Marshal.GetDelegateForFunctionPointer<T>(IntPtr)`. **This is NOT an AOT-correctness issue in .NET 10** (confirmed by analyzer baseline at `docs/superpowers/notes/2026-05-19-bl025-aot-baseline.txt` — zero IL3050/IL2026 from this path). However, function pointers would still deliver: (1) smaller AOT binary (no per-delegate marshalling-stub IL emission), (2) zero per-call delegate-thunk synthesis cost at first call, (3) no `Delegate.Invoke` indirection on the hot path, (4) eliminated `[UnmanagedFunctionPointer]` boilerplate, (5) uniform dispatch style — the codebase already uses `delegate*` elsewhere.
+- **Proposed action:** Migrate per `docs/superpowers/plans/2026-05-19-pkcs11-function-pointer-dispatch-aot.md` (Tasks 2–10 of the original BL-025 plan, now preserved here as the design for this follow-up). The plan covers introducing a `FunctionPointers` class with `delegate* unmanaged[Cdecl]<...>` fields, migrating function groups in coherent waves with per-call marshalling shims (`fixed` for arrays/ref structs, bool↔byte conversions), and deleting the legacy `delegate` types. Each task ends with `dotnet test` green — cryptographic correctness must not regress.
+- **Breaks public API?** No (internal-only refactor — `LowLevelPkcs11Library` public method signatures unchanged by design).
+- **Raised by:** Derived from BL-025 closure.
+- **Spec / References:** [Function pointers (C# language spec)](https://learn.microsoft.com/dotnet/csharp/language-reference/proposals/csharp-9.0/function-pointers); the existing `docs/superpowers/plans/2026-05-19-pkcs11-function-pointer-dispatch-aot.md` (13-task plan, Tasks 2–10 apply here).
 
 ---
 
