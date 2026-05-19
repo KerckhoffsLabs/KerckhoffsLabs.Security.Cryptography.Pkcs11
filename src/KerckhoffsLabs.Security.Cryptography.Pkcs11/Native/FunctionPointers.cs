@@ -42,20 +42,5 @@ internal sealed unsafe class FunctionPointers
     /// <summary>Cryptoki <c>CK_RV C_CancelFunction(CK_SESSION_HANDLE hSession)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_CancelFunction;
 
-    /// <summary>Cryptoki <c>CK_RV C_GetInfo(CK_INFO_PTR pInfo)</c>.</summary>
-    public delegate* unmanaged[Cdecl]<CK_INFO*, NativeCULong> C_GetInfo;
-
-    /// <summary>Cryptoki <c>CK_RV C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)</c>.</summary>
-    public delegate* unmanaged[Cdecl]<NativeCULong, CK_SLOT_INFO*, NativeCULong> C_GetSlotInfo;
-
-    /// <summary>Cryptoki <c>CK_RV C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)</c>.</summary>
-    public delegate* unmanaged[Cdecl]<NativeCULong, CK_TOKEN_INFO*, NativeCULong> C_GetTokenInfo;
-
-    /// <summary>Cryptoki <c>CK_RV C_GetSessionInfo(CK_SESSION_HANDLE hSession, CK_SESSION_INFO_PTR pInfo)</c>.</summary>
-    public delegate* unmanaged[Cdecl]<NativeCULong, CK_SESSION_INFO*, NativeCULong> C_GetSessionInfo;
-
-    /// <summary>Cryptoki <c>CK_RV C_GetMechanismInfo(CK_SLOT_ID slotID, CK_MECHANISM_TYPE type, CK_MECHANISM_INFO_PTR pInfo)</c>.</summary>
-    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_MECHANISM_INFO*, NativeCULong> C_GetMechanismInfo;
-
     // Additional fields are added one group at a time in subsequent tasks.
 }

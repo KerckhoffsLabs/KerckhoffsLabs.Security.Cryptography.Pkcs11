@@ -8,13 +8,25 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal delegate NativeCULong C_InitializeDelegate(IntPtr pInitArgs);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetInfoDelegate(ref CK_INFO info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetFunctionListDelegate(out IntPtr functionList);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetSlotListDelegate([MarshalAs(UnmanagedType.U1)] bool tokenPresent, [In, Out] NativeCULong[] slotList, ref NativeCULong count);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetSlotInfoDelegate(NativeCULong slotId, ref CK_SLOT_INFO info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetTokenInfoDelegate(NativeCULong slotId, ref CK_TOKEN_INFO info);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetMechanismListDelegate(NativeCULong slotId, [In, Out] NativeCULong[] mechanismList, ref NativeCULong count);
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetMechanismInfoDelegate(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_InitTokenDelegate(NativeCULong slotId, byte[] pin, NativeCULong pinLen, byte[] label);
@@ -28,6 +40,9 @@ internal delegate NativeCULong C_SetPINDelegate(NativeCULong session, byte[] old
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_OpenSessionDelegate(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session);
 
+
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+internal delegate NativeCULong C_GetSessionInfoDelegate(NativeCULong session, ref CK_SESSION_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetOperationStateDelegate(NativeCULong session, [In, Out] byte[] operationState, ref NativeCULong operationStateLen);
@@ -444,13 +459,10 @@ internal partial class Delegates
         return _fp.C_Finalize(reserved);
     }
 
-    /// <summary>Wrapper for <c>C_GetInfo</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetInfo(ref CK_INFO info)
-    {
-        if (_fp.C_GetInfo is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInfo");
-        fixed (CK_INFO* p = &info) return _fp.C_GetInfo(p);
-    }
+    /// <summary>
+    /// Delegate for C_GetInfo
+    /// </summary>
+    internal C_GetInfoDelegate? C_GetInfo = null;
 
     /// <summary>
     /// Delegate for C_GetFunctionList
@@ -462,34 +474,25 @@ internal partial class Delegates
     /// </summary>
     internal C_GetSlotListDelegate? C_GetSlotList = null;
 
-    /// <summary>Wrapper for <c>C_GetSlotInfo</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
-    {
-        if (_fp.C_GetSlotInfo is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotInfo");
-        fixed (CK_SLOT_INFO* p = &info) return _fp.C_GetSlotInfo(slotId, p);
-    }
+    /// <summary>
+    /// Delegate for C_GetSlotInfo
+    /// </summary>
+    internal C_GetSlotInfoDelegate? C_GetSlotInfo = null;
 
-    /// <summary>Wrapper for <c>C_GetTokenInfo</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
-    {
-        if (_fp.C_GetTokenInfo is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetTokenInfo");
-        fixed (CK_TOKEN_INFO* p = &info) return _fp.C_GetTokenInfo(slotId, p);
-    }
+    /// <summary>
+    /// Delegate for C_GetTokenInfo
+    /// </summary>
+    internal C_GetTokenInfoDelegate? C_GetTokenInfo = null;
 
     /// <summary>
     /// Delegate for C_GetMechanismList
     /// </summary>
     internal C_GetMechanismListDelegate? C_GetMechanismList = null;
 
-    /// <summary>Wrapper for <c>C_GetMechanismInfo</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info)
-    {
-        if (_fp.C_GetMechanismInfo is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetMechanismInfo");
-        fixed (CK_MECHANISM_INFO* p = &info) return _fp.C_GetMechanismInfo(slotId, type, p);
-    }
+    /// <summary>
+    /// Delegate for C_GetMechanismInfo
+    /// </summary>
+    internal C_GetMechanismInfoDelegate? C_GetMechanismInfo = null;
 
     /// <summary>
     /// Delegate for C_InitToken
@@ -527,13 +530,10 @@ internal partial class Delegates
         return _fp.C_CloseAllSessions(slotId);
     }
 
-    /// <summary>Wrapper for <c>C_GetSessionInfo</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
-    {
-        if (_fp.C_GetSessionInfo is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSessionInfo");
-        fixed (CK_SESSION_INFO* p = &info) return _fp.C_GetSessionInfo(session, p);
-    }
+    /// <summary>
+    /// Delegate for C_GetSessionInfo
+    /// </summary>
+    internal C_GetSessionInfoDelegate? C_GetSessionInfo = null;
 
     /// <summary>
     /// Delegate for C_GetOperationState
@@ -1250,16 +1250,16 @@ internal partial class Delegates
     {
         C_Initialize = Marshal.GetDelegateForFunctionPointer<C_InitializeDelegate>(funcList.C_Initialize);
         unsafe { _fp.C_Finalize = (delegate* unmanaged[Cdecl]<IntPtr, NativeCULong>)funcList.C_Finalize; }
-        unsafe { _fp.C_GetInfo = (delegate* unmanaged[Cdecl]<CK_INFO*, NativeCULong>)funcList.C_GetInfo; }
+        C_GetInfo = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate>(funcList.C_GetInfo);
         C_GetInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate_Windows>(funcList.C_GetInfo);
         C_GetFunctionList = Marshal.GetDelegateForFunctionPointer<C_GetFunctionListDelegate>(funcList.C_GetFunctionList);
         C_GetSlotList = Marshal.GetDelegateForFunctionPointer<C_GetSlotListDelegate>(funcList.C_GetSlotList);
-        unsafe { _fp.C_GetSlotInfo = (delegate* unmanaged[Cdecl]<NativeCULong, CK_SLOT_INFO*, NativeCULong>)funcList.C_GetSlotInfo; }
+        C_GetSlotInfo = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate>(funcList.C_GetSlotInfo);
         C_GetSlotInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate_Windows>(funcList.C_GetSlotInfo);
-        unsafe { _fp.C_GetTokenInfo = (delegate* unmanaged[Cdecl]<NativeCULong, CK_TOKEN_INFO*, NativeCULong>)funcList.C_GetTokenInfo; }
+        C_GetTokenInfo = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate>(funcList.C_GetTokenInfo);
         C_GetTokenInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate_Windows>(funcList.C_GetTokenInfo);
         C_GetMechanismList = Marshal.GetDelegateForFunctionPointer<C_GetMechanismListDelegate>(funcList.C_GetMechanismList);
-        unsafe { _fp.C_GetMechanismInfo = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_MECHANISM_INFO*, NativeCULong>)funcList.C_GetMechanismInfo; }
+        C_GetMechanismInfo = Marshal.GetDelegateForFunctionPointer<C_GetMechanismInfoDelegate>(funcList.C_GetMechanismInfo);
         C_GetMechanismInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetMechanismInfoDelegate_Windows>(funcList.C_GetMechanismInfo);
         C_InitToken = Marshal.GetDelegateForFunctionPointer<C_InitTokenDelegate>(funcList.C_InitToken);
         C_InitPIN = Marshal.GetDelegateForFunctionPointer<C_InitPINDelegate>(funcList.C_InitPIN);
@@ -1267,7 +1267,7 @@ internal partial class Delegates
         C_OpenSession = Marshal.GetDelegateForFunctionPointer<C_OpenSessionDelegate>(funcList.C_OpenSession);
         unsafe { _fp.C_CloseSession = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CloseSession; }
         unsafe { _fp.C_CloseAllSessions = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CloseAllSessions; }
-        unsafe { _fp.C_GetSessionInfo = (delegate* unmanaged[Cdecl]<NativeCULong, CK_SESSION_INFO*, NativeCULong>)funcList.C_GetSessionInfo; }
+        C_GetSessionInfo = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate>(funcList.C_GetSessionInfo);
         C_GetSessionInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate_Windows>(funcList.C_GetSessionInfo);
         C_GetOperationState = Marshal.GetDelegateForFunctionPointer<C_GetOperationStateDelegate>(funcList.C_GetOperationState);
         C_SetOperationState = Marshal.GetDelegateForFunctionPointer<C_SetOperationStateDelegate>(funcList.C_SetOperationState);
