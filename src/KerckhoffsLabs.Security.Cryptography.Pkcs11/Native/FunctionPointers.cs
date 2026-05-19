@@ -208,6 +208,128 @@ internal sealed unsafe class FunctionPointers
     /// <summary>Cryptoki <c>CK_RV C_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hBaseKey, CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount, CK_OBJECT_HANDLE_PTR phKey)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong*, NativeCULong> C_DeriveKey;
 
+    // ── Session / lifecycle stragglers ───────────────────────────────────────────
+
+    /// <summary>Cryptoki <c>CK_RV C_OpenSession(CK_SLOT_ID slotID, CK_FLAGS flags, CK_VOID_PTR pApplication, CK_NOTIFY Notify, CK_SESSION_HANDLE_PTR phSession)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, IntPtr, IntPtr, NativeCULong*, NativeCULong> C_OpenSession;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetObjectSize(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject, CK_ULONG_PTR pulSize)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong> C_GetObjectSize;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetFunctionStatus(CK_SESSION_HANDLE hSession)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_GetFunctionStatus;
+
+    /// <summary>Cryptoki <c>CK_RV C_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot, CK_VOID_PTR pReserved)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, IntPtr, NativeCULong> C_WaitForSlotEvent;
+
+    // ── v3.0 entry / login ───────────────────────────────────────────────────────
+
+    /// <summary>Cryptoki <c>CK_RV C_GetInterface(CK_UTF8CHAR_PTR pInterfaceName, CK_VERSION_PTR pVersion, CK_INTERFACE_PTR_PTR ppInterface, CK_FLAGS ulFlags)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong> C_GetInterface;
+
+    /// <summary>Cryptoki <c>CK_RV C_LoginUser(CK_SESSION_HANDLE hSession, CK_USER_TYPE userType, CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen, CK_UTF8CHAR_PTR pUsername, CK_ULONG ulUsernameLen)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong> C_LoginUser;
+
+    // ── Message-AEAD family (v3.0) ───────────────────────────────────────────────
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageEncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hKey)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong> C_MessageEncryptInit;
+
+    /// <summary>Cryptoki <c>CK_RV C_EncryptMessage(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong> C_EncryptMessage;
+
+    /// <summary>Cryptoki <c>CK_RV C_EncryptMessageBegin(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong> C_EncryptMessageBegin;
+
+    /// <summary>Cryptoki <c>CK_RV C_EncryptMessageNext(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong> C_EncryptMessageNext;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageEncryptFinal(CK_SESSION_HANDLE hSession)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_MessageEncryptFinal;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageDecryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hKey)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong> C_MessageDecryptInit;
+
+    /// <summary>Cryptoki <c>CK_RV C_DecryptMessage(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong> C_DecryptMessage;
+
+    /// <summary>Cryptoki <c>CK_RV C_DecryptMessageBegin(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong> C_DecryptMessageBegin;
+
+    /// <summary>Cryptoki <c>CK_RV C_DecryptMessageNext(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong> C_DecryptMessageNext;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageDecryptFinal(CK_SESSION_HANDLE hSession)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_MessageDecryptFinal;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageSignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hKey)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong> C_MessageSignInit;
+
+    /// <summary>Cryptoki <c>CK_RV C_SignMessage(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong> C_SignMessage;
+
+    /// <summary>Cryptoki <c>CK_RV C_SignMessageBegin(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong> C_SignMessageBegin;
+
+    /// <summary>Cryptoki <c>CK_RV C_SignMessageNext(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong> C_SignMessageNext;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageSignFinal(CK_SESSION_HANDLE hSession)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_MessageSignFinal;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageVerifyInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism, CK_OBJECT_HANDLE hKey)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong> C_MessageVerifyInit;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifyMessage(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong> C_VerifyMessage;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifyMessageBegin(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong> C_VerifyMessageBegin;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifyMessageNext(...)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong> C_VerifyMessageNext;
+
+    /// <summary>Cryptoki <c>CK_RV C_MessageVerifyFinal(CK_SESSION_HANDLE hSession)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_MessageVerifyFinal;
+
+    // ── v3.2 PQC / signature / async / authenticated-wrap ────────────────────────
+
+    /// <summary>Cryptoki <c>CK_RV C_EncapsulateKey(...)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong> C_EncapsulateKey;
+
+    /// <summary>Cryptoki <c>CK_RV C_DecapsulateKey(...)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong> C_DecapsulateKey;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifySignatureInit(...)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong> C_VerifySignatureInit;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifySignature(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong> C_VerifySignature;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifySignatureUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart, CK_ULONG ulPartLen)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong> C_VerifySignatureUpdate;
+
+    /// <summary>Cryptoki <c>CK_RV C_VerifySignatureFinal(CK_SESSION_HANDLE hSession)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong> C_VerifySignatureFinal;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetSessionValidationFlags(CK_SESSION_HANDLE hSession, CK_FLAGS ulFlags, CK_FLAGS_PTR pulFlags)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong> C_GetSessionValidationFlags;
+
+    /// <summary>Cryptoki <c>CK_RV C_AsyncComplete(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pFunctionName, CK_ASYNC_DATA_PTR pResult)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong> C_AsyncComplete;
+
+    /// <summary>Cryptoki <c>CK_RV C_AsyncGetID(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pFunctionName, CK_ULONG_PTR pulID)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong> C_AsyncGetID;
+
+    /// <summary>Cryptoki <c>CK_RV C_AsyncJoin(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pFunctionName, CK_ULONG ulID, CK_BYTE_PTR pData, CK_ULONG ulDataLen)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong> C_AsyncJoin;
+
+    /// <summary>Cryptoki <c>CK_RV C_WrapKeyAuthenticated(...)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong> C_WrapKeyAuthenticated;
+
+    /// <summary>Cryptoki <c>CK_RV C_UnwrapKeyAuthenticated(...)</c> (v3.2).</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong> C_UnwrapKeyAuthenticated;
+
     // ── Windows-layout variants (Pack=1) ─────────────────────────────────────────
     // Each fptr below is the Pack=1 twin of its unified sibling above.
     // Both are cast from the SAME native function-list entry; only the managed

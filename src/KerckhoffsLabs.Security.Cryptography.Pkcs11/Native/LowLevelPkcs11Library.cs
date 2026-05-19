@@ -517,12 +517,12 @@ internal sealed class LowLevelPkcs11Library
     /// </summary>
     public bool IsMessageApiSupported
         => _delegates is not null
-           && _delegates.C_MessageEncryptInit is not null
-           && _delegates.C_EncryptMessage is not null
-           && _delegates.C_MessageEncryptFinal is not null
-           && _delegates.C_MessageDecryptInit is not null
-           && _delegates.C_DecryptMessage is not null
-           && _delegates.C_MessageDecryptFinal is not null;
+           && _delegates.HasC_MessageEncryptInit
+           && _delegates.HasC_EncryptMessage
+           && _delegates.HasC_MessageEncryptFinal
+           && _delegates.HasC_MessageDecryptInit
+           && _delegates.HasC_DecryptMessage
+           && _delegates.HasC_MessageDecryptFinal;
 
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
@@ -531,13 +531,13 @@ internal sealed class LowLevelPkcs11Library
     /// </summary>
     public bool IsV32ApiSupported
         => _delegates is not null
-           && _delegates.C_EncapsulateKey is not null
-           && _delegates.C_DecapsulateKey is not null
-           && _delegates.C_WrapKeyAuthenticated is not null
-           && _delegates.C_UnwrapKeyAuthenticated is not null
-           && _delegates.C_VerifySignatureInit is not null
-           && _delegates.C_VerifySignature is not null
-           && _delegates.C_GetSessionValidationFlags is not null;
+           && _delegates.HasC_EncapsulateKey
+           && _delegates.HasC_DecapsulateKey
+           && _delegates.HasC_WrapKeyAuthenticated
+           && _delegates.HasC_UnwrapKeyAuthenticated
+           && _delegates.HasC_VerifySignatureInit
+           && _delegates.HasC_VerifySignature
+           && _delegates.HasC_GetSessionValidationFlags;
 
     /// <summary>
     /// Logs a user into a token by user type plus a free-form username (PKCS#11 v3.0 §5.6.7).
@@ -553,7 +553,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_LoginUser is null)
+        if (!_delegates.HasC_LoginUser)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_LoginUser(session, userType.ToCULong(), pin, pinLen, username, usernameLen);
@@ -587,7 +587,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageEncryptInit is null)
+        if (!_delegates.HasC_MessageEncryptInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_MessageEncryptInit_Windows)
@@ -607,7 +607,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_EncryptMessage is null)
+        if (!_delegates.HasC_EncryptMessage)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_EncryptMessage(session, parameter, parameterLen, associatedData, associatedDataLen, plaintext, plaintextLen, ciphertext, ref ciphertextLen);
@@ -622,7 +622,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_EncryptMessageBegin is null)
+        if (!_delegates.HasC_EncryptMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_EncryptMessageBegin(session, parameter, parameterLen, associatedData, associatedDataLen);
@@ -637,7 +637,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_EncryptMessageNext is null)
+        if (!_delegates.HasC_EncryptMessageNext)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_EncryptMessageNext(session, parameter, parameterLen, plaintextPart, plaintextPartLen, ciphertextPart, ref ciphertextPartLen, flags);
@@ -652,7 +652,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageEncryptFinal is null)
+        if (!_delegates.HasC_MessageEncryptFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageEncryptFinal(session);
@@ -667,7 +667,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageDecryptInit is null)
+        if (!_delegates.HasC_MessageDecryptInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_MessageDecryptInit_Windows)
@@ -687,7 +687,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_DecryptMessage is null)
+        if (!_delegates.HasC_DecryptMessage)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_DecryptMessage(session, parameter, parameterLen, associatedData, associatedDataLen, ciphertext, ciphertextLen, plaintext, ref plaintextLen);
@@ -702,7 +702,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_DecryptMessageBegin is null)
+        if (!_delegates.HasC_DecryptMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_DecryptMessageBegin(session, parameter, parameterLen, associatedData, associatedDataLen);
@@ -717,7 +717,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_DecryptMessageNext is null)
+        if (!_delegates.HasC_DecryptMessageNext)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_DecryptMessageNext(session, parameter, parameterLen, ciphertextPart, ciphertextPartLen, plaintextPart, ref plaintextPartLen, flags);
@@ -732,7 +732,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageDecryptFinal is null)
+        if (!_delegates.HasC_MessageDecryptFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageDecryptFinal(session);
@@ -747,7 +747,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageSignInit is null)
+        if (!_delegates.HasC_MessageSignInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_MessageSignInit_Windows)
@@ -767,7 +767,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_SignMessage is null)
+        if (!_delegates.HasC_SignMessage)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SignMessage(session, parameter, parameterLen, data, dataLen, signature, ref signatureLen);
@@ -782,7 +782,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_SignMessageBegin is null)
+        if (!_delegates.HasC_SignMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SignMessageBegin(session, parameter, parameterLen);
@@ -797,7 +797,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_SignMessageNext is null)
+        if (!_delegates.HasC_SignMessageNext)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SignMessageNext(session, parameter, parameterLen, data, dataLen, signature, ref signatureLen);
@@ -812,7 +812,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageSignFinal is null)
+        if (!_delegates.HasC_MessageSignFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageSignFinal(session);
@@ -827,7 +827,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageVerifyInit is null)
+        if (!_delegates.HasC_MessageVerifyInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_MessageVerifyInit_Windows)
@@ -847,7 +847,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifyMessage is null)
+        if (!_delegates.HasC_VerifyMessage)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifyMessage(session, parameter, parameterLen, data, dataLen, signature, signatureLen);
@@ -862,7 +862,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifyMessageBegin is null)
+        if (!_delegates.HasC_VerifyMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifyMessageBegin(session, parameter, parameterLen);
@@ -877,7 +877,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifyMessageNext is null)
+        if (!_delegates.HasC_VerifyMessageNext)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifyMessageNext(session, parameter, parameterLen, data, dataLen, signature, signatureLen);
@@ -892,7 +892,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_MessageVerifyFinal is null)
+        if (!_delegates.HasC_MessageVerifyFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageVerifyFinal(session);
@@ -907,7 +907,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_EncapsulateKey is null)
+        if (!_delegates.HasC_EncapsulateKey)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_EncapsulateKey_Windows)
@@ -928,7 +928,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_DecapsulateKey is null)
+        if (!_delegates.HasC_DecapsulateKey)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_DecapsulateKey_Windows)
@@ -949,7 +949,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifySignatureInit is null)
+        if (!_delegates.HasC_VerifySignatureInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_VerifySignatureInit_Windows)
@@ -969,7 +969,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifySignature is null)
+        if (!_delegates.HasC_VerifySignature)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifySignature(session, data, dataLen);
@@ -984,7 +984,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifySignatureUpdate is null)
+        if (!_delegates.HasC_VerifySignatureUpdate)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifySignatureUpdate(session, part, partLen);
@@ -999,7 +999,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_VerifySignatureFinal is null)
+        if (!_delegates.HasC_VerifySignatureFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifySignatureFinal(session);
@@ -1014,7 +1014,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_GetSessionValidationFlags is null)
+        if (!_delegates.HasC_GetSessionValidationFlags)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_GetSessionValidationFlags(session, type, ref flags);
@@ -1029,7 +1029,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_AsyncComplete is null)
+        if (!_delegates.HasC_AsyncComplete)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_AsyncComplete_Windows)
@@ -1051,7 +1051,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_AsyncGetID is null)
+        if (!_delegates.HasC_AsyncGetID)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_AsyncGetID(session, functionName, ref id);
@@ -1066,7 +1066,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_AsyncJoin is null)
+        if (!_delegates.HasC_AsyncJoin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_AsyncJoin(session, functionName, id, data, dataLen);
@@ -1081,7 +1081,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_WrapKeyAuthenticated is null)
+        if (!_delegates.HasC_WrapKeyAuthenticated)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_WrapKeyAuthenticated_Windows)
@@ -1101,7 +1101,7 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_delegates.C_UnwrapKeyAuthenticated is null)
+        if (!_delegates.HasC_UnwrapKeyAuthenticated)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (Pkcs11Marshal.IsWindows && _delegates!.HasC_UnwrapKeyAuthenticated_Windows)

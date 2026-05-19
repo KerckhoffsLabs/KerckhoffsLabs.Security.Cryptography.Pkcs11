@@ -17,149 +17,7 @@ internal delegate NativeCULong C_GetTokenInfoDelegate(NativeCULong slotId, ref C
 internal delegate NativeCULong C_GetMechanismInfoDelegate(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info);
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_OpenSessionDelegate(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session);
-
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate NativeCULong C_GetSessionInfoDelegate(NativeCULong session, ref CK_SESSION_INFO info);
-
-
-/// <summary>
-/// C_GetInterface was added in PKCS#11 v3.0 — returns a typed function-list interface
-/// the application can use, allowing the token to expose newer or vendor-specific
-/// function tables independently of the legacy C_GetFunctionList path.
-/// </summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetInterfaceDelegate(byte[]? interfaceName, IntPtr version, out IntPtr interfacePtr, NativeCULong flags);
-
-/// <summary>
-/// C_LoginUser was added in PKCS#11 v3.0 — logs in by both user type and a free-form
-/// username, supporting HSMs with named user accounts beyond the SO/User dichotomy.
-/// </summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_LoginUserDelegate(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen);
-
-
-
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetObjectSizeDelegate(NativeCULong session, NativeCULong objectId, ref NativeCULong size);
-
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetFunctionStatusDelegate(NativeCULong session);
-
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_WaitForSlotEventDelegate(NativeCULong flags, ref NativeCULong slot, IntPtr reserved);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageEncryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncryptMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] plaintextPart, NativeCULong plaintextPartLen, byte[] ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageEncryptFinalDelegate(NativeCULong session);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageDecryptInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecryptMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] ciphertextPart, NativeCULong ciphertextPartLen, byte[] plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageDecryptFinalDelegate(NativeCULong session);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageSignInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_SignMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageSignFinalDelegate(NativeCULong session);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageVerifyInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifyMessageDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifyMessageBeginDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifyMessageNextDelegate(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_MessageVerifyFinalDelegate(NativeCULong session);
-
-/// <summary>ML-KEM-style key encapsulation (PKCS#11 v3.2 §5.18.10). Takes an encapsulating public key, returns ciphertext + a handle to the encapsulated shared-secret key.</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_EncapsulateKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, [In, Out] byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey);
-
-/// <summary>ML-KEM-style key decapsulation (PKCS#11 v3.2 §5.18.11). Reverses C_EncapsulateKey using the matching private key.</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_DecapsulateKeyDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey);
-
-/// <summary>Initialize a signature-only verify operation, supplying the signature up front (PKCS#11 v3.2 §5.16.10). Data is fed via C_VerifySignature(Update) and the final check happens in C_VerifySignatureFinal.</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifySignatureInitDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen);
-
-/// <summary>One-shot verify against the signature bound at init time (PKCS#11 v3.2 §5.16.11).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifySignatureDelegate(NativeCULong session, byte[] data, NativeCULong dataLen);
-
-/// <summary>Feed a data chunk to a streaming signature-only verify (PKCS#11 v3.2 §5.16.12).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifySignatureUpdateDelegate(NativeCULong session, byte[] part, NativeCULong partLen);
-
-/// <summary>Conclude a streaming signature-only verify; returns CKR_OK on match, CKR_SIGNATURE_INVALID otherwise (PKCS#11 v3.2 §5.16.13).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_VerifySignatureFinalDelegate(NativeCULong session);
-
-/// <summary>Reads the session's validation flags for the requested validation-state type (PKCS#11 v3.2 §5.6.10).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetSessionValidationFlagsDelegate(NativeCULong session, NativeCULong type, ref NativeCULong flags);
-
-/// <summary>Retrieve the result of a previously-pending async crypto operation (PKCS#11 v3.2 §5.20.2).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_AsyncCompleteDelegate(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA result);
-
-/// <summary>Obtain a persistent identifier for an async operation so it can be rejoined later (PKCS#11 v3.2 §5.20.3).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_AsyncGetIDDelegate(NativeCULong session, byte[] functionName, ref NativeCULong id);
-
-/// <summary>Reattach to a previously-issued async operation using its persistent ID (PKCS#11 v3.2 §5.20.4).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_AsyncJoinDelegate(NativeCULong session, byte[] functionName, NativeCULong id, byte[] data, NativeCULong dataLen);
-
-/// <summary>Wraps a key with authentication: the wrap is bound to the AAD bytes which must be supplied at unwrap (PKCS#11 v3.2 §5.18.12).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_WrapKeyAuthenticatedDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, [In, Out] byte[] wrappedKey, ref NativeCULong wrappedKeyLen);
-
-/// <summary>Unwrap counterpart to C_WrapKeyAuthenticated; verifies the AAD as part of the unwrap (PKCS#11 v3.2 §5.18.13).</summary>
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_UnwrapKeyAuthenticatedDelegate(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key);
 
 // ── Windows-layout variants (non-blittable only) ─────────────────────────────
 // Only the *_INFO delegates remain here; their structs contain [MarshalAs(ByValArray)]
@@ -305,10 +163,14 @@ internal partial class Delegates
             return _fp.C_SetPIN(session, oldPinPtr, oldPinLen, newPinPtr, newPinLen);
     }
 
-    /// <summary>
-    /// Delegate for C_OpenSession
-    /// </summary>
-    internal C_OpenSessionDelegate? C_OpenSession = null;
+    /// <summary>Wrapper for <c>C_OpenSession</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+    {
+        if (_fp.C_OpenSession is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_OpenSession");
+        fixed (NativeCULong* sessionPtr = &session)
+            return _fp.C_OpenSession(slotId, flags, application, notify, sessionPtr);
+    }
 
     /// <summary>Wrapper for <c>C_CloseSession</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_CloseSession(NativeCULong session)
@@ -393,10 +255,14 @@ internal partial class Delegates
         return _fp.C_DestroyObject(session, objectId);
     }
 
-    /// <summary>
-    /// Delegate for C_GetObjectSize
-    /// </summary>
-    internal C_GetObjectSizeDelegate? C_GetObjectSize = null;
+    /// <summary>Wrapper for <c>C_GetObjectSize</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetObjectSize(NativeCULong session, NativeCULong objectId, ref NativeCULong size)
+    {
+        if (_fp.C_GetObjectSize is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetObjectSize");
+        fixed (NativeCULong* sizePtr = &size)
+            return _fp.C_GetObjectSize(session, objectId, sizePtr);
+    }
 
     /// <summary>Wrapper for <c>C_GetAttributeValue</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
@@ -789,10 +655,13 @@ internal partial class Delegates
             return _fp.C_GenerateRandom(session, dataPtr, randomLen);
     }
 
-    /// <summary>
-    /// Delegate for C_GetFunctionStatus
-    /// </summary>
-    internal C_GetFunctionStatusDelegate? C_GetFunctionStatus = null;
+    /// <summary>Wrapper for <c>C_GetFunctionStatus</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetFunctionStatus(NativeCULong session)
+    {
+        if (_fp.C_GetFunctionStatus is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetFunctionStatus");
+        return _fp.C_GetFunctionStatus(session);
+    }
 
     /// <summary>Wrapper for <c>C_CancelFunction</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_CancelFunction(NativeCULong session)
@@ -802,16 +671,27 @@ internal partial class Delegates
         return _fp.C_CancelFunction(session);
     }
 
-    /// <summary>
-    /// Delegate for C_WaitForSlotEvent
-    /// </summary>
-    internal C_WaitForSlotEventDelegate? C_WaitForSlotEvent = null;
+    /// <summary>Wrapper for <c>C_WaitForSlotEvent</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot, IntPtr reserved)
+    {
+        if (_fp.C_WaitForSlotEvent is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WaitForSlotEvent");
+        fixed (NativeCULong* slotPtr = &slot)
+            return _fp.C_WaitForSlotEvent(flags, slotPtr, reserved);
+    }
 
-    /// <summary>
-    /// Delegate for C_LoginUser (PKCS#11 v3.0). Null if the loaded library is v2.40
-    /// or does not export the symbol.
-    /// </summary>
-    internal C_LoginUserDelegate? C_LoginUser = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_LoginUser</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_LoginUser => _fp.C_LoginUser is not null;
+
+    /// <summary>Wrapper for <c>C_LoginUser</c> (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
+    public unsafe NativeCULong C_LoginUser(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen)
+    {
+        if (_fp.C_LoginUser is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_LoginUser");
+        fixed (byte* pinPtr = pin)
+        fixed (byte* userPtr = username)
+            return _fp.C_LoginUser(session, userType, pinPtr, pinLen, userPtr, usernameLen);
+    }
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SessionCancel</c> (PKCS#11 v3.0+).</summary>
     public unsafe bool IsC_SessionCancelSupported => _fp.C_SessionCancel is not null;
@@ -824,101 +704,418 @@ internal partial class Delegates
         return _fp.C_SessionCancel(session, flags);
     }
 
-    /// <summary>Delegate for C_MessageEncryptInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageEncryptInitDelegate? C_MessageEncryptInit = null;
+    // ── Has* availability properties for optional v3.0/v3.2 functions ─────────────
 
-    /// <summary>Delegate for C_EncryptMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_EncryptMessageDelegate? C_EncryptMessage = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageEncryptInit</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageEncryptInit => _fp.C_MessageEncryptInit is not null;
 
-    /// <summary>Delegate for C_EncryptMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_EncryptMessageBeginDelegate? C_EncryptMessageBegin = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_EncryptMessage</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_EncryptMessage => _fp.C_EncryptMessage is not null;
 
-    /// <summary>Delegate for C_EncryptMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_EncryptMessageNextDelegate? C_EncryptMessageNext = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_EncryptMessageBegin</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_EncryptMessageBegin => _fp.C_EncryptMessageBegin is not null;
 
-    /// <summary>Delegate for C_MessageEncryptFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageEncryptFinalDelegate? C_MessageEncryptFinal = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_EncryptMessageNext</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_EncryptMessageNext => _fp.C_EncryptMessageNext is not null;
 
-    /// <summary>Delegate for C_MessageDecryptInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageDecryptInitDelegate? C_MessageDecryptInit = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageEncryptFinal</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageEncryptFinal => _fp.C_MessageEncryptFinal is not null;
 
-    /// <summary>Delegate for C_DecryptMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_DecryptMessageDelegate? C_DecryptMessage = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageDecryptInit</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageDecryptInit => _fp.C_MessageDecryptInit is not null;
 
-    /// <summary>Delegate for C_DecryptMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_DecryptMessageBeginDelegate? C_DecryptMessageBegin = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_DecryptMessage</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_DecryptMessage => _fp.C_DecryptMessage is not null;
 
-    /// <summary>Delegate for C_DecryptMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_DecryptMessageNextDelegate? C_DecryptMessageNext = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_DecryptMessageBegin</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_DecryptMessageBegin => _fp.C_DecryptMessageBegin is not null;
 
-    /// <summary>Delegate for C_MessageDecryptFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageDecryptFinalDelegate? C_MessageDecryptFinal = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_DecryptMessageNext</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_DecryptMessageNext => _fp.C_DecryptMessageNext is not null;
 
-    /// <summary>Delegate for C_MessageSignInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageSignInitDelegate? C_MessageSignInit = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageDecryptFinal</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageDecryptFinal => _fp.C_MessageDecryptFinal is not null;
 
-    /// <summary>Delegate for C_SignMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_SignMessageDelegate? C_SignMessage = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageSignInit</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageSignInit => _fp.C_MessageSignInit is not null;
 
-    /// <summary>Delegate for C_SignMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_SignMessageBeginDelegate? C_SignMessageBegin = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SignMessage</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_SignMessage => _fp.C_SignMessage is not null;
 
-    /// <summary>Delegate for C_SignMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_SignMessageNextDelegate? C_SignMessageNext = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SignMessageBegin</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_SignMessageBegin => _fp.C_SignMessageBegin is not null;
 
-    /// <summary>Delegate for C_MessageSignFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageSignFinalDelegate? C_MessageSignFinal = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SignMessageNext</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_SignMessageNext => _fp.C_SignMessageNext is not null;
 
-    /// <summary>Delegate for C_MessageVerifyInit (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageVerifyInitDelegate? C_MessageVerifyInit = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageSignFinal</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageSignFinal => _fp.C_MessageSignFinal is not null;
 
-    /// <summary>Delegate for C_VerifyMessage (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_VerifyMessageDelegate? C_VerifyMessage = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageVerifyInit</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageVerifyInit => _fp.C_MessageVerifyInit is not null;
 
-    /// <summary>Delegate for C_VerifyMessageBegin (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_VerifyMessageBeginDelegate? C_VerifyMessageBegin = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifyMessage</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_VerifyMessage => _fp.C_VerifyMessage is not null;
 
-    /// <summary>Delegate for C_VerifyMessageNext (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_VerifyMessageNextDelegate? C_VerifyMessageNext = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifyMessageBegin</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_VerifyMessageBegin => _fp.C_VerifyMessageBegin is not null;
 
-    /// <summary>Delegate for C_MessageVerifyFinal (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    internal C_MessageVerifyFinalDelegate? C_MessageVerifyFinal = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifyMessageNext</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_VerifyMessageNext => _fp.C_VerifyMessageNext is not null;
 
-    /// <summary>Delegate for C_EncapsulateKey (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_EncapsulateKeyDelegate? C_EncapsulateKey = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageVerifyFinal</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_MessageVerifyFinal => _fp.C_MessageVerifyFinal is not null;
 
-    /// <summary>Delegate for C_DecapsulateKey (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_DecapsulateKeyDelegate? C_DecapsulateKey = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_EncapsulateKey</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_EncapsulateKey => _fp.C_EncapsulateKey is not null;
 
-    /// <summary>Delegate for C_VerifySignatureInit (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_VerifySignatureInitDelegate? C_VerifySignatureInit = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_DecapsulateKey</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_DecapsulateKey => _fp.C_DecapsulateKey is not null;
 
-    /// <summary>Delegate for C_VerifySignature (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_VerifySignatureDelegate? C_VerifySignature = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_WrapKeyAuthenticated</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_WrapKeyAuthenticated => _fp.C_WrapKeyAuthenticated is not null;
 
-    /// <summary>Delegate for C_VerifySignatureUpdate (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_VerifySignatureUpdateDelegate? C_VerifySignatureUpdate = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_UnwrapKeyAuthenticated</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_UnwrapKeyAuthenticated => _fp.C_UnwrapKeyAuthenticated is not null;
 
-    /// <summary>Delegate for C_VerifySignatureFinal (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_VerifySignatureFinalDelegate? C_VerifySignatureFinal = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifySignatureInit</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_VerifySignatureInit => _fp.C_VerifySignatureInit is not null;
 
-    /// <summary>Delegate for C_GetSessionValidationFlags (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_GetSessionValidationFlagsDelegate? C_GetSessionValidationFlags = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifySignature</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_VerifySignature => _fp.C_VerifySignature is not null;
 
-    /// <summary>Delegate for C_AsyncComplete (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_AsyncCompleteDelegate? C_AsyncComplete = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifySignatureUpdate</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_VerifySignatureUpdate => _fp.C_VerifySignatureUpdate is not null;
 
-    /// <summary>Delegate for C_AsyncGetID (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_AsyncGetIDDelegate? C_AsyncGetID = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_VerifySignatureFinal</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_VerifySignatureFinal => _fp.C_VerifySignatureFinal is not null;
 
-    /// <summary>Delegate for C_AsyncJoin (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_AsyncJoinDelegate? C_AsyncJoin = null;
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_GetSessionValidationFlags</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_GetSessionValidationFlags => _fp.C_GetSessionValidationFlags is not null;
 
-    /// <summary>Delegate for C_WrapKeyAuthenticated (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_WrapKeyAuthenticatedDelegate? C_WrapKeyAuthenticated = null;
+    // ── Message-AEAD family wrappers (v3.0) ──────────────────────────────────────
 
-    /// <summary>Delegate for C_UnwrapKeyAuthenticated (PKCS#11 v3.2). Null on libraries that do not expose it.</summary>
-    internal C_UnwrapKeyAuthenticatedDelegate? C_UnwrapKeyAuthenticated = null;
+    /// <summary>Wrapper for <c>C_MessageEncryptInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_MessageEncryptInit is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageEncryptInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageEncryptInit(session, m, key);
+    }
+
+    /// <summary>Wrapper for <c>C_EncryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen)
+    {
+        if (_fp.C_EncryptMessage is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptMessage");
+        fixed (byte* adPtr = associatedData)
+        fixed (byte* ptPtr = plaintext)
+        fixed (byte* ctPtr = ciphertext)
+        fixed (NativeCULong* ctLenPtr = &ciphertextLen)
+            return _fp.C_EncryptMessage(session, parameter, parameterLen, adPtr, associatedDataLen, ptPtr, plaintextLen, ctPtr, ctLenPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_EncryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
+    {
+        if (_fp.C_EncryptMessageBegin is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptMessageBegin");
+        fixed (byte* adPtr = associatedData)
+            return _fp.C_EncryptMessageBegin(session, parameter, parameterLen, adPtr, associatedDataLen);
+    }
+
+    /// <summary>Wrapper for <c>C_EncryptMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] plaintextPart, NativeCULong plaintextPartLen, byte[] ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags)
+    {
+        if (_fp.C_EncryptMessageNext is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptMessageNext");
+        fixed (byte* ptPtr = plaintextPart)
+        fixed (byte* ctPtr = ciphertextPart)
+        fixed (NativeCULong* ctLenPtr = &ciphertextPartLen)
+            return _fp.C_EncryptMessageNext(session, parameter, parameterLen, ptPtr, plaintextPartLen, ctPtr, ctLenPtr, flags);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageEncryptFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageEncryptFinal(NativeCULong session)
+    {
+        if (_fp.C_MessageEncryptFinal is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageEncryptFinal");
+        return _fp.C_MessageEncryptFinal(session);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageDecryptInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_MessageDecryptInit is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageDecryptInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageDecryptInit(session, m, key);
+    }
+
+    /// <summary>Wrapper for <c>C_DecryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen)
+    {
+        if (_fp.C_DecryptMessage is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptMessage");
+        fixed (byte* adPtr = associatedData)
+        fixed (byte* ctPtr = ciphertext)
+        fixed (byte* ptPtr = plaintext)
+        fixed (NativeCULong* ptLenPtr = &plaintextLen)
+            return _fp.C_DecryptMessage(session, parameter, parameterLen, adPtr, associatedDataLen, ctPtr, ciphertextLen, ptPtr, ptLenPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_DecryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
+    {
+        if (_fp.C_DecryptMessageBegin is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptMessageBegin");
+        fixed (byte* adPtr = associatedData)
+            return _fp.C_DecryptMessageBegin(session, parameter, parameterLen, adPtr, associatedDataLen);
+    }
+
+    /// <summary>Wrapper for <c>C_DecryptMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] ciphertextPart, NativeCULong ciphertextPartLen, byte[] plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags)
+    {
+        if (_fp.C_DecryptMessageNext is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptMessageNext");
+        fixed (byte* ctPtr = ciphertextPart)
+        fixed (byte* ptPtr = plaintextPart)
+        fixed (NativeCULong* ptLenPtr = &plaintextPartLen)
+            return _fp.C_DecryptMessageNext(session, parameter, parameterLen, ctPtr, ciphertextPartLen, ptPtr, ptLenPtr, flags);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageDecryptFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageDecryptFinal(NativeCULong session)
+    {
+        if (_fp.C_MessageDecryptFinal is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageDecryptFinal");
+        return _fp.C_MessageDecryptFinal(session);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageSignInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_MessageSignInit is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageSignInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageSignInit(session, m, key);
+    }
+
+    /// <summary>Wrapper for <c>C_SignMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    {
+        if (_fp.C_SignMessage is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessage");
+        fixed (byte* dataPtr = data)
+        fixed (byte* sigPtr = signature)
+        fixed (NativeCULong* sigLenPtr = &signatureLen)
+            return _fp.C_SignMessage(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, sigLenPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_SignMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
+    {
+        if (_fp.C_SignMessageBegin is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessageBegin");
+        return _fp.C_SignMessageBegin(session, parameter, parameterLen);
+    }
+
+    /// <summary>Wrapper for <c>C_SignMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    {
+        if (_fp.C_SignMessageNext is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessageNext");
+        fixed (byte* dataPtr = data)
+        fixed (byte* sigPtr = signature)
+        fixed (NativeCULong* sigLenPtr = &signatureLen)
+            return _fp.C_SignMessageNext(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, sigLenPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageSignFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageSignFinal(NativeCULong session)
+    {
+        if (_fp.C_MessageSignFinal is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageSignFinal");
+        return _fp.C_MessageSignFinal(session);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageVerifyInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageVerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    {
+        if (_fp.C_MessageVerifyInit is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageVerifyInit");
+        fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageVerifyInit(session, m, key);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifyMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    {
+        if (_fp.C_VerifyMessage is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyMessage");
+        fixed (byte* dataPtr = data)
+        fixed (byte* sigPtr = signature)
+            return _fp.C_VerifyMessage(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, signatureLen);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifyMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifyMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
+    {
+        if (_fp.C_VerifyMessageBegin is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyMessageBegin");
+        return _fp.C_VerifyMessageBegin(session, parameter, parameterLen);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifyMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    {
+        if (_fp.C_VerifyMessageNext is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyMessageNext");
+        fixed (byte* dataPtr = data)
+        fixed (byte* sigPtr = signature)
+            return _fp.C_VerifyMessageNext(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, signatureLen);
+    }
+
+    /// <summary>Wrapper for <c>C_MessageVerifyFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_MessageVerifyFinal(NativeCULong session)
+    {
+        if (_fp.C_MessageVerifyFinal is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageVerifyFinal");
+        return _fp.C_MessageVerifyFinal(session);
+    }
+
+    // ── v3.2 PQC / signature / async / authenticated-wrap wrappers ───────────────
+
+    /// <summary>Wrapper for <c>C_EncapsulateKey</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    {
+        if (_fp.C_EncapsulateKey is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncapsulateKey");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (byte* ctPtr = ciphertext)
+        fixed (NativeCULong* ctLenPtr = &ciphertextLen)
+        fixed (NativeCULong* dkPtr = &derivedKey)
+            return _fp.C_EncapsulateKey(session, m, publicKey, t, attributeCount, ctPtr, ctLenPtr, dkPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_DecapsulateKey</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    {
+        if (_fp.C_DecapsulateKey is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecapsulateKey");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (byte* ctPtr = ciphertext)
+        fixed (NativeCULong* dkPtr = &derivedKey)
+            return _fp.C_DecapsulateKey(session, m, privateKey, t, attributeCount, ctPtr, ciphertextLen, dkPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifySignatureInit</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen)
+    {
+        if (_fp.C_VerifySignatureInit is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureInit");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (byte* sigPtr = signature)
+            return _fp.C_VerifySignatureInit(session, m, key, sigPtr, signatureLen);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifySignature</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifySignature(NativeCULong session, byte[] data, NativeCULong dataLen)
+    {
+        if (_fp.C_VerifySignature is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignature");
+        fixed (byte* dataPtr = data)
+            return _fp.C_VerifySignature(session, dataPtr, dataLen);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifySignatureUpdate</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifySignatureUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
+    {
+        if (_fp.C_VerifySignatureUpdate is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureUpdate");
+        fixed (byte* partPtr = part)
+            return _fp.C_VerifySignatureUpdate(session, partPtr, partLen);
+    }
+
+    /// <summary>Wrapper for <c>C_VerifySignatureFinal</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_VerifySignatureFinal(NativeCULong session)
+    {
+        if (_fp.C_VerifySignatureFinal is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureFinal");
+        return _fp.C_VerifySignatureFinal(session);
+    }
+
+    /// <summary>Wrapper for <c>C_GetSessionValidationFlags</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)
+    {
+        if (_fp.C_GetSessionValidationFlags is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSessionValidationFlags");
+        fixed (NativeCULong* flagsPtr = &flags)
+            return _fp.C_GetSessionValidationFlags(session, type, flagsPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_AsyncComplete</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_AsyncComplete(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA result)
+    {
+        if (_fp.C_AsyncComplete is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncComplete");
+        fixed (byte* fnPtr = functionName)
+        fixed (CK_ASYNC_DATA* rPtr = &result)
+            return _fp.C_AsyncComplete(session, fnPtr, rPtr);
+    }
+
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_AsyncComplete</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_AsyncComplete => _fp.C_AsyncComplete is not null;
+
+    /// <summary>Wrapper for <c>C_AsyncGetID</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_AsyncGetID(NativeCULong session, byte[] functionName, ref NativeCULong id)
+    {
+        if (_fp.C_AsyncGetID is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncGetID");
+        fixed (byte* fnPtr = functionName)
+        fixed (NativeCULong* idPtr = &id)
+            return _fp.C_AsyncGetID(session, fnPtr, idPtr);
+    }
+
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_AsyncGetID</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_AsyncGetID => _fp.C_AsyncGetID is not null;
+
+    /// <summary>Wrapper for <c>C_AsyncJoin</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_AsyncJoin(NativeCULong session, byte[] functionName, NativeCULong id, byte[] data, NativeCULong dataLen)
+    {
+        if (_fp.C_AsyncJoin is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncJoin");
+        fixed (byte* fnPtr = functionName)
+        fixed (byte* dataPtr = data)
+            return _fp.C_AsyncJoin(session, fnPtr, id, dataPtr, dataLen);
+    }
+
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_AsyncJoin</c> (PKCS#11 v3.2+).</summary>
+    internal unsafe bool HasC_AsyncJoin => _fp.C_AsyncJoin is not null;
+
+    /// <summary>Wrapper for <c>C_WrapKeyAuthenticated</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    {
+        if (_fp.C_WrapKeyAuthenticated is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKeyAuthenticated");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (byte* adPtr = associatedData)
+        fixed (byte* wkPtr = wrappedKey)
+        fixed (NativeCULong* lenPtr = &wrappedKeyLen)
+            return _fp.C_WrapKeyAuthenticated(session, m, wrappingKey, key, adPtr, associatedDataLen, wkPtr, lenPtr);
+    }
+
+    /// <summary>Wrapper for <c>C_UnwrapKeyAuthenticated</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    public unsafe NativeCULong C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key)
+    {
+        if (_fp.C_UnwrapKeyAuthenticated is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKeyAuthenticated");
+        fixed (CK_MECHANISM* m = &mechanism)
+        fixed (byte* wkPtr = wrappedKey)
+        fixed (CK_ATTRIBUTE* t = template)
+        fixed (byte* adPtr = associatedData)
+        fixed (NativeCULong* kPtr = &key)
+            return _fp.C_UnwrapKeyAuthenticated(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
+    }
 
     // ── Windows-layout delegate fields (non-blittable only) ──────────────────
     // Only the *_INFO delegates remain as delegates; their structs contain
@@ -1244,68 +1441,104 @@ internal partial class Delegates
 
         // Fallback: per-symbol lookup. Works for libraries that export the v3.0
         // functions as plain symbols even though they don't expose C_GetInterface.
-        C_LoginUser = TryGetDelegate<C_LoginUserDelegate>(libraryHandle, "C_LoginUser");
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_LoginUser", out IntPtr loginUserPtr) && loginUserPtr != IntPtr.Zero)
+            unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)loginUserPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_SessionCancel", out IntPtr sessionCancelPtr) && sessionCancelPtr != IntPtr.Zero)
             unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)sessionCancelPtr; }
-        C_MessageEncryptInit = TryGetDelegate<C_MessageEncryptInitDelegate>(libraryHandle, "C_MessageEncryptInit");
         if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageEncryptInit", out IntPtr msgEncInitPtr) && msgEncInitPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgEncInitPtr; }
             unsafe { _fp.C_MessageEncryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgEncInitPtr; }
-        C_EncryptMessage = TryGetDelegate<C_EncryptMessageDelegate>(libraryHandle, "C_EncryptMessage");
-        C_EncryptMessageBegin = TryGetDelegate<C_EncryptMessageBeginDelegate>(libraryHandle, "C_EncryptMessageBegin");
-        C_EncryptMessageNext = TryGetDelegate<C_EncryptMessageNextDelegate>(libraryHandle, "C_EncryptMessageNext");
-        C_MessageEncryptFinal = TryGetDelegate<C_MessageEncryptFinalDelegate>(libraryHandle, "C_MessageEncryptFinal");
-        C_MessageDecryptInit = TryGetDelegate<C_MessageDecryptInitDelegate>(libraryHandle, "C_MessageDecryptInit");
+        }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncryptMessage", out IntPtr encMsgPtr) && encMsgPtr != IntPtr.Zero)
+            unsafe { _fp.C_EncryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)encMsgPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncryptMessageBegin", out IntPtr encMsgBeginPtr) && encMsgBeginPtr != IntPtr.Zero)
+            unsafe { _fp.C_EncryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)encMsgBeginPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncryptMessageNext", out IntPtr encMsgNextPtr) && encMsgNextPtr != IntPtr.Zero)
+            unsafe { _fp.C_EncryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)encMsgNextPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageEncryptFinal", out IntPtr msgEncFinalPtr) && msgEncFinalPtr != IntPtr.Zero)
+            unsafe { _fp.C_MessageEncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgEncFinalPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageDecryptInit", out IntPtr msgDecInitPtr) && msgDecInitPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_MessageDecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgDecInitPtr; }
             unsafe { _fp.C_MessageDecryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgDecInitPtr; }
-        C_DecryptMessage = TryGetDelegate<C_DecryptMessageDelegate>(libraryHandle, "C_DecryptMessage");
-        C_DecryptMessageBegin = TryGetDelegate<C_DecryptMessageBeginDelegate>(libraryHandle, "C_DecryptMessageBegin");
-        C_DecryptMessageNext = TryGetDelegate<C_DecryptMessageNextDelegate>(libraryHandle, "C_DecryptMessageNext");
-        C_MessageDecryptFinal = TryGetDelegate<C_MessageDecryptFinalDelegate>(libraryHandle, "C_MessageDecryptFinal");
-        C_MessageSignInit = TryGetDelegate<C_MessageSignInitDelegate>(libraryHandle, "C_MessageSignInit");
+        }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecryptMessage", out IntPtr decMsgPtr) && decMsgPtr != IntPtr.Zero)
+            unsafe { _fp.C_DecryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)decMsgPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecryptMessageBegin", out IntPtr decMsgBeginPtr) && decMsgBeginPtr != IntPtr.Zero)
+            unsafe { _fp.C_DecryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)decMsgBeginPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecryptMessageNext", out IntPtr decMsgNextPtr) && decMsgNextPtr != IntPtr.Zero)
+            unsafe { _fp.C_DecryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)decMsgNextPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageDecryptFinal", out IntPtr msgDecFinalPtr) && msgDecFinalPtr != IntPtr.Zero)
+            unsafe { _fp.C_MessageDecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgDecFinalPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageSignInit", out IntPtr msgSignInitPtr) && msgSignInitPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_MessageSignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgSignInitPtr; }
             unsafe { _fp.C_MessageSignInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgSignInitPtr; }
-        C_SignMessage = TryGetDelegate<C_SignMessageDelegate>(libraryHandle, "C_SignMessage");
-        C_SignMessageBegin = TryGetDelegate<C_SignMessageBeginDelegate>(libraryHandle, "C_SignMessageBegin");
-        C_SignMessageNext = TryGetDelegate<C_SignMessageNextDelegate>(libraryHandle, "C_SignMessageNext");
-        C_MessageSignFinal = TryGetDelegate<C_MessageSignFinalDelegate>(libraryHandle, "C_MessageSignFinal");
-        C_MessageVerifyInit = TryGetDelegate<C_MessageVerifyInitDelegate>(libraryHandle, "C_MessageVerifyInit");
+        }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_SignMessage", out IntPtr signMsgPtr) && signMsgPtr != IntPtr.Zero)
+            unsafe { _fp.C_SignMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)signMsgPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_SignMessageBegin", out IntPtr signMsgBeginPtr) && signMsgBeginPtr != IntPtr.Zero)
+            unsafe { _fp.C_SignMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)signMsgBeginPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_SignMessageNext", out IntPtr signMsgNextPtr) && signMsgNextPtr != IntPtr.Zero)
+            unsafe { _fp.C_SignMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)signMsgNextPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageSignFinal", out IntPtr msgSignFinalPtr) && msgSignFinalPtr != IntPtr.Zero)
+            unsafe { _fp.C_MessageSignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgSignFinalPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageVerifyInit", out IntPtr msgVerifyInitPtr) && msgVerifyInitPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_MessageVerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgVerifyInitPtr; }
             unsafe { _fp.C_MessageVerifyInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgVerifyInitPtr; }
-        C_VerifyMessage = TryGetDelegate<C_VerifyMessageDelegate>(libraryHandle, "C_VerifyMessage");
-        C_VerifyMessageBegin = TryGetDelegate<C_VerifyMessageBeginDelegate>(libraryHandle, "C_VerifyMessageBegin");
-        C_VerifyMessageNext = TryGetDelegate<C_VerifyMessageNextDelegate>(libraryHandle, "C_VerifyMessageNext");
-        C_MessageVerifyFinal = TryGetDelegate<C_MessageVerifyFinalDelegate>(libraryHandle, "C_MessageVerifyFinal");
-        C_EncapsulateKey = TryGetDelegate<C_EncapsulateKeyDelegate>(libraryHandle, "C_EncapsulateKey");
+        }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifyMessage", out IntPtr verMsgPtr) && verMsgPtr != IntPtr.Zero)
+            unsafe { _fp.C_VerifyMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)verMsgPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifyMessageBegin", out IntPtr verMsgBeginPtr) && verMsgBeginPtr != IntPtr.Zero)
+            unsafe { _fp.C_VerifyMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)verMsgBeginPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifyMessageNext", out IntPtr verMsgNextPtr) && verMsgNextPtr != IntPtr.Zero)
+            unsafe { _fp.C_VerifyMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)verMsgNextPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageVerifyFinal", out IntPtr msgVerifyFinalPtr) && msgVerifyFinalPtr != IntPtr.Zero)
+            unsafe { _fp.C_MessageVerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgVerifyFinalPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_EncapsulateKey", out IntPtr encapPtr) && encapPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_EncapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)encapPtr; }
             unsafe { _fp.C_EncapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)encapPtr; }
-        C_DecapsulateKey = TryGetDelegate<C_DecapsulateKeyDelegate>(libraryHandle, "C_DecapsulateKey");
+        }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_DecapsulateKey", out IntPtr decapPtr) && decapPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_DecapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)decapPtr; }
             unsafe { _fp.C_DecapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)decapPtr; }
-        C_VerifySignatureInit = TryGetDelegate<C_VerifySignatureInitDelegate>(libraryHandle, "C_VerifySignatureInit");
+        }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignatureInit", out IntPtr vsiPtr) && vsiPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_VerifySignatureInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong>)vsiPtr; }
             unsafe { _fp.C_VerifySignatureInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong>)vsiPtr; }
-        C_VerifySignature = TryGetDelegate<C_VerifySignatureDelegate>(libraryHandle, "C_VerifySignature");
-        C_VerifySignatureUpdate = TryGetDelegate<C_VerifySignatureUpdateDelegate>(libraryHandle, "C_VerifySignatureUpdate");
-        C_VerifySignatureFinal = TryGetDelegate<C_VerifySignatureFinalDelegate>(libraryHandle, "C_VerifySignatureFinal");
-        C_GetSessionValidationFlags = TryGetDelegate<C_GetSessionValidationFlagsDelegate>(libraryHandle, "C_GetSessionValidationFlags");
-        C_AsyncComplete = TryGetDelegate<C_AsyncCompleteDelegate>(libraryHandle, "C_AsyncComplete");
+        }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignature", out IntPtr vsPtr) && vsPtr != IntPtr.Zero)
+            unsafe { _fp.C_VerifySignature = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)vsPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignatureUpdate", out IntPtr vsuPtr) && vsuPtr != IntPtr.Zero)
+            unsafe { _fp.C_VerifySignatureUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)vsuPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignatureFinal", out IntPtr vsfPtr) && vsfPtr != IntPtr.Zero)
+            unsafe { _fp.C_VerifySignatureFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)vsfPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_GetSessionValidationFlags", out IntPtr gsvfPtr) && gsvfPtr != IntPtr.Zero)
+            unsafe { _fp.C_GetSessionValidationFlags = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)gsvfPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_AsyncComplete", out IntPtr asyncCompletePtr) && asyncCompletePtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_AsyncComplete = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong>)asyncCompletePtr; }
             unsafe { _fp.C_AsyncComplete_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong>)asyncCompletePtr; }
-        C_AsyncGetID = TryGetDelegate<C_AsyncGetIDDelegate>(libraryHandle, "C_AsyncGetID");
-        C_AsyncJoin = TryGetDelegate<C_AsyncJoinDelegate>(libraryHandle, "C_AsyncJoin");
-        C_WrapKeyAuthenticated = TryGetDelegate<C_WrapKeyAuthenticatedDelegate>(libraryHandle, "C_WrapKeyAuthenticated");
+        }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_AsyncGetID", out IntPtr asyncGetIdPtr) && asyncGetIdPtr != IntPtr.Zero)
+            unsafe { _fp.C_AsyncGetID = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)asyncGetIdPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_AsyncJoin", out IntPtr asyncJoinPtr) && asyncJoinPtr != IntPtr.Zero)
+            unsafe { _fp.C_AsyncJoin = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)asyncJoinPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_WrapKeyAuthenticated", out IntPtr wkaPtr) && wkaPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_WrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)wkaPtr; }
             unsafe { _fp.C_WrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)wkaPtr; }
-        C_UnwrapKeyAuthenticated = TryGetDelegate<C_UnwrapKeyAuthenticatedDelegate>(libraryHandle, "C_UnwrapKeyAuthenticated");
+        }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_UnwrapKeyAuthenticated", out IntPtr uwkaPtr) && uwkaPtr != IntPtr.Zero)
+        {
+            unsafe { _fp.C_UnwrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)uwkaPtr; }
             unsafe { _fp.C_UnwrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)uwkaPtr; }
-    }
-
-    private static T? TryGetDelegate<T>(IntPtr libraryHandle, string symbol) where T : class
-    {
-        if (NativeLibrary.TryGetExport(libraryHandle, symbol, out IntPtr fnPtr) && fnPtr != IntPtr.Zero)
-            return Marshal.GetDelegateForFunctionPointer<T>(fnPtr);
-        return null;
+        }
     }
 
     /// <summary>
@@ -1317,15 +1550,16 @@ internal partial class Delegates
     /// </summary>
     private bool TryLoadFromGetInterface(IntPtr libraryHandle)
     {
-        var getInterface = TryGetDelegate<C_GetInterfaceDelegate>(libraryHandle, "C_GetInterface");
-        if (getInterface is null) return false;
+        if (!NativeLibrary.TryGetExport(libraryHandle, "C_GetInterface", out IntPtr getInterfaceRawPtr) || getInterfaceRawPtr == IntPtr.Zero)
+            return false;
+        unsafe { _fp.C_GetInterface = (delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)getInterfaceRawPtr; }
 
         // Request the default interface: null name, null version, flags = 0.
         IntPtr interfacePtr;
         NativeCULong rv;
         try
         {
-            rv = getInterface(null, IntPtr.Zero, out interfacePtr, new NativeCULong(0));
+            unsafe { rv = _fp.C_GetInterface(null, IntPtr.Zero, &interfacePtr, new NativeCULong(0)); }
         }
         catch
         {
@@ -1348,65 +1582,65 @@ internal partial class Delegates
         CK_FUNCTION_LIST_3_0 v30 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(iface.FunctionList);
 
         if (v30.C_LoginUser != IntPtr.Zero)
-            C_LoginUser = Marshal.GetDelegateForFunctionPointer<C_LoginUserDelegate>(v30.C_LoginUser);
+            unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_LoginUser; }
         if (v30.C_SessionCancel != IntPtr.Zero)
             unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)v30.C_SessionCancel; }
 
         if (v30.C_MessageEncryptInit != IntPtr.Zero)
         {
-            C_MessageEncryptInit = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptInitDelegate>(v30.C_MessageEncryptInit);
+            unsafe { _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageEncryptInit; }
             unsafe { _fp.C_MessageEncryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageEncryptInit; }
         }
         if (v30.C_EncryptMessage != IntPtr.Zero)
-            C_EncryptMessage = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageDelegate>(v30.C_EncryptMessage);
+            unsafe { _fp.C_EncryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_EncryptMessage; }
         if (v30.C_EncryptMessageBegin != IntPtr.Zero)
-            C_EncryptMessageBegin = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageBeginDelegate>(v30.C_EncryptMessageBegin);
+            unsafe { _fp.C_EncryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_EncryptMessageBegin; }
         if (v30.C_EncryptMessageNext != IntPtr.Zero)
-            C_EncryptMessageNext = Marshal.GetDelegateForFunctionPointer<C_EncryptMessageNextDelegate>(v30.C_EncryptMessageNext);
+            unsafe { _fp.C_EncryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)v30.C_EncryptMessageNext; }
         if (v30.C_MessageEncryptFinal != IntPtr.Zero)
-            C_MessageEncryptFinal = Marshal.GetDelegateForFunctionPointer<C_MessageEncryptFinalDelegate>(v30.C_MessageEncryptFinal);
+            unsafe { _fp.C_MessageEncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageEncryptFinal; }
 
         if (v30.C_MessageDecryptInit != IntPtr.Zero)
         {
-            C_MessageDecryptInit = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptInitDelegate>(v30.C_MessageDecryptInit);
+            unsafe { _fp.C_MessageDecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageDecryptInit; }
             unsafe { _fp.C_MessageDecryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageDecryptInit; }
         }
         if (v30.C_DecryptMessage != IntPtr.Zero)
-            C_DecryptMessage = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageDelegate>(v30.C_DecryptMessage);
+            unsafe { _fp.C_DecryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_DecryptMessage; }
         if (v30.C_DecryptMessageBegin != IntPtr.Zero)
-            C_DecryptMessageBegin = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageBeginDelegate>(v30.C_DecryptMessageBegin);
+            unsafe { _fp.C_DecryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_DecryptMessageBegin; }
         if (v30.C_DecryptMessageNext != IntPtr.Zero)
-            C_DecryptMessageNext = Marshal.GetDelegateForFunctionPointer<C_DecryptMessageNextDelegate>(v30.C_DecryptMessageNext);
+            unsafe { _fp.C_DecryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)v30.C_DecryptMessageNext; }
         if (v30.C_MessageDecryptFinal != IntPtr.Zero)
-            C_MessageDecryptFinal = Marshal.GetDelegateForFunctionPointer<C_MessageDecryptFinalDelegate>(v30.C_MessageDecryptFinal);
+            unsafe { _fp.C_MessageDecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageDecryptFinal; }
 
         if (v30.C_MessageSignInit != IntPtr.Zero)
         {
-            C_MessageSignInit = Marshal.GetDelegateForFunctionPointer<C_MessageSignInitDelegate>(v30.C_MessageSignInit);
+            unsafe { _fp.C_MessageSignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageSignInit; }
             unsafe { _fp.C_MessageSignInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageSignInit; }
         }
         if (v30.C_SignMessage != IntPtr.Zero)
-            C_SignMessage = Marshal.GetDelegateForFunctionPointer<C_SignMessageDelegate>(v30.C_SignMessage);
+            unsafe { _fp.C_SignMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_SignMessage; }
         if (v30.C_SignMessageBegin != IntPtr.Zero)
-            C_SignMessageBegin = Marshal.GetDelegateForFunctionPointer<C_SignMessageBeginDelegate>(v30.C_SignMessageBegin);
+            unsafe { _fp.C_SignMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)v30.C_SignMessageBegin; }
         if (v30.C_SignMessageNext != IntPtr.Zero)
-            C_SignMessageNext = Marshal.GetDelegateForFunctionPointer<C_SignMessageNextDelegate>(v30.C_SignMessageNext);
+            unsafe { _fp.C_SignMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_SignMessageNext; }
         if (v30.C_MessageSignFinal != IntPtr.Zero)
-            C_MessageSignFinal = Marshal.GetDelegateForFunctionPointer<C_MessageSignFinalDelegate>(v30.C_MessageSignFinal);
+            unsafe { _fp.C_MessageSignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageSignFinal; }
 
         if (v30.C_MessageVerifyInit != IntPtr.Zero)
         {
-            C_MessageVerifyInit = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyInitDelegate>(v30.C_MessageVerifyInit);
+            unsafe { _fp.C_MessageVerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageVerifyInit; }
             unsafe { _fp.C_MessageVerifyInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageVerifyInit; }
         }
         if (v30.C_VerifyMessage != IntPtr.Zero)
-            C_VerifyMessage = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageDelegate>(v30.C_VerifyMessage);
+            unsafe { _fp.C_VerifyMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_VerifyMessage; }
         if (v30.C_VerifyMessageBegin != IntPtr.Zero)
-            C_VerifyMessageBegin = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageBeginDelegate>(v30.C_VerifyMessageBegin);
+            unsafe { _fp.C_VerifyMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)v30.C_VerifyMessageBegin; }
         if (v30.C_VerifyMessageNext != IntPtr.Zero)
-            C_VerifyMessageNext = Marshal.GetDelegateForFunctionPointer<C_VerifyMessageNextDelegate>(v30.C_VerifyMessageNext);
+            unsafe { _fp.C_VerifyMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_VerifyMessageNext; }
         if (v30.C_MessageVerifyFinal != IntPtr.Zero)
-            C_MessageVerifyFinal = Marshal.GetDelegateForFunctionPointer<C_MessageVerifyFinalDelegate>(v30.C_MessageVerifyFinal);
+            unsafe { _fp.C_MessageVerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageVerifyFinal; }
 
         // v3.2 token: re-read the function table as CK_FUNCTION_LIST_3_2 and bind
         // the 12 v3.2 additions on top of the v3.0 bindings.
@@ -1416,44 +1650,44 @@ internal partial class Delegates
 
             if (v32.C_EncapsulateKey != IntPtr.Zero)
             {
-                C_EncapsulateKey = Marshal.GetDelegateForFunctionPointer<C_EncapsulateKeyDelegate>(v32.C_EncapsulateKey);
+                unsafe { _fp.C_EncapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)v32.C_EncapsulateKey; }
                 unsafe { _fp.C_EncapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)v32.C_EncapsulateKey; }
             }
             if (v32.C_DecapsulateKey != IntPtr.Zero)
             {
-                C_DecapsulateKey = Marshal.GetDelegateForFunctionPointer<C_DecapsulateKeyDelegate>(v32.C_DecapsulateKey);
+                unsafe { _fp.C_DecapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_DecapsulateKey; }
                 unsafe { _fp.C_DecapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_DecapsulateKey; }
             }
             if (v32.C_VerifySignatureInit != IntPtr.Zero)
             {
-                C_VerifySignatureInit = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureInitDelegate>(v32.C_VerifySignatureInit);
+                unsafe { _fp.C_VerifySignatureInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignatureInit; }
                 unsafe { _fp.C_VerifySignatureInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignatureInit; }
             }
             if (v32.C_VerifySignature != IntPtr.Zero)
-                C_VerifySignature = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureDelegate>(v32.C_VerifySignature);
+                unsafe { _fp.C_VerifySignature = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignature; }
             if (v32.C_VerifySignatureUpdate != IntPtr.Zero)
-                C_VerifySignatureUpdate = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureUpdateDelegate>(v32.C_VerifySignatureUpdate);
+                unsafe { _fp.C_VerifySignatureUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignatureUpdate; }
             if (v32.C_VerifySignatureFinal != IntPtr.Zero)
-                C_VerifySignatureFinal = Marshal.GetDelegateForFunctionPointer<C_VerifySignatureFinalDelegate>(v32.C_VerifySignatureFinal);
+                unsafe { _fp.C_VerifySignatureFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v32.C_VerifySignatureFinal; }
             if (v32.C_GetSessionValidationFlags != IntPtr.Zero)
-                C_GetSessionValidationFlags = Marshal.GetDelegateForFunctionPointer<C_GetSessionValidationFlagsDelegate>(v32.C_GetSessionValidationFlags);
+                unsafe { _fp.C_GetSessionValidationFlags = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)v32.C_GetSessionValidationFlags; }
             if (v32.C_AsyncComplete != IntPtr.Zero)
             {
-                C_AsyncComplete = Marshal.GetDelegateForFunctionPointer<C_AsyncCompleteDelegate>(v32.C_AsyncComplete);
+                unsafe { _fp.C_AsyncComplete = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong>)v32.C_AsyncComplete; }
                 unsafe { _fp.C_AsyncComplete_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong>)v32.C_AsyncComplete; }
             }
             if (v32.C_AsyncGetID != IntPtr.Zero)
-                C_AsyncGetID = Marshal.GetDelegateForFunctionPointer<C_AsyncGetIDDelegate>(v32.C_AsyncGetID);
+                unsafe { _fp.C_AsyncGetID = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)v32.C_AsyncGetID; }
             if (v32.C_AsyncJoin != IntPtr.Zero)
-                C_AsyncJoin = Marshal.GetDelegateForFunctionPointer<C_AsyncJoinDelegate>(v32.C_AsyncJoin);
+                unsafe { _fp.C_AsyncJoin = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_AsyncJoin; }
             if (v32.C_WrapKeyAuthenticated != IntPtr.Zero)
             {
-                C_WrapKeyAuthenticated = Marshal.GetDelegateForFunctionPointer<C_WrapKeyAuthenticatedDelegate>(v32.C_WrapKeyAuthenticated);
+                unsafe { _fp.C_WrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v32.C_WrapKeyAuthenticated; }
                 unsafe { _fp.C_WrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v32.C_WrapKeyAuthenticated; }
             }
             if (v32.C_UnwrapKeyAuthenticated != IntPtr.Zero)
             {
-                C_UnwrapKeyAuthenticated = Marshal.GetDelegateForFunctionPointer<C_UnwrapKeyAuthenticatedDelegate>(v32.C_UnwrapKeyAuthenticated);
+                unsafe { _fp.C_UnwrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_UnwrapKeyAuthenticated; }
                 unsafe { _fp.C_UnwrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_UnwrapKeyAuthenticated; }
             }
         }
@@ -1522,7 +1756,7 @@ internal partial class Delegates
         unsafe { _fp.C_InitToken = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong>)funcList.C_InitToken; }
         unsafe { _fp.C_InitPIN = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_InitPIN; }
         unsafe { _fp.C_SetPIN = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_SetPIN; }
-        C_OpenSession = Marshal.GetDelegateForFunctionPointer<C_OpenSessionDelegate>(funcList.C_OpenSession);
+        unsafe { _fp.C_OpenSession = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, IntPtr, IntPtr, NativeCULong*, NativeCULong>)funcList.C_OpenSession; }
         unsafe { _fp.C_CloseSession = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CloseSession; }
         unsafe { _fp.C_CloseAllSessions = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CloseAllSessions; }
         C_GetSessionInfo = Marshal.GetDelegateForFunctionPointer<C_GetSessionInfoDelegate>(funcList.C_GetSessionInfo);
@@ -1542,7 +1776,7 @@ internal partial class Delegates
             _fp.C_CopyObject_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_CopyObject;
         }
         unsafe { _fp.C_DestroyObject = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)funcList.C_DestroyObject; }
-        C_GetObjectSize = Marshal.GetDelegateForFunctionPointer<C_GetObjectSizeDelegate>(funcList.C_GetObjectSize);
+        unsafe { _fp.C_GetObjectSize = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)funcList.C_GetObjectSize; }
         unsafe
         {
             _fp.C_GetAttributeValue = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_ATTRIBUTE*, NativeCULong, NativeCULong>)funcList.C_GetAttributeValue;
@@ -1644,8 +1878,8 @@ internal partial class Delegates
         }
         unsafe { _fp.C_SeedRandom = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_SeedRandom; }
         unsafe { _fp.C_GenerateRandom = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)funcList.C_GenerateRandom; }
-        C_GetFunctionStatus = Marshal.GetDelegateForFunctionPointer<C_GetFunctionStatusDelegate>(funcList.C_GetFunctionStatus);
+        unsafe { _fp.C_GetFunctionStatus = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_GetFunctionStatus; }
         unsafe { _fp.C_CancelFunction = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)funcList.C_CancelFunction; }
-        C_WaitForSlotEvent = Marshal.GetDelegateForFunctionPointer<C_WaitForSlotEventDelegate>(funcList.C_WaitForSlotEvent);
+        unsafe { _fp.C_WaitForSlotEvent = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, IntPtr, NativeCULong>)funcList.C_WaitForSlotEvent; }
     }
 }
