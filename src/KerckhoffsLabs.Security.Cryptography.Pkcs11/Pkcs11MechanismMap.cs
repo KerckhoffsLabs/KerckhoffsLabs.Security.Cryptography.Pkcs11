@@ -99,9 +99,17 @@ internal static class Pkcs11MechanismMap
     /// Returns a <see cref="Mechanism"/> for HashML-DSA signing (CKM_HASH_ML_DSA_*,
     /// PKCS#11 v3.2). Maps the BCL hash name to the matching combined-hash mechanism.
     /// </summary>
-    /// <param name="hash">BCL hash algorithm name (SHA256, SHA384, SHA512, SHA3_256, SHA3_384, SHA3_512, SHAKE128, SHAKE256).</param>
+    /// <param name="hash">BCL hash algorithm name (SHA224, SHA256, SHA384, SHA512, SHA3-224, SHA3-256, SHA3-384, SHA3-512).</param>
     /// <param name="hedgeVariant">Hedge mode.</param>
     /// <param name="context">Optional context bytes (max 255).</param>
+    /// <remarks>
+    /// SHAKE128 / SHAKE256 (FIPS 204 §5.4) are intentionally not mapped here. OASIS PKCS#11
+    /// v3.2 defines <c>CKM_HASH_ML_DSA_SHAKE128/256</c> as the combined mechanism but does
+    /// not define a standalone <c>CKM_SHAKE_128/256</c> hash mechanism — only the
+    /// <c>_KEY_DERIVATION</c> variants. The <c>hash</c> field of
+    /// <c>CK_HASH_SIGN_ADDITIONAL_CONTEXT</c> has no spec-defined value for the SHAKE-prehash
+    /// case, so adding arms requires a token-by-token compatibility test we do not yet have.
+    /// </remarks>
     /// <exception cref="NotSupportedException">Unsupported hash.</exception>
     public static Mechanism MlDsaHashSign(
         HashAlgorithmName hash,

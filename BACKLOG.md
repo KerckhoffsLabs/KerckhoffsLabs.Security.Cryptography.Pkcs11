@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 26 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 25 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -150,6 +150,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-010] `Pkcs11MlDsa.MlDsaHashSign` docstring promises SHAKE128/SHAKE256; switch arm is missing
 
+- **Status: Resolved (2026-05-19)** — Docstring now lists exactly the eight hashes the switch implements (SHA224, SHA256, SHA384, SHA512, SHA3-224/256/384/512). Added remarks block explaining why SHAKE128/SHAKE256 are deferred: OASIS PKCS#11 v3.2 defines `CKM_HASH_ML_DSA_SHAKE128/256` as the combined mechanism but does not define a standalone `CKM_SHAKE_128/256` hash CKM (only `_KEY_DERIVATION` variants), so the `hash` field of `CK_HASH_SIGN_ADDITIONAL_CONTEXT` has no spec-defined value for the SHAKE-prehash case. Adding arms would require a token-by-token compat test we don't yet have — track as a follow-up. Regression tests in `Pkcs11MechanismMapTests` pin the 8-hash mapping and assert `NotSupportedException` for SHAKE128 / SHAKE256 / MD5.
 - **Area:** Cryptography
 - **Severity:** High
 - **Effort:** S

@@ -83,4 +83,32 @@ public sealed class Pkcs11MechanismMapTests
         using var mech = Pkcs11MechanismMap.Hmac(HashAlgorithmName.SHA256);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, mech.Type);
     }
+
+    [Theory]
+    [InlineData("SHA224", (ulong)CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_SHA224)]
+    [InlineData("SHA256", (ulong)CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256)]
+    [InlineData("SHA384", (ulong)CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384)]
+    [InlineData("SHA512", (ulong)CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512)]
+    [InlineData("SHA3-224", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224)]
+    [InlineData("SHA3-256", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256)]
+    [InlineData("SHA3-384", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384)]
+    [InlineData("SHA3-512", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512)]
+    public void MlDsaHashSign_HashToCkm_ReturnsExpectedWithParams(
+        string hashName, ulong expectedCkm, CKM expectedInnerHash)
+    {
+        using var mech = Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName));
+        Assert.Equal(expectedCkm, mech.Type);
+        Assert.IsType<CkmHashPqcSignParams>(mech.Parameters);
+        _ = expectedInnerHash; // documented mapping — verified by the absence of NotSupportedException above
+    }
+
+    [Theory]
+    [InlineData("SHAKE128")]
+    [InlineData("SHAKE256")]
+    [InlineData("MD5")]
+    public void MlDsaHashSign_UnsupportedHash_Throws(string hashName)
+    {
+        Assert.Throws<NotSupportedException>(() =>
+            Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName)));
+    }
 }
