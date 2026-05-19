@@ -206,12 +206,12 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     /// <param name="nonBlocking">
     /// When <c>true</c>, returns immediately even if no event is pending
-    /// (<paramref name="eventOccured"/> will be <c>false</c>). When <c>false</c>,
+    /// (<paramref name="eventOccurred"/> will be <c>false</c>). When <c>false</c>,
     /// blocks until an event occurs.
     /// </param>
-    /// <param name="eventOccured">True when a slot event was reported.</param>
+    /// <param name="eventOccurred">True when a slot event was reported.</param>
     /// <param name="slotId">PKCS#11 handle of the slot the event occurred in. Zero when no event.</param>
-    public void WaitForSlotEvent(bool nonBlocking, out bool eventOccured, out ulong slotId)
+    public void WaitForSlotEvent(bool nonBlocking, out bool eventOccurred, out ulong slotId)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -223,12 +223,12 @@ public sealed class Pkcs11Library : IDisposable
 
         if (rv == CKR.CKR_OK)
         {
-            eventOccured = true;
+            eventOccurred = true;
             slotId = (ulong)slotIdOut;
             return;
         }
 
-        eventOccured = false;
+        eventOccurred = false;
         slotId = 0;
 
         // CKR_NO_EVENT is expected in non-blocking mode when nothing's pending.
