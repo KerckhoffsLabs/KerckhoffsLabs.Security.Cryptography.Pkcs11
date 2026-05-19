@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 19 | **Medium:** 18 | **Low:** 6
+- **Critical:** 0 | **High:** 19 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -655,6 +655,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-060] Migrate cryptoki dispatch from `[UnmanagedFunctionPointer]` delegates to `delegate* unmanaged[Cdecl]` function pointers
 
+- **Status: Resolved (2026-05-19)** — All blittable-parameter cryptoki functions migrated from `[UnmanagedFunctionPointer]` delegates to `delegate* unmanaged[Cdecl]<...>` function pointers held in a new `FunctionPointers` class, populated by direct `IntPtr`→fptr cast (no `Marshal.GetDelegateForFunctionPointer`). Wrapper methods on `Delegates` preserve the exact prior call signatures (pinning `byte[]`/`CK_ATTRIBUTE[]`/`NativeCULong[]` via `fixed`, taking `&` of `ref CK_MECHANISM`, converting `bool`→`byte` for `CK_BBOOL`), so `LowLevelPkcs11Library` call sites are unchanged; optional v3.0/v3.2 functions use `HasC_X` boolean properties for safe-context null checks. **Scope correction:** the 5 `*_INFO` functions (`C_GetInfo`, `C_GetSlotInfo`, `C_GetTokenInfo`, `C_GetSessionInfo`, `C_GetMechanismInfo`) and their 5 `_Windows` siblings are **intentionally kept as delegates** — those structs are non-blittable (`[MarshalAs(ByValArray)] byte[]` + `CK_VERSION` sub-structs), so a `fixed`-pointer hand-off corrupts memory (caught when an initial attempt crashed the test host). They derive zero fptr benefit (a marshal-to-native-buffer round-trip would be required regardless) and are not hot-path. Net: 10 delegates remain (the `*_INFO` family), ~125 functions are now fptr-dispatched. All 565 tests pass; build stays zero-AOT-warning throughout. Landed in commits `0c9565f` → `837bd7c` (phases 1–8; one intermediate `*_INFO` attempt reverted at `7c5e085`).
 - **Area:** P/Invoke
 - **Severity:** Medium
 - **Effort:** L
