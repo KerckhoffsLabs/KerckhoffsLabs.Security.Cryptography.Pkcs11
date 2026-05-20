@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// buffer for the optional source data. Dispose this instance AFTER the
 /// <see cref="Mechanism"/> that holds a reference to it has been disposed.
 /// </summary>
-public sealed class CkmRsaPkcsOaepParams : IMechanismParams
+public sealed class CkmRsaPkcsOaepParams : MechanismParameters
 {
     private CK_RSA_PKCS_OAEP_PARAMS _lowLevelParams;
     private IntPtr _sourceData;
@@ -40,14 +40,14 @@ public sealed class CkmRsaPkcsOaepParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _sourceData);

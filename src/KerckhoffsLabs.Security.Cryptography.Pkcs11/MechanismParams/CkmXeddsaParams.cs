@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_XEDDSA_PARAMS"/>. Used with CKM_XEDDSA (Signal-protocol XEdDSA signing, PKCS#11 v3.0).
 /// </summary>
-public sealed class CkmXeddsaParams : IMechanismParams
+public sealed class CkmXeddsaParams : MechanismParameters
 {
     private CK_XEDDSA_PARAMS _lowLevelParams;
 
@@ -24,14 +24,14 @@ public sealed class CkmXeddsaParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
 

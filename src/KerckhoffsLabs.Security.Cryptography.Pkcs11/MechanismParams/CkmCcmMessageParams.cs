@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// message-based AEAD API on CKM_AES_CCM. Note that CCM requires the data length to
 /// be known up front.
 /// </summary>
-public sealed class CkmCcmMessageParams : IMechanismParams
+public sealed class CkmCcmMessageParams : MechanismParameters
 {
     private CK_CCM_MESSAGE_PARAMS _lowLevelParams;
     private IntPtr _nonce;
@@ -62,14 +62,14 @@ public sealed class CkmCcmMessageParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);

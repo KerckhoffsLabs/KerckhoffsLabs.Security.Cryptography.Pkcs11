@@ -37,7 +37,7 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
     }
 
     [Fact]
-    public void Mechanism_NoLeak_WithIMechanismParams()
+    public void Mechanism_NoLeak_WithMechanismParams()
     {
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < 20; i++)

@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 14 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 13 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -317,6 +317,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-023] `IMechanismParams.ToMarshalableStructure()` returns `object` — AOT/trim hostile and breaks abstraction
 
+- **Status: Resolved (2026-05-20)** — Replaced the public `IMechanismParams` interface with a public abstract base class `MechanismParameters` (named to avoid colliding with the `MechanismParams` namespace) whose marshalling method `internal abstract object ToMarshalableStructure()` is no longer on the public surface. The 26 `Ckm*Params` wrappers now derive from it (`internal override` the marshalling method, `public override void Dispose()`); the public `Mechanism(type, MechanismParameters)` constructors and `Pkcs11Key.MessageEncrypt/MessageDecrypt` take the base class, so `new Mechanism(CKM.X, new CkmYParams(...))` is unchanged. Because the abstract marshalling member is `internal`, consumers in other assemblies cannot subclass `MechanismParameters` — custom/vendor parameters go through the existing `Mechanism(type, byte[])` ctor, which closes the "no type-system constraint enforces the blittable contract" hole. `Mechanism.ToMarshalableStructure()` (same `object`-returning leak, internal-only callers) was also demoted to `internal`. The AOT/trim concern was already mitigated by the packed-struct source generator: mechanism params marshal through `UnmanagedMemory.SizeOf`/`Write` → `PackedDispatch` (JIT-folded `typeof` chain), never `Marshal.StructureToPtr` reflection, so no `[RequiresDynamicCode]` annotation is needed and the assembly stays AOT-clean. 590 tests pass.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** M

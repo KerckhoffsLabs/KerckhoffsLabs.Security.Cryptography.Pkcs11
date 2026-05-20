@@ -36,7 +36,7 @@ public sealed class Mechanism : IDisposable
     /// Exposes the high-level mechanism parameters for test inspection (visible to the test assembly via InternalsVisibleTo).
     /// Returns <c>null</c> when the mechanism was constructed without parameters.
     /// </summary>
-    internal IMechanismParams? Parameters
+    internal MechanismParameters? Parameters
     {
         get
         {
@@ -49,7 +49,7 @@ public sealed class Mechanism : IDisposable
     /// Returns managed object corresponding to CK_MECHANISM structure that can be marshaled to an unmanaged block of memory
     /// </summary>
     /// <returns>A managed object holding the data to be marshaled. This object must be an instance of a formatted class.</returns>
-    public object ToMarshalableStructure()
+    internal object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -59,7 +59,7 @@ public sealed class Mechanism : IDisposable
     /// <summary>
     /// High level object with mechanism parameters
     /// </summary>
-    private IMechanismParams? _mechanismParams = null;
+    private MechanismParameters? _mechanismParams = null;
 
     /// <summary>
     /// Creates mechanism of given type with no parameter
@@ -104,7 +104,7 @@ public sealed class Mechanism : IDisposable
     /// </summary>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
-    public Mechanism(ulong type, IMechanismParams parameter)
+    public Mechanism(ulong type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
 
@@ -120,7 +120,7 @@ public sealed class Mechanism : IDisposable
     /// </summary>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
-    public Mechanism(CKM type, IMechanismParams parameter)
+    public Mechanism(CKM type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
 

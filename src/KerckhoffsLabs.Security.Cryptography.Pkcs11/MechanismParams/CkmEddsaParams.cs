@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_EDDSA_PARAMS"/>. Used with CKM_EDDSA (PKCS#11 v3.1) — needed for the prehash variants (Ed25519ph / Ed448ph) and contextualized signing.
 /// </summary>
-public sealed class CkmEddsaParams : IMechanismParams
+public sealed class CkmEddsaParams : MechanismParameters
 {
     private CK_EDDSA_PARAMS _lowLevelParams;
     private IntPtr _contextData;
@@ -34,14 +34,14 @@ public sealed class CkmEddsaParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _contextData);

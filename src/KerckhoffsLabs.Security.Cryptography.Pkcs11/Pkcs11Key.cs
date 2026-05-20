@@ -352,7 +352,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>Ciphertext (tag is in <paramref name="messageParams"/>).</returns>
     public byte[] MessageEncrypt(
         Mechanism mechanism,
-        IMechanismParams messageParams,
+        MechanismParameters messageParams,
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> plaintext)
     {
@@ -375,7 +375,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> when authentication fails.</exception>
     public byte[] MessageDecrypt(
         Mechanism mechanism,
-        IMechanismParams messageParams,
+        MechanismParameters messageParams,
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> ciphertext)
     {

@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// CKM_HASH_ML_DSA and CKM_HASH_SLH_DSA — the prehash PQC signing mechanisms in
 /// PKCS#11 v3.2. The data is digested with the chosen hash mechanism before signing.
 /// </summary>
-public sealed class CkmHashPqcSignParams : IMechanismParams
+public sealed class CkmHashPqcSignParams : MechanismParameters
 {
     private CK_HASH_SIGN_ADDITIONAL_CONTEXT _lowLevelParams;
     private IntPtr _context;
@@ -43,14 +43,14 @@ public sealed class CkmHashPqcSignParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _context);

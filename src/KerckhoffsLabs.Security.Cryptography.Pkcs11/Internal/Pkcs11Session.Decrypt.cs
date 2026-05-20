@@ -274,7 +274,7 @@ internal sealed partial class Pkcs11Session
     public byte[] MessageDecrypt(
         Mechanism mechanism,
         ObjectHandle keyHandle,
-        IMechanismParams messageParams,
+        MechanismParameters messageParams,
         ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> ciphertext)
     {

@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// the unmanaged buffers for the nonce and AAD. Dispose this instance AFTER the
 /// <see cref="Mechanism"/> that holds a reference to it has been disposed.
 /// </summary>
-public sealed class CkmSalsa20ChaCha20Poly1305Params : IMechanismParams
+public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
 {
     private CK_SALSA20_CHACHA20_POLY1305_PARAMS _lowLevelParams;
     private IntPtr _nonce;
@@ -43,14 +43,14 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);

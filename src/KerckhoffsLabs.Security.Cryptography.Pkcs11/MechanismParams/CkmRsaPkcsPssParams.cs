@@ -5,10 +5,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_RSA_PKCS_PSS_PARAMS"/>. Owns no unmanaged
-/// buffers — PSS params are three integers — but follows the IMechanismParams
+/// buffers — PSS params are three integers — but follows the MechanismParams
 /// contract so the secure helpers can construct a Mechanism uniformly.
 /// </summary>
-public sealed class CkmRsaPkcsPssParams : IMechanismParams
+public sealed class CkmRsaPkcsPssParams : MechanismParameters
 {
     private CK_RSA_PKCS_PSS_PARAMS _lowLevelParams;
     private bool _disposed;
@@ -32,14 +32,14 @@ public sealed class CkmRsaPkcsPssParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         _disposed = true;

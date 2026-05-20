@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// High-level wrapper for <see cref="CK_CCM_PARAMS"/>. Owns the unmanaged buffers for
 /// the nonce and AAD. Dispose AFTER the Mechanism holding it has been disposed.
 /// </summary>
-public sealed class CkmAesCcmParams : IMechanismParams
+public sealed class CkmAesCcmParams : MechanismParameters
 {
     private CK_CCM_PARAMS _lowLevelParams;
     private IntPtr _nonce;
@@ -50,14 +50,14 @@ public sealed class CkmAesCcmParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);

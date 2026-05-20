@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// High-level wrapper for <see cref="CK_SIGN_ADDITIONAL_CONTEXT"/>. Used with CKM_ML_DSA
 /// and CKM_SLH_DSA — the pure (non-prehash) PQC signing mechanisms in PKCS#11 v3.2.
 /// </summary>
-public sealed class CkmPqcSignParams : IMechanismParams
+public sealed class CkmPqcSignParams : MechanismParameters
 {
     private CK_SIGN_ADDITIONAL_CONTEXT _lowLevelParams;
     private IntPtr _context;
@@ -38,14 +38,14 @@ public sealed class CkmPqcSignParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _context);

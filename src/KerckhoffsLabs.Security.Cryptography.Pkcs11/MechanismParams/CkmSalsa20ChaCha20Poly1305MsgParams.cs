@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// with the v3.0 message-based AEAD API on CKM_CHACHA20_POLY1305 and CKM_SALSA20_POLY1305.
 /// The Poly1305 tag is fixed at 16 bytes.
 /// </summary>
-public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : IMechanismParams
+public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
 {
     private const int Poly1305TagLen = 16;
 
@@ -58,14 +58,14 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);

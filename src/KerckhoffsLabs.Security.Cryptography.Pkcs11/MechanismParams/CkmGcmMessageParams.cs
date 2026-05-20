@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// High-level wrapper for <see cref="CK_GCM_MESSAGE_PARAMS"/>. Used with the v3.0
 /// message-based AEAD API (C_EncryptMessage / C_DecryptMessage) on CKM_AES_GCM.
 /// </summary>
-public sealed class CkmGcmMessageParams : IMechanismParams
+public sealed class CkmGcmMessageParams : MechanismParameters
 {
     private CK_GCM_MESSAGE_PARAMS _lowLevelParams;
     private IntPtr _iv;
@@ -60,14 +60,14 @@ public sealed class CkmGcmMessageParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _iv);

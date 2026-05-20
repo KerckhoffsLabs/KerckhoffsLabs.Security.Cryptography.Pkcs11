@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// Dispose this instance AFTER the <see cref="Mechanism"/> that holds a reference
 /// to it has been disposed.
 /// </summary>
-public sealed class CkmEcdh1DeriveParams : IMechanismParams
+public sealed class CkmEcdh1DeriveParams : MechanismParameters
 {
     private CK_ECDH1_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _publicData;
@@ -48,14 +48,14 @@ public sealed class CkmEcdh1DeriveParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _publicData);

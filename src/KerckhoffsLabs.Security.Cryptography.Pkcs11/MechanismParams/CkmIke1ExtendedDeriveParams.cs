@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_IKE1_EXTENDED_DERIVE_PARAMS"/>. Used with CKM_IKE1_EXTENDED_DERIVE (PKCS#11 v3.0).
 /// </summary>
-public sealed class CkmIke1ExtendedDeriveParams : IMechanismParams
+public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
 {
     private CK_IKE1_EXTENDED_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _extraData;
@@ -39,14 +39,14 @@ public sealed class CkmIke1ExtendedDeriveParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _extraData);

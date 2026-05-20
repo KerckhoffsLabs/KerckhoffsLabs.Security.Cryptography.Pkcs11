@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// entries that themselves point into other unmanaged buffers. The additional-derived-keys
 /// array is optional
 /// </summary>
-public sealed class CkmSp800108KdfParams : IMechanismParams
+public sealed class CkmSp800108KdfParams : MechanismParameters
 {
     private CK_SP800_108_KDF_PARAMS _lowLevelParams;
 
@@ -38,14 +38,14 @@ public sealed class CkmSp800108KdfParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
 

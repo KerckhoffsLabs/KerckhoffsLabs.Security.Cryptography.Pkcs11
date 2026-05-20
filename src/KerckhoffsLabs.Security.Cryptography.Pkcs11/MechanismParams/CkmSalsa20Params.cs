@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_SALSA20_PARAMS"/>. Used with the raw CKM_SALSA20 stream cipher mechanism (PKCS#11 v3.0).
 /// </summary>
-public sealed class CkmSalsa20Params : IMechanismParams
+public sealed class CkmSalsa20Params : MechanismParameters
 {
     private CK_SALSA20_PARAMS _lowLevelParams;
     private IntPtr _blockCounter;
@@ -38,14 +38,14 @@ public sealed class CkmSalsa20Params : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _blockCounter);

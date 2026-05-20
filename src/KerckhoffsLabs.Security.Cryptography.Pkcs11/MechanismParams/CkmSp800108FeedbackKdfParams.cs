@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// as <see cref="CkmSp800108KdfParams"/>, plus an IV that this wrapper copies into a
 /// freshly-allocated unmanaged buffer
 /// </summary>
-public sealed class CkmSp800108FeedbackKdfParams : IMechanismParams
+public sealed class CkmSp800108FeedbackKdfParams : MechanismParameters
 {
     private CK_SP800_108_FEEDBACK_KDF_PARAMS _lowLevelParams;
     private IntPtr _iv;
@@ -46,14 +46,14 @@ public sealed class CkmSp800108FeedbackKdfParams : IMechanismParams
     }
 
     /// <inheritdoc/>
-    public object ToMarshalableStructure()
+    internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _iv);
