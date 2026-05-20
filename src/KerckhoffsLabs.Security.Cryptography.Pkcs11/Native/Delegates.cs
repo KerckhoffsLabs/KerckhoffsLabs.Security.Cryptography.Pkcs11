@@ -259,7 +259,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_CreateObject</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_CreateObject(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong objectId)
+    public unsafe NativeCULong C_CreateObject(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong objectId)
     {
         if (_fp.C_CreateObject is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CreateObject");
         fixed (CK_ATTRIBUTE* t = template)
@@ -268,7 +268,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_CopyObject</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong newObjectId)
+    public unsafe NativeCULong C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong newObjectId)
     {
         if (_fp.C_CopyObject is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CopyObject");
         fixed (CK_ATTRIBUTE* t = template)
@@ -310,7 +310,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_FindObjectsInit</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[] template, NativeCULong count)
+    public unsafe NativeCULong C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count)
     {
         if (_fp.C_FindObjectsInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjectsInit");
         fixed (CK_ATTRIBUTE* t = template)
@@ -611,7 +611,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_GenerateKey</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, NativeCULong count, ref NativeCULong key)
+    public unsafe NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong key)
     {
         if (_fp.C_GenerateKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKey");
         fixed (CK_MECHANISM* m = &mechanism)
@@ -622,8 +622,8 @@ internal partial class Delegates
 
     /// <summary>Wrapper for <c>C_GenerateKeyPair</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism,
-        CK_ATTRIBUTE[] publicKeyTemplate, NativeCULong publicKeyAttributeCount,
-        CK_ATTRIBUTE[] privateKeyTemplate, NativeCULong privateKeyAttributeCount,
+        CK_ATTRIBUTE[]? publicKeyTemplate, NativeCULong publicKeyAttributeCount,
+        CK_ATTRIBUTE[]? privateKeyTemplate, NativeCULong privateKeyAttributeCount,
         ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
         if (_fp.C_GenerateKeyPair is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKeyPair");
@@ -646,7 +646,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_UnwrapKey</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key)
+    public unsafe NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
     {
         if (_fp.C_UnwrapKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKey");
         fixed (CK_MECHANISM* m = &mechanism)
@@ -657,7 +657,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DeriveKey</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, ref NativeCULong key)
+    public unsafe NativeCULong C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
     {
         if (_fp.C_DeriveKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DeriveKey");
         fixed (CK_MECHANISM* m = &mechanism)
