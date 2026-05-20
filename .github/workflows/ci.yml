@@ -11,6 +11,11 @@ permissions: read-all
 jobs:
   lint:
     runs-on: ubuntu-latest
+    env:
+      # Lint only verifies formatting; skip the native vendor builds so this job
+      # needs neither the submodules nor a C toolchain.
+      SkipPkcs11MockBuild: true
+      SkipSoftHsmV2Build: true
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -35,7 +40,11 @@ jobs:
             arch: x86
 
     steps:
+      # submodules: the test project builds pkcs11-mock (vendor/pkcs11-mock) and,
+      # on Linux/macOS, SoftHSM2 (vendor/softhsmv2) from source during `dotnet build`.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
 
       - name: Setup .NET
         uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
@@ -43,11 +52,23 @@ jobs:
           dotnet-version: '10.0.x'
           architecture: ${{ matrix.arch || 'x64' }}
 
+      # pkcs11-mock builds with gcc/make (in build-essential); SoftHSM2 builds with
+      # CMake against the OpenSSL backend (libssl-dev). Both BeforeTargets fire during
+      # the Build step below, placing the libraries next to the test assembly where the
+      # backend fixtures auto-discover them.
+      - name: Install native build deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev
+
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln --locked-mode
 
       - name: Build
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
+      # Linux: both the pkcs11-mock and SoftHSM2 backends are present, so the
+      # SoftHSM-gated [ConditionalFact] tests run alongside the mock tests.
+      # Windows: only pkcs11-mock is built (the SoftHSM2 target is Linux/macOS-only),
+      # so its SoftHSM tests self-skip.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
