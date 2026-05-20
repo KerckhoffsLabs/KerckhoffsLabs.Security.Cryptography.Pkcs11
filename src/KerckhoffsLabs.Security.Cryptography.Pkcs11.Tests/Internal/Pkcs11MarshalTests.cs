@@ -25,15 +25,15 @@ public sealed class Pkcs11MarshalTests
     [Fact]
     public void RoundTrip_CK_VERSION_ThroughWriteRead()
     {
-        var src = new CK_VERSION { Major = [3], Minor = [2] };
+        var src = new CK_VERSION { Major = 3, Minor = 2 };
         int size = Pkcs11Marshal.SizeOf<CK_VERSION>();
         IntPtr ptr = Marshal.AllocHGlobal(size);
         try
         {
             Pkcs11Marshal.WriteStructure(ptr, src);
             var rt = Pkcs11Marshal.ReadStructure<CK_VERSION>(ptr);
-            Assert.Equal(3, rt.Major[0]);
-            Assert.Equal(2, rt.Minor[0]);
+            Assert.Equal(3, rt.Major);
+            Assert.Equal(2, rt.Minor);
         }
         finally { Marshal.FreeHGlobal(ptr); }
     }
@@ -41,14 +41,11 @@ public sealed class Pkcs11MarshalTests
     [Fact]
     public void RoundTrip_CK_INFO_ThroughWriteRead()
     {
-        // Pre-populate the byte arrays — Marshal will reject null inline arrays.
         var src = new CK_INFO
         {
-            CryptokiVersion = new CK_VERSION { Major = [3], Minor = [2] },
-            ManufacturerId = new byte[32],
+            CryptokiVersion = new CK_VERSION { Major = 3, Minor = 2 },
             Flags = default,
-            LibraryDescription = new byte[32],
-            LibraryVersion = new CK_VERSION { Major = [1], Minor = [0] },
+            LibraryVersion = new CK_VERSION { Major = 1, Minor = 0 },
         };
         for (int i = 0; i < 32; i++) src.ManufacturerId[i] = (byte)'A';
 
@@ -58,8 +55,8 @@ public sealed class Pkcs11MarshalTests
         {
             Pkcs11Marshal.WriteStructure(ptr, src);
             var rt = Pkcs11Marshal.ReadStructure<CK_INFO>(ptr);
-            Assert.Equal(3, rt.CryptokiVersion.Major[0]);
-            Assert.Equal(2, rt.CryptokiVersion.Minor[0]);
+            Assert.Equal(3, rt.CryptokiVersion.Major);
+            Assert.Equal(2, rt.CryptokiVersion.Minor);
             Assert.Equal((byte)'A', rt.ManufacturerId[0]);
             Assert.Equal((byte)'A', rt.ManufacturerId[31]);
         }

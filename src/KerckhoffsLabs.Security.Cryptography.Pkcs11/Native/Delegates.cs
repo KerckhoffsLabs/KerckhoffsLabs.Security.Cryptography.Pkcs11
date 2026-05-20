@@ -1588,7 +1588,7 @@ internal partial class Delegates
         // CK_FUNCTION_LIST_3_0 (v3.0+). The CK_VERSION header at offset 0 distinguishes
         // them. Read just the version first to decide.
         CK_VERSION version = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
-        if (version.Major is null || version.Major.Length == 0 || version.Major[0] < 3) return false;
+        if (version.Major < 3) return false;
 
         CK_FUNCTION_LIST_3_0 v30 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(iface.FunctionList);
 
@@ -1655,7 +1655,7 @@ internal partial class Delegates
 
         // v3.2 token: re-read the function table as CK_FUNCTION_LIST_3_2 and bind
         // the 12 v3.2 additions on top of the v3.0 bindings.
-        if (version.Minor is not null && version.Minor.Length > 0 && version.Minor[0] >= 2)
+        if (version.Minor >= 2)
         {
             CK_FUNCTION_LIST_3_2 v32 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(iface.FunctionList);
 

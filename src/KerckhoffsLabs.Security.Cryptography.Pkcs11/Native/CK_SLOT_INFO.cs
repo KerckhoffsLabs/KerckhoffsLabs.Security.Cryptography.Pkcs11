@@ -10,16 +10,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal partial struct CK_SLOT_INFO
 {
     /// <summary>
-    /// Character-string description of the slot. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// Character-string description of the slot. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-    public byte[] SlotDescription;
+    public CkChar64 SlotDescription;
 
     /// <summary>
-    /// ID of the slot manufacturer. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// ID of the slot manufacturer. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-    public byte[] ManufacturerId;
+    public CkChar32 ManufacturerId;
 
     /// <summary>
     /// Bits flags that provide capabilities of the slot.

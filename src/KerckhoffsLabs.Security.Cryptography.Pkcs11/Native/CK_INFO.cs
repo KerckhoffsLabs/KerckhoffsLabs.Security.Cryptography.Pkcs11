@@ -15,10 +15,9 @@ internal partial struct CK_INFO
     public CK_VERSION CryptokiVersion;
 
     /// <summary>
-    /// ID of the Cryptoki library manufacturer. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// ID of the Cryptoki library manufacturer. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-    public byte[] ManufacturerId;
+    public CkChar32 ManufacturerId;
 
     /// <summary>
     /// Bit flags reserved for future versions. Must be zero for this version
@@ -26,10 +25,9 @@ internal partial struct CK_INFO
     public NativeCULong Flags;
 
     /// <summary>
-    /// Character-string description of the library. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// Character-string description of the library. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-    public byte[] LibraryDescription;
+    public CkChar32 LibraryDescription;
 
     /// <summary>
     /// Cryptoki library version number

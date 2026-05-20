@@ -10,28 +10,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal partial struct CK_TOKEN_INFO
 {
     /// <summary>
-    /// Application-defined label, assigned during token initialization. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// Application-defined label, assigned during token initialization. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-    public byte[] Label;
+    public CkChar32 Label;
 
     /// <summary>
-    /// ID of the device manufacturer. Must be padded with the blank character (‘ ‘). Should not be nullterminated.
+    /// ID of the device manufacturer. Must be padded with the blank character (' '). Should not be nullterminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
-    public byte[] ManufacturerId;
+    public CkChar32 ManufacturerId;
 
     /// <summary>
-    /// Model of the device. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// Model of the device. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] Model;
+    public CkChar16 Model;
 
     /// <summary>
-    /// Character-string serial number of the device. Must be padded with the blank character (‘ ‘). Should not be null-terminated.
+    /// Character-string serial number of the device. Must be padded with the blank character (' '). Should not be null-terminated.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] SerialNumber;
+    public CkChar16 SerialNumber;
 
     /// <summary>
     /// Bit flags indicating capabilities and status of the device
@@ -99,8 +95,7 @@ internal partial struct CK_TOKEN_INFO
     public CK_VERSION FirmwareVersion;
 
     /// <summary>
-    /// Current time as a character-string of length 16, represented in the format YYYYMMDDhhmmssxx (4 characters for the year; 2 characters each for the month, the day, the hour, the minute, and the second; and 2 additional reserved ‘0' characters). The value of this field only makes sense for tokens equipped with a clock, as indicated in the token information flags.
+    /// Current time as a character-string of length 16, represented in the format YYYYMMDDhhmmssxx (4 characters for the year; 2 characters each for the month, the day, the hour, the minute, and the second; and 2 additional reserved '0' characters). The value of this field only makes sense for tokens equipped with a clock, as indicated in the token information flags.
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] UtcTime;
+    public CkChar16 UtcTime;
 }

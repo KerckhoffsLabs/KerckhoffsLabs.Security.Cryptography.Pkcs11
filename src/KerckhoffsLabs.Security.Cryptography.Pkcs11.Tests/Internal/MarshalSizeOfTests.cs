@@ -161,7 +161,6 @@ public sealed class MarshalSizeOfTests
     [InlineData("CK_SESSION_INFO_Windows", 32)]
     [InlineData("CK_SLOT_INFO_Windows", 108)]
     [InlineData("CK_TOKEN_INFO_Windows", 204)]
-    [InlineData("CK_VERSION_Windows", 2)]
     [InlineData("CK_AES_CBC_ENCRYPT_DATA_PARAMS_Windows", 32)]
     [InlineData("CK_AES_CTR_PARAMS_Windows", 24)]
     [InlineData("CK_ARIA_CBC_ENCRYPT_DATA_PARAMS_Windows", 32)]
