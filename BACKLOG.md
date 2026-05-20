@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 12 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 10 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -392,6 +392,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-029] No automated versioning — `<Version>0.1.0</Version>` is a literal
 
+- **Status: Resolved (2026-05-20)** — Done differently from the proposed MinVer approach: `.github/workflows/publish.yml` triggers on `v*` tags, checks out with `fetch-depth: 0`, derives `VERSION=${GITHUB_REF_NAME#v}` from the tag, and packs with `/p:Version=$VERSION`. Tagged releases now pack the tag's version instead of a hardcoded literal. The csproj keeps `<Version>0.0.0</Version>` as the local/untagged-build default (overridden on release). MinVer was not adopted — the CI-injected version is sufficient and avoids the extra build-time dependency; revisit MinVer only if meaningful versions for local/dev builds become a requirement.
 - **Area:** Release Eng
 - **Severity:** High
 - **Effort:** M
@@ -404,6 +405,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-030] CI `pack` job uploads artifacts but never publishes to NuGet.org
 
+- **Status: Resolved (2026-05-20)** — A dedicated `.github/workflows/publish.yml` (triggered on `v*` tags) now builds, tests, packs the tag-derived version, and runs `dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json`. Goes beyond the proposed action: uses NuGet **OIDC trusted publishing** (`nuget/login` + `id-token: write`) instead of a long-lived `NUGET_API_KEY` secret, and attaches build provenance via `actions/attest-build-provenance`. `dotnet nuget push *.nupkg` auto-detects and pushes the adjacent `.snupkg` symbol package when symbol generation is enabled.
 - **Area:** Release Eng
 - **Severity:** High
 - **Effort:** S
