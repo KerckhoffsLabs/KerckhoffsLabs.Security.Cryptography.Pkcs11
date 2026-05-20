@@ -694,14 +694,14 @@ internal sealed partial class Pkcs11Session
             case CKM.CKM_CAST3_MAC:
             case CKM.CKM_CAST3_MAC_GENERAL:
             case CKM.CKM_CAST3_KEY_GEN:
-            // CKM_CAST128_* are aliases of CKM_CAST5_* (identical enum values), so the
-            // CAST5 labels below also match CAST128 calls.
-            case CKM.CKM_CAST5_ECB:
-            case CKM.CKM_CAST5_CBC:
-            case CKM.CKM_CAST5_CBC_PAD:
-            case CKM.CKM_CAST5_MAC:
-            case CKM.CKM_CAST5_MAC_GENERAL:
-            case CKM.CKM_CAST5_KEY_GEN:
+            // CKM_CAST5_* are the old names for CKM_CAST128_* (identical enum values), so the
+            // CAST128 labels below also match CAST5 calls.
+            case CKM.CKM_CAST128_ECB:
+            case CKM.CKM_CAST128_CBC:
+            case CKM.CKM_CAST128_CBC_PAD:
+            case CKM.CKM_CAST128_MAC:
+            case CKM.CKM_CAST128_MAC_GENERAL:
+            case CKM.CKM_CAST128_KEY_GEN:
                 throw new InsecureOperationException(mechanism,
                     "CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
             case CKM.CKM_RC5_ECB:

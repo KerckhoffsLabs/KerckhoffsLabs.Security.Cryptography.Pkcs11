@@ -289,7 +289,7 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_RC4)]       // broken stream cipher
     [InlineData((ulong)CKM.CKM_RC2_CBC)]   // deprecated cipher
     [InlineData((ulong)CKM.CKM_SEED_CBC)]  // legacy cipher
-    [InlineData((ulong)CKM.CKM_CAST5_CBC)]      // legacy 64-bit-block cipher
+    [InlineData((ulong)CKM.CKM_CAST128_CBC)]      // legacy 64-bit-block cipher
     [InlineData((ulong)CKM.CKM_RC5_CBC)]        // legacy 64-bit-block cipher
     [InlineData((ulong)CKM.CKM_BLOWFISH_CBC)]   // legacy 64-bit-block cipher
     [InlineData((ulong)CKM.CKM_SKIPJACK_CBC64)] // withdrawn cipher
@@ -356,7 +356,7 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_RC4_KEY_GEN)]   // broken cipher key-gen
     [InlineData((ulong)CKM.CKM_RC2_KEY_GEN)]   // deprecated cipher key-gen
     [InlineData((ulong)CKM.CKM_SEED_KEY_GEN)]  // legacy cipher key-gen
-    [InlineData((ulong)CKM.CKM_CAST5_KEY_GEN)]    // legacy 64-bit-block cipher
+    [InlineData((ulong)CKM.CKM_CAST128_KEY_GEN)]    // legacy 64-bit-block cipher
     [InlineData((ulong)CKM.CKM_RC5_KEY_GEN)]      // legacy 64-bit-block cipher
     [InlineData((ulong)CKM.CKM_BLOWFISH_KEY_GEN)] // legacy 64-bit-block cipher
     [InlineData((ulong)CKM.CKM_SKIPJACK_KEY_GEN)] // withdrawn cipher
