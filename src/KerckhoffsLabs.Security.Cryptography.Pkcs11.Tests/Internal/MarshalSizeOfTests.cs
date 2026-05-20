@@ -1,9 +1,6 @@
-using System;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
-using Microsoft.DotNet.XUnitExtensions;
-using Xunit;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
 
