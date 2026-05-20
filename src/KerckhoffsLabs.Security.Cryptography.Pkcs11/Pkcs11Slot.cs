@@ -22,12 +22,12 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private ILowLevelPkcs11Library _pkcs11Library = null;
+    private readonly ILowLevelPkcs11Library _pkcs11Library;
 
     /// <summary>
     /// PKCS#11 handle of slot
     /// </summary>
-    private NativeCULong _slotId = new(0);
+    private readonly NativeCULong _slotId = new(0);
 
     /// <summary>
     /// PKCS#11 handle of slot

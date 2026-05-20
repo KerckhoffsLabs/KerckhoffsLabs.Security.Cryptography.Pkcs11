@@ -51,7 +51,8 @@ public sealed class HMACPkcs11 : HMAC
         ArgumentNullException.ThrowIfNull(key);
         _key = key;
         _hashAlgorithm = hashAlgorithm;
-        HashName = hashAlgorithm.Name;
+        HashName = hashAlgorithm.Name
+            ?? throw new NotSupportedException("HMAC requires a named hash algorithm (SHA1, SHA256, SHA384, or SHA512).");
         HashSizeValue = HashSizeFromName(hashAlgorithm) * 8;
     }
 

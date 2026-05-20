@@ -223,7 +223,7 @@ internal partial class Delegates
     internal unsafe bool HasC_GetSessionInfo_Windows => _fp.C_GetSessionInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_GetOperationState</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetOperationState(NativeCULong session, byte[] operationState, ref NativeCULong operationStateLen)
+    public unsafe NativeCULong C_GetOperationState(NativeCULong session, byte[]? operationState, ref NativeCULong operationStateLen)
     {
         if (_fp.C_GetOperationState is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetOperationState");
@@ -343,7 +343,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Encrypt</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] encryptedData, ref NativeCULong encryptedDataLen)
+    public unsafe NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? encryptedData, ref NativeCULong encryptedDataLen)
     {
         if (_fp.C_Encrypt is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Encrypt");
@@ -365,7 +365,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_EncryptFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_EncryptFinal(NativeCULong session, byte[] lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
+    public unsafe NativeCULong C_EncryptFinal(NativeCULong session, byte[]? lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
     {
         if (_fp.C_EncryptFinal is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptFinal");
@@ -382,7 +382,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Decrypt</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[] data, ref NativeCULong dataLen)
+    public unsafe NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[]? data, ref NativeCULong dataLen)
     {
         if (_fp.C_Decrypt is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Decrypt");
@@ -404,7 +404,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DecryptFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DecryptFinal(NativeCULong session, byte[] lastPart, ref NativeCULong lastPartLen)
+    public unsafe NativeCULong C_DecryptFinal(NativeCULong session, byte[]? lastPart, ref NativeCULong lastPartLen)
     {
         if (_fp.C_DecryptFinal is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptFinal");
@@ -421,7 +421,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Digest</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] digest, ref NativeCULong digestLen)
+    public unsafe NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? digest, ref NativeCULong digestLen)
     {
         if (_fp.C_Digest is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Digest");
@@ -449,7 +449,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DigestFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DigestFinal(NativeCULong session, byte[] digest, ref NativeCULong digestLen)
+    public unsafe NativeCULong C_DigestFinal(NativeCULong session, byte[]? digest, ref NativeCULong digestLen)
     {
         if (_fp.C_DigestFinal is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestFinal");
@@ -466,7 +466,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Sign</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
         if (_fp.C_Sign is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Sign");
@@ -486,7 +486,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SignFinal(NativeCULong session, byte[] signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignFinal(NativeCULong session, byte[]? signature, ref NativeCULong signatureLen)
     {
         if (_fp.C_SignFinal is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignFinal");
@@ -503,7 +503,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignRecover</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
         if (_fp.C_SignRecover is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignRecover");
@@ -556,7 +556,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_VerifyRecover</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[] data, ref NativeCULong dataLen)
+    public unsafe NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[]? data, ref NativeCULong dataLen)
     {
         if (_fp.C_VerifyRecover is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyRecover");
@@ -636,7 +636,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_WrapKey</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    public unsafe NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
     {
         if (_fp.C_WrapKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKey");
         fixed (CK_MECHANISM* m = &mechanism)
@@ -929,7 +929,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
         if (_fp.C_SignMessage is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessage");
@@ -948,7 +948,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
         if (_fp.C_SignMessageNext is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessageNext");
@@ -1122,7 +1122,7 @@ internal partial class Delegates
     internal unsafe bool HasC_AsyncJoin => _fp.C_AsyncJoin is not null;
 
     /// <summary>Wrapper for <c>C_WrapKeyAuthenticated</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    public unsafe NativeCULong C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
     {
         if (_fp.C_WrapKeyAuthenticated is null)
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKeyAuthenticated");
@@ -1268,7 +1268,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_WrapKey</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_WrapKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    public unsafe NativeCULong C_WrapKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
     {
         if (_fp.C_WrapKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKey_Windows");
         fixed (CK_MECHANISM_Windows* m = &mechanism)
@@ -1368,7 +1368,7 @@ internal partial class Delegates
     }
 
     /// <summary>Wrapper for <c>C_WrapKeyAuthenticated</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_WrapKeyAuthenticated_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[] wrappedKey, ref NativeCULong wrappedKeyLen)
+    public unsafe NativeCULong C_WrapKeyAuthenticated_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
     {
         if (_fp.C_WrapKeyAuthenticated_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKeyAuthenticated_Windows");
         fixed (CK_MECHANISM_Windows* m = &mechanism)

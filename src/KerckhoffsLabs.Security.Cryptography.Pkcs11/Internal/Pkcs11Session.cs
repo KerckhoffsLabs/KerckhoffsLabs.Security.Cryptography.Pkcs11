@@ -27,7 +27,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private ILowLevelPkcs11Library _pkcs11Library = null;
+    private ILowLevelPkcs11Library _pkcs11Library;
 
     /// <summary>
     /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
