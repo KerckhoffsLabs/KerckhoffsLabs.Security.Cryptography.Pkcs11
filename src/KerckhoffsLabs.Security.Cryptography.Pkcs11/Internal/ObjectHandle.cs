@@ -16,7 +16,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// equality and no heap allocation.
 /// </para>
 /// <para>
-/// Instances are produced exclusively by <see cref="Session"/> factory methods
+/// Instances are produced exclusively by <see cref="Pkcs11Session"/> factory methods
 /// (<c>FindObjects</c>, <c>GenerateKey</c>, <c>GenerateKeyPair</c>, <c>CreateObject</c>,
 /// <c>DeriveKey</c>, <c>UnwrapKey</c>). The constructor is <c>internal</c> so external
 /// code cannot fabricate a handle with an arbitrary <see cref="ObjectId"/> and feed it
