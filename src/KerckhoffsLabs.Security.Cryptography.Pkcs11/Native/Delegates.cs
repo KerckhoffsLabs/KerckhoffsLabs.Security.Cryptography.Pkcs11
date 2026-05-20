@@ -1438,7 +1438,23 @@ internal partial class Delegates
         }
         else
         {
+            // Statically-linked module (iOS / Native AOT): bind the v2.40 surface via the
+            // __Internal C_GetFunctionList bootstrap.
             InitializeWithGetFunctionList();
+
+            // Then attempt the v3.0/v3.2 surface against the process's own symbol table.
+            // GetMainProgramHandle() resolves statically-linked exports, and TryGetExport
+            // (used inside TryLoadV30Symbols) returns false — no throw, no link-time symbol
+            // requirement — for functions a v2.40-only module doesn't provide, so we degrade
+            // gracefully instead of silently skipping v3.0 as before.
+            try
+            {
+                TryLoadV30Symbols(NativeLibrary.GetMainProgramHandle());
+            }
+            catch
+            {
+                // Process-global symbol resolution unavailable on this platform; remain v2.40-only.
+            }
         }
     }
 

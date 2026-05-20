@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 16 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 15 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -178,6 +178,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-012] Static-link path skips v3.0/v3.2 surface entirely
 
+- **Status: Resolved (2026-05-20)** — The static-link constructor branch (`Delegates(IntPtr.Zero)`) now runs the same v3.0/v3.2 binding logic as the dynamic path. After the `__Internal` `C_GetFunctionList` v2.40 bootstrap, it calls `TryLoadV30Symbols(NativeLibrary.GetMainProgramHandle())`. `GetMainProgramHandle()` (.NET 8+) resolves statically-linked / process-global exports, and the `NativeLibrary.TryGetExport` calls inside `TryLoadV30Symbols` / `TryLoadFromGetInterface` return `false` (no throw, no link-time symbol requirement) for functions a v2.40-only module doesn't provide — so v3.2 modules now bind `EncapsulateKey` / `SessionCancel` / message-AEAD, while v2.40-only modules degrade gracefully. The call is wrapped in try/catch so a platform without process-global symbol resolution stays v2.40-only rather than failing construction. This is cleaner than the originally-proposed `[DllImport("__Internal")] C_GetInterface`, which would impose an AOT link-time unresolved-symbol requirement on v2.40-only static modules. **Not exercised by the test suite** — the suite (and AOT smoke) use the dynamic-load path; the static-link branch needs an actual statically-linked PKCS#11 module to validate end-to-end. Build stays AOT-clean and the AOT smoke binary still runs.
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** M
