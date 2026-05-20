@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 15 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 15 | **Medium:** 17 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -706,6 +706,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-057] Missing `global.json`, `--locked-mode` restore, `coverlet` collection
 
+- **Status: Resolved (2026-05-20)** — All three addressed: (1) Added `global.json` at the repo root pinning the SDK to the .NET 10 band (`version: 10.0.100`, `rollForward: latestFeature`) so the build no longer floats across installed SDKs while still picking up patch/feature updates within net10. (2) Every `dotnet restore` in the CI workflows now passes `--locked-mode` (`ci.yml` lint + build-and-test, `coverage.yml`) — `packages.lock.json` is enforced. (3) `coverlet.collector` is now exercised: `coverage.yml` runs `dotnet test --collect:"XPlat Code Coverage"` and uploads to Codecov. `<LangVersion>latest</LangVersion>` is kept intentionally (per CLAUDE.md) but is now deterministic, bounded by the pinned SDK band.
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
