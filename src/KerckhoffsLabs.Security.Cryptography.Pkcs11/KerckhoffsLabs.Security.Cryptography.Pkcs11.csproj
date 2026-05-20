@@ -20,6 +20,7 @@
     <Version>0.0.0</Version>
     <Authors>KerckhoffsLabs and contributors</Authors>
     <Description>Modern, secure-by-default PKCS#11 v3.2 interop for .NET.</Description>
+    <PackageTags>pkcs11;hsm;cryptography;pkcs11v3;pqc;ml-dsa;ml-kem</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>

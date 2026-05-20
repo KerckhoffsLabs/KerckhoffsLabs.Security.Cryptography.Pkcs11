@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 15 | **Medium:** 17 | **Low:** 5
+- **Critical:** 0 | **High:** 15 | **Medium:** 17 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -696,6 +696,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-056] NuGet `<Description>` says v3.1 — codebase is v3.2
 
+- **Status: Resolved (2026-05-20)** — `<Description>` corrected to "PKCS#11 v3.2" and the README headline updated to match (both landed in the metadata-tidy / README commits). Added `<PackageTags>pkcs11;hsm;cryptography;pkcs11v3;pqc;ml-dsa;ml-kem</PackageTags>` for discoverability. The remaining `v3.1` mentions in source are accurate spec citations (HSS/LMS, `C_GetTokenInfo` locking, optional `CKA_EC_POINT`) — features genuinely introduced in PKCS#11 v3.1 — not version claims, so they stay.
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
