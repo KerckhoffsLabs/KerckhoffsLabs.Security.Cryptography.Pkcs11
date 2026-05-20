@@ -29,16 +29,12 @@ internal partial class Delegates
         /// then resolves all 67 other cryptoki functions through that table — no
         /// further <c>DllImport</c> declarations are needed.
         /// </summary>
-        // SYSLIB1054 (prefer LibraryImport) is intentionally suppressed: LibraryImport's
-        // source generator cannot marshal the NativeCULong return type without applying
-        // [assembly: DisableRuntimeMarshalling], which would change marshalling semantics
-        // for the entire interop assembly. This single static-link bootstrap import is
-        // already AOT-clean under classic DllImport (no IL2026/IL3050), so the suggested
-        // migration carries broad risk for no benefit.
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Interoperability", "SYSLIB1054",
-            Justification = "NativeCULong return needs runtime marshalling; LibraryImport would require assembly-wide DisableRuntimeMarshalling.")]
-        [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeCULong C_GetFunctionList(out IntPtr functionList);
+        // Source-generated P/Invoke. Viable because [assembly: DisableRuntimeMarshalling]
+        // (see AssemblyAttributes.cs) lets LibraryImport marshal the blittable NativeCULong
+        // return + out IntPtr without runtime marshalling.
+        [LibraryImport("__Internal")]
+        [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+        internal static partial NativeCULong C_GetFunctionList(out IntPtr functionList);
     }
 
     /// <summary>Wrapper for <c>C_Initialize</c>. Matches the prior delegate signature exactly.</summary>
