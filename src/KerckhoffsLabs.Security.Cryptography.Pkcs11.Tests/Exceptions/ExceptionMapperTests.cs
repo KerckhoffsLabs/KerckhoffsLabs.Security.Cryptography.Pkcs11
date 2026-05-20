@@ -9,17 +9,17 @@ public class ExceptionMapperTests
     public static IEnumerable<object[]> AuthenticationCases() => new[]
     {
         new object[] { CKR.CKR_PIN_INCORRECT },
-        new object[] { CKR.CKR_PIN_INVALID },
-        new object[] { CKR.CKR_PIN_LEN_RANGE },
-        new object[] { CKR.CKR_PIN_EXPIRED },
-        new object[] { CKR.CKR_PIN_LOCKED },
-        new object[] { CKR.CKR_PIN_TOO_WEAK },
-        new object[] { CKR.CKR_USER_ALREADY_LOGGED_IN },
-        new object[] { CKR.CKR_USER_NOT_LOGGED_IN },
-        new object[] { CKR.CKR_USER_PIN_NOT_INITIALIZED },
-        new object[] { CKR.CKR_USER_TYPE_INVALID },
-        new object[] { CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN },
-        new object[] { CKR.CKR_USER_TOO_MANY_TYPES },
+        [CKR.CKR_PIN_INVALID],
+        [CKR.CKR_PIN_LEN_RANGE],
+        [CKR.CKR_PIN_EXPIRED],
+        [CKR.CKR_PIN_LOCKED],
+        [CKR.CKR_PIN_TOO_WEAK],
+        [CKR.CKR_USER_ALREADY_LOGGED_IN],
+        [CKR.CKR_USER_NOT_LOGGED_IN],
+        [CKR.CKR_USER_PIN_NOT_INITIALIZED],
+        [CKR.CKR_USER_TYPE_INVALID],
+        [CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN],
+        [CKR.CKR_USER_TOO_MANY_TYPES],
     };
 
     [Theory]
@@ -36,13 +36,13 @@ public class ExceptionMapperTests
     public static IEnumerable<object[]> SessionCases() => new[]
     {
         new object[] { CKR.CKR_SESSION_CLOSED },
-        new object[] { CKR.CKR_SESSION_COUNT },
-        new object[] { CKR.CKR_SESSION_HANDLE_INVALID },
-        new object[] { CKR.CKR_SESSION_PARALLEL_NOT_SUPPORTED },
-        new object[] { CKR.CKR_SESSION_READ_ONLY },
-        new object[] { CKR.CKR_SESSION_EXISTS },
-        new object[] { CKR.CKR_SESSION_READ_ONLY_EXISTS },
-        new object[] { CKR.CKR_SESSION_READ_WRITE_SO_EXISTS },
+        [CKR.CKR_SESSION_COUNT],
+        [CKR.CKR_SESSION_HANDLE_INVALID],
+        [CKR.CKR_SESSION_PARALLEL_NOT_SUPPORTED],
+        [CKR.CKR_SESSION_READ_ONLY],
+        [CKR.CKR_SESSION_EXISTS],
+        [CKR.CKR_SESSION_READ_ONLY_EXISTS],
+        [CKR.CKR_SESSION_READ_WRITE_SO_EXISTS],
     };
 
     [Theory]
@@ -53,12 +53,12 @@ public class ExceptionMapperTests
     public static IEnumerable<object[]> TokenCases() => new[]
     {
         new object[] { CKR.CKR_TOKEN_NOT_PRESENT },
-        new object[] { CKR.CKR_TOKEN_NOT_RECOGNIZED },
-        new object[] { CKR.CKR_TOKEN_WRITE_PROTECTED },
-        new object[] { CKR.CKR_TOKEN_RESOURCE_EXCEEDED },
-        new object[] { CKR.CKR_DEVICE_ERROR },
-        new object[] { CKR.CKR_DEVICE_MEMORY },
-        new object[] { CKR.CKR_DEVICE_REMOVED },
+        [CKR.CKR_TOKEN_NOT_RECOGNIZED],
+        [CKR.CKR_TOKEN_WRITE_PROTECTED],
+        [CKR.CKR_TOKEN_RESOURCE_EXCEEDED],
+        [CKR.CKR_DEVICE_ERROR],
+        [CKR.CKR_DEVICE_MEMORY],
+        [CKR.CKR_DEVICE_REMOVED],
     };
 
     [Theory]
@@ -69,8 +69,8 @@ public class ExceptionMapperTests
     public static IEnumerable<object[]> MechanismCases() => new[]
     {
         new object[] { CKR.CKR_MECHANISM_INVALID },
-        new object[] { CKR.CKR_MECHANISM_PARAM_INVALID },
-        new object[] { CKR.CKR_KEY_FUNCTION_NOT_PERMITTED },
+        [CKR.CKR_MECHANISM_PARAM_INVALID],
+        [CKR.CKR_KEY_FUNCTION_NOT_PERMITTED],
     };
 
     [Theory]
@@ -81,10 +81,10 @@ public class ExceptionMapperTests
     public static IEnumerable<object[]> ObjectCases() => new[]
     {
         new object[] { CKR.CKR_OBJECT_HANDLE_INVALID },
-        new object[] { CKR.CKR_ATTRIBUTE_READ_ONLY },
-        new object[] { CKR.CKR_ATTRIBUTE_SENSITIVE },
-        new object[] { CKR.CKR_ATTRIBUTE_TYPE_INVALID },
-        new object[] { CKR.CKR_ATTRIBUTE_VALUE_INVALID },
+        [CKR.CKR_ATTRIBUTE_READ_ONLY],
+        [CKR.CKR_ATTRIBUTE_SENSITIVE],
+        [CKR.CKR_ATTRIBUTE_TYPE_INVALID],
+        [CKR.CKR_ATTRIBUTE_VALUE_INVALID],
     };
 
     [Theory]
@@ -95,9 +95,9 @@ public class ExceptionMapperTests
     public static IEnumerable<object[]> ArgumentCases() => new[]
     {
         new object[] { CKR.CKR_ARGUMENTS_BAD },
-        new object[] { CKR.CKR_DATA_INVALID },
-        new object[] { CKR.CKR_DATA_LEN_RANGE },
-        new object[] { CKR.CKR_BUFFER_TOO_SMALL },
+        [CKR.CKR_DATA_INVALID],
+        [CKR.CKR_DATA_LEN_RANGE],
+        [CKR.CKR_BUFFER_TOO_SMALL],
     };
 
     [Theory]

@@ -129,7 +129,7 @@ internal sealed partial class Pkcs11Session
         if (attributes.Count < 1)
             throw new ArgumentException("No attributes specified", "attributes");
 
-        List<ulong> ulongs = new List<ulong>();
+        List<ulong> ulongs = [];
         foreach (CKA attribute in attributes)
             ulongs.Add((ulong)attribute.ToCULong());
 
@@ -235,7 +235,7 @@ internal sealed partial class Pkcs11Session
         }
 
         // Convert CK_ATTRIBUTEs to ObjectAttributes
-        List<ObjectAttribute> outAttributes = new List<ObjectAttribute>();
+        List<ObjectAttribute> outAttributes = [];
         for (int i = 0; i < template.Length; i++)
             outAttributes.Add(new ObjectAttribute(template[i]));
 
@@ -306,7 +306,7 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::FindObjects", _sessionId);
 
-        List<ObjectHandle> foundObjects = new List<ObjectHandle>();
+        List<ObjectHandle> foundObjects = [];
 
         NativeCULong[] objects = new NativeCULong[objectCount];
         NativeCULong foundObjectsCount = (NativeCULong)0;
@@ -345,7 +345,7 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::FindAllObjects", _sessionId);
 
-        List<ObjectHandle> foundObjects = new List<ObjectHandle>();
+        List<ObjectHandle> foundObjects = [];
 
         CK_ATTRIBUTE[] template = null;
         NativeCULong templateLength = (NativeCULong)0;

@@ -71,7 +71,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm
     {
         string label = $"ec-prov-{Guid.NewGuid():N}";
         byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
-        byte[] p256Oid = { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
+        byte[] p256Oid = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Label(label).Id(id).Verify().EcParams(p256Oid).Build();

@@ -18,8 +18,8 @@ internal static class DeriveSharedSecretEcdhTestCases
             try
             {
                 // Extract each peer's public point (CKA_EC_POINT is a DER-encoded OCTET STRING).
-                var aliceAttrs = session.GetAttributeValue(alicePub, new List<CKA> { CKA.CKA_EC_POINT });
-                var bobAttrs = session.GetAttributeValue(bobPub, new List<CKA> { CKA.CKA_EC_POINT });
+                var aliceAttrs = session.GetAttributeValue(alicePub, [CKA.CKA_EC_POINT]);
+                var bobAttrs = session.GetAttributeValue(bobPub, [CKA.CKA_EC_POINT]);
                 byte[] alicePoint;
                 byte[] bobPoint;
                 try

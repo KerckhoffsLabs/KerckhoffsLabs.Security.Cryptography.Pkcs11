@@ -187,11 +187,11 @@ public sealed class RSAPkcs11 : RSA
         if (!_key.PublicHandle.IsInvalid)
         {
             var session = _key.Workspace.Session;
-            var attrs = session.GetAttributeValue(_key.PublicHandle, new List<CKA>
-            {
+            var attrs = session.GetAttributeValue(_key.PublicHandle,
+            [
                 CKA.CKA_MODULUS,
                 CKA.CKA_PUBLIC_EXPONENT,
-            });
+            ]);
             try
             {
                 if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)

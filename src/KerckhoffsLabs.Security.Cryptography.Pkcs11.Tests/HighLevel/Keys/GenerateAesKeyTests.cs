@@ -32,7 +32,7 @@ internal static class GenerateAesKeyTestCases
             try
             {
                 Assert.NotEqual(0UL, key.ObjectId);
-                var attrs = session.GetAttributeValue(key, new List<CKA> { CKA.CKA_VALUE_LEN });
+                var attrs = session.GetAttributeValue(key, [CKA.CKA_VALUE_LEN]);
                 try
                 {
                     Assert.Single(attrs);

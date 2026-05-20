@@ -81,7 +81,7 @@ public sealed class Pkcs11WorkspaceFindKeysTests_SoftHsm
 
         using (var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label(label).ValueLen(32).OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), template.Attributes.ToList());
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. template.Attributes]);
         }
 
         try

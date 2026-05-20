@@ -74,7 +74,7 @@ internal static class TestKeys
         using var pubEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
         using var pubWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
         using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)2048);
-        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, [0x01, 0x00, 0x01]);
 
         using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
         using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
@@ -105,7 +105,7 @@ internal static class TestKeys
         using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
         using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)2048);
-        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, [0x01, 0x00, 0x01]);
 
         using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
         using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
@@ -130,7 +130,7 @@ internal static class TestKeys
 
         // DER-encoded ASN.1 OID for prime256v1 (1.2.840.10045.3.1.7):
         // 06 08 2A 86 48 CE 3D 03 01 07
-        byte[] p256Params = new byte[] { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 };
+        byte[] p256Params = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
@@ -161,7 +161,7 @@ internal static class TestKeys
 
         // DER-encoded ASN.1 OID for id-Ed25519 (1.3.101.112):
         // 06 03 2B 65 70
-        byte[] ed25519Params = new byte[] { 0x06, 0x03, 0x2B, 0x65, 0x70 };
+        byte[] ed25519Params = [0x06, 0x03, 0x2B, 0x65, 0x70];
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
@@ -192,7 +192,7 @@ internal static class TestKeys
 
         // DER-encoded ASN.1 OID for id-Ed448 (1.3.101.113):
         // 06 03 2B 65 71
-        byte[] ed448Params = new byte[] { 0x06, 0x03, 0x2B, 0x65, 0x71 };
+        byte[] ed448Params = [0x06, 0x03, 0x2B, 0x65, 0x71];
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);

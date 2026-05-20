@@ -29,7 +29,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm
         string label = $"chacha-{Guid.NewGuid():N}";
         using var t = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build();
-        workspace.Session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t.Attributes.ToList());
+        workspace.Session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), [.. t.Attributes]);
         return label;
     }
 

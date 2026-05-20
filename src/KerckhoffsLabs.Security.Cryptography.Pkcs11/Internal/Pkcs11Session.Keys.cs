@@ -266,7 +266,7 @@ internal sealed partial class Pkcs11Session
         using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
         using var pubWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
         using var pubModBits = new ObjectAttribute(CKA.CKA_MODULUS_BITS, (ulong)modulusBits);
-        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, new byte[] { 0x01, 0x00, 0x01 });
+        using var pubExp = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, [0x01, 0x00, 0x01]);
         using var pubModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
 
         using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
@@ -312,11 +312,11 @@ internal sealed partial class Pkcs11Session
         byte[] ecParams = curve switch
         {
             // prime256v1 (P-256): 1.2.840.10045.3.1.7
-            EcCurve.P256 => new byte[] { 0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07 },
+            EcCurve.P256 => [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07],
             // secp384r1 (P-384): 1.3.132.0.34
-            EcCurve.P384 => new byte[] { 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22 },
+            EcCurve.P384 => [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22],
             // secp521r1 (P-521): 1.3.132.0.35
-            EcCurve.P521 => new byte[] { 0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23 },
+            EcCurve.P521 => [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23],
             _ => throw new ArgumentOutOfRangeException(nameof(curve), $"Unsupported curve: {curve}."),
         };
 

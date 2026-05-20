@@ -14,7 +14,7 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     // Dictionary keyed by CKA so "last write wins" replaces an earlier attribute rather
     // than appending — matches PKCS#11 v3.1 §5.5.6 semantics. We own the ObjectAttribute
     // values and must dispose the displaced one on replacement.
-    private readonly Dictionary<CKA, ObjectAttribute> _attributes = new();
+    private readonly Dictionary<CKA, ObjectAttribute> _attributes = [];
     private bool _built;
     private bool _disposed;
 

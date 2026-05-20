@@ -20,11 +20,11 @@ internal static class Pkcs11PublicKeyView
     /// </summary>
     internal static RSAParameters? TrySynthesizeRsa(Pkcs11Session session, ObjectHandle privateHandle)
     {
-        var attrs = session.GetAttributeValue(privateHandle, new List<CKA>
-        {
+        var attrs = session.GetAttributeValue(privateHandle,
+        [
             CKA.CKA_MODULUS,
             CKA.CKA_PUBLIC_EXPONENT,
-        });
+        ]);
 
         try
         {
@@ -51,11 +51,11 @@ internal static class Pkcs11PublicKeyView
     /// </summary>
     internal static ECParameters? TrySynthesizeEc(Pkcs11Session session, ObjectHandle privateHandle)
     {
-        var attrs = session.GetAttributeValue(privateHandle, new List<CKA>
-        {
+        var attrs = session.GetAttributeValue(privateHandle,
+        [
             CKA.CKA_EC_POINT,
             CKA.CKA_EC_PARAMS,
-        });
+        ]);
 
         try
         {

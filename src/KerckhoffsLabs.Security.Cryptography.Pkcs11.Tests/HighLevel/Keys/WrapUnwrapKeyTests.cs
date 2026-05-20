@@ -33,7 +33,7 @@ internal static class WrapUnwrapKeyTestCases
             try
             {
                 // Encrypt a known plaintext with the original data key.
-                byte[] iv = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+                byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
                 byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a wrap round-trip plaintext");
                 byte[] ciphertext = session.EncryptAesGcm(dataKey, iv, plaintext);
 

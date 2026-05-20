@@ -50,7 +50,7 @@ public class SpanOverloadSmokeTests
     [Fact]
     public void ObjectAttribute_DoubleDisposeIsSafe()
     {
-        var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+        var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
         attr.Dispose();
         attr.Dispose(); // must not throw
     }
@@ -58,7 +58,7 @@ public class SpanOverloadSmokeTests
     [Fact]
     public void ObjectAttribute_PostDisposeAccess_Throws()
     {
-        var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+        var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
         attr.Dispose();
         Assert.Throws<ObjectDisposedException>(() => attr.GetValueAsByteArray());
     }

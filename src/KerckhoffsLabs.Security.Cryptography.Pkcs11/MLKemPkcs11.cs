@@ -72,7 +72,7 @@ public sealed class MLKemPkcs11 : MLKem
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
 
         var (ct, sharedHandle) = session.EncapsulateKey(
-            mech, _key.PublicHandle, template.Attributes.ToList());
+            mech, _key.PublicHandle, [.. template.Attributes]);
 
         try
         {
@@ -101,7 +101,7 @@ public sealed class MLKemPkcs11 : MLKem
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
 
         ObjectHandle sharedHandle = session.DecapsulateKey(
-            mech, _key.PrivateHandle, ciphertext, template.Attributes.ToList());
+            mech, _key.PrivateHandle, ciphertext, [.. template.Attributes]);
 
         try
         {
@@ -127,7 +127,7 @@ public sealed class MLKemPkcs11 : MLKem
                 "MLKemPkcs11.ExportEncapsulationKey (no public handle)");
 
         var session = _key.Workspace.Session;
-        var attrs = session.GetAttributeValue(_key.PublicHandle, new List<CKA> { CKA.CKA_VALUE });
+        var attrs = session.GetAttributeValue(_key.PublicHandle, [CKA.CKA_VALUE]);
         try
         {
             if (attrs[0].CannotBeRead)
@@ -190,7 +190,7 @@ public sealed class MLKemPkcs11 : MLKem
                 "ML-KEM key has no reachable handle to read CKA_PARAMETER_SET from.", nameof(key));
 
         var session = key.Workspace.Session;
-        var attrs = session.GetAttributeValue(handle, new List<CKA> { CKA.CKA_PARAMETER_SET });
+        var attrs = session.GetAttributeValue(handle, [CKA.CKA_PARAMETER_SET]);
         try
         {
             if (attrs[0].CannotBeRead)
@@ -222,7 +222,7 @@ public sealed class MLKemPkcs11 : MLKem
 
     private static void ReadAndCopySecret(Pkcs11Session session, ObjectHandle sharedHandle, Span<byte> destination)
     {
-        var attrs = session.GetAttributeValue(sharedHandle, new List<CKA> { CKA.CKA_VALUE });
+        var attrs = session.GetAttributeValue(sharedHandle, [CKA.CKA_VALUE]);
         byte[]? value = null;
         try
         {

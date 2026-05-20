@@ -222,7 +222,7 @@ internal static class InsecureOperationGateTestCases
         {
             using var mech = new Mechanism((CKM)mechanismId);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.GenerateKey(mech, new List<ObjectAttribute>()));
+                session.GenerateKey(mech, []));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
         finally
@@ -250,7 +250,7 @@ internal static class InsecureOperationGateTestCases
             using var mech = new Mechanism((CKM)mechanismId);
             var fakeBase = new ObjectHandle(0);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.DeriveKey(mech, fakeBase, new List<ObjectAttribute>()));
+                session.DeriveKey(mech, fakeBase, []));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
         finally

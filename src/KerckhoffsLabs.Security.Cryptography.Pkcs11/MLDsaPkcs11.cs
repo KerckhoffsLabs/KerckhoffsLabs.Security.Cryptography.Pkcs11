@@ -155,7 +155,7 @@ public sealed class MLDsaPkcs11 : MLDsa
                 "MLDsaPkcs11.ExportMLDsaPublicKey (no public handle)");
 
         var session = _key.Workspace.Session;
-        var attrs = session.GetAttributeValue(_key.PublicHandle, new List<CKA> { CKA.CKA_VALUE });
+        var attrs = session.GetAttributeValue(_key.PublicHandle, [CKA.CKA_VALUE]);
         try
         {
             if (attrs[0].CannotBeRead)
@@ -206,7 +206,7 @@ public sealed class MLDsaPkcs11 : MLDsa
                 "ML-DSA key has no reachable handle to read CKA_PARAMETER_SET from.", nameof(key));
 
         var session = key.Workspace.Session;
-        var attrs = session.GetAttributeValue(handle, new List<CKA> { CKA.CKA_PARAMETER_SET });
+        var attrs = session.GetAttributeValue(handle, [CKA.CKA_PARAMETER_SET]);
         try
         {
             if (attrs[0].CannotBeRead)

@@ -198,8 +198,8 @@ public class ObjectTemplateTests
     [Fact]
     public void Certificate_FluentMethods_AddSubjectAndValue()
     {
-        byte[] subject = { 0x30, 0x05 };
-        byte[] cert = { 0x30, 0x82 };
+        byte[] subject = [0x30, 0x05];
+        byte[] cert = [0x30, 0x82];
 
         using var template = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
             .Subject(subject)
@@ -222,7 +222,7 @@ public class ObjectTemplateTests
     [Fact]
     public void Data_ValueAndApplication_AddAttributes()
     {
-        byte[] payload = { 0x01, 0x02, 0x03 };
+        byte[] payload = [0x01, 0x02, 0x03];
 
         using var template = ObjectTemplate.ForData()
             .Application("my-app")

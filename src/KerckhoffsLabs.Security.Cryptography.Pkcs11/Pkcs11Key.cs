@@ -436,7 +436,7 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.Unwrap (unwrapping-key handle unavailable)");
 
         ObjectHandle resulting = _workspace.Session.UnwrapKey(
-            mechanism, unwrapHandle, wrappedBytes, template.Attributes.ToList());
+            mechanism, unwrapHandle, wrappedBytes, [.. template.Attributes]);
 
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
@@ -462,7 +462,7 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.EncapsulateKey (no public handle)");
 
         var (ct, sharedHandle) = _workspace.Session.EncapsulateKey(
-            mechanism, _publicHandle, sharedSecretTemplate.Attributes.ToList());
+            mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes]);
         return (ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
     }
 
@@ -486,7 +486,7 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.DecapsulateKey (no private handle)");
 
         ObjectHandle sharedHandle = _workspace.Session.DecapsulateKey(
-            mechanism, _privateHandle, ciphertext, sharedSecretTemplate.Attributes.ToList());
+            mechanism, _privateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
         return _workspace.HydrateExistingHandleAsKey(sharedHandle);
     }
 
@@ -505,7 +505,7 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.Derive (base-key handle unavailable)");
 
         ObjectHandle resulting = _workspace.Session.DeriveKey(
-            mechanism, baseHandle, template.Attributes.ToList());
+            mechanism, baseHandle, [.. template.Attributes]);
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
 

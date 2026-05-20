@@ -18,7 +18,7 @@ internal static class Pkcs11KeyMechanismCases
         using var labeledTpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build();
         workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
-            labeledTpl.Attributes.ToList());
+            [.. labeledTpl.Attributes]);
 
         try
         {
@@ -50,14 +50,14 @@ internal static class Pkcs11KeyMechanismCases
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().ModulusBits(2048)
-            .PublicExponent(new byte[] { 0x01, 0x00, 0x01 }).Build();
+            .PublicExponent([0x01, 0x00, 0x01]).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Build();
 
         workspace.Session.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
-            pubTpl.Attributes.ToList(),
-            privTpl.Attributes.ToList(),
+            [.. pubTpl.Attributes],
+            [.. privTpl.Attributes],
             out var pubHandle,
             out var privHandle);
 
@@ -87,7 +87,7 @@ internal static class Pkcs11KeyMechanismCases
             .Label(wrapperLabel).ValueLen(32).Wrap().Unwrap().OnToken().Build())
         {
             workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
-                t.Attributes.ToList());
+                [.. t.Attributes]);
         }
 
         string targetLabel = $"target-{Guid.NewGuid():N}";
@@ -95,7 +95,7 @@ internal static class Pkcs11KeyMechanismCases
             .Label(targetLabel).ValueLen(16).Encrypt().Decrypt().Extractable().OnToken().Build())
         {
             workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN),
-                t.Attributes.ToList());
+                [.. t.Attributes]);
         }
 
         try

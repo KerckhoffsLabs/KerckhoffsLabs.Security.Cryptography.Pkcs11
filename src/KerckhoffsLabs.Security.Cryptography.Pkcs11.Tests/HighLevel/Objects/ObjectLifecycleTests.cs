@@ -29,11 +29,11 @@ internal static class ObjectLifecycleTestCases
                 // Find it back by label.
                 using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
                 using var findLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
-                var found = session.FindAllObjects(new List<ObjectAttribute> { findClass, findLabel });
+                var found = session.FindAllObjects([findClass, findLabel]);
                 Assert.Single(found);
 
                 // GetAttributeValue retrieves the value.
-                var attrs = session.GetAttributeValue(found[0], new List<CKA> { CKA.CKA_VALUE });
+                var attrs = session.GetAttributeValue(found[0], [CKA.CKA_VALUE]);
                 try
                 {
                     Assert.Single(attrs);
@@ -53,7 +53,7 @@ internal static class ObjectLifecycleTestCases
             {
                 using var verifyClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
                 using var verifyLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
-                var afterDestroy = session.FindAllObjects(new List<ObjectAttribute> { verifyClass, verifyLabel });
+                var afterDestroy = session.FindAllObjects([verifyClass, verifyLabel]);
                 Assert.Empty(afterDestroy);
             }
         }

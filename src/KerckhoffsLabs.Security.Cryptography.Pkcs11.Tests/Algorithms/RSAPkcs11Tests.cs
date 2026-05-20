@@ -117,7 +117,7 @@ public sealed class RSAPkcs11Tests_SoftHsm
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().Encrypt().ModulusBits(2048)
-            .PublicExponent(new byte[] { 0x01, 0x00, 0x01 }).Build();
+            .PublicExponent([0x01, 0x00, 0x01]).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Decrypt().Build();
 

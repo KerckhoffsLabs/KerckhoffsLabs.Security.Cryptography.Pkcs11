@@ -50,7 +50,7 @@ public sealed class Pkcs11KeyTests
     public void Properties_AreExposed()
     {
         using var workspace = OpenWorkspace();
-        byte[] id = { 0x01, 0x02 };
+        byte[] id = [0x01, 0x02];
 
         var key = new Pkcs11Key(
             workspace,

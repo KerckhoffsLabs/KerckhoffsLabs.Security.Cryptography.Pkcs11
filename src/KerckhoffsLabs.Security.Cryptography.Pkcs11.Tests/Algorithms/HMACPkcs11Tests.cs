@@ -31,7 +31,7 @@ public sealed class HMACPkcs11Tests_SoftHsm
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).ValueLen(32).Sign().Verify().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t.Attributes.ToList());
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), [.. t.Attributes]);
         }
         try
         {

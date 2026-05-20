@@ -26,7 +26,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_SoftHsm
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().ModulusBits(2048)
-            .PublicExponent(new byte[] { 0x01, 0x00, 0x01 })
+            .PublicExponent([0x01, 0x00, 0x01])
             .Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign()
@@ -34,8 +34,8 @@ public sealed class Pkcs11KeyPublicSynthesisTests_SoftHsm
 
         workspace.Session.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
-            pubTpl.Attributes.ToList(),
-            privTpl.Attributes.ToList(),
+            [.. pubTpl.Attributes],
+            [.. privTpl.Attributes],
             out var pubHandle,
             out var privHandle);
 

@@ -30,7 +30,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t.Attributes.ToList());
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
         }
         try
         {
@@ -72,7 +72,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t.Attributes.ToList());
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
         }
         try
         {
@@ -108,7 +108,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t.Attributes.ToList());
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
         }
         try
         {
@@ -144,7 +144,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t.Attributes.ToList());
+            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
         }
         try
         {

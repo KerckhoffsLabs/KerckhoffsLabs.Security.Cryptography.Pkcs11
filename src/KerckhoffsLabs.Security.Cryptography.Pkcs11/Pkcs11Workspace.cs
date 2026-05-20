@@ -120,7 +120,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
 
-        var handles = _session.FindAllObjects(filter.Attributes.ToList());
+        var handles = _session.FindAllObjects([.. filter.Attributes]);
         var result = new List<Pkcs11Key>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateKeyFromHandle(handle));
@@ -140,7 +140,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(template);
 
-        var handle = _session.CreateObject(template.Attributes.ToList());
+        var handle = _session.CreateObject([.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
 
@@ -155,7 +155,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        var handle = _session.GenerateKey(mechanism, template.Attributes.ToList());
+        var handle = _session.GenerateKey(mechanism, [.. template.Attributes]);
         return HydrateKeyFromHandle(handle);
     }
 
@@ -178,19 +178,19 @@ public sealed class Pkcs11Workspace : IDisposable
 
         _session.GenerateKeyPair(
             mechanism,
-            publicTemplate.Attributes.ToList(),
-            privateTemplate.Attributes.ToList(),
+            [.. publicTemplate.Attributes],
+            [.. privateTemplate.Attributes],
             out var publicHandle,
             out var privateHandle);
 
         // Read identifying metadata off the private side — we already have both
         // handles in hand so we bypass the companion-discovery lookup.
-        var attrs = _session.GetAttributeValue(privateHandle, new List<CKA>
-        {
+        var attrs = _session.GetAttributeValue(privateHandle,
+        [
             CKA.CKA_KEY_TYPE,
             CKA.CKA_LABEL,
             CKA.CKA_ID,
-        });
+        ]);
 
         try
         {
@@ -266,13 +266,13 @@ public sealed class Pkcs11Workspace : IDisposable
             .Attribute(CKA.CKA_CLASS, (ulong)companionClass)
             .Id(id)
             .Build();
-        var handles = _session.FindAllObjects(filter.Attributes.ToList());
+        var handles = _session.FindAllObjects([.. filter.Attributes]);
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
 
     private Pkcs11Key OpenKeyByFilter(ObjectTemplate filter, string queryDescription)
     {
-        var handles = _session.FindAllObjects(filter.Attributes.ToList());
+        var handles = _session.FindAllObjects([.. filter.Attributes]);
         if (handles.Count == 0)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 $"OpenKey({queryDescription})");
@@ -287,13 +287,13 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     private Pkcs11Key HydrateKeyFromHandle(ObjectHandle handle)
     {
-        var attrs = _session.GetAttributeValue(handle, new List<CKA>
-        {
+        var attrs = _session.GetAttributeValue(handle,
+        [
             CKA.CKA_CLASS,
             CKA.CKA_KEY_TYPE,
             CKA.CKA_LABEL,
             CKA.CKA_ID,
-        });
+        ]);
 
         try
         {

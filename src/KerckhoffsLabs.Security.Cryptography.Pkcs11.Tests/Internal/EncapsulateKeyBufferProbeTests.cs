@@ -56,7 +56,7 @@ public sealed class EncapsulateKeyBufferProbeTests
             using var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
             var (ciphertext, sharedKey) = session.EncapsulateKey(
-                mechanism, new ObjectHandle(2), new List<ObjectAttribute>());
+                mechanism, new ObjectHandle(2), []);
 
             Assert.Equal(BufferTooSmallProbeFake.CiphertextSize, ciphertext.Length);
             Assert.Equal(2, fake.Calls); // probe (BUFFER_TOO_SMALL) + real call

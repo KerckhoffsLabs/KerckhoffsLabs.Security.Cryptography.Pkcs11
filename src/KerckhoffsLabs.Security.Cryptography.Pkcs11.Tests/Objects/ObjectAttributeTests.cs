@@ -173,7 +173,7 @@ public class ObjectAttributeTests
     [Fact]
     public void CopyValueTo_WritesExactBytes()
     {
-        byte[] source = { 9, 8, 7 };
+        byte[] source = [9, 8, 7];
         using var attr = new ObjectAttribute(CKA.CKA_VALUE, source);
         Span<byte> dest = stackalloc byte[8];
         int written = attr.CopyValueTo(dest);
@@ -184,7 +184,7 @@ public class ObjectAttributeTests
     [Fact]
     public void CopyValueTo_ThrowsWhenDestinationTooSmall()
     {
-        using var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3, 4 });
+        using var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3, 4]);
         byte[] tooSmall = new byte[2];
         Assert.Throws<ArgumentException>(() => attr.CopyValueTo(tooSmall));
     }
@@ -194,7 +194,7 @@ public class ObjectAttributeTests
     [Fact]
     public void DoubleDisposeIsSafe()
     {
-        var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+        var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
         attr.Dispose();
         attr.Dispose(); // must not throw
     }
@@ -202,7 +202,7 @@ public class ObjectAttributeTests
     [Fact]
     public void PostDisposeAccess_Throws()
     {
-        var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+        var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
         attr.Dispose();
         Assert.Throws<ObjectDisposedException>(() => attr.Type);
         Assert.Throws<ObjectDisposedException>(() => attr.ValueLength);
@@ -234,7 +234,7 @@ public class ObjectAttributeTests
     [Fact]
     public void CannotBeRead_ReturnsFalseForNormalAttribute()
     {
-        using var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1 });
+        using var attr = new ObjectAttribute(CKA.CKA_VALUE, [1]);
         Assert.False(attr.CannotBeRead);
     }
 
@@ -263,7 +263,7 @@ public class ObjectAttributeTests
     public void RawUlongTypeCtor_PreservesVendorAttributeId()
     {
         const ulong vendorAttrId = 0x80000042; // CKA_VENDOR_DEFINED + 0x42
-        using var attr = new ObjectAttribute(vendorAttrId, new byte[] { 0xAA });
+        using var attr = new ObjectAttribute(vendorAttrId, [0xAA]);
         Assert.Equal(vendorAttrId, attr.Type);
         Assert.Single(attr.GetValueAsByteArray(), (byte)0xAA);
     }
