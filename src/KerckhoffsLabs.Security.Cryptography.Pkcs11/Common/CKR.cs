@@ -528,8 +528,6 @@ public enum CKR : uint
     /// </summary>
     CKR_PARAMETER_SET_NOT_SUPPORTED = 0x00000209,
 
-
-
     /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
@@ -548,19 +546,10 @@ public static class CKRExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKR"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKRChecked"/>.
-    /// </summary>
-    public static CKR ToCKR(this NativeCULong value)
-    {
-        return (CKR)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKR"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKR ToCKRChecked(this NativeCULong value)
+    public static CKR ToCKR(this NativeCULong value)
     {
         CKR result = (CKR)(ulong)value;
         if (!Enum.IsDefined(result))

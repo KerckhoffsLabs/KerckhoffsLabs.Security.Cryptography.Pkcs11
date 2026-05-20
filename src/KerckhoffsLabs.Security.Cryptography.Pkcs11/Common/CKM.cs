@@ -2368,8 +2368,6 @@ public enum CKM : uint
     /// </summary>
     CKM_PUB_KEY_FROM_PRIV_KEY = 0x0000403A,
 
-
-
     /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
@@ -2389,26 +2387,10 @@ public static class CKMExtensions
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKM
-    /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKM with NativeCULong value</returns>
-    public static CKM ToCKM(this NativeCULong value)
-    {
-        return (CKM)value.Value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKM"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
-    /// Use this for values coming from the PKCS#11 module (return codes, attribute values, etc.)
-    /// where a malformed response must fail loudly. For values that originate in trusted
-    /// application code, prefer the loose <see cref="ToCKM(NativeCULong)"/> for speed.
     /// </summary>
-    /// <param name="value">NativeCULong value to convert.</param>
-    /// <returns>The corresponding CKM enum member.</returns>
-    /// <exception cref="InvalidEnumValueException">if <paramref name="value"/> is not a defined CKM member.</exception>
-    public static CKM ToCKMChecked(this NativeCULong value)
+    public static CKM ToCKM(this NativeCULong value)
     {
         CKM result = (CKM)(ulong)value;
         if (!Enum.IsDefined(result))

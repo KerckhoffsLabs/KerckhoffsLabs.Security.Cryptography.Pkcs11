@@ -1583,7 +1583,7 @@ internal partial class Delegates
             return false;
         }
 
-        if (rv.ToCKRChecked() != CKR.CKR_OK || interfacePtr == IntPtr.Zero)
+        if (rv.ToCKR() != CKR.CKR_OK || interfacePtr == IntPtr.Zero)
             return false;
 
         CK_INTERFACE iface = UnmanagedMemory.Read<CK_INTERFACE>(interfacePtr);
@@ -1723,7 +1723,7 @@ internal partial class Delegates
 
         IntPtr functionList = IntPtr.Zero;
 
-        CKR returnValue = getFunctionList(&functionList).ToCKRChecked();
+        CKR returnValue = getFunctionList(&functionList).ToCKR();
         Pkcs11Exception.ThrowIfError(returnValue, "C_GetFunctionList");
         if (functionList == IntPtr.Zero)
             throw new InvalidOperationException(
@@ -1738,7 +1738,7 @@ internal partial class Delegates
     /// </summary>
     private void InitializeWithGetFunctionList()
     {
-        CKR returnValue = NativeMethods.C_GetFunctionList(out IntPtr functionList).ToCKRChecked();
+        CKR returnValue = NativeMethods.C_GetFunctionList(out IntPtr functionList).ToCKR();
         Pkcs11Exception.ThrowIfError(returnValue, "C_GetFunctionList");
         if (functionList == IntPtr.Zero)
             throw new InvalidOperationException(

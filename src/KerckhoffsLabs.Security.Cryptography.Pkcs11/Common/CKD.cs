@@ -66,19 +66,10 @@ public static class CKDExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKD"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKDChecked"/>.
-    /// </summary>
-    public static CKD ToCKD(this NativeCULong value)
-    {
-        return (CKD)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKD"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKD ToCKDChecked(this NativeCULong value)
+    public static CKD ToCKD(this NativeCULong value)
     {
         CKD result = (CKD)(ulong)value;
         if (!Enum.IsDefined(result))

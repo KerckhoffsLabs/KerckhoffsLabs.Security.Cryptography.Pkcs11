@@ -30,14 +30,11 @@ public static class CKNExtensions
         return (NativeCULong)(ulong)value;
     }
 
-    /// <summary>Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKN"/>.</summary>
+    /// <summary>
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKN"/>, validating that the value
+    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// </summary>
     public static CKN ToCKN(this NativeCULong value)
-    {
-        return (CKN)(ulong)value;
-    }
-
-    /// <summary>Strict variant; throws <see cref="InvalidEnumValueException"/> on undefined values.</summary>
-    public static CKN ToCKNChecked(this NativeCULong value)
     {
         CKN result = (CKN)(ulong)value;
         if (!Enum.IsDefined(result))

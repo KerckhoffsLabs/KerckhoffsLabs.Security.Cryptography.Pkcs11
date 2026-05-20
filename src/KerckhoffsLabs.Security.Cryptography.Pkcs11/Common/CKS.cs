@@ -46,19 +46,10 @@ public static class CKSExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKS"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKSChecked"/>.
-    /// </summary>
-    public static CKS ToCKS(this NativeCULong value)
-    {
-        return (CKS)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKS"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKS ToCKSChecked(this NativeCULong value)
+    public static CKS ToCKS(this NativeCULong value)
     {
         CKS result = (CKS)(ulong)value;
         if (!Enum.IsDefined(result))

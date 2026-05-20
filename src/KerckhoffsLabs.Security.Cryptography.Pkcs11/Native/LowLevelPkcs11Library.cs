@@ -171,7 +171,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (initArgs == null)
         {
             NativeCULong rv = _delegates.C_Initialize(IntPtr.Zero);
-            return rv.ToCKRChecked();
+            return rv.ToCKR();
         }
         else
         {
@@ -181,7 +181,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
                 CK_C_INITIALIZE_ARGS initArgsValue = initArgs.Value;
                 UnmanagedMemory.Write(pInitArgs, in initArgsValue);
                 NativeCULong rv = _delegates.C_Initialize(pInitArgs);
-                return rv.ToCKRChecked();
+                return rv.ToCKR();
             }
             finally
             {
@@ -200,7 +200,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Finalize(reserved);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -220,7 +220,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetInfo(ref info);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -233,7 +233,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetFunctionList(out functionList);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -251,7 +251,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetSlotList(tokenPresent, slotList, ref count);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -272,7 +272,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetSlotInfo(slotId, ref info);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -293,7 +293,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetTokenInfo(slotId, ref info);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -319,10 +319,13 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (mechanismList != null)
         {
             for (int i = 0; i < mechanismList.Length; i++)
-                mechanismList[i] = CULongList[i].ToCKM();
+                // Deliberately an unvalidated cast, not ToCKM(): a token may report vendor-defined
+                // mechanisms (>= CKM_VENDOR_DEFINED) that are not declared CKM members, and the
+                // validating conversion would throw mid-enumeration.
+                mechanismList[i] = (CKM)(ulong)CULongList[i];
         }
 
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -344,7 +347,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetMechanismInfo(slotId, type.ToCULong(), ref info);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -360,7 +363,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_InitToken(slotId, pin, pinLen, label);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -375,7 +378,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_InitPIN(session, pin, pinLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -392,7 +395,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SetPIN(session, oldPin, oldPinLen, newPin, newPinLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -409,7 +412,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_OpenSession(slotId, flags, application, notify, ref session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -422,7 +425,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CloseSession(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -435,7 +438,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CloseAllSessions(slotId);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -456,7 +459,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetSessionInfo(session, ref info);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -474,7 +477,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetOperationState(session, operationState, ref operationStateLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -491,7 +494,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SetOperationState(session, operationState, operationStateLen, encryptionKey, authenticationKey);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -507,7 +510,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Login(session, userType.ToCULong(), pin, pinLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -557,7 +560,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_LoginUser(session, userType.ToCULong(), pin, pinLen, username, usernameLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -576,7 +579,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SessionCancel(session, flags);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -596,7 +599,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_MessageEncryptInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_MessageEncryptInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -611,7 +614,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_EncryptMessage(session, parameter, parameterLen, associatedData, associatedDataLen, plaintext, plaintextLen, ciphertext, ref ciphertextLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -626,7 +629,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_EncryptMessageBegin(session, parameter, parameterLen, associatedData, associatedDataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -641,7 +644,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_EncryptMessageNext(session, parameter, parameterLen, plaintextPart, plaintextPartLen, ciphertextPart, ref ciphertextPartLen, flags);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -656,7 +659,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageEncryptFinal(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -676,7 +679,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_MessageDecryptInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_MessageDecryptInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -691,7 +694,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_DecryptMessage(session, parameter, parameterLen, associatedData, associatedDataLen, ciphertext, ciphertextLen, plaintext, ref plaintextLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -706,7 +709,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_DecryptMessageBegin(session, parameter, parameterLen, associatedData, associatedDataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -721,7 +724,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_DecryptMessageNext(session, parameter, parameterLen, ciphertextPart, ciphertextPartLen, plaintextPart, ref plaintextPartLen, flags);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -736,7 +739,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageDecryptFinal(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -756,7 +759,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_MessageSignInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_MessageSignInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -771,7 +774,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SignMessage(session, parameter, parameterLen, data, dataLen, signature, ref signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -786,7 +789,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SignMessageBegin(session, parameter, parameterLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -801,7 +804,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_SignMessageNext(session, parameter, parameterLen, data, dataLen, signature, ref signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -816,7 +819,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageSignFinal(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -836,7 +839,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_MessageVerifyInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_MessageVerifyInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -851,7 +854,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifyMessage(session, parameter, parameterLen, data, dataLen, signature, signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -866,7 +869,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifyMessageBegin(session, parameter, parameterLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -881,7 +884,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifyMessageNext(session, parameter, parameterLen, data, dataLen, signature, signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -896,7 +899,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_MessageVerifyFinal(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -917,7 +920,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_EncapsulateKey_Windows(session, ref winMech, publicKey, winTpl, attributeCount, ciphertext, ref ciphertextLen, ref derivedKey);
         }
         NativeCULong rv = _delegates.C_EncapsulateKey(session, ref mechanism, publicKey, template, attributeCount, ciphertext, ref ciphertextLen, ref derivedKey);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -938,7 +941,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_DecapsulateKey_Windows(session, ref winMech, privateKey, winTpl, attributeCount, ciphertext, ciphertextLen, ref derivedKey);
         }
         NativeCULong rv = _delegates.C_DecapsulateKey(session, ref mechanism, privateKey, template, attributeCount, ciphertext, ciphertextLen, ref derivedKey);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -958,7 +961,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_VerifySignatureInit_Windows(session, ref winMech, key, signature, signatureLen);
         }
         NativeCULong rv = _delegates.C_VerifySignatureInit(session, ref mechanism, key, signature, signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -973,7 +976,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifySignature(session, data, dataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -988,7 +991,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifySignatureUpdate(session, part, partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1003,7 +1006,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_VerifySignatureFinal(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1018,7 +1021,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_GetSessionValidationFlags(session, type, ref flags);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1040,7 +1043,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_AsyncComplete(session, functionName, ref result);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -1055,7 +1058,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_AsyncGetID(session, functionName, ref id);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1070,7 +1073,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         NativeCULong rv = _delegates.C_AsyncJoin(session, functionName, id, data, dataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1090,7 +1093,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_WrapKeyAuthenticated_Windows(session, ref winMech, wrappingKey, key, associatedData, associatedDataLen, wrappedKey, ref wrappedKeyLen);
         }
         NativeCULong rv = _delegates.C_WrapKeyAuthenticated(session, ref mechanism, wrappingKey, key, associatedData, associatedDataLen, wrappedKey, ref wrappedKeyLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1111,7 +1114,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_UnwrapKeyAuthenticated_Windows(session, ref winMech, unwrappingKey, wrappedKey, wrappedKeyLen, winTpl, attributeCount, associatedData, associatedDataLen, ref key);
         }
         NativeCULong rv = _delegates.C_UnwrapKeyAuthenticated(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, associatedData, associatedDataLen, ref key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
 
@@ -1126,7 +1129,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Logout(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1147,7 +1150,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_CreateObject_Windows(session, winTpl, count, ref objectId);
         }
         NativeCULong rv = _delegates.C_CreateObject(session, template, count, ref objectId);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1169,7 +1172,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_CopyObject_Windows(session, objectId, winTpl, count, ref newObjectId);
         }
         NativeCULong rv = _delegates.C_CopyObject(session, objectId, template, count, ref newObjectId);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1183,7 +1186,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DestroyObject(session, objectId);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1198,7 +1201,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetObjectSize(session, objectId, ref size);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1225,7 +1228,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetAttributeValue(session, objectId, template, count);
-        return rv2.ToCKRChecked();
+        return rv2.ToCKR();
     }
 
     /// <summary>
@@ -1246,7 +1249,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_SetAttributeValue_Windows(session, objectId, winTpl, count);
         }
         NativeCULong rv = _delegates.C_SetAttributeValue(session, objectId, template, count);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1266,7 +1269,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_FindObjectsInit_Windows(session, winTpl, count);
         }
         NativeCULong rv = _delegates.C_FindObjectsInit(session, template, count);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1282,7 +1285,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_FindObjects(session, objectId, maxObjectCount, ref objectCount);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1295,7 +1298,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_FindObjectsFinal(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1315,7 +1318,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_EncryptInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_EncryptInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1335,7 +1338,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Encrypt(session, data, dataLen, encryptedData, ref encryptedDataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1355,7 +1358,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_EncryptUpdate(session, part, partLen, encryptedPart, ref encryptedPartLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1373,7 +1376,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_EncryptFinal(session, lastEncryptedPart, ref lastEncryptedPartLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1393,7 +1396,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_DecryptInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_DecryptInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1413,7 +1416,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Decrypt(session, encryptedData, encryptedDataLen, data, ref dataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1433,7 +1436,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptUpdate(session, encryptedPart, encryptedPartLen, part, ref partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1451,7 +1454,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptFinal(session, lastPart, ref lastPartLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1470,7 +1473,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_DigestInit_Windows(session, ref winMech);
         }
         NativeCULong rv = _delegates.C_DigestInit(session, ref mechanism);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1490,7 +1493,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Digest(session, data, dataLen, digest, ref digestLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1505,7 +1508,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestUpdate(session, part, partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1519,7 +1522,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestKey(session, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1537,7 +1540,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestFinal(session, digest, ref digestLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1557,7 +1560,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_SignInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_SignInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1577,7 +1580,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Sign(session, data, dataLen, signature, ref signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1592,7 +1595,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignUpdate(session, part, partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1610,7 +1613,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignFinal(session, signature, ref signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1630,7 +1633,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_SignRecoverInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_SignRecoverInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1650,7 +1653,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignRecover(session, data, dataLen, signature, ref signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1670,7 +1673,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_VerifyInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_VerifyInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1687,7 +1690,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_Verify(session, data, dataLen, signature, signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1702,7 +1705,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyUpdate(session, part, partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1717,7 +1720,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyFinal(session, signature, signatureLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1737,7 +1740,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_VerifyRecoverInit_Windows(session, ref winMech, key);
         }
         NativeCULong rv = _delegates.C_VerifyRecoverInit(session, ref mechanism, key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1757,7 +1760,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_VerifyRecover(session, signature, signatureLen, data, ref dataLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1777,7 +1780,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DigestEncryptUpdate(session, part, partLen, encryptedPart, ref encryptedPartLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1797,7 +1800,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptDigestUpdate(session, encryptedPart, encryptedPartLen, part, ref partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1817,7 +1820,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SignEncryptUpdate(session, part, partLen, encryptedPart, ref encryptedPartLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1837,7 +1840,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_DecryptVerifyUpdate(session, encryptedPart, encryptedPartLen, part, ref partLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1860,7 +1863,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_GenerateKey_Windows(session, ref winMech, winTpl, count, ref key);
         }
         NativeCULong rv = _delegates.C_GenerateKey(session, ref mechanism, template, count, ref key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1887,7 +1890,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_GenerateKeyPair_Windows(session, ref winMech, winPubTpl, publicKeyAttributeCount, winPrivTpl, privateKeyAttributeCount, ref publicKey, ref privateKey);
         }
         NativeCULong rv = _delegates.C_GenerateKeyPair(session, ref mechanism, publicKeyTemplate, publicKeyAttributeCount, privateKeyTemplate, privateKeyAttributeCount, ref publicKey, ref privateKey);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1913,7 +1916,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_WrapKey_Windows(session, ref winMech, wrappingKey, key, wrappedKey, ref wrappedKeyLen);
         }
         NativeCULong rv = _delegates.C_WrapKey(session, ref mechanism, wrappingKey, key, wrappedKey, ref wrappedKeyLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1939,7 +1942,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_UnwrapKey_Windows(session, ref winMech, unwrappingKey, wrappedKey, wrappedKeyLen, winTpl, attributeCount, ref key);
         }
         NativeCULong rv = _delegates.C_UnwrapKey(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, ref key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1963,7 +1966,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             return (CKR)(ulong)_delegates.C_DeriveKey_Windows(session, ref winMech, baseKey, winTpl, attributeCount, ref key);
         }
         NativeCULong rv = _delegates.C_DeriveKey(session, ref mechanism, baseKey, template, attributeCount, ref key);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1978,7 +1981,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_SeedRandom(session, seed, seedLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -1993,7 +1996,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GenerateRandom(session, randomData, randomLen);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -2006,7 +2009,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_GetFunctionStatus(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -2019,7 +2022,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_CancelFunction(session);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
     /// <summary>
@@ -2034,7 +2037,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         NativeCULong rv = _delegates.C_WaitForSlotEvent(flags, ref slot, reserved);
-        return rv.ToCKRChecked();
+        return rv.ToCKR();
     }
 
 

@@ -61,19 +61,10 @@ public static class CKPExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKP"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKPChecked"/>.
-    /// </summary>
-    public static CKP ToCKP(this NativeCULong value)
-    {
-        return (CKP)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKP"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKP ToCKPChecked(this NativeCULong value)
+    public static CKP ToCKP(this NativeCULong value)
     {
         CKP result = (CKP)(ulong)value;
         if (!Enum.IsDefined(result))

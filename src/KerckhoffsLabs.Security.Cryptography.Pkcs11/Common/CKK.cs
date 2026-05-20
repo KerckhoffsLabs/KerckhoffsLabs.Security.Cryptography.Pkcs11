@@ -336,8 +336,6 @@ public enum CKK : uint
     /// </summary>
     CKK_SLH_DSA = 0x0000004B,
 
-
-
     /// <summary>
     /// Permanently reserved for token vendors
     /// </summary>
@@ -356,19 +354,10 @@ public static class CKKExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKK"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKKChecked"/>.
-    /// </summary>
-    public static CKK ToCKK(this NativeCULong value)
-    {
-        return (CKK)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKK"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKK ToCKKChecked(this NativeCULong value)
+    public static CKK ToCKK(this NativeCULong value)
     {
         CKK result = (CKK)(ulong)value;
         if (!Enum.IsDefined(result))

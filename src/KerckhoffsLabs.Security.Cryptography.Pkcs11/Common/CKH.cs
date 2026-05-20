@@ -41,19 +41,10 @@ public static class CKHExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKH"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKHChecked"/>.
-    /// </summary>
-    public static CKH ToCKH(this NativeCULong value)
-    {
-        return (CKH)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKH"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKH ToCKHChecked(this NativeCULong value)
+    public static CKH ToCKH(this NativeCULong value)
     {
         CKH result = (CKH)(ulong)value;
         if (!Enum.IsDefined(result))

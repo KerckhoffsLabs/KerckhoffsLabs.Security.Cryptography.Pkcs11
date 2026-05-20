@@ -46,19 +46,10 @@ public static class CKGExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKG"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKGChecked"/>.
-    /// </summary>
-    public static CKG ToCKG(this NativeCULong value)
-    {
-        return (CKG)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKG"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKG ToCKGChecked(this NativeCULong value)
+    public static CKG ToCKG(this NativeCULong value)
     {
         CKG result = (CKG)(ulong)value;
         if (!Enum.IsDefined(result))

@@ -68,8 +68,6 @@ public enum CKO : uint
     /// </summary>
     CKO_TRUST = 0x0000000B,
 
-
-
     /// <summary>
     /// Reserved for token vendors.
     /// </summary>
@@ -88,19 +86,10 @@ public static class CKOExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKO"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKOChecked"/>.
-    /// </summary>
-    public static CKO ToCKO(this NativeCULong value)
-    {
-        return (CKO)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKO"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKO ToCKOChecked(this NativeCULong value)
+    public static CKO ToCKO(this NativeCULong value)
     {
         CKO result = (CKO)(ulong)value;
         if (!Enum.IsDefined(result))

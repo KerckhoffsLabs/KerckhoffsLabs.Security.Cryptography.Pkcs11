@@ -45,26 +45,10 @@ public static class CKCExtensions
     }
 
     /// <summary>
-    /// Converts NativeCULong to CKC
-    /// </summary>
-    /// <param name="value">NativeCULong that should be converted</param>
-    /// <returns>CKC with NativeCULong value</returns>
-    public static CKC ToCKC(this NativeCULong value)
-    {
-        return (CKC)value.Value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKC"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
-    /// Use this for values coming from the PKCS#11 module (return codes, attribute values, etc.)
-    /// where a malformed response must fail loudly. For values that originate in trusted
-    /// application code, prefer the loose <see cref="ToCKC(NativeCULong)"/> for speed.
     /// </summary>
-    /// <param name="value">NativeCULong value to convert.</param>
-    /// <returns>The corresponding CKC enum member.</returns>
-    /// <exception cref="InvalidEnumValueException">if <paramref name="value"/> is not a defined CKC member.</exception>
-    public static CKC ToCKCChecked(this NativeCULong value)
+    public static CKC ToCKC(this NativeCULong value)
     {
         CKC result = (CKC)(ulong)value;
         if (!Enum.IsDefined(result))

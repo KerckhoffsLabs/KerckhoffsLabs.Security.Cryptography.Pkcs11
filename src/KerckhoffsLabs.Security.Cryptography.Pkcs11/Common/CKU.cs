@@ -36,19 +36,10 @@ public static class CKUExtensions
     }
 
     /// <summary>
-    /// Fast loose cast from <see cref="NativeCULong"/> to <see cref="CKU"/>. Use only when the
-    /// value is trusted; otherwise prefer <see cref="ToCKUChecked"/>.
-    /// </summary>
-    public static CKU ToCKU(this NativeCULong value)
-    {
-        return (CKU)(ulong)value;
-    }
-
-    /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKU"/>, validating that the value
     /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
     /// </summary>
-    public static CKU ToCKUChecked(this NativeCULong value)
+    public static CKU ToCKU(this NativeCULong value)
     {
         CKU result = (CKU)(ulong)value;
         if (!Enum.IsDefined(result))
