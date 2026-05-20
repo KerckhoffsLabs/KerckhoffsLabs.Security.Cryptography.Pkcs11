@@ -22,8 +22,7 @@ public sealed class CkmRsaPkcsPssParams : IMechanismParams
     /// <param name="saltLength">Salt length in bytes. RFC 8017 recommends matching the hash output length (32 for SHA-256).</param>
     public CkmRsaPkcsPssParams(CKM hashAlg, CKG mgf, int saltLength)
     {
-        if (saltLength < 0)
-            throw new ArgumentOutOfRangeException(nameof(saltLength), "Salt length must be non-negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(saltLength);
 
         _lowLevelParams = new CK_RSA_PKCS_PSS_PARAMS
         {

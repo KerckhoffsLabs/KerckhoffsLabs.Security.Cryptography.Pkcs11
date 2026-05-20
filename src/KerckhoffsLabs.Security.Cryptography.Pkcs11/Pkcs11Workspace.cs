@@ -223,8 +223,7 @@ public sealed class Pkcs11Workspace : IDisposable
     public byte[] GenerateRandom(int length)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (length <= 0)
-            throw new ArgumentOutOfRangeException(nameof(length), "Length must be > 0.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
         return _session.GenerateRandom(length);
     }
 

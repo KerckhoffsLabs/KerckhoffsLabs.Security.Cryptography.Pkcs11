@@ -23,7 +23,7 @@ public sealed class CkmAesCcmParams : IMechanismParams
     /// <param name="macLen">MAC (tag) length in bytes; must be one of {4, 6, 8, 10, 12, 14, 16}.</param>
     public CkmAesCcmParams(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> aad, int macLen)
     {
-        if (dataLen < 0) throw new ArgumentOutOfRangeException(nameof(dataLen));
+        ArgumentOutOfRangeException.ThrowIfNegative(dataLen);
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
         if (macLen is not (4 or 6 or 8 or 10 or 12 or 14 or 16))
             throw new ArgumentOutOfRangeException(nameof(macLen),

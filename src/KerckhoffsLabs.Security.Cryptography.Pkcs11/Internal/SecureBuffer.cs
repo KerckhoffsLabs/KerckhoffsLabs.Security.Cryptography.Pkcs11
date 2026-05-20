@@ -32,8 +32,7 @@ internal sealed class SecureBuffer : IDisposable
     /// </exception>
     public SecureBuffer(int length)
     {
-        if (length <= 0)
-            throw new ArgumentOutOfRangeException(nameof(length), "Length must be > 0.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
 
         _buffer = new byte[length];
         _pin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);

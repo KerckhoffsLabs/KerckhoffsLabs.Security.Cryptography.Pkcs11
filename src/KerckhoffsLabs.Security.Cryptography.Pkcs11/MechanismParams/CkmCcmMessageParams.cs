@@ -26,7 +26,7 @@ public sealed class CkmCcmMessageParams : IMechanismParams
 
     private CkmCcmMessageParams(int dataLen, ReadOnlySpan<byte> nonce, int macLen, ReadOnlySpan<byte> macInput)
     {
-        if (dataLen < 0) throw new ArgumentOutOfRangeException(nameof(dataLen));
+        ArgumentOutOfRangeException.ThrowIfNegative(dataLen);
         if (nonce.Length < 7 || nonce.Length > 13)
             throw new ArgumentException("CCM nonce must be 7..13 bytes (RFC 3610).", nameof(nonce));
         if (macLen != 4 && macLen != 6 && macLen != 8 && macLen != 10 && macLen != 12 && macLen != 14 && macLen != 16)
