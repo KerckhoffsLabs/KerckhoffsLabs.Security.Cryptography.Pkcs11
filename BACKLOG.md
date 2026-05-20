@@ -5,8 +5,8 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 ## Summary
 
 
-- **Total items:** 55
-- **Critical:** 0 | **High:** 15 | **Medium:** 17 | **Low:** 4
+- **Total items:** 62
+- **Critical:** 0 | **High:** 15 | **Medium:** 20 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -670,6 +670,42 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Raised by:** Derived from BL-025 closure.
 - **Spec / References:** [Function pointers (C# language spec)](https://learn.microsoft.com/dotnet/csharp/language-reference/proposals/csharp-9.0/function-pointers); the existing `docs/superpowers/plans/2026-05-19-pkcs11-function-pointer-dispatch-aot.md` (13-task plan, Tasks 2–10 apply here).
 
+### [BL-062] No public way to delete a token object (create-without-delete)
+
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs`; `Pkcs11Key.cs:122` (`Dispose` only closes the handle); internal `Pkcs11Session.Objects.cs` has `DestroyObject`.
+- **Problem:** Public API surface review (2026-05-20). Consumers can `GenerateKey` / `ImportKey` but there is no public way to remove a token object — `Pkcs11Key.Dispose` closes the handle without calling `C_DestroyObject`, so the object persists on the token. A consumer can fill a token with no API to clean up. The internal `Pkcs11Session.DestroyObject` already exists; it's simply not surfaced.
+- **Proposed action:** Surface deletion — e.g., `Pkcs11Key.Delete()` (and/or `Pkcs11Workspace.DeleteKey`) that calls the internal `DestroyObject`. Be explicit in docs about the distinction from `Dispose` (close handle vs destroy on token). Respect token permissions (deletion of a read-only/CKA_DESTROYABLE=false object fails at the token).
+- **Breaks public API?** No (additive).
+- **Raised by:** Public-surface review.
+- **Spec / References:** PKCS#11 v3.2 `C_DestroyObject`.
+
+### [BL-063] No public generic attribute read/write
+
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs`; `Objects/ObjectAttribute.cs` (internal); internal `Pkcs11Session.Objects.cs` has `GetAttributeValue`/`SetAttributeValue`.
+- **Problem:** Public API surface review (2026-05-20). No public way to read object attributes (`CKA_MODULUS`, `CKA_EC_POINT`, `CKA_VALUE`, `CKA_ID`, custom/vendor attributes) or modify mutable ones (`CKA_LABEL`, `CKA_ID`). The library synthesizes RSA/EC public params internally for the BCL adapters (`Pkcs11PublicKeyView`) but exposes no general "read attribute X" door. `Pkcs11Key` surfaces only `KeyType`/`Label`/`Id`.
+- **Proposed action:** Add a public read API (e.g., `Pkcs11Key.GetAttribute(CKA)` returning a typed value, or a small attribute accessor) and a guarded write for mutable attributes. Keep the secure-by-default posture: attribute *read* must honour the token's sensitivity flags (return "unavailable" rather than throwing on `CKA_SENSITIVE`/non-readable), and must not become a side-channel to extract material the token marks non-extractable.
+- **Breaks public API?** No (additive).
+- **Raised by:** Public-surface review.
+- **Spec / References:** PKCS#11 v3.2 `C_GetAttributeValue` / `C_SetAttributeValue`; relates to BL-014 (vendor values).
+
+### [BL-064] Object find/read is key-only — certificates and data objects unreachable
+
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs:118` (`FindKeys`); `CertificateTemplateBuilder.cs`, `DataTemplateBuilder.cs` (import-only).
+- **Problem:** Public API surface review (2026-05-20). `FindKeys` enumerates keys only. There is no public way to find or read certificates or data objects, even though `CertificateTemplateBuilder` / `DataTemplateBuilder` exist for *importing* them — so a consumer can write a certificate to the token but cannot enumerate or read it back.
+- **Proposed action:** Generalize the find/read surface beyond keys — e.g., a `FindObjects(ObjectTemplate filter)` returning object handles/views, plus typed certificate/data accessors (read `CKA_VALUE` for a cert). Pairs naturally with BL-063 (attribute read).
+- **Breaks public API?** No (additive).
+- **Raised by:** Public-surface review.
+- **Spec / References:** PKCS#11 v3.2 `C_FindObjects*`.
+
 ---
 
 ## Low
@@ -747,6 +783,30 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Proposed action:** Decide whether to model CKF as a `[Flags]` enum (and similar bitmask domains) for discoverability + type safety, or leave the `NativeCULong`-constant model. If adopting an enum, do it consistently across the CKF surface, not just `CancelOperations`. Pre-1.0 (signature change to `CancelOperations`).
 - **Raised by:** Derived from BL-055.
 - **Spec / References:** —
+
+### [BL-065] No public PIN management (SetPin / InitPin)
+
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs`; internal `Pkcs11Session.cs` has `SetPin`/`InitPin`.
+- **Problem:** Public API surface review (2026-05-20). Token administration beyond `Pkcs11Slot.InitToken` is unreachable: there is no public way to change the logged-in user's PIN (`C_SetPIN`) or for the SO to initialize the user PIN (`C_InitPIN`). Both already exist on the internal `Pkcs11Session` (taking `SecurePin`); they are simply not surfaced on `Pkcs11Workspace`.
+- **Proposed action:** Surface `SetPin(SecurePin oldPin, SecurePin newPin)` and `InitPin(SecurePin userPin)` on `Pkcs11Workspace`, delegating to the session. Mirror the `SecurePin`/zeroize handling already used internally.
+- **Breaks public API?** No (additive).
+- **Raised by:** Public-surface review.
+- **Spec / References:** PKCS#11 v3.2 `C_SetPIN` / `C_InitPIN`.
+
+### [BL-066] No public multi-part / streaming crypto (one-shot only)
+
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** L
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs`; internal `Pkcs11Session.{Encrypt,Decrypt,Sign,Verify,Digest}.cs` have the multi-part `*Update`/`*Final` wrappers.
+- **Problem:** Public API surface review (2026-05-20). All public crypto is one-shot (`Encrypt`/`Decrypt`/`Sign`/`Verify`/`Digest` over a single buffer), so data that does not fit in memory cannot be processed. The internal session already implements the multi-part `Init`/`Update`/`Final` sequences (with BL-003 self-healing cleanup); they are not exposed.
+- **Proposed action:** Design a public streaming surface (e.g., `Stream`-based or incremental `Update`/`Final` objects) over the existing internal multi-part wrappers. This is the surface that would also justify making `CancelOperations` public (see BL-061) so a consumer can abort a partial operation. Significant API-design work — sequence-state management, disposal semantics, and thread-affinity all need care.
+- **Breaks public API?** No (additive).
+- **Raised by:** Public-surface review.
+- **Spec / References:** PKCS#11 v3.2 §5.9–5.12 (multi-part operations).
 
 ---
 
