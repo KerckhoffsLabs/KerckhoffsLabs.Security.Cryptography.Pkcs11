@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 17 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 16 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -165,6 +165,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-011] `EncapsulateKey` / `WrapKeyAuthenticated` size-probe throws on `CKR_BUFFER_TOO_SMALL`
 
+- **Status: Resolved (2026-05-20)** — Both length-probe calls in `Pkcs11Session.V32.cs` now treat `CKR_OK` and `CKR_BUFFER_TOO_SMALL` as successful probe outcomes (the token has populated the length output either way per PKCS#11 v3.2 §5.2); only a genuine error code aborts the probe. The real (second) call still goes through `ThrowIfError` unchanged. `DecapsulateKey` is unaffected — its output is an object handle, not a sized buffer, so it makes a single call with no probe. No regression test added: `LowLevelPkcs11Library` is `internal sealed` with no interface seam and pkcs11-mock returns `CKR_OK` from the probe, so exercising the `CKR_BUFFER_TOO_SMALL` branch would require introducing a mockable low-level dispatch seam (its own refactor, tracked separately if pursued). Full suite (569) confirms no regression on the `CKR_OK` path.
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** S

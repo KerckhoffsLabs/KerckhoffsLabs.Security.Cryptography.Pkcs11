@@ -63,7 +63,11 @@ internal sealed partial class Pkcs11Session
             _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
             template, (NativeCULong)template.Length,
             null!, ref ctLen, ref sharedHandle);
-        Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
+        // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
+        // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
+        // Only a genuine error aborts the probe.
+        if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+            Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
 
         byte[] ct = new byte[(int)ctLen];
         rv = _pkcs11Library.C_EncapsulateKey(
@@ -145,7 +149,11 @@ internal sealed partial class Pkcs11Session
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
             aad, (NativeCULong)aad.Length, null!, ref wrappedLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_WrapKeyAuthenticated (length probe)");
+        // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome (PKCS#11 v3.2 §5.2):
+        // the token populated wrappedLen despite the (null) output buffer. Only a genuine
+        // error aborts the probe.
+        if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+            Pkcs11Exception.ThrowIfError(rv, "C_WrapKeyAuthenticated (length probe)");
 
         byte[] wrapped = new byte[(int)wrappedLen];
         rv = _pkcs11Library.C_WrapKeyAuthenticated(
