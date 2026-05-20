@@ -347,7 +347,7 @@ internal static class UnmanagedMemory
 
     /// <summary>
     /// Returns <c>true</c> when <paramref name="t"/> is decorated with
-    /// <see cref="PackedForPkcs11Attribute"/>. Uses <see cref="Type.IsDefined"/> which
+    /// <see cref="PackedForPkcs11Attribute"/>. Uses <c>Type.IsDefined</c> which
     /// only reads the metadata token — AOT-safe, no dynamic code generation required.
     /// </summary>
     private static bool IsPackedForPkcs11(Type t) =>

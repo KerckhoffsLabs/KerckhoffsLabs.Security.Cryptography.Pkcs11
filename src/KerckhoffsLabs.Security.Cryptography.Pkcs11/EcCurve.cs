@@ -1,9 +1,10 @@
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Named curves supported by the <see cref="Pkcs11Workspace.GenerateEcKeyPair"/> secure helper.
-/// Vendor-specific or less common curves can still be generated via <see cref="Pkcs11Workspace.GenerateKeyPair"/>
-/// with an explicit <c>CKA_EC_PARAMS</c> attribute.
+/// Named elliptic curves. Each value maps to the standard <c>CKA_EC_PARAMS</c> OID
+/// encoding used when generating an EC key pair. Vendor-specific or less common curves
+/// can still be selected by supplying an explicit <c>CKA_EC_PARAMS</c> attribute in the
+/// key-generation template instead.
 /// </summary>
 public enum EcCurve
 {

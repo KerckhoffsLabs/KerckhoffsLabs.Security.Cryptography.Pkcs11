@@ -296,7 +296,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Reads the session's validation flags for the requested validation-state type
     /// (PKCS#11 v3.2 §5.6.10). <paramref name="validationType"/> is typically
-    /// <see cref="CK.CKS_LAST_VALIDATION_OK"/> to query whether the most recent
+    /// <c>CKS_LAST_VALIDATION_OK</c> to query whether the most recent
     /// operation completed within the active validation profile.
     /// </summary>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>

@@ -22,8 +22,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <see cref="Pkcs11Key.EncapsulateKey"/> / <see cref="Pkcs11Key.DecapsulateKey"/> directly —
 /// they return a <see cref="Pkcs11Key"/> wrapping the token-resident secret with no
 /// extraction step.</para>
-/// <para><b>Gating:</b> <see cref="Encapsulate(Span{byte},Span{byte})"/> /
-/// <see cref="Decapsulate(ReadOnlySpan{byte},Span{byte})"/> throw
+/// <para><b>Gating:</b> <see cref="EncapsulateCore(Span{byte}, Span{byte})"/> /
+/// <see cref="DecapsulateCore(ReadOnlySpan{byte}, Span{byte})"/> throw
 /// <see cref="InsecureOperationException"/> unless the owning workspace has set
 /// <c>Pkcs11Workspace.AllowInsecure = true</c> (or <c>AllowInsecureScope()</c>). The gate is
 /// mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>

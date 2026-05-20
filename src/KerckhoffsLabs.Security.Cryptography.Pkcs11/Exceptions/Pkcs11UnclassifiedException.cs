@@ -3,7 +3,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Raised when a PKCS#11 call fails with a return value that has no narrower
-/// categorization. Catches everything <see cref="ExceptionMapper"/> does not route to a
+/// categorization. Catches everything <see cref="Internal.ExceptionMapper"/> does not route to a
 /// more specific subclass.
 /// </summary>
 /// <param name="returnValue">The PKCS#11 return value.</param>
