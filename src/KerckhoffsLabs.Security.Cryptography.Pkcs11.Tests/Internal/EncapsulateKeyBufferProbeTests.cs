@@ -8,7 +8,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fakes;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
 
 /// <summary>
-/// BL-011 regression: a conformant token may return <c>CKR_BUFFER_TOO_SMALL</c> from the
+/// Regression: a conformant token may return <c>CKR_BUFFER_TOO_SMALL</c> from the
 /// two-call length probe (it has still populated the length output, per PKCS#11 v3.2 §5.2).
 /// <c>EncapsulateKey</c> must treat that as a successful probe, allocate, and make the real
 /// call — not throw. This is exercised through the <see cref="ILowLevelPkcs11Library"/> seam

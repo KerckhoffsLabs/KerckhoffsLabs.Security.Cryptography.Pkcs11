@@ -29,7 +29,7 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         _library = library ?? throw new ArgumentNullException(nameof(library));
         SetHandle((IntPtr)(ulong)sessionId);
         // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
-        // unloads the function table (BL-016).
+        // unloads the function table.
         _library.RegisterSession(this);
     }
 

@@ -19,7 +19,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     bool IsMessageApiSupported { get; }
     bool IsV32ApiSupported { get; }
 
-    // ---- Session tracking (BL-016): registration + teardown seam ----
+    // ---- Session tracking: registration + teardown seam ----
     /// <summary>Count of still-live tracked session handles (test/diagnostic seam).</summary>
     int TrackedSessionCount { get; }
     /// <summary>Registers a session handle for cleanup at library teardown.</summary>

@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.LibraryLifecycle;
 
 /// <summary>
-/// BL-015 regression: a second <see cref="Pkcs11Library"/> instance pointing at the
+/// Regression: a second <see cref="Pkcs11Library"/> instance pointing at the
 /// same path observes <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c> (the OS loader refcounts
 /// the shared image, so the same global cryptoki state is reused). The second
 /// instance's <c>Dispose</c> must not call <c>C_Finalize</c> — that would tear down

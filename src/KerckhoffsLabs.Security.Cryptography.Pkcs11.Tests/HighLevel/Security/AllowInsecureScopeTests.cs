@@ -5,9 +5,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Security;
 
 /// <summary>
-/// BL-007 (the AllowInsecure flag is reachable from the public <see cref="Pkcs11Workspace"/>
-/// surface) and BL-008 (a disposable scope opts in for a single operation and restores the
-/// prior value on dispose, rather than latching the flag on for the session lifetime).
+/// Verifies the AllowInsecure flag is reachable from the public <see cref="Pkcs11Workspace"/>
+/// surface, and that a disposable scope opts in for a single operation and restores the prior
+/// value on dispose, rather than latching the flag on for the session lifetime.
 /// </summary>
 [Collection("Mock")]
 public sealed class AllowInsecureScopeTests

@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
 
 /// <summary>
 /// Pins the marshalled size of every native interop struct, separately per platform.
-/// Catches BL-001-class struct-layout drift the moment it lands. The Unix expected
+/// Catches struct-layout drift the moment it lands. The Unix expected
 /// values were captured from a probe on Linux x64 at plan-creation time. The Windows
 /// expected values are the OASIS pkcs11.h spec ABI (#pragma pack(push, 1)) and are
 /// added struct-by-struct as types are migrated to [PackedForPkcs11].

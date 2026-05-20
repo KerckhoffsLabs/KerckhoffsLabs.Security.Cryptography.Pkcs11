@@ -50,7 +50,7 @@ public sealed class Pkcs11Library : IDisposable
 
     /// <summary>
     /// Test seam: access to the underlying low-level wrapper for regression checks on
-    /// session tracking (BL-016). Not exposed publicly.
+    /// session tracking. Not exposed publicly.
     /// </summary>
     internal ILowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
@@ -312,7 +312,7 @@ public sealed class Pkcs11Library : IDisposable
                     // Close any session handles still alive against this library before
                     // C_Finalize tears down the cryptoki state — otherwise a stray
                     // Pkcs11SessionHandle finalizer would call C_CloseSession through a
-                    // function table whose backing module has been unmapped (BL-016). The
+                    // function table whose backing module has been unmapped. The
                     // ownership contract is: the library MUST outlive every session it
                     // produced. This is the safety net for callers that violate it.
                     _pkcs11Library.CloseAllTrackedSessions();

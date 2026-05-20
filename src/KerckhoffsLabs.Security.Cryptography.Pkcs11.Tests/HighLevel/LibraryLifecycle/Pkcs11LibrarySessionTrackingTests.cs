@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.LibraryLifecycle;
 
 /// <summary>
-/// BL-016 regression: <see cref="Pkcs11Library.Dispose"/> must close every still-live
+/// Regression: <see cref="Pkcs11Library.Dispose"/> must close every still-live
 /// <c>Pkcs11SessionHandle</c> before <c>C_Finalize</c> and module unload. Otherwise a
 /// stray SafeHandle finalizer would call <c>C_CloseSession</c> through a function table
 /// whose backing module has been unmapped.
@@ -85,7 +85,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
         Assert.Equal(0, lowLevel.TrackedSessionCount);
 
         // The session's SafeHandle should now be closed — its finalizer becomes a no-op,
-        // which is the actual BL-016 safety property (no C_CloseSession against an unloaded
+        // which is the actual safety property (no C_CloseSession against an unloaded
         // function table).
         session.Dispose(); // idempotent — must not throw even though the library is gone
     }

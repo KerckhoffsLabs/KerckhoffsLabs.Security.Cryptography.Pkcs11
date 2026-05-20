@@ -1,6 +1,6 @@
 // Disables the runtime marshalling subsystem for this assembly's interop boundaries
 // (P/Invoke, [LibraryImport], and delegate*-unmanaged calls). Every cryptoki call now
-// passes only blittable types — the BL-060 migration replaced all [UnmanagedFunctionPointer]
+// passes only blittable types — the dispatch layer replaced all [UnmanagedFunctionPointer]
 // delegates with delegate* unmanaged[Cdecl] dispatch (manual bool->byte, pinned arrays,
 // mechanism params crossing as IntPtr) and made the *_INFO structs blittable via [InlineArray].
 //

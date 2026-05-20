@@ -92,7 +92,7 @@ public sealed class Pkcs11Slot
     /// Vendor-defined mechanisms (values <c>≥ CKM_VENDOR_DEFINED = 0x80000000</c>) that
     /// don't have a <see cref="CKM"/> enum member are dropped from the result — they can't
     /// be represented as <see cref="CKM"/> values. A future overload returning raw
-    /// <see cref="ulong"/> values may surface them; see BL-014.
+    /// <see cref="ulong"/> values may surface them.
     /// </remarks>
     /// <returns>Read-only list of mechanism types supported by a token.</returns>
     public IReadOnlyList<CKM> GetMechanismList()

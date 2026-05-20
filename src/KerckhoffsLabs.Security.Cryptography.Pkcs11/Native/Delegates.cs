@@ -12,9 +12,8 @@ internal partial class Delegates
 {
     /// <summary>
     /// Typed function pointer table. Populated by Initialize / TryLoadV30Symbols /
-    /// TryLoadFromGetInterface alongside the legacy delegate fields. Migration target
-    /// for BL-060 — every delegate field is being replaced by an entry here plus a
-    /// wrapper method on this class.
+    /// TryLoadFromGetInterface; every cryptoki function is dispatched through an entry
+    /// here plus a wrapper method on this class.
     /// </summary>
     internal readonly FunctionPointers _fp = new();
 
