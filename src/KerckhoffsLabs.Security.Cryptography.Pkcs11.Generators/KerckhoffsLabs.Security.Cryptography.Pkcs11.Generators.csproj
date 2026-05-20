@@ -7,7 +7,7 @@
          emit NETSDK1207 when the smoke project (or any AOT-publish consumer) is built. -->
     <PublishAot>false</PublishAot>
     <IsAotCompatible>false</IsAotCompatible>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>

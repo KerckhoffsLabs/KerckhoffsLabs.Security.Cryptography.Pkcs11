@@ -11,19 +11,19 @@
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <RuntimeIdentifiers>win-x86;win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>13.0</LangVersion>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
 
   <PropertyGroup>
     <PackageId>KerckhoffsLabs.Security.Cryptography.Pkcs11</PackageId>
-    <Version>0.1.0</Version>
-    <Authors>Alexandre Laroche</Authors>
-    <Description>Modern, secure-by-default PKCS#11 v3.1 interop for .NET.</Description>
+    <Version>0.0.0</Version>
+    <Authors>KerckhoffsLabs and contributors</Authors>
+    <Description>Modern, secure-by-default PKCS#11 v3.2 interop for .NET.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/KerckhoffsLabs/PKCS11.NET</RepositoryUrl>
+    <RepositoryUrl>https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
