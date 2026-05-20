@@ -21,28 +21,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// </list>
 /// Never construct instances directly.
 /// </remarks>
-public abstract class Pkcs11Exception : Exception
+/// <remarks>
+/// Initializes a new instance carrying the CKR and method name. Used by
+/// <see cref="ExceptionMapper"/> when dispatching <see cref="ThrowIfError(CKR, string)"/>.
+/// </remarks>
+/// <param name="returnValue">The PKCS#11 return value.</param>
+/// <param name="method">Name of the failing PKCS#11 method.</param>
+/// <param name="message">Optional explanatory message. When null, a default message
+/// of the form <c>"PKCS#11 method &lt;method&gt; returned &lt;returnValue&gt;"</c> is used.</param>
+public abstract class Pkcs11Exception(CKR returnValue, string method, string? message) : Exception(BuildMessage(method, returnValue, message))
 {
     /// <summary>PKCS#11 return value that triggered this exception.</summary>
-    public CKR ReturnValue { get; }
+    public CKR ReturnValue { get; } = returnValue;
 
     /// <summary>Name of the PKCS#11 method whose return value triggered this exception.</summary>
-    public string Method { get; }
-
-    /// <summary>
-    /// Initializes a new instance carrying the CKR and method name. Used by
-    /// <see cref="ExceptionMapper"/> when dispatching <see cref="ThrowIfError(CKR, string)"/>.
-    /// </summary>
-    /// <param name="returnValue">The PKCS#11 return value.</param>
-    /// <param name="method">Name of the failing PKCS#11 method.</param>
-    /// <param name="message">Optional explanatory message. When null, a default message
-    /// of the form <c>"PKCS#11 method &lt;method&gt; returned &lt;returnValue&gt;"</c> is used.</param>
-    protected Pkcs11Exception(CKR returnValue, string method, string? message)
-        : base(BuildMessage(method, returnValue, message))
-    {
-        ReturnValue = returnValue;
-        Method = method;
-    }
+    public string Method { get; } = method;
 
     private static string BuildMessage(string method, CKR returnValue, string? message)
     {
