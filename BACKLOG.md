@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 15 | **Medium:** 20 | **Low:** 6
+- **Critical:** 0 | **High:** 15 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -755,6 +755,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-058] Pre-release `Microsoft.DotNet.XUnitExtensions` test dependency fragility
 
+- **Status: Won't Fix (2026-05-20)** — Test-only dependency; it never ships in the package, so feed fragility can at most break a local/CI test restore, not consumers. No stable `Microsoft.DotNet.XUnitExtensions` release exists to pin to, and the `[ConditionalFact]`/`[ConditionalTheory]` support it provides (used for the SoftHSM-gated tests) has no drop-in replacement worth a rewrite. `packages.lock.json` + `--locked-mode` already pin the exact resolved version, so the build is reproducible despite the pre-release source. Revisit only if the feed actually breaks or a stable release ships.
 - **Area:** Release Eng
 - **Severity:** Low
 - **Effort:** S
