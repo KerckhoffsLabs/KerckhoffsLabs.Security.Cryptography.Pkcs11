@@ -30,7 +30,7 @@ internal partial struct CK_MECHANISM
     /// </summary>
     /// <param name="mechanism">Mechanism type</param>
     /// <returns>Mechanism of given type with no parameter</returns>
-    public static CK_MECHANISM CreateMechanism(CKM mechanism)
+    internal static CK_MECHANISM CreateMechanism(CKM mechanism)
     {
         return CreateMechanism(mechanism.ToCULong());
     }
@@ -40,7 +40,7 @@ internal partial struct CK_MECHANISM
     /// </summary>
     /// <param name="mechanism">Mechanism type</param>
     /// <returns>Mechanism of given type with no parameter</returns>
-    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism)
+    internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism)
     {
         return CreateMechanism(mechanism, ReadOnlySpan<byte>.Empty);
     }
@@ -51,7 +51,7 @@ internal partial struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with byte array parameter</returns>
-    public static CK_MECHANISM CreateMechanism(CKM mechanism, byte[]? parameter)
+    internal static CK_MECHANISM CreateMechanism(CKM mechanism, byte[]? parameter)
         => CreateMechanism(mechanism.ToCULong(), (ReadOnlySpan<byte>)(parameter ?? Array.Empty<byte>()));
 
     /// <summary>
@@ -60,7 +60,7 @@ internal partial struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with byte array parameter</returns>
-    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, byte[]? parameter)
+    internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism, byte[]? parameter)
         => CreateMechanism(mechanism, (ReadOnlySpan<byte>)(parameter ?? Array.Empty<byte>()));
 
     /// <summary>
@@ -69,7 +69,7 @@ internal partial struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with span parameter</returns>
-    public static CK_MECHANISM CreateMechanism(CKM mechanism, ReadOnlySpan<byte> parameter)
+    internal static CK_MECHANISM CreateMechanism(CKM mechanism, ReadOnlySpan<byte> parameter)
         => CreateMechanism(mechanism.ToCULong(), parameter);
 
     /// <summary>
@@ -78,7 +78,7 @@ internal partial struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with span parameter</returns>
-    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, ReadOnlySpan<byte> parameter)
+    internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism, ReadOnlySpan<byte> parameter)
     {
         CK_MECHANISM mech = new() { Mechanism = mechanism };
         if (parameter.Length > 0)
@@ -101,7 +101,7 @@ internal partial struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameterStructure">Structure with mechanism parameters</param>
     /// <returns>Mechanism of given type with structure as parameter</returns>
-    public static CK_MECHANISM CreateMechanism(CKM mechanism, object parameterStructure)
+    internal static CK_MECHANISM CreateMechanism(CKM mechanism, object parameterStructure)
     {
         ArgumentNullException.ThrowIfNull(parameterStructure);
 
@@ -114,7 +114,7 @@ internal partial struct CK_MECHANISM
     /// <param name="mechanism">Mechanism type</param>
     /// <param name="parameterStructure">Structure with mechanism parameters</param>
     /// <returns>Mechanism of given type with structure as parameter</returns>
-    public static CK_MECHANISM CreateMechanism(NativeCULong mechanism, object parameterStructure)
+    internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism, object parameterStructure)
     {
         ArgumentNullException.ThrowIfNull(parameterStructure);
         CK_MECHANISM mech = new()

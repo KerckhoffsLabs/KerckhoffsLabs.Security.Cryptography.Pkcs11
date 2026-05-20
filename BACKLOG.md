@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 13 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 12 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -330,6 +330,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-024] `CK_MECHANISM.CreateMechanism` is `public static` and allocates unmanaged memory invisibly
 
+- **Status: Resolved (2026-05-20)** — The `CK_MECHANISM` struct itself was already demoted to `internal` by BL-022; the remaining gap was the eight `CreateMechanism` factories still declared `public static` (misleading — they were already unreachable externally through the internal struct). Demoted all eight to `internal static`, so no public escape hatch advertises an allocate-without-dispose path. All mechanism construction goes through the `IDisposable` `Mechanism` class. The lone external caller is a test, which reaches the internal members via `[InternalsVisibleTo]`. Struct fields stay `public` — the same harmless public-fields-on-internal-struct pattern BL-022 left across the other `CK_*` types. 590 tests pass.
 - **Area:** .NET API Design / P/Invoke
 - **Severity:** High
 - **Effort:** M
