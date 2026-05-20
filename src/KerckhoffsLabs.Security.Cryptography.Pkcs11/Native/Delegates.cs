@@ -4,29 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetInfoDelegate(ref CK_INFO info);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetSlotInfoDelegate(NativeCULong slotId, ref CK_SLOT_INFO info);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetTokenInfoDelegate(NativeCULong slotId, ref CK_TOKEN_INFO info);
-
-// ── Windows-layout variants (non-blittable only) ─────────────────────────────
-// Only the *_INFO delegates for CK_INFO / CK_SLOT_INFO / CK_TOKEN_INFO remain here;
-// their structs contain [MarshalAs(ByValArray)] byte[] fields and are not blittable.
-// CK_MECHANISM_INFO and CK_SESSION_INFO are fully blittable and have been migrated to
-// fptrs in FunctionPointers.
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetInfoDelegate_Windows(ref CK_INFO_Windows info);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetSlotInfoDelegate_Windows(NativeCULong slotId, ref CK_SLOT_INFO_Windows info);
-
-[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-internal delegate NativeCULong C_GetTokenInfoDelegate_Windows(NativeCULong slotId, ref CK_TOKEN_INFO_Windows info);
 
 /// <summary>
 /// Holds delegates for all PKCS#11 functions
@@ -72,10 +49,22 @@ internal partial class Delegates
         return _fp.C_Finalize(reserved);
     }
 
-    /// <summary>
-    /// Delegate for C_GetInfo
-    /// </summary>
-    internal C_GetInfoDelegate? C_GetInfo = null;
+    /// <summary>Wrapper for <c>C_GetInfo</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetInfo(ref CK_INFO info)
+    {
+        if (_fp.C_GetInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInfo");
+        fixed (CK_INFO* p = &info) return _fp.C_GetInfo(p);
+    }
+
+    /// <summary>Wrapper for <c>C_GetInfo</c> with Pack=1 Windows struct layout.</summary>
+    public unsafe NativeCULong C_GetInfo_Windows(ref CK_INFO_Windows info)
+    {
+        if (_fp.C_GetInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInfo_Windows");
+        fixed (CK_INFO_Windows* p = &info) return _fp.C_GetInfo_Windows(p);
+    }
+
+    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetInfo</c> fptr is bound.</summary>
+    internal unsafe bool HasC_GetInfo_Windows => _fp.C_GetInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_GetFunctionList</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetFunctionList(out IntPtr functionList)
@@ -98,15 +87,39 @@ internal partial class Delegates
             return _fp.C_GetSlotList((byte)(tokenPresent ? 1 : 0), slotPtr, countPtr);
     }
 
-    /// <summary>
-    /// Delegate for C_GetSlotInfo
-    /// </summary>
-    internal C_GetSlotInfoDelegate? C_GetSlotInfo = null;
+    /// <summary>Wrapper for <c>C_GetSlotInfo</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
+    {
+        if (_fp.C_GetSlotInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotInfo");
+        fixed (CK_SLOT_INFO* p = &info) return _fp.C_GetSlotInfo(slotId, p);
+    }
 
-    /// <summary>
-    /// Delegate for C_GetTokenInfo
-    /// </summary>
-    internal C_GetTokenInfoDelegate? C_GetTokenInfo = null;
+    /// <summary>Wrapper for <c>C_GetSlotInfo</c> with Pack=1 Windows struct layout.</summary>
+    public unsafe NativeCULong C_GetSlotInfo_Windows(NativeCULong slotId, ref CK_SLOT_INFO_Windows info)
+    {
+        if (_fp.C_GetSlotInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotInfo_Windows");
+        fixed (CK_SLOT_INFO_Windows* p = &info) return _fp.C_GetSlotInfo_Windows(slotId, p);
+    }
+
+    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetSlotInfo</c> fptr is bound.</summary>
+    internal unsafe bool HasC_GetSlotInfo_Windows => _fp.C_GetSlotInfo_Windows is not null;
+
+    /// <summary>Wrapper for <c>C_GetTokenInfo</c>. Matches the prior delegate signature exactly.</summary>
+    public unsafe NativeCULong C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
+    {
+        if (_fp.C_GetTokenInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetTokenInfo");
+        fixed (CK_TOKEN_INFO* p = &info) return _fp.C_GetTokenInfo(slotId, p);
+    }
+
+    /// <summary>Wrapper for <c>C_GetTokenInfo</c> with Pack=1 Windows struct layout.</summary>
+    public unsafe NativeCULong C_GetTokenInfo_Windows(NativeCULong slotId, ref CK_TOKEN_INFO_Windows info)
+    {
+        if (_fp.C_GetTokenInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetTokenInfo_Windows");
+        fixed (CK_TOKEN_INFO_Windows* p = &info) return _fp.C_GetTokenInfo_Windows(slotId, p);
+    }
+
+    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetTokenInfo</c> fptr is bound.</summary>
+    internal unsafe bool HasC_GetTokenInfo_Windows => _fp.C_GetTokenInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_GetMechanismList</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetMechanismList(NativeCULong slotId, NativeCULong[]? mechanismList, ref NativeCULong count)
@@ -1130,20 +1143,10 @@ internal partial class Delegates
             return _fp.C_UnwrapKeyAuthenticated(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
     }
 
-    // ── Windows-layout delegate fields (non-blittable only) ──────────────────
-    // Only CK_INFO / CK_SLOT_INFO / CK_TOKEN_INFO delegates remain as delegates;
-    // their structs contain [MarshalAs(ByValArray)] byte[] fields and are not blittable
-    // (Pack=1 does not change blittability). CK_MECHANISM_INFO and CK_SESSION_INFO are
-    // blittable and have been migrated to fptrs in FunctionPointers with wrapper methods.
-
-    internal C_GetInfoDelegate_Windows? C_GetInfo_Windows;
-    internal C_GetSlotInfoDelegate_Windows? C_GetSlotInfo_Windows;
-    internal C_GetTokenInfoDelegate_Windows? C_GetTokenInfo_Windows;
-
     // ── Windows-layout fptr wrapper methods ──────────────────────────────────
     // These wrap the fptrs in FunctionPointers._fp for blittable _Windows types.
-    // Callers check _fp.C_X_Windows is not null before invoking; the wrapper
-    // throws Pkcs11Exception if the fptr is unexpectedly null (defensive only).
+    // Callers check HasC_X_Windows before invoking; the wrapper throws Pkcs11Exception
+    // if the fptr is unexpectedly null (defensive only).
 
     /// <summary>Wrapper for <c>C_CreateObject</c> with Pack=1 Windows struct layout.</summary>
     public unsafe NativeCULong C_CreateObject_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong objectId)
@@ -1753,14 +1756,23 @@ internal partial class Delegates
     {
         unsafe { _fp.C_Initialize = (delegate* unmanaged[Cdecl]<IntPtr, NativeCULong>)funcList.C_Initialize; }
         unsafe { _fp.C_Finalize = (delegate* unmanaged[Cdecl]<IntPtr, NativeCULong>)funcList.C_Finalize; }
-        C_GetInfo = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate>(funcList.C_GetInfo);
-        C_GetInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetInfoDelegate_Windows>(funcList.C_GetInfo);
+        unsafe
+        {
+            _fp.C_GetInfo = (delegate* unmanaged[Cdecl]<CK_INFO*, NativeCULong>)funcList.C_GetInfo;
+            _fp.C_GetInfo_Windows = (delegate* unmanaged[Cdecl]<CK_INFO_Windows*, NativeCULong>)funcList.C_GetInfo;
+        }
         unsafe { _fp.C_GetFunctionList = (delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)funcList.C_GetFunctionList; }
         unsafe { _fp.C_GetSlotList = (delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong>)funcList.C_GetSlotList; }
-        C_GetSlotInfo = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate>(funcList.C_GetSlotInfo);
-        C_GetSlotInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetSlotInfoDelegate_Windows>(funcList.C_GetSlotInfo);
-        C_GetTokenInfo = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate>(funcList.C_GetTokenInfo);
-        C_GetTokenInfo_Windows = Marshal.GetDelegateForFunctionPointer<C_GetTokenInfoDelegate_Windows>(funcList.C_GetTokenInfo);
+        unsafe
+        {
+            _fp.C_GetSlotInfo = (delegate* unmanaged[Cdecl]<NativeCULong, CK_SLOT_INFO*, NativeCULong>)funcList.C_GetSlotInfo;
+            _fp.C_GetSlotInfo_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_SLOT_INFO_Windows*, NativeCULong>)funcList.C_GetSlotInfo;
+        }
+        unsafe
+        {
+            _fp.C_GetTokenInfo = (delegate* unmanaged[Cdecl]<NativeCULong, CK_TOKEN_INFO*, NativeCULong>)funcList.C_GetTokenInfo;
+            _fp.C_GetTokenInfo_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_TOKEN_INFO_Windows*, NativeCULong>)funcList.C_GetTokenInfo;
+        }
         unsafe { _fp.C_GetMechanismList = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong*, NativeCULong>)funcList.C_GetMechanismList; }
         unsafe
         {

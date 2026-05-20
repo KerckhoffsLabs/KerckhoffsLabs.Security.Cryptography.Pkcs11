@@ -212,10 +212,10 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates!.C_GetInfo_Windows is { } winFn)
+        if (Pkcs11Marshal.IsWindows && _delegates!.HasC_GetInfo_Windows)
         {
             var winInfo = default(CK_INFO_Windows);
-            var rv = winFn(ref winInfo);
+            var rv = _delegates.C_GetInfo_Windows(ref winInfo);
             info = winInfo.ToUnified();
             return (CKR)(ulong)rv;
         }
@@ -264,10 +264,10 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates!.C_GetSlotInfo_Windows is { } winFn)
+        if (Pkcs11Marshal.IsWindows && _delegates!.HasC_GetSlotInfo_Windows)
         {
             var winInfo = default(CK_SLOT_INFO_Windows);
-            var rv = winFn(slotId, ref winInfo);
+            var rv = _delegates.C_GetSlotInfo_Windows(slotId, ref winInfo);
             info = winInfo.ToUnified();
             return (CKR)(ulong)rv;
         }
@@ -285,10 +285,10 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates!.C_GetTokenInfo_Windows is { } winFn)
+        if (Pkcs11Marshal.IsWindows && _delegates!.HasC_GetTokenInfo_Windows)
         {
             var winInfo = default(CK_TOKEN_INFO_Windows);
-            var rv = winFn(slotId, ref winInfo);
+            var rv = _delegates.C_GetTokenInfo_Windows(slotId, ref winInfo);
             info = winInfo.ToUnified();
             return (CKR)(ulong)rv;
         }

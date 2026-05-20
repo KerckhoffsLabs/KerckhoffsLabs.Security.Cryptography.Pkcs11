@@ -33,8 +33,26 @@ internal sealed unsafe class FunctionPointers
     /// <summary>Cryptoki <c>CK_RV C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong> C_DestroyObject;
 
+    /// <summary>Cryptoki <c>CK_RV C_GetInfo(CK_INFO_PTR pInfo)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<CK_INFO*, NativeCULong> C_GetInfo;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetInfo</c> — Pack=1 Windows layout.</summary>
+    public delegate* unmanaged[Cdecl]<CK_INFO_Windows*, NativeCULong> C_GetInfo_Windows;
+
     /// <summary>Cryptoki <c>CK_RV C_GetSlotList(CK_BBOOL tokenPresent, CK_SLOT_ID_PTR pSlotList, CK_ULONG_PTR pulCount)</c>.</summary>
     public delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong> C_GetSlotList;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_SLOT_INFO*, NativeCULong> C_GetSlotInfo;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetSlotInfo</c> — Pack=1 Windows layout.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_SLOT_INFO_Windows*, NativeCULong> C_GetSlotInfo_Windows;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_TOKEN_INFO*, NativeCULong> C_GetTokenInfo;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetTokenInfo</c> — Pack=1 Windows layout.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_TOKEN_INFO_Windows*, NativeCULong> C_GetTokenInfo_Windows;
 
     /// <summary>Cryptoki <c>CK_RV C_GetMechanismList(CK_SLOT_ID slotID, CK_MECHANISM_TYPE_PTR pMechanismList, CK_ULONG_PTR pulCount)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong*, NativeCULong> C_GetMechanismList;
