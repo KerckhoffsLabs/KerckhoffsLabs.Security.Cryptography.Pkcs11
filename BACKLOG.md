@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 15 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 14 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -253,6 +253,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-018] `CKM_AES_CBC`, `CKM_AES_CTR`, `CKM_RC4`, `CKM_RC2_*` not in `GuardMechanism`
 
+- **Status: Resolved (2026-05-20)** — Added `GuardMechanism` arms grouped by class: unauthenticated AES modes (`CKM_AES_CBC` raw, `CKM_AES_CTR`, `CKM_AES_CTS`, `CKM_AES_OFB`, `CKM_AES_CFB{1,8,64,128}` — `CKM_AES_CBC_PAD` stays permitted as the documented legacy fallback); broken/legacy ciphers (`CKM_RC4*`, `CKM_RC2_*`, `CKM_SEED_*`); broken/deprecated hashes (`CKM_MD2*`, `CKM_RIPEMD128*`/`CKM_RIPEMD160*`); SHA-1 in signature/MAC contexts (`CKM_SHA_1_HMAC*`, `CKM_ECDSA_SHA1`); and raw `CKM_RSA_X_509`. Each throws `InsecureOperationException` with a specific remediation; all are opt-out via `AllowInsecure`. Two tests that deliberately round-trip raw AES-CBC now use `AllowInsecureScope()`/`AllowInsecure=true`. Added 13 gate-coverage `[InlineData]` cases. 582 tests pass. Out of scope (not named in this item, left ungated): the other 64-bit-block legacy ciphers `CKM_CAST*`, `CKM_RC5_*`, `CKM_BLOWFISH_*`, `CKM_SKIPJACK_*` — file a follow-up if a wider sweep is wanted.
 - **Area:** Cryptography
 - **Severity:** High
 - **Effort:** S

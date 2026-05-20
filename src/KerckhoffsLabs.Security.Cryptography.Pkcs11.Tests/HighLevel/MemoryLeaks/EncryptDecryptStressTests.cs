@@ -54,10 +54,12 @@ public sealed class EncryptDecryptStressTests : IDisposable
         for (int i = 0; i < 100; i++)
         {
             var session = TestKeys.OpenLoggedInSession(_backend);
+            // Raw AES-CBC is gated by default (BL-018); opt in since this stress test only
+            // cares about unmanaged-allocation discipline, not the choice of mechanism.
+            session.AllowInsecure = true;
             try
             {
                 // Build the Mechanism and attempt a realistic create+encrypt+destroy cycle.
-                // CKM_AES_CBC is not on the insecure-mechanism list, so GuardMechanism passes.
                 // The mock backend may reject C_EncryptInit with a CKR_* code; that is fine —
                 // the assertion is about unmanaged-allocation discipline, not crypto output.
                 using var mech = new Mechanism(CKM.CKM_AES_CBC, iv);

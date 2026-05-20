@@ -625,6 +625,63 @@ internal sealed partial class Pkcs11Session
             case CKM.CKM_AES_ECB:
                 throw new InsecureOperationException(mechanism,
                     "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
+            case CKM.CKM_AES_CBC:
+            case CKM.CKM_AES_CTR:
+            case CKM.CKM_AES_CTS:
+            case CKM.CKM_AES_OFB:
+            case CKM.CKM_AES_CFB1:
+            case CKM.CKM_AES_CFB8:
+            case CKM.CKM_AES_CFB64:
+            case CKM.CKM_AES_CFB128:
+                throw new InsecureOperationException(mechanism,
+                    "Unauthenticated AES modes provide no integrity protection (and raw CBC enables padding-oracle attacks); use CKM_AES_GCM or CKM_AES_CCM. CKM_AES_CBC_PAD remains permitted for legacy interop.");
+            case CKM.CKM_RC4:
+            case CKM.CKM_RC4_KEY_GEN:
+                throw new InsecureOperationException(mechanism,
+                    "RC4 is a broken stream cipher with a biased keystream (prohibited in TLS by RFC 7465); use CKM_AES_GCM.");
+            case CKM.CKM_RC2_ECB:
+            case CKM.CKM_RC2_CBC:
+            case CKM.CKM_RC2_CBC_PAD:
+            case CKM.CKM_RC2_MAC:
+            case CKM.CKM_RC2_MAC_GENERAL:
+            case CKM.CKM_RC2_KEY_GEN:
+                throw new InsecureOperationException(mechanism,
+                    "RC2 is a deprecated 40/64-bit-key cipher with known weaknesses; use CKM_AES_GCM.");
+            case CKM.CKM_SEED_ECB:
+            case CKM.CKM_SEED_CBC:
+            case CKM.CKM_SEED_CBC_PAD:
+            case CKM.CKM_SEED_MAC:
+            case CKM.CKM_SEED_MAC_GENERAL:
+            case CKM.CKM_SEED_KEY_GEN:
+            case CKM.CKM_SEED_CBC_ENCRYPT_DATA:
+            case CKM.CKM_SEED_ECB_ENCRYPT_DATA:
+                throw new InsecureOperationException(mechanism,
+                    "SEED is a legacy regional cipher retained only for Korean-standard interop; use CKM_AES_GCM.");
+            case CKM.CKM_MD2:
+            case CKM.CKM_MD2_HMAC:
+            case CKM.CKM_MD2_HMAC_GENERAL:
+            case CKM.CKM_MD2_KEY_DERIVATION:
+            case CKM.CKM_MD2_RSA_PKCS:
+                throw new InsecureOperationException(mechanism,
+                    "MD2 is a broken hash function; use CKM_SHA256 or stronger.");
+            case CKM.CKM_RIPEMD128:
+            case CKM.CKM_RIPEMD128_HMAC:
+            case CKM.CKM_RIPEMD128_HMAC_GENERAL:
+            case CKM.CKM_RIPEMD128_RSA_PKCS:
+            case CKM.CKM_RIPEMD160:
+            case CKM.CKM_RIPEMD160_HMAC:
+            case CKM.CKM_RIPEMD160_HMAC_GENERAL:
+            case CKM.CKM_RIPEMD160_RSA_PKCS:
+                throw new InsecureOperationException(mechanism,
+                    "RIPEMD-128/160 are deprecated hash functions; use CKM_SHA256 or stronger.");
+            case CKM.CKM_SHA_1_HMAC:
+            case CKM.CKM_SHA_1_HMAC_GENERAL:
+            case CKM.CKM_ECDSA_SHA1:
+                throw new InsecureOperationException(mechanism,
+                    "SHA-1 is collision-broken and deprecated in signature/MAC contexts; use CKM_SHA256_HMAC or CKM_ECDSA_SHA256.");
+            case CKM.CKM_RSA_X_509:
+                throw new InsecureOperationException(mechanism,
+                    "Raw RSA (X.509, no padding) is malleable and forgeable; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
             default:
                 return;
         }
