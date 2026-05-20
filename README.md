@@ -1,6 +1,21 @@
-# PKCS11.NET
+# KerckhoffsLabs.Security.Cryptography.Pkcs11
 
-Modern, secure-by-default PKCS#11 v3.1 interop for .NET.
+[![NuGet](https://img.shields.io/nuget/v/KerckhoffsLabs.Security.Cryptography.Pkcs11)](https://www.nuget.org/packages/KerckhoffsLabs.Security.Cryptography.Pkcs11)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![codecov](https://codecov.io/gh/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/graph/badge.svg?token=9N30Z15QRA)](https://codecov.io/gh/KerckhoffsLabs.Security.Cryptography.Pkcs11)
+
+Modern, secure-by-default PKCS#11 v3.2 interop for .NET.
+
+## Requirements
+
+- .NET 10.0 or later
+
+## Installation
+
+```
+dotnet add package KerckhoffsLabs.Security.Cryptography.Pkcs11
+```
 
 ## Building
 
