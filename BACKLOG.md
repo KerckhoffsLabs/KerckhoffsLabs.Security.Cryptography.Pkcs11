@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 14 | **Medium:** 21 | **Low:** 5
+- **Critical:** 0 | **High:** 14 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -812,6 +812,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-067] Other legacy 64-bit-block ciphers not in `GuardMechanism`
 
+- **Status: Resolved (2026-05-20)** — Added `GuardMechanism` arms for the CAST (`CKM_CAST_*`, `CKM_CAST3_*`, `CKM_CAST5_*`), RC5 (`CKM_RC5_*`), Blowfish (`CKM_BLOWFISH_*`), and SKIPJACK (`CKM_SKIPJACK_*`, including the `*64`/`CFB*` modes and the `WRAP`/`PRIVATE_WRAP`/`RELAYX` key-wrap mechanisms) families, each throwing `InsecureOperationException` recommending `CKM_AES_GCM`. `CKM_CAST128_*` is an alias of `CKM_CAST5_*` (identical enum values), so only the CAST5 labels are listed — they match CAST128 calls too. Added 8 gate-coverage `[InlineData]` cases. 590 tests pass.
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** S

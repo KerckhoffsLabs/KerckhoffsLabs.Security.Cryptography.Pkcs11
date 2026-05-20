@@ -682,6 +682,54 @@ internal sealed partial class Pkcs11Session
             case CKM.CKM_RSA_X_509:
                 throw new InsecureOperationException(mechanism,
                     "Raw RSA (X.509, no padding) is malleable and forgeable; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
+            case CKM.CKM_CAST_ECB:
+            case CKM.CKM_CAST_CBC:
+            case CKM.CKM_CAST_CBC_PAD:
+            case CKM.CKM_CAST_MAC:
+            case CKM.CKM_CAST_MAC_GENERAL:
+            case CKM.CKM_CAST_KEY_GEN:
+            case CKM.CKM_CAST3_ECB:
+            case CKM.CKM_CAST3_CBC:
+            case CKM.CKM_CAST3_CBC_PAD:
+            case CKM.CKM_CAST3_MAC:
+            case CKM.CKM_CAST3_MAC_GENERAL:
+            case CKM.CKM_CAST3_KEY_GEN:
+            // CKM_CAST128_* are aliases of CKM_CAST5_* (identical enum values), so the
+            // CAST5 labels below also match CAST128 calls.
+            case CKM.CKM_CAST5_ECB:
+            case CKM.CKM_CAST5_CBC:
+            case CKM.CKM_CAST5_CBC_PAD:
+            case CKM.CKM_CAST5_MAC:
+            case CKM.CKM_CAST5_MAC_GENERAL:
+            case CKM.CKM_CAST5_KEY_GEN:
+                throw new InsecureOperationException(mechanism,
+                    "CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
+            case CKM.CKM_RC5_ECB:
+            case CKM.CKM_RC5_CBC:
+            case CKM.CKM_RC5_CBC_PAD:
+            case CKM.CKM_RC5_MAC:
+            case CKM.CKM_RC5_MAC_GENERAL:
+            case CKM.CKM_RC5_KEY_GEN:
+                throw new InsecureOperationException(mechanism,
+                    "RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
+            case CKM.CKM_BLOWFISH_CBC:
+            case CKM.CKM_BLOWFISH_CBC_PAD:
+            case CKM.CKM_BLOWFISH_KEY_GEN:
+                throw new InsecureOperationException(mechanism,
+                    "Blowfish is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
+            case CKM.CKM_SKIPJACK_KEY_GEN:
+            case CKM.CKM_SKIPJACK_ECB64:
+            case CKM.CKM_SKIPJACK_CBC64:
+            case CKM.CKM_SKIPJACK_OFB64:
+            case CKM.CKM_SKIPJACK_CFB64:
+            case CKM.CKM_SKIPJACK_CFB32:
+            case CKM.CKM_SKIPJACK_CFB16:
+            case CKM.CKM_SKIPJACK_CFB8:
+            case CKM.CKM_SKIPJACK_WRAP:
+            case CKM.CKM_SKIPJACK_PRIVATE_WRAP:
+            case CKM.CKM_SKIPJACK_RELAYX:
+                throw new InsecureOperationException(mechanism,
+                    "SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses; use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping).");
             default:
                 return;
         }
