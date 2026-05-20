@@ -1,0 +1,41 @@
+name: coverage
+
+on:
+  push:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore src/KerckhoffsLabs.sln --locked-mode
+
+      - name: Build
+        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+
+      - name: Test with coverage
+        run: >
+          dotnet test src/KerckhoffsLabs.sln --no-build -c Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+          --logger "console;verbosity=normal"
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        with:
+          files: ./coverage/**/coverage.cobertura.xml
+          fail_ci_if_error: true
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

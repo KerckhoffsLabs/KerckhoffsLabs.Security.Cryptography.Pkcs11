@@ -1,0 +1,45 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC trusted publishing
+      attestations: write  # required for attest-build-provenance
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0  # required to resolve the tag ref
+
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore src/KerckhoffsLabs.sln --locked-mode
+
+      - run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+
+      - run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release
+
+      - name: Pack
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          dotnet pack src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj --no-build -c Release -o ./artifacts /p:Version=$VERSION
+
+      - uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: ./artifacts/*.nupkg
+
+      - name: NuGet login (OIDC)
+        uses: nuget/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}

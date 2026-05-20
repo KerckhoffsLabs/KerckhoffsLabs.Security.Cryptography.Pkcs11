@@ -3,90 +3,51 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
 
+permissions: read-all
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore src/KerckhoffsLabs.sln --locked-mode
+
+      - run: dotnet format src/KerckhoffsLabs.sln --verify-no-changes --no-restore
+
   build-and-test:
-    name: build-and-test (${{ matrix.os }})
+    name: ${{ matrix.os }}${{ matrix.arch == 'x86' && ' (x86)' || '' }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: windows-latest
+            arch: x86
+
     steps:
-      - name: Checkout (with submodules)
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
-          dotnet-version: |
-            10.0.x
-
-      - name: Install build deps (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential
-
-      - name: Install SoftHSM2 (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y softhsm2
-
-      - name: Install SoftHSM2 (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install -y softhsm --no-progress
-          if (-not (Get-Command softhsm2-util.exe -ErrorAction SilentlyContinue))
-          {
-              $candidate = (Get-ChildItem -Path 'C:\Program Files\SoftHSM2\bin\softhsm2-util.exe' -ErrorAction SilentlyContinue)
-              if (-not $candidate) {
-                  Write-Error "SoftHSM2 install did not produce softhsm2-util.exe"
-                  exit 1
-              }
-              echo "$($candidate.DirectoryName)" >> $env:GITHUB_PATH
-          }
-          softhsm2-util.exe --version
+          dotnet-version: '10.0.x'
+          architecture: ${{ matrix.arch || 'x64' }}
 
       - name: Restore
-        run: dotnet restore src/KerckhoffsLabs.sln
+        run: dotnet restore src/KerckhoffsLabs.sln --locked-mode
 
       - name: Build
-        run: dotnet build src/KerckhoffsLabs.sln --configuration Release --no-restore
+        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       - name: Test
-        run: dotnet test src/KerckhoffsLabs.sln --configuration Release --no-build --logger trx --results-directory TestResults
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.os }}
-          path: TestResults/
-
-  pack:
-    name: pack
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            10.0.x
-
-      - name: Pack
-        run: dotnet pack src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj --configuration Release -p:SkipPkcs11MockBuild=true -o artifacts
-
-      - name: Upload nupkg
-        uses: actions/upload-artifact@v4
-        with:
-          name: nupkg
-          path: artifacts/
+        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
