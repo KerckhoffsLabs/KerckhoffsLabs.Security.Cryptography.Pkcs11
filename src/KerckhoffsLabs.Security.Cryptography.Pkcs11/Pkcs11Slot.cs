@@ -22,7 +22,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private LowLevelPkcs11Library _pkcs11Library = null;
+    private ILowLevelPkcs11Library _pkcs11Library = null;
 
     /// <summary>
     /// PKCS#11 handle of slot
@@ -45,7 +45,7 @@ public sealed class Pkcs11Slot
     /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="slotId">PKCS#11 handle of slot</param>
-    internal Pkcs11Slot(LowLevelPkcs11Library pkcs11Library, ulong slotId)
+    internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId)
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::ctor", slotId);
 

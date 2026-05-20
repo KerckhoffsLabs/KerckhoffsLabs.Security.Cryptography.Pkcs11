@@ -19,11 +19,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 /// </remarks>
 internal sealed class Pkcs11SessionHandle : SafeHandle
 {
-    private readonly LowLevelPkcs11Library _library;
+    private readonly ILowLevelPkcs11Library _library;
 
     /// <summary>Creates a session handle. The handle is invalid if <paramref name="sessionId"/> is <see cref="CK.CK_INVALID_HANDLE"/>.</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="library"/> is null.</exception>
-    public Pkcs11SessionHandle(LowLevelPkcs11Library library, NativeCULong sessionId)
+    public Pkcs11SessionHandle(ILowLevelPkcs11Library library, NativeCULong sessionId)
         : base(IntPtr.Zero, ownsHandle: true)
     {
         _library = library ?? throw new ArgumentNullException(nameof(library));

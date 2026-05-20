@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-internal sealed class LowLevelPkcs11Library
+internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
@@ -42,7 +42,7 @@ internal sealed class LowLevelPkcs11Library
     /// Test seam: current count of tracked (still-live) session handles. Prunes dead
     /// weak refs on read so the count reflects what's actually reachable.
     /// </summary>
-    internal int TrackedSessionCount
+    public int TrackedSessionCount
     {
         get
         {
@@ -58,7 +58,7 @@ internal sealed class LowLevelPkcs11Library
     /// Registers a session handle for cleanup at library teardown. Called from the
     /// <see cref="Pkcs11SessionHandle"/> constructor.
     /// </summary>
-    internal void RegisterSession(Pkcs11SessionHandle handle)
+    public void RegisterSession(Pkcs11SessionHandle handle)
     {
         ArgumentNullException.ThrowIfNull(handle);
         lock (_sessionsLock)
@@ -73,7 +73,7 @@ internal sealed class LowLevelPkcs11Library
     /// <see cref="Pkcs11SessionHandle.ReleaseHandle"/> after a normal close so the
     /// tracker doesn't grow unbounded.
     /// </summary>
-    internal void UnregisterSession(Pkcs11SessionHandle handle)
+    public void UnregisterSession(Pkcs11SessionHandle handle)
     {
         ArgumentNullException.ThrowIfNull(handle);
         lock (_sessionsLock)
@@ -91,7 +91,7 @@ internal sealed class LowLevelPkcs11Library
     /// thread-safe, so it's safe to invoke even if the user races us by disposing the same
     /// session on another thread.
     /// </summary>
-    internal void CloseAllTrackedSessions()
+    public void CloseAllTrackedSessions()
     {
         Pkcs11SessionHandle[] live;
         lock (_sessionsLock)

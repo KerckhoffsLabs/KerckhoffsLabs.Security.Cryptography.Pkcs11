@@ -27,7 +27,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private LowLevelPkcs11Library _pkcs11Library = null;
+    private ILowLevelPkcs11Library _pkcs11Library = null;
 
     /// <summary>
     /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
@@ -249,7 +249,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="sessionId">PKCS#11 handle of session</param>
-    internal Pkcs11Session(LowLevelPkcs11Library pkcs11Library, ulong sessionId)
+    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)
     {
         _logger.LogDebug("Session({SessionId})::ctor", sessionId);
 

@@ -37,7 +37,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private LowLevelPkcs11Library? _pkcs11Library = null;
+    private ILowLevelPkcs11Library? _pkcs11Library = null;
 
     /// <summary>
     /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>.
@@ -52,7 +52,7 @@ public sealed class Pkcs11Library : IDisposable
     /// Test seam: access to the underlying low-level wrapper for regression checks on
     /// session tracking (BL-016). Not exposed publicly.
     /// </summary>
-    internal LowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
+    internal ILowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
     /// <summary>
     /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
