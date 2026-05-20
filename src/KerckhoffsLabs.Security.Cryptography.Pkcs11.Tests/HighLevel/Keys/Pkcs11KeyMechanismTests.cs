@@ -24,7 +24,7 @@ internal static class Pkcs11KeyMechanismCases
             using var key = workspace.OpenKey(label);
             var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
 
-            // Raw AES-CBC is gated by default (BL-018); this test deliberately exercises it.
+            // Raw AES-CBC is gated by default; this test deliberately exercises it.
             using var _ = workspace.AllowInsecureScope();
             byte[] ciphertext = key.Encrypt(mech, plaintext);
             byte[] recovered = key.Decrypt(mech, ciphertext);

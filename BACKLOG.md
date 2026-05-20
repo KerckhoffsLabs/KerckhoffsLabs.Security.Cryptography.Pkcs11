@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 14 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 14 | **Medium:** 21 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -809,6 +809,18 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Breaks public API?** No (additive).
 - **Raised by:** Public-surface review.
 - **Spec / References:** PKCS#11 v3.2 §5.9–5.12 (multi-part operations).
+
+### [BL-067] Other legacy 64-bit-block ciphers not in `GuardMechanism`
+
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs` (`GuardMechanism`)
+- **Problem:** BL-018 gated the insecure mechanisms it enumerated (DES/3DES, RC4, RC2, SEED, MD2, RIPEMD, SHA-1 sig/MAC, unauthenticated AES modes, raw RSA). It did not gate the remaining legacy ciphers that are present in the `CKM` enum: `CKM_CAST*` / `CKM_CAST3_*` / `CKM_CAST5_*` / `CKM_CAST128_*`, `CKM_RC5_*`, `CKM_BLOWFISH_*`, and `CKM_SKIPJACK_*`. These are 64-bit-block ciphers (vulnerable to Sweet32-class birthday attacks) or, for SKIPJACK, an 80-bit-key cipher with known weaknesses — all unauthenticated and effectively unused outside legacy interop. A caller can use them today with no warning.
+- **Proposed action:** Add `GuardMechanism` arms for the CAST/RC5/Blowfish/SKIPJACK families (key-gen, ECB/CBC/CBC_PAD, MAC variants), each throwing `InsecureOperationException` recommending `CKM_AES_GCM`. Mirror the BL-018 grouping and add gate-coverage `[InlineData]` cases.
+- **Breaks public API?** No (additive gate; opt-out via `AllowInsecure`).
+- **Raised by:** BL-018 follow-up (2026-05-20).
+- **Spec / References:** NIST SP 800-131A Rev. 2; Sweet32 (CVE-2016-2183) for 64-bit-block ciphers.
 
 ---
 

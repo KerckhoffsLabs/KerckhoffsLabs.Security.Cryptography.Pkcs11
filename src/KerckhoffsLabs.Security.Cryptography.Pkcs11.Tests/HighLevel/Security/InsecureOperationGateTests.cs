@@ -284,11 +284,11 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
-    [InlineData((ulong)CKM.CKM_AES_CBC)]   // BL-018: raw (unauthenticated) AES-CBC
-    [InlineData((ulong)CKM.CKM_AES_CTR)]   // BL-018: unauthenticated AES-CTR
-    [InlineData((ulong)CKM.CKM_RC4)]       // BL-018: broken stream cipher
-    [InlineData((ulong)CKM.CKM_RC2_CBC)]   // BL-018: deprecated cipher
-    [InlineData((ulong)CKM.CKM_SEED_CBC)]  // BL-018: legacy cipher
+    [InlineData((ulong)CKM.CKM_AES_CBC)]   // raw (unauthenticated) AES-CBC
+    [InlineData((ulong)CKM.CKM_AES_CTR)]   // unauthenticated AES-CTR
+    [InlineData((ulong)CKM.CKM_RC4)]       // broken stream cipher
+    [InlineData((ulong)CKM.CKM_RC2_CBC)]   // deprecated cipher
+    [InlineData((ulong)CKM.CKM_SEED_CBC)]  // legacy cipher
     public void Encrypt_InsecureMechanismThrows_Mock(ulong mech)
         => InsecureOperationGateTestCases.Assert_Encrypt_InsecureMechanismThrows(_backend, mech);
 
@@ -318,9 +318,9 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_DES_MAC)]
     [InlineData((ulong)CKM.CKM_DES3_MAC)]
-    [InlineData((ulong)CKM.CKM_ECDSA_SHA1)]  // BL-018: SHA-1 in signatures
-    [InlineData((ulong)CKM.CKM_SHA_1_HMAC)]  // BL-018: SHA-1 in MACs
-    [InlineData((ulong)CKM.CKM_RSA_X_509)]   // BL-018: raw RSA, no padding
+    [InlineData((ulong)CKM.CKM_ECDSA_SHA1)]  // SHA-1 in signatures
+    [InlineData((ulong)CKM.CKM_SHA_1_HMAC)]  // SHA-1 in MACs
+    [InlineData((ulong)CKM.CKM_RSA_X_509)]   // raw RSA, no padding
     public void Sign_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Sign_InsecureMechanismThrows(_backend, mech);
 
@@ -338,8 +338,8 @@ public sealed class InsecureOperationGateTests_Mock
     [Theory]
     [InlineData((ulong)CKM.CKM_MD5)]
     [InlineData((ulong)CKM.CKM_SHA_1)]
-    [InlineData((ulong)CKM.CKM_MD2)]        // BL-018: broken hash
-    [InlineData((ulong)CKM.CKM_RIPEMD160)]  // BL-018: deprecated hash
+    [InlineData((ulong)CKM.CKM_MD2)]        // broken hash
+    [InlineData((ulong)CKM.CKM_RIPEMD160)]  // deprecated hash
     public void Digest_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Digest_InsecureMechanismThrows(_backend, mech);
 
@@ -349,9 +349,9 @@ public sealed class InsecureOperationGateTests_Mock
     [InlineData((ulong)CKM.CKM_DES_KEY_GEN)]
     [InlineData((ulong)CKM.CKM_DES2_KEY_GEN)]
     [InlineData((ulong)CKM.CKM_DES3_KEY_GEN)]
-    [InlineData((ulong)CKM.CKM_RC4_KEY_GEN)]   // BL-018: broken cipher key-gen
-    [InlineData((ulong)CKM.CKM_RC2_KEY_GEN)]   // BL-018: deprecated cipher key-gen
-    [InlineData((ulong)CKM.CKM_SEED_KEY_GEN)]  // BL-018: legacy cipher key-gen
+    [InlineData((ulong)CKM.CKM_RC4_KEY_GEN)]   // broken cipher key-gen
+    [InlineData((ulong)CKM.CKM_RC2_KEY_GEN)]   // deprecated cipher key-gen
+    [InlineData((ulong)CKM.CKM_SEED_KEY_GEN)]  // legacy cipher key-gen
     public void GenerateKey_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_GenerateKey_InsecureMechanismThrows(_backend, mech);
 

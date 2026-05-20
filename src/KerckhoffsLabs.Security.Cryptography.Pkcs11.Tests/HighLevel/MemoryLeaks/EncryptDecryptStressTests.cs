@@ -54,7 +54,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
         for (int i = 0; i < 100; i++)
         {
             var session = TestKeys.OpenLoggedInSession(_backend);
-            // Raw AES-CBC is gated by default (BL-018); opt in since this stress test only
+            // Raw AES-CBC is gated by default; opt in since this stress test only
             // cares about unmanaged-allocation discipline, not the choice of mechanism.
             session.AllowInsecure = true;
             try
