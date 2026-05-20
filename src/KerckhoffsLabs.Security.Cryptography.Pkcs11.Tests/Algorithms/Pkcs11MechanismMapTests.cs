@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 public sealed class Pkcs11MechanismMapTests
 {

@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 using Microsoft.DotNet.XUnitExtensions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Keys;
 
 internal static class Pkcs11KeyMechanismCases
 {

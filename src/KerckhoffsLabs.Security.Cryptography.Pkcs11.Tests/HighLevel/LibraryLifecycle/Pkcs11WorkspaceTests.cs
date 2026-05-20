@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.LibraryLifecycle;
 
 [Collection("Mock")]
 public sealed class Pkcs11WorkspaceTests
