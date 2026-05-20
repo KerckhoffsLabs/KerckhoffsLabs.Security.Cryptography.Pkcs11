@@ -12,7 +12,7 @@ public class AttributeValueException : Exception
     /// <summary>
     /// Attribute whose value could not be read or converted
     /// </summary>
-    private CKA _attribute = CKA.CKA_VENDOR_DEFINED;
+    private readonly CKA _attribute = CKA.CKA_VENDOR_DEFINED;
 
     /// <summary>
     /// Attribute whose value could not be read or converted
@@ -93,6 +93,9 @@ public class AttributeValueException : Exception
     /// </summary>
     /// <param name="info">SerializationInfo that holds the serialized object data about the exception being thrown</param>
     /// <param name="context">StreamingContext that contains contextual information about the source or destination</param>
+    [Obsolete(
+        "This API supports obsolete formatter-based serialization. It should not be called or extended by application code.",
+        DiagnosticId = "SYSLIB0051", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
     protected AttributeValueException(SerializationInfo info, StreamingContext context)
         : base(info, context)
     {
@@ -106,6 +109,9 @@ public class AttributeValueException : Exception
     /// </summary>
     /// <param name="info">SerializationInfo to populate with data</param>
     /// <param name="context">The destination for this serialization</param>
+    [Obsolete(
+        "This API supports obsolete formatter-based serialization. It should not be called or extended by application code.",
+        DiagnosticId = "SYSLIB0051", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
     public override void GetObjectData(SerializationInfo info, StreamingContext context)
     {
         ArgumentNullException.ThrowIfNull(info);
