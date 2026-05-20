@@ -160,7 +160,7 @@ internal sealed partial class Pkcs11Session
                 outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
             }
 
-            byte[] lastEncryptedPart = null;
+            byte[]? lastEncryptedPart = null;
             NativeCULong lastEncryptedPartLen = (NativeCULong)0;
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");

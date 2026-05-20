@@ -30,7 +30,7 @@ internal sealed partial class Pkcs11Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLength = (NativeCULong)0;
 
         if (attributes != null)
@@ -69,7 +69,7 @@ internal sealed partial class Pkcs11Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[] publicKeyTemplate = null;
+        CK_ATTRIBUTE[]? publicKeyTemplate = null;
         NativeCULong publicKeyTemplateLength = (NativeCULong)0;
 
         if (publicKeyAttributes != null)
@@ -80,7 +80,7 @@ internal sealed partial class Pkcs11Session
                 publicKeyTemplate[i] = publicKeyAttributes[i].CkAttribute;
         }
 
-        CK_ATTRIBUTE[] privateKeyTemplate = null;
+        CK_ATTRIBUTE[]? privateKeyTemplate = null;
         NativeCULong privateKeyTemplateLength = (NativeCULong)0;
 
         if (privateKeyAttributes != null)
@@ -181,7 +181,7 @@ internal sealed partial class Pkcs11Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLen = (NativeCULong)0;
         if (attributes != null)
         {

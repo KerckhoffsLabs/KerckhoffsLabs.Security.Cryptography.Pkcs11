@@ -347,7 +347,7 @@ internal sealed partial class Pkcs11Session
             outputStream.Write(part, 0, (int)(partLen));
         }
 
-        byte[] lastPart = null;
+        byte[]? lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");

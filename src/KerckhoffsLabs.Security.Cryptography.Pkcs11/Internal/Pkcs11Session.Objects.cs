@@ -24,7 +24,7 @@ internal sealed partial class Pkcs11Session
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLength = (NativeCULong)0;
 
         if (attributes != null)
@@ -57,7 +57,7 @@ internal sealed partial class Pkcs11Session
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLength = (NativeCULong)0;
 
         if (attributes != null)
@@ -279,7 +279,7 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::FindObjectsInit", _sessionId);
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLength = (NativeCULong)0;
 
         if (attributes != null)
@@ -347,7 +347,7 @@ internal sealed partial class Pkcs11Session
 
         List<ObjectHandle> foundObjects = [];
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLength = (NativeCULong)0;
 
         if (attributes != null)

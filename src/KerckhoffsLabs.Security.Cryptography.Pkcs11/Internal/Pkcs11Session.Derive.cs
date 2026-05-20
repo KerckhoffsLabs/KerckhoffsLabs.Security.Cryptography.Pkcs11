@@ -33,7 +33,7 @@ internal sealed partial class Pkcs11Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[] template = null;
+        CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLen = (NativeCULong)0;
         if (attributes != null)
         {
