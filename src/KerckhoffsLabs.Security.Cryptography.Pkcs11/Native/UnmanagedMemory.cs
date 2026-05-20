@@ -94,12 +94,11 @@ internal static class UnmanagedMemory
         if (size < 0)
             throw new ArgumentException("Value has to be positive number", nameof(size));
 
-        IntPtr memory = IntPtr.Zero;
-
-        // Allocate memory and fill it with zeros
-        // Note: new byte array is automaticaly filled with zeros
-        memory = Marshal.AllocHGlobal(size);
-        Write(memory, new byte[size]);
+        // Allocate then zero in place. NativeMemory.Clear avoids the throwaway managed
+        // byte[] the old Write(memory, new byte[size]) path allocated on every call.
+        IntPtr memory = Marshal.AllocHGlobal(size);
+        if (size > 0)
+            unsafe { NativeMemory.Clear((void*)memory, (nuint)size); }
 
         lock (_allocationsLock)
         {

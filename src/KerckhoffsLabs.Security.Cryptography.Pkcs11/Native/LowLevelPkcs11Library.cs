@@ -2062,7 +2062,6 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
             if (disposing)
             {
                 _library.Dispose();
-                _library = new Pkcs11ModuleHandle();
             }
 
             _disposed = true;

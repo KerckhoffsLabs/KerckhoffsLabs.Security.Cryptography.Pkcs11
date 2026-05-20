@@ -686,6 +686,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-055] Minor polish: `eventOccurred` doc-class items
 
+- **Status: Resolved (2026-05-20)** — Dispositions per sub-item: (1) `Mechanism._mechanismParams` now `IMechanismParams?` (matches the `Parameters` property which is already nullable). (2) `UnmanagedMemory.Allocate` zeroes via `NativeMemory.Clear` instead of allocating a throwaway managed `byte[]` each call. (4) `Pkcs11PublicKeyView.TrySynthesizeRsa/Ec` changed `public static` → `internal static` to match the internal class. (5) `LowLevelPkcs11Library.Dispose` no longer re-assigns `_library = new Pkcs11ModuleHandle()` after disposing it (dead churn; nothing reads the field post-dispose, which is gated by `_disposed`). (7) `Pkcs11Library.GetSlotList` slot-count check simplified to `slotList.Length != (int)slotCount`, dropping the `NativeCULong((uint)…)` round-trip. (8) The `C_GetInterface` version `Minor` guard is moot — `CK_VERSION` became two `byte` fields when made blittable, so the reads are now `version.Major < 3` / `version.Minor >= 2` with no `[0]`/null/length concern. **Deliberately kept:** (3) `DebugModeEnabled` logging the allocation address — it's opt-in debug-only, a pointer is not secret material (and ASLR randomizes it per run), and the address is the correlation key the tracker exists to provide. **Deferred:** (6) a `[Flags]` enum for `CancelOperations(ulong flags)` — the library models *all* CKF flags as `NativeCULong` constants (`CKF.CKF_*`), so a one-off cancel-only enum would be inconsistent; surfacing CKF as a typed flags enum is a broader API decision worth its own item.
 - **Area:** Cross-cutting
 - **Severity:** Low
 - **Effort:** S
@@ -735,6 +736,17 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Problem:** Both `Encrypt` and `DestroyObject` are wrapped in `catch (Pkcs11Exception) {}`. The baseline-count comparison only tracks `UnmanagedMemory` blocks, not PKCS#11 object handles, so a `CreateObject` success + `DestroyObject` failure pattern would not be flagged.
 - **Proposed action:** Track whether `CreateObject` succeeded; ensure `DestroyObject` runs for any successfully-created key regardless of encrypt outcome.
 - **Raised by:** QA A
+
+### [BL-061] `CancelOperations(ulong flags)` takes raw flags — no typed `[Flags]` surface
+
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:495`
+- **Problem:** Split out from BL-055. `CancelOperations(ulong flags)` (and the broader CKF surface) is passed as raw `ulong` / `NativeCULong`; the CKF constants live in a static `CKF` class as `NativeCULong` fields, not a `[Flags]` enum, so callers have no discoverable, type-safe way to compose `CKF_ENCRYPT | CKF_SIGN | …`.
+- **Proposed action:** Decide whether to model CKF as a `[Flags]` enum (and similar bitmask domains) for discoverability + type safety, or leave the `NativeCULong`-constant model. If adopting an enum, do it consistently across the CKF surface, not just `CancelOperations`. Pre-1.0 (signature change to `CancelOperations`).
+- **Raised by:** Derived from BL-055.
+- **Spec / References:** —
 
 ---
 

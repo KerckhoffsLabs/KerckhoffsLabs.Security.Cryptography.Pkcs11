@@ -18,7 +18,7 @@ internal static class Pkcs11PublicKeyView
     /// <see cref="RSAParameters"/>. Returns <c>null</c> if either attribute is missing
     /// or marked sensitive.
     /// </summary>
-    public static RSAParameters? TrySynthesizeRsa(Pkcs11Session session, ObjectHandle privateHandle)
+    internal static RSAParameters? TrySynthesizeRsa(Pkcs11Session session, ObjectHandle privateHandle)
     {
         var attrs = session.GetAttributeValue(privateHandle, new List<CKA>
         {
@@ -49,7 +49,7 @@ internal static class Pkcs11PublicKeyView
     /// is unreadable (per PKCS#11 v3.1, CKA_EC_POINT is optional on private-key
     /// objects).
     /// </summary>
-    public static ECParameters? TrySynthesizeEc(Pkcs11Session session, ObjectHandle privateHandle)
+    internal static ECParameters? TrySynthesizeEc(Pkcs11Session session, ObjectHandle privateHandle)
     {
         var attrs = session.GetAttributeValue(privateHandle, new List<CKA>
         {

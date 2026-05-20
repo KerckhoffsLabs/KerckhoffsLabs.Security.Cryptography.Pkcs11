@@ -190,8 +190,9 @@ public sealed class Pkcs11Library : IDisposable
             rv = _pkcs11Library.C_GetSlotList(tokenPresent, slotList, ref slotCount);
             Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
-            if (new NativeCULong((uint)slotList.Length).Value != slotCount.Value)
-                Array.Resize(ref slotList, (int)(slotCount));
+            // The token may report a different count on the second call; resize to match.
+            if (slotList.Length != (int)slotCount)
+                Array.Resize(ref slotList, (int)slotCount);
 
             List<Pkcs11Slot> list = [];
             foreach (NativeCULong slot in slotList)

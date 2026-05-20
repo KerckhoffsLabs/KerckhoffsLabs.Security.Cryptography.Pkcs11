@@ -59,7 +59,7 @@ public sealed class Mechanism : IDisposable
     /// <summary>
     /// High level object with mechanism parameters
     /// </summary>
-    private IMechanismParams _mechanismParams = null;
+    private IMechanismParams? _mechanismParams = null;
 
     /// <summary>
     /// Creates mechanism of given type with no parameter
