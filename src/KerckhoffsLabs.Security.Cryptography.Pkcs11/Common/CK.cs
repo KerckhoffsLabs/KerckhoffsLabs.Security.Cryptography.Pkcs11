@@ -3,10 +3,12 @@ using System.Runtime.InteropServices;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
-/// General constants
+/// General PKCS#11 constants, grouped by the spec category they belong to.
 /// </summary>
 public static class CK
 {
+    #region General sentinels
+
     /// <summary>
     /// The following value is always invalid if used as a session handle or object handle
     /// </summary>
@@ -32,6 +34,10 @@ public static class CK
     /// </summary>
     public static readonly NativeCULong CK_EFFECTIVELY_INFINITE = new(0);
 
+    #endregion
+
+    #region Certificate categories (CKA_CERTIFICATE_CATEGORY)
+
     /// <summary>
     /// No certificate category specified
     /// </summary>
@@ -51,6 +57,10 @@ public static class CK
     /// Certificate belongs to an end entity (i.e. not a CA)
     /// </summary>
     public static readonly NativeCULong CK_CERTIFICATE_CATEGORY_OTHER_ENTITY = new(3);
+
+    #endregion
+
+    #region JAVA MIDP security domains
 
     /// <summary>
     /// No JAVA MIDP security domain specified
@@ -72,6 +82,10 @@ public static class CK
     /// </summary>
     public static readonly NativeCULong CK_SECURITY_DOMAIN_THIRD_PARTY = new(3);
 
+    #endregion
+
+    #region OTP value formats (CK_OTP_FORMAT)
+
     /// <summary>
     /// Decimal (default) (UTF8-encoded) format of OTP value
     /// </summary>
@@ -92,6 +106,10 @@ public static class CK
     /// </summary>
     public static readonly NativeCULong CK_OTP_FORMAT_BINARY = new(3);
 
+    #endregion
+
+    #region OTP parameter requirement levels (CK_OTP_PARAM)
+
     /// <summary>
     /// OTP parameter, if supplied, will be ignored
     /// </summary>
@@ -106,6 +124,10 @@ public static class CK
     /// OTP parameter must be supplied
     /// </summary>
     public static readonly NativeCULong CK_OTP_PARAM_MANDATORY = new(2);
+
+    #endregion
+
+    #region OTP parameter types (CK_OTP_PARAM type field)
 
     /// <summary>
     /// An actual OTP value
@@ -146,4 +168,6 @@ public static class CK
     /// Returned OTP format
     /// </summary>
     public static readonly NativeCULong CK_OTP_OUTPUT_FORMAT = new(7);
+
+    #endregion
 }
