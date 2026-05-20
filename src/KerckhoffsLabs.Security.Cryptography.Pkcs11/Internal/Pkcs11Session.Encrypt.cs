@@ -266,7 +266,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.0 message-based AEAD API
     /// (<see cref="MessageEncrypt"/> / <see cref="MessageDecrypt"/> use it). False on
-    /// v2.40 libraries — callers must use <see cref="Encrypt"/> / <see cref="Decrypt"/>
+    /// v2.40 libraries — callers must use <see cref="Encrypt(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/> / <see cref="Decrypt(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/>
     /// with the legacy CK_GCM_PARAMS / CK_CCM_PARAMS / CK_SALSA20_CHACHA20_POLY1305_PARAMS
     /// instead.
     /// </summary>

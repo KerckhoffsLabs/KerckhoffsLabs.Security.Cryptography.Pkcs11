@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 /// </remarks>
 internal sealed class Pkcs11ModuleHandle : SafeHandle
 {
-    /// <summary>Creates an invalid handle. Used as a sentinel before <see cref="NativeLibrary.Load"/>.</summary>
+    /// <summary>Creates an invalid handle. Used as a sentinel before <see cref="NativeLibrary.Load(string)"/>.</summary>
     public Pkcs11ModuleHandle() : base(IntPtr.Zero, ownsHandle: true) { }
 
     /// <summary>Creates a handle that owns <paramref name="moduleHandle"/>.</summary>

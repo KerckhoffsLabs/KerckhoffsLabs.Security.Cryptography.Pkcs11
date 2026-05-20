@@ -28,7 +28,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
 
     /// <summary>
     /// Weak references to every <see cref="Pkcs11SessionHandle"/> opened against this library.
-    /// Cleared by <see cref="CloseAllTrackedSessions"/> at <see cref="Pkcs11Library.Dispose"/>
+    /// Cleared by <see cref="CloseAllTrackedSessions"/> at <see cref="Pkcs11Library.Dispose()"/>
     /// time so we can issue a graceful <c>C_CloseSession</c> while the function table is still
     /// valid — without preventing GC of normally-disposed sessions.
     /// </summary>
@@ -83,7 +83,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// Closes every still-live tracked session handle. Must run before <c>C_Finalize</c>
     /// and before the module is unloaded — otherwise a stray <see cref="Pkcs11SessionHandle"/>
     /// finalizer would call <c>C_CloseSession</c> through a function table whose backing
-    /// module has been unmapped. <see cref="SafeHandle.Dispose"/> is reentrant and
+    /// module has been unmapped. <see cref="SafeHandle.Dispose()"/> is reentrant and
     /// thread-safe, so it's safe to invoke even if the user races us by disposing the same
     /// session on another thread.
     /// </summary>

@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// Always dispose this instance as soon as the sensitive bytes are no longer needed;
 /// the finalizer is a safety net, not a substitute for deterministic disposal.
 ///
-/// The constructor does not require a try/catch around post-<see cref="GCHandle.Alloc"/>
+/// The constructor does not require a try/catch around post-<see cref="GCHandle.Alloc(object, GCHandleType)"/>
 /// code because the runtime zero-initializes the new <c>byte[]</c> — there is no
 /// mutation step that could throw after the pin is taken. If the constructor ever grows
 /// a post-Alloc initialization step, apply the canonical try/catch pattern from

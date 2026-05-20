@@ -163,7 +163,7 @@ internal static class UnmanagedMemory
     /// Returns the unmanaged size of the <typeparamref name="T"/> struct in bytes.
     /// For <c>[PackedForPkcs11]</c>-marked types, returns the Windows-packed sibling size on
     /// Windows and the natural size on Linux/macOS; otherwise delegates to
-    /// <see cref="Marshal.SizeOf{T}"/>.
+    /// <see cref="Marshal.SizeOf{T}()"/>.
     /// </summary>
     public static int SizeOf<T>() where T : struct
         => IsPackedForPkcs11(typeof(T)) ? Pkcs11Marshal.SizeOf<T>() : Marshal.SizeOf<T>();
