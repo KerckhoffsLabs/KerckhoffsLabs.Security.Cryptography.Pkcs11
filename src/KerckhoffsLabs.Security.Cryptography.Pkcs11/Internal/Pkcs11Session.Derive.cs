@@ -73,9 +73,6 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (myPrivateKeyHandle == null)
-            throw new ArgumentNullException(nameof(myPrivateKeyHandle));
-
         if (aesBitLength != 128 && aesBitLength != 192 && aesBitLength != 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
 

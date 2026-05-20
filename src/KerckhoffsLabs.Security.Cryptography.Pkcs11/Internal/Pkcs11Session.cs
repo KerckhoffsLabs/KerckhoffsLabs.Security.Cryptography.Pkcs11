@@ -247,6 +247,8 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>
+    /// Wraps an already-open PKCS#11 session handle.
+    /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="sessionId">PKCS#11 handle of session</param>
     internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)

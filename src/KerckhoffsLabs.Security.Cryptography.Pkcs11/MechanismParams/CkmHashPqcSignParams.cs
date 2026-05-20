@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_HASH_SIGN_ADDITIONAL_CONTEXT"/>. Used with
 /// CKM_HASH_ML_DSA and CKM_HASH_SLH_DSA — the prehash PQC signing mechanisms in
-/// PKCS#11 v3.2. The data is digested with <paramref name="hash"/> before signing.
+/// PKCS#11 v3.2. The data is digested with the chosen hash mechanism before signing.
 /// </summary>
 public sealed class CkmHashPqcSignParams : IMechanismParams
 {
