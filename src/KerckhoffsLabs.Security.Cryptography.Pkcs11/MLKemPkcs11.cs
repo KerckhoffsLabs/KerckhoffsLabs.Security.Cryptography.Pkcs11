@@ -24,9 +24,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// extraction step.</para>
 /// <para><b>Gating:</b> <see cref="Encapsulate(Span{byte},Span{byte})"/> /
 /// <see cref="Decapsulate(ReadOnlySpan{byte},Span{byte})"/> throw
-/// <see cref="InsecureOperationException"/> unless the underlying session has set
-/// <c>AllowInsecure = true</c>. The gate is mechanism-agnostic — it gates the
-/// extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
+/// <see cref="InsecureOperationException"/> unless the owning workspace has set
+/// <c>Pkcs11Workspace.AllowInsecure = true</c> (or <c>AllowInsecureScope()</c>). The gate is
+/// mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
 /// <para><b>Private-key export</b> (<c>ExportDecapsulationKey</c>, seed, PKCS#8) is always
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
 /// public handle.</para>
@@ -54,9 +54,10 @@ public sealed class MLKemPkcs11 : MLKem
 
     /// <inheritdoc/>
     /// <exception cref="InsecureOperationException">
-    /// Thrown when the underlying session has not set <c>AllowInsecure = true</c>. Set it
-    /// explicitly to acknowledge that the shared secret will be extracted from the token,
-    /// or use <see cref="Pkcs11Key.EncapsulateKey"/> for the on-token-only path.
+    /// Thrown when the owning workspace has not set <c>Pkcs11Workspace.AllowInsecure = true</c>.
+    /// Set it explicitly (or scope it with <c>AllowInsecureScope()</c>) to acknowledge that the
+    /// shared secret will be extracted from the token, or use <see cref="Pkcs11Key.EncapsulateKey"/>
+    /// for the on-token-only path.
     /// </exception>
     protected override void EncapsulateCore(Span<byte> ciphertext, Span<byte> sharedSecret)
     {
@@ -172,7 +173,8 @@ public sealed class MLKemPkcs11 : MLKem
         throw new InsecureOperationException(
             $"MLKemPkcs11.{verb} extracts the shared-secret bytes from the token. " +
             $"This violates the non-extractable-by-default posture. Use Pkcs11Key.{verb}Key " +
-            $"for the on-token-only path, or set Pkcs11Session.AllowInsecure = true to opt in.");
+            $"for the on-token-only path, or set Pkcs11Workspace.AllowInsecure = true " +
+            $"(or use Pkcs11Workspace.AllowInsecureScope()) to opt in.");
     }
 
     private static MLKemAlgorithm ResolveAlgorithm(Pkcs11Key key)

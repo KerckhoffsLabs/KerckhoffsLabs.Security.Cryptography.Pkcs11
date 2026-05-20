@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 55
-- **Critical:** 0 | **High:** 19 | **Medium:** 17 | **Low:** 6
+- **Critical:** 0 | **High:** 17 | **Medium:** 17 | **Low:** 6
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -113,6 +113,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-007] `AllowInsecure` is unreachable from consumer code; exception messages reference an internal type
 
+- **Status: Resolved (2026-05-20)** — Surfaced `AllowInsecure` (get/set) and `AllowInsecureScope()` as public members on `Pkcs11Workspace`, delegating to the internal session. Updated every consumer-facing message to reference the public name: `InsecureOperationException`'s base message + doc now say `Pkcs11Workspace.AllowInsecure` (and mention `AllowInsecureScope()`), and `MLKemPkcs11`'s extract-and-destroy guard + docs likewise. Also swept the internal `[Obsolete]` compile-time messages across the `Pkcs11Session` partials from `Session.AllowInsecure` to `Pkcs11Workspace.AllowInsecure` for consistency. `AllowInsecureScopeTests` confirms the flag is reachable and toggles via the public workspace surface.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** S
@@ -125,6 +126,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-008] `AllowInsecure` once set stays on for the session lifetime — no scoped opt-in
 
+- **Status: Resolved (2026-05-20)** — Added `AllowInsecureScope()` on `Pkcs11Session` (and surfaced on `Pkcs11Workspace`) returning an `IDisposable` lease that captures the prior flag value, sets it true through the setter, and restores the captured value on dispose — restoring directly so unwinding never re-logs. Nested scopes restore in LIFO order. The raw setter is retained for long-running cases and now logs a warning on every transition into the insecure state, so the relaxation is auditable. `AllowInsecureScopeTests` covers scope enable/restore, restoring a previously-true value, nested LIFO, and that the gate is bypassed for exactly one operation then re-armed.
 - **Area:** Cryptography
 - **Severity:** High
 - **Effort:** M

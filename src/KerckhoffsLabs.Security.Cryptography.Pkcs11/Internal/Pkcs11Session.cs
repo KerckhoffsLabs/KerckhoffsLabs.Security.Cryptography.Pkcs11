@@ -156,7 +156,8 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// When <c>true</c>, this session does not reject operations that use mechanisms flagged as
     /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, etc.). Default is <c>false</c>.
-    /// Set explicitly per session; never set this globally.
+    /// Set explicitly per session; never set this globally. Prefer <see cref="AllowInsecureScope"/>
+    /// for a single operation rather than leaving the flag latched on for the session lifetime.
     /// </summary>
     public bool AllowInsecure
     {
@@ -170,7 +171,45 @@ internal sealed partial class Pkcs11Session
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
+            // Warn on every transition into the insecure state so the relaxation is auditable.
+            if (value && !_allowInsecure)
+                _logger.LogWarning(
+                    "Session({SessionId})::AllowInsecure enabled — insecure-by-default mechanisms " +
+                    "(RSA PKCS#1 v1.5, DES/3DES, AES-ECB, MD5/SHA-1) are no longer gated on this session.",
+                    _sessionId);
+
             _allowInsecure = value;
+        }
+    }
+
+    /// <summary>
+    /// Enables <see cref="AllowInsecure"/> for the duration of the returned lease and restores the
+    /// previous value when the lease is disposed. Use this to opt into an insecure mechanism for a
+    /// single operation rather than latching the flag on for the whole session:
+    /// <code>using (session.AllowInsecureScope()) { /* one insecure op */ }</code>
+    /// Nested scopes restore in LIFO order. Logs a warning on entry (via the setter).
+    /// </summary>
+    public IDisposable AllowInsecureScope()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        bool previous = _allowInsecure;
+        AllowInsecure = true; // routes through the setter so the transition is logged
+        return new AllowInsecureLease(this, previous);
+    }
+
+    /// <summary>Disposable returned by <see cref="AllowInsecureScope"/>. Restores the prior flag value on dispose.</summary>
+    private sealed class AllowInsecureLease(Pkcs11Session session, bool previous) : IDisposable
+    {
+        private bool _released;
+
+        public void Dispose()
+        {
+            if (_released) return;
+            _released = true;
+            // Restore directly (not via the setter) so unwinding never re-logs a "now insecure" warning.
+            if (!session._disposed)
+                session._allowInsecure = previous;
         }
     }
 

@@ -45,6 +45,27 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <summary>Internal accessor for the underlying session. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11Session Session => _session;
 
+    /// <summary>
+    /// When <c>true</c>, operations on this workspace that use mechanisms the library considers
+    /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, raw MD5/SHA-1, and the ML-KEM
+    /// extract-and-destroy path) are no longer rejected with <see cref="Exceptions.InsecureOperationException"/>.
+    /// Default is <c>false</c>. Enabling it logs a warning. Prefer <see cref="AllowInsecureScope"/>
+    /// to opt in for a single operation rather than latching the flag on for the workspace lifetime.
+    /// </summary>
+    public bool AllowInsecure
+    {
+        get => _session.AllowInsecure;
+        set => _session.AllowInsecure = value;
+    }
+
+    /// <summary>
+    /// Enables <see cref="AllowInsecure"/> for the duration of the returned lease and restores the
+    /// previous value on dispose. Scopes the insecure opt-in to a single operation:
+    /// <code>using (workspace.AllowInsecureScope()) { /* one insecure op */ }</code>
+    /// Nested scopes restore in LIFO order.
+    /// </summary>
+    public IDisposable AllowInsecureScope() => _session.AllowInsecureScope();
+
     /// <inheritdoc/>
     public void Dispose()
     {

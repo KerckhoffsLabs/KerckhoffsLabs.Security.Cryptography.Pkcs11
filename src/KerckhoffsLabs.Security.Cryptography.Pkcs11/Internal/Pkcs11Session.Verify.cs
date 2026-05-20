@@ -435,7 +435,7 @@ internal sealed partial class Pkcs11Session
     /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
     [Obsolete("RSA PKCS#1 v1.5 signatures are vulnerable to fault attacks and are not recommended for new code. " +
-              "Use VerifyRsaPss instead. If you must use it, set Session.AllowInsecure = true.")]
+              "Use VerifyRsaPss instead. If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
     public void VerifyRsaPkcs1V15(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
