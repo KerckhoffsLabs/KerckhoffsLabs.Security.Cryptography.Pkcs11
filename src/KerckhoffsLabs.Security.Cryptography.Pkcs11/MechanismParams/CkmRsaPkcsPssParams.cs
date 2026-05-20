@@ -24,7 +24,7 @@ public sealed class CkmRsaPkcsPssParams : IMechanismParams
     {
         ArgumentOutOfRangeException.ThrowIfNegative(saltLength);
 
-        _lowLevelParams = new CK_RSA_PKCS_PSS_PARAMS
+        _lowLevelParams = new()
         {
             HashAlg = hashAlg.ToCULong(),
             Mgf = mgf.ToCULong(),

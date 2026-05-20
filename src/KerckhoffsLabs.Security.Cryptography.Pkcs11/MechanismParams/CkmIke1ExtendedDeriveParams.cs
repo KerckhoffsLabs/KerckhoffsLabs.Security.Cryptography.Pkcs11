@@ -28,7 +28,7 @@ public sealed class CkmIke1ExtendedDeriveParams : IMechanismParams
             UnmanagedMemory.Write(_extraData, extraData);
         }
 
-        _lowLevelParams = new CK_IKE1_EXTENDED_DERIVE_PARAMS
+        _lowLevelParams = new()
         {
             PrfMechanism = (NativeCULong)(ulong)prfMechanism,
             HasKeygxy = hasKeygxy,

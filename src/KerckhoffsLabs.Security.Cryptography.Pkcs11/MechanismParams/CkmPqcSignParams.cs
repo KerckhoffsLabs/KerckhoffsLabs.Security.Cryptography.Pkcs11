@@ -29,7 +29,7 @@ public sealed class CkmPqcSignParams : IMechanismParams
             UnmanagedMemory.Write(_context, context);
         }
 
-        _lowLevelParams = new CK_SIGN_ADDITIONAL_CONTEXT
+        _lowLevelParams = new()
         {
             HedgeVariant = (NativeCULong)(uint)hedgeVariant,
             Context = _context,

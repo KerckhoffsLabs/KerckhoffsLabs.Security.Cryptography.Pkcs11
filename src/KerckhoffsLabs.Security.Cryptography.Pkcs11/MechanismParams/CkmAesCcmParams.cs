@@ -38,7 +38,7 @@ public sealed class CkmAesCcmParams : IMechanismParams
             UnmanagedMemory.Write(_aad, aad);
         }
 
-        _lowLevelParams = new CK_CCM_PARAMS
+        _lowLevelParams = new()
         {
             DataLen = (NativeCULong)dataLen,
             Nonce = _nonce,

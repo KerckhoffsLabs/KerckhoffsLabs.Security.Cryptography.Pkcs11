@@ -25,7 +25,7 @@ public sealed class CkmEddsaParams : IMechanismParams
             UnmanagedMemory.Write(_contextData, contextData);
         }
 
-        _lowLevelParams = new CK_EDDSA_PARAMS
+        _lowLevelParams = new()
         {
             PhFlag = phFlag,
             ContextDataLen = (NativeCULong)contextData.Length,

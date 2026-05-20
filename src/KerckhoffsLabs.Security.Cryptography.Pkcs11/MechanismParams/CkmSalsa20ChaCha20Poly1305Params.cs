@@ -33,7 +33,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : IMechanismParams
             UnmanagedMemory.Write(_aad, aad);
         }
 
-        _lowLevelParams = new CK_SALSA20_CHACHA20_POLY1305_PARAMS
+        _lowLevelParams = new()
         {
             Nonce = _nonce,
             NonceLen = (NativeCULong)nonce.Length,

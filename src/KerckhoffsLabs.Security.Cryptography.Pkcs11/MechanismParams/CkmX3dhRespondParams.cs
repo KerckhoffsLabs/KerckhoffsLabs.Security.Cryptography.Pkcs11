@@ -50,7 +50,7 @@ public sealed class CkmX3dhRespondParams : IMechanismParams
             UnmanagedMemory.Write(_initiatorEphemeral, initiatorEphemeral);
         }
 
-        _lowLevelParams = new CK_X3DH_RESPOND_PARAMS
+        _lowLevelParams = new()
         {
             Kdf = (NativeCULong)kdf,
             IdentityId = _identityId,

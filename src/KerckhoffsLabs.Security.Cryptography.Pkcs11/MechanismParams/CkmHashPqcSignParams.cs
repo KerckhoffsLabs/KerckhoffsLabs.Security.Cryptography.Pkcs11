@@ -33,7 +33,7 @@ public sealed class CkmHashPqcSignParams : IMechanismParams
             UnmanagedMemory.Write(_context, context);
         }
 
-        _lowLevelParams = new CK_HASH_SIGN_ADDITIONAL_CONTEXT
+        _lowLevelParams = new()
         {
             HedgeVariant = (NativeCULong)(uint)hedgeVariant,
             Context = _context,

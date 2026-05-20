@@ -38,7 +38,7 @@ public sealed class CkmHkdfParams : IMechanismParams
             UnmanagedMemory.Write(_info, info);
         }
 
-        _lowLevelParams = new CK_HKDF_PARAMS
+        _lowLevelParams = new()
         {
             Extract = extract,
             Expand = expand,

@@ -18,11 +18,11 @@ public sealed class CkmCcmMessageParams : IMechanismParams
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>
     public static CkmCcmMessageParams ForEncrypt(int dataLen, ReadOnlySpan<byte> nonce, int macBytes)
-        => new CkmCcmMessageParams(dataLen, nonce, macBytes, default);
+        => new(dataLen, nonce, macBytes, default);
 
     /// <summary>For decryption — wrapper stores caller's MAC bytes for the library to verify.</summary>
     public static CkmCcmMessageParams ForDecrypt(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> mac)
-        => new CkmCcmMessageParams(dataLen, nonce, mac.Length, mac);
+        => new(dataLen, nonce, mac.Length, mac);
 
     private CkmCcmMessageParams(int dataLen, ReadOnlySpan<byte> nonce, int macLen, ReadOnlySpan<byte> macInput)
     {
@@ -40,7 +40,7 @@ public sealed class CkmCcmMessageParams : IMechanismParams
         if (!macInput.IsEmpty)
             UnmanagedMemory.Write(_mac, macInput);
 
-        _lowLevelParams = new CK_CCM_MESSAGE_PARAMS
+        _lowLevelParams = new()
         {
             DataLen = (NativeCULong)dataLen,
             Nonce = _nonce,

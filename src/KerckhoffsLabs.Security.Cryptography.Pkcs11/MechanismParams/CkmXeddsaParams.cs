@@ -18,7 +18,7 @@ public sealed class CkmXeddsaParams : IMechanismParams
     /// <param name="hashType">Hash function (CK_XEDDSA_HASH_TYPE).</param>
     public CkmXeddsaParams(ulong hashType)
     {
-        _lowLevelParams = new CK_XEDDSA_PARAMS
+        _lowLevelParams = new()
         {
             Hash = (NativeCULong)hashType,
         };

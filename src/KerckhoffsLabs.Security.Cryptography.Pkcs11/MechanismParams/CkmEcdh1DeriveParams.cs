@@ -37,7 +37,7 @@ public sealed class CkmEcdh1DeriveParams : IMechanismParams
             UnmanagedMemory.Write(_sharedData, sharedData);
         }
 
-        _lowLevelParams = new CK_ECDH1_DERIVE_PARAMS
+        _lowLevelParams = new()
         {
             Kdf = kdf.ToCULong(),
             SharedData = _sharedData,

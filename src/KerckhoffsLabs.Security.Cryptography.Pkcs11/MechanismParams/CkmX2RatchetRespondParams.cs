@@ -30,7 +30,7 @@ public sealed class CkmX2RatchetRespondParams : IMechanismParams
         _sk = UnmanagedMemory.Allocate(sk.Length);
         UnmanagedMemory.Write(_sk, sk);
 
-        _lowLevelParams = new CK_X2RATCHET_RESPOND_PARAMS
+        _lowLevelParams = new()
         {
             Sk = _sk,
             OwnPrekey = (NativeCULong)ownPrekey,

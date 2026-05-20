@@ -19,7 +19,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : IMechanismParams
 
     /// <summary>For encryption — wrapper allocates a 16-byte zero-filled tag buffer.</summary>
     public static CkmSalsa20ChaCha20Poly1305MsgParams ForEncrypt(ReadOnlySpan<byte> nonce)
-        => new CkmSalsa20ChaCha20Poly1305MsgParams(nonce, default);
+        => new(nonce, default);
 
     /// <summary>For decryption — wrapper stores caller's 16-byte tag for the library to verify.</summary>
     public static CkmSalsa20ChaCha20Poly1305MsgParams ForDecrypt(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
@@ -40,7 +40,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : IMechanismParams
         if (!tagInput.IsEmpty)
             UnmanagedMemory.Write(_tag, tagInput);
 
-        _lowLevelParams = new CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
+        _lowLevelParams = new()
         {
             Nonce = _nonce,
             NonceLen = (NativeCULong)nonce.Length,

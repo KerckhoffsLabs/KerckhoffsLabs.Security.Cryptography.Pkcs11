@@ -28,7 +28,7 @@ public sealed class CkmIke2PrfPlusDeriveParams : IMechanismParams
             UnmanagedMemory.Write(_seedData, seedData);
         }
 
-        _lowLevelParams = new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
+        _lowLevelParams = new()
         {
             PrfMechanism = (NativeCULong)(ulong)prfMechanism,
             HasSeedKey = hasSeedKey,

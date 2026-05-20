@@ -33,7 +33,7 @@ public sealed class CkmSp800108FeedbackKdfParams : IMechanismParams
             UnmanagedMemory.Write(_iv, iv);
         }
 
-        _lowLevelParams = new CK_SP800_108_FEEDBACK_KDF_PARAMS
+        _lowLevelParams = new()
         {
             PrfType = (NativeCULong)(ulong)prfType,
             NumberOfDataParams = (NativeCULong)numberOfDataParams,

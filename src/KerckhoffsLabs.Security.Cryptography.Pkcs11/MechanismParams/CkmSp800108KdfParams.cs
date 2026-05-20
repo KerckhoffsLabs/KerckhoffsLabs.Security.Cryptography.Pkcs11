@@ -28,7 +28,7 @@ public sealed class CkmSp800108KdfParams : IMechanismParams
     /// <param name="additionalDerivedKeysCount">Number of entries in <paramref name="additionalDerivedKeys"/>.</param>
     public CkmSp800108KdfParams(CKM prfType, IntPtr dataParams, ulong numberOfDataParams, IntPtr additionalDerivedKeys = default, ulong additionalDerivedKeysCount = 0)
     {
-        _lowLevelParams = new CK_SP800_108_KDF_PARAMS
+        _lowLevelParams = new()
         {
             PrfType = (NativeCULong)(ulong)prfType,
             NumberOfDataParams = (NativeCULong)numberOfDataParams,

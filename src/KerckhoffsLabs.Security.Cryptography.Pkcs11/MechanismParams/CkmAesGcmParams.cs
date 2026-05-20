@@ -36,7 +36,7 @@ public sealed class CkmAesGcmParams : IMechanismParams
             UnmanagedMemory.Write(_aad, aad);
         }
 
-        _lowLevelParams = new CK_GCM_PARAMS
+        _lowLevelParams = new()
         {
             Iv = _iv,
             IvLen = (NativeCULong)iv.Length,

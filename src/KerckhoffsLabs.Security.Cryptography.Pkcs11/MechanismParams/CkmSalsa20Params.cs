@@ -29,7 +29,7 @@ public sealed class CkmSalsa20Params : IMechanismParams
         _nonce = UnmanagedMemory.Allocate(nonce.Length);
         UnmanagedMemory.Write(_nonce, nonce);
 
-        _lowLevelParams = new CK_SALSA20_PARAMS
+        _lowLevelParams = new()
         {
             BlockCounter = _blockCounter,
             Nonce = _nonce,

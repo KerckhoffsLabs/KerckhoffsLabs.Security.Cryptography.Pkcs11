@@ -30,7 +30,7 @@ public sealed class CkmX2RatchetInitializeParams : IMechanismParams
         _sk = UnmanagedMemory.Allocate(sk.Length);
         UnmanagedMemory.Write(_sk, sk);
 
-        _lowLevelParams = new CK_X2RATCHET_INITIALIZE_PARAMS
+        _lowLevelParams = new()
         {
             Sk = _sk,
             PeerPublicPrekey = (NativeCULong)peerPublicPrekey,

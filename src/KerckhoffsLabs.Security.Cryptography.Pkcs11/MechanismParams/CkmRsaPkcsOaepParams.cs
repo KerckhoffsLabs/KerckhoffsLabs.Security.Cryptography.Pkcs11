@@ -29,7 +29,7 @@ public sealed class CkmRsaPkcsOaepParams : IMechanismParams
             UnmanagedMemory.Write(_sourceData, sourceData);
         }
 
-        _lowLevelParams = new CK_RSA_PKCS_OAEP_PARAMS
+        _lowLevelParams = new()
         {
             HashAlg = hashAlg.ToCULong(),
             Mgf = mgf.ToCULong(),

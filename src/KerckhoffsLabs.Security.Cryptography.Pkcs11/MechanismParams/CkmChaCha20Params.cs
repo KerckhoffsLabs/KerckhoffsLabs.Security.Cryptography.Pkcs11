@@ -30,7 +30,7 @@ public sealed class CkmChaCha20Params : IMechanismParams
         _nonce = UnmanagedMemory.Allocate(nonce.Length);
         UnmanagedMemory.Write(_nonce, nonce);
 
-        _lowLevelParams = new CK_CHACHA20_PARAMS
+        _lowLevelParams = new()
         {
             BlockCounter = _blockCounter,
             BlockCounterBits = (NativeCULong)blockCounterBits,

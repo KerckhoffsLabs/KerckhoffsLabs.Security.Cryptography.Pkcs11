@@ -19,12 +19,12 @@ public sealed class CkmGcmMessageParams : IMechanismParams
     /// <paramref name="tagBytes"/>; the library writes into it during C_EncryptMessage.
     /// Read the result via <see cref="CopyTagTo"/> after the call.</summary>
     public static CkmGcmMessageParams ForEncrypt(ReadOnlySpan<byte> iv, int tagBytes)
-        => new CkmGcmMessageParams(iv, tagBytes, default);
+        => new(iv, tagBytes, default);
 
     /// <summary>For decryption — the wrapper stores the caller's tag bytes; the library
     /// reads them during C_DecryptMessage and verifies the AEAD authentication.</summary>
     public static CkmGcmMessageParams ForDecrypt(ReadOnlySpan<byte> iv, ReadOnlySpan<byte> tag)
-        => new CkmGcmMessageParams(iv, tag.Length, tag);
+        => new(iv, tag.Length, tag);
 
     private CkmGcmMessageParams(ReadOnlySpan<byte> iv, int tagLen, ReadOnlySpan<byte> tagInput)
     {
@@ -39,7 +39,7 @@ public sealed class CkmGcmMessageParams : IMechanismParams
         if (!tagInput.IsEmpty)
             UnmanagedMemory.Write(_tag, tagInput);
 
-        _lowLevelParams = new CK_GCM_MESSAGE_PARAMS
+        _lowLevelParams = new()
         {
             Iv = _iv,
             IvLen = (NativeCULong)iv.Length,

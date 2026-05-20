@@ -37,7 +37,7 @@ public sealed class CkmX3dhInitiateParams : IMechanismParams
             UnmanagedMemory.Write(_onetimeKey, onetimeKey);
         }
 
-        _lowLevelParams = new CK_X3DH_INITIATE_PARAMS
+        _lowLevelParams = new()
         {
             Kdf = (NativeCULong)kdf,
             PeerIdentity = (NativeCULong)peerIdentity,
