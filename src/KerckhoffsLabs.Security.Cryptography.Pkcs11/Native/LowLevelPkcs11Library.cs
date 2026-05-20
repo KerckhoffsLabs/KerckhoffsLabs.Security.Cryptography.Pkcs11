@@ -336,10 +336,10 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates!.C_GetMechanismInfo_Windows is { } winFn)
+        if (Pkcs11Marshal.IsWindows && _delegates!.HasC_GetMechanismInfo_Windows)
         {
             var winInfo = default(CK_MECHANISM_INFO_Windows);
-            var rv = winFn(slotId, type.ToCULong(), ref winInfo);
+            var rv = _delegates.C_GetMechanismInfo_Windows(slotId, type.ToCULong(), ref winInfo);
             info = winInfo.ToUnified();
             return (CKR)(ulong)rv;
         }
@@ -448,10 +448,10 @@ internal sealed class LowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates!.C_GetSessionInfo_Windows is { } winFn)
+        if (Pkcs11Marshal.IsWindows && _delegates!.HasC_GetSessionInfo_Windows)
         {
             var winInfo = default(CK_SESSION_INFO_Windows);
-            var rv = winFn(session, ref winInfo);
+            var rv = _delegates.C_GetSessionInfo_Windows(session, ref winInfo);
             info = winInfo.ToUnified();
             return (CKR)(ulong)rv;
         }

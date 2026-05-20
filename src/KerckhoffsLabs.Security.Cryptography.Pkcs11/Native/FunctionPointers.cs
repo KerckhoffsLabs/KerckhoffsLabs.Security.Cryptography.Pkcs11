@@ -39,6 +39,18 @@ internal sealed unsafe class FunctionPointers
     /// <summary>Cryptoki <c>CK_RV C_GetMechanismList(CK_SLOT_ID slotID, CK_MECHANISM_TYPE_PTR pMechanismList, CK_ULONG_PTR pulCount)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong*, NativeCULong> C_GetMechanismList;
 
+    /// <summary>Cryptoki <c>CK_RV C_GetMechanismInfo(CK_SLOT_ID slotID, CK_MECHANISM_TYPE type, CK_MECHANISM_INFO_PTR pInfo)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_MECHANISM_INFO*, NativeCULong> C_GetMechanismInfo;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetMechanismInfo</c> — Pack=1 Windows layout.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, CK_MECHANISM_INFO_Windows*, NativeCULong> C_GetMechanismInfo_Windows;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetSessionInfo(CK_SESSION_HANDLE hSession, CK_SESSION_INFO_PTR pInfo)</c>.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_SESSION_INFO*, NativeCULong> C_GetSessionInfo;
+
+    /// <summary>Cryptoki <c>CK_RV C_GetSessionInfo</c> — Pack=1 Windows layout.</summary>
+    public delegate* unmanaged[Cdecl]<NativeCULong, CK_SESSION_INFO_Windows*, NativeCULong> C_GetSessionInfo_Windows;
+
     /// <summary>Cryptoki <c>CK_RV C_FindObjects(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE_PTR phObject, CK_ULONG ulMaxObjectCount, CK_ULONG_PTR pulObjectCount)</c>.</summary>
     public delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong, NativeCULong*, NativeCULong> C_FindObjects;
 
