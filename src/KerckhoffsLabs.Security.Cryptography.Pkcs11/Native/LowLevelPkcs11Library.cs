@@ -19,16 +19,12 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// <summary>
     /// Delegates for PKCS#11 functions
     /// </summary>
-    private Delegates? _delegates = null;
+    private readonly Delegates _delegates;
 
     /// <summary>
     /// Lock guarding <see cref="_trackedSessions"/>.
     /// </summary>
-#if NET9_0_OR_GREATER
     private readonly Lock _sessionsLock = new();
-#else
-    private readonly object _sessionsLock = new();
-#endif
 
     /// <summary>
     /// Weak references to every <see cref="Pkcs11SessionHandle"/> opened against this library.
@@ -124,13 +120,11 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// <param name="libraryPath">Library name or path.</param>
     public LowLevelPkcs11Library(string libraryPath)
     {
+        ArgumentException.ThrowIfNullOrEmpty(libraryPath);
         try
         {
-            if (!string.IsNullOrEmpty(libraryPath))
-            {
-                _library = new Pkcs11ModuleHandle(NativeLibrary.Load(libraryPath));
-                _delegates = new Delegates(_library.DangerousGetHandle());
-            }
+            _library = new Pkcs11ModuleHandle(NativeLibrary.Load(libraryPath));
+            _delegates = new Delegates(_library.DangerousGetHandle());
         }
         catch
         {
@@ -310,13 +304,13 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong[] CULongList = null;
-        if (mechanismList != null)
-            CULongList = new NativeCULong[mechanismList.Length];
+        NativeCULong[]? CULongList = mechanismList != null
+            ? new NativeCULong[mechanismList.Length]
+            : null;
 
         NativeCULong rv = _delegates.C_GetMechanismList(slotId, CULongList, ref count);
 
-        if (mechanismList != null)
+        if (mechanismList != null && CULongList != null)
         {
             for (int i = 0; i < mechanismList.Length; i++)
                 // Deliberately an unvalidated cast, not ToCKM(): a token may report vendor-defined

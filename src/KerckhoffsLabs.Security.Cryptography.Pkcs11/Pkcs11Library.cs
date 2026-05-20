@@ -40,6 +40,13 @@ public sealed class Pkcs11Library : IDisposable
     private ILowLevelPkcs11Library? _pkcs11Library = null;
 
     /// <summary>
+    /// The loaded low-level library. Set during construction and released on
+    /// <see cref="Dispose()"/>; accessing it afterwards throws.
+    /// </summary>
+    private ILowLevelPkcs11Library LowLevel => _pkcs11Library
+        ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
+
+    /// <summary>
     /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>.
     /// Stays false when another <see cref="Pkcs11Library"/> instance (or a different
     /// component in the same process) had already initialized the library and we observed
@@ -123,7 +130,7 @@ public sealed class Pkcs11Library : IDisposable
         _logger.LogDebug("Pkcs11Library({LibraryPath})::Initialize", _libraryPath);
 
         var initArgs = new CK_C_INITIALIZE_ARGS { Flags = CKF.CKF_OS_LOCKING_OK };
-        CKR rv = _pkcs11Library.C_Initialize(initArgs);
+        CKR rv = LowLevel.C_Initialize(initArgs);
 
         // Another component already initialized the library — treat as success but
         // leave _weInitialized = false so Dispose doesn't tear down their state.
@@ -136,7 +143,7 @@ public sealed class Pkcs11Library : IDisposable
             _logger.LogWarning(
                 "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking",
                 _libraryPath);
-            rv = _pkcs11Library.C_Initialize(null);
+            rv = LowLevel.C_Initialize(null);
             if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
         }
 
@@ -155,7 +162,7 @@ public sealed class Pkcs11Library : IDisposable
         _logger.LogDebug("Pkcs11Library({LibraryPath})::GetInfo", _libraryPath);
 
         CK_INFO info = new();
-        CKR rv = _pkcs11Library.C_GetInfo(ref info);
+        CKR rv = LowLevel.C_GetInfo(ref info);
         Pkcs11Exception.ThrowIfError(rv, "C_GetInfo");
 
         return new LibraryInfo(info);
@@ -177,7 +184,7 @@ public sealed class Pkcs11Library : IDisposable
         _logger.LogDebug("Pkcs11Library({LibraryPath})::GetSlotList", _libraryPath);
 
         NativeCULong slotCount = new(0);
-        CKR rv = _pkcs11Library.C_GetSlotList(tokenPresent, null, ref slotCount);
+        CKR rv = LowLevel.C_GetSlotList(tokenPresent, null, ref slotCount);
         Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
         if (slotCount.Value == 0)
@@ -187,7 +194,7 @@ public sealed class Pkcs11Library : IDisposable
         else
         {
             NativeCULong[] slotList = new NativeCULong[slotCount.Value];
-            rv = _pkcs11Library.C_GetSlotList(tokenPresent, slotList, ref slotCount);
+            rv = LowLevel.C_GetSlotList(tokenPresent, slotList, ref slotCount);
             Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
             // The token may report a different count on the second call; resize to match.
@@ -196,7 +203,7 @@ public sealed class Pkcs11Library : IDisposable
 
             List<Pkcs11Slot> list = [];
             foreach (NativeCULong slot in slotList)
-                list.Add(new Pkcs11Slot(_pkcs11Library, (ulong)slot));
+                list.Add(new Pkcs11Slot(LowLevel, (ulong)slot));
 
             return list;
         }
@@ -220,7 +227,7 @@ public sealed class Pkcs11Library : IDisposable
 
         NativeCULong flags = nonBlocking ? CKF.CKF_DONT_BLOCK : new(0);
         NativeCULong slotIdOut = new(0);
-        CKR rv = _pkcs11Library.C_WaitForSlotEvent(flags, ref slotIdOut, IntPtr.Zero);
+        CKR rv = LowLevel.C_WaitForSlotEvent(flags, ref slotIdOut, IntPtr.Zero);
 
         if (rv == CKR.CKR_OK)
         {
