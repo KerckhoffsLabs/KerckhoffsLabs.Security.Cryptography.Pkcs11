@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 19 | **Low:** 5
+- **Critical:** 0 | **High:** 9 | **Medium:** 18 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -616,6 +616,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-049] Windows SoftHSM install masked by `continue-on-error: true` — Windows integration tests silently skip
 
+- **Status: Resolved (2026-05-20)** — The literal cause is already gone: `ci.yml` was refactored and no longer runs `choco install softhsm` (with or without `continue-on-error`). Two of the proposed actions conflict with deliberate design and were *not* taken: the `SoftHsmBackendFixture` intentionally refuses to auto-discover a system-installed SoftHSM (distro/choco versions are unpredictable; prior bugs traced to mismatched installs), and the vendored `BuildSoftHsmV2` target is Linux/macOS-only. On Windows the marshalling / Windows struct-packing path (the BL-001 concern) is exercised by the **pkcs11-mock** backend, which *does* build and run on Windows; the real-crypto SoftHSM suite is Linux/macOS-only by design and skips on Windows intentionally. The surviving masking risk is platform-flipped — if the **Linux** vendored build silently fails to place `libsofthsm2.so`, every `[ConditionalFact(SoftHsmAvailable)]` skips and CI stays green. Closed that with a guard test `SoftHsmAvailabilityTests.SoftHsm_IsAvailable_OnCiBuildPlatforms` that **fails** (not skips) in CI on Linux/macOS when SoftHSM is unavailable (verified non-vacuous: it fails when the built lib is removed), plus a `ci.yml` "Report SoftHSM build (Linux)" step that prints `softhsm2-util --version` for an auditable log. 599 tests pass.
 - **Area:** Release Eng
 - **Severity:** Medium
 - **Effort:** S

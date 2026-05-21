@@ -66,9 +66,22 @@ jobs:
       - name: Build
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
+      # Auditable record of which SoftHSM the Linux job will exercise. The vendored
+      # BuildSoftHsmV2 target places libsofthsm2.so + softhsm2-util next to the test
+      # assembly; if the build silently failed to place them, this surfaces it in the
+      # log and the SoftHsm_IsAvailable_OnCiBuildPlatforms test fails the job (BL-049).
+      - name: Report SoftHSM build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          util=$(find . -path '*runtimes*native*' -name 'softhsm2-util' | head -1)
+          if [ -n "$util" ]; then echo "Built SoftHSM: $util"; "$util" --version; \
+          else echo "::warning::built softhsm2-util not found under runtimes/*/native"; fi
+
       # Linux: both the pkcs11-mock and SoftHSM2 backends are present, so the
-      # SoftHSM-gated [ConditionalFact] tests run alongside the mock tests.
-      # Windows: only pkcs11-mock is built (the SoftHSM2 target is Linux/macOS-only),
-      # so its SoftHSM tests self-skip.
+      # SoftHSM-gated [ConditionalFact] tests run alongside the mock tests; the
+      # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if SoftHSM is missing.
+      # Windows: only pkcs11-mock is built (the SoftHSM2 build is Linux/macOS-only, and
+      # the fixture intentionally does not auto-discover a system install), so the SoftHSM
+      # tests skip there by design and the guard is a no-op on Windows.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
