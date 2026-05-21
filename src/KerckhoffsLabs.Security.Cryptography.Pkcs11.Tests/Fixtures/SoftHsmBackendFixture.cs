@@ -142,17 +142,18 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     private static string? BuiltLibraryPath()
     {
         string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-        string ext = OperatingSystem.IsMacOS() ? "dylib" : "so";
+        string ext = OperatingSystem.IsWindows() ? "dll" : OperatingSystem.IsMacOS() ? "dylib" : "so";
         string candidate = Path.Combine(asmDir, "runtimes", GetRid(), "native", $"libsofthsm2.{ext}");
         return File.Exists(candidate) ? candidate : null;
     }
 
     private static string ResolveUtil(string libPath)
     {
-        string builtUtil = Path.Combine(Path.GetDirectoryName(libPath)!, "softhsm2-util");
+        string utilName = OperatingSystem.IsWindows() ? "softhsm2-util.exe" : "softhsm2-util";
+        string builtUtil = Path.Combine(Path.GetDirectoryName(libPath)!, utilName);
         if (!File.Exists(builtUtil))
             throw new FileNotFoundException(
-                $"softhsm2-util not found next to the built libsofthsm2 at '{builtUtil}'. " +
+                $"{utilName} not found next to the built libsofthsm2 at '{builtUtil}'. " +
                 "The BuildSoftHsmV2 MSBuild target should place both side-by-side; " +
                 "auto-discovery of a system install is deliberately not supported.", builtUtil);
         return builtUtil;
@@ -166,6 +167,9 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         if (OperatingSystem.IsMacOS())
             return RuntimeInformation.OSArchitecture == Architecture.Arm64
                 ? "osx-arm64" : "osx-x64";
+        if (OperatingSystem.IsWindows())
+            return RuntimeInformation.OSArchitecture == Architecture.Arm64
+                ? "win-arm64" : "win-x64";
         return "linux-x64";
     }
 

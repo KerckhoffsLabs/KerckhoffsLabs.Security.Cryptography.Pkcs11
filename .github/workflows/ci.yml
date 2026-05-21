@@ -77,11 +77,10 @@ jobs:
           if [ -n "$util" ]; then echo "Built SoftHSM: $util"; "$util" --version; \
           else echo "::warning::built softhsm2-util not found under runtimes/*/native"; fi
 
-      # Linux: both the pkcs11-mock and SoftHSM2 backends are present, so the
-      # SoftHSM-gated [ConditionalFact] tests run alongside the mock tests; the
-      # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if SoftHSM is missing.
-      # Windows: only pkcs11-mock is built (the SoftHSM2 build is Linux/macOS-only, and
-      # the fixture intentionally does not auto-discover a system install), so the SoftHSM
-      # tests skip there by design and the guard is a no-op on Windows.
+      # Both backends build on all three legs: pkcs11-mock everywhere, and SoftHSM2 from the
+      # vendored submodule (Linux/macOS via build-softhsmv2.sh; Windows via build-softhsmv2.ps1,
+      # which uses CMake + the preinstalled vcpkg for OpenSSL). So the SoftHSM-gated
+      # [ConditionalFact] tests run on every leg; the SoftHsm_IsAvailable_OnCiBuildPlatforms
+      # guard fails the job if the build failed to place libsofthsm2.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
