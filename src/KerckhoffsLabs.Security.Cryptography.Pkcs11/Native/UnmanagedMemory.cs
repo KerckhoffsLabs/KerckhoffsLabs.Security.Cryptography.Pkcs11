@@ -15,8 +15,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 internal static class UnmanagedMemory
 {
-    /// <summary>Size in bytes of one CK_ULONG (NativeCULong) on the current platform: 4 on Windows, 8 on Unix-LP64.</summary>
-    public static int NativeULongSize { get; } = Marshal.SizeOf<NativeCULong>();
+    /// <summary>
+    /// Size in bytes of one native CK_ULONG on the current platform: 4 on Windows, 8 on Unix-LP64.
+    /// Windows is hard-coded to 4 because its C <c>unsigned long</c> is 32-bit (LLP64); the
+    /// nuint-backed <see cref="NativeCULong"/> would otherwise report 8 on Windows x64.
+    /// </summary>
+    public static int NativeULongSize { get; } = OperatingSystem.IsWindows() ? sizeof(uint) : Marshal.SizeOf<NativeCULong>();
 
     /// <summary>
     /// Logger responsible for message logging
