@@ -61,6 +61,12 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// SoftHSM 2.7 hardcodes <c>kdf == CKD_NULL</c>; see <c>SoftHSM.cpp:deriveECDH</c>.</summary>
     public static bool SoftHsmSupportsEcdh1WithKdf => false;
 
+    /// <summary>True if the token supports ML-DSA (FIPS 204): <see cref="CKM.CKM_ML_DSA_KEY_PAIR_GEN"/>
+    /// and <see cref="CKM.CKM_ML_DSA"/>. The vendored SoftHSM source has ML-DSA behind
+    /// <c>WITH_ML_DSA</c>, but the binary we build is not compiled with it (requires OpenSSL 3.5+),
+    /// so key generation returns <c>CKR_MECHANISM_INVALID</c>. Flip when the build gains ML-DSA.</summary>
+    public static bool SoftHsmSupportsMlDsa => false;
+
     // Parent directory that SoftHSM2 creates UUID token subdirs inside.
     private readonly string _tokenStoreDir;
     private readonly string _configPath;
