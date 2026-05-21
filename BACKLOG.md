@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 15 | **Low:** 4
+- **Critical:** 0 | **High:** 9 | **Medium:** 15 | **Low:** 3
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -804,6 +804,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-065] No public PIN management (SetPin / InitPin)
 
+- **Status: Resolved (2026-05-20)** — Surfaced `Pkcs11Workspace.SetPin(SecurePin oldPin, SecurePin newPin)` (`C_SetPIN`) and `InitPin(SecurePin userPin)` (`C_InitPIN`), delegating to the existing internal `Pkcs11Session` methods after a disposed-guard + null-guard (matching the established workspace delegation style; `SecurePin` zeroize handling is unchanged). Tests: mock-backend guard tests (null args → `ArgumentNullException`, after-dispose → `ObjectDisposedException`) that run cross-platform and never touch a real PIN, plus a SoftHSM `SetPin` round-trip that performs a real `C_SetPIN` change and restores the shared token's user PIN (self-restoring, with a finally fallback; SoftHSM tests run serially so the change is contained). InitPin's SoftHSM integration was intentionally not added — exercising it resets the user PIN via an SO session, a high-blast-radius change to the shared token, and it's the same thin delegation pattern that the SetPin round-trip already proves end-to-end. 606 tests pass.
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** S

@@ -340,6 +340,36 @@ public sealed class Pkcs11Workspace : IDisposable
     }
 
     /// <summary>
+    /// Changes the logged-in user's PIN via <c>C_SetPIN</c>. The session must be authenticated as
+    /// the user (or SO) whose PIN is being changed.
+    /// </summary>
+    /// <param name="oldPin">The current PIN.</param>
+    /// <param name="newPin">The replacement PIN.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">The token rejected the change (e.g. wrong old PIN, policy violation).</exception>
+    public void SetPin(SecurePin oldPin, SecurePin newPin)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(oldPin);
+        ArgumentNullException.ThrowIfNull(newPin);
+        _session.SetPin(oldPin, newPin);
+    }
+
+    /// <summary>
+    /// Initializes the normal user's PIN via <c>C_InitPIN</c>. Requires a session authenticated as
+    /// the Security Officer (SO).
+    /// </summary>
+    /// <param name="userPin">The user PIN to set.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
+    public void InitPin(SecurePin userPin)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(userPin);
+        _session.InitPin(userPin);
+    }
+
+    /// <summary>
     /// Computes a one-shot digest over <paramref name="data"/> using the given mechanism.
     /// </summary>
     /// <param name="mechanism">Digest mechanism (e.g. <see cref="Mechanism"/> wrapping <see cref="CKM.CKM_SHA256"/>).</param>
