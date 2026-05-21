@@ -75,6 +75,45 @@ public sealed class RSAPkcs11Tests_SoftHsm
         finally { Cleanup(workspace, pubH, privH); }
     }
 
+    // BL-038: cross-library verification. Export the public key, import it into a fresh BCL RSA,
+    // and verify the PKCS#11-produced signature with the BCL — catches a DER/parameter-export bug
+    // or a wrong PSS salt that a same-instance round-trip would miss.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void SignData_Pkcs1_VerifiesUnderBclFromExportedPublicKey()
+    {
+        using var workspace = OpenWorkspace();
+        using var key = GenerateRsaKey(workspace, out var pubH, out var privH);
+        try
+        {
+            using var rsa = new RSAPkcs11(key);
+            byte[] data = System.Text.Encoding.UTF8.GetBytes("cross-library verify");
+            byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+            using var bcl = RSA.Create();
+            bcl.ImportParameters(rsa.ExportParameters(includePrivateParameters: false));
+            Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+        }
+        finally { Cleanup(workspace, pubH, privH); }
+    }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void SignData_Pss_VerifiesUnderBclFromExportedPublicKey()
+    {
+        using var workspace = OpenWorkspace();
+        using var key = GenerateRsaKey(workspace, out var pubH, out var privH);
+        try
+        {
+            using var rsa = new RSAPkcs11(key);
+            byte[] data = System.Text.Encoding.UTF8.GetBytes("cross-library verify");
+            byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+
+            using var bcl = RSA.Create();
+            bcl.ImportParameters(rsa.ExportParameters(includePrivateParameters: false));
+            Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        }
+        finally { Cleanup(workspace, pubH, privH); }
+    }
+
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void ExportParameters_PublicOnly_ReturnsModulusAndExponent()
     {

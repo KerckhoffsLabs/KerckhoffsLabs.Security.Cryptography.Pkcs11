@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 5 | **Medium:** 15 | **Low:** 4
+- **Critical:** 0 | **High:** 5 | **Medium:** 14 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -509,6 +509,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-038] No cross-library signature-verification test
 
+- **Status: Resolved (2026-05-21)** — Added cross-library verification: the PKCS#11 adapter signs, its public key is exported via `ExportParameters` and imported into a fresh BCL primitive, and the BCL re-verifies the signature. `RSAPkcs11Tests` covers PKCS#1 v1.5 and PSS (the PSS case pins the salt/MGF agreement); `ECDsaPkcs11Tests` covers P-256/384/521 as a theory — `CKM_ECDSA` emits raw r||s, so the BCL verifies with `DSASignatureFormat.IeeeP1363FixedFieldConcatenation`, which also exercises the named-curve OID and point encoding in `ExportParameters`. A DER/parameter-export bug or wrong PSS salt now fails where a same-instance round-trip would have passed. 522 tests pass (+5).
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M

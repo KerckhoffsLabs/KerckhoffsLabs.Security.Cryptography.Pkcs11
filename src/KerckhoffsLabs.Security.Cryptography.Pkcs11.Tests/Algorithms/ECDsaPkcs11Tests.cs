@@ -46,6 +46,36 @@ public sealed class ECDsaPkcs11Tests_SoftHsm
         }
     }
 
+    // BL-038: cross-library verification. Export the public key, rebuild an ECDsa from it, and
+    // verify the PKCS#11 signature with the BCL — catches a wrong named-curve OID or a mangled
+    // point in ExportParameters that a same-instance round-trip would not. CKM_ECDSA emits raw
+    // r||s, so the BCL must interpret the signature as IEEE P1363.
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData("P-256")]
+    [InlineData("P-384")]
+    [InlineData("P-521")]
+    public void SignData_VerifiesUnderBclFromExportedPublicKey(string curve)
+    {
+        var (oid, hash, _) = Spec(curve);
+        using var workspace = _backend.Library.OpenWorkspace(
+            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
+        using var key = GenerateEcKey(workspace, oid, out var pubH, out var privH);
+        try
+        {
+            using var ec = new ECDsaPkcs11(key);
+            byte[] data = System.Text.Encoding.UTF8.GetBytes("cross-library verify");
+            byte[] sig = ec.SignData(data, hash);
+
+            using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+            Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+        }
+        finally
+        {
+            if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
+            if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
+        }
+    }
+
     [ConditionalTheory(nameof(SoftHsmAvailable))]
     [InlineData("P-256")]
     [InlineData("P-384")]
