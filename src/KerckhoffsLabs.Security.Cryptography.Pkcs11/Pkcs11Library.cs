@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -206,6 +207,47 @@ public sealed class Pkcs11Library : IDisposable
 
             return list;
         }
+    }
+
+    /// <summary>
+    /// Enumerates the interfaces this module exposes (PKCS#11 v3.0 <c>C_GetInterfaceList</c>) —
+    /// the standard <c>"PKCS 11"</c> interface plus any vendor-specific ones. This is the only way
+    /// to discover vendor interface tables a token offers.
+    /// </summary>
+    /// <returns>The interface descriptors, or an empty list if the module reports none.</returns>
+    /// <exception cref="Exceptions.Pkcs11Exception">
+    /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules, which have no
+    /// interface concept.
+    /// </exception>
+    public IReadOnlyList<Pkcs11Interface> GetInterfaces()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::GetInterfaces", _libraryPath);
+
+        NativeCULong count = new(0);
+        CKR rv = LowLevel.C_GetInterfaceList(null, ref count);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetInterfaceList");
+
+        if (count.Value == 0)
+            return [];
+
+        CK_INTERFACE[] raw = new CK_INTERFACE[(int)count];
+        rv = LowLevel.C_GetInterfaceList(raw, ref count);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetInterfaceList");
+
+        // The module may report fewer on the second call; never read past the buffer.
+        int n = Math.Min((int)count, raw.Length);
+        List<Pkcs11Interface> list = new(n);
+        for (int i = 0; i < n; i++)
+        {
+            string name = raw[i].InterfaceName != IntPtr.Zero
+                ? Marshal.PtrToStringUTF8(raw[i].InterfaceName) ?? string.Empty
+                : string.Empty;
+            list.Add(new Pkcs11Interface(name, (ulong)raw[i].Flags));
+        }
+
+        return list;
     }
 
     /// <summary>

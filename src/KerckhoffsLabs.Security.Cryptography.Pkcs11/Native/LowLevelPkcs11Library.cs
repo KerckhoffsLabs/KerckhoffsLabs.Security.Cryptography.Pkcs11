@@ -601,6 +601,36 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     }
 
     /// <summary>
+    /// Lists the interfaces a v3.0+ module exposes (PKCS#11 v3.0 §5.4.4). Standard two-call idiom:
+    /// pass <c>null</c> to learn the count, then a buffer of that size to receive the descriptors.
+    /// </summary>
+    /// <param name="interfaces">Buffer to receive the interface descriptors, or <c>null</c> to query the count.</param>
+    /// <param name="count">In/out count: receives the interface count on the null call.</param>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (!_delegates.HasC_GetInterfaceList)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+
+        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetInterfaceList_Windows)
+        {
+            if (interfaces is null)
+                return (CKR)(ulong)_delegates.C_GetInterfaceList_Windows(null, ref count);
+
+            var winList = new CK_INTERFACE_Windows[interfaces.Length];
+            CKR winRv = (CKR)(ulong)_delegates.C_GetInterfaceList_Windows(winList, ref count);
+            if (winRv == CKR.CKR_OK)
+                for (int i = 0; i < interfaces.Length; i++)
+                    interfaces[i] = winList[i].ToUnified();
+            return winRv;
+        }
+
+        return _delegates.C_GetInterfaceList(interfaces, ref count).ToCKR();
+    }
+
+    /// <summary>
     /// Begins an AEAD encrypt-message sequence (PKCS#11 v3.0 §5.9.4). Pair with C_EncryptMessage or C_EncryptMessageBegin/Next + C_MessageEncryptFinal.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>

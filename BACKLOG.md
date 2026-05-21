@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 15 | **Low:** 4
+- **Critical:** 0 | **High:** 8 | **Medium:** 15 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -191,6 +191,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-013] `C_GetInterfaceList` unreachable from managed code
 
+- **Status: Resolved (2026-05-21)** — Added `C_GetInterfaceList` + `_Windows` function pointers (`FunctionPointers.cs`), bound them in both loader paths (`TryLoadV30Symbols` raw export and the v3.0 function-list read in `TryLoadFromGetInterface`, which also covers v3.2 tokens since the entry sits at the same offset), and added `Delegates` wrappers + a `LowLevelPkcs11Library.C_GetInterfaceList` two-call wrapper with the Windows `CK_INTERFACE_Windows`→`ToUnified` readback. Surfaced as `Pkcs11Library.GetInterfaces()` returning a new public `Pkcs11Interface` (`Name`, `Flags`, `IsForkSafe`). Returns `CKR_FUNCTION_NOT_SUPPORTED` on v2.40 modules. Test `GetInterfacesTests_Mock` asserts pkcs11-mock's two "PKCS 11" interfaces; full suite 509 pass.
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** M

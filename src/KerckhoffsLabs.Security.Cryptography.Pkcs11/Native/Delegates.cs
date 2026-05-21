@@ -733,6 +733,32 @@ internal partial class Delegates
         return _fp.C_SessionCancel(session, flags);
     }
 
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_GetInterfaceList</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_GetInterfaceList => _fp.C_GetInterfaceList is not null;
+
+    /// <summary>Returns <see langword="true"/> if the Windows-packed <c>C_GetInterfaceList</c> sibling is bound.</summary>
+    internal unsafe bool HasC_GetInterfaceList_Windows => _fp.C_GetInterfaceList_Windows is not null;
+
+    /// <summary>Wrapper for <c>C_GetInterfaceList</c> (PKCS#11 v3.0). Two-call idiom: pass <c>null</c> to get the count.</summary>
+    public unsafe NativeCULong C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
+    {
+        if (_fp.C_GetInterfaceList is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInterfaceList");
+        fixed (CK_INTERFACE* list = interfaces)
+        fixed (NativeCULong* c = &count)
+            return _fp.C_GetInterfaceList(list, c);
+    }
+
+    /// <summary>Wrapper for <c>C_GetInterfaceList</c> with Pack=1 Windows struct layout.</summary>
+    public unsafe NativeCULong C_GetInterfaceList_Windows(CK_INTERFACE_Windows[]? interfaces, ref NativeCULong count)
+    {
+        if (_fp.C_GetInterfaceList_Windows is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInterfaceList_Windows");
+        fixed (CK_INTERFACE_Windows* list = interfaces)
+        fixed (NativeCULong* c = &count)
+            return _fp.C_GetInterfaceList_Windows(list, c);
+    }
+
     // ── Has* availability properties for optional v3.0/v3.2 functions ─────────────
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageEncryptInit</c> (PKCS#11 v3.0+).</summary>
@@ -1478,6 +1504,12 @@ internal partial class Delegates
             unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)loginUserPtr; }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_SessionCancel", out IntPtr sessionCancelPtr) && sessionCancelPtr != IntPtr.Zero)
             unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)sessionCancelPtr; }
+        if (NativeLibrary.TryGetExport(libraryHandle, "C_GetInterfaceList", out IntPtr getInterfaceListPtr) && getInterfaceListPtr != IntPtr.Zero)
+            unsafe
+            {
+                _fp.C_GetInterfaceList = (delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong>)getInterfaceListPtr;
+                _fp.C_GetInterfaceList_Windows = (delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong>)getInterfaceListPtr;
+            }
         if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageEncryptInit", out IntPtr msgEncInitPtr) && msgEncInitPtr != IntPtr.Zero)
         {
             unsafe { _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgEncInitPtr; }
@@ -1618,6 +1650,13 @@ internal partial class Delegates
             unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_LoginUser; }
         if (v30.C_SessionCancel != IntPtr.Zero)
             unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)v30.C_SessionCancel; }
+        // v3.0 func; present at the same offset in the v3.2 table, so this also covers v3.2 tokens.
+        if (v30.C_GetInterfaceList != IntPtr.Zero)
+            unsafe
+            {
+                _fp.C_GetInterfaceList = (delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong>)v30.C_GetInterfaceList;
+                _fp.C_GetInterfaceList_Windows = (delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong>)v30.C_GetInterfaceList;
+            }
 
         if (v30.C_MessageEncryptInit != IntPtr.Zero)
         {

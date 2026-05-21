@@ -49,6 +49,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_Login(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen);
     CKR C_LoginUser(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen);
     CKR C_SessionCancel(NativeCULong session, NativeCULong flags);
+    CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count);
     CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen);
     CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen);

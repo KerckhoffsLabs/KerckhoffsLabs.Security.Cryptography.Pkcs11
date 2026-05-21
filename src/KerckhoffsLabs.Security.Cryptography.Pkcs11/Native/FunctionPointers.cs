@@ -251,6 +251,12 @@ internal sealed unsafe class FunctionPointers
 
     // ── v3.0 entry / login ───────────────────────────────────────────────────────
 
+    /// <summary>Cryptoki <c>CK_RV C_GetInterfaceList(CK_INTERFACE_PTR pInterfacesList, CK_ULONG_PTR pulCount)</c> (v3.0).</summary>
+    public delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong> C_GetInterfaceList;
+
+    /// <summary>Windows-packed sibling of <see cref="C_GetInterfaceList"/>.</summary>
+    public delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong> C_GetInterfaceList_Windows;
+
     /// <summary>Cryptoki <c>CK_RV C_GetInterface(CK_UTF8CHAR_PTR pInterfaceName, CK_VERSION_PTR pVersion, CK_INTERFACE_PTR_PTR ppInterface, CK_FLAGS ulFlags)</c> (v3.0).</summary>
     public delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong> C_GetInterface;
 
