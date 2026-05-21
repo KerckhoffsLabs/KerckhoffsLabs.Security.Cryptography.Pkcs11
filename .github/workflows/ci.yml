@@ -52,16 +52,41 @@ jobs:
           dotnet-version: '10.0.x'
           architecture: ${{ matrix.arch || 'x64' }}
 
-      # pkcs11-mock builds with gcc/make (in build-essential); SoftHSM2 builds with
-      # CMake against the OpenSSL backend (libssl-dev). Both BeforeTargets fire during
-      # the Build step below, placing the libraries next to the test assembly where the
-      # backend fixtures auto-discover them.
+      # pkcs11-mock builds with gcc/make (in build-essential); SoftHSM2 builds from source with
+      # autotools (autoconf/automake/libtool). Both BeforeTargets fire during the Build step below,
+      # placing the libraries next to the test assembly where the backend fixtures auto-discover them.
       # Windows SoftHSM2 is gated off for now: the vendored build (build-softhsmv2.ps1) compiles,
       # but token init fails to load the module and a from-source vcpkg OpenSSL build takes ~27 min.
       # Tracked as a follow-up; until then Windows runs pkcs11-mock only and SoftHSM tests self-skip.
       - name: Install native build deps (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
+
+      # SoftHSM is built against OpenSSL 3.5+ so ML-DSA (CKM_ML_DSA) compiles in — ubuntu-latest
+      # ships OpenSSL 3.0, so we build 3.5.6 from source (the same release the upstream SoftHSM CI
+      # uses) into a user-writable prefix (cache-friendly, no sudo). build-softhsmv2.sh reads
+      # OPENSSL_PREFIX and bakes an rpath so libsofthsm2 loads this OpenSSL at runtime.
+      - name: Cache OpenSSL 3.5
+        if: runner.os == 'Linux'
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: ~/openssl-3.5
+          key: openssl-3.5.6-${{ runner.arch }}
+      - name: Build OpenSSL 3.5.6 (on cache miss)
+        if: runner.os == 'Linux' && steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          work="$(mktemp -d)"; cd "$work"
+          curl -fsSL -O https://github.com/openssl/openssl/releases/download/openssl-3.5.6/openssl-3.5.6.tar.gz
+          echo "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736  openssl-3.5.6.tar.gz" | sha256sum -c -
+          tar -xf openssl-3.5.6.tar.gz && cd openssl-3.5.6
+          ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
+          make -j"$(nproc)" >/dev/null
+          make install_sw >/dev/null
+          ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
+      - name: Point SoftHSM at OpenSSL 3.5 (Linux)
+        if: runner.os == 'Linux'
+        run: echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
