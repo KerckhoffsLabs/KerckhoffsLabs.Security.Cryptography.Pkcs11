@@ -1,13 +1,11 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using System.Runtime.Serialization;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
 /// Exception with the name of PKCS#11 attribute whose value could not be read or converted
 /// </summary>
-[Serializable]
-public class AttributeValueException : Exception
+public sealed class AttributeValueException : Exception
 {
     /// <summary>
     /// Attribute whose value could not be read or converted
@@ -86,38 +84,5 @@ public class AttributeValueException : Exception
         : this((CKA)Convert.ToUInt32(attribute), innerException)
     {
 
-    }
-
-    /// <summary>
-    /// Initializes new instance of AttributeValueException class with serialized data
-    /// </summary>
-    /// <param name="info">SerializationInfo that holds the serialized object data about the exception being thrown</param>
-    /// <param name="context">StreamingContext that contains contextual information about the source or destination</param>
-    [Obsolete(
-        "This API supports obsolete formatter-based serialization. It should not be called or extended by application code.",
-        DiagnosticId = "SYSLIB0051", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
-    protected AttributeValueException(SerializationInfo info, StreamingContext context)
-        : base(info, context)
-    {
-        ArgumentNullException.ThrowIfNull(info);
-
-        _attribute = (CKA)info.GetUInt32("Attribute");
-    }
-
-    /// <summary>
-    /// Populates a SerializationInfo with the data needed to serialize the target object
-    /// </summary>
-    /// <param name="info">SerializationInfo to populate with data</param>
-    /// <param name="context">The destination for this serialization</param>
-    [Obsolete(
-        "This API supports obsolete formatter-based serialization. It should not be called or extended by application code.",
-        DiagnosticId = "SYSLIB0051", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
-    public override void GetObjectData(SerializationInfo info, StreamingContext context)
-    {
-        ArgumentNullException.ThrowIfNull(info);
-
-        info.AddValue("Attribute", _attribute);
-
-        base.GetObjectData(info, context);
     }
 }

@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 18 | **Low:** 5
+- **Critical:** 0 | **High:** 9 | **Medium:** 17 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -647,6 +647,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-052] `AttributeValueException` is `[Serializable]` (obsolete) and unsealed
 
+- **Status: Resolved (2026-05-20)** — Removed `[Serializable]`, the `protected SerializationInfo` constructor, `GetObjectData`, and the now-unused `using System.Runtime.Serialization;` (these had been stop-gap `[Obsolete(SYSLIB0051)]`-marked in an earlier pass; full removal supersedes that). Marked the class `sealed`, matching every other concrete exception in the hierarchy. No subclasses and no callers of the serialization members existed (verified by grep), so no consumer churn. 599 tests pass.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** S
