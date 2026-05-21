@@ -1,4 +1,3 @@
-using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -65,20 +64,6 @@ public sealed class Pkcs11Object : IDisposable
         {
             foreach (var a in attrs) a.Dispose();
         }
-    }
-
-    /// <summary>
-    /// Loads the object's <c>CKA_VALUE</c> as an X.509 certificate. Valid only for certificate
-    /// objects (<see cref="ObjectClass"/> = <see cref="CKO.CKO_CERTIFICATE"/>) holding a
-    /// DER-encoded X.509 certificate. The caller owns the returned instance.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">The object is not a certificate.</exception>
-    public X509Certificate2 AsX509Certificate()
-    {
-        if (_objectClass != CKO.CKO_CERTIFICATE)
-            throw new InvalidOperationException(
-                $"AsX509Certificate is only valid for certificate objects; this object is {_objectClass}.");
-        return X509CertificateLoader.LoadCertificate(GetValue());
     }
 
     /// <summary>

@@ -148,23 +148,6 @@ public sealed class Pkcs11Workspace : IDisposable
         return result;
     }
 
-    /// <summary>
-    /// Finds all certificate objects on the token (<c>CKA_CLASS = CKO_CERTIFICATE</c>) — a typed
-    /// counterpart to <see cref="FindKeys"/>. Convenience over <see cref="FindObjects"/> with a
-    /// class filter; call <see cref="Pkcs11Object.AsX509Certificate"/> on each result to parse
-    /// the DER, or <see cref="Pkcs11Object.Delete"/> to remove it.
-    /// </summary>
-    /// <returns>A list of certificate <see cref="Pkcs11Object"/>. May be empty. Caller disposes each.</returns>
-    public IReadOnlyList<Pkcs11Object> FindCertificates()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        using var filter = ObjectTemplate.Empty()
-            .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_CERTIFICATE)
-            .Build();
-        return FindObjects(filter);
-    }
-
     private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
     {
         var attrs = _session.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);

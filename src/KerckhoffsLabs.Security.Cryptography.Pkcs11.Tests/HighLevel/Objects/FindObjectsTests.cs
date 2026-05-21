@@ -51,25 +51,10 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
                 Assert.Single(objs);
                 Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
                 Assert.Equal(der, objs[0].GetValue());
-                using var roundTrip = objs[0].AsX509Certificate();
-                Assert.Equal(cert.Thumbprint, roundTrip.Thumbprint);
             }
             finally
             {
                 foreach (var o in objs) o.Dispose();
-            }
-        }
-
-        // FindCertificates() convenience returns the cert among CKO_CERTIFICATE objects.
-        {
-            var certs = workspace.FindCertificates();
-            try
-            {
-                Assert.Contains(certs, o => o.Label == label && o.ObjectClass == CKO.CKO_CERTIFICATE);
-            }
-            finally
-            {
-                foreach (var o in certs) o.Dispose();
             }
         }
 
