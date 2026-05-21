@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 17 | **Low:** 5
+- **Critical:** 0 | **High:** 9 | **Medium:** 16 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -681,6 +681,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-062] No public way to delete a token object (create-without-delete)
 
+- **Status: Resolved (2026-05-20)** — Added public `Pkcs11Key.Delete()`, which calls the internal `Pkcs11Session.DestroyObject` (`C_DestroyObject`) on each valid handle — both halves of a key pair. Doc is explicit about the distinction from `Dispose` (release the wrapper, leave the token object) vs `Delete` (erase the key material), and notes the token enforces `CKA_DESTROYABLE`/read-only permissions (`CKR_ACTION_PROHIBITED`). Chose the single OO entry point over a redundant `Pkcs11Workspace.DeleteKey`. New SoftHSM test `DeleteKeyTests.Delete_RemovesKeyFromToken` generates an on-token AES key, deletes it via `Pkcs11Key.Delete()`, and asserts `FindKeys` is empty afterward (verified it runs, not skips). 600 tests pass.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** S

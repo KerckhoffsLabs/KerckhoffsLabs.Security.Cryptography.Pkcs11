@@ -118,6 +118,27 @@ public sealed class Pkcs11Key : IDisposable
         return Pkcs11PublicKeyView.TrySynthesizeEc(_workspace.Session, _privateHandle);
     }
 
+    /// <summary>
+    /// Permanently removes the underlying object(s) from the token via <c>C_DestroyObject</c>.
+    /// For a key pair this destroys both the private and public objects.
+    /// </summary>
+    /// <remarks>
+    /// This is distinct from <see cref="Dispose"/>: <c>Dispose</c> only releases this wrapper
+    /// (and any workspace/library it owns) and leaves the token object intact, whereas
+    /// <c>Delete</c> erases the key material from the token. The token enforces its own
+    /// permissions — destroying a read-only object, or one created with
+    /// <c>CKA_DESTROYABLE = false</c>, fails with a <see cref="Exceptions.Pkcs11Exception"/>
+    /// (typically <c>CKR_ACTION_PROHIBITED</c>). After a successful delete the handles are stale;
+    /// still <see cref="Dispose"/> the key to release the wrapper.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">The key has already been disposed.</exception>
+    public void Delete()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!_privateHandle.IsInvalid) _workspace.Session.DestroyObject(_privateHandle);
+        if (!_publicHandle.IsInvalid) _workspace.Session.DestroyObject(_publicHandle);
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
