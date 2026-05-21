@@ -1,7 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!--
+      Single-target per host so tests bind to the library asset whose CK_ULONG width matches
+      this OS and pass the LowLevelPkcs11Library guard: net10.0-windows (uint) on Windows,
+      net10.0 (nuint) on Unix. Tests run where they are built, so keying off the build host
+      is correct here (unlike the shipped library, which keys off the target framework).
+    -->
+    <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -9,6 +16,12 @@
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <LangVersion>13.0</LangVersion>
+  </PropertyGroup>
+
+  <!-- Define WINDOWS for the net10.0-windows build so #if WINDOWS layout assertions
+       (MarshalSizeOfTests) compile against the 4-byte CK_ULONG sibling sizes. -->
+  <PropertyGroup Condition="'$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework)))' == 'windows'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

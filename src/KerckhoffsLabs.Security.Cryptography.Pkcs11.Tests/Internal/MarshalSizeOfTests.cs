@@ -144,11 +144,14 @@ public sealed class MarshalSizeOfTests
         Assert.Equal(expectedSize, Marshal.SizeOf(t));
     }
 
+#if WINDOWS
     /// <summary>
     /// Pins the Pack=1 layout emitted by the source generator for Windows-bound siblings.
     /// Values are the OASIS pkcs11.h Windows ABI on a 64-bit pointer: CK_ULONG = 4 bytes
-    /// (LLP64 <c>unsigned long</c>), pointer = 8, <c>#pragma pack(1)</c>. Gated to a 64-bit
-    /// process because the pointer-bearing structs are narrower on 32-bit Windows.
+    /// (LLP64 <c>unsigned long</c>), pointer = 8, <c>#pragma pack(1)</c>. Compiled only in the
+    /// net10.0-windows build, where NativeCULong is the 4-byte storage these sizes assume — the
+    /// neutral net10.0 build's siblings are nuint-wide and are never used on Windows (guarded).
+    /// Gated to a 64-bit process because the pointer-bearing structs are narrower on 32-bit Windows.
     /// </summary>
     [ConditionalTheory(nameof(Is64BitProcess))]
     // BEGIN Windows InlineData — OASIS Windows x64 ABI (CK_ULONG=4, ptr=8, pack=1)
@@ -259,4 +262,5 @@ public sealed class MarshalSizeOfTests
         Assert.NotNull(t);
         Assert.Equal(expectedSize, Marshal.SizeOf(t!));
     }
+#endif
 }

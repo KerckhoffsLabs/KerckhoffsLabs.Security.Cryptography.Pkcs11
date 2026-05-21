@@ -14,16 +14,6 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private const string AttributeFullName =
         "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.PackedForPkcs11Attribute";
 
-    // CK_ULONG is platform `unsigned long`: 8 bytes on Unix-LP64 but 4 bytes on Windows (LLP64).
-    // NativeCULong is nuint-backed, so on the unified (Unix) path it is the correct 8-byte width,
-    // but on Windows x64 it would still be 8 bytes — wrong for the 4-byte native CK_ULONG. The
-    // Windows packed siblings therefore represent every CK_ULONG field as a 4-byte `uint`, with a
-    // narrowing/widening cast on the FromUnified/ToUnified boundary.
-    private const string NativeCULongFq = "global::KerckhoffsLabs.Runtime.InteropServices.NativeCULong";
-
-    private static bool IsNativeCULong(ITypeSymbol t) =>
-        t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == NativeCULongFq;
-
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var marked = context.SyntaxProvider.ForAttributeWithMetadataName(
@@ -99,10 +89,6 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         if (t is IArrayTypeSymbol arr)
             return SubstituteFieldType(arr.ElementType, packedNames) + "[]";
 
-        // CK_ULONG narrows to a 4-byte uint on the Windows packed layout.
-        if (IsNativeCULong(t))
-            return "uint";
-
         var key = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         if (packedNames.TryGetValue(key, out var winName))
         {
@@ -121,8 +107,9 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         foreach (var f in fields)
         {
-            var elemType = f.Type is IArrayTypeSymbol arr ? arr.ElementType : f.Type;
-            var key = elemType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var key = f.Type is IArrayTypeSymbol arr
+                ? arr.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                : f.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
             if (packedNames.TryGetValue(key, out var winName))
             {
@@ -137,21 +124,6 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
                 {
                     sb.Append("        ").Append(f.Name).Append(" = ").Append(winName)
                       .Append(".FromUnified(in src.").Append(f.Name).AppendLine("),");
-                }
-            }
-            else if (IsNativeCULong(elemType))
-            {
-                // Narrow CK_ULONG (8-byte nuint-backed) to the 4-byte Windows uint. `unchecked`
-                // forces the truncating operator (values are inherently ≤32-bit on Windows).
-                if (f.Type is IArrayTypeSymbol)
-                {
-                    sb.Append("        ").Append(f.Name).Append(" = src.").Append(f.Name)
-                      .Append(" is null ? null! : System.Array.ConvertAll(src.").Append(f.Name)
-                      .AppendLine(", static x => unchecked((uint)x)),");
-                }
-                else
-                {
-                    sb.Append("        ").Append(f.Name).Append(" = unchecked((uint)src.").Append(f.Name).AppendLine("),");
                 }
             }
             else
@@ -170,8 +142,9 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine("    {");
         foreach (var f in fields)
         {
-            var elemType = f.Type is IArrayTypeSymbol arr ? arr.ElementType : f.Type;
-            var key = elemType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var key = f.Type is IArrayTypeSymbol arr
+                ? arr.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                : f.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
             if (packedNames.TryGetValue(key, out var winName))
             {
@@ -185,21 +158,6 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
                 else
                 {
                     sb.Append("        ").Append(f.Name).Append(" = this.").Append(f.Name).AppendLine(".ToUnified(),");
-                }
-            }
-            else if (IsNativeCULong(elemType))
-            {
-                // Widen the 4-byte Windows uint back to CK_ULONG (always exact).
-                if (f.Type is IArrayTypeSymbol)
-                {
-                    sb.Append("        ").Append(f.Name).Append(" = this.").Append(f.Name)
-                      .Append(" is null ? null! : System.Array.ConvertAll(this.").Append(f.Name)
-                      .Append(", static x => (").Append(NativeCULongFq).AppendLine(")x),");
-                }
-                else
-                {
-                    sb.Append("        ").Append(f.Name).Append(" = (").Append(NativeCULongFq)
-                      .Append(")this.").Append(f.Name).AppendLine(",");
                 }
             }
             else

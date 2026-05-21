@@ -1,7 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!--
+      Multi-target so Windows consumers resolve the 4-byte CK_ULONG layout. The interop layer
+      uses NativeCULong (KerckhoffsLabs.Runtime.InteropServices) for CK_ULONG, whose storage is
+      uint on the net10.0-windows asset and nuint elsewhere. A net10.0-windows consumer therefore
+      gets the correct 4-byte CK_ULONG on Windows; a neutral net10.0 consumer gets the nuint asset
+      (correct on Unix-LP64). The two builds are platform-specific — the runtime guard in
+      LowLevelPkcs11Library throws if the resolved build's CK_ULONG width does not match the host.
+    -->
+    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -38,7 +46,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="KerckhoffsLabs.Runtime.InteropServices" Version="1.0.0" />
+    <PackageReference Include="KerckhoffsLabs.Runtime.InteropServices" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
