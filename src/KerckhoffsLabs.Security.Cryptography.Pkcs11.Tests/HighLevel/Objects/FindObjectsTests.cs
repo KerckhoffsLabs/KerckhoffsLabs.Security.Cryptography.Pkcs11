@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Objects;
 
 /// <summary>
-/// SoftHSM-only (BL-064): <see cref="Pkcs11Workspace.FindObjects"/> / <see cref="Pkcs11Object"/>
+/// SoftHSM-only: <see cref="Pkcs11Workspace.FindObjects"/> / <see cref="Pkcs11Object"/>
 /// enumerate and read back a non-key object — an X.509 certificate — which the key-only
 /// <c>FindKeys</c> path cannot reach.
 /// </summary>
@@ -25,7 +25,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
 
         // A self-signed X.509 cert to store on the token.
         using var rsa = RSA.Create(2048);
-        var req = new CertificateRequest("CN=BL-064 find-objects test", rsa,
+        var req = new CertificateRequest("CN=pkcs11 find-objects test", rsa,
             HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         using var cert = req.CreateSelfSigned(
             DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
@@ -92,7 +92,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
         byte[] subject;
         using (var signer = new RSAPkcs11(keypair))
         {
-            var req = new CertificateRequest("CN=BL-064 hsm cert", signer,
+            var req = new CertificateRequest("CN=pkcs11 hsm cert", signer,
                 HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             var gen = X509SignatureGenerator.CreateForRSA(signer, RSASignaturePadding.Pkcs1);
             using var minted = req.Create(req.SubjectName, gen,

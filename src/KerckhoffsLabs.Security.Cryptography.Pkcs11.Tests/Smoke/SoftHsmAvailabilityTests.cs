@@ -4,8 +4,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Smoke;
 
 /// <summary>
 /// CI-health guard: makes a missing SoftHSM2 fail loudly instead of silently skipping the
-/// whole <c>[ConditionalFact(SoftHsmAvailable)]</c> integration suite while CI stays green
-/// (BL-049). SoftHSM is built from the vendored submodule on Linux/macOS only; on Windows it
+/// whole <c>[ConditionalFact(SoftHsmAvailable)]</c> integration suite while CI stays green.
+/// SoftHSM is built from the vendored submodule on Linux/macOS only; on Windows it
 /// is intentionally absent (the fixture does not auto-discover a system install), so the guard
 /// is scoped to CI runs on the build platforms.
 /// </summary>

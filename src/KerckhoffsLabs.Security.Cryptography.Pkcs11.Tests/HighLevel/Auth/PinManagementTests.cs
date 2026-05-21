@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Auth;
 
 /// <summary>
-/// Managed-side guards for the BL-065 PIN-management surface (<c>Pkcs11Workspace.SetPin</c> /
+/// Managed-side guards for the PIN-management surface (<c>Pkcs11Workspace.SetPin</c> /
 /// <c>InitPin</c>). These fire before any P/Invoke, so they run on the mock and need no real
 /// token — and crucially never change a PIN.
 /// </summary>

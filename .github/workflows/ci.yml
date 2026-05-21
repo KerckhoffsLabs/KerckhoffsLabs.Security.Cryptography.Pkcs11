@@ -69,7 +69,7 @@ jobs:
       # Auditable record of which SoftHSM the Linux job will exercise. The vendored
       # BuildSoftHsmV2 target places libsofthsm2.so + softhsm2-util next to the test
       # assembly; if the build silently failed to place them, this surfaces it in the
-      # log and the SoftHsm_IsAvailable_OnCiBuildPlatforms test fails the job (BL-049).
+      # log and the SoftHsm_IsAvailable_OnCiBuildPlatforms test fails the job.
       - name: Report SoftHSM build (Linux)
         if: runner.os == 'Linux'
         run: |
