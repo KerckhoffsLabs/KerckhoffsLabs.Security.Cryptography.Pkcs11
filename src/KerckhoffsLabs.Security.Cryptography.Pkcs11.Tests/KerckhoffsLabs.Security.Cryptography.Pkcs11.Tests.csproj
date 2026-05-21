@@ -7,7 +7,6 @@
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <LangVersion>13.0</LangVersion>
   </PropertyGroup>
