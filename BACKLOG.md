@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 9 | **Medium:** 19 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -515,6 +515,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-039] EC curves beyond P-256 are untested; HMAC-SHA-384/512 likewise
 
+- **Status: Resolved (2026-05-20)** — Promoted the three test classes to `[ConditionalTheory]` over the curve / hash set: `SignEcdsaTests` (P-256/384/521 with expected r||s lengths 64/96/132), `ECDsaPkcs11Tests` (SignVerify with the curve-matched hash, and ExportParameters asserting the right named-curve OID per curve), and `HMACPkcs11Tests` (SHA-256/384/512 with 32/48/64-byte MACs). Added a shared `TestKeys.GenerateEcKeyPair(session, ecParams)` + `EcParams(curve)` helper; `GenerateEcP256KeyPair` now delegates to it. The new SHA-384/512 HMAC cases surfaced that SoftHSM enforces a per-mechanism minimum key size (`CKR_KEY_SIZE_RANGE`), so the test now sizes the generic-secret key to the digest length. All curves/hashes verified against the live SoftHSM backend (`ECDsaPkcs11.ExportParameters` resolves P-384/521 via `Pkcs11PublicKeyView.ResolveNamedCurve`). 598 tests pass (+8).
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** S

@@ -120,23 +120,41 @@ internal static class TestKeys
         return (pub, priv);
     }
 
+    // DER-encoded ASN.1 OIDs for the NIST P-curves (the CKA_EC_PARAMS value).
+    //   P-256 = 1.2.840.10045.3.1.7   P-384 = 1.3.132.0.34   P-521 = 1.3.132.0.35
+    public static readonly byte[] EcP256Oid = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
+    public static readonly byte[] EcP384Oid = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22];
+    public static readonly byte[] EcP521Oid = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23];
+
+    /// <summary>Maps a NIST P-curve name ("P-256"/"P-384"/"P-521") to its DER-encoded CKA_EC_PARAMS OID.</summary>
+    public static byte[] EcParams(string curve) => curve switch
+    {
+        "P-256" => EcP256Oid,
+        "P-384" => EcP384Oid,
+        "P-521" => EcP521Oid,
+        _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
+    };
+
     /// <summary>
     /// Generates an EC key pair on the P-256 (secp256r1) curve as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
     public static (ObjectHandle pub, ObjectHandle priv) GenerateEcP256KeyPair(Pkcs11Session session)
+        => GenerateEcKeyPair(session, EcP256Oid);
+
+    /// <summary>
+    /// Generates an EC key pair on the curve identified by the DER-encoded
+    /// <paramref name="ecParams"/> OID, as session objects. Returns (publicHandle, privateHandle).
+    /// </summary>
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(Pkcs11Session session, byte[] ecParams)
     {
         using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
-
-        // DER-encoded ASN.1 OID for prime256v1 (1.2.840.10045.3.1.7):
-        // 06 08 2A 86 48 CE 3D 03 01 07
-        byte[] p256Params = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
         using var pubToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
         using var pubVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
-        using var pubParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, p256Params);
+        using var pubParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, ecParams);
 
         using var privClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
         using var privKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
