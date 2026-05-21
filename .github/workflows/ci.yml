@@ -56,6 +56,9 @@ jobs:
       # CMake against the OpenSSL backend (libssl-dev). Both BeforeTargets fire during
       # the Build step below, placing the libraries next to the test assembly where the
       # backend fixtures auto-discover them.
+      # Windows SoftHSM2 is gated off for now: the vendored build (build-softhsmv2.ps1) compiles,
+      # but token init fails to load the module and a from-source vcpkg OpenSSL build takes ~27 min.
+      # Tracked as a follow-up; until then Windows runs pkcs11-mock only and SoftHSM tests self-skip.
       - name: Install native build deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev
@@ -64,6 +67,8 @@ jobs:
         run: dotnet restore src/KerckhoffsLabs.sln
 
       - name: Build
+        env:
+          SkipSoftHsmV2Build: ${{ runner.os == 'Windows' && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Auditable record of which SoftHSM the Linux job will exercise. The vendored
@@ -77,10 +82,9 @@ jobs:
           if [ -n "$util" ]; then echo "Built SoftHSM: $util"; "$util" --version; \
           else echo "::warning::built softhsm2-util not found under runtimes/*/native"; fi
 
-      # Both backends build on all three legs: pkcs11-mock everywhere, and SoftHSM2 from the
-      # vendored submodule (Linux/macOS via build-softhsmv2.sh; Windows via build-softhsmv2.ps1,
-      # which uses CMake + the preinstalled vcpkg for OpenSSL). So the SoftHSM-gated
-      # [ConditionalFact] tests run on every leg; the SoftHsm_IsAvailable_OnCiBuildPlatforms
-      # guard fails the job if the build failed to place libsofthsm2.
+      # Linux builds both backends (pkcs11-mock + SoftHSM2 via build-softhsmv2.sh), so the
+      # SoftHSM-gated [ConditionalFact] tests run there and the SoftHsm_IsAvailable_OnCiBuildPlatforms
+      # guard fails the job if the build failed to place libsofthsm2. Windows builds pkcs11-mock
+      # only (SoftHSM2 gated off above), so its SoftHSM tests self-skip and the guard is a no-op.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
