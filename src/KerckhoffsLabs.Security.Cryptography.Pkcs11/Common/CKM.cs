@@ -2373,6 +2373,7 @@ public enum CKM : uint
     CKM_VENDOR_DEFINED = 0x80000000
 }
 
+/// <summary>Conversion helpers between <see cref="CKM"/> and the native <c>CK_ULONG</c> width.</summary>
 public static class CKMExtensions
 {
     /// <summary>

@@ -10,9 +10,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 public sealed class AesGcmPkcs11 : IDisposable
 {
+    /// <summary>Authentication-tag sizes (in bytes) supported by AES-GCM; mirrors <see cref="System.Security.Cryptography.AesGcm.TagByteSizes"/>.</summary>
     public static System.Security.Cryptography.KeySizes TagByteSizes
         => System.Security.Cryptography.AesGcm.TagByteSizes;
 
+    /// <summary>Nonce sizes (in bytes) supported by AES-GCM; mirrors <see cref="System.Security.Cryptography.AesGcm.NonceByteSizes"/>.</summary>
     public static System.Security.Cryptography.KeySizes NonceByteSizes
         => System.Security.Cryptography.AesGcm.NonceByteSizes;
 
@@ -65,6 +67,10 @@ public sealed class AesGcmPkcs11 : IDisposable
                 nameof(tagLength));
     }
 
+    /// <summary>
+    /// Encrypts data and writes the authentication tag using the token-resident AES key —
+    /// one-shot AES-GCM AEAD, mirroring <see cref="System.Security.Cryptography.AesGcm"/>.
+    /// </summary>
     public void Encrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> plaintext,
@@ -102,6 +108,10 @@ public sealed class AesGcmPkcs11 : IDisposable
         result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
     }
 
+    /// <summary>
+    /// Verifies the authentication tag and decrypts using the token-resident AES key —
+    /// one-shot AES-GCM AEAD, mirroring <see cref="System.Security.Cryptography.AesGcm"/>.
+    /// </summary>
     public void Decrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> ciphertext,

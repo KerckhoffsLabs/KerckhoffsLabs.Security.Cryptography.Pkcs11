@@ -1,0 +1,12 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      Compiler and analyzer warnings fail the build across every project in the
+      repo. Warnings are not advisory: fix the warning, or suppress it at the
+      source with a justified #pragma / [SuppressMessage], never silently leave it.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

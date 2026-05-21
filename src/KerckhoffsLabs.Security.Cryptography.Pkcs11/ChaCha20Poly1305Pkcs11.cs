@@ -13,9 +13,11 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
     // ChaCha20-Poly1305 mandates exactly 12-byte nonce and 16-byte tag per RFC 8439.
     // The BCL ChaCha20Poly1305 does not expose these as static KeySizes properties, so
     // we define the constants here to mirror the shape of AesGcm / AesCcm wrappers.
+    /// <summary>Nonce size (in bytes): always exactly 12, per RFC 8439.</summary>
     public static System.Security.Cryptography.KeySizes NonceByteSizes
         => new System.Security.Cryptography.KeySizes(12, 12, 1);
 
+    /// <summary>Authentication-tag size (in bytes): always exactly 16, per RFC 8439.</summary>
     public static System.Security.Cryptography.KeySizes TagByteSizes
         => new System.Security.Cryptography.KeySizes(16, 16, 1);
 
@@ -69,6 +71,10 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
                 nameof(tagLength));
     }
 
+    /// <summary>
+    /// Encrypts data and writes the authentication tag using the token-resident ChaCha20 key —
+    /// one-shot ChaCha20-Poly1305 AEAD, mirroring <see cref="System.Security.Cryptography.ChaCha20Poly1305"/>.
+    /// </summary>
     public void Encrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> plaintext,
@@ -105,6 +111,10 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         result.AsSpan(plaintext.Length, tag.Length).CopyTo(tag);
     }
 
+    /// <summary>
+    /// Verifies the authentication tag and decrypts using the token-resident ChaCha20 key —
+    /// one-shot ChaCha20-Poly1305 AEAD, mirroring <see cref="System.Security.Cryptography.ChaCha20Poly1305"/>.
+    /// </summary>
     public void Decrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> ciphertext,

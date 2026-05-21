@@ -210,6 +210,7 @@ public sealed class ObjectAttribute : IDisposable
 
     // --- Read-back -----------------------------------------------------------
 
+    /// <summary>Reads the value as a PKCS#11 <c>CK_BBOOL</c> (single byte; non-zero is <c>true</c>).</summary>
     public bool GetValueAsBool()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -220,6 +221,7 @@ public sealed class ObjectAttribute : IDisposable
         return b != 0;
     }
 
+    /// <summary>Reads the value as a platform-width PKCS#11 <c>CK_ULONG</c>.</summary>
     public ulong GetValueAsUlong()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -234,6 +236,7 @@ public sealed class ObjectAttribute : IDisposable
             : System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(tmp[..8]);
     }
 
+    /// <summary>Reads the value as a UTF-8 string (trailing NUL padding trimmed).</summary>
     public string GetValueAsString()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -245,6 +248,7 @@ public sealed class ObjectAttribute : IDisposable
         return System.Text.Encoding.UTF8.GetString(buf).TrimEnd('\0');
     }
 
+    /// <summary>Returns a copy of the raw value bytes.</summary>
     public byte[] GetValueAsByteArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -272,6 +276,7 @@ public sealed class ObjectAttribute : IDisposable
         return len;
     }
 
+    /// <summary>Reads the value as a PKCS#11 <c>CK_DATE</c> (UTC); returns <c>null</c> when empty or unparseable.</summary>
     public DateTime? GetValueAsDateTime()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -290,6 +295,7 @@ public sealed class ObjectAttribute : IDisposable
         return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
     }
 
+    /// <summary>Reads the value as a PKCS#11 attribute array (a contiguous <c>CK_ATTRIBUTE[]</c>).</summary>
     public ObjectAttribute[] GetValueAsAttributeArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -309,6 +315,7 @@ public sealed class ObjectAttribute : IDisposable
         return result;
     }
 
+    /// <summary>Reads the value as a contiguous array of platform-width <c>CK_ULONG</c> values.</summary>
     public ulong[] GetValueAsUlongArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -331,6 +338,7 @@ public sealed class ObjectAttribute : IDisposable
         return result;
     }
 
+    /// <summary>Reads the value as an array of <see cref="CKM"/> mechanism types (unvalidated cast from <c>CK_ULONG[]</c>).</summary>
     public CKM[] GetValueAsCkmArray()
     {
         ulong[] raw = GetValueAsUlongArray();
@@ -341,6 +349,7 @@ public sealed class ObjectAttribute : IDisposable
 
     // --- IDisposable ---------------------------------------------------------
 
+    /// <summary>Frees the unmanaged buffer backing this attribute's value.</summary>
     public void Dispose()
     {
         if (_disposed) return;

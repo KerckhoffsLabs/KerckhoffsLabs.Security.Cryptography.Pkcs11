@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 10 | **Medium:** 20 | **Low:** 5
+- **Critical:** 0 | **High:** 9 | **Medium:** 20 | **Low:** 5
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -418,6 +418,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-031] `TreatWarningsAsErrors` absent — analyzer warnings are advisory
 
+- **Status: Resolved (2026-05-20)** — Added repo-root `Directory.Build.props` with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` (applies to the library, test, and generator projects). Dropped the project-wide `<NoWarn>$(NoWarn);CS1591</NoWarn>` suppression and addressed the 22 undocumented public members per-callsite with `<summary>` doc comments (the three AEAD adapters' `NonceByteSizes`/`TagByteSizes`/`Encrypt`/`Decrypt`, `CKMExtensions`, and `ObjectAttribute`'s `GetValueAs*` + `Dispose`). The whole solution builds clean with warnings-as-errors; 590 tests pass. The lone remaining build warning is the local-only SourceLink "repository has no remote" message — an MSBuild *task* warning (no warning code), which `TreatWarningsAsErrors` (a C# compiler property) does not elevate, and which never fires in CI where a remote exists. `Meziantou.Analyzer` was considered but not added (it would surface a fresh wave of diagnostics that would immediately become errors — out of scope here).
 - **Area:** Release Eng
 - **Severity:** High
 - **Effort:** S
