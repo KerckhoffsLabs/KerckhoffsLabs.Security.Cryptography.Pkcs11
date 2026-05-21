@@ -48,6 +48,68 @@ internal static class TestKeys
     }
 
     /// <summary>
+    /// Imports a generic-secret key with a known value (e.g. for HMAC known-answer tests).
+    /// </summary>
+    public static ObjectHandle CreateGenericSecretKey(Pkcs11Session session, byte[] rawKey)
+    {
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
+
+        var template = new List<ObjectAttribute>
+            { attrClass, attrKeyType, attrToken, attrSign, attrVerify, attrValue };
+        return session.CreateObject(template);
+    }
+
+    // DER-encoded ASN.1 OID for id-Ed25519 (1.3.101.112): 06 03 2B 65 70.
+    private static readonly byte[] Ed25519Params = [0x06, 0x03, 0x2B, 0x65, 0x70];
+
+    /// <summary>
+    /// Imports an Ed25519 private key from its 32-byte seed (RFC 8032 secret scalar input).
+    /// </summary>
+    public static ObjectHandle CreateEd25519PrivateKey(Pkcs11Session session, byte[] seed)
+    {
+        if (seed.Length != 32)
+            throw new ArgumentException("Ed25519 seed must be 32 bytes.", nameof(seed));
+
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrSign = new ObjectAttribute(CKA.CKA_SIGN, true);
+        using var attrParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, Ed25519Params);
+        using var attrValue = new ObjectAttribute(CKA.CKA_VALUE, seed);
+
+        var template = new List<ObjectAttribute>
+            { attrClass, attrKeyType, attrToken, attrSign, attrParams, attrValue };
+        return session.CreateObject(template);
+    }
+
+    /// <summary>
+    /// Imports an Ed25519 public key from its 32-byte encoded point (RFC 8032 public key).
+    /// CKA_EC_POINT is the point wrapped in a DER OCTET STRING, per PKCS#11 EdDSA.
+    /// </summary>
+    public static ObjectHandle CreateEd25519PublicKey(Pkcs11Session session, byte[] point)
+    {
+        if (point.Length != 32)
+            throw new ArgumentException("Ed25519 public point must be 32 bytes.", nameof(point));
+        byte[] ecPoint = [0x04, 0x20, .. point];
+
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC_EDWARDS);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrVerify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var attrParams = new ObjectAttribute(CKA.CKA_EC_PARAMS, Ed25519Params);
+        using var attrPoint = new ObjectAttribute(CKA.CKA_EC_POINT, ecPoint);
+
+        var template = new List<ObjectAttribute>
+            { attrClass, attrKeyType, attrToken, attrVerify, attrParams, attrPoint };
+        return session.CreateObject(template);
+    }
+
+    /// <summary>
     /// Opens a R/W session on the backend's slot, logs in as USER, returns it. Caller disposes.
     /// </summary>
     public static Pkcs11Session OpenLoggedInSession(IPkcs11Backend backend)

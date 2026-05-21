@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 6 | **Medium:** 15 | **Low:** 4
+- **Critical:** 0 | **High:** 5 | **Medium:** 15 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -446,6 +446,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-033] No KATs for any AEAD / asymmetric mechanism
 
+- **Status: Resolved (2026-05-21)** — Added `Algorithms/KnownAnswerTests.cs` pinning published vectors for the primary mechanisms: AES-GCM (McGrew & Viega TC16, SP 800-38D-style 256-bit/96-bit-IV with AAD), HMAC-SHA256 (RFC 4231 TC6 — 131-byte key, which clears SoftHSM's per-mechanism minimum key size), Ed25519 (RFC 8032 test 3, signature pinned to the exact 64 bytes + a tampered-signature negative check), and ChaCha20-Poly1305 (RFC 8439 §2.8.2). The first three run against SoftHSM in CI; ChaCha20-Poly1305 is gated on `SoftHsmSupportsChaCha20Poly1305` (false — SoftHSM does not implement it) but kept ready for backends that do. All expected bytes were independently confirmed via the BCL primitives (`AesGcm`, `HMACSHA256`, `ChaCha20Poly1305`). Keys are imported by value through new `TestKeys` helpers (`CreateGenericSecretKey`, `CreateEd25519PrivateKey` from seed, `CreateEd25519PublicKey` from the encoded point). AES-CCM is deferred: SoftHSM does not support it and there is no high-level CCM encrypt helper yet, so a CCM KAT would never execute — left as a follow-up rather than added as dead code.
 - **Area:** QA
 - **Severity:** High
 - **Effort:** M
