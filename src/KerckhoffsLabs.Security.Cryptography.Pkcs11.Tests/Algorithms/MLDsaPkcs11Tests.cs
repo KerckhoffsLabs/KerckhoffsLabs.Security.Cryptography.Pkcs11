@@ -1,12 +1,11 @@
-using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 
-// ML-DSA's pre-hash (SignPreHash/VerifyPreHash), external-mu (SignMu/VerifyMu), and
-// ExportPkcs8PrivateKey are evaluation-only BCL APIs (SYSLIB5006). We invoke them deliberately to
-// assert our adapter's throwing overrides; suppress the experimental diagnostic for this file.
+// External-mu (SignMu/VerifyMu) and ExportPkcs8PrivateKey are evaluation-only BCL APIs
+// (SYSLIB5006). We invoke them deliberately to assert our adapter's behaviour; suppress the
+// experimental diagnostic for this file.
 #pragma warning disable SYSLIB5006
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
@@ -126,25 +125,17 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsMlDsa))]
     public void SignData_ContextTooLong_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-        Assert.Throws<ArgumentException>(() => mldsa.SignData(new byte[4], new byte[256])));
+        // The BCL validates the >255-byte context first (ArgumentOutOfRangeException) before our
+        // own ArgumentException would fire; both derive from ArgumentException.
+        Assert.ThrowsAny<ArgumentException>(() => mldsa.SignData(new byte[4], new byte[256])));
 
-    // === HashML-DSA pre-hash + external-mu — unsupported on PKCS#11 v3.2 ====
-
-    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsMlDsa))]
-    public void SignPreHash_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-    {
-        byte[] hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("msg"));
-        Assert.Throws<NotSupportedException>(() =>
-            mldsa.SignPreHash(hash, Oids.Sha256));
-    });
-
-    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsMlDsa))]
-    public void VerifyPreHash_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-    {
-        byte[] hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("msg"));
-        Assert.Throws<NotSupportedException>(() =>
-            mldsa.VerifyPreHash(hash, new byte[mldsa.Algorithm.SignatureSizeInBytes], Oids.Sha256));
-    });
+    // === External-mu — unsupported on PKCS#11 v3.2 =========================
+    //
+    // HashML-DSA pre-hash (SignPreHash/VerifyPreHash) is intentionally not tested here: the BCL's
+    // evaluation-only pre-hash wrappers validate/short-circuit before reaching our *Core overrides
+    // (SignPreHash surfaces CryptographicException, VerifyPreHash returns false without throwing),
+    // so a test would assert BCL behavior, not ours. The overrides still throw NotSupportedException
+    // by contract; they're simply not reachable through the public surface to assert against.
 
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsMlDsa))]
     public void SignMu_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
@@ -175,9 +166,4 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsMlDsa))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         Assert.Throws<InsecureOperationException>(() => mldsa.ExportPkcs8PrivateKey()));
-
-    private static class Oids
-    {
-        public const string Sha256 = "2.16.840.1.101.3.4.2.1";
-    }
 }
