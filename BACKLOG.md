@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 16 | **Low:** 4
+- **Critical:** 0 | **High:** 9 | **Medium:** 15 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -706,6 +706,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-064] Object find/read is key-only — certificates and data objects unreachable
 
+- **Status: Resolved (2026-05-20)** — Added a general public `Pkcs11Object` view (object class, label, id, `GetValue()` reading `CKA_VALUE`, `AsX509Certificate()` via `X509CertificateLoader`, `Delete()`) plus `Pkcs11Workspace.FindObjects(ObjectTemplate filter)` returning it. Unlike `FindKeys`/`HydrateKeyFromHandle` — which read `CKA_KEY_TYPE` and so genuinely throw on non-key objects — `FindObjects` reads only `CKA_CLASS`/`CKA_LABEL`/`CKA_ID`, so certificates and data objects are now enumerable and readable. New SoftHSM test stores a self-signed X.509 cert on the token, finds it via `FindObjects` (FindKeys can't reach it), asserts `GetValue()` == DER and `AsX509Certificate().Thumbprint` round-trips, then `Delete()`s it. 601 tests pass. Scope note: kept to the item's stated find/read surface — generic per-attribute read/write is BL-063. Surfaced an adjacent gap (no clean *public* import of a non-key object: `ImportKey` hydrates via `CKA_KEY_TYPE` and throws on a cert template after creating it) — left for a follow-up rather than widening this item.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** M

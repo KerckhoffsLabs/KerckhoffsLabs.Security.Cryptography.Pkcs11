@@ -128,6 +128,43 @@ public sealed class Pkcs11Workspace : IDisposable
     }
 
     /// <summary>
+    /// Finds all token objects matching the given template, regardless of class — certificates,
+    /// data objects, keys, etc. Unlike <see cref="FindKeys"/> (which is key-only and reads
+    /// <c>CKA_KEY_TYPE</c>), this returns a general <see cref="Pkcs11Object"/> view exposing the
+    /// object class and its <c>CKA_VALUE</c>.
+    /// </summary>
+    /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder
+    /// (e.g. filter on <c>CKA_CLASS = CKO_CERTIFICATE</c>).</param>
+    /// <returns>A list of <see cref="Pkcs11Object"/>. May be empty. Caller disposes each.</returns>
+    public IReadOnlyList<Pkcs11Object> FindObjects(ObjectTemplate filter)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(filter);
+
+        var handles = _session.FindAllObjects([.. filter.Attributes]);
+        var result = new List<Pkcs11Object>(handles.Count);
+        foreach (var handle in handles)
+            result.Add(HydrateObjectFromHandle(handle));
+        return result;
+    }
+
+    private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
+    {
+        var attrs = _session.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);
+        try
+        {
+            var objectClass = (CKO)attrs[0].GetValueAsUlong();
+            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+            byte[] id = attrs[2].CannotBeRead ? Array.Empty<byte>() : attrs[2].GetValueAsByteArray();
+            return new Pkcs11Object(this, handle, objectClass, label, id);
+        }
+        finally
+        {
+            foreach (var a in attrs) a.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Creates a new object on the token from the given template and returns it as a
     /// <see cref="Pkcs11Key"/>. Used for importing pre-existing key material —
     /// <see cref="ObjectTemplate.ForSecretKey(CKK)"/> with <c>.Value(...)</c> for
