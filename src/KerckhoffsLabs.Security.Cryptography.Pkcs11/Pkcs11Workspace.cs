@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -146,6 +147,67 @@ public sealed class Pkcs11Workspace : IDisposable
         foreach (var handle in handles)
             result.Add(HydrateObjectFromHandle(handle));
         return result;
+    }
+
+    /// <summary>
+    /// Finds all certificate objects on the token (<c>CKA_CLASS = CKO_CERTIFICATE</c>) — a typed
+    /// counterpart to <see cref="FindKeys"/>. Each <see cref="Pkcs11Certificate"/> exposes the
+    /// parsed <see cref="X509Certificate2"/> and bridges to its on-token private key by
+    /// <c>CKA_ID</c>.
+    /// </summary>
+    /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. Caller disposes each.</returns>
+    public IReadOnlyList<Pkcs11Certificate> FindCertificates()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        using var filter = ObjectTemplate.Empty()
+            .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_CERTIFICATE)
+            .Build();
+
+        var handles = _session.FindAllObjects([.. filter.Attributes]);
+        var result = new List<Pkcs11Certificate>(handles.Count);
+        foreach (var handle in handles)
+            result.Add(HydrateCertificateFromHandle(handle));
+        return result;
+    }
+
+    private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)
+    {
+        var attrs = _session.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID]);
+        try
+        {
+            if (attrs[0].CannotBeRead)
+                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                    "FindCertificates (CKA_VALUE unreadable)");
+
+            var certificate = X509CertificateLoader.LoadCertificate(attrs[0].GetValueAsByteArray());
+            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
+            return new Pkcs11Certificate(this, handle, label, id, certificate);
+        }
+        finally
+        {
+            foreach (var a in attrs) a.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Finds the private-key object with the given <c>CKA_ID</c> and hydrates it (pairing its
+    /// public companion). Returns <c>null</c> when <paramref name="id"/> is empty or no matching
+    /// private key exists. Filters on <c>CKA_CLASS = CKO_PRIVATE_KEY</c> so it never matches the
+    /// certificate (which shares the id). Used by <see cref="Pkcs11Certificate"/>.
+    /// </summary>
+    internal Pkcs11Key? TryOpenPrivateKey(byte[] id)
+    {
+        if (id.Length == 0) return null;
+
+        using var filter = ObjectTemplate.Empty()
+            .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY)
+            .Id(id)
+            .Build();
+
+        var handles = _session.FindAllObjects([.. filter.Attributes]);
+        return handles.Count == 0 ? null : HydrateKeyFromHandle(handles[0]);
     }
 
     private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
