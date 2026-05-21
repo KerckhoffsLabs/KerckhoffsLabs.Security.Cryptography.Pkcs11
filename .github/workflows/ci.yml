@@ -84,9 +84,16 @@ jobs:
           make -j"$(nproc)" >/dev/null
           make install_sw >/dev/null
           ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
+      # OPENSSL_PREFIX: build-softhsmv2.sh links SoftHSM against this OpenSSL.
+      # LD_LIBRARY_PATH: at runtime the .NET host loads the system libcrypto.so.3 (OpenSSL 3.0)
+      # first, so the rpath in libsofthsm2 loses to the already-loaded soname and ML-DSA symbols
+      # (OPENSSL_3.4.0+) are missing. Putting the 3.5 libdir on the loader path makes the whole
+      # process use OpenSSL 3.5 (which .NET also supports), resolving the collision.
       - name: Point SoftHSM at OpenSSL 3.5 (Linux)
         if: runner.os == 'Linux'
-        run: echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
+        run: |
+          echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln

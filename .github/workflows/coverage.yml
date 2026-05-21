@@ -46,8 +46,12 @@ jobs:
           make -j"$(nproc)" >/dev/null
           make install_sw >/dev/null
           ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
+      # LD_LIBRARY_PATH: ensure the whole process uses OpenSSL 3.5 (the .NET host otherwise loads
+      # system libcrypto 3.0 first, so libsofthsm2's rpath loses and ML-DSA symbols are missing).
       - name: Point SoftHSM at OpenSSL 3.5
-        run: echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
+        run: |
+          echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
