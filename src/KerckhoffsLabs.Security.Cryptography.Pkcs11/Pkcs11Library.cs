@@ -49,7 +49,7 @@ public sealed class Pkcs11Library : IDisposable
     /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>.
     /// Stays false when another <see cref="Pkcs11Library"/> instance (or a different
     /// component in the same process) had already initialized the library and we observed
-    /// <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>. <see cref="Dispose(bool)"/> gates
+    /// <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>. <see cref="Dispose()"/> gates
     /// <c>C_Finalize</c> on this flag so we never tear down another owner's state.
     /// </summary>
     private bool _weInitialized = false;
@@ -291,62 +291,39 @@ public sealed class Pkcs11Library : IDisposable
     #region IDisposable
 
     /// <summary>
-    /// Disposes object
+    /// Releases the library: closes any sessions still tracked against it, calls
+    /// <c>C_Finalize</c> (only if this instance drove <c>C_Initialize</c>), and disposes the
+    /// underlying low-level wrapper. There is no finalizer — the native module is released by
+    /// <c>Pkcs11ModuleHandle</c>'s critical-finalizer <see cref="System.Runtime.InteropServices.SafeHandle"/>
+    /// if a caller forgets to dispose.
     /// </summary>
     public void Dispose()
     {
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose1", _libraryPath);
+        if (_disposed) return;
+        _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose", _libraryPath);
 
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Disposes object
-    /// </summary>
-    /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    private void Dispose(bool disposing)
-    {
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose2", _libraryPath);
-
-        if (!_disposed)
+        if (_pkcs11Library != null)
         {
-            if (disposing)
-            {
-                // Dispose managed objects
-                if (_pkcs11Library != null)
-                {
-                    // Close any session handles still alive against this library before
-                    // C_Finalize tears down the cryptoki state — otherwise a stray
-                    // Pkcs11SessionHandle finalizer would call C_CloseSession through a
-                    // function table whose backing module has been unmapped. The
-                    // ownership contract is: the library MUST outlive every session it
-                    // produced. This is the safety net for callers that violate it.
-                    _pkcs11Library.CloseAllTrackedSessions();
+            // Close any session handles still alive against this library before
+            // C_Finalize tears down the cryptoki state — otherwise a stray
+            // Pkcs11SessionHandle finalizer would call C_CloseSession through a
+            // function table whose backing module has been unmapped. The
+            // ownership contract is: the library MUST outlive every session it
+            // produced. This is the safety net for callers that violate it.
+            _pkcs11Library.CloseAllTrackedSessions();
 
-                    // Only call C_Finalize if THIS instance drove the C_Initialize to CKR_OK.
-                    // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
-                    // responsible for finalization — calling it here would tear down their state.
-                    if (_weInitialized)
-                        _pkcs11Library.C_Finalize(IntPtr.Zero);
+            // Only call C_Finalize if THIS instance drove the C_Initialize to CKR_OK.
+            // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
+            // responsible for finalization — calling it here would tear down their state.
+            if (_weInitialized)
+                _pkcs11Library.C_Finalize(IntPtr.Zero);
 
-                    _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
-                    _pkcs11Library.Dispose();
-                    _pkcs11Library = null;
-                }
-            }
-
-            // Dispose unmanaged objects
-            _disposed = true;
+            _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
+            _pkcs11Library.Dispose();
+            _pkcs11Library = null;
         }
-    }
 
-    /// <summary>
-    /// Class destructor that disposes object if caller forgot to do so
-    /// </summary>
-    ~Pkcs11Library()
-    {
-        Dispose(false);
+        _disposed = true;
     }
 
     #endregion

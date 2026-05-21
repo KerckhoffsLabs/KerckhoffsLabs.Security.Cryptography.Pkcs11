@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 9 | **Medium:** 16 | **Low:** 5
+- **Critical:** 0 | **High:** 9 | **Medium:** 16 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -722,6 +722,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-054] `Pkcs11Library` finalizer body is empty — comment promises cleanup that doesn't happen
 
+- **Status: Resolved (2026-05-20)** — Removed the `~Pkcs11Library()` finalizer. Native release was never done there anyway — it's handled by `Pkcs11ModuleHandle`'s critical-finalizer `SafeHandle` (reached via `_pkcs11Library.Dispose()`). With no finalizer the `Dispose(bool disposing)` split and `GC.SuppressFinalize` became dead finalizer-pattern scaffolding (the same misleading-cleanup smell the item flags), so collapsed them into a single idempotent `Dispose()`. Updated the `<see cref="Dispose(bool)"/>` doc reference to `Dispose()`. Behavior is unchanged (managed dispose always ran the cleanup; the finalizer path did nothing). 600 tests pass.
 - **Area:** P/Invoke
 - **Severity:** Low
 - **Effort:** S
