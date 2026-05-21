@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 7 | **Medium:** 15 | **Low:** 4
+- **Critical:** 0 | **High:** 6 | **Medium:** 15 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -358,6 +358,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-026] `CK_SSL3_KEY_MAT_PARAMS.IsExport` missing `[MarshalAs(UnmanagedType.U1)]`
 
+- **Status: Resolved (2026-05-21)** — `IsExport` already carries `[MarshalAs(UnmanagedType.U1)]` (fixed in earlier marshalling work); audited all `bool` fields in `Native/` and every marshalled struct field has the attribute (the only un-attributed `bool`s are C# *properties* on `LowLevelPkcs11Library`, not interop fields). The size is pinned in `MarshalSizeOfTests`: `CK_SSL3_KEY_MAT_PARAMS`=72 (Unix) and `CK_SSL3_KEY_MAT_PARAMS_Windows`=45. Note the unified (default-aligned) size is 72 with either a 1- or 4-byte `IsExport` (the 8-byte alignment of the following `CK_SSL3_RANDOM_DATA` absorbs the difference), so the **Pack=1 Windows sibling** is the meaningful guard: 45 with `U1` vs 48 without. That assertion runs on the win-x64 CI legs (the `WindowsSiblingStructSize` theory, runtime-gated to 64-bit Windows) and is green. No code change required.
 - **Area:** P/Invoke
 - **Severity:** High
 - **Effort:** S
