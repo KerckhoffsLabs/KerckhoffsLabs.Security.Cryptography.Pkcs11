@@ -60,6 +60,19 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
             }
         }
 
+        // FindCertificates() convenience returns the cert among CKO_CERTIFICATE objects.
+        {
+            var certs = workspace.FindCertificates();
+            try
+            {
+                Assert.Contains(certs, o => o.Label == label && o.ObjectClass == CKO.CKO_CERTIFICATE);
+            }
+            finally
+            {
+                foreach (var o in certs) o.Dispose();
+            }
+        }
+
         // Delete via the view; confirm it's gone.
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
