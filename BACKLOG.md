@@ -6,7 +6,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 
 - **Total items:** 62
-- **Critical:** 0 | **High:** 8 | **Medium:** 15 | **Low:** 4
+- **Critical:** 0 | **High:** 7 | **Medium:** 15 | **Low:** 4
 - **Headline risks:**
   - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
   - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
@@ -242,6 +242,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-017] `UnwrapKey` doesn't enforce `CKA_SENSITIVE=true` / `CKA_EXTRACTABLE=false` on the result
 
+- **Status: Resolved (2026-05-21)** — `Pkcs11Session.UnwrapKey` (the byte[] core both unwrap surfaces route through) now merges secure defaults: when the result template omits `CKA_SENSITIVE` / `CKA_EXTRACTABLE`, it appends `true` / `false`. An explicit insecure value (`CKA_SENSITIVE=false` or `CKA_EXTRACTABLE=true`) throws `InsecureOperationException` unless `AllowInsecure` / `AllowInsecureScope` is set (the documented opt-out). The injected attributes are disposed after the call. Tests: `UnwrapSecureDefaultsTests_Mock` (managed gate — explicit insecure throws, AllowInsecure bypasses) plus SoftHSM `Unwrap_AppliesSecureDefaults` (reads back SENSITIVE=true/EXTRACTABLE=false) and `Unwrap_ExplicitExtractable_RequiresAllowInsecure` (throws by default; under AllowInsecureScope the key really is extractable). Updated one existing round-trip test that unwrapped with `.Extractable()` but never extracts. Full suite 514 pass.
 - **Area:** Cryptography
 - **Severity:** High
 - **Effort:** M

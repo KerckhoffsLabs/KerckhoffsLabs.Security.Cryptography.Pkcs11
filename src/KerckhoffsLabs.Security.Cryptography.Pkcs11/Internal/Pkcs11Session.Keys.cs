@@ -178,21 +178,81 @@ internal sealed partial class Pkcs11Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[]? template = null;
-        NativeCULong templateLen = (NativeCULong)0;
+        // Unwrapping decrypts a key blob into a new token object. Without secure defaults a caller
+        // could land an extractable, non-sensitive key — silently downgrading the posture the key
+        // template builders establish. Append CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the
+        // caller omitted them; an explicit insecure value requires AllowInsecure (throws otherwise).
+        List<ObjectAttribute> secureDefaults = BuildSecureUnwrapDefaults(attributes);
+        try
+        {
+            int attrCount = attributes?.Count ?? 0;
+            int total = attrCount + secureDefaults.Count;
+            CK_ATTRIBUTE[]? template = total > 0 ? new CK_ATTRIBUTE[total] : null;
+            NativeCULong templateLen = (NativeCULong)0;
+            if (template != null)
+            {
+                int idx = 0;
+                for (int i = 0; i < attrCount; i++)
+                    template[idx++] = attributes![i].CkAttribute;
+                foreach (ObjectAttribute d in secureDefaults)
+                    template[idx++] = d.CkAttribute;
+                templateLen = (NativeCULong)total;
+            }
+
+            NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
+            CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
+            Pkcs11Exception.ThrowIfError(rv, "C_UnwrapKey");
+
+            return new ObjectHandle((ulong)unwrappedKey);
+        }
+        finally
+        {
+            foreach (ObjectAttribute d in secureDefaults)
+                d.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Returns the secure-default attributes (<c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c>)
+    /// to append to an unwrap template for any the caller omitted. If the caller supplied an explicit
+    /// insecure value (<c>CKA_SENSITIVE=false</c> or <c>CKA_EXTRACTABLE=true</c>), it is permitted only
+    /// when <see cref="AllowInsecure"/> is set; otherwise <see cref="InsecureOperationException"/> is
+    /// thrown. The returned attributes own unmanaged buffers and must be disposed by the caller.
+    /// </summary>
+    private List<ObjectAttribute> BuildSecureUnwrapDefaults(List<ObjectAttribute>? attributes)
+    {
+        bool hasSensitive = false;
+        bool hasExtractable = false;
+
         if (attributes != null)
         {
-            template = new CK_ATTRIBUTE[attributes.Count];
-            for (int i = 0; i < attributes.Count; i++)
-                template[i] = attributes[i].CkAttribute;
-            templateLen = (NativeCULong)(attributes.Count);
+            foreach (ObjectAttribute a in attributes)
+            {
+                if (a.Type == (ulong)CKA.CKA_SENSITIVE)
+                {
+                    hasSensitive = true;
+                    if (!a.GetValueAsBool() && !AllowInsecure)
+                        throw new InsecureOperationException(
+                            "UnwrapKey with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
+                            "Pass AllowInsecure (or use AllowInsecureScope) to override.");
+                }
+                else if (a.Type == (ulong)CKA.CKA_EXTRACTABLE)
+                {
+                    hasExtractable = true;
+                    if (a.GetValueAsBool() && !AllowInsecure)
+                        throw new InsecureOperationException(
+                            "UnwrapKey with CKA_EXTRACTABLE=true would create an extractable key. " +
+                            "Pass AllowInsecure (or use AllowInsecureScope) to override.");
+                }
+            }
         }
 
-        NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
-        Pkcs11Exception.ThrowIfError(rv, "C_UnwrapKey");
-
-        return new ObjectHandle((ulong)unwrappedKey);
+        List<ObjectAttribute> added = [];
+        if (!hasSensitive)
+            added.Add(new ObjectAttribute(CKA.CKA_SENSITIVE, true));
+        if (!hasExtractable)
+            added.Add(new ObjectAttribute(CKA.CKA_EXTRACTABLE, false));
+        return added;
     }
 
     // === Secure-default key-generation helpers =============================

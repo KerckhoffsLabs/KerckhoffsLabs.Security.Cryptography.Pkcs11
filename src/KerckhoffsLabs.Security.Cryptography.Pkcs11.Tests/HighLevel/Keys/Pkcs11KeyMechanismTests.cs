@@ -106,8 +106,10 @@ internal static class Pkcs11KeyMechanismCases
 
             byte[] wrapped = wrapper.Wrap(new Mechanism(CKM.CKM_AES_KEY_WRAP), target);
 
+            // No .Extractable(): the unwrap secure-default (CKA_EXTRACTABLE=false) is fine here —
+            // the assertions only check the handle and key type, not the key value.
             using var unwrapTpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-                .Extractable().Encrypt().Decrypt().Build();
+                .Encrypt().Decrypt().Build();
             using var unwrapped = wrapper.Unwrap(
                 new Mechanism(CKM.CKM_AES_KEY_WRAP), wrapped, unwrapTpl);
 
