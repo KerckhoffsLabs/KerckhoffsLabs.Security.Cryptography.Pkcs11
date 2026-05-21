@@ -40,8 +40,16 @@ public static class Settings
     {
         string baseDir = AppContext.BaseDirectory;
         string rid =
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "win-x64" :
-            RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            // Windows keys off the PROCESS architecture (the testhost), so a 32-bit run finds the
+            // x86 mock — an x64 mock can't load into an x86 process (BadImageFormat).
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? RuntimeInformation.ProcessArchitecture switch
+                {
+                    Architecture.X86 => "win-x86",
+                    Architecture.Arm64 => "win-arm64",
+                    _ => "win-x64",
+                }
+            : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
                 ? (RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "osx-arm64" : "osx-x64")
             : RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "linux-arm64"
             : "linux-x64";

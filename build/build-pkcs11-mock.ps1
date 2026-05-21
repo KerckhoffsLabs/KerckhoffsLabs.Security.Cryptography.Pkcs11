@@ -1,15 +1,22 @@
-# Builds pkcs11-mock and copies the resulting DLL into the Pkcs11.Tests
-# output directory under runtimes/win-x64/native (or win-arm64/native).
+# Builds pkcs11-mock and copies the matching-architecture DLL into the Pkcs11.Tests
+# output directory under runtimes/<rid>/native.
 #
-# Usage: pwsh build-pkcs11-mock.ps1 -TestOutputDir <path>
+# Usage: pwsh build-pkcs11-mock.ps1 -TestOutputDir <path> [-Rid win-x64|win-x86|win-arm64]
+#
+# -Rid selects which architecture's mock to install. It MUST match the architecture the
+# tests run as (the testhost), which is the .NET SDK's architecture — the build target
+# passes $(NETCoreSdkPortableRuntimeIdentifier). The x86 test process cannot load an x64
+# mock (BadImageFormat), so this must not be guessed from the (64-bit) pwsh host.
+# build.bat builds both Win32 and x64, producing pkcs11-mock-x86.dll and pkcs11-mock-x64.dll.
 #
 # NOTE: Windows build uses build.bat + the Visual Studio solution under
-# third-party/pkcs11-mock/build/windows. Requires VS Build Tools or a
+# vendor/pkcs11-mock/build/windows. Requires VS Build Tools or a
 # full Visual Studio installation with the C++ workload.
 
 param(
     [Parameter(Mandatory=$true)]
-    [string]$TestOutputDir
+    [string]$TestOutputDir,
+    [string]$Rid = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,8 +28,13 @@ if (-not (Test-Path $mockDir)) {
     Write-Error "pkcs11-mock submodule missing at $mockDir. Run: git submodule update --init --recursive"
 }
 
-$arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-$rid = if ($arch -eq [System.Runtime.InteropServices.Architecture]::Arm64) { 'win-arm64' } else { 'win-x64' }
+if ($Rid) {
+    $rid = $Rid
+} else {
+    # Fallback only when no RID is passed: detect from the host architecture.
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    $rid = if ($arch -eq [System.Runtime.InteropServices.Architecture]::Arm64) { 'win-arm64' } else { 'win-x64' }
+}
 $destDir  = Join-Path $TestOutputDir "runtimes\$rid\native"
 $destFile = Join-Path $destDir 'pkcs11-mock.dll'
 
@@ -53,17 +65,20 @@ try {
     Pop-Location
 }
 
-# Upstream produces pkcs11-mock-x64.dll and pkcs11-mock-x86.dll.
-# Select the architecture that matches the current RID.
-$archSuffix = if ($rid -eq 'win-arm64') { 'arm64' } else { 'x64' }
-$srcLib = Get-ChildItem -Path $winBuildDir -Filter "pkcs11-mock*.dll" -Recurse |
-          Where-Object { $_.Name -match $archSuffix } |
+# Upstream produces pkcs11-mock-x64.dll, pkcs11-mock-x86.dll (and arm64 where supported).
+# Select the architecture that matches the target RID.
+$archSuffix = switch ($rid) {
+    'win-x86'   { 'x86' }
+    'win-arm64' { 'arm64' }
+    default     { 'x64' }
+}
+$srcLib = Get-ChildItem -Path $winBuildDir -Filter "pkcs11-mock-$archSuffix.dll" -Recurse |
           Select-Object -First 1
 
 if (-not $srcLib) {
     # Fallback: list what was actually produced to aid debugging.
     $produced = Get-ChildItem -Path $winBuildDir -Filter '*.dll' -Recurse | Select-Object -ExpandProperty FullName
-    Write-Error "build succeeded but no $archSuffix .dll found under $winBuildDir.`nProduced files:`n$($produced -join "`n")"
+    Write-Error "build succeeded but no pkcs11-mock-$archSuffix.dll ($rid) found under $winBuildDir.`nProduced files:`n$($produced -join "`n")"
 }
 
 Copy-Item -Path $srcLib.FullName -Destination $destFile -Force

@@ -30,6 +30,11 @@
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
     <PropertyGroup>
       <_MockOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_MockOutputDir>
+      <!-- The mock must match the architecture the tests run as (the testhost = the .NET SDK arch),
+           not the architecture of the (64-bit) pwsh that runs the build script. An explicit RID
+           build (-r) wins; otherwise use the SDK's RID. -->
+      <_MockRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_MockRid>
+      <_MockRid Condition="'$(_MockRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_MockRid>
     </PropertyGroup>
     <Exec
       Condition="!$([MSBuild]::IsOSPlatform('Windows'))"
@@ -37,7 +42,7 @@
       IgnoreStandardErrorWarningFormat="true" />
     <Exec
       Condition="$([MSBuild]::IsOSPlatform('Windows'))"
-      Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot;"
+      Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;"
       IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
