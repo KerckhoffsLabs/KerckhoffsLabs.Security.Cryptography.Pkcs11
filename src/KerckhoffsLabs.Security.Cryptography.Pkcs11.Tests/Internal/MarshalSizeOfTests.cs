@@ -20,6 +20,11 @@ public sealed class MarshalSizeOfTests
     // structs shrink, so the single hard-coded expectation only holds for a 64-bit process.
     public static bool Is64BitProcess => Environment.Is64BitProcess;
 
+    // The narrow CK_ULONG (uint) runtime asset is resolved only on 64-bit Windows; that is where
+    // the Pack=1 sibling sizes above hold. On 32-bit Windows the pointers shrink; on Unix the
+    // siblings aren't used at all (the unified path handles marshalling), so skip elsewhere.
+    public static bool IsWindows64 => OperatingSystem.IsWindows() && Environment.Is64BitProcess;
+
     [Fact]
     public void CK_VERSION_SizeIs2()
     {
@@ -144,16 +149,16 @@ public sealed class MarshalSizeOfTests
         Assert.Equal(expectedSize, Marshal.SizeOf(t));
     }
 
-#if WINDOWS
     /// <summary>
     /// Pins the Pack=1 layout emitted by the source generator for Windows-bound siblings.
     /// Values are the OASIS pkcs11.h Windows ABI on a 64-bit pointer: CK_ULONG = 4 bytes
-    /// (LLP64 <c>unsigned long</c>), pointer = 8, <c>#pragma pack(1)</c>. Compiled only in the
-    /// net10.0-windows build, where NativeCULong is the 4-byte storage these sizes assume — the
-    /// neutral net10.0 build's siblings are nuint-wide and are never used on Windows (guarded).
-    /// Gated to a 64-bit process because the pointer-bearing structs are narrower on 32-bit Windows.
+    /// (LLP64 <c>unsigned long</c>), pointer = 8, <c>#pragma pack(1)</c>. Runs only on 64-bit
+    /// Windows, where NativeCULong resolves to the 4-byte (uint) runtime asset these sizes assume;
+    /// elsewhere the siblings are nuint-wide and never used (the unified path handles Unix), so the
+    /// theory is skipped. The check is on the live <see cref="Marshal.SizeOf(System.Type)"/>, i.e.
+    /// the loaded per-RID build, not the compile-time reference.
     /// </summary>
-    [ConditionalTheory(nameof(Is64BitProcess))]
+    [ConditionalTheory(nameof(IsWindows64))]
     // BEGIN Windows InlineData — OASIS Windows x64 ABI (CK_ULONG=4, ptr=8, pack=1)
     [InlineData("CK_ASYNC_DATA_Windows", 24)]
     [InlineData("CK_ATTRIBUTE_Windows", 16)]
@@ -262,5 +267,4 @@ public sealed class MarshalSizeOfTests
         Assert.NotNull(t);
         Assert.Equal(expectedSize, Marshal.SizeOf(t!));
     }
-#endif
 }
