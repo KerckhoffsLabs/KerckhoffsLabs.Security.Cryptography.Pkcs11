@@ -69,7 +69,7 @@ fi
 
 echo "Building SoftHSMv2 for ${RID}..."
 
-# We build with autotools (not CMake): only the autotools path wires up ML-DSA
+# We build with autotools: only the autotools path wires up ML-DSA
 # (CKM_ML_DSA), via `--enable-mldsa` defaulting to "detect" — it auto-enables when the
 # OpenSSL backend exposes ML-DSA (OpenSSL 3.5+). The CMake build's ENABLE_MLDSA option is a
 # no-op (it never sets WITH_ML_DSA), so it can never produce an ML-DSA-capable token.
