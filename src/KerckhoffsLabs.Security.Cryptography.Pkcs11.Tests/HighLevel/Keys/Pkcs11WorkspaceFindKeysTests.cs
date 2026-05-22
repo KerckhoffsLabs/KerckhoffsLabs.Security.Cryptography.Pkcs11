@@ -30,10 +30,9 @@ internal static class WorkspaceKeyTestCases
 }
 
 [Collection("Mock")]
-public sealed class Pkcs11WorkspaceFindKeysTests_Mock
+public sealed class Pkcs11WorkspaceFindKeysTests_Mock(MockBackendFixture backend)
 {
-    private readonly MockBackendFixture _backend;
-    public Pkcs11WorkspaceFindKeysTests_Mock(MockBackendFixture backend) => _backend = backend;
+    private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
@@ -55,10 +54,10 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Mock
 }
 
 [Collection("SoftHsm")]
-public sealed class Pkcs11WorkspaceFindKeysTests_SoftHsm
+public sealed class Pkcs11WorkspaceFindKeysTests_SoftHsm(SoftHsmBackendFixture backend)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public Pkcs11WorkspaceFindKeysTests_SoftHsm(SoftHsmBackendFixture backend) => _backend = backend;
+    private readonly SoftHsmBackendFixture _backend = backend;
+
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>

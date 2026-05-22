@@ -10,10 +10,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Security;
 /// value on dispose, rather than latching the flag on for the session lifetime.
 /// </summary>
 [Collection("Mock")]
-public sealed class AllowInsecureScopeTests
+public sealed class AllowInsecureScopeTests(MockBackendFixture backend)
 {
-    private readonly MockBackendFixture _backend;
-    public AllowInsecureScopeTests(MockBackendFixture backend) => _backend = backend;
+    private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(_backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));

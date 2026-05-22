@@ -5,10 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Keys;
 
 [Collection("SoftHsm")]
-public sealed class Pkcs11WorkspaceGenerateKeyTests_SoftHsm
+public sealed class Pkcs11WorkspaceGenerateKeyTests_SoftHsm(SoftHsmBackendFixture backend)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public Pkcs11WorkspaceGenerateKeyTests_SoftHsm(SoftHsmBackendFixture backend) => _backend = backend;
+    private readonly SoftHsmBackendFixture _backend = backend;
+
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>

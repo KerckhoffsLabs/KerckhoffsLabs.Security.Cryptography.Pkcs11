@@ -9,10 +9,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Random;
 /// across backends lives in <see cref="RandomTests"/>.
 /// </summary>
 [Collection("Mock")]
-public sealed class WorkspaceRandomTests
+public sealed class WorkspaceRandomTests(MockBackendFixture backend)
 {
-    private readonly MockBackendFixture _backend;
-    public WorkspaceRandomTests(MockBackendFixture backend) => _backend = backend;
+    private readonly MockBackendFixture _backend = backend;
 
     [Fact]
     public void GenerateRandom_ReturnsRequestedLength()

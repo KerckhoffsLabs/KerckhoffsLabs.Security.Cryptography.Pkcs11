@@ -4,10 +4,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.LibraryLifecycle;
 
 [Collection("Mock")]
-public sealed class Pkcs11WorkspaceTests
+public sealed class Pkcs11WorkspaceTests(MockBackendFixture backend)
 {
-    private readonly MockBackendFixture _backend;
-    public Pkcs11WorkspaceTests(MockBackendFixture backend) => _backend = backend;
+    private readonly MockBackendFixture _backend = backend;
 
     [Fact]
     public void OpenWorkspace_NullSlotLabel_Throws()

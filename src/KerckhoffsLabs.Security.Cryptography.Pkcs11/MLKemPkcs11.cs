@@ -31,22 +31,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
 /// public handle.</para>
 /// </remarks>
-public sealed class MLKemPkcs11 : MLKem
+/// <remarks>
+/// Wraps a PKCS#11 ML-KEM key as a BCL <see cref="MLKem"/> instance. Does not take
+/// ownership.
+/// </remarks>
+/// <param name="key">A token-resident ML-KEM key (<see cref="CKK.CKK_ML_KEM"/>).</param>
+/// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
+/// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-KEM key, or its parameter set is unrecognized / unreadable.</exception>
+public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 {
-    private readonly Pkcs11Key _key;
-
-    /// <summary>
-    /// Wraps a PKCS#11 ML-KEM key as a BCL <see cref="MLKem"/> instance. Does not take
-    /// ownership.
-    /// </summary>
-    /// <param name="key">A token-resident ML-KEM key (<see cref="CKK.CKK_ML_KEM"/>).</param>
-    /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-KEM key, or its parameter set is unrecognized / unreadable.</exception>
-    public MLKemPkcs11(Pkcs11Key key)
-        : base(ResolveAlgorithm(key))
-    {
-        _key = key;
-    }
+    private readonly Pkcs11Key _key = key;
 
     // -----------------------------------------------------------------------
     // Encapsulate / decapsulate — extract-and-destroy

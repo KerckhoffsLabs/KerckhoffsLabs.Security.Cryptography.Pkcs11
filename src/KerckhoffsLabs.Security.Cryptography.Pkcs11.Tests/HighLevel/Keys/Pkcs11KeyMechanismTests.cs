@@ -136,10 +136,10 @@ internal static class Pkcs11KeyMechanismCases
 }
 
 [Collection("SoftHsm")]
-public sealed class Pkcs11KeyMechanismTests_SoftHsm
+public sealed class Pkcs11KeyMechanismTests_SoftHsm(SoftHsmBackendFixture backend)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public Pkcs11KeyMechanismTests_SoftHsm(SoftHsmBackendFixture backend) => _backend = backend;
+    private readonly SoftHsmBackendFixture _backend = backend;
+
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>

@@ -11,10 +11,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Digest;
 /// and <see cref="DigestMd5Sha1Tests"/>.
 /// </summary>
 [Collection("Mock")]
-public sealed class WorkspaceDigestTests
+public sealed class WorkspaceDigestTests(MockBackendFixture backend)
 {
-    private readonly MockBackendFixture _backend;
-    public WorkspaceDigestTests(MockBackendFixture backend) => _backend = backend;
+    private readonly MockBackendFixture _backend = backend;
 
     [Fact]
     public void Digest_Sha1_ThrowsInsecureOperationException()

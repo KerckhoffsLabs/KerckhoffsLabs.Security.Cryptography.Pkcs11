@@ -28,10 +28,9 @@ internal static class VerifyRsaPkcsTestCases
 }
 
 [Collection("Mock")]
-public sealed class VerifyRsaPkcsTests_Mock
+public sealed class VerifyRsaPkcsTests_Mock(MockBackendFixture f)
 {
-    private readonly MockBackendFixture _backend;
-    public VerifyRsaPkcsTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     [Fact]
     public void VerifyRsaPkcs1V15_GatedByDefault() => VerifyRsaPkcsTestCases.Assert_VerifyRsaPkcs1V15_GatedByDefault(_backend);

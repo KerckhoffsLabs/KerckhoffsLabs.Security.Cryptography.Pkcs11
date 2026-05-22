@@ -27,22 +27,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// handle, which holds the FIPS 204 standard public-key encoding.
 /// </para>
 /// </remarks>
-public sealed class MLDsaPkcs11 : MLDsa
+/// <remarks>
+/// Wraps a PKCS#11 ML-DSA key as a BCL <see cref="MLDsa"/> instance. Does not take
+/// ownership — disposing this provider does not dispose <paramref name="key"/>.
+/// </remarks>
+/// <param name="key">A token-resident ML-DSA key (<see cref="CKK.CKK_ML_DSA"/>).</param>
+/// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
+/// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-DSA key, or its parameter set is unrecognized / unreadable.</exception>
+public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
 {
-    private readonly Pkcs11Key _key;
-
-    /// <summary>
-    /// Wraps a PKCS#11 ML-DSA key as a BCL <see cref="MLDsa"/> instance. Does not take
-    /// ownership — disposing this provider does not dispose <paramref name="key"/>.
-    /// </summary>
-    /// <param name="key">A token-resident ML-DSA key (<see cref="CKK.CKK_ML_DSA"/>).</param>
-    /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-DSA key, or its parameter set is unrecognized / unreadable.</exception>
-    public MLDsaPkcs11(Pkcs11Key key)
-        : base(ResolveAlgorithm(key))
-    {
-        _key = key;
-    }
+    private readonly Pkcs11Key _key = key;
 
     // -----------------------------------------------------------------------
     // Sign / verify — pure ML-DSA (CKM_ML_DSA)

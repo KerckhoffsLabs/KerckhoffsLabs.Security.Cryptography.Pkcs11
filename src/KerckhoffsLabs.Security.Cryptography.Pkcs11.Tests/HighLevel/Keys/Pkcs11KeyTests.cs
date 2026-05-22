@@ -5,10 +5,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Keys;
 
 [Collection("Mock")]
-public sealed class Pkcs11KeyTests
+public sealed class Pkcs11KeyTests(MockBackendFixture backend)
 {
-    private readonly MockBackendFixture _backend;
-    public Pkcs11KeyTests(MockBackendFixture backend) => _backend = backend;
+    private readonly MockBackendFixture _backend = backend;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(

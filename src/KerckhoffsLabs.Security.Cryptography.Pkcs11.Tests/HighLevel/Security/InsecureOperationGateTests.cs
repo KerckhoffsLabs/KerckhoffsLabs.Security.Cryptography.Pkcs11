@@ -270,12 +270,11 @@ internal static class InsecureOperationGateTestCases
 /// required.
 /// </summary>
 [Collection("Mock")]
-public sealed class InsecureOperationGateTests_Mock
+public sealed class InsecureOperationGateTests_Mock(MockBackendFixture f)
 {
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    private readonly MockBackendFixture _backend;
-    public InsecureOperationGateTests_Mock(MockBackendFixture f) { _backend = f; }
+    private readonly MockBackendFixture _backend = f;
 
     // --- Encrypt gate ---
 
@@ -377,10 +376,9 @@ public sealed class InsecureOperationGateTests_Mock
 // ---------------------------------------------------------------------------
 
 [Collection("SoftHsm")]
-public sealed class InsecureOperationGateTests_SoftHsm
+public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
 {
-    private readonly SoftHsmBackendFixture _backend;
-    public InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f) { _backend = f; }
+    private readonly SoftHsmBackendFixture _backend = f;
 
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
