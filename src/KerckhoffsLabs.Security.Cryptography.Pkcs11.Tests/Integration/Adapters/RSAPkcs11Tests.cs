@@ -113,6 +113,10 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         byte[] data = System.Text.Encoding.UTF8.GetBytes("test");
         byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
         Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+        byte[] tamperedSig = [.. sig];
+        tamperedSig[0] ^= 0xFF;
+        Assert.False(rsa.VerifyData(data, tamperedSig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]

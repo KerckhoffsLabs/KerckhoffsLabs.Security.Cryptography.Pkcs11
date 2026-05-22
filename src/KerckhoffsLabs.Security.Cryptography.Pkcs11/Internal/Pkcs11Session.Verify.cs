@@ -369,39 +369,6 @@ internal sealed partial class Pkcs11Session
 
     // === Secure-default verification helpers ===============================
 
-    /// <summary>Verifies <paramref name="signature"/> over <paramref name="data"/> using RSA-PSS / SHA-256 / MGF1+SHA-256 / 32-byte salt.</summary>
-    /// <param name="publicKeyHandle">Handle of an RSA public key (CKA_VERIFY=true).</param>
-    /// <param name="data">Data the signature was computed over.</param>
-    /// <param name="signature">Signature bytes to verify.</param>
-    /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
-    public void VerifyRsaPss(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
-    {
-        using var _ = AcquireExclusive();
-        using var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
-        using var mechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, p);
-        Verify(mechanism, publicKeyHandle, data, signature, out isValid);
-    }
-
-    /// <summary>Verifies an ECDSA-SHA256 signature.</summary>
-    /// <param name="publicKeyHandle">Handle of an EC public key (CKA_VERIFY=true).</param>
-    /// <param name="data">Data the signature was computed over.</param>
-    /// <param name="signature">Signature bytes to verify.</param>
-    /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
-    public void VerifyEcdsa(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
-    {
-        using var _ = AcquireExclusive();
-        if (SupportsMechanism(CKM.CKM_ECDSA_SHA256))
-        {
-            using var mechanism = new Mechanism(CKM.CKM_ECDSA_SHA256);
-            Verify(mechanism, publicKeyHandle, data, signature, out isValid);
-            return;
-        }
-        // Fallback: pre-hash in managed code and use raw CKM_ECDSA.
-        byte[] hash = System.Security.Cryptography.SHA256.HashData(data);
-        using var rawMechanism = new Mechanism(CKM.CKM_ECDSA);
-        Verify(rawMechanism, publicKeyHandle, hash, signature, out isValid);
-    }
-
     /// <summary>Verifies an Ed25519 signature.</summary>
     /// <param name="publicKeyHandle">Handle of an Ed25519 public key.</param>
     /// <param name="data">Data the signature was computed over.</param>
@@ -430,11 +397,11 @@ internal sealed partial class Pkcs11Session
 
     /// <summary>
     /// Verifies a signature produced with RSA PKCS#1 v1.5 padding.
-    /// **Use <see cref="VerifyRsaPss"/> instead.** Throws <see cref="InsecureOperationException"/>
+    /// **Use RSA-PSS via <c>RSAPkcs11</c> instead.** Throws <see cref="InsecureOperationException"/>
     /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
     [Obsolete("RSA PKCS#1 v1.5 signatures are vulnerable to fault attacks and are not recommended for new code. " +
-              "Use VerifyRsaPss instead. If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
+              "Use RSAPkcs11 (RSA-PSS) instead. If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
     public void VerifyRsaPkcs1V15(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
