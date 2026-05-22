@@ -42,7 +42,7 @@ internal partial struct CK_MECHANISM
     /// <returns>Mechanism of given type with no parameter</returns>
     internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism)
     {
-        return CreateMechanism(mechanism, ReadOnlySpan<byte>.Empty);
+        return CreateMechanism(mechanism, []);
     }
 
     /// <summary>
@@ -52,7 +52,7 @@ internal partial struct CK_MECHANISM
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with byte array parameter</returns>
     internal static CK_MECHANISM CreateMechanism(CKM mechanism, byte[]? parameter)
-        => CreateMechanism(mechanism.ToCULong(), (ReadOnlySpan<byte>)(parameter ?? Array.Empty<byte>()));
+        => CreateMechanism(mechanism.ToCULong(), (ReadOnlySpan<byte>)(parameter ?? []));
 
     /// <summary>
     /// Creates mechanism of given type with byte array parameter
@@ -61,7 +61,7 @@ internal partial struct CK_MECHANISM
     /// <param name="parameter">Mechanism parameter</param>
     /// <returns>Mechanism of given type with byte array parameter</returns>
     internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism, byte[]? parameter)
-        => CreateMechanism(mechanism, (ReadOnlySpan<byte>)(parameter ?? Array.Empty<byte>()));
+        => CreateMechanism(mechanism, (ReadOnlySpan<byte>)(parameter ?? []));
 
     /// <summary>
     /// Creates mechanism of given type with span parameter

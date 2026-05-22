@@ -107,10 +107,10 @@ internal static class Pkcs11PublicKeyView
         }
         else if (len > 0x7F)
         {
-            return ReadOnlySpan<byte>.Empty;
+            return [];
         }
 
-        if (offset + len > der.Length) return ReadOnlySpan<byte>.Empty;
+        if (offset + len > der.Length) return [];
         return der.AsSpan(offset, len);
     }
 

@@ -42,7 +42,7 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < 20; i++)
         {
-            using var p = new CkmAesGcmParams(iv: new byte[12], aad: ReadOnlySpan<byte>.Empty, tagBits: 128);
+            using var p = new CkmAesGcmParams(iv: new byte[12], aad: [], tagBits: 128);
             using var m = new Mechanism(CKM.CKM_AES_GCM, p);
             _ = m.ToMarshalableStructure();
         }

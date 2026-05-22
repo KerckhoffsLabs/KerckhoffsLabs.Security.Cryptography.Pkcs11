@@ -315,7 +315,7 @@ internal sealed partial class Pkcs11Session
             {
                 UnmanagedMemory.Write(paramsPtr, paramsStruct);
 
-                byte[] aad = associatedData.IsEmpty ? Array.Empty<byte>() : associatedData.ToArray();
+                byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
                 byte[] pt = plaintext.ToArray();
 
                 NativeCULong ctLen = (NativeCULong)0;

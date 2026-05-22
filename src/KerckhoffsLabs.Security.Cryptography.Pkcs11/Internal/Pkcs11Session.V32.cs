@@ -142,7 +142,7 @@ internal sealed partial class Pkcs11Session
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
-        byte[] aad = associatedData.IsEmpty ? Array.Empty<byte>() : associatedData.ToArray();
+        byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
         NativeCULong wrappedLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
@@ -189,7 +189,7 @@ internal sealed partial class Pkcs11Session
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         byte[] wrapped = wrappedKey.ToArray();
-        byte[] aad = associatedData.IsEmpty ? Array.Empty<byte>() : associatedData.ToArray();
+        byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[unwrappedKeyTemplate.Count];
         for (int i = 0; i < unwrappedKeyTemplate.Count; i++)

@@ -88,18 +88,18 @@ public sealed class AllowInsecureScopeTests(MockBackendFixture backend)
 
         // Raw SHA-1 digest is gated as insecure-by-default. Outside the scope it must throw.
         Assert.Throws<InsecureOperationException>(() =>
-            workspace.Digest(new Mechanism(CKM.CKM_SHA_1), Array.Empty<byte>()));
+            workspace.Digest(new Mechanism(CKM.CKM_SHA_1), []));
 
         // Inside the scope the gate is lifted — the mock actually performs SHA-1, so this succeeds.
         using (workspace.AllowInsecureScope())
         {
             var ex = Record.Exception(() =>
-                workspace.Digest(new Mechanism(CKM.CKM_SHA_1), Array.Empty<byte>()));
+                workspace.Digest(new Mechanism(CKM.CKM_SHA_1), []));
             Assert.IsNotType<InsecureOperationException>(ex);
         }
 
         // After the scope the gate is re-armed.
         Assert.Throws<InsecureOperationException>(() =>
-            workspace.Digest(new Mechanism(CKM.CKM_SHA_1), Array.Empty<byte>()));
+            workspace.Digest(new Mechanism(CKM.CKM_SHA_1), []));
     }
 }

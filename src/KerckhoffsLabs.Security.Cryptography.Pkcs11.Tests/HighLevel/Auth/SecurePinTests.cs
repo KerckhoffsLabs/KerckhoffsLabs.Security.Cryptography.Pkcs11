@@ -27,7 +27,7 @@ public sealed class SecurePinTests
 
     [Fact]
     public void Constructor_FromSpan_RejectsEmpty()
-        => Assert.Throws<ArgumentException>(() => new SecurePin(ReadOnlySpan<byte>.Empty));
+        => Assert.Throws<ArgumentException>(() => new SecurePin([]));
 
     [Fact]
     public void Constructor_FromString_RejectsEmpty()

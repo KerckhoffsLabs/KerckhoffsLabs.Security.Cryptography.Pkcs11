@@ -30,7 +30,7 @@ internal static class InsecureOperationGateTestCases
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.Encrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+                session.Encrypt(mechanism, fakeHandle, []));
 
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
@@ -55,7 +55,7 @@ internal static class InsecureOperationGateTestCases
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Record.Exception(() =>
-                session.Encrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+                session.Encrypt(mechanism, fakeHandle, []));
 
             Assert.False(ex is InsecureOperationException,
                 "Expected gate to be bypassed, but InsecureOperationException was still thrown.");
@@ -84,7 +84,7 @@ internal static class InsecureOperationGateTestCases
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.Decrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+                session.Decrypt(mechanism, fakeHandle, []));
 
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
@@ -109,7 +109,7 @@ internal static class InsecureOperationGateTestCases
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Record.Exception(() =>
-                session.Decrypt(mechanism, fakeHandle, Array.Empty<byte>()));
+                session.Decrypt(mechanism, fakeHandle, []));
 
             Assert.False(ex is InsecureOperationException,
                 "Expected gate to be bypassed, but InsecureOperationException was still thrown.");
@@ -138,7 +138,7 @@ internal static class InsecureOperationGateTestCases
             using var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.Sign(mech, fakeHandle, Array.Empty<byte>()));
+                session.Sign(mech, fakeHandle, []));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
         finally
@@ -193,7 +193,7 @@ internal static class InsecureOperationGateTestCases
         {
             using var mech = new Mechanism((CKM)mechanismId);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.Digest(mech, Array.Empty<byte>()));
+                session.Digest(mech, []));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
         }
         finally

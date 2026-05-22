@@ -37,6 +37,6 @@ public sealed class WorkspaceDigestTests(MockBackendFixture backend)
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         Assert.Throws<ArgumentNullException>(() =>
-            workspace.Digest(mechanism: null!, ReadOnlySpan<byte>.Empty));
+            workspace.Digest(mechanism: null!, []));
     }
 }

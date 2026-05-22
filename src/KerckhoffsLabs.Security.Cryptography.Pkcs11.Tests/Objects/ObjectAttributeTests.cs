@@ -102,7 +102,7 @@ public class ObjectAttributeTests
     public void RoundTrip_ByteArray_Empty()
     {
         using var attr = new ObjectAttribute(CKA.CKA_VALUE, Array.Empty<byte>());
-        Assert.Equal(Array.Empty<byte>(), attr.GetValueAsByteArray());
+        Assert.Equal([], attr.GetValueAsByteArray());
         Assert.Equal(0, attr.ValueLength);
     }
 

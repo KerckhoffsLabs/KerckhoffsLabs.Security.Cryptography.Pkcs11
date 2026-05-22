@@ -15,7 +15,7 @@ internal static class VerifyRsaPkcsTestCases
             var fakeKey = new ObjectHandle(0);
 #pragma warning disable CS0618
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.VerifyRsaPkcs1V15(fakeKey, Array.Empty<byte>(), Array.Empty<byte>(), out _));
+                session.VerifyRsaPkcs1V15(fakeKey, [], [], out _));
 #pragma warning restore CS0618
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }

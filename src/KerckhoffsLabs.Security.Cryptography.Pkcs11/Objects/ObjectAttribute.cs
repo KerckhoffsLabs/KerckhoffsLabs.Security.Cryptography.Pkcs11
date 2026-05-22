@@ -74,7 +74,7 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute of the given vendor-defined attribute id with no value.</summary>
-    public ObjectAttribute(ulong type) { _ckAttribute = _CreateAttribute((NativeCULong)type, ReadOnlySpan<byte>.Empty); }
+    public ObjectAttribute(ulong type) { _ckAttribute = _CreateAttribute((NativeCULong)type, []); }
     /// <summary>Creates an attribute of the given <see cref="CKA"/> type with no value.</summary>
     public ObjectAttribute(CKA type) : this((ulong)type) { }
 
@@ -97,8 +97,7 @@ public sealed class ObjectAttribute : IDisposable
     /// <summary>Creates a vendor-defined-id attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
     public ObjectAttribute(ulong type, bool value)
     {
-        Span<byte> buf = stackalloc byte[1];
-        buf[0] = value ? (byte)0x01 : (byte)0x00;
+        Span<byte> buf = [value ? (byte)0x01 : (byte)0x00];
         _ckAttribute = _CreateAttribute((NativeCULong)type, buf);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
@@ -116,7 +115,7 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Creates a vendor-defined-id attribute holding the bytes of <paramref name="value"/>.</summary>
     public ObjectAttribute(ulong type, byte[] value)
-        : this(type, (ReadOnlySpan<byte>)(value ?? Array.Empty<byte>())) { }
+        : this(type, (ReadOnlySpan<byte>)(value ?? [])) { }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding the bytes of <paramref name="value"/>.</summary>
     public ObjectAttribute(CKA type, byte[] value) : this((ulong)type, value) { }
 

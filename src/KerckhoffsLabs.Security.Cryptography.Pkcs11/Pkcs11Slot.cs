@@ -103,7 +103,7 @@ public sealed class Pkcs11Slot
         Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismList");
 
         if (mechanismCount < (NativeCULong)1)
-            return Array.Empty<CKM>();
+            return [];
 
         CKM[] mechanismList = new CKM[(int)mechanismCount];
         rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, ref mechanismCount);

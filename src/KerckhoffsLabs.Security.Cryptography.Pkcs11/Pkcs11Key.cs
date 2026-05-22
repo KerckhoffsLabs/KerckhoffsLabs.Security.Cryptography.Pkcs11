@@ -65,7 +65,7 @@ public sealed class Pkcs11Key : IDisposable
         _publicHandle = publicHandle;
         _keyType = keyType;
         _label = label;
-        _id = id ?? Array.Empty<byte>();
+        _id = id ?? [];
         _ownedLibrary = ownedLibrary;
         _ownsWorkspace = ownsWorkspace;
     }

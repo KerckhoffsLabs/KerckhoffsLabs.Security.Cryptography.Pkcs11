@@ -75,7 +75,7 @@ internal sealed class SecureBuffer : IDisposable
         if (_disposed) return;
         CryptographicOperations.ZeroMemory(_buffer);
         if (_pin.IsAllocated) _pin.Free();
-        _buffer = Array.Empty<byte>();
+        _buffer = [];
         _disposed = true;
         GC.SuppressFinalize(this);
     }

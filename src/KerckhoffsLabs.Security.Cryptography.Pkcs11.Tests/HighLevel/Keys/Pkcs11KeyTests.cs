@@ -23,7 +23,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
                 publicHandle: ObjectHandle.Invalid,
                 keyType: CKK.CKK_AES,
                 label: null,
-                id: Array.Empty<byte>(),
+                id: [],
                 ownedLibrary: null,
                 ownsWorkspace: false));
     }
@@ -40,7 +40,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
                 publicHandle: ObjectHandle.Invalid,
                 keyType: CKK.CKK_AES,
                 label: null,
-                id: Array.Empty<byte>(),
+                id: [],
                 ownedLibrary: null,
                 ownsWorkspace: false));
     }
@@ -79,7 +79,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
             publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES,
             label: null,
-            id: Array.Empty<byte>(),
+            id: [],
             ownedLibrary: null,
             ownsWorkspace: false);
 

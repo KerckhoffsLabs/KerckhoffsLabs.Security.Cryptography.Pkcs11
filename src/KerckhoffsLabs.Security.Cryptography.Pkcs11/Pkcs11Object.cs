@@ -28,7 +28,7 @@ public sealed class Pkcs11Object : IDisposable
         _handle = handle;
         _objectClass = objectClass;
         _label = label;
-        _id = id ?? Array.Empty<byte>();
+        _id = id ?? [];
     }
 
     /// <summary>The object's <c>CKA_CLASS</c> (e.g. <see cref="CKO.CKO_CERTIFICATE"/>, <see cref="CKO.CKO_DATA"/>).</summary>

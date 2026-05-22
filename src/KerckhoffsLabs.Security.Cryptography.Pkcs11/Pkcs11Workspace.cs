@@ -217,7 +217,7 @@ public sealed class Pkcs11Workspace : IDisposable
         {
             var objectClass = (CKO)attrs[0].GetValueAsUlong();
             string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
-            byte[] id = attrs[2].CannotBeRead ? Array.Empty<byte>() : attrs[2].GetValueAsByteArray();
+            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
             return new Pkcs11Object(this, handle, objectClass, label, id);
         }
         finally
@@ -295,7 +295,7 @@ public sealed class Pkcs11Workspace : IDisposable
         {
             var keyType = (CKK)attrs[0].GetValueAsUlong();
             string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
-            byte[] id = attrs[2].CannotBeRead ? Array.Empty<byte>() : attrs[2].GetValueAsByteArray();
+            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
 
             return new Pkcs11Key(
                 workspace: this,
@@ -429,7 +429,7 @@ public sealed class Pkcs11Workspace : IDisposable
             var objectClass = (CKO)attrs[0].GetValueAsUlong();
             var keyType = (CKK)attrs[1].GetValueAsUlong();
             string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
-            byte[] id = attrs[3].CannotBeRead ? Array.Empty<byte>() : attrs[3].GetValueAsByteArray();
+            byte[] id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
 
             ObjectHandle privateHandle = ObjectHandle.Invalid;
             ObjectHandle publicHandle = ObjectHandle.Invalid;
