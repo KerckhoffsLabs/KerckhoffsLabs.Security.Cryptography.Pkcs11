@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// Pins the marshalled size of every native interop struct, separately per platform.

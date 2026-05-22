@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Auth;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 public sealed class SecurePinTests
 {

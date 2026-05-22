@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
 
 // Pkcs11Logging holds a process-wide ILoggerFactory. These tests mutate it, so they live in one
 // class (xUnit runs a class's tests sequentially) and always reset to the NullLoggerFactory default

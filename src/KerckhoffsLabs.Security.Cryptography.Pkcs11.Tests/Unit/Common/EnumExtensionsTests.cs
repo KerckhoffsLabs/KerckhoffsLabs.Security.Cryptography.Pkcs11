@@ -4,7 +4,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Common;
 
 /// <summary>
 /// Round-trip and validation tests for the per-enum extension methods. One representative

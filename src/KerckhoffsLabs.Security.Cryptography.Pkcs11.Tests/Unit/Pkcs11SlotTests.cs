@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// Unit tests for <see cref="Pkcs11Slot"/> driven through the <see cref="ILowLevelPkcs11Library"/>

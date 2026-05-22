@@ -2,7 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Discovery;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 // Pure decoding logic — no session needed. Builds CK_SESSION_INFO native structs and asserts
 // how SessionInfo decodes them.

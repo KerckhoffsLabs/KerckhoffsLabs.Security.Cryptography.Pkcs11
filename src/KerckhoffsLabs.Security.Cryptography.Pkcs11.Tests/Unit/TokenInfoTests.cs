@@ -3,7 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Discovery;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 // Pure marshalling/decoding logic — no token needed. Builds CK_TOKEN_INFO native structs and
 // asserts how TokenInfo decodes them.

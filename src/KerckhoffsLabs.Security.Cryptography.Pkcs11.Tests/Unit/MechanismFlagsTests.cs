@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Discovery;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 public sealed class MechanismFlagsTests
 {

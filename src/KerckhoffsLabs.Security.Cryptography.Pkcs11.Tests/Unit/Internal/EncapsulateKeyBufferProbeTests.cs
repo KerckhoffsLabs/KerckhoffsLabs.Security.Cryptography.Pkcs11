@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// Regression: a conformant token may return <c>CKR_BUFFER_TOO_SMALL</c> from the

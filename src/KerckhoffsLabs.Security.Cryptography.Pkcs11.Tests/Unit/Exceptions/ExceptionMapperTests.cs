@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Exceptions;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 
 public class ExceptionMapperTests
 {

@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Objects;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Objects;
 
 public class ObjectTemplateTests
 {

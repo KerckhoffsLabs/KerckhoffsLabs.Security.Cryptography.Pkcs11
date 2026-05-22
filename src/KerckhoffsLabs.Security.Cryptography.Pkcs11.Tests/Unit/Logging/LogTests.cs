@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
 
 // Verifies the source-generated [LoggerMessage] methods render the exact message text at the right
 // level. Pass a CapturingLogger directly (the methods take ILogger), so no global state is touched.

@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
 
 public sealed class Pkcs11LogUtilsTests
 {
