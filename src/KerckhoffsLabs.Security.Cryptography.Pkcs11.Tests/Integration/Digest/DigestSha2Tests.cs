@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Digest;
@@ -16,7 +17,8 @@ internal static class DigestSha2TestCases
         try
         {
             byte[] data = System.Text.Encoding.UTF8.GetBytes("abc");
-            byte[] digest = session.DigestSha256(data);
+            using var mech = new Mechanism(CKM.CKM_SHA256);
+            byte[] digest = session.Digest(mech, data);
             Assert.Equal(32, digest.Length);
 
             // NIST FIPS 180-4 published vector for SHA-256("abc"):

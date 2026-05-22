@@ -532,16 +532,8 @@ internal sealed partial class Pkcs11Session
     }
 
     // === Secure-default digest helpers =====================================
-
-    /// <summary>Computes a SHA-256 digest over <paramref name="data"/>. Output is 32 bytes.</summary>
-    /// <param name="data">Data to digest.</param>
-    /// <returns>32-byte SHA-256 digest.</returns>
-    public byte[] DigestSha256(ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_SHA256);
-        return Digest(mechanism, data);
-    }
+    // NOTE: SHA-256 is exposed through the BCL adapter SHA256Pkcs11 (analogous to SHA256Cng);
+    // it digests via Workspace.Digest(CKM_SHA256). SHA-384/512 remain here pending their adapters.
 
     /// <summary>Computes a SHA-384 digest over <paramref name="data"/>. Output is 48 bytes.</summary>
     /// <param name="data">Data to digest.</param>
@@ -566,12 +558,12 @@ internal sealed partial class Pkcs11Session
     // === Legacy named shortcuts (gated, compile-time warning) ==============
 
     /// <summary>
-    /// Computes an MD5 digest. **Use <see cref="DigestSha256"/> instead.** Throws
+    /// Computes an MD5 digest. **Use SHA-256 (<c>SHA256Pkcs11</c>) or stronger instead.** Throws
     /// <see cref="InsecureOperationException"/> at runtime unless
     /// <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
     [Obsolete("MD5 is a broken hash function with practical collisions. " +
-              "Use DigestSha256 (or stronger) instead. " +
+              "Use SHA-256 (SHA256Pkcs11) or stronger instead. " +
               "If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
     public byte[] DigestMd5(ReadOnlySpan<byte> data)
     {
@@ -581,12 +573,12 @@ internal sealed partial class Pkcs11Session
     }
 
     /// <summary>
-    /// Computes a SHA-1 digest. **Use <see cref="DigestSha256"/> instead.** Throws
+    /// Computes a SHA-1 digest. **Use SHA-256 (<c>SHA256Pkcs11</c>) or stronger instead.** Throws
     /// <see cref="InsecureOperationException"/> at runtime unless
     /// <see cref="AllowInsecure"/> is set on the session.
     /// </summary>
     [Obsolete("SHA-1 is broken (SHAttered demonstrated practical collisions). " +
-              "Use DigestSha256 (or stronger) instead. " +
+              "Use SHA-256 (SHA256Pkcs11) or stronger instead. " +
               "If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
     public byte[] DigestSha1(ReadOnlySpan<byte> data)
     {
