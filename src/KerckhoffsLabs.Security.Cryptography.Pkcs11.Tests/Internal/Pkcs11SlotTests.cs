@@ -1,7 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fakes;
 
@@ -150,7 +149,8 @@ public sealed class Pkcs11SlotTests
     {
         var fake = new SlotFake { Mechs = [CKM.CKM_AES_GCM, CKM.CKM_SHA256, CKM.CKM_RSA_PKCS] };
         var list = NewSlot(fake).GetMechanismList();
-        Assert.Equal(new[] { CKM.CKM_AES_GCM, CKM.CKM_SHA256, CKM.CKM_RSA_PKCS }, list);
+        CKM[] expected = [CKM.CKM_AES_GCM, CKM.CKM_SHA256, CKM.CKM_RSA_PKCS];
+        Assert.Equal(expected, list);
     }
 
     [Fact]
@@ -159,7 +159,8 @@ public sealed class Pkcs11SlotTests
         // Probe says 3, the real call fills only 2 -> result must be trimmed to 2.
         var fake = new SlotFake { FirstCallCount = (NativeCULong)3UL, Mechs = [CKM.CKM_AES_GCM, CKM.CKM_SHA256] };
         var list = NewSlot(fake).GetMechanismList();
-        Assert.Equal(new[] { CKM.CKM_AES_GCM, CKM.CKM_SHA256 }, list);
+        CKM[] expected = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
+        Assert.Equal(expected, list);
     }
 
     [Fact]
@@ -211,7 +212,7 @@ public sealed class Pkcs11SlotTests
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, fake.CapturedPin);
         Assert.Equal(4UL, (ulong)fake.CapturedPinLen);
         Assert.NotNull(fake.CapturedLabel);
-        Assert.Equal(32, fake.CapturedLabel!.Length);
+        Assert.Equal(32, fake.CapturedLabel.Length);
         Assert.Equal("tok"u8.ToArray(), fake.CapturedLabel[..3]);
         Assert.All(fake.CapturedLabel[3..], b => Assert.Equal((byte)0x20, b)); // space padding
     }
