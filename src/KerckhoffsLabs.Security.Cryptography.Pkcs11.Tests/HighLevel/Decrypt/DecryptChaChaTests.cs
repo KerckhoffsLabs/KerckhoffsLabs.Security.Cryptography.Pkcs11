@@ -1,5 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.HighLevel.Decrypt;

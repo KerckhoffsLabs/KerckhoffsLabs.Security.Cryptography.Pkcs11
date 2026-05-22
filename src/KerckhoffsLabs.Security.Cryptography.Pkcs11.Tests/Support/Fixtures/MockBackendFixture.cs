@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 /// <summary>
 /// xUnit collection fixture wrapping pkcs11-mock. Loads the mock library

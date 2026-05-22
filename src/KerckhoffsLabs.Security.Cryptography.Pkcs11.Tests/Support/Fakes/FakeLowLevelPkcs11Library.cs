@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fakes;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
 /// <summary>
 /// Test double for <see cref="ILowLevelPkcs11Library"/>. Every cryptoki method throws

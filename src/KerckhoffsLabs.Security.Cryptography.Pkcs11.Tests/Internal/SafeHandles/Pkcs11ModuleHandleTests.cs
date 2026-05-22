@@ -1,5 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 using System.Runtime.InteropServices;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Internal.SafeHandles;

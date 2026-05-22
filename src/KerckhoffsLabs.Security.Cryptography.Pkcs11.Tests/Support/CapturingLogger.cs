@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 
 /// <summary>Test <see cref="ILogger"/> that records each emitted entry (level, id, rendered text).</summary>
 internal sealed class CapturingLogger : ILogger

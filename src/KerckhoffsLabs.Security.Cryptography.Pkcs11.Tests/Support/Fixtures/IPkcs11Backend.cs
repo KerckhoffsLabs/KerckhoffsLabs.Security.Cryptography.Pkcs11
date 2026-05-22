@@ -1,6 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 /// <summary>
 /// Abstraction over a backing PKCS#11 module (pkcs11-mock or SoftHSM2). Tests

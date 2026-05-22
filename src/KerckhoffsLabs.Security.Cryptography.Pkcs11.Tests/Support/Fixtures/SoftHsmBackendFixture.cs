@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Fixtures;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 /// <summary>
 /// xUnit collection fixture wrapping SoftHSM2. Uses the library built from the
