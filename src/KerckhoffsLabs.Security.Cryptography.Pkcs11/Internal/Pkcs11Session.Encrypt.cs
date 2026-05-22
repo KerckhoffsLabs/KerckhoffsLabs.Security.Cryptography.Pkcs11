@@ -180,31 +180,9 @@ internal sealed partial class Pkcs11Session
     }
 
     // === Secure-default encryption helpers =================================
-
-    /// <summary>
-    /// Encrypts <paramref name="plaintext"/> using AES-GCM with a 96-bit IV and a 128-bit
-    /// authentication tag. Produces ciphertext concatenated with the tag (PKCS#11 standard
-    /// output format for AEAD).
-    /// </summary>
-    /// <param name="keyHandle">An AES key handle (must allow encryption).</param>
-    /// <param name="iv">12-byte (96-bit) nonce, MUST be unique per key.</param>
-    /// <param name="plaintext">Data to encrypt.</param>
-    /// <param name="aad">Additional Authenticated Data; default is empty.</param>
-    /// <returns>Ciphertext + 16-byte tag.</returns>
-    public byte[] EncryptAesGcm(
-        ObjectHandle keyHandle,
-        ReadOnlySpan<byte> iv,
-        ReadOnlySpan<byte> plaintext,
-        ReadOnlySpan<byte> aad = default)
-    {
-        using var _ = AcquireExclusive();
-        if (iv.Length != 12)
-            throw new ArgumentException("AES-GCM IV must be exactly 12 bytes (96 bits).", nameof(iv));
-
-        using var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
-        using var mechanism = new Mechanism(CKM.CKM_AES_GCM, p);
-        return Encrypt(mechanism, keyHandle, plaintext);
-    }
+    // NOTE: the AES-GCM convenience moved to the AesGcmPkcs11 BCL adapter (over Pkcs11Key), which
+    // uses the message API when available; this raw-ObjectHandle session layer keeps only the
+    // mechanisms the adapter does not yet wrap.
 
     /// <summary>
     /// Encrypts <paramref name="plaintext"/> using ChaCha20-Poly1305 with a 96-bit nonce.

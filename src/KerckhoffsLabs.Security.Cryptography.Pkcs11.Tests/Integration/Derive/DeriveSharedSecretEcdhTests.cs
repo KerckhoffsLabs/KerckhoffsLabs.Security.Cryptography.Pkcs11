@@ -44,8 +44,8 @@ internal static class DeriveSharedSecretEcdhTestCases
                     // deterministic so the byte-equality check is meaningful. Never use a fixed IV in production.
                     byte[] iv = new byte[12];
                     byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a ECDH sanity check");
-                    byte[] ctA = session.EncryptAesGcm(aliceKey, iv, plaintext);
-                    byte[] ctB = session.EncryptAesGcm(bobKey, iv, plaintext);
+                    byte[] ctA = TestAesGcm.Encrypt(session, aliceKey, iv, plaintext);
+                    byte[] ctB = TestAesGcm.Encrypt(session, bobKey, iv, plaintext);
                     Assert.Equal(ctA, ctB);
                 }
                 finally

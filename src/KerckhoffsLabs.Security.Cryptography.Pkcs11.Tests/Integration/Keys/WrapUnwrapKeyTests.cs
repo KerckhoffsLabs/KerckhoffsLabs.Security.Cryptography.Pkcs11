@@ -35,7 +35,7 @@ internal static class WrapUnwrapKeyTestCases
                 // Encrypt a known plaintext with the original data key.
                 byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
                 byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a wrap round-trip plaintext");
-                byte[] ciphertext = session.EncryptAesGcm(dataKey, iv, plaintext);
+                byte[] ciphertext = TestAesGcm.Encrypt(session, dataKey, iv, plaintext);
 
                 using var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
@@ -55,7 +55,7 @@ internal static class WrapUnwrapKeyTestCases
                 {
                     // The real assertion: the unwrapped key must produce the original
                     // plaintext when decrypting the ciphertext from the original key.
-                    byte[] recovered = session.DecryptAesGcm(unwrapped, iv, ciphertext);
+                    byte[] recovered = TestAesGcm.Decrypt(session, unwrapped, iv, ciphertext);
                     Assert.Equal(plaintext, recovered);
                 }
                 finally

@@ -32,9 +32,9 @@ internal static class KnownAnswerTestCases
             ObjectHandle k = TestKeys.CreateAes256Key(session, key);
             try
             {
-                byte[] ctAndTag = session.EncryptAesGcm(k, iv, pt, aad);
+                byte[] ctAndTag = TestAesGcm.Encrypt(session, k, iv, pt, aad);
                 Assert.Equal(expected, ctAndTag);
-                Assert.Equal(pt, session.DecryptAesGcm(k, iv, ctAndTag, aad));
+                Assert.Equal(pt, TestAesGcm.Decrypt(session, k, iv, ctAndTag, aad));
             }
             finally { session.DestroyObject(k); }
         }

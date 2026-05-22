@@ -176,31 +176,7 @@ internal sealed partial class Pkcs11Session
     }
 
     // === Secure-default decryption helpers =================================
-
-    /// <summary>
-    /// Decrypts ciphertext+tag produced by <see cref="EncryptAesGcm"/>.
-    /// </summary>
-    /// <param name="keyHandle">An AES key handle (must allow decryption).</param>
-    /// <param name="iv">12-byte (96-bit) IV used during encryption.</param>
-    /// <param name="ciphertextAndTag">Ciphertext concatenated with the 16-byte authentication tag.</param>
-    /// <param name="aad">Additional Authenticated Data used during encryption; default is empty.</param>
-    /// <returns>Decrypted plaintext.</returns>
-    public byte[] DecryptAesGcm(
-        ObjectHandle keyHandle,
-        ReadOnlySpan<byte> iv,
-        ReadOnlySpan<byte> ciphertextAndTag,
-        ReadOnlySpan<byte> aad = default)
-    {
-        using var _ = AcquireExclusive();
-        if (iv.Length != 12)
-            throw new ArgumentException("AES-GCM IV must be exactly 12 bytes (96 bits).", nameof(iv));
-        if (ciphertextAndTag.Length < 16)
-            throw new ArgumentException("AES-GCM ciphertext must include a 16-byte tag.", nameof(ciphertextAndTag));
-
-        using var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
-        using var mechanism = new Mechanism(CKM.CKM_AES_GCM, p);
-        return Decrypt(mechanism, keyHandle, ciphertextAndTag);
-    }
+    // NOTE: AES-GCM moved to the AesGcmPkcs11 BCL adapter (see Pkcs11Session.Encrypt.cs note).
 
     /// <summary>
     /// Decrypts ciphertext+tag produced by <see cref="EncryptChaCha20Poly1305"/>.
