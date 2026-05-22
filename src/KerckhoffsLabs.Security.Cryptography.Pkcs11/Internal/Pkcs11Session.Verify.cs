@@ -393,19 +393,4 @@ internal sealed partial class Pkcs11Session
         Verify(mechanism, publicKeyHandle, data, signature, out isValid);
     }
 
-    // === Legacy named shortcut (gated, compile-time warning) ===============
-
-    /// <summary>
-    /// Verifies a signature produced with RSA PKCS#1 v1.5 padding.
-    /// **Use RSA-PSS via <c>RSAPkcs11</c> instead.** Throws <see cref="InsecureOperationException"/>
-    /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
-    /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 signatures are vulnerable to fault attacks and are not recommended for new code. " +
-              "Use RSAPkcs11 (RSA-PSS) instead. If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
-    public void VerifyRsaPkcs1V15(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
-        Verify(mechanism, publicKeyHandle, data, signature, out isValid);
-    }
 }

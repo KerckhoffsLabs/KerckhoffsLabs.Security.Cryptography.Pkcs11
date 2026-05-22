@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 internal static class SignRsaPkcsTestCases
 {
     /// <summary>
-    /// Asserts that <see cref="Session.SignRsaPkcs1V15"/> throws
+    /// Asserts that RSA PKCS#1 v1.5 signing (CKM_RSA_PKCS) throws
     /// <see cref="InsecureOperationException"/> by default (AllowInsecure = false).
     /// </summary>
     internal static void Assert_SignRsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
@@ -22,10 +22,9 @@ internal static class SignRsaPkcsTestCases
         try
         {
             var fakeKey = new ObjectHandle(0);
-#pragma warning disable CS0618 // intentionally testing the obsolete API
+            using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.SignRsaPkcs1V15(fakeKey, []));
-#pragma warning restore CS0618
+                session.Sign(mech, fakeKey, Array.Empty<byte>()));
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }
         finally
@@ -50,9 +49,8 @@ internal static class SignRsaPkcsTestCases
             var fakeKey = new ObjectHandle(0);
             try
             {
-#pragma warning disable CS0618 // intentionally testing the obsolete API
-                session.SignRsaPkcs1V15(fakeKey, []);
-#pragma warning restore CS0618
+                using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+                session.Sign(mech, fakeKey, Array.Empty<byte>());
             }
             catch (InsecureOperationException)
             {

@@ -80,19 +80,4 @@ internal sealed partial class Pkcs11Session
         return Sign(mechanism, privateKeyHandle, data);
     }
 
-    // === Legacy named shortcut (gated, compile-time warning) ===============
-
-    /// <summary>
-    /// Signs using RSA PKCS#1 v1.5 padding. **Use RSA-PSS via <c>RSAPkcs11</c> instead.**
-    /// This method exists for compatibility; it throws <see cref="InsecureOperationException"/>
-    /// at runtime unless <see cref="AllowInsecure"/> is set on the session.
-    /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 signing is vulnerable to fault attacks and is not recommended for new code. " +
-              "Use RSAPkcs11 (RSA-PSS) instead. If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
-    public byte[] SignRsaPkcs1V15(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
-        return Sign(mechanism, privateKeyHandle, data);
-    }
 }
