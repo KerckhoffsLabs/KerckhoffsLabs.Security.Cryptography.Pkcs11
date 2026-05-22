@@ -14,7 +14,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// <summary>
     /// Handle to the PKCS#11 library
     /// </summary>
-    private Pkcs11ModuleHandle _library = new();
+    private readonly Pkcs11ModuleHandle _library = new();
 
     /// <summary>
     /// Delegates for PKCS#11 functions

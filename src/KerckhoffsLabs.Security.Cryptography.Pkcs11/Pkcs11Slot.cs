@@ -196,7 +196,7 @@ public sealed class Pkcs11Slot
 
         NativeCULong flags = CKF.CKF_SERIAL_SESSION;
         if (readWrite)
-            flags = flags | CKF.CKF_RW_SESSION;
+            flags |= CKF.CKF_RW_SESSION;
 
         NativeCULong sessionId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);

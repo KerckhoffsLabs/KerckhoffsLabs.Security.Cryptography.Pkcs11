@@ -32,7 +32,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// Library name or path
     /// </summary>
-    private string? _libraryPath = null;
+    private readonly string? _libraryPath = null;
 
     /// <summary>
     /// Low level PKCS#11 wrapper

@@ -74,7 +74,7 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute of the given vendor-defined attribute id with no value.</summary>
-    public ObjectAttribute(ulong type) { _ckAttribute = _CreateAttribute((NativeCULong)type, []); }
+    public ObjectAttribute(ulong type) { _ckAttribute = CreateAttribute((NativeCULong)type, []); }
     /// <summary>Creates an attribute of the given <see cref="CKA"/> type with no value.</summary>
     public ObjectAttribute(CKA type) : this((ulong)type) { }
 
@@ -83,7 +83,7 @@ public sealed class ObjectAttribute : IDisposable
     {
         Span<byte> buf = stackalloc byte[sizeof(ulong)];
         System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(buf, value);
-        _ckAttribute = _CreateAttribute((NativeCULong)type, buf[..UnmanagedMemory.NativeULongSize]);
+        _ckAttribute = CreateAttribute((NativeCULong)type, buf[..UnmanagedMemory.NativeULongSize]);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="ulong"/> value (encoded as CK_ULONG on the wire).</summary>
     public ObjectAttribute(CKA type, ulong value) : this((ulong)type, value) { }
@@ -98,7 +98,7 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute(ulong type, bool value)
     {
         Span<byte> buf = [value ? (byte)0x01 : (byte)0x00];
-        _ckAttribute = _CreateAttribute((NativeCULong)type, buf);
+        _ckAttribute = CreateAttribute((NativeCULong)type, buf);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
     public ObjectAttribute(CKA type, bool value) : this((ulong)type, value) { }
@@ -108,7 +108,7 @@ public sealed class ObjectAttribute : IDisposable
     {
         ArgumentNullException.ThrowIfNull(value);
         ReadOnlySpan<byte> bytes = System.Text.Encoding.UTF8.GetBytes(value); // no null terminator
-        _ckAttribute = _CreateAttribute((NativeCULong)type, bytes);
+        _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a UTF-8 string with no null terminator.</summary>
     public ObjectAttribute(CKA type, string value) : this((ulong)type, value) { }
@@ -122,7 +122,7 @@ public sealed class ObjectAttribute : IDisposable
     /// <summary>Creates a vendor-defined-id attribute holding the bytes of <paramref name="value"/>. Zero-allocation when the caller already holds a span.</summary>
     public ObjectAttribute(ulong type, ReadOnlySpan<byte> value)
     {
-        _ckAttribute = _CreateAttribute((NativeCULong)type, value);
+        _ckAttribute = CreateAttribute((NativeCULong)type, value);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding the bytes of <paramref name="value"/>. Zero-allocation when the caller already holds a span.</summary>
     public ObjectAttribute(CKA type, ReadOnlySpan<byte> value) : this((ulong)type, value) { }
@@ -133,7 +133,7 @@ public sealed class ObjectAttribute : IDisposable
         // CK_DATE wire format: 8 ASCII bytes "YYYYMMDD"
         string formatted = value.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
         ReadOnlySpan<byte> bytes = System.Text.Encoding.ASCII.GetBytes(formatted);
-        _ckAttribute = _CreateAttribute((NativeCULong)type, bytes);
+        _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a date value (encoded as 8-byte ASCII "yyyyMMdd").</summary>
     public ObjectAttribute(CKA type, DateTime value) : this((ulong)type, value) { }
@@ -157,7 +157,7 @@ public sealed class ObjectAttribute : IDisposable
                 }
             }
         }
-        _ckAttribute = _CreateAttribute((NativeCULong)type, flat);
+        _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
     public ObjectAttribute(CKA type, List<ObjectAttribute> value) : this((ulong)type, value) { }
@@ -178,7 +178,7 @@ public sealed class ObjectAttribute : IDisposable
             else
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), value[i]);
         }
-        _ckAttribute = _CreateAttribute((NativeCULong)type, flat);
+        _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     public ObjectAttribute(CKA type, List<ulong> value) : this((ulong)type, value) { }
@@ -202,7 +202,7 @@ public sealed class ObjectAttribute : IDisposable
             else
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), ulist[i]);
         }
-        _ckAttribute = _CreateAttribute((NativeCULong)type, flat);
+        _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     public ObjectAttribute(CKA type, List<CKM> value) : this((ulong)type, value) { }
@@ -362,7 +362,7 @@ public sealed class ObjectAttribute : IDisposable
 
     // --- Private marshalling kernel ------------------------------------------
 
-    private static CK_ATTRIBUTE _CreateAttribute(NativeCULong type, ReadOnlySpan<byte> value)
+    private static CK_ATTRIBUTE CreateAttribute(NativeCULong type, ReadOnlySpan<byte> value)
     {
         CK_ATTRIBUTE a = new() { type = type };
         if (value.Length > 0)

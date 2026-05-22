@@ -26,7 +26,7 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private ILowLevelPkcs11Library _pkcs11Library;
+    private readonly ILowLevelPkcs11Library _pkcs11Library;
 
     /// <summary>
     /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
@@ -422,8 +422,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(pin);
 
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().FullName);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
