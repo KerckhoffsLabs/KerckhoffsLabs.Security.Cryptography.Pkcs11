@@ -175,25 +175,6 @@ internal sealed partial class Pkcs11Session
         }
     }
 
-    // === Legacy named shortcuts (gated, compile-time warning) ==============
-    // NOTE: the secure AEAD/OAEP convenience moved to the BCL adapters (AesGcmPkcs11,
-    // ChaCha20Poly1305Pkcs11, RSAPkcs11). Only the gated PKCS#1 v1.5 shortcut remains here.
-
-    /// <summary>
-    /// Decrypts ciphertext that was encrypted with RSA PKCS#1 v1.5 padding.
-    /// <b>Use RSA-OAEP via <c>RSAPkcs11</c> instead.</b>
-    /// This method exists for compatibility only; it throws <see cref="InsecureOperationException"/>
-    /// at runtime unless <see cref="AllowInsecure"/> is set to <c>true</c> on the session.
-    /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use RSAPkcs11 (RSA-OAEP) instead. " +
-              "If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
-    public byte[] DecryptRsaPkcs1V15(ObjectHandle keyHandle, ReadOnlySpan<byte> ciphertext)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS);
-        return Decrypt(mechanism, keyHandle, ciphertext);
-    }
-
     /// <summary>
     /// One-shot AEAD decrypt via the PKCS#11 v3.0 message-based API
     /// (C_MessageDecryptInit + C_DecryptMessage + C_MessageDecryptFinal). The tag is
