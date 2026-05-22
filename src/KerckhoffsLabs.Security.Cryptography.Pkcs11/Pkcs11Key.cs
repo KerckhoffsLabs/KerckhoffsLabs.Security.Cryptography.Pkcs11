@@ -79,6 +79,47 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>The key's CKA_ID. Returns an empty span if not set on the token.</summary>
     public ReadOnlySpan<byte> Id => _id;
 
+    /// <summary>
+    /// Returns the workspace's <see cref="Pkcs11Workspace.AllowInsecure"/> flag. Convenience accessor
+    /// so consumers don't need a direct workspace reference to check the policy.
+    /// </summary>
+    public bool AllowInsecure => _workspace.AllowInsecure;
+
+    /// <summary>
+    /// Returns <c>true</c> when the token backing this key advertises support for the given
+    /// mechanism. Convenience for adapter logic that picks between a combined-hash mechanism and a
+    /// hash-then-sign fallback.
+    /// </summary>
+    public bool SupportsMechanism(CKM mechanism) => _workspace.Session.SupportsMechanism(mechanism);
+
+    /// <summary>
+    /// Reads the requested attribute values from this key. Uses the public-key handle for
+    /// asymmetric keys when it is available (matching the rule <see cref="Encrypt"/> follows), and
+    /// the private-key handle otherwise — covering both public-companion key pairs and private-only
+    /// keys that carry their own attributes.
+    /// </summary>
+    /// <param name="types">CKA types to read.</param>
+    /// <returns>The attribute values, in the same order as <paramref name="types"/>. Attributes the
+    /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="types"/> is null.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetAttributeValue</c> on fatal errors.</exception>
+    public IReadOnlyList<ObjectAttribute> GetAttributeValue(params CKA[] types)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(types);
+
+        ObjectHandle handle = (IsAsymmetricKeyType(_keyType) && !_publicHandle.IsInvalid)
+            ? _publicHandle
+            : _privateHandle;
+
+        if (handle.IsInvalid)
+            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
+                "Pkcs11Key.GetAttributeValue (no readable handle)");
+
+        return _workspace.Session.GetAttributeValue(handle, [.. types]);
+    }
+
     /// <summary>Internal accessor for the workspace this key belongs to.</summary>
     internal Pkcs11Workspace Workspace => _workspace;
 

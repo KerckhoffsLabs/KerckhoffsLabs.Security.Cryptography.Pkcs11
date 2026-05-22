@@ -2,14 +2,14 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Central translation from BCL hash / padding choices to PKCS#11 <see cref="Mechanism"/>
 /// instances. Used by every BCL-aligned provider (<c>RSAPkcs11</c>, <c>ECDsaPkcs11</c>,
 /// etc.) to avoid duplicated mapping logic.
 /// </summary>
-internal static class Pkcs11MechanismMap
+public static class Pkcs11MechanismMap
 {
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for RSA PKCS#1 v1.5 signing with the given hash.

@@ -71,7 +71,7 @@ public sealed class AesPkcs11 : Aes
     {
         try
         {
-            var attrs = key.Workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
+            var attrs = key.GetAttributeValue(CKA.CKA_VALUE_LEN);
             if (attrs.Count > 0 && !attrs[0].CannotBeRead)
             {
                 int bytes = (int)attrs[0].GetValueAsUlong();

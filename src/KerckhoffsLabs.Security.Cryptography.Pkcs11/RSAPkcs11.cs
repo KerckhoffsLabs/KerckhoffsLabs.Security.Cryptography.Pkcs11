@@ -1,7 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -179,40 +178,26 @@ public sealed class RSAPkcs11 : RSA
                 "Refusing to export RSA private parameters. PKCS#11 keys are non-extractable " +
                 "by design; export only public material via ExportParameters(false).");
 
-        // Fast path: key was opened from a private-only token object whose public params
-        // were synthesized from readable attributes on the private-key object.
-        var synth = _key.GetSynthesizedRsaParameters();
-        if (synth is not null) return synth.Value;
-
-        // Normal path: key has a real CKO_PUBLIC_KEY companion — read its attributes.
-        if (!_key.PublicHandle.IsInvalid)
+        // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one
+        // exists, falling back to the private-key handle otherwise — covering both real key-pair
+        // companions and private-only objects whose CKA_MODULUS / CKA_PUBLIC_EXPONENT are readable.
+        var attrs = _key.GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
+        try
         {
-            var session = _key.Workspace.Session;
-            var attrs = session.GetAttributeValue(_key.PublicHandle,
-            [
-                CKA.CKA_MODULUS,
-                CKA.CKA_PUBLIC_EXPONENT,
-            ]);
-            try
-            {
-                if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-                    throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                        "RSAPkcs11.ExportParameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT)");
+            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                    "RSAPkcs11.ExportParameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT)");
 
-                return new RSAParameters
-                {
-                    Modulus = attrs[0].GetValueAsByteArray(),
-                    Exponent = attrs[1].GetValueAsByteArray(),
-                };
-            }
-            finally
+            return new RSAParameters
             {
-                foreach (var a in attrs) a.Dispose();
-            }
+                Modulus = attrs[0].GetValueAsByteArray(),
+                Exponent = attrs[1].GetValueAsByteArray(),
+            };
         }
-
-        throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-            "RSAPkcs11.ExportParameters (no public material reachable)");
+        finally
+        {
+            foreach (var a in attrs) a.Dispose();
+        }
     }
 
     /// <inheritdoc/>

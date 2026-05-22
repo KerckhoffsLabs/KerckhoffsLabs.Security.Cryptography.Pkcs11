@@ -1,7 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -83,9 +82,8 @@ public sealed class ECDsaPkcs11 : ECDsa
         ReadOnlySpan<byte> signature,
         HashAlgorithmName hashAlgorithm)
     {
-        var session = _key.Workspace.Session;
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (session.SupportsMechanism((CKM)combined.Type))
+        if (_key.SupportsMechanism((CKM)combined.Type))
         {
             return _key.Verify(combined, data, signature);
         }
@@ -120,9 +118,8 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
-        var session = _key.Workspace.Session;
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (session.SupportsMechanism((CKM)combined.Type))
+        if (_key.SupportsMechanism((CKM)combined.Type))
             return _key.Sign(combined, data);
         combined.Dispose();
         byte[] hash = HashData(hashAlgorithm, data);
@@ -155,21 +152,25 @@ public sealed class ECDsaPkcs11 : ECDsa
             throw new InsecureOperationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        // Path 1: private-only key with CKA_EC_POINT stored on the private object.
-        var synth = _key.GetSynthesizedEcParameters();
-        if (synth is not null) return synth.Value;
-
-        // Path 2: key pair generated via GenerateKey — read CKA_EC_POINT + CKA_EC_PARAMS
-        // from the real public-key companion handle.
-        if (!_key.PublicHandle.IsInvalid)
+        // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one
+        // exists and falls back to the private-key handle otherwise — covering both real key-pair
+        // companions and private-only objects that carry CKA_EC_POINT / CKA_EC_PARAMS.
+        var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
+        try
         {
-            var fromPublic = Pkcs11PublicKeyView.TrySynthesizeEc(
-                _key.Workspace.Session, _key.PublicHandle);
-            if (fromPublic is not null) return fromPublic.Value;
-        }
+            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                    "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS not readable from any available handle)");
 
-        throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-            "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be read from any available handle)");
+            var ec = Pkcs11PublicKeyView.TryParseEcPublicKey(
+                attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
+            return ec ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+                "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be parsed as a named-curve uncompressed point)");
+        }
+        finally
+        {
+            foreach (var a in attrs) a.Dispose();
+        }
     }
 
     /// <inheritdoc/>

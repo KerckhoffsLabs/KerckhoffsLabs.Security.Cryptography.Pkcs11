@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -145,12 +144,7 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
     /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
     protected override void ExportMLDsaPublicKeyCore(Span<byte> destination)
     {
-        if (_key.PublicHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "MLDsaPkcs11.ExportMLDsaPublicKey (no public handle)");
-
-        var session = _key.Workspace.Session;
-        var attrs = session.GetAttributeValue(_key.PublicHandle, [CKA.CKA_VALUE]);
+        var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
         try
         {
             if (attrs[0].CannotBeRead)
@@ -195,13 +189,7 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
             throw new ArgumentException(
                 $"Expected an ML-DSA key, got {key.KeyType}.", nameof(key));
 
-        var handle = key.PublicHandle.IsInvalid ? key.PrivateHandle : key.PublicHandle;
-        if (handle.IsInvalid)
-            throw new ArgumentException(
-                "ML-DSA key has no reachable handle to read CKA_PARAMETER_SET from.", nameof(key));
-
-        var session = key.Workspace.Session;
-        var attrs = session.GetAttributeValue(handle, [CKA.CKA_PARAMETER_SET]);
+        var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
         try
         {
             if (attrs[0].CannotBeRead)

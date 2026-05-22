@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Internal helper that synthesizes a managed public-key view from attributes on a
@@ -9,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// token. Used by <see cref="Pkcs11Key"/> to support verify-only / encrypt-only paths
 /// that need only public material.
 /// </summary>
-internal static class Pkcs11PublicKeyView
+public static class Pkcs11PublicKeyView
 {
     /// <summary>
     /// Reads CKA_MODULUS + CKA_PUBLIC_EXPONENT from the private-key object identified by
@@ -43,6 +44,34 @@ internal static class Pkcs11PublicKeyView
     }
 
     /// <summary>
+    /// Parses raw <c>CKA_EC_POINT</c> + <c>CKA_EC_PARAMS</c> bytes into an <see cref="ECParameters"/>
+    /// for a named curve (P-256/P-384/P-521). Returns <c>null</c> when the inputs don't decode as
+    /// a DER-OCTET-wrapped uncompressed point or the curve OID isn't recognised.
+    /// </summary>
+    /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (DER OCTET STRING containing the uncompressed point).</param>
+    /// <param name="ecParams">Raw <c>CKA_EC_PARAMS</c> bytes (DER-encoded named-curve OID).</param>
+    public static ECParameters? TryParseEcPublicKey(byte[] ecPoint, byte[] ecParams)
+    {
+        ArgumentNullException.ThrowIfNull(ecPoint);
+        ArgumentNullException.ThrowIfNull(ecParams);
+
+        // CKA_EC_POINT is a DER-encoded OCTET STRING wrapping the uncompressed point.
+        ReadOnlySpan<byte> pointBytes = StripDerOctetString(ecPoint);
+        if (pointBytes.IsEmpty) return null;
+
+        // Point format: 0x04 || X || Y for uncompressed.
+        if (pointBytes[0] != 0x04) return null;
+        int coordLen = (pointBytes.Length - 1) / 2;
+        if (coordLen <= 0 || pointBytes.Length != 1 + 2 * coordLen) return null;
+
+        byte[] x = pointBytes.Slice(1, coordLen).ToArray();
+        byte[] y = pointBytes.Slice(1 + coordLen, coordLen).ToArray();
+
+        ECCurve curve = ResolveNamedCurve(ecParams);
+        return new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
+    }
+
+    /// <summary>
     /// Reads CKA_EC_POINT + CKA_EC_PARAMS from a CKO_PRIVATE_KEY object and returns the
     /// corresponding <see cref="ECParameters"/>. Returns <c>null</c> if either attribute
     /// is unreadable (per PKCS#11 v3.1, CKA_EC_POINT is optional on private-key
@@ -60,28 +89,7 @@ internal static class Pkcs11PublicKeyView
         {
             if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
                 return null;
-
-            // CKA_EC_POINT is DER-encoded OCTET STRING wrapping the uncompressed point.
-            byte[] der = attrs[0].GetValueAsByteArray();
-            ReadOnlySpan<byte> pointBytes = StripDerOctetString(der);
-            if (pointBytes.IsEmpty) return null;
-
-            // Point format: 0x04 || X || Y for uncompressed.
-            if (pointBytes[0] != 0x04) return null;
-            int coordLen = (pointBytes.Length - 1) / 2;
-            if (coordLen <= 0 || pointBytes.Length != 1 + 2 * coordLen) return null;
-
-            byte[] x = pointBytes.Slice(1, coordLen).ToArray();
-            byte[] y = pointBytes.Slice(1 + coordLen, coordLen).ToArray();
-
-            byte[] paramsBytes = attrs[1].GetValueAsByteArray();
-            ECCurve curve = ResolveNamedCurve(paramsBytes);
-
-            return new ECParameters
-            {
-                Curve = curve,
-                Q = new ECPoint { X = x, Y = y },
-            };
+            return TryParseEcPublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
         }
         finally
         {

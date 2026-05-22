@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -57,24 +56,17 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     {
         GuardExtraction(encapsulating: true);
 
-        if (_key.PublicHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "MLKemPkcs11.Encapsulate (no public handle)");
-
-        var session = _key.Workspace.Session;
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
-
-        var (ct, sharedHandle) = session.EncapsulateKey(
-            mech, _key.PublicHandle, [.. template.Attributes]);
+        var (ct, sharedKey) = _key.EncapsulateKey(mech, template);
 
         try
         {
-            ReadAndCopySecret(session, sharedHandle, sharedSecret);
+            ReadAndCopySecret(sharedKey, sharedSecret);
         }
         finally
         {
-            TryDestroy(session, sharedHandle);
+            TryDestroy(sharedKey);
         }
 
         CopyExact(ct, ciphertext, Algorithm.CiphertextSizeInBytes);
@@ -86,24 +78,17 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     {
         GuardExtraction(encapsulating: false);
 
-        if (_key.PrivateHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "MLKemPkcs11.Decapsulate (no private handle)");
-
-        var session = _key.Workspace.Session;
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
-
-        ObjectHandle sharedHandle = session.DecapsulateKey(
-            mech, _key.PrivateHandle, ciphertext, [.. template.Attributes]);
+        Pkcs11Key sharedKey = _key.DecapsulateKey(mech, ciphertext, template);
 
         try
         {
-            ReadAndCopySecret(session, sharedHandle, sharedSecret);
+            ReadAndCopySecret(sharedKey, sharedSecret);
         }
         finally
         {
-            TryDestroy(session, sharedHandle);
+            TryDestroy(sharedKey);
         }
     }
 
@@ -116,12 +101,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
     protected override void ExportEncapsulationKeyCore(Span<byte> destination)
     {
-        if (_key.PublicHandle.IsInvalid)
-            throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "MLKemPkcs11.ExportEncapsulationKey (no public handle)");
-
-        var session = _key.Workspace.Session;
-        var attrs = session.GetAttributeValue(_key.PublicHandle, [CKA.CKA_VALUE]);
+        var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
         try
         {
             if (attrs[0].CannotBeRead)
@@ -161,7 +141,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
     private void GuardExtraction(bool encapsulating)
     {
-        if (_key.Workspace.Session.AllowInsecure) return;
+        if (_key.AllowInsecure) return;
 
         string verb = encapsulating ? "Encapsulate" : "Decapsulate";
         throw new InsecureOperationException(
@@ -178,13 +158,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
             throw new ArgumentException(
                 $"Expected an ML-KEM key, got {key.KeyType}.", nameof(key));
 
-        var handle = key.PublicHandle.IsInvalid ? key.PrivateHandle : key.PublicHandle;
-        if (handle.IsInvalid)
-            throw new ArgumentException(
-                "ML-KEM key has no reachable handle to read CKA_PARAMETER_SET from.", nameof(key));
-
-        var session = key.Workspace.Session;
-        var attrs = session.GetAttributeValue(handle, [CKA.CKA_PARAMETER_SET]);
+        var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
         try
         {
             if (attrs[0].CannotBeRead)
@@ -214,9 +188,9 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
             .ValueLen(sharedSecretLen)
             .Build();
 
-    private static void ReadAndCopySecret(Pkcs11Session session, ObjectHandle sharedHandle, Span<byte> destination)
+    private static void ReadAndCopySecret(Pkcs11Key sharedKey, Span<byte> destination)
     {
-        var attrs = session.GetAttributeValue(sharedHandle, [CKA.CKA_VALUE]);
+        var attrs = sharedKey.GetAttributeValue(CKA.CKA_VALUE);
         byte[]? value = null;
         try
         {
@@ -234,11 +208,11 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         }
     }
 
-    private static void TryDestroy(Pkcs11Session session, ObjectHandle handle)
+    private static void TryDestroy(Pkcs11Key sharedKey)
     {
-        if (handle.IsInvalid) return;
-        try { session.DestroyObject(handle); }
+        try { sharedKey.Delete(); }
         catch (Pkcs11Exception) { /* best-effort cleanup */ }
+        finally { sharedKey.Dispose(); }
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)
