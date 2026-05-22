@@ -219,7 +219,7 @@ public sealed class Pkcs11Library : IDisposable
     /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules, which have no
     /// interface concept.
     /// </exception>
-    public IReadOnlyList<Pkcs11Interface> GetInterfaces()
+    public IReadOnlyList<InterfaceInfo> GetInterfaces()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -238,13 +238,13 @@ public sealed class Pkcs11Library : IDisposable
 
         // The module may report fewer on the second call; never read past the buffer.
         int n = Math.Min((int)count, raw.Length);
-        List<Pkcs11Interface> list = new(n);
+        List<InterfaceInfo> list = new(n);
         for (int i = 0; i < n; i++)
         {
             string name = raw[i].InterfaceName != IntPtr.Zero
                 ? Marshal.PtrToStringUTF8(raw[i].InterfaceName) ?? string.Empty
                 : string.Empty;
-            list.Add(new Pkcs11Interface(name, (ulong)raw[i].Flags));
+            list.Add(new InterfaceInfo(name, (ulong)raw[i].Flags));
         }
 
         return list;
