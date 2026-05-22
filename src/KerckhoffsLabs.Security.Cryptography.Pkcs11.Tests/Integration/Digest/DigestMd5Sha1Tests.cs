@@ -33,10 +33,9 @@ internal static class DigestMd5Sha1TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-#pragma warning disable CS0618
+            using var mech = new Mechanism(CKM.CKM_SHA_1);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.DigestSha1([]));
-#pragma warning restore CS0618
+                session.Digest(mech, Array.Empty<byte>()));
             Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
         }
         finally
