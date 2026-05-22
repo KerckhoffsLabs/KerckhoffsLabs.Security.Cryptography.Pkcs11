@@ -605,7 +605,7 @@ internal sealed partial class Pkcs11Session
             case CKM.CKM_DES3_CBC:
             case CKM.CKM_DES3_CBC_PAD:
                 throw new InsecureOperationException(mechanism,
-                    "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CBC_PAD) instead.");
+                    "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CCM) instead.");
             case CKM.CKM_DES_MAC:
             case CKM.CKM_DES_MAC_GENERAL:
             case CKM.CKM_DES3_MAC:
@@ -623,8 +623,9 @@ internal sealed partial class Pkcs11Session
                     "DES3 key-derive mechanisms are weak; use CKM_SP800_108-family KDFs or CKM_AES_CBC_ENCRYPT_DATA on a strong base key instead.");
             case CKM.CKM_AES_ECB:
                 throw new InsecureOperationException(mechanism,
-                    "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CBC_PAD instead.");
+                    "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CCM instead.");
             case CKM.CKM_AES_CBC:
+            case CKM.CKM_AES_CBC_PAD:
             case CKM.CKM_AES_CTR:
             case CKM.CKM_AES_CTS:
             case CKM.CKM_AES_OFB:
@@ -633,7 +634,7 @@ internal sealed partial class Pkcs11Session
             case CKM.CKM_AES_CFB64:
             case CKM.CKM_AES_CFB128:
                 throw new InsecureOperationException(mechanism,
-                    "Unauthenticated AES modes provide no integrity protection (and raw CBC enables padding-oracle attacks); use CKM_AES_GCM or CKM_AES_CCM. CKM_AES_CBC_PAD remains permitted for legacy interop.");
+                    "Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. To use these for legacy interop, set Pkcs11Workspace.AllowInsecure = true.");
             case CKM.CKM_RC4:
             case CKM.CKM_RC4_KEY_GEN:
                 throw new InsecureOperationException(mechanism,

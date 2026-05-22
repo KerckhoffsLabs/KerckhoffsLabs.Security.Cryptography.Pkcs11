@@ -202,6 +202,10 @@ public sealed class Pkcs11SessionTests
     [InlineData(CKM.CKM_DES3_MAC)]
     [InlineData(CKM.CKM_DES_KEY_GEN)]
     [InlineData(CKM.CKM_DES3_KEY_GEN)]
+    [InlineData(CKM.CKM_AES_ECB)]
+    [InlineData(CKM.CKM_AES_CBC)]
+    [InlineData(CKM.CKM_AES_CBC_PAD)]
+    [InlineData(CKM.CKM_AES_CFB128)]
     public void InsecureMechanism_IsRejected(CKM insecure)
     {
         var s = NewSession();

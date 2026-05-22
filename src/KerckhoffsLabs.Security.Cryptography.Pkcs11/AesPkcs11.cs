@@ -12,33 +12,34 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 /// <remarks>
 /// <para>
-/// CBC and ECB provide confidentiality only, not integrity — they are malleable and (for CBC)
-/// padding-oracle prone. Prefer authenticated encryption: <see cref="AesGcmPkcs11"/> or
-/// <see cref="AesCcmPkcs11"/>. This type exists for legacy/interop scenarios.
+/// CBC, ECB and CFB provide confidentiality only, not integrity — they are malleable and (for CBC)
+/// padding-oracle prone. <b>All of them are gated by the secure-defaults policy</b>: every operation
+/// throws <c>InsecureOperationException</c> unless <see cref="Pkcs11Workspace.AllowInsecure"/> is set
+/// on the wrapped key's workspace. Prefer authenticated encryption — <see cref="AesGcmPkcs11"/> or
+/// <see cref="AesCcmPkcs11"/>; this type exists only for legacy/interop scenarios.
 /// </para>
 /// <para>
-/// Supported surface — the modern one-shot API runs on the token:
+/// Supported modes (on the token, once AllowInsecure is set):
 /// <list type="bullet">
-/// <item><see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> /
-/// <c>DecryptCbc</c> with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_AES_CBC_PAD</c>, permitted by
-/// default) or <see cref="PaddingMode.None"/> (→ <c>CKM_AES_CBC</c>, block-aligned input).</item>
-/// <item><c>EncryptEcb</c> / <c>DecryptEcb</c> with <see cref="PaddingMode.None"/> (→ <c>CKM_AES_ECB</c>).</item>
+/// <item>CBC — <see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> / <c>DecryptCbc</c>
+/// with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_AES_CBC_PAD</c>) or <see cref="PaddingMode.None"/>
+/// (→ <c>CKM_AES_CBC</c>, block-aligned input).</item>
+/// <item>ECB — <c>EncryptEcb</c> / <c>DecryptEcb</c> with <see cref="PaddingMode.None"/> (→ <c>CKM_AES_ECB</c>).</item>
+/// <item>CFB — <c>EncryptCfb</c> / <c>DecryptCfb</c> with feedback size 128 (→ <c>CKM_AES_CFB128</c>) or
+/// 8 (→ <c>CKM_AES_CFB8</c>), <see cref="PaddingMode.None"/>. Requires a token that implements CFB
+/// (SoftHSM does not).</item>
 /// </list>
-/// Raw/unauthenticated modes — <see cref="PaddingMode.None"/> CBC (<c>CKM_AES_CBC</c>) and ECB
-/// (<c>CKM_AES_ECB</c>) — are gated by the secure-defaults policy and throw
-/// <c>InsecureOperationException</c> unless <see cref="Pkcs11Workspace.AllowInsecure"/> is set; only
-/// <c>CKM_AES_CBC_PAD</c> is permitted by default. Empty input that yields empty output (any
-/// decryption, or unpadded encryption) is a no-op returned without touching the token; empty
-/// plaintext with PKCS7 must emit a padding block, so it is sent to the token (which must support
-/// empty-input <c>CKM_AES_CBC_PAD</c> — SoftHSM, for example, does not).
+/// Empty input that yields empty output (any decryption, or unpadded encryption) is a no-op returned
+/// without touching the token; empty plaintext with PKCS7 must emit a padding block, so it is sent to
+/// the token (which must support empty-input <c>CKM_AES_CBC_PAD</c> — SoftHSM, for example, does not).
 /// </para>
 /// <para>
 /// NOT supported (a token key is not extractable, so the streaming/managed-key contract of
 /// <see cref="SymmetricAlgorithm"/> does not apply): <see cref="CreateEncryptor(byte[], byte[])"/> /
 /// <see cref="CreateDecryptor(byte[], byte[])"/> (no <see cref="ICryptoTransform"/>),
 /// <see cref="GenerateKey"/> (generate via <c>Pkcs11Workspace</c> instead), the <see cref="Key"/>
-/// property, CFB mode, and ECB/CBC with non-PKCS7/None padding. These throw
-/// <see cref="NotSupportedException"/>.
+/// property, OFB/CTS/CTR modes, CFB feedback sizes other than 8/128, and non-PKCS7/None padding.
+/// These throw <see cref="NotSupportedException"/>.
 /// </para>
 /// </remarks>
 public sealed class AesPkcs11 : Aes
@@ -105,6 +106,16 @@ public sealed class AesPkcs11 : Aes
         ReadOnlySpan<byte> ciphertext, Span<byte> destination, PaddingMode paddingMode, out int bytesWritten)
         => RunBlock(EcbMechanism(paddingMode), encrypt: false, ciphertext, destination, out bytesWritten);
 
+    /// <inheritdoc/>
+    protected override bool TryEncryptCfbCore(
+        ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> iv, Span<byte> destination, PaddingMode paddingMode, int feedbackSizeInBits, out int bytesWritten)
+        => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits), encrypt: true, plaintext, destination, out bytesWritten);
+
+    /// <inheritdoc/>
+    protected override bool TryDecryptCfbCore(
+        ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> iv, Span<byte> destination, PaddingMode paddingMode, int feedbackSizeInBits, out int bytesWritten)
+        => RunBlock(CfbMechanism(iv, paddingMode, feedbackSizeInBits), encrypt: false, ciphertext, destination, out bytesWritten);
+
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
         using (mechanism)
@@ -156,6 +167,19 @@ public sealed class AesPkcs11 : Aes
             "AesPkcs11 supports only PaddingMode.None for ECB (PKCS#11 has no CKM_AES_ECB_PAD). " +
             "Pre-pad the input, or use CBC with PKCS7."),
     };
+
+    private static Mechanism CfbMechanism(ReadOnlySpan<byte> iv, PaddingMode paddingMode, int feedbackSizeInBits)
+    {
+        if (paddingMode != PaddingMode.None)
+            throw new NotSupportedException("AesPkcs11 CFB is a stream mode and supports only PaddingMode.None.");
+        return feedbackSizeInBits switch
+        {
+            128 => new Mechanism(CKM.CKM_AES_CFB128, iv.ToArray()),
+            8 => new Mechanism(CKM.CKM_AES_CFB8, iv.ToArray()),
+            _ => throw new NotSupportedException(
+                $"AesPkcs11 CFB supports feedback size 128 (CKM_AES_CFB128) or 8 (CKM_AES_CFB8); got {feedbackSizeInBits} bits."),
+        };
+    }
 
     /// <summary>Generates a random initialization vector (16 bytes) for CBC mode.</summary>
     public override void GenerateIV() => IVValue = RandomNumberGenerator.GetBytes(BlockSize / 8);

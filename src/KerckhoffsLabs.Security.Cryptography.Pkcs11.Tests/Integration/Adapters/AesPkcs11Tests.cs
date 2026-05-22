@@ -86,11 +86,15 @@ public sealed class AesPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     }
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void EncryptCbc_Pkcs7_MatchesBclAndRoundTrips() => WithImportedAes((_, aes) =>
+    public void EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl() => WithImportedAes((workspace, aes) =>
     {
         byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a token key — variable length.");
-        using var bcl = BclAes();
 
+        // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
+        Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16));
+
+        workspace.AllowInsecure = true;
+        using var bcl = BclAes();
         byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
         Assert.Equal(bcl.EncryptCbc(plaintext, Iv16), ct);
         Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16));
@@ -102,8 +106,6 @@ public sealed class AesPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         byte[] plaintext = new byte[32]; // exactly two blocks
         RandomNumberGenerator.Fill(plaintext);
 
-        // Raw CBC (CKM_AES_CBC, no padding/MAC) is gated by the secure-defaults policy; only
-        // CKM_AES_CBC_PAD is permitted by default.
         Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
 
         workspace.AllowInsecure = true;
@@ -112,6 +114,28 @@ public sealed class AesPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         Assert.Equal(bcl.EncryptCbc(plaintext, Iv16, PaddingMode.None), ct);
         Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16, PaddingMode.None));
     });
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Cfb_GatedByDefault_Throws() => WithImportedAes((_, aes) =>
+        Assert.Throws<InsecureOperationException>(
+            () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128)));
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Cfb_WithAllowInsecure_GateBypassed() => WithImportedAes((workspace, aes) =>
+    {
+        workspace.AllowInsecure = true;
+        // SoftHSM does not implement CFB, so the token call may fail — but the secure-defaults gate
+        // must NOT fire once AllowInsecure is set.
+        Exception? ex = Record.Exception(
+            () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128));
+        Assert.False(ex is InsecureOperationException,
+            $"Gate should be bypassed; got {ex?.GetType().Name ?? "no exception"}.");
+    });
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Cfb_NonNonePadding_Throws() => WithImportedAes((_, aes) =>
+        Assert.Throws<NotSupportedException>(
+            () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.PKCS7, feedbackSizeInBits: 128)));
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void EncryptCbc_UnsupportedPadding_Throws() => WithImportedAes((_, aes) =>

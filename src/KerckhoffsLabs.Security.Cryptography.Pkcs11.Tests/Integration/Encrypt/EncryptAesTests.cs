@@ -36,6 +36,7 @@ internal static class EncryptAesTestCases
             {
                 byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
 
+                session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
                 using var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] ciphertext = session.Encrypt(mechanism, keyHandle, plaintext);
 
@@ -63,6 +64,7 @@ internal static class EncryptAesTestCases
             {
                 byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
 
+                session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
                 using var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] ciphertext = session.Encrypt(encMechanism, keyHandle, plaintext);
 
