@@ -179,59 +179,17 @@ internal sealed partial class Pkcs11Session
         }
     }
 
-    // === Secure-default encryption helpers =================================
-    // NOTE: the AES-GCM convenience moved to the AesGcmPkcs11 BCL adapter (over Pkcs11Key), which
-    // uses the message API when available; this raw-ObjectHandle session layer keeps only the
-    // mechanisms the adapter does not yet wrap.
-
-    /// <summary>
-    /// Encrypts <paramref name="plaintext"/> using ChaCha20-Poly1305 with a 96-bit nonce.
-    /// Produces ciphertext concatenated with a 128-bit tag.
-    /// </summary>
-    /// <param name="keyHandle">A ChaCha20 key handle (must allow encryption).</param>
-    /// <param name="nonce">12-byte (96-bit) nonce, MUST be unique per key.</param>
-    /// <param name="plaintext">Data to encrypt.</param>
-    /// <param name="aad">Additional Authenticated Data; default is empty.</param>
-    /// <returns>Ciphertext + 16-byte tag.</returns>
-    public byte[] EncryptChaCha20Poly1305(
-        ObjectHandle keyHandle,
-        ReadOnlySpan<byte> nonce,
-        ReadOnlySpan<byte> plaintext,
-        ReadOnlySpan<byte> aad = default)
-    {
-        using var _ = AcquireExclusive();
-        if (nonce.Length != 12)
-            throw new ArgumentException("ChaCha20-Poly1305 nonce must be exactly 12 bytes (96 bits).", nameof(nonce));
-
-        using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
-        using var mechanism = new Mechanism(CKM.CKM_CHACHA20_POLY1305, p);
-        return Encrypt(mechanism, keyHandle, plaintext);
-    }
-
-    /// <summary>
-    /// Encrypts <paramref name="plaintext"/> using RSA-OAEP with SHA-256 and MGF1+SHA-256.
-    /// Suitable for wrapping symmetric keys; not for bulk data (plaintext must be smaller
-    /// than the RSA modulus minus 2*hashSize+2).
-    /// </summary>
-    /// <param name="keyHandle">An RSA public key handle (must allow encryption).</param>
-    /// <param name="plaintext">Data to encrypt.</param>
-    /// <returns>RSA-OAEP encrypted ciphertext.</returns>
-    public byte[] EncryptRsaOaep(ObjectHandle keyHandle, ReadOnlySpan<byte> plaintext)
-    {
-        using var _ = AcquireExclusive();
-        using var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256);
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, p);
-        return Encrypt(mechanism, keyHandle, plaintext);
-    }
-
     // === Legacy named shortcuts (gated, compile-time warning) ==============
+    // NOTE: the secure AEAD/OAEP convenience moved to the BCL adapters (AesGcmPkcs11,
+    // ChaCha20Poly1305Pkcs11, RSAPkcs11). Only the gated PKCS#1 v1.5 shortcut remains here, kept
+    // to surface the InsecureOperationException gate.
 
     /// <summary>
-    /// Encrypts using RSA PKCS#1 v1.5 padding. <b>Use <see cref="EncryptRsaOaep"/> instead.</b>
+    /// Encrypts using RSA PKCS#1 v1.5 padding. <b>Use RSA-OAEP via <c>RSAPkcs11</c> instead.</b>
     /// This method exists for compatibility only; it throws <see cref="InsecureOperationException"/>
     /// at runtime unless <see cref="AllowInsecure"/> is set to <c>true</c> on the session.
     /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use EncryptRsaOaep instead. " +
+    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use RSAPkcs11 (RSA-OAEP) instead. " +
               "If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
     public byte[] EncryptRsaPkcs1V15(ObjectHandle keyHandle, ReadOnlySpan<byte> plaintext)
     {

@@ -117,9 +117,9 @@ internal static class KnownAnswerTestCases
             ObjectHandle k = TestKeys.CreateChaCha20Key(session, key);
             try
             {
-                byte[] ctAndTag = session.EncryptChaCha20Poly1305(k, nonce, pt, aad);
+                byte[] ctAndTag = TestChaCha20Poly1305.Encrypt(session, k, nonce, pt, aad);
                 Assert.Equal(expected, ctAndTag);
-                Assert.Equal(pt, session.DecryptChaCha20Poly1305(k, nonce, ctAndTag, aad));
+                Assert.Equal(pt, TestChaCha20Poly1305.Decrypt(session, k, nonce, ctAndTag, aad));
             }
             finally { session.DestroyObject(k); }
         }

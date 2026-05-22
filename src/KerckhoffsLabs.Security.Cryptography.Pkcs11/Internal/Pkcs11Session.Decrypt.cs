@@ -175,58 +175,17 @@ internal sealed partial class Pkcs11Session
         }
     }
 
-    // === Secure-default decryption helpers =================================
-    // NOTE: AES-GCM moved to the AesGcmPkcs11 BCL adapter (see Pkcs11Session.Encrypt.cs note).
-
-    /// <summary>
-    /// Decrypts ciphertext+tag produced by <see cref="EncryptChaCha20Poly1305"/>.
-    /// </summary>
-    /// <param name="keyHandle">A ChaCha20 key handle (must allow decryption).</param>
-    /// <param name="nonce">12-byte (96-bit) nonce used during encryption.</param>
-    /// <param name="ciphertextAndTag">Ciphertext concatenated with the 16-byte authentication tag.</param>
-    /// <param name="aad">Additional Authenticated Data used during encryption; default is empty.</param>
-    /// <returns>Decrypted plaintext.</returns>
-    public byte[] DecryptChaCha20Poly1305(
-        ObjectHandle keyHandle,
-        ReadOnlySpan<byte> nonce,
-        ReadOnlySpan<byte> ciphertextAndTag,
-        ReadOnlySpan<byte> aad = default)
-    {
-        using var _ = AcquireExclusive();
-        if (nonce.Length != 12)
-            throw new ArgumentException("ChaCha20-Poly1305 nonce must be exactly 12 bytes (96 bits).", nameof(nonce));
-        if (ciphertextAndTag.Length < 16)
-            throw new ArgumentException("ChaCha20-Poly1305 ciphertext must include a 16-byte tag.", nameof(ciphertextAndTag));
-
-        using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
-        using var mechanism = new Mechanism(CKM.CKM_CHACHA20_POLY1305, p);
-        return Decrypt(mechanism, keyHandle, ciphertextAndTag);
-    }
-
-    /// <summary>
-    /// Decrypts ciphertext produced by <see cref="EncryptRsaOaep"/> using RSA-OAEP with
-    /// SHA-256 and MGF1+SHA-256.
-    /// </summary>
-    /// <param name="keyHandle">An RSA private key handle (must allow decryption).</param>
-    /// <param name="ciphertext">RSA-OAEP ciphertext to decrypt.</param>
-    /// <returns>Decrypted plaintext.</returns>
-    public byte[] DecryptRsaOaep(ObjectHandle keyHandle, ReadOnlySpan<byte> ciphertext)
-    {
-        using var _ = AcquireExclusive();
-        using var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256);
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, p);
-        return Decrypt(mechanism, keyHandle, ciphertext);
-    }
-
     // === Legacy named shortcuts (gated, compile-time warning) ==============
+    // NOTE: the secure AEAD/OAEP convenience moved to the BCL adapters (AesGcmPkcs11,
+    // ChaCha20Poly1305Pkcs11, RSAPkcs11). Only the gated PKCS#1 v1.5 shortcut remains here.
 
     /// <summary>
     /// Decrypts ciphertext that was encrypted with RSA PKCS#1 v1.5 padding.
-    /// <b>Use <see cref="DecryptRsaOaep"/> instead.</b>
+    /// <b>Use RSA-OAEP via <c>RSAPkcs11</c> instead.</b>
     /// This method exists for compatibility only; it throws <see cref="InsecureOperationException"/>
     /// at runtime unless <see cref="AllowInsecure"/> is set to <c>true</c> on the session.
     /// </summary>
-    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use DecryptRsaOaep instead. " +
+    [Obsolete("RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks. Use RSAPkcs11 (RSA-OAEP) instead. " +
               "If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
     public byte[] DecryptRsaPkcs1V15(ObjectHandle keyHandle, ReadOnlySpan<byte> ciphertext)
     {
