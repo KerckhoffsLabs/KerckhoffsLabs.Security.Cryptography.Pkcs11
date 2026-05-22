@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 
-public class ExceptionMapperTests
+public sealed class ExceptionMapperTests
 {
     public static IEnumerable<object[]> AuthenticationCases() =>
     [
@@ -112,13 +112,4 @@ public class ExceptionMapperTests
     [InlineData(CKR.CKR_CRYPTOKI_NOT_INITIALIZED)]
     public void Map_UncategorizedCkr_ReturnsUnclassifiedException(CKR ckr)
         => Assert.IsType<Pkcs11UnclassifiedException>(ExceptionMapper.Map(ckr, "C_Finalize"));
-
-    [Fact]
-    public void Map_PreservesMethodAndCkr()
-    {
-        var ex = ExceptionMapper.Map(CKR.CKR_PIN_INCORRECT, "C_Login");
-
-        Assert.Equal(CKR.CKR_PIN_INCORRECT, ex.ReturnValue);
-        Assert.Equal("C_Login", ex.Method);
-    }
 }

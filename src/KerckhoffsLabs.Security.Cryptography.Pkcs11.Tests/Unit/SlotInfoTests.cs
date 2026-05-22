@@ -1,4 +1,3 @@
-using System.Text;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -7,18 +6,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 public sealed class SlotInfoTests
 {
-    private static void FillPadded(Span<byte> dest, string value)
-    {
-        dest.Fill((byte)' ');
-        Encoding.UTF8.GetBytes(value, dest);
-    }
-
     [Fact]
     public void Decodes_AllFields()
     {
         var native = new CK_SLOT_INFO();
-        FillPadded(native.SlotDescription, "USB Reader Slot 0");
-        FillPadded(native.ManufacturerId, "Acme Corp");
+        NativeTestStructs.FillPadded(native.SlotDescription, "USB Reader Slot 0");
+        NativeTestStructs.FillPadded(native.ManufacturerId, "Acme Corp");
         native.Flags = (NativeCULong)(CKF.CKF_TOKEN_PRESENT.Value | CKF.CKF_HW_SLOT.Value);
         native.HardwareVersion = new CK_VERSION { Major = 1, Minor = 0 };
         native.FirmwareVersion = new CK_VERSION { Major = 2, Minor = 5 };
@@ -39,7 +32,7 @@ public sealed class SlotInfoTests
     public void Strings_TrailingSpacePaddingIsTrimmed()
     {
         var native = new CK_SLOT_INFO();
-        FillPadded(native.SlotDescription, "slot"); // remaining bytes are spaces
+        NativeTestStructs.FillPadded(native.SlotDescription, "slot"); // remaining bytes are spaces
         var info = new SlotInfo((NativeCULong)0UL, native);
         Assert.Equal("slot", info.SlotDescription);
     }

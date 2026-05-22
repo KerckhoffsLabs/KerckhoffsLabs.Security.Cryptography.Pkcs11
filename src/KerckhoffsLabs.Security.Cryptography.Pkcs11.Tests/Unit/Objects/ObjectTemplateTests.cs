@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Objects;
 
-public class ObjectTemplateTests
+public sealed class ObjectTemplateTests
 {
     [Fact]
     public void Empty_BuildsEmptyTemplate()

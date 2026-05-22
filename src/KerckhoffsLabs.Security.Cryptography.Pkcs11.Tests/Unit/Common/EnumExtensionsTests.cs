@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Common;
 /// mechanically identical across enums. <c>ToCK*</c> always validates — there is no longer
 /// a loose, non-validating variant.
 /// </summary>
-public class EnumExtensionsTests
+public sealed class EnumExtensionsTests
 {
     [Fact] public void CKR_RoundTrip() { CKR v = CKR.CKR_OK; Assert.Equal(v, v.ToCULong().ToCKR()); }
     [Fact] public void CKM_RoundTrip() { CKM v = CKM.CKM_AES_GCM; Assert.Equal(v, v.ToCULong().ToCKM()); }
@@ -36,4 +36,13 @@ public class EnumExtensionsTests
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKA());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKM());
     }
+
+    // Exhaustive round-trips for the alias-free enums (every defined member must survive). CKM/CKK/CKA
+    // are excluded: they intentionally carry duplicate-value spec aliases (e.g. CKK_EC == CKK_ECDSA),
+    // so a numeric value can only map back to one member and exhaustive round-tripping can't hold.
+    [Fact] public void CKR_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKR>(), v => Assert.Equal(v, v.ToCULong().ToCKR()));
+    [Fact] public void CKU_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKU>(), v => Assert.Equal(v, v.ToCULong().ToCKU()));
+    [Fact] public void CKS_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKS>(), v => Assert.Equal(v, v.ToCULong().ToCKS()));
+    [Fact] public void CKO_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKO>(), v => Assert.Equal(v, v.ToCULong().ToCKO()));
+    [Fact] public void CKC_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKC>(), v => Assert.Equal(v, v.ToCULong().ToCKC()));
 }

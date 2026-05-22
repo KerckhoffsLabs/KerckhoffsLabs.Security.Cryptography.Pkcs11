@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 
-public class Pkcs11ExceptionTests
+public sealed class Pkcs11ExceptionTests
 {
     [Fact]
     public void ReturnValue_ExposesCkr()

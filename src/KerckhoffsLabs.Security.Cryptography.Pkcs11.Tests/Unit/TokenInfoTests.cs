@@ -1,4 +1,3 @@
-using System.Text;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -9,20 +8,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 // asserts how TokenInfo decodes them.
 public sealed class TokenInfoTests
 {
-    // PKCS#11 fixed-width string fields are space-padded; copy the value and pad the remainder.
-    private static void FillPadded(Span<byte> dest, string value)
-    {
-        dest.Fill((byte)' ');
-        Encoding.UTF8.GetBytes(value, dest);
-    }
-
     private static CK_TOKEN_INFO Sample()
     {
         var info = new CK_TOKEN_INFO();
-        FillPadded(info.Label, "My Token");
-        FillPadded(info.ManufacturerId, "Acme Corp");
-        FillPadded(info.Model, "Model-X");
-        FillPadded(info.SerialNumber, "SN12345");
+        NativeTestStructs.FillPadded(info.Label, "My Token");
+        NativeTestStructs.FillPadded(info.ManufacturerId, "Acme Corp");
+        NativeTestStructs.FillPadded(info.Model, "Model-X");
+        NativeTestStructs.FillPadded(info.SerialNumber, "SN12345");
         info.Flags = (NativeCULong)(CKF.CKF_RNG.Value | CKF.CKF_LOGIN_REQUIRED.Value);
         info.MaxSessionCount = (NativeCULong)10UL;
         info.SessionCount = (NativeCULong)3UL;
@@ -36,7 +28,7 @@ public sealed class TokenInfoTests
         info.FreePrivateMemory = (NativeCULong)40000UL;
         info.HardwareVersion = new CK_VERSION { Major = 2, Minor = 1 };  // minor renders as hundredths
         info.FirmwareVersion = new CK_VERSION { Major = 3, Minor = 40 };
-        FillPadded(info.UtcTime, "2024011510304500");
+        NativeTestStructs.FillPadded(info.UtcTime, "2024011510304500");
         return info;
     }
 
@@ -77,7 +69,7 @@ public sealed class TokenInfoTests
     public void Strings_TrailingSpacePaddingIsTrimmed()
     {
         var native = new CK_TOKEN_INFO();
-        FillPadded(native.Label, "abc"); // remaining 29 bytes are spaces
+        NativeTestStructs.FillPadded(native.Label, "abc"); // remaining 29 bytes are spaces
         var info = new TokenInfo((NativeCULong)0UL, native);
         Assert.Equal("abc", info.Label);
     }
@@ -86,7 +78,7 @@ public sealed class TokenInfoTests
     public void Strings_DecodeUtf8MultiByte()
     {
         var native = new CK_TOKEN_INFO();
-        FillPadded(native.Label, "Tökén café"); // multi-byte UTF-8
+        NativeTestStructs.FillPadded(native.Label, "Tökén café"); // multi-byte UTF-8
         var info = new TokenInfo((NativeCULong)0UL, native);
         Assert.Equal("Tökén café", info.Label);
     }
@@ -106,7 +98,7 @@ public sealed class TokenInfoTests
     public void UtcTime_InvalidString_IsNullButStringPreserved()
     {
         var native = Sample();
-        FillPadded(native.UtcTime, "not-a-timestamp!"); // 16 bytes, unparseable
+        NativeTestStructs.FillPadded(native.UtcTime, "not-a-timestamp!"); // 16 bytes, unparseable
         var info = new TokenInfo((NativeCULong)0UL, native);
 
         Assert.Equal("not-a-timestamp!", info.UtcTimeString);
@@ -117,7 +109,7 @@ public sealed class TokenInfoTests
     public void UtcTime_BlankClocklessToken_IsNull()
     {
         var native = Sample();
-        FillPadded(native.UtcTime, ""); // all spaces -> trims to empty
+        NativeTestStructs.FillPadded(native.UtcTime, ""); // all spaces -> trims to empty
         var info = new TokenInfo((NativeCULong)0UL, native);
 
         Assert.Equal("", info.UtcTimeString);

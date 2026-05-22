@@ -3,11 +3,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
-public sealed class TokenFlagsTests
+public sealed class TokenFlagsTests : FlagsContract<TokenFlags>
 {
-    // Every TokenFlags bit property, paired with the CKF flag it must read. Each CKF_* is a
-    // distinct bit, so this table also asserts no two properties alias the same bit.
-    private static readonly (string Name, ulong Bit, Func<TokenFlags, bool> Get)[] All =
+    protected override TokenFlags Make(ulong bits) => new((NativeCULong)bits);
+    protected override ulong RawValueOf(TokenFlags flags) => flags.Flags;
+
+    protected override (string Name, ulong Bit, Func<TokenFlags, bool> Get)[] All =>
     [
         (nameof(TokenFlags.Rng), CKF.CKF_RNG.Value, f => f.Rng),
         (nameof(TokenFlags.WriteProtected), CKF.CKF_WRITE_PROTECTED.Value, f => f.WriteProtected),
@@ -28,46 +29,4 @@ public sealed class TokenFlagsTests
         (nameof(TokenFlags.SoPinLocked), CKF.CKF_SO_PIN_LOCKED.Value, f => f.SoPinLocked),
         (nameof(TokenFlags.SoPinToBeChanged), CKF.CKF_SO_PIN_TO_BE_CHANGED.Value, f => f.SoPinToBeChanged),
     ];
-
-    [Fact]
-    public void EachFlag_SetInIsolation_TogglesOnlyItsOwnProperty()
-    {
-        foreach (var (name, bit, _) in All)
-        {
-            var flags = new TokenFlags((NativeCULong)bit);
-            foreach (var (otherName, _, get) in All)
-                Assert.Equal(otherName == name, get(flags));
-        }
-    }
-
-    [Fact]
-    public void NoBitsSet_AllPropertiesFalse()
-    {
-        var flags = new TokenFlags((NativeCULong)0UL);
-        Assert.Equal(0UL, flags.Flags);
-        Assert.All(All, e => Assert.False(e.Get(flags)));
-    }
-
-    [Fact]
-    public void AllBitsSet_AllPropertiesTrue()
-    {
-        ulong all = 0;
-        foreach (var (_, bit, _) in All) all |= bit;
-        var flags = new TokenFlags((NativeCULong)all);
-        Assert.All(All, e => Assert.True(e.Get(flags)));
-    }
-
-    [Fact]
-    public void Flags_ExposesRawValue()
-    {
-        var flags = new TokenFlags((NativeCULong)0x1234UL);
-        Assert.Equal(0x1234UL, flags.Flags);
-    }
-
-    [Fact]
-    public void Record_ValueEquality()
-    {
-        Assert.Equal(new TokenFlags((NativeCULong)5UL), new TokenFlags((NativeCULong)5UL));
-        Assert.NotEqual(new TokenFlags((NativeCULong)5UL), new TokenFlags((NativeCULong)6UL));
-    }
 }

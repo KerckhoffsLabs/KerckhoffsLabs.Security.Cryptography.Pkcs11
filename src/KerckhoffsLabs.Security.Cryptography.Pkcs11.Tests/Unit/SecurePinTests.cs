@@ -10,7 +10,7 @@ public sealed class SecurePinTests
         byte[] source = Encoding.UTF8.GetBytes("hunter2");
         using var pin = new SecurePin(source);
         Assert.Equal(source.Length, pin.Length);
-        Assert.True(pin.Pin.SequenceEqual(source));
+        Assert.Equal(source, pin.Pin.ToArray());
     }
 
     [Fact]
@@ -18,7 +18,7 @@ public sealed class SecurePinTests
     {
         using var pin = new SecurePin("hunter2");
         byte[] expected = Encoding.UTF8.GetBytes("hunter2");
-        Assert.True(pin.Pin.SequenceEqual(expected));
+        Assert.Equal(expected, pin.Pin.ToArray());
     }
 
     [Fact]

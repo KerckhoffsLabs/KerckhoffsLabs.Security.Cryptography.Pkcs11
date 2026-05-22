@@ -3,11 +3,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
-public sealed class MechanismFlagsTests
+public sealed class MechanismFlagsTests : FlagsContract<MechanismFlags>
 {
-    // Every MechanismFlags bit property, paired with the CKF flag it must read. Each CKF_* in the
-    // mechanism-info set is a distinct bit, so this table also asserts no two properties alias.
-    private static readonly (string Name, ulong Bit, Func<MechanismFlags, bool> Get)[] All =
+    protected override MechanismFlags Make(ulong bits) => new((NativeCULong)bits);
+    protected override ulong RawValueOf(MechanismFlags flags) => flags.Flags;
+
+    protected override (string Name, ulong Bit, Func<MechanismFlags, bool> Get)[] All =>
     [
         (nameof(MechanismFlags.Hw), CKF.CKF_HW.Value, f => f.Hw),
         (nameof(MechanismFlags.Encrypt), CKF.CKF_ENCRYPT.Value, f => f.Encrypt),
@@ -30,46 +31,4 @@ public sealed class MechanismFlagsTests
         (nameof(MechanismFlags.EcUncompress), CKF.CKF_EC_UNCOMPRESS.Value, f => f.EcUncompress),
         (nameof(MechanismFlags.EcCompress), CKF.CKF_EC_COMPRESS.Value, f => f.EcCompress),
     ];
-
-    [Fact]
-    public void EachFlag_SetInIsolation_TogglesOnlyItsOwnProperty()
-    {
-        foreach (var (name, bit, _) in All)
-        {
-            var flags = new MechanismFlags((NativeCULong)bit);
-            foreach (var (otherName, _, get) in All)
-                Assert.Equal(otherName == name, get(flags));
-        }
-    }
-
-    [Fact]
-    public void NoBitsSet_AllPropertiesFalse()
-    {
-        var flags = new MechanismFlags((NativeCULong)0UL);
-        Assert.Equal(0UL, flags.Flags);
-        Assert.All(All, e => Assert.False(e.Get(flags)));
-    }
-
-    [Fact]
-    public void AllBitsSet_AllPropertiesTrue()
-    {
-        ulong all = 0;
-        foreach (var (_, bit, _) in All) all |= bit;
-        var flags = new MechanismFlags((NativeCULong)all);
-        Assert.All(All, e => Assert.True(e.Get(flags)));
-    }
-
-    [Fact]
-    public void Flags_ExposesRawValue()
-    {
-        var flags = new MechanismFlags((NativeCULong)0x12340UL);
-        Assert.Equal(0x12340UL, flags.Flags);
-    }
-
-    [Fact]
-    public void Record_ValueEquality()
-    {
-        Assert.Equal(new MechanismFlags((NativeCULong)0x300UL), new MechanismFlags((NativeCULong)0x300UL));
-        Assert.NotEqual(new MechanismFlags((NativeCULong)0x300UL), new MechanismFlags((NativeCULong)0x100UL));
-    }
 }

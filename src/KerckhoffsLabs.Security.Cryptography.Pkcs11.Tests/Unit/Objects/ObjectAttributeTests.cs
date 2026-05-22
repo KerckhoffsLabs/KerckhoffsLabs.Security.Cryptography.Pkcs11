@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Objects;
 /// Lifecycle invariants (Dispose, post-dispose access, CannotBeRead)
 /// are also covered.
 /// </summary>
-public class ObjectAttributeTests
+public sealed class ObjectAttributeTests
 {
     // ---- Round-trip per typed constructor -----------------------------------
 
