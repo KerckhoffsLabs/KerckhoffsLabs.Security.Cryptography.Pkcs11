@@ -232,4 +232,75 @@ public sealed class ObjectTemplateTests
         Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_APPLICATION);
         Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VALUE);
     }
+
+    [Fact]
+    public void Data_ObjectId_AddsAttribute()
+    {
+        using var template = ObjectTemplate.ForData().ObjectId([0x06, 0x03, 0x55, 0x04]).Build();
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_OBJECT_ID);
+    }
+
+    [Fact]
+    public void SecretKey_RemainingFluentMethods_AddAttributes()
+    {
+        byte[] raw = new byte[32];
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Sensitive()
+            .NonExtractable()
+            .Value(raw)
+            .Build();
+
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SENSITIVE);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_EXTRACTABLE);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VALUE);
+    }
+
+    [Fact]
+    public void PrivateKey_RemainingFluentMethods_AddAttributes()
+    {
+        using var template = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Sensitive()
+            .Extractable()
+            .NonExtractable()
+            .SignRecover()
+            .Unwrap()
+            .Build();
+
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SENSITIVE);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_EXTRACTABLE);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SIGN_RECOVER);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_UNWRAP);
+    }
+
+    [Fact]
+    public void PublicKey_RemainingFluentMethods_AddAttributes()
+    {
+        using var template = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .VerifyRecover()
+            .Derive()
+            .ModulusBits(2048)
+            .PublicExponent([0x01, 0x00, 0x01])
+            .EcParams([0x06, 0x08, 0x2A])
+            .Build();
+
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VERIFY_RECOVER);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_DERIVE);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_MODULUS_BITS);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_PUBLIC_EXPONENT);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_EC_PARAMS);
+    }
+
+    [Fact]
+    public void Certificate_RemainingFluentMethods_AddAttributes()
+    {
+        using var template = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
+            .Trusted()
+            .Issuer([0x30, 0x05])
+            .SerialNumber([0x02, 0x01, 0x01])
+            .Build();
+
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_TRUSTED);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_ISSUER);
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SERIAL_NUMBER);
+    }
 }

@@ -111,4 +111,20 @@ public sealed class Pkcs11MechanismMapTests
         Assert.Throws<NotSupportedException>(() =>
             Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName)));
     }
+
+    [Fact]
+    public void MlDsaSign_ReturnsMlDsaMechanismWithPqcParams()
+    {
+        using var mech = Pkcs11MechanismMap.MlDsaSign();
+        Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
+        Assert.IsType<CkmPqcSignParams>(mech.Parameters);
+    }
+
+    [Fact]
+    public void MlDsaSign_WithContext_ReturnsMlDsaMechanism()
+    {
+        using var mech = Pkcs11MechanismMap.MlDsaSign(context: [0x01, 0x02, 0x03]);
+        Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
+        Assert.IsType<CkmPqcSignParams>(mech.Parameters);
+    }
 }

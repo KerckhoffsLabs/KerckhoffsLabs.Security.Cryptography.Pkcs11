@@ -58,6 +58,14 @@ public sealed class SecurePinTests
     }
 
     [Fact]
+    public void ToString_IsRedacted_AndLeaksNoPinBytes()
+    {
+        using var pin = new SecurePin("hunter2");
+        Assert.Equal("SecurePin{redacted}", pin.ToString());
+        Assert.DoesNotContain("hunter2", pin.ToString());
+    }
+
+    [Fact]
     public void Dispose_ZeroesUnderlyingBuffer()
     {
         var pin = new SecurePin("hunter2");

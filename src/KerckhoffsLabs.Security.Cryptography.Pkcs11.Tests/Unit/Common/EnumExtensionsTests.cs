@@ -35,6 +35,16 @@ public sealed class EnumExtensionsTests
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKR());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKA());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKM());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKC());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKD());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKG());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKH());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKK());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKN());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKO());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKP());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKS());
+        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKU());
     }
 
     // Exhaustive round-trips for the alias-free enums (every defined member must survive). CKM/CKK/CKA
@@ -45,4 +55,9 @@ public sealed class EnumExtensionsTests
     [Fact] public void CKS_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKS>(), v => Assert.Equal(v, v.ToCULong().ToCKS()));
     [Fact] public void CKO_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKO>(), v => Assert.Equal(v, v.ToCULong().ToCKO()));
     [Fact] public void CKC_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKC>(), v => Assert.Equal(v, v.ToCULong().ToCKC()));
+    [Fact] public void CKD_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKD>(), v => Assert.Equal(v, v.ToCULong().ToCKD()));
+    [Fact] public void CKG_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKG>(), v => Assert.Equal(v, v.ToCULong().ToCKG()));
+    [Fact] public void CKH_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKH>(), v => Assert.Equal(v, v.ToCULong().ToCKH()));
+    [Fact] public void CKN_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKN>(), v => Assert.Equal(v, v.ToCULong().ToCKN()));
+    [Fact] public void CKP_AllMembersRoundTrip() => Assert.All(Enum.GetValues<CKP>(), v => Assert.Equal(v, v.ToCULong().ToCKP()));
 }
