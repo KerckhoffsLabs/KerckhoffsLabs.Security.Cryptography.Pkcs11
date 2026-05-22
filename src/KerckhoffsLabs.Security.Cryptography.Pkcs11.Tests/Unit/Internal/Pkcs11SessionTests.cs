@@ -184,4 +184,218 @@ public sealed class Pkcs11SessionTests
         s.Logout();
         s.CancelOperations(0);
     }
+
+    // === Secure-defaults gate (GuardMechanism) ==============================================
+    // GuardMechanism is mechanism-based, not operation-based, so routing every insecure mechanism
+    // through Digest exercises each rejection arm.
+
+    [Theory]
+    [InlineData(CKM.CKM_RSA_PKCS)]
+    [InlineData(CKM.CKM_MD5)]
+    [InlineData(CKM.CKM_SHA_1)]
+    [InlineData(CKM.CKM_MD5_RSA_PKCS)]
+    [InlineData(CKM.CKM_SHA1_RSA_PKCS)]
+    [InlineData(CKM.CKM_SHA1_RSA_PKCS_PSS)]
+    [InlineData(CKM.CKM_DES_CBC)]
+    [InlineData(CKM.CKM_DES3_CBC)]
+    [InlineData(CKM.CKM_DES_MAC)]
+    [InlineData(CKM.CKM_DES3_MAC)]
+    [InlineData(CKM.CKM_DES_KEY_GEN)]
+    [InlineData(CKM.CKM_DES3_KEY_GEN)]
+    public void InsecureMechanism_IsRejected(CKM insecure)
+    {
+        var s = NewSession();
+        using var mech = new Mechanism(insecure);
+        Assert.Throws<InsecureOperationException>(() => s.Digest(mech, new byte[1]));
+    }
+
+    // === Two-call buffer-probe paths (hermetic: the fake supplies size then bytes) ===========
+
+    private sealed class CryptoFake : FakeLowLevelPkcs11Library
+    {
+        public byte[] Output = [0xAA, 0xBB, 0xCC, 0xDD];
+        public CKR InitRv = CKR.CKR_OK, ProbeRv = CKR.CKR_OK, FinalRv = CKR.CKR_OK;
+        public int? SecondLen;            // when set, the data call reports fewer bytes -> resize
+        public CKR GenerateKeyRv = CKR.CKR_OK;
+        public ulong GeneratedKeyId = 99;
+        public CKS SessionState = CKS.CKS_RW_USER_FUNCTIONS;
+        public CKR VerifyRv = CKR.CKR_OK;
+        public ulong CreatedObjectId = 77;
+        public ulong ObjectSizeBytes = 256;
+
+        private CKR TwoCall(byte[]? outBuf, ref NativeCULong outLen)
+        {
+            // Null-buffer probe (Sign/Digest report the size on the first call).
+            if (outBuf is null) { outLen = (NativeCULong)Output.Length; return ProbeRv; }
+            // Too-small buffer (Encrypt/Decrypt size to the input first, then retry on this).
+            if (outBuf.Length < Output.Length) { outLen = (NativeCULong)Output.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+            int n = SecondLen ?? Output.Length;
+            Array.Copy(Output, outBuf, Math.Min(n, outBuf.Length));
+            outLen = (NativeCULong)n;
+            return FinalRv;
+        }
+
+        public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
+        public override CKR C_DigestInit(NativeCULong s, ref CK_MECHANISM m) => InitRv;
+        public override CKR C_Digest(NativeCULong s, byte[] d, NativeCULong dl, byte[]? o, ref NativeCULong ol) => TwoCall(o, ref ol);
+        public override CKR C_SignInit(NativeCULong s, ref CK_MECHANISM m, NativeCULong k) => InitRv;
+        public override CKR C_Sign(NativeCULong s, byte[] d, NativeCULong dl, byte[]? o, ref NativeCULong ol) => TwoCall(o, ref ol);
+        public override CKR C_EncryptInit(NativeCULong s, ref CK_MECHANISM m, NativeCULong k) => InitRv;
+        public override CKR C_Encrypt(NativeCULong s, byte[] d, NativeCULong dl, byte[]? o, ref NativeCULong ol) => TwoCall(o, ref ol);
+        public override CKR C_DecryptInit(NativeCULong s, ref CK_MECHANISM m, NativeCULong k) => InitRv;
+        public override CKR C_Decrypt(NativeCULong s, byte[] d, NativeCULong dl, byte[]? o, ref NativeCULong ol) => TwoCall(o, ref ol);
+        public override CKR C_GenerateKey(NativeCULong s, ref CK_MECHANISM m, CK_ATTRIBUTE[]? t, NativeCULong c, ref NativeCULong key)
+        { key = (NativeCULong)GeneratedKeyId; return GenerateKeyRv; }
+        public override CKR C_GetSessionInfo(NativeCULong s, ref CK_SESSION_INFO info)
+        { info.State = (NativeCULong)(ulong)SessionState; return CKR.CKR_OK; }
+        public override CKR C_VerifyInit(NativeCULong s, ref CK_MECHANISM m, NativeCULong k) => InitRv;
+        public override CKR C_Verify(NativeCULong s, byte[] d, NativeCULong dl, byte[] sig, NativeCULong sl) => VerifyRv;
+        public override CKR C_CreateObject(NativeCULong s, CK_ATTRIBUTE[]? t, NativeCULong c, ref NativeCULong oid)
+        { oid = (NativeCULong)CreatedObjectId; return CKR.CKR_OK; }
+        public override CKR C_DestroyObject(NativeCULong s, NativeCULong oid) => CKR.CKR_OK;
+        public override CKR C_GetObjectSize(NativeCULong s, NativeCULong oid, ref NativeCULong size)
+        { size = (NativeCULong)ObjectSizeBytes; return CKR.CKR_OK; }
+    }
+
+    private static Pkcs11Session NewSession(CryptoFake fake) => new(fake, SessionId);
+
+    [Fact]
+    public void Digest_Ok_ReturnsProbedBytes()
+    {
+        var fake = new CryptoFake();
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_SHA256);
+        Assert.Equal(fake.Output, s.Digest(mech, new byte[] { 1, 2, 3 }));
+    }
+
+    [Fact]
+    public void Sign_Ok_ReturnsProbedBytes()
+    {
+        var fake = new CryptoFake();
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        Assert.Equal(fake.Output, s.Sign(mech, ObjectHandle.Invalid, new byte[] { 1, 2, 3 }));
+    }
+
+    [Fact]
+    public void Encrypt_Ok_ReturnsProbedBytes()
+    {
+        var fake = new CryptoFake();
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        Assert.Equal(fake.Output, s.Encrypt(mech, ObjectHandle.Invalid, new byte[] { 1, 2, 3 }));
+    }
+
+    [Fact]
+    public void Decrypt_Ok_ReturnsProbedBytes()
+    {
+        var fake = new CryptoFake();
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        Assert.Equal(fake.Output, s.Decrypt(mech, ObjectHandle.Invalid, new byte[] { 1, 2, 3 }));
+    }
+
+    [Fact]
+    public void Digest_SecondCallReportsFewerBytes_ResizesDown()
+    {
+        var fake = new CryptoFake { SecondLen = 2 }; // probe says 4, data call fills 2
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_SHA256);
+        Assert.Equal(new byte[] { 0xAA, 0xBB }, s.Digest(mech, new byte[] { 1 }));
+    }
+
+    [Theory]
+    [InlineData("init")]
+    [InlineData("probe")]
+    [InlineData("final")]
+    public void Digest_NativeError_Throws(string failingCall)
+    {
+        var fake = new CryptoFake
+        {
+            InitRv = failingCall == "init" ? CKR.CKR_MECHANISM_INVALID : CKR.CKR_OK,
+            ProbeRv = failingCall == "probe" ? CKR.CKR_FUNCTION_FAILED : CKR.CKR_OK,
+            FinalRv = failingCall == "final" ? CKR.CKR_DEVICE_ERROR : CKR.CKR_OK,
+        };
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_SHA256);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.Digest(mech, new byte[] { 1 }));
+    }
+
+    [Fact]
+    public void GenerateKey_Ok_ReturnsHandleFromToken()
+    {
+        var fake = new CryptoFake { GeneratedKeyId = 0x1234 };
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        Assert.Equal(0x1234UL, s.GenerateKey(mech, []).ObjectId);
+    }
+
+    [Fact]
+    public void GenerateKey_Error_Throws()
+    {
+        var fake = new CryptoFake { GenerateKeyRv = CKR.CKR_TEMPLATE_INCONSISTENT };
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.GenerateKey(mech, []));
+    }
+
+    [Fact]
+    public void GetSessionInfo_Ok_DecodesState()
+    {
+        var fake = new CryptoFake { SessionState = CKS.CKS_RW_USER_FUNCTIONS };
+        var s = NewSession(fake);
+        Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, s.GetSessionInfo().State);
+    }
+
+    // === Verify (CKR_OK = valid, CKR_SIGNATURE_INVALID = false, else throw) =================
+
+    [Fact]
+    public void Verify_Ok_SetsValidTrue()
+    {
+        var s = NewSession(new CryptoFake { VerifyRv = CKR.CKR_OK });
+        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }, out bool valid);
+        Assert.True(valid);
+    }
+
+    [Fact]
+    public void Verify_SignatureInvalid_SetsValidFalse()
+    {
+        var s = NewSession(new CryptoFake { VerifyRv = CKR.CKR_SIGNATURE_INVALID });
+        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }, out bool valid);
+        Assert.False(valid);
+    }
+
+    [Fact]
+    public void Verify_OtherError_Throws()
+    {
+        var s = NewSession(new CryptoFake { VerifyRv = CKR.CKR_DEVICE_ERROR });
+        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        Assert.ThrowsAny<Pkcs11Exception>(() =>
+            s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }, out _));
+    }
+
+    // === Objects ============================================================================
+
+    [Fact]
+    public void CreateObject_Ok_ReturnsHandleFromToken()
+    {
+        var s = NewSession(new CryptoFake { CreatedObjectId = 0x55 });
+        Assert.Equal(0x55UL, s.CreateObject([]).ObjectId);
+    }
+
+    [Fact]
+    public void DestroyObject_Ok_DoesNotThrow()
+    {
+        var s = NewSession(new CryptoFake());
+        s.DestroyObject(new ObjectHandle(1));
+    }
+
+    [Fact]
+    public void GetObjectSize_Ok_ReturnsSize()
+    {
+        var s = NewSession(new CryptoFake { ObjectSizeBytes = 512 });
+        Assert.Equal(512UL, s.GetObjectSize(new ObjectHandle(1)));
+    }
 }
