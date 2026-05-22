@@ -38,7 +38,8 @@ internal static class DigestSha2TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            byte[] digest = session.DigestSha384(System.Text.Encoding.UTF8.GetBytes("phase-3"));
+            using var mech = new Mechanism(CKM.CKM_SHA384);
+            byte[] digest = session.Digest(mech, System.Text.Encoding.UTF8.GetBytes("phase-3"));
             Assert.Equal(48, digest.Length);
         }
         finally
@@ -53,7 +54,8 @@ internal static class DigestSha2TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            byte[] digest = session.DigestSha512(System.Text.Encoding.UTF8.GetBytes("phase-3"));
+            using var mech = new Mechanism(CKM.CKM_SHA512);
+            byte[] digest = session.Digest(mech, System.Text.Encoding.UTF8.GetBytes("phase-3"));
             Assert.Equal(64, digest.Length);
         }
         finally

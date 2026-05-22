@@ -531,31 +531,9 @@ internal sealed partial class Pkcs11Session
         }
     }
 
-    // === Secure-default digest helpers =====================================
-    // NOTE: SHA-256 is exposed through the BCL adapter SHA256Pkcs11 (analogous to SHA256Cng);
-    // it digests via Workspace.Digest(CKM_SHA256). SHA-384/512 remain here pending their adapters.
-
-    /// <summary>Computes a SHA-384 digest over <paramref name="data"/>. Output is 48 bytes.</summary>
-    /// <param name="data">Data to digest.</param>
-    /// <returns>48-byte SHA-384 digest.</returns>
-    public byte[] DigestSha384(ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_SHA384);
-        return Digest(mechanism, data);
-    }
-
-    /// <summary>Computes a SHA-512 digest over <paramref name="data"/>. Output is 64 bytes.</summary>
-    /// <param name="data">Data to digest.</param>
-    /// <returns>64-byte SHA-512 digest.</returns>
-    public byte[] DigestSha512(ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_SHA512);
-        return Digest(mechanism, data);
-    }
-
     // === Legacy named shortcuts (gated, compile-time warning) ==============
+    // NOTE: SHA-256/384/512 are exposed through the BCL adapters SHA256Pkcs11 / SHA384Pkcs11 /
+    // SHA512Pkcs11 (digesting via Workspace.Digest); only the gated MD5/SHA-1 shortcuts remain here.
 
     /// <summary>
     /// Computes an MD5 digest. **Use SHA-256 (<c>SHA256Pkcs11</c>) or stronger instead.** Throws
