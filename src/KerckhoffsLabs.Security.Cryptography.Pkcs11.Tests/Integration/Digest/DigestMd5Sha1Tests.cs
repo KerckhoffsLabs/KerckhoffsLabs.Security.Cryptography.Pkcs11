@@ -16,10 +16,9 @@ internal static class DigestMd5Sha1TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-#pragma warning disable CS0618
+            using var mech = new Mechanism(CKM.CKM_MD5);
             var ex = Assert.Throws<InsecureOperationException>(() =>
-                session.DigestMd5([]));
-#pragma warning restore CS0618
+                session.Digest(mech, Array.Empty<byte>()));
             Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
         }
         finally
@@ -55,9 +54,8 @@ internal static class DigestMd5Sha1TestCases
         {
             try
             {
-#pragma warning disable CS0618
-                session.DigestMd5([]);
-#pragma warning restore CS0618
+                using var mech = new Mechanism(CKM.CKM_MD5);
+                session.Digest(mech, Array.Empty<byte>());
             }
             catch (InsecureOperationException)
             {

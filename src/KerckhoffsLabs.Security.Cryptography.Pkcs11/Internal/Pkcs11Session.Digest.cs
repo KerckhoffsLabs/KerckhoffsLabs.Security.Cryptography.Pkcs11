@@ -532,23 +532,8 @@ internal sealed partial class Pkcs11Session
     }
 
     // === Legacy named shortcuts (gated, compile-time warning) ==============
-    // NOTE: SHA-256/384/512 are exposed through the BCL adapters SHA256Pkcs11 / SHA384Pkcs11 /
-    // SHA512Pkcs11 (digesting via Workspace.Digest); only the gated MD5/SHA-1 shortcuts remain here.
-
-    /// <summary>
-    /// Computes an MD5 digest. **Use SHA-256 (<c>SHA256Pkcs11</c>) or stronger instead.** Throws
-    /// <see cref="InsecureOperationException"/> at runtime unless
-    /// <see cref="AllowInsecure"/> is set on the session.
-    /// </summary>
-    [Obsolete("MD5 is a broken hash function with practical collisions. " +
-              "Use SHA-256 (SHA256Pkcs11) or stronger instead. " +
-              "If you must use it, set Pkcs11Workspace.AllowInsecure = true.")]
-    public byte[] DigestMd5(ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_MD5);
-        return Digest(mechanism, data);
-    }
+    // NOTE: SHA-256/384/512 -> SHA{256,384,512}Pkcs11 and MD5 -> MD5Pkcs11 (all digest via
+    // Workspace.Digest); only the gated SHA-1 shortcut remains here.
 
     /// <summary>
     /// Computes a SHA-1 digest. **Use SHA-256 (<c>SHA256Pkcs11</c>) or stronger instead.** Throws
