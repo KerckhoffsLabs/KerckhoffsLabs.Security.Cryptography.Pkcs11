@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -11,6 +12,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 /// <remarks>
 /// <para>
+/// CBC and ECB provide confidentiality only, not integrity — they are malleable and (for CBC)
+/// padding-oracle prone. Prefer authenticated encryption: <see cref="AesGcmPkcs11"/> or
+/// <see cref="AesCcmPkcs11"/>. This type exists for legacy/interop scenarios.
+/// </para>
+/// <para>
 /// Supported surface — the modern one-shot API runs on the token:
 /// <list type="bullet">
 /// <item><see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> /
@@ -21,7 +27,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// Raw/unauthenticated modes — <see cref="PaddingMode.None"/> CBC (<c>CKM_AES_CBC</c>) and ECB
 /// (<c>CKM_AES_ECB</c>) — are gated by the secure-defaults policy and throw
 /// <c>InsecureOperationException</c> unless <see cref="Pkcs11Workspace.AllowInsecure"/> is set; only
-/// <c>CKM_AES_CBC_PAD</c> is permitted by default.
+/// <c>CKM_AES_CBC_PAD</c> is permitted by default. Empty input that yields empty output (any
+/// decryption, or unpadded encryption) is a no-op returned without touching the token; empty
+/// plaintext with PKCS7 must emit a padding block, so it is sent to the token (which must support
+/// empty-input <c>CKM_AES_CBC_PAD</c> — SoftHSM, for example, does not).
 /// </para>
 /// <para>
 /// NOT supported (a token key is not extractable, so the streaming/managed-key contract of
@@ -48,7 +57,32 @@ public sealed class AesPkcs11 : Aes
         if (key.KeyType != CKK.CKK_AES)
             throw new ArgumentException($"Expected an AES key, got {key.KeyType}.", nameof(key));
         _key = key;
-        // The Aes base constructor already sets BlockSize=128, KeySize=256, and the legal-size tables.
+
+        // Reflect the token key's real size (CKA_VALUE_LEN is the byte length and is not sensitive).
+        // Best-effort: the Aes base constructor leaves KeySize=256, which we keep if the token does
+        // not expose the length. BlockSize stays 128 and the legal-size tables are set by the base.
+        int? bits = TryReadKeySizeBits(key);
+        if (bits is int b)
+            KeySizeValue = b;
+    }
+
+    private static int? TryReadKeySizeBits(Pkcs11Key key)
+    {
+        try
+        {
+            var attrs = key.Workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
+            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
+            {
+                int bytes = (int)attrs[0].GetValueAsUlong();
+                if (bytes is 16 or 24 or 32)
+                    return bytes * 8;
+            }
+        }
+        catch (Pkcs11Exception)
+        {
+            // Token doesn't expose CKA_VALUE_LEN — fall back to the base default.
+        }
+        return null;
     }
 
     /// <inheritdoc/>
@@ -75,15 +109,35 @@ public sealed class AesPkcs11 : Aes
     {
         using (mechanism)
         {
-            byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
-            if (output.Length > destination.Length)
+            // Empty input is a no-op (0 bytes in → 0 bytes out) returned without touching the token:
+            // there is nothing to do, and some tokens (e.g. SoftHSM) reject an empty C_Encrypt /
+            // C_Decrypt buffer. The exception is padded encryption (CKM_AES_CBC_PAD), where the BCL
+            // contract requires a full padding block to be emitted, so that path goes to the token.
+            if (input.IsEmpty && !(encrypt && mechanism.Type == (ulong)CKM.CKM_AES_CBC_PAD))
             {
                 bytesWritten = 0;
-                return false;
+                return true;
             }
-            output.CopyTo(destination);
-            bytesWritten = output.Length;
-            return true;
+
+            byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
+            try
+            {
+                if (output.Length > destination.Length)
+                {
+                    bytesWritten = 0;
+                    return false;
+                }
+                output.CopyTo(destination);
+                bytesWritten = output.Length;
+                return true;
+            }
+            finally
+            {
+                // On decrypt, `output` is plaintext — zero this intermediate copy (the caller still
+                // receives the plaintext via `destination`). Ciphertext on encrypt is not sensitive.
+                if (!encrypt)
+                    CryptographicOperations.ZeroMemory(output);
+            }
         }
     }
 

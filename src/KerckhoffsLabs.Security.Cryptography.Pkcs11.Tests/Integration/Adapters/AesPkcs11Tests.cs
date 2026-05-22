@@ -141,6 +141,34 @@ public sealed class AesPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         Assert.Equal(16, aes.IV.Length);
     });
 
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData(16, 128)]
+    [InlineData(32, 256)]
+    public void KeySize_ReflectsTokenKeyLength(int keyBytes, int expectedBits)
+    {
+        using var workspace = OpenWorkspace();
+        string label = $"aes-ks-{Guid.NewGuid():N}";
+        byte[] raw = new byte[keyBytes];
+        RandomNumberGenerator.Fill(raw);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label(label).Value(raw).Encrypt().Decrypt().OnToken().Build();
+        try
+        {
+            using var key = workspace.ImportKey(tpl);
+            using var aes = new AesPkcs11(key);
+            Assert.Equal(expectedBits, aes.KeySize);
+        }
+        finally { DestroyByLabel(workspace, label); }
+    }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((_, aes) =>
+    {
+        // Empty input that yields empty output is a no-op returned without touching the token
+        // (so it does not trip SoftHSM's empty-buffer rejection on CKM_AES_CBC / CKM_AES_CBC_PAD).
+        Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+    });
+
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void ManagedKeyAndStreamingSurface_NotSupported() => WithImportedAes((ws, aes) =>
     {
