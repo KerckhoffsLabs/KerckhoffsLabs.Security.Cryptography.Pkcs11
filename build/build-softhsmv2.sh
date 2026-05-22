@@ -69,31 +69,54 @@ fi
 
 echo "Building SoftHSMv2 for ${RID}..."
 
-BUILD_DIR="${SRC_DIR}/_cmake_build"
+# We build with autotools: only the autotools path wires up ML-DSA
+# (CKM_ML_DSA), via `--enable-mldsa` defaulting to "detect" — it auto-enables when the
+# OpenSSL backend exposes ML-DSA (OpenSSL 3.5+). The CMake build's ENABLE_MLDSA option is a
+# no-op (it never sets WITH_ML_DSA), so it can never produce an ML-DSA-capable token.
+#
+# To build against a non-system OpenSSL (e.g. 3.5+ for ML-DSA), set OPENSSL_PREFIX to its
+# install dir; we point configure at it and bake an rpath so libsofthsm2 loads that OpenSSL
+# at runtime. When unset, the system OpenSSL is used (ML-DSA simply detects off).
+NPROC="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
+
+OPENSSL_CONFIGURE_ARGS=()
+if [[ -n "${OPENSSL_PREFIX:-}" && -d "${OPENSSL_PREFIX}" ]]; then
+  OPENSSL_CONFIGURE_ARGS+=("--with-openssl=${OPENSSL_PREFIX}")
+  # OpenSSL built from source installs to lib64 (with a lib -> lib64 symlink); cover both.
+  for libdir in "${OPENSSL_PREFIX}/lib64" "${OPENSSL_PREFIX}/lib"; do
+    if [[ -d "${libdir}" ]]; then
+      export LDFLAGS="-Wl,-rpath,${libdir} -L${libdir} ${LDFLAGS:-}"
+      export PKG_CONFIG_PATH="${libdir}/pkgconfig:${PKG_CONFIG_PATH:-}"
+    fi
+  done
+  echo "Using OpenSSL from ${OPENSSL_PREFIX}"
+fi
+
+# autogen.sh generates ./configure in the source tree; build out-of-tree (VPATH) to keep it clean.
+( cd "${SRC_DIR}" && sh ./autogen.sh ) 2>&1
+
+BUILD_DIR="${SRC_DIR}/_at_build"
+INSTALL_DIR="${BUILD_DIR}/install"
+rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 
-cmake -S "${SRC_DIR}" -B "${BUILD_DIR}" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTS=OFF \
-  -DENABLE_P11_KIT=OFF \
-  -DENABLE_STATIC=OFF \
-  -DWITH_CRYPTO_BACKEND=openssl \
-  -DENABLE_ECC=ON \
-  -DENABLE_EDDSA=ON \
-  -DDISABLE_NON_PAGED_MEMORY=ON \
-  -DDEFAULT_SOFTHSM2_CONF="${DEST_DIR}/softhsm2.conf" \
-  -DDEFAULT_TOKENDIR="${DEST_DIR}/tokens/" \
-  -DDEFAULT_PKCS11_LIB="${DEST_DIR}/${LIB_NAME}" \
-  -DCMAKE_INSTALL_PREFIX="${BUILD_DIR}/install" \
-  -DENABLE_STRICT=OFF \
-  -Wno-dev \
-  2>&1
+(
+  cd "${BUILD_DIR}"
+  "${SRC_DIR}/configure" \
+    --prefix="${INSTALL_DIR}" \
+    --with-crypto-backend=openssl \
+    --enable-ecc \
+    --enable-eddsa \
+    --disable-non-paged-memory \
+    --disable-p11-kit \
+    "${OPENSSL_CONFIGURE_ARGS[@]}"
+  make -j"${NPROC}"
+  make install
+) 2>&1
 
-cmake --build "${BUILD_DIR}" --parallel "$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)" 2>&1
-
-# Locate outputs.
-SRC_LIB="$(find "${BUILD_DIR}" -name "${LIB_NAME}" ! -name '*-static*' | head -1)"
-SRC_UTIL="$(find "${BUILD_DIR}" -name "softhsm2-util" -type f | head -1)"
+# Locate installed outputs (autotools: lib/softhsm/libsofthsm2.so, bin/softhsm2-util).
+SRC_LIB="$(find "${INSTALL_DIR}" -name "${LIB_NAME}" ! -name '*-static*' | head -1)"
+SRC_UTIL="$(find "${INSTALL_DIR}" -name "softhsm2-util" -type f | head -1)"
 
 if [[ -z "${SRC_LIB}" ]]; then
   echo "build succeeded but ${LIB_NAME} not found under ${BUILD_DIR}" >&2; exit 1
@@ -107,3 +130,14 @@ cp "${SRC_UTIL}" "${DEST_UTIL}"
 chmod +x "${DEST_UTIL}"
 echo "Installed ${DEST_LIB}"
 echo "Installed ${DEST_UTIL}"
+
+# Record whether ML-DSA was actually compiled in (depends on OpenSSL 3.5+), so the test suite
+# can gate its ML-DSA cases on a cheap file check instead of probing the token at discovery time.
+MLDSA_MARKER="${DEST_DIR}/softhsm-mldsa.enabled"
+if grep -q '^#define WITH_ML_DSA' "${BUILD_DIR}/config.h" 2>/dev/null; then
+  : > "${MLDSA_MARKER}"
+  echo "ML-DSA: enabled (marker written)"
+else
+  rm -f "${MLDSA_MARKER}"
+  echo "ML-DSA: not available in this build (OpenSSL < 3.5)"
+fi

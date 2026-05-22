@@ -22,9 +22,36 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # pkcs11-mock: gcc/make (build-essential); SoftHSM2: CMake + OpenSSL (libssl-dev).
+      # pkcs11-mock: gcc/make (build-essential); SoftHSM2: autotools (autoconf/automake/libtool).
       - name: Install native build deps
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
+
+      # Build SoftHSM against OpenSSL 3.5+ so ML-DSA compiles in (ubuntu-latest ships 3.0). Same
+      # release as upstream SoftHSM CI; user-writable prefix for caching; build-softhsmv2.sh reads
+      # OPENSSL_PREFIX.
+      - name: Cache OpenSSL 3.5
+        id: cache-openssl
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/openssl-3.5
+          key: openssl-3.5.6-${{ runner.arch }}
+      - name: Build OpenSSL 3.5.6 (on cache miss)
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          work="$(mktemp -d)"; cd "$work"
+          curl -fsSL -O https://github.com/openssl/openssl/releases/download/openssl-3.5.6/openssl-3.5.6.tar.gz
+          echo "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736  openssl-3.5.6.tar.gz" | sha256sum -c -
+          tar -xf openssl-3.5.6.tar.gz && cd openssl-3.5.6
+          ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
+          make -j"$(nproc)" >/dev/null
+          make install_sw >/dev/null
+          ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
+      # LD_LIBRARY_PATH: ensure the whole process uses OpenSSL 3.5 (the .NET host otherwise loads
+      # system libcrypto 3.0 first, so libsofthsm2's rpath loses and ML-DSA symbols are missing).
+      - name: Point SoftHSM at OpenSSL 3.5
+        run: |
+          echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
