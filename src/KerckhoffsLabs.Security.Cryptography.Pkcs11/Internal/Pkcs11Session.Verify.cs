@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
@@ -45,7 +46,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Verify1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
 
         ArgumentNullException.ThrowIfNull(data);
 
@@ -83,7 +84,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Verify2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -111,7 +112,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Verify3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -173,7 +174,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::VerifyRecover", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "VerifyRecover");
 
         ArgumentNullException.ThrowIfNull(signature);
 
@@ -226,7 +227,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecryptVerify1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify1");
 
         ArgumentNullException.ThrowIfNull(data);
 
@@ -264,7 +265,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecryptVerify2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -301,7 +302,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecryptVerify3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 

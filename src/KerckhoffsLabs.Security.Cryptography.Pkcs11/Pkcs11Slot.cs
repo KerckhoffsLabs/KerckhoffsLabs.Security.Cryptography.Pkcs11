@@ -46,7 +46,7 @@ public sealed class Pkcs11Slot
     /// <param name="slotId">PKCS#11 handle of slot</param>
     internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId)
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::ctor", slotId);
+        Log.SlotTrace(_logger, (ulong)slotId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
 
@@ -60,7 +60,7 @@ public sealed class Pkcs11Slot
     /// <returns>Slot information</returns>
     public SlotInfo GetSlotInfo()
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::GetSlotInfo", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "GetSlotInfo");
 
         CK_SLOT_INFO slotInfo = new();
         CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, ref slotInfo);
@@ -75,7 +75,7 @@ public sealed class Pkcs11Slot
     /// <returns>Token information</returns>
     public TokenInfo GetTokenInfo()
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::GetTokenInfo", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "GetTokenInfo");
 
         CK_TOKEN_INFO tokenInfo = new();
         CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, ref tokenInfo);
@@ -96,7 +96,7 @@ public sealed class Pkcs11Slot
     /// <returns>Read-only list of mechanism types supported by a token.</returns>
     public IReadOnlyList<CKM> GetMechanismList()
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::GetMechanismList", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "GetMechanismList");
 
         NativeCULong mechanismCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
@@ -122,7 +122,7 @@ public sealed class Pkcs11Slot
     /// <returns>Information about mechanism</returns>
     public MechanismInfo GetMechanismInfo(CKM mechanism)
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::GetMechanismInfo", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "GetMechanismInfo");
 
         CK_MECHANISM_INFO mechanismInfo = new();
         CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, ref mechanismInfo);
@@ -153,7 +153,7 @@ public sealed class Pkcs11Slot
         ArgumentNullException.ThrowIfNull(soPin);
         ArgumentNullException.ThrowIfNull(label);
 
-        _logger.LogDebug("Pkcs11Slot({SlotId})::InitToken", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "InitToken");
 
         // PKCS#11 v3.1 §11.5: pLabel points to a 32-byte field padded with
         // ASCII spaces (0x20) and must not be null-terminated.
@@ -192,7 +192,7 @@ public sealed class Pkcs11Slot
     /// <returns>The opened session.</returns>
     internal Pkcs11Session OpenSession(bool readWrite = true)
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::OpenSession", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "OpenSession");
 
         NativeCULong flags = CKF.CKF_SERIAL_SESSION;
         if (readWrite)
@@ -215,9 +215,9 @@ public sealed class Pkcs11Slot
     /// </summary>
     public void CloseAllSessions()
     {
-        _logger.LogDebug("Pkcs11Slot({SlotId})::CloseAllSessions", _slotId);
+        Log.SlotTrace(_logger, (ulong)_slotId, "CloseAllSessions");
 
-        _logger.LogInformation("Closing all sessions with token in slot {SlotId}", _slotId);
+        Log.ClosingAllSessions(_logger, (ulong)_slotId);
 
         CKR rv = _pkcs11Library.C_CloseAllSessions(_slotId);
         Pkcs11Exception.ThrowIfError(rv, "C_CloseAllSessions");

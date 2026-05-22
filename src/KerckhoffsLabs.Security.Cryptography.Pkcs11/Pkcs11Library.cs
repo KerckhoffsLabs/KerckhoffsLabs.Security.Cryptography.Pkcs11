@@ -87,13 +87,13 @@ public sealed class Pkcs11Library : IDisposable
 
     private Pkcs11Library(string libraryPath, bool useStaticLink)
     {
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::ctor", libraryPath);
+        Log.LibraryTrace(_logger, libraryPath, "ctor");
 
         _libraryPath = libraryPath;
 
         try
         {
-            _logger.LogInformation("Loading PKCS#11 library {LibraryPath}", _libraryPath);
+            Log.LoadingLibrary(_logger, _libraryPath);
             _pkcs11Library = useStaticLink
                 ? new LowLevelPkcs11Library()
                 : new LowLevelPkcs11Library(_libraryPath);
@@ -103,7 +103,7 @@ public sealed class Pkcs11Library : IDisposable
         {
             if (_pkcs11Library != null)
             {
-                _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
+                Log.UnloadingLibrary(_logger, _libraryPath);
                 _pkcs11Library.Dispose();
                 _pkcs11Library = null;
             }
@@ -127,7 +127,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </remarks>
     private void Initialize()
     {
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::Initialize", _libraryPath);
+        Log.LibraryTrace(_logger, _libraryPath, "Initialize");
 
         var initArgs = new CK_C_INITIALIZE_ARGS { Flags = CKF.CKF_OS_LOCKING_OK };
         CKR rv = LowLevel.C_Initialize(initArgs);
@@ -159,7 +159,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::GetInfo", _libraryPath);
+        Log.LibraryTrace(_logger, _libraryPath, "GetInfo");
 
         CK_INFO info = new();
         CKR rv = LowLevel.C_GetInfo(ref info);
@@ -181,7 +181,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::GetSlotList", _libraryPath);
+        Log.LibraryTrace(_logger, _libraryPath, "GetSlotList");
 
         NativeCULong slotCount = new(0);
         CKR rv = LowLevel.C_GetSlotList(tokenPresent, null, ref slotCount);
@@ -223,7 +223,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::GetInterfaces", _libraryPath);
+        Log.LibraryTrace(_logger, _libraryPath, "GetInterfaces");
 
         NativeCULong count = new(0);
         CKR rv = LowLevel.C_GetInterfaceList(null, ref count);
@@ -264,7 +264,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::WaitForSlotEvent", _libraryPath);
+        Log.LibraryTrace(_logger, _libraryPath, "WaitForSlotEvent");
 
         NativeCULong flags = nonBlocking ? CKF.CKF_DONT_BLOCK : new(0);
         NativeCULong slotIdOut = new(0);
@@ -342,7 +342,7 @@ public sealed class Pkcs11Library : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        _logger.LogDebug("Pkcs11Library({LibraryPath})::Dispose", _libraryPath);
+        Log.LibraryTrace(_logger, _libraryPath, "Dispose");
 
         if (_pkcs11Library != null)
         {
@@ -360,7 +360,7 @@ public sealed class Pkcs11Library : IDisposable
             if (_weInitialized)
                 _pkcs11Library.C_Finalize(IntPtr.Zero);
 
-            _logger.LogInformation("Unloading PKCS#11 library {LibraryPath}", _libraryPath);
+            Log.UnloadingLibrary(_logger, _libraryPath);
             _pkcs11Library.Dispose();
             _pkcs11Library = null;
         }

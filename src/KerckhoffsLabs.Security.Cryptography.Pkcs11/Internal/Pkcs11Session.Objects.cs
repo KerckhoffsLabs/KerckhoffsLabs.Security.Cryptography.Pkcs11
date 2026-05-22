@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::CreateObject", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "CreateObject");
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
@@ -50,7 +51,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::CopyObject", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "CopyObject");
 
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
@@ -81,7 +82,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::DestroyObject", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DestroyObject");
 
 
         CKR rv = _pkcs11Library.C_DestroyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId));
@@ -98,7 +99,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetObjectSize", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetObjectSize");
 
 
         NativeCULong objectSize = (NativeCULong)0;
@@ -119,7 +120,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetAttributeValue1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue1");
 
 
         ArgumentNullException.ThrowIfNull(attributes);
@@ -145,7 +146,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetAttributeValue2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue2");
 
 
         ArgumentNullException.ThrowIfNull(attributes);
@@ -250,7 +251,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::SetAttributeValue", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "SetAttributeValue");
 
 
         ArgumentNullException.ThrowIfNull(attributes);
@@ -275,7 +276,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::FindObjectsInit", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsInit");
 
         CK_ATTRIBUTE[]? template = null;
         NativeCULong templateLength = (NativeCULong)0;
@@ -302,7 +303,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::FindObjects", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjects");
 
         List<ObjectHandle> foundObjects = [];
 
@@ -325,7 +326,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::FindObjectsFinal", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsFinal");
 
         CKR rv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
         Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsFinal");
@@ -341,7 +342,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::FindAllObjects", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "FindAllObjects");
 
         List<ObjectHandle> foundObjects = [];
 

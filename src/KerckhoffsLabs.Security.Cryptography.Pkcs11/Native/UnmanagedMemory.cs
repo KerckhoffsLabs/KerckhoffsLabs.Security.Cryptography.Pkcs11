@@ -111,7 +111,7 @@ internal static class UnmanagedMemory
             }
 
             if (_debugModeEnabled)
-                _logger.LogDebug("Allocated {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
+                Log.AllocatedMemory(_logger, size, memory, _allocations.Count);
         }
 
         return memory;
@@ -140,7 +140,7 @@ internal static class UnmanagedMemory
             }
 
             if (_debugModeEnabled)
-                _logger.LogDebug("Freeing {Size} bytes at {Address}. Allocations: {AllocationCount}", size, memory, _allocations.Count);
+                Log.FreeingMemory(_logger, size, memory, _allocations.Count);
         }
 
         Zeroize(memory, size);

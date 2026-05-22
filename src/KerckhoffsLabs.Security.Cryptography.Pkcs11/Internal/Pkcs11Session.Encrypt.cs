@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
@@ -44,7 +45,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Encrypt1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
 
         ArgumentNullException.ThrowIfNull(data);
 
@@ -91,7 +92,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Encrypt2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -118,7 +119,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Encrypt3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -299,7 +300,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::MessageEncrypt", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "MessageEncrypt");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);

@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
@@ -25,7 +26,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Sign", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
         // P/Invoke when perf profiling proves it matters.

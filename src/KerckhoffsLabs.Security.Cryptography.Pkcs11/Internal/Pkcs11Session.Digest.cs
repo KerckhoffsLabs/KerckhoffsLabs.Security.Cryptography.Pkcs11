@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 
@@ -23,7 +24,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DigestKey", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -80,7 +81,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Digest1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
 
         ArgumentNullException.ThrowIfNull(data);
 
@@ -118,7 +119,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Digest2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Digest2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -141,7 +142,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Digest3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Digest3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -208,7 +209,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DigestEncrypt1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt1");
 
         ArgumentNullException.ThrowIfNull(data);
 
@@ -241,7 +242,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DigestEncrypt2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -273,7 +274,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DigestEncrypt3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -382,7 +383,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecryptDigest1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest1");
 
         ArgumentNullException.ThrowIfNull(data);
 
@@ -413,7 +414,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecryptDigest2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -445,7 +446,7 @@ internal sealed partial class Pkcs11Session
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecryptDigest3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 

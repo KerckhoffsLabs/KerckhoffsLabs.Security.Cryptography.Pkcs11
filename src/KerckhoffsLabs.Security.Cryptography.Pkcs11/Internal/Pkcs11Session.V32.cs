@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using Microsoft.Extensions.Logging;
@@ -47,7 +48,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::EncapsulateKey", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count];
@@ -100,7 +101,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::DecapsulateKey", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count];
@@ -138,7 +139,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::WrapKeyAuthenticated", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         byte[] aad = associatedData.IsEmpty ? Array.Empty<byte>() : associatedData.ToArray();
@@ -184,7 +185,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::UnwrapKeyAuthenticated", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         byte[] wrapped = wrappedKey.ToArray();
@@ -226,7 +227,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::VerifySignature", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         byte[] sig = signature.ToArray();
@@ -265,7 +266,7 @@ internal sealed partial class Pkcs11Session
             throw new ArgumentException("Value has to be a positive number.", nameof(bufferLength));
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::VerifySignature(stream)", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         byte[] sig = signature.ToArray();
@@ -303,7 +304,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetSessionValidationFlags type=0x{Type:X}", _sessionId, validationType);
+        Log.SessionGetValidationFlags(_logger, (ulong)_sessionId, validationType);
 
         NativeCULong flags = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetSessionValidationFlags(_sessionId, (NativeCULong)validationType, ref flags);

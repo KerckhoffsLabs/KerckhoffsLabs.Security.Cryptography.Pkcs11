@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
@@ -41,7 +42,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Decrypt1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 
         ArgumentNullException.ThrowIfNull(encryptedData);
 
@@ -88,7 +89,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Decrypt2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -114,7 +115,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::Decrypt3", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
 
@@ -286,7 +287,7 @@ internal sealed partial class Pkcs11Session
 
         GuardMechanism((CKM)mechanism.Type);
 
-        _logger.LogDebug("Session({SessionId})::MessageDecrypt", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
         CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);

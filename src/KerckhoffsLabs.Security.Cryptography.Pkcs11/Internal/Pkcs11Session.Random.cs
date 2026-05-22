@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -29,7 +30,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::SeedRandom", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "SeedRandom");
 
         ArgumentNullException.ThrowIfNull(seed);
 
@@ -62,7 +63,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GenerateRandom", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateRandom");
 
         if (length < 1)
             throw new ArgumentException("Value has to be positive number", nameof(length));

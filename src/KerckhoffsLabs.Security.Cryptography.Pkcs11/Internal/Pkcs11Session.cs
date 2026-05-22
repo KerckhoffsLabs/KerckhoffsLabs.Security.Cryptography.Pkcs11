@@ -143,7 +143,7 @@ internal sealed partial class Pkcs11Session
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            _logger.LogDebug("Session({SessionId})::CloseWhenDisposed", _sessionId);
+            Log.SessionTrace(_logger, (ulong)_sessionId, "CloseWhenDisposed");
 
             _closeWhenDisposed = value;
         }
@@ -252,7 +252,7 @@ internal sealed partial class Pkcs11Session
     /// <param name="sessionId">PKCS#11 handle of session</param>
     internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)
     {
-        _logger.LogDebug("Session({SessionId})::ctor", sessionId);
+        Log.SessionTrace(_logger, (ulong)sessionId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
 
@@ -274,9 +274,9 @@ internal sealed partial class Pkcs11Session
         if (_sessionHandle is null || _sessionHandle.IsInvalid)
             return;
 
-        _logger.LogDebug("Session({SessionId})::CloseSession", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "CloseSession");
 
-        _logger.LogInformation("Closing session {SessionId}", _sessionId);
+        Log.ClosingSession(_logger, (ulong)_sessionId);
 
         // SafeHandle.Dispose() calls ReleaseHandle, which invokes C_CloseSession on the library.
         _sessionHandle.Dispose();
@@ -298,7 +298,7 @@ internal sealed partial class Pkcs11Session
 
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::InitPin", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
 
         byte[] tmp = userPin.Pin.ToArray();
         try
@@ -329,7 +329,7 @@ internal sealed partial class Pkcs11Session
 
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::SetPin", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin");
 
         byte[] oldTmp = oldPin.Pin.ToArray();
         byte[] newTmp = newPin.Pin.ToArray();
@@ -357,7 +357,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetSessionInfo", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo");
 
         CK_SESSION_INFO sessionInfo = new();
         CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref sessionInfo);
@@ -375,7 +375,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetOperationState", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetOperationState");
 
         NativeCULong operationStateLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetOperationState(_sessionId, null, ref operationStateLen);
@@ -399,7 +399,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::SetOperationState", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "SetOperationState");
 
         ArgumentNullException.ThrowIfNull(state);
 
@@ -425,7 +425,7 @@ internal sealed partial class Pkcs11Session
         if (_disposed)
             throw new ObjectDisposedException(GetType().FullName);
 
-        _logger.LogDebug("Session({SessionId})::Login", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Logging as {UserType} into session {SessionId}", Pkcs11LogUtils.ToString(userType), _sessionId);
@@ -463,7 +463,7 @@ internal sealed partial class Pkcs11Session
 
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::LoginUser", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "LoginUser");
 
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation(
@@ -498,7 +498,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::CancelOperations flags=0x{Flags:X}", _sessionId, flags);
+        Log.SessionCancelOperations(_logger, (ulong)_sessionId, flags);
 
         CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, (NativeCULong)flags);
         Pkcs11Exception.ThrowIfError(rv, "C_SessionCancel");
@@ -540,9 +540,9 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::Logout", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Logout");
 
-        _logger.LogInformation("Logging out of session {SessionId}", _sessionId);
+        Log.LoggingOutSession(_logger, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);
         Pkcs11Exception.ThrowIfError(rv, "C_Logout");
@@ -556,7 +556,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::GetFunctionStatus", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetFunctionStatus");
 
         CKR rv = _pkcs11Library.C_GetFunctionStatus(_sessionId);
         Pkcs11Exception.ThrowIfError(rv, "C_GetFunctionStatus");
@@ -570,7 +570,7 @@ internal sealed partial class Pkcs11Session
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _logger.LogDebug("Session({SessionId})::CancelFunction", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "CancelFunction");
 
         CKR rv = _pkcs11Library.C_CancelFunction(_sessionId);
         Pkcs11Exception.ThrowIfError(rv, "C_CancelFunction");
@@ -742,7 +742,7 @@ internal sealed partial class Pkcs11Session
     /// </summary>
     public void Dispose()
     {
-        _logger.LogDebug("Session({SessionId})::Dispose1", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Dispose1");
 
         Dispose(true);
         GC.SuppressFinalize(this);
@@ -754,7 +754,7 @@ internal sealed partial class Pkcs11Session
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
     private void Dispose(bool disposing)
     {
-        _logger.LogDebug("Session({SessionId})::Dispose2", _sessionId);
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Dispose2");
 
         if (!_disposed)
         {
