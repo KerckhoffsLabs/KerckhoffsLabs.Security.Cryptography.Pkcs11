@@ -124,7 +124,7 @@ public sealed class Pkcs11Slot
     {
         _logger.LogDebug("Pkcs11Slot({SlotId})::GetMechanismInfo", _slotId);
 
-        CK_MECHANISM_INFO mechanismInfo = new CK_MECHANISM_INFO();
+        CK_MECHANISM_INFO mechanismInfo = new();
         CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, ref mechanismInfo);
         Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismInfo");
 

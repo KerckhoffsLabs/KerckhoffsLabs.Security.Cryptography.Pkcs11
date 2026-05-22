@@ -212,7 +212,7 @@ internal sealed partial class Pkcs11Session
                     // Allocate memory for each nested attribute
                     for (int j = 0; j < nestedAttrCount; j++)
                     {
-                        IntPtr tempPointer = new IntPtr(template[i].value.ToInt64() + (j * ckAttributeSize));
+                        IntPtr tempPointer = new(template[i].value.ToInt64() + (j * ckAttributeSize));
                         CK_ATTRIBUTE tempAttribute = UnmanagedMemory.Read<CK_ATTRIBUTE>(tempPointer);
 
                         if (tempAttribute.valueLen.Value != nuint.MaxValue)

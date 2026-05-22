@@ -153,7 +153,7 @@ public sealed class ObjectAttribute : IDisposable
                 IntPtr basePtr = (IntPtr)p;
                 for (int i = 0; i < value.Count; i++)
                 {
-                    IntPtr slot = new IntPtr(basePtr.ToInt64() + (long)i * stride);
+                    IntPtr slot = new(basePtr.ToInt64() + (long)i * stride);
                     UnmanagedMemory.Write(slot, in value[i]._ckAttribute);
                 }
             }
@@ -308,7 +308,7 @@ public sealed class ObjectAttribute : IDisposable
         ObjectAttribute[] result = new ObjectAttribute[n];
         for (int i = 0; i < n; i++)
         {
-            IntPtr slot = new IntPtr(_ckAttribute.value.ToInt64() + (long)i * stride);
+            IntPtr slot = new(_ckAttribute.value.ToInt64() + (long)i * stride);
             CK_ATTRIBUTE attr = UnmanagedMemory.Read<CK_ATTRIBUTE>(slot);
             result[i] = new ObjectAttribute(attr);
         }
@@ -365,7 +365,7 @@ public sealed class ObjectAttribute : IDisposable
 
     private static CK_ATTRIBUTE _CreateAttribute(NativeCULong type, ReadOnlySpan<byte> value)
     {
-        CK_ATTRIBUTE a = new CK_ATTRIBUTE { type = type };
+        CK_ATTRIBUTE a = new() { type = type };
         if (value.Length > 0)
         {
             a.value = UnmanagedMemory.Allocate(value.Length);

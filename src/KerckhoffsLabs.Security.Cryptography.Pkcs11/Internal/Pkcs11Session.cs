@@ -359,7 +359,7 @@ internal sealed partial class Pkcs11Session
 
         _logger.LogDebug("Session({SessionId})::GetSessionInfo", _sessionId);
 
-        CK_SESSION_INFO sessionInfo = new CK_SESSION_INFO();
+        CK_SESSION_INFO sessionInfo = new();
         CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref sessionInfo);
         Pkcs11Exception.ThrowIfError(rv, "C_GetSessionInfo");
 

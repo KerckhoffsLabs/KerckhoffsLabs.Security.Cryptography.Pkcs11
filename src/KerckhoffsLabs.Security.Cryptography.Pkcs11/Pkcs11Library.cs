@@ -83,7 +83,7 @@ public sealed class Pkcs11Library : IDisposable
     /// other unmanaged bindings are required.
     /// </remarks>
     public static Pkcs11Library LoadStaticallyLinked()
-        => new Pkcs11Library(libraryPath: "<statically-linked>", useStaticLink: true);
+        => new(libraryPath: "<statically-linked>", useStaticLink: true);
 
     private Pkcs11Library(string libraryPath, bool useStaticLink)
     {
