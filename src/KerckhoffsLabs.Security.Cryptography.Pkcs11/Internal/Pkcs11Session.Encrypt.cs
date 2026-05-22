@@ -125,7 +125,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", "bufferLength");
+            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 

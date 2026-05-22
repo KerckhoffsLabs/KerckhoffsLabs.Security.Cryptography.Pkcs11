@@ -257,7 +257,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(pkcs11Library);
 
         if (sessionId == (ulong)CK.CK_INVALID_HANDLE)
-            throw new ArgumentException("Invalid handle specified", "sessionId");
+            throw new ArgumentException("Invalid handle specified", nameof(sessionId));
 
         _pkcs11Library = pkcs11Library;
         _sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, (NativeCULong)sessionId);

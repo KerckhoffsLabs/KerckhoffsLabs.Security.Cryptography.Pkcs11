@@ -65,7 +65,7 @@ internal sealed partial class Pkcs11Session
         _logger.LogDebug("Session({SessionId})::GenerateRandom", _sessionId);
 
         if (length < 1)
-            throw new ArgumentException("Value has to be positive number", "length");
+            throw new ArgumentException("Value has to be positive number", nameof(length));
 
         byte[] randomData = new byte[length];
         CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, (NativeCULong)(length));

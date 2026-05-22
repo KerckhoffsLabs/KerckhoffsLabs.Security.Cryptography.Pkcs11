@@ -125,7 +125,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(attributes);
 
         if (attributes.Count < 1)
-            throw new ArgumentException("No attributes specified", "attributes");
+            throw new ArgumentException("No attributes specified", nameof(attributes));
 
         List<ulong> ulongs = [];
         foreach (CKA attribute in attributes)
@@ -151,7 +151,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(attributes);
 
         if (attributes.Count < 1)
-            throw new ArgumentException("No attributes specified", "attributes");
+            throw new ArgumentException("No attributes specified", nameof(attributes));
 
         // Prepare array of CK_ATTRIBUTEs
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
@@ -256,7 +256,7 @@ internal sealed partial class Pkcs11Session
         ArgumentNullException.ThrowIfNull(attributes);
 
         if (attributes.Count < 1)
-            throw new ArgumentException("No attributes specified", "attributes");
+            throw new ArgumentException("No attributes specified", nameof(attributes));
 
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
         for (int i = 0; i < attributes.Count; i++)
