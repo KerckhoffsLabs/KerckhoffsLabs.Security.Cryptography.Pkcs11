@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 /// <summary>
 /// Central translation from BCL hash / padding choices to PKCS#11 <see cref="Mechanism"/>
