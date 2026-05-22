@@ -246,6 +246,11 @@ public static class CKF
     public static readonly NativeCULong CKF_DONT_BLOCK = new(1);
 
     /// <summary>
+    /// True if the functions in this interface are safe to call from a child process after fork() (PKCS#11 v3.0)
+    /// </summary>
+    public static readonly NativeCULong CKF_INTERFACE_FORK_SAFE = new(0x00000001);
+
+    /// <summary>
     /// True if the OTP computation shall be for the next OTP, rather than the current one
     /// </summary>
     public static readonly NativeCULong CKF_NEXT_OTP = new(0x00000001);

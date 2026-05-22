@@ -244,7 +244,7 @@ public sealed class Pkcs11Library : IDisposable
             string name = raw[i].InterfaceName != IntPtr.Zero
                 ? Marshal.PtrToStringUTF8(raw[i].InterfaceName) ?? string.Empty
                 : string.Empty;
-            list.Add(new InterfaceInfo(name, (ulong)raw[i].Flags));
+            list.Add(new InterfaceInfo(name, raw[i].Flags));
         }
 
         return list;

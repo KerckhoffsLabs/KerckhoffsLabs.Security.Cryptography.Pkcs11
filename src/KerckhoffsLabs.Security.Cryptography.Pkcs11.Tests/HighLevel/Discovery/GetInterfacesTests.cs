@@ -20,7 +20,7 @@ public sealed class GetInterfacesTests_Mock(MockBackendFixture f)
         Assert.Equal(2, interfaces.Count);
         Assert.All(interfaces, i => Assert.Equal("PKCS 11", i.Name));
         // The mock advertises flags = 0 on both interfaces.
-        Assert.All(interfaces, i => Assert.False(i.IsForkSafe));
-        Assert.All(interfaces, i => Assert.Equal(0UL, i.Flags));
+        Assert.All(interfaces, i => Assert.False(i.InterfaceFlags.ForkSafe));
+        Assert.All(interfaces, i => Assert.Equal(0UL, i.InterfaceFlags.Flags));
     }
 }
