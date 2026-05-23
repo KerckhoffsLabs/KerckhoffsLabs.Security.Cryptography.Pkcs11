@@ -231,11 +231,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        using (MemoryStream inputMemoryStream = new(data), outputMemorySteam = new())
-        {
-            DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputMemoryStream, outputMemorySteam, signature, out isValid);
-            decryptedData = outputMemorySteam.ToArray();
-        }
+        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
+        DecryptVerify(verificationMechanism, verificationKeyHandle, decryptionMechanism, decryptionKeyHandle, inputMemoryStream, outputMemorySteam, signature, out isValid);
+        decryptedData = outputMemorySteam.ToArray();
     }
 
     /// <summary>

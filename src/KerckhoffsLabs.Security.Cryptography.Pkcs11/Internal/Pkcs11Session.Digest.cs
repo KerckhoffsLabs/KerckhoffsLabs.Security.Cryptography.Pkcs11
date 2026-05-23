@@ -212,11 +212,9 @@ internal sealed partial class Pkcs11Session
 
         ArgumentNullException.ThrowIfNull(data);
 
-        using (MemoryStream inputMemoryStream = new(data), outputMemorySteam = new())
-        {
-            digest = DigestEncrypt(digestingMechanism, encryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
-            encryptedData = outputMemorySteam.ToArray();
-        }
+        using MemoryStream inputMemoryStream = new(data), outputMemorySteam = new();
+        digest = DigestEncrypt(digestingMechanism, encryptionMechanism, keyHandle, inputMemoryStream, outputMemorySteam);
+        encryptedData = outputMemorySteam.ToArray();
     }
 
     /// <summary>
