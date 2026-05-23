@@ -187,7 +187,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         });
     }
 
-    // BL-038: cross-library verification. Export the public key, rebuild an ECDsa from it, and
+    // cross-library verification. Export the public key, rebuild an ECDsa from it, and
     // verify the PKCS#11 signature with the BCL — catches a wrong named-curve OID or a mangled
     // point in ExportParameters that a same-instance round-trip would not. CKM_ECDSA emits raw
     // r||s, so the BCL must interpret the signature as IEEE P1363.

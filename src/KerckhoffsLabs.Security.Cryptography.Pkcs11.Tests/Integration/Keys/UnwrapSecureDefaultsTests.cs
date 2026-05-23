@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// BL-017: UnwrapKey must reject an explicitly insecure result template (CKA_EXTRACTABLE=true or
+/// UnwrapKey must reject an explicitly insecure result template (CKA_EXTRACTABLE=true or
 /// CKA_SENSITIVE=false) unless AllowInsecure is set. The gate runs before the native C_UnwrapKey,
 /// so it is exercised on pkcs11-mock with a dummy handle/blob and a secure (ungated) wrap mechanism
 /// — no real key material needed.

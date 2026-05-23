@@ -256,7 +256,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void ImportParameters_Throws() => WithRsa((_, rsa) =>
         Assert.Throws<NotSupportedException>(() => rsa.ImportParameters(default)));
 
-    // BL-038: cross-library verification. Export the public key into a fresh BCL RSA and verify the
+    // cross-library verification. Export the public key into a fresh BCL RSA and verify the
     // PKCS#11-produced signature — catches a DER/parameter-export bug or wrong PSS salt that a
     // same-instance round-trip would miss.
     [ConditionalFact(nameof(SoftHsmAvailable))]

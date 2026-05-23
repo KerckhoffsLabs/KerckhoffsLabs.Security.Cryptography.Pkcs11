@@ -36,28 +36,21 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- SoftHSM/mock native libs (and the fixture-managed runtimes/<rid>/native/tokens dir) must
-       live in THIS assembly's bin/ for the xUnit fixture to resolve and initialise them. Each
-       project runs the same build scripts — they're cache-aware ("up to date" on re-entry) — and
-       the ProjectReference to .Tests above serialises the two projects so the second invocation
-       is a no-op rather than a race. Can be deduplicated to a shared .targets if maintenance
-       becomes an issue. -->
-  <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
+  <!-- SoftHSM/mock native libs live under bin/<conf>/<tfm>/runtimes/<rid>/native/ in the main
+       Tests assembly. Adapters.Tests can't run those build scripts itself: the SoftHSM autotools
+       build dir is in vendor/ and is not serialised between two MSBuild projects on a clean CI
+       build, so concurrent invocations race. Instead, copy the artifacts Tests already built.
+       The ProjectReference to .Tests above guarantees Tests is fully built first, so by the time
+       this target runs the runtimes/ tree is already populated. -->
+  <Target Name="CopyNativeArtifactsFromTests" AfterTargets="ResolveProjectReferences" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <_MockOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_MockOutputDir>
-      <_MockRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_MockRid>
-      <_MockRid Condition="'$(_MockRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_MockRid>
+      <_TestsBinDir>$(MSBuildProjectDirectory)/../KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/$(Configuration)/$(TargetFramework)</_TestsBinDir>
+      <_AdaptersTestsBinDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_AdaptersTestsBinDir>
     </PropertyGroup>
-    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-pkcs11-mock.sh&quot; &quot;$(_MockOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
-    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
-  </Target>
-
-  <Target Name="BuildSoftHsmV2" BeforeTargets="PrepareForBuild" Condition="'$(SkipSoftHsmV2Build)' != 'true'">
-    <PropertyGroup>
-      <_SoftHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_SoftHsmOutputDir>
-    </PropertyGroup>
-    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-softhsmv2.sh&quot; &quot;$(_SoftHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
-    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-softhsmv2.ps1&quot; -TestOutputDir &quot;$(_SoftHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <ItemGroup>
+      <_NativeArtifact Include="$(_TestsBinDir)/runtimes/**/*" Exclude="$(_TestsBinDir)/runtimes/**/tokens/**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_NativeArtifact)" DestinationFiles="@(_NativeArtifact->'$(_AdaptersTestsBinDir)/runtimes/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(_NativeArtifact)' != ''" />
   </Target>
 
 </Project>

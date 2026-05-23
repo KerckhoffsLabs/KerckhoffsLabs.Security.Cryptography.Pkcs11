@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
 
 /// <summary>
-/// BL-033: Known-answer tests (KATs) for the primary mechanisms, pinning the interop layer to
+/// Known-answer tests (KATs) for the primary mechanisms, pinning the interop layer to
 /// published test vectors so marshalling regressions (IV/nonce/AAD/tag/params, signature encoding)
 /// surface as wrong bytes rather than silently-passing round-trips. Expected values come from the
 /// mechanism's reference vector and were independently confirmed via the BCL primitives.

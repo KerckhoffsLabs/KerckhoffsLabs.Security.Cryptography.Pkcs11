@@ -112,7 +112,7 @@ internal static class WrapUnwrapKeyTestCases
         }
     }
 
-    /// <summary>BL-017: unwrapping without CKA_SENSITIVE / CKA_EXTRACTABLE must yield a sensitive,
+    /// <summary>unwrapping without CKA_SENSITIVE / CKA_EXTRACTABLE must yield a sensitive,
     /// non-extractable key.</summary>
     internal static void Assert_Unwrap_AppliesSecureDefaults(IPkcs11Backend backend)
     {
@@ -142,7 +142,7 @@ internal static class WrapUnwrapKeyTestCases
         });
     }
 
-    /// <summary>BL-017: an explicit CKA_EXTRACTABLE=true is rejected by default and permitted under
+    /// <summary>an explicit CKA_EXTRACTABLE=true is rejected by default and permitted under
     /// AllowInsecureScope (the resulting key really is extractable).</summary>
     internal static void Assert_Unwrap_ExplicitExtractable_RequiresAllowInsecure(IPkcs11Backend backend)
     {
