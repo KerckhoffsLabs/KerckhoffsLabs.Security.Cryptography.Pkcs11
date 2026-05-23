@@ -8,21 +8,18 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// A certificate object on a PKCS#11 token, returned by <see cref="Pkcs11Workspace.FindCertificates"/>.
 /// Exposes the parsed <see cref="X509Certificate2"/> (identity + public key), retains the token
 /// handle for <see cref="Delete"/>, and bridges to the associated on-token private key — located by
-/// the certificate's <c>CKA_ID</c> — as a BCL <see cref="RSA"/> / <see cref="ECDsa"/>.
+/// the certificate's <c>CKA_ID</c> — as a <see cref="Pkcs11Key"/>.
 /// </summary>
 /// <remarks>
 /// The certificate and its private key are two distinct token objects (PKCS#11 models them
 /// separately, and a non-extractable key cannot be fused into a single <see cref="X509Certificate2"/>
-/// on the OpenSSL backend). Operations on a key returned by <see cref="GetRSAPrivateKey"/> /
-/// <see cref="GetECDsaPrivateKey"/> run on the token and are valid only while the owning
-/// <see cref="Pkcs11Workspace"/> is open. Disposing this instance disposes the wrapped
-/// <see cref="X509Certificate2"/> but does not destroy the token object — use <see cref="Delete"/>.
+/// on the OpenSSL backend). Operations on a key returned by <see cref="TryOpenPrivateKey"/> run on
+/// the token and are valid only while the owning <see cref="Pkcs11Workspace"/> is open. Disposing
+/// this instance disposes the wrapped <see cref="X509Certificate2"/> but does not destroy the token
+/// object — use <see cref="Delete"/>.
 /// </remarks>
 public sealed class Pkcs11Certificate : IDisposable
 {
-    private const string RsaOid = "1.2.840.113549.1.1.1";
-    private const string EcOid = "1.2.840.10045.2.1";
-
     private readonly Pkcs11Workspace _workspace;
     private readonly ObjectHandle _handle;
     private readonly string? _label;
@@ -53,33 +50,20 @@ public sealed class Pkcs11Certificate : IDisposable
     internal ObjectHandle Handle => _handle;
 
     /// <summary>
-    /// Returns the certificate's on-token RSA private key (located by <see cref="Id"/>) as a
-    /// token-backed <see cref="RSA"/>, mirroring <c>X509Certificate2.GetRSAPrivateKey()</c>.
-    /// Returns <c>null</c> when the certificate is not RSA, or no private key with this
-    /// certificate's <c>CKA_ID</c> exists on the token. The caller owns the returned instance.
+    /// Opens the certificate's matching on-token private key (located by <see cref="Id"/>) as a
+    /// <see cref="Pkcs11Key"/>. Returns <c>null</c> when no private key with this certificate's
+    /// <c>CKA_ID</c> exists on the token. The caller owns the returned key.
     /// </summary>
+    /// <remarks>
+    /// BCL-shaped convenience wrappers <c>GetRSAPrivateKey()</c> / <c>GetECDsaPrivateKey()</c>
+    /// (mirroring <c>X509Certificate2</c>) live in the
+    /// <c>KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters</c> assembly as extension methods.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
-    public RSA? GetRSAPrivateKey()
+    public Pkcs11Key? TryOpenPrivateKey()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_certificate.GetKeyAlgorithm() != RsaOid) return null;
-        var key = _workspace.TryOpenPrivateKey(_id);
-        return key is null ? null : new RSAPkcs11(key);
-    }
-
-    /// <summary>
-    /// Returns the certificate's on-token EC private key (located by <see cref="Id"/>) as a
-    /// token-backed <see cref="ECDsa"/>, mirroring <c>X509Certificate2.GetECDsaPrivateKey()</c>.
-    /// Returns <c>null</c> when the certificate is not EC, or no private key with this
-    /// certificate's <c>CKA_ID</c> exists on the token. The caller owns the returned instance.
-    /// </summary>
-    /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
-    public ECDsa? GetECDsaPrivateKey()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_certificate.GetKeyAlgorithm() != EcOid) return null;
-        var key = _workspace.TryOpenPrivateKey(_id);
-        return key is null ? null : new ECDsaPkcs11(key);
+        return _workspace.TryOpenPrivateKey(_id);
     }
 
     /// <summary>

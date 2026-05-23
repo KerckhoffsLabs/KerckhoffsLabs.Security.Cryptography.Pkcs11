@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <RuntimeIdentifiers>win-x86;win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <LangVersion>13.0</LangVersion>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <!-- Adapters wrap the core PKCS#11 surface with BCL-shaped types (RSAPkcs11 : RSA,
+         AesPkcs11 : Aes, …). Types deliberately stay in the root
+         KerckhoffsLabs.Security.Cryptography.Pkcs11 namespace so their full names match the
+         pre-split builds; only the assembly name reflects the layer split. -->
+    <RootNamespace>KerckhoffsLabs.Security.Cryptography.Pkcs11</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters</PackageId>
+    <Version>0.0.0</Version>
+    <Authors>KerckhoffsLabs and contributors</Authors>
+    <Description>BCL-aligned adapter types (AesPkcs11, RSAPkcs11, ECDsaPkcs11, MLKemPkcs11, …) over KerckhoffsLabs.Security.Cryptography.Pkcs11.</Description>
+    <PackageTags>pkcs11;hsm;cryptography;adapters;rsa;ecdsa;aes;ml-dsa;ml-kem</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
+    <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters\KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,28 +37,16 @@
       <_MockRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_MockRid>
       <_MockRid Condition="'$(_MockRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_MockRid>
     </PropertyGroup>
-    <Exec
-      Condition="!$([MSBuild]::IsOSPlatform('Windows'))"
-      Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-pkcs11-mock.sh&quot; &quot;$(_MockOutputDir)&quot;"
-      IgnoreStandardErrorWarningFormat="true" />
-    <Exec
-      Condition="$([MSBuild]::IsOSPlatform('Windows'))"
-      Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;"
-      IgnoreStandardErrorWarningFormat="true" />
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-pkcs11-mock.sh&quot; &quot;$(_MockOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="BuildSoftHsmV2" BeforeTargets="PrepareForBuild" Condition="'$(SkipSoftHsmV2Build)' != 'true'">
     <PropertyGroup>
       <_SoftHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_SoftHsmOutputDir>
     </PropertyGroup>
-    <Exec
-      Condition="!$([MSBuild]::IsOSPlatform('Windows'))"
-      Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-softhsmv2.sh&quot; &quot;$(_SoftHsmOutputDir)&quot;"
-      IgnoreStandardErrorWarningFormat="true" />
-    <Exec
-      Condition="$([MSBuild]::IsOSPlatform('Windows'))"
-      Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-softhsmv2.ps1&quot; -TestOutputDir &quot;$(_SoftHsmOutputDir)&quot;"
-      IgnoreStandardErrorWarningFormat="true" />
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-softhsmv2.sh&quot; &quot;$(_SoftHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-softhsmv2.ps1&quot; -TestOutputDir &quot;$(_SoftHsmOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
 </Project>
