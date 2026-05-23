@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -20,7 +21,7 @@ internal static class EncryptRsaTestCases
             var (pub, priv) = TestKeys.GenerateRsa2048KeyPair(session);
             try
             {
-                byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("RSA v1.5 test");
+                byte[] plaintext = Encoding.UTF8.GetBytes("RSA v1.5 test");
 
                 // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by Session.GuardMechanism; the same gate the
                 // RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.

@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Runtime.InteropServices;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -12,8 +13,8 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
     public string LibraryPath { get; }
     public Pkcs11Library Library { get; }
     public NativeCULong SlotId { get; }
-    public ReadOnlyMemory<byte> SoPin { get; } = System.Text.Encoding.UTF8.GetBytes(Settings.SoPin);
-    public ReadOnlyMemory<byte> UserPin { get; } = System.Text.Encoding.UTF8.GetBytes(Settings.UserPin);
+    public ReadOnlyMemory<byte> SoPin { get; } = Encoding.UTF8.GetBytes(Settings.SoPin);
+    public ReadOnlyMemory<byte> UserPin { get; } = Encoding.UTF8.GetBytes(Settings.UserPin);
     public string TokenLabel { get; } = "Pkcs11Interop";
 
     public MockBackendFixture()

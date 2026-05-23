@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -47,7 +48,7 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     {
         using var workspace = OpenWorkspace();
         string label = $"mldsa-{Guid.NewGuid():N}";
-        byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
+        byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Verify()
@@ -99,7 +100,7 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
     public void SignVerifyData_RoundTrips(CkpMlDsa parameterSet) => WithMlDsa(parameterSet, mldsa =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("ml-dsa round trip");
+        byte[] data = Encoding.UTF8.GetBytes("ml-dsa round trip");
         byte[] sig = mldsa.SignData(data);
         Assert.Equal(mldsa.Algorithm.SignatureSizeInBytes, sig.Length);
         Assert.True(mldsa.VerifyData(data, sig));
@@ -112,8 +113,8 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsMlDsa))]
     public void SignVerifyData_WithContext_RoundTrips() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("context-bound message");
-        byte[] context = System.Text.Encoding.UTF8.GetBytes("app-context");
+        byte[] data = Encoding.UTF8.GetBytes("context-bound message");
+        byte[] context = Encoding.UTF8.GetBytes("app-context");
 
         byte[] sig = mldsa.SignData(data, context);
         Assert.True(mldsa.VerifyData(data, sig, context));

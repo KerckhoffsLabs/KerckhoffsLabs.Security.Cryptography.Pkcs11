@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -78,7 +79,7 @@ public sealed class HMACPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         {
             using var hmac = new HMACPkcs11(key, new HashAlgorithmName(hashName));
 
-            byte[] data = System.Text.Encoding.UTF8.GetBytes("hmac test data");
+            byte[] data = Encoding.UTF8.GetBytes("hmac test data");
             byte[] mac1 = hmac.ComputeHash(data);
             byte[] mac2 = hmac.ComputeHash(data);
 
@@ -94,7 +95,7 @@ public sealed class HMACPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA1);
         Assert.Equal(160, hmac.HashSize); // 20-byte digest reported in bits
 
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("sha1 hmac");
+        byte[] data = Encoding.UTF8.GetBytes("sha1 hmac");
         using (workspace.AllowInsecureScope())
         {
             byte[] mac = hmac.ComputeHash(data);
@@ -108,8 +109,8 @@ public sealed class HMACPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void ComputeHash_DifferentInputs_DifferDespiteReuse() => WithHmacKey(32, (_, key) =>
     {
         using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA256);
-        byte[] macA = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes("message A"));
-        byte[] macB = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes("message B"));
+        byte[] macA = hmac.ComputeHash(Encoding.UTF8.GetBytes("message A"));
+        byte[] macB = hmac.ComputeHash(Encoding.UTF8.GetBytes("message B"));
         Assert.NotEqual(macA, macB);
     });
 
@@ -128,7 +129,7 @@ public sealed class HMACPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     {
         byte[] key = new byte[131];
         Array.Fill(key, (byte)0xaa);
-        byte[] data = System.Text.Encoding.ASCII.GetBytes("Test Using Larger Than Block-Size Key - Hash Key First");
+        byte[] data = Encoding.ASCII.GetBytes("Test Using Larger Than Block-Size Key - Hash Key First");
         byte[] expected = H("60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54");
 
         WithImportedHmacKey(key, k =>

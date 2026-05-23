@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -78,7 +79,7 @@ public sealed class ObjectAttributeTests
         using var attr = new ObjectAttribute(CKA.CKA_LABEL, source);
         Assert.Equal(source, attr.GetValueAsString());
         // No trailing NUL byte:
-        Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(source), attr.ValueLength);
+        Assert.Equal(Encoding.UTF8.GetByteCount(source), attr.ValueLength);
     }
 
     [Fact]

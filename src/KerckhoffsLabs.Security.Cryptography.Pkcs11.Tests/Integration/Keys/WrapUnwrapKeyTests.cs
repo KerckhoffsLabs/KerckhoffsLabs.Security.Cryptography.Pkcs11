@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -34,7 +35,7 @@ internal static class WrapUnwrapKeyTestCases
             {
                 // Encrypt a known plaintext with the original data key.
                 byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-                byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a wrap round-trip plaintext");
+                byte[] plaintext = Encoding.UTF8.GetBytes("phase-4a wrap round-trip plaintext");
                 byte[] ciphertext = TestAesGcm.Encrypt(session, dataKey, iv, plaintext);
 
                 using var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -38,7 +39,7 @@ public sealed class MD5Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var md5 = new MD5Pkcs11(workspace);
 
         var ex = Assert.Throws<InsecureOperationException>(
-            () => md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes("abc")));
+            () => md5.ComputeHash(Encoding.UTF8.GetBytes("abc")));
         Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
     }
 
@@ -49,7 +50,7 @@ public sealed class MD5Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         workspace.AllowInsecure = true;
         using var md5 = new MD5Pkcs11(workspace);
 
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("abc");
+        byte[] data = Encoding.UTF8.GetBytes("abc");
         // RFC 1321 / BCL: MD5("abc") = 900150983cd24fb0d6963f7d28e17f72
         byte[] expected = Convert.FromHexString("900150983CD24FB0D6963F7D28E17F72");
         byte[] digest = md5.ComputeHash(data);

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -38,7 +39,7 @@ public sealed class SHA1Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var sha1 = new SHA1Pkcs11(workspace);
 
         var ex = Assert.Throws<InsecureOperationException>(
-            () => sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes("abc")));
+            () => sha1.ComputeHash(Encoding.UTF8.GetBytes("abc")));
         Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
     }
 
@@ -49,7 +50,7 @@ public sealed class SHA1Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         workspace.AllowInsecure = true;
         using var sha1 = new SHA1Pkcs11(workspace);
 
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("abc");
+        byte[] data = Encoding.UTF8.GetBytes("abc");
         // FIPS 180-4 / BCL: SHA-1("abc") = a9993e364706816aba3e25717850c26c9cd0d89d
         byte[] expected = Convert.FromHexString("A9993E364706816ABA3E25717850C26C9CD0D89D");
         byte[] digest = sha1.ComputeHash(data);

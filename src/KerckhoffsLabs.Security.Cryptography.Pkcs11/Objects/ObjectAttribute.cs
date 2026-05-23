@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Runtime.InteropServices;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -107,7 +108,7 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute(ulong type, string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        ReadOnlySpan<byte> bytes = System.Text.Encoding.UTF8.GetBytes(value); // no null terminator
+        ReadOnlySpan<byte> bytes = Encoding.UTF8.GetBytes(value); // no null terminator
         _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a UTF-8 string with no null terminator.</summary>
@@ -132,7 +133,7 @@ public sealed class ObjectAttribute : IDisposable
     {
         // CK_DATE wire format: 8 ASCII bytes "YYYYMMDD"
         string formatted = value.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
-        ReadOnlySpan<byte> bytes = System.Text.Encoding.ASCII.GetBytes(formatted);
+        ReadOnlySpan<byte> bytes = Encoding.ASCII.GetBytes(formatted);
         _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a date value (encoded as 8-byte ASCII "yyyyMMdd").</summary>
@@ -244,7 +245,7 @@ public sealed class ObjectAttribute : IDisposable
         if (len == 0) return string.Empty;
         byte[] buf = new byte[len];
         UnmanagedMemory.Read(_ckAttribute.value, buf);
-        return System.Text.Encoding.UTF8.GetString(buf).TrimEnd('\0');
+        return Encoding.UTF8.GetString(buf).TrimEnd('\0');
     }
 
     /// <summary>Returns a copy of the raw value bytes.</summary>
@@ -285,7 +286,7 @@ public sealed class ObjectAttribute : IDisposable
         if (len != 8) throw new AttributeValueException(Type);
         byte[] buf = new byte[8];
         UnmanagedMemory.Read(_ckAttribute.value, buf);
-        string s = System.Text.Encoding.ASCII.GetString(buf);
+        string s = Encoding.ASCII.GetString(buf);
         if (!DateTime.TryParseExact(s, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture,
                                     System.Globalization.DateTimeStyles.None, out DateTime dt))
         {

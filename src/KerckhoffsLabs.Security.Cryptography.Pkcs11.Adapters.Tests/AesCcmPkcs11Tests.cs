@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -206,8 +207,8 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void EncryptDecrypt_RoundTrips_WithAad() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("AES-CCM round trip");
-        byte[] aad = System.Text.Encoding.UTF8.GetBytes("associated-data");
+        byte[] plaintext = Encoding.UTF8.GetBytes("AES-CCM round trip");
+        byte[] aad = Encoding.UTF8.GetBytes("associated-data");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
 
@@ -223,7 +224,7 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void EncryptDecrypt_RoundTrips_NoAad() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("no associated data");
+        byte[] plaintext = Encoding.UTF8.GetBytes("no associated data");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
 
@@ -257,7 +258,7 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void EncryptDecrypt_EmptyPlaintext_RoundTrips() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] aad = System.Text.Encoding.UTF8.GetBytes("aad-only authentication");
+        byte[] aad = Encoding.UTF8.GetBytes("aad-only authentication");
         byte[] tag = new byte[16];
 
         ccm.Encrypt(nonce, [], [], tag, aad);
@@ -268,7 +269,7 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void Decrypt_TamperedTag_Throws() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("authenticity");
+        byte[] plaintext = Encoding.UTF8.GetBytes("authenticity");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
 
@@ -283,7 +284,7 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void Decrypt_TamperedCiphertext_Throws() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("integrity matters");
+        byte[] plaintext = Encoding.UTF8.GetBytes("integrity matters");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
 
@@ -298,22 +299,22 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     public void Decrypt_WrongAad_Throws() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("bound to its aad");
+        byte[] plaintext = Encoding.UTF8.GetBytes("bound to its aad");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
 
-        ccm.Encrypt(nonce, plaintext, ciphertext, tag, System.Text.Encoding.UTF8.GetBytes("aad-A"));
+        ccm.Encrypt(nonce, plaintext, ciphertext, tag, Encoding.UTF8.GetBytes("aad-A"));
 
         byte[] dest = new byte[plaintext.Length];
         Assert.ThrowsAny<Exception>(() =>
-            ccm.Decrypt(nonce, ciphertext, tag, dest, System.Text.Encoding.UTF8.GetBytes("aad-B")));
+            ccm.Decrypt(nonce, ciphertext, tag, dest, Encoding.UTF8.GetBytes("aad-B")));
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsAesCcm))]
     public void Decrypt_WrongNonce_Throws() => WithCcm(ccm =>
     {
         byte[] nonce = Iota(12);
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("nonce bound");
+        byte[] plaintext = Encoding.UTF8.GetBytes("nonce bound");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
 

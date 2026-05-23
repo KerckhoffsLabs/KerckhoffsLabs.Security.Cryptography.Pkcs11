@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -25,9 +26,9 @@ public sealed record LibraryInfo
     internal LibraryInfo(CK_INFO ck_info)
     {
         CryptokiVersion = ck_info.CryptokiVersion.ToString();
-        ManufacturerId = System.Text.Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd();
+        ManufacturerId = Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd();
         Flags = (ulong)ck_info.Flags;
-        LibraryDescription = System.Text.Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd();
+        LibraryDescription = Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd();
         LibraryVersion = ck_info.LibraryVersion.ToString();
     }
 }

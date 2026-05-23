@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -14,7 +15,7 @@ internal static class ObjectLifecycleTestCases
         try
         {
             string label = "phase-4a-test-" + Guid.NewGuid().ToString("N");
-            byte[] value = System.Text.Encoding.UTF8.GetBytes("phase-4a object lifecycle");
+            byte[] value = Encoding.UTF8.GetBytes("phase-4a object lifecycle");
 
             using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
             using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);

@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -28,8 +29,8 @@ public sealed record SlotInfo
     internal SlotInfo(NativeCULong slotId, CK_SLOT_INFO ck_slot_info)
     {
         SlotId = (ulong)slotId;
-        SlotDescription = System.Text.Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
-        ManufacturerId = System.Text.Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
+        SlotDescription = Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
+        ManufacturerId = Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
         SlotFlags = new SlotFlags(ck_slot_info.Flags);
         HardwareVersion = ck_slot_info.HardwareVersion.ToString();
         FirmwareVersion = ck_slot_info.FirmwareVersion.ToString();

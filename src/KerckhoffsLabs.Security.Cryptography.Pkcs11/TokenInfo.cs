@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -70,10 +71,10 @@ public sealed record TokenInfo
     internal TokenInfo(NativeCULong slotId, CK_TOKEN_INFO ck_token_info)
     {
         SlotId = (ulong)slotId;
-        Label = System.Text.Encoding.UTF8.GetString(ck_token_info.Label).TrimEnd();
-        ManufacturerId = System.Text.Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd();
-        Model = System.Text.Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd();
-        SerialNumber = System.Text.Encoding.UTF8.GetString(ck_token_info.SerialNumber).TrimEnd();
+        Label = Encoding.UTF8.GetString(ck_token_info.Label).TrimEnd();
+        ManufacturerId = Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd();
+        Model = Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd();
+        SerialNumber = Encoding.UTF8.GetString(ck_token_info.SerialNumber).TrimEnd();
         TokenFlags = new TokenFlags(ck_token_info.Flags);
         MaxSessionCount = (ulong)ck_token_info.MaxSessionCount;
         SessionCount = (ulong)ck_token_info.SessionCount;
@@ -87,7 +88,7 @@ public sealed record TokenInfo
         FreePrivateMemory = (ulong)ck_token_info.FreePrivateMemory;
         HardwareVersion = ck_token_info.HardwareVersion.ToString();
         FirmwareVersion = ck_token_info.FirmwareVersion.ToString();
-        UtcTimeString = System.Text.Encoding.UTF8.GetString(ck_token_info.UtcTime).TrimEnd();
+        UtcTimeString = Encoding.UTF8.GetString(ck_token_info.UtcTime).TrimEnd();
 
         UtcTime = DateTime.TryParseExact(
             UtcTimeString,

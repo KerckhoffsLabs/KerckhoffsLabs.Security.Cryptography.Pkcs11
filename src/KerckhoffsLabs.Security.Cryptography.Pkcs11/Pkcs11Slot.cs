@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -157,7 +158,7 @@ public sealed class Pkcs11Slot
 
         // PKCS#11 v3.1 §11.5: pLabel points to a 32-byte field padded with
         // ASCII spaces (0x20) and must not be null-terminated.
-        byte[] labelBytes = System.Text.Encoding.UTF8.GetBytes(label);
+        byte[] labelBytes = Encoding.UTF8.GetBytes(label);
         if (labelBytes.Length > 32)
             throw new ArgumentException(
                 $"Token label must encode to 32 UTF-8 bytes or fewer (got {labelBytes.Length}).",

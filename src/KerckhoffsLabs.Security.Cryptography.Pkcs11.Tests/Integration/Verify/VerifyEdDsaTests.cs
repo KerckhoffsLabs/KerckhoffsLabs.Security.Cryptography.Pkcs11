@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
@@ -10,7 +11,7 @@ internal static class VerifyEdDsaTestCases
         var (pub, priv) = TestKeys.GenerateEd25519KeyPair(session);
         try
         {
-            byte[] data = System.Text.Encoding.UTF8.GetBytes("Ed25519 tamper");
+            byte[] data = Encoding.UTF8.GetBytes("Ed25519 tamper");
             byte[] sig = session.SignEd25519(priv, data);
             byte[] tampered = (byte[])data.Clone();
             tampered[0] ^= 0xFF;

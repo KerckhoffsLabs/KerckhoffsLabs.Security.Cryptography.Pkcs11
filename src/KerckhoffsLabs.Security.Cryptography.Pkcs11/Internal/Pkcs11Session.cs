@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
@@ -470,7 +471,7 @@ internal sealed partial class Pkcs11Session
                 Pkcs11LogUtils.ToString(userType), _sessionId);
 
         byte[] pinTmp = pin.Pin.ToArray();
-        byte[] usernameBytes = System.Text.Encoding.UTF8.GetBytes(username);
+        byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
         {
             CKR rv = _pkcs11Library.C_LoginUser(

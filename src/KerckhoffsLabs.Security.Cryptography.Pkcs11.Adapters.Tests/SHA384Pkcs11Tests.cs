@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -29,7 +30,7 @@ public sealed class SHA384Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var workspace = OpenWorkspace();
         using var sha = new SHA384Pkcs11(workspace);
 
-        byte[] digest = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("abc"));
+        byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes("abc"));
 
         // NIST FIPS 180-4 vector for SHA-384("abc").
         byte[] expected = Convert.FromHexString(
@@ -44,7 +45,7 @@ public sealed class SHA384Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var workspace = OpenWorkspace();
         using var sha = new SHA384Pkcs11(workspace);
 
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
+        byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         Assert.Equal(SHA384.HashData(data), sha.ComputeHash(data));
     }
 
@@ -54,11 +55,11 @@ public sealed class SHA384Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var workspace = OpenWorkspace();
         using var sha = new SHA384Pkcs11(workspace);
 
-        byte[] part1 = System.Text.Encoding.UTF8.GetBytes("hello ");
-        byte[] part2 = System.Text.Encoding.UTF8.GetBytes("world");
+        byte[] part1 = Encoding.UTF8.GetBytes("hello ");
+        byte[] part2 = Encoding.UTF8.GetBytes("world");
         sha.TransformBlock(part1, 0, part1.Length, null, 0);
         sha.TransformFinalBlock(part2, 0, part2.Length);
 
-        Assert.Equal(SHA384.HashData(System.Text.Encoding.UTF8.GetBytes("hello world")), sha.Hash!);
+        Assert.Equal(SHA384.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash!);
     }
 }

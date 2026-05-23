@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -31,7 +32,7 @@ public sealed class SHA256Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var workspace = OpenWorkspace();
         using var sha = new SHA256Pkcs11(workspace);
 
-        byte[] digest = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("abc"));
+        byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes("abc"));
 
         // NIST FIPS 180-4 vector for SHA-256("abc").
         byte[] expected = Convert.FromHexString("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD");
@@ -45,7 +46,7 @@ public sealed class SHA256Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var workspace = OpenWorkspace();
         using var sha = new SHA256Pkcs11(workspace);
 
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
+        byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         Assert.Equal(SHA256.HashData(data), sha.ComputeHash(data));
     }
 
@@ -56,13 +57,13 @@ public sealed class SHA256Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var sha = new SHA256Pkcs11(workspace);
 
         // Feed in chunks via TransformBlock/TransformFinalBlock; result must equal the one-shot hash.
-        byte[] part1 = System.Text.Encoding.UTF8.GetBytes("hello ");
-        byte[] part2 = System.Text.Encoding.UTF8.GetBytes("world");
+        byte[] part1 = Encoding.UTF8.GetBytes("hello ");
+        byte[] part2 = Encoding.UTF8.GetBytes("world");
         sha.TransformBlock(part1, 0, part1.Length, null, 0);
         sha.TransformFinalBlock(part2, 0, part2.Length);
         byte[] streamed = sha.Hash!;
 
-        Assert.Equal(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("hello world")), streamed);
+        Assert.Equal(SHA256.HashData(Encoding.UTF8.GetBytes("hello world")), streamed);
     }
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
@@ -71,9 +72,9 @@ public sealed class SHA256Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         using var workspace = OpenWorkspace();
         using var sha = new SHA256Pkcs11(workspace);
 
-        byte[] first = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("one"));
-        byte[] second = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize
-        Assert.Equal(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("one")), first);
-        Assert.Equal(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("two")), second);
+        byte[] first = sha.ComputeHash(Encoding.UTF8.GetBytes("one"));
+        byte[] second = sha.ComputeHash(Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize
+        Assert.Equal(SHA256.HashData(Encoding.UTF8.GetBytes("one")), first);
+        Assert.Equal(SHA256.HashData(Encoding.UTF8.GetBytes("two")), second);
     }
 }

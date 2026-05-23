@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -57,7 +58,7 @@ public sealed class PinManagementTests_SoftHsm(SoftHsmBackendFixture f)
     public void SetPin_ChangesUserPin_RoundTrip()
     {
         byte[] original = _backend.UserPin.ToArray();
-        byte[] temp = System.Text.Encoding.UTF8.GetBytes("87654321");
+        byte[] temp = Encoding.UTF8.GetBytes("87654321");
 
         using var workspace = _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));

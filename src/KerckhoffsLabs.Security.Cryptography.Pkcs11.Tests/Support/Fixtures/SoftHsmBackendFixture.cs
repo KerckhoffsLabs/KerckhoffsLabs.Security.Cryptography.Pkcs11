@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
@@ -24,8 +25,8 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     public string LibraryPath { get; }
     public Pkcs11Library Library { get; } = null!;
     public NativeCULong SlotId { get; }
-    public ReadOnlyMemory<byte> SoPin { get; } = System.Text.Encoding.UTF8.GetBytes(Settings.SoPin);
-    public ReadOnlyMemory<byte> UserPin { get; } = System.Text.Encoding.UTF8.GetBytes(Settings.UserPin);
+    public ReadOnlyMemory<byte> SoPin { get; } = Encoding.UTF8.GetBytes(Settings.SoPin);
+    public ReadOnlyMemory<byte> UserPin { get; } = Encoding.UTF8.GetBytes(Settings.UserPin);
     public string TokenLabel { get; } = "phase1-test-token";
 
     /// <summary>The set of <see cref="CKM"/> mechanisms exposed by the token (from <c>C_GetMechanismList</c>).

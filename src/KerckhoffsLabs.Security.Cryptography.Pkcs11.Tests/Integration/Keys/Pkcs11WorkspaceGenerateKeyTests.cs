@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -44,7 +45,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_SoftHsm(SoftHsmBackendFixtur
         using var workspace = OpenWorkspace();
 
         string label = $"gen-pair-{Guid.NewGuid():N}";
-        byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
+        byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().ModulusBits(2048)

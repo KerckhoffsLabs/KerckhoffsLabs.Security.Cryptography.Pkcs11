@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -30,7 +31,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
-        byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
+        byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Label(label).Id(id).Verify().Encrypt().ModulusBits(2048)
@@ -97,7 +98,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void SignVerifyData_Pkcs1_RoundTrips() => WithRsa((_, rsa) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("test");
+        byte[] data = Encoding.UTF8.GetBytes("test");
         byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
         data[0] ^= 0xFF;
@@ -107,7 +108,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void SignVerifyData_Pss_RoundTrips() => WithRsa((_, rsa) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("test");
+        byte[] data = Encoding.UTF8.GetBytes("test");
         byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
         Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
 
@@ -156,7 +157,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void TrySignData_Span_VerifyData_Span_RoundTrips() => WithRsa((_, rsa) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("span hash+sign on token");
+        byte[] data = Encoding.UTF8.GetBytes("span hash+sign on token");
         byte[] dest = new byte[256]; // 2048-bit signature == 256 bytes
 
         Assert.True(rsa.TrySignData(data, dest, HashAlgorithmName.SHA256, RSASignaturePadding.Pss, out int written));
@@ -173,7 +174,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void TrySignData_DestinationTooSmall_ReturnsFalse() => WithRsa((_, rsa) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("too small destination");
+        byte[] data = Encoding.UTF8.GetBytes("too small destination");
         Assert.False(rsa.TrySignData(data, new byte[8], HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1, out int written));
         Assert.Equal(0, written);
     });
@@ -194,7 +195,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void EncryptDecrypt_OaepSha1_RoundTrips() => WithRsa((_, rsa) =>
     {
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("oaep-sha1 payload");
+        byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha1 payload");
         byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA1);
         byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1);
         Assert.Equal(plaintext, recovered);
@@ -204,7 +205,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => WithRsa((workspace, rsa) =>
     {
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("pkcs1 payload");
+        byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
         using (workspace.AllowInsecureScope())
         {
             byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.Pkcs1);
@@ -230,7 +231,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsOaepSha256))]
     public void EncryptDecrypt_OaepSha256_RoundTrips() => WithRsa((_, rsa) =>
     {
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("secret payload");
+        byte[] plaintext = Encoding.UTF8.GetBytes("secret payload");
         byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256);
         byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA256);
         Assert.Equal(plaintext, recovered);
@@ -262,7 +263,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void SignData_Pkcs1_VerifiesUnderBclFromExportedPublicKey() => WithRsa((_, rsa) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("cross-library verify");
+        byte[] data = Encoding.UTF8.GetBytes("cross-library verify");
         byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
         using var bcl = RSA.Create();
@@ -273,7 +274,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void SignData_Pss_VerifiesUnderBclFromExportedPublicKey() => WithRsa((_, rsa) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("cross-library verify");
+        byte[] data = Encoding.UTF8.GetBytes("cross-library verify");
         byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
 
         using var bcl = RSA.Create();

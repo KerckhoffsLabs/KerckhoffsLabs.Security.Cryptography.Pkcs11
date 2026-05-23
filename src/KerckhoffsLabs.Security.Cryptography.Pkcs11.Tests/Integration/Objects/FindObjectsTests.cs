@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -120,7 +121,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
                     if (c.Label == certLabel) cert = c;
                 Assert.NotNull(cert);
 
-                byte[] data = System.Text.Encoding.UTF8.GetBytes("sign via FindCertificates bridge");
+                byte[] data = Encoding.UTF8.GetBytes("sign via FindCertificates bridge");
                 using var priv = cert!.GetRSAPrivateKey();
                 Assert.NotNull(priv);
                 byte[] sig = priv!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);

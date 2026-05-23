@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -16,7 +17,7 @@ internal static class DigestSha2TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            byte[] data = System.Text.Encoding.UTF8.GetBytes("abc");
+            byte[] data = Encoding.UTF8.GetBytes("abc");
             using var mech = new Mechanism(CKM.CKM_SHA256);
             byte[] digest = session.Digest(mech, data);
             Assert.Equal(32, digest.Length);
@@ -39,7 +40,7 @@ internal static class DigestSha2TestCases
         try
         {
             using var mech = new Mechanism(CKM.CKM_SHA384);
-            byte[] digest = session.Digest(mech, System.Text.Encoding.UTF8.GetBytes("phase-3"));
+            byte[] digest = session.Digest(mech, Encoding.UTF8.GetBytes("phase-3"));
             Assert.Equal(48, digest.Length);
         }
         finally
@@ -55,7 +56,7 @@ internal static class DigestSha2TestCases
         try
         {
             using var mech = new Mechanism(CKM.CKM_SHA512);
-            byte[] digest = session.Digest(mech, System.Text.Encoding.UTF8.GetBytes("phase-3"));
+            byte[] digest = session.Digest(mech, Encoding.UTF8.GetBytes("phase-3"));
             Assert.Equal(64, digest.Length);
         }
         finally

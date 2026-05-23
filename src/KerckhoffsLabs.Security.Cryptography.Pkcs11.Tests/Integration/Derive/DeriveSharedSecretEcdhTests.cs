@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -43,7 +44,7 @@ internal static class DeriveSharedSecretEcdhTestCases
                     // is no nonce reuse on a single key. The fixed IV is required to make the output
                     // deterministic so the byte-equality check is meaningful. Never use a fixed IV in production.
                     byte[] iv = new byte[12];
-                    byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("phase-4a ECDH sanity check");
+                    byte[] plaintext = Encoding.UTF8.GetBytes("phase-4a ECDH sanity check");
                     byte[] ctA = TestAesGcm.Encrypt(session, aliceKey, iv, plaintext);
                     byte[] ctB = TestAesGcm.Encrypt(session, bobKey, iv, plaintext);
                     Assert.Equal(ctA, ctB);

@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -22,7 +23,7 @@ public sealed class WorkspaceDigestTests(MockBackendFixture backend)
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         var mechanism = new Mechanism(CKM.CKM_SHA_1);
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("hello");
+        byte[] data = Encoding.UTF8.GetBytes("hello");
 
         // InsecureOperationException fires in managed code before C_DigestInit,
         // which proves workspace.Digest delegates correctly to _session.Digest.

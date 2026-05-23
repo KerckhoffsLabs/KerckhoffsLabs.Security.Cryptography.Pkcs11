@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -37,7 +38,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     private static Pkcs11Key GenerateEcKey(Pkcs11Workspace workspace, byte[] ecOid)
     {
         string label = $"ec-prov-{Guid.NewGuid():N}";
-        byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
+        byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Label(label).Id(id).Verify().EcParams(ecOid).Build();
@@ -107,7 +108,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [InlineData("P-521")]
     public void SignVerifyData_RoundTrips(string curve) => WithEcDsa(curve, (ec, hash) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("ecdsa test");
+        byte[] data = Encoding.UTF8.GetBytes("ecdsa test");
         byte[] sig = ec.SignData(data, hash);
         Assert.True(ec.VerifyData(data, sig, hash));
         data[0] ^= 0xFF;
@@ -122,7 +123,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [InlineData("P-521")]
     public void TrySignData_Span_VerifyData_Span_RoundTrips(string curve) => WithEcDsa(curve, (ec, hash) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("combined hash+sign on token");
+        byte[] data = Encoding.UTF8.GetBytes("combined hash+sign on token");
         byte[] dest = new byte[256];
 
         Assert.True(ec.TrySignData(data, dest, hash, out int written));
@@ -139,7 +140,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void TrySignData_DestinationTooSmall_ReturnsFalse() => WithEcDsa("P-256", (ec, hash) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("too small destination");
+        byte[] data = Encoding.UTF8.GetBytes("too small destination");
         Assert.False(ec.TrySignData(data, new byte[1], hash, out int written));
         Assert.Equal(0, written);
     });
@@ -149,7 +150,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void SignHash_VerifyHash_RoundTrips() => WithEcDsa("P-256", (ec, _) =>
     {
-        byte[] hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("raw ecdsa over a digest"));
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("raw ecdsa over a digest"));
         byte[] sig = ec.SignHash(hash);
         Assert.True(ec.VerifyHash(hash, sig));
 
@@ -197,7 +198,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [InlineData("P-521")]
     public void SignData_VerifiesUnderBclFromExportedPublicKey(string curve) => WithEcDsa(curve, (ec, hash) =>
     {
-        byte[] data = System.Text.Encoding.UTF8.GetBytes("cross-library verify");
+        byte[] data = Encoding.UTF8.GetBytes("cross-library verify");
         byte[] sig = ec.SignData(data, hash);
 
         using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -88,7 +89,7 @@ public sealed class AesPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl() => WithImportedAes((workspace, aes) =>
     {
-        byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a token key — variable length.");
+        byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a token key — variable length.");
 
         // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
         Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16));

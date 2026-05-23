@@ -1,3 +1,4 @@
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -34,7 +35,7 @@ internal static class EncryptAesTestCases
             var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
             try
             {
-                byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
+                byte[] plaintext = Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
 
                 session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
                 using var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
@@ -62,7 +63,7 @@ internal static class EncryptAesTestCases
             var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
             try
             {
-                byte[] plaintext = System.Text.Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
+                byte[] plaintext = Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
 
                 session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
                 using var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
