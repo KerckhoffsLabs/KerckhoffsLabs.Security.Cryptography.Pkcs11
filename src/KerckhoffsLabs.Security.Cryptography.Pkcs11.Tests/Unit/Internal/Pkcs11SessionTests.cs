@@ -269,7 +269,7 @@ public sealed class Pkcs11SessionTests
         var fake = new CryptoFake();
         var s = NewSession(fake);
         using var mech = new Mechanism(CKM.CKM_SHA256);
-        Assert.Equal(fake.Output, s.Digest(mech, new byte[] { 1, 2, 3 }));
+        Assert.Equal(fake.Output, s.Digest(mech, [1, 2, 3]));
     }
 
     [Fact]
@@ -278,7 +278,7 @@ public sealed class Pkcs11SessionTests
         var fake = new CryptoFake();
         var s = NewSession(fake);
         using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
-        Assert.Equal(fake.Output, s.Sign(mech, ObjectHandle.Invalid, new byte[] { 1, 2, 3 }));
+        Assert.Equal(fake.Output, s.Sign(mech, ObjectHandle.Invalid, [1, 2, 3]));
     }
 
     [Fact]
@@ -287,7 +287,7 @@ public sealed class Pkcs11SessionTests
         var fake = new CryptoFake();
         var s = NewSession(fake);
         using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        Assert.Equal(fake.Output, s.Encrypt(mech, ObjectHandle.Invalid, new byte[] { 1, 2, 3 }));
+        Assert.Equal(fake.Output, s.Encrypt(mech, ObjectHandle.Invalid, [1, 2, 3]));
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public sealed class Pkcs11SessionTests
         var fake = new CryptoFake();
         var s = NewSession(fake);
         using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        Assert.Equal(fake.Output, s.Decrypt(mech, ObjectHandle.Invalid, new byte[] { 1, 2, 3 }));
+        Assert.Equal(fake.Output, s.Decrypt(mech, ObjectHandle.Invalid, [1, 2, 3]));
     }
 
     [Fact]
@@ -305,7 +305,7 @@ public sealed class Pkcs11SessionTests
         var fake = new CryptoFake { SecondLen = 2 }; // probe says 4, data call fills 2
         var s = NewSession(fake);
         using var mech = new Mechanism(CKM.CKM_SHA256);
-        Assert.Equal(new byte[] { 0xAA, 0xBB }, s.Digest(mech, new byte[] { 1 }));
+        Assert.Equal(new byte[] { 0xAA, 0xBB }, s.Digest(mech, [1]));
     }
 
     [Theory]
@@ -322,7 +322,7 @@ public sealed class Pkcs11SessionTests
         };
         var s = NewSession(fake);
         using var mech = new Mechanism(CKM.CKM_SHA256);
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.Digest(mech, new byte[] { 1 }));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.Digest(mech, [1]));
     }
 
     [Fact]

@@ -72,7 +72,7 @@ public sealed class UnmanagedMemoryTests
     {
         WithBuffer(4, p =>
         {
-            UnmanagedMemory.Write(p, new byte[] { 1, 2, 3, 4 });
+            UnmanagedMemory.Write(p, [1, 2, 3, 4]);
             Assert.Equal(new byte[] { 1, 2, 3, 4 }, UnmanagedMemory.Read(p, 4));
         });
     }
@@ -92,7 +92,7 @@ public sealed class UnmanagedMemoryTests
     {
         WithBuffer(4, p =>
         {
-            UnmanagedMemory.Write(p, new byte[] { 5, 6, 7, 8 }.AsSpan());
+            UnmanagedMemory.Write(p, [5, 6, 7, 8]);
             byte[] dst = new byte[4];
             UnmanagedMemory.Read(p, dst.AsSpan());
             Assert.Equal(new byte[] { 5, 6, 7, 8 }, dst);
@@ -128,7 +128,7 @@ public sealed class UnmanagedMemoryTests
     {
         WithBuffer(4, p =>
         {
-            UnmanagedMemory.Write(p, new byte[] { 9, 8, 7, 6 });
+            UnmanagedMemory.Write(p, [9, 8, 7, 6]);
             byte[] dst = new byte[4];
             UnmanagedMemory.Read(p, dst);
             Assert.Equal(new byte[] { 9, 8, 7, 6 }, dst);
@@ -254,7 +254,7 @@ public sealed class UnmanagedMemoryTests
         // Allocate, fill, free; the Free path zeroes before FreeHGlobal. We can't read freed memory
         // safely, so just assert the round-trip + that Free succeeds (Zeroize is exercised on the way out).
         IntPtr p = UnmanagedMemory.Allocate(4);
-        UnmanagedMemory.Write(p, new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
+        UnmanagedMemory.Write(p, [0xFF, 0xFF, 0xFF, 0xFF]);
         Assert.Equal(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, UnmanagedMemory.Read(p, 4));
         UnmanagedMemory.Free(ref p);
         Assert.Equal(IntPtr.Zero, p);
