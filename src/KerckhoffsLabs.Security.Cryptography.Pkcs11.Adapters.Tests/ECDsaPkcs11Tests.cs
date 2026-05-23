@@ -3,9 +3,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests;
 
 public sealed class ECDsaPkcs11ArgumentTests
 {
@@ -33,8 +34,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    private static Pkcs11Key GenerateEcKey(Pkcs11Workspace workspace, byte[] ecOid,
-        out ObjectHandle pubH, out ObjectHandle privH)
+    private static Pkcs11Key GenerateEcKey(Pkcs11Workspace workspace, byte[] ecOid)
     {
         string label = $"ec-prov-{Guid.NewGuid():N}";
         byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
@@ -44,11 +44,8 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Sign().Build();
 
-        var key = workspace.GenerateKey(
+        return workspace.GenerateKey(
             new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl);
-        pubH = key.PublicHandle;
-        privH = key.PrivateHandle;
-        return key;
     }
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
@@ -56,18 +53,18 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            workspace.Session.DestroyObject(k.PrivateHandle);
+            k.Delete();
             k.Dispose();
         }
     }
 
     // Generates an EC key pair for the curve, wraps it as ECDsaPkcs11, runs the body with the
-    // adapter and the curve-matched hash, then destroys both handles.
+    // adapter and the curve-matched hash, then destroys both objects.
     private void WithEcDsa(string curve, Action<ECDsaPkcs11, HashAlgorithmName> body)
     {
         var (oid, hash, _) = Spec(curve);
         using var workspace = OpenWorkspace();
-        var key = GenerateEcKey(workspace, oid, out var pubH, out var privH);
+        var key = GenerateEcKey(workspace, oid);
         try
         {
             using var ec = new ECDsaPkcs11(key);
@@ -75,9 +72,9 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         }
         finally
         {
+            try { key.Delete(); }
+            catch { /* best-effort cleanup */ }
             key.Dispose();
-            if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
-            if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
         }
     }
 
@@ -91,7 +88,7 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
+            using (var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t)) { }
         }
         try
         {

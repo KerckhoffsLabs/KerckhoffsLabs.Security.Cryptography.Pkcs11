@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests;
 
 public sealed class RSAPkcs11ArgumentTests
 {
@@ -27,7 +27,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace, out ObjectHandle pubH, out ObjectHandle privH)
+    private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
         byte[] id = System.Text.Encoding.ASCII.GetBytes(label);
@@ -38,11 +38,8 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Decrypt().Build();
 
-        var key = workspace.GenerateKey(
+        return workspace.GenerateKey(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
-        pubH = key.PublicHandle;
-        privH = key.PrivateHandle;
-        return key;
     }
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
@@ -50,17 +47,17 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            workspace.Session.DestroyObject(k.PrivateHandle);
+            k.Delete();
             k.Dispose();
         }
     }
 
     // Generates a 2048-bit RSA key pair, wraps it as RSAPkcs11, runs the body with the workspace
-    // (some tests need AllowInsecureScope) and the adapter, then destroys both handles.
+    // (some tests need AllowInsecureScope) and the adapter, then destroys both objects.
     private void WithRsa(Action<Pkcs11Workspace, RSAPkcs11> body)
     {
         using var workspace = OpenWorkspace();
-        var key = GenerateRsaKey(workspace, out var pubH, out var privH);
+        var key = GenerateRsaKey(workspace);
         try
         {
             using var rsa = new RSAPkcs11(key);
@@ -68,9 +65,9 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         }
         finally
         {
+            try { key.Delete(); }
+            catch { /* best-effort cleanup */ }
             key.Dispose();
-            if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
-            if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
         }
     }
 
@@ -84,7 +81,7 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
+            using (var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t)) { }
         }
         try
         {

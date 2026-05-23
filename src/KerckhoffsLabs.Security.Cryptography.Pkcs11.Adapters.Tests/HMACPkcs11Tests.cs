@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests;
 
 public sealed class HMACPkcs11ArgumentTests
 {
@@ -29,7 +29,7 @@ public sealed class HMACPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            workspace.Session.DestroyObject(k.PrivateHandle);
+            k.Delete();
             k.Dispose();
         }
     }
@@ -44,7 +44,7 @@ public sealed class HMACPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).ValueLen(keyLen).Sign().Verify().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), [.. t.Attributes]);
+            using (var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t)) { }
         }
         try
         {

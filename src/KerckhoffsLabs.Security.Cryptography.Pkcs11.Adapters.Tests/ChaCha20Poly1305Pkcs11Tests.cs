@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests;
 
 /// <summary>
 /// Backend-free tests: ctor null-guard and the static size contracts. The BCL
@@ -66,7 +66,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm(SoftHsmBackendFixture ba
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            workspace.Session.DestroyObject(k.PrivateHandle);
+            k.Delete();
             k.Dispose();
         }
     }
@@ -80,7 +80,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm(SoftHsmBackendFixture ba
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), [.. t.Attributes]);
+            using (var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t)) { }
         }
         try
         {
@@ -117,7 +117,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_SoftHsm(SoftHsmBackendFixture ba
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
+            using (var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t)) { }
         }
         try
         {

@@ -8,7 +8,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 // experimental diagnostic for this file.
 #pragma warning disable SYSLIB5006
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests;
 
 public sealed class MLDsaPkcs11ArgumentTests
 {
@@ -36,7 +36,7 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            workspace.Session.DestroyObject(k.PrivateHandle);
+            k.Delete();
             k.Dispose();
         }
     }
@@ -57,8 +57,6 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
         var key = workspace.GenerateKey(
             new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
-        var pubH = key.PublicHandle;
-        var privH = key.PrivateHandle;
         try
         {
             using var mldsa = new MLDsaPkcs11(key);
@@ -66,9 +64,9 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         }
         finally
         {
+            try { key.Delete(); }
+            catch { /* best-effort cleanup */ }
             key.Dispose();
-            if (!pubH.IsInvalid) workspace.Session.DestroyObject(pubH);
-            if (!privH.IsInvalid) workspace.Session.DestroyObject(privH);
         }
     }
 
@@ -82,7 +80,7 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            workspace.Session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. t.Attributes]);
+            using (var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t)) { }
         }
         try
         {

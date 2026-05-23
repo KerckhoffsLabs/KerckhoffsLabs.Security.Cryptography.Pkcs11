@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests;
 
 /// <summary>Backend-free argument tests for <see cref="SHA256Pkcs11"/>.</summary>
 public sealed class SHA256Pkcs11ArgumentTests

@@ -9,11 +9,19 @@
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <LangVersion>13.0</LangVersion>
+    <!-- Match the namespace used by the moved adapter tests; keep test files in the
+         flat .Adapters.Tests namespace. -->
+    <RootNamespace>KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
     <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters\KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.csproj" />
+    <!-- Reuses the shared test infrastructure (SoftHsmBackendFixture, MockBackendFixture,
+         TestKeys, Settings, IPkcs11Backend) from the main Tests assembly. xUnit
+         [CollectionDefinition]s are per-assembly, so SoftHsmBackendCollection / MockBackendCollection
+         are redeclared locally in Collections.cs. -->
+    <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests\KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,17 +36,15 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- ECDsaPkcs11Tests in the .Adapters.Tests assembly uses the internal TestKeys helper. -->
-    <InternalsVisibleTo Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests" />
-  </ItemGroup>
-
+  <!-- SoftHSM/mock native libs (and the fixture-managed runtimes/<rid>/native/tokens dir) must
+       live in THIS assembly's bin/ for the xUnit fixture to resolve and initialise them. Each
+       project runs the same build scripts — they're cache-aware ("up to date" on re-entry) — and
+       the ProjectReference to .Tests above serialises the two projects so the second invocation
+       is a no-op rather than a race. Can be deduplicated to a shared .targets if maintenance
+       becomes an issue. -->
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
     <PropertyGroup>
       <_MockOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_MockOutputDir>
-      <!-- The mock must match the architecture the tests run as (the testhost = the .NET SDK arch),
-           not the architecture of the (64-bit) pwsh that runs the build script. An explicit RID
-           build (-r) wins; otherwise use the SDK's RID. -->
       <_MockRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_MockRid>
       <_MockRid Condition="'$(_MockRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_MockRid>
     </PropertyGroup>
