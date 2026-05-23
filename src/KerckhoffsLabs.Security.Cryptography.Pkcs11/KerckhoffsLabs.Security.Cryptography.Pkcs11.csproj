@@ -46,7 +46,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="KerckhoffsLabs.Runtime.InteropServices" Version="1.2.0" />
+    <PackageReference Include="KerckhoffsLabs.Runtime.InteropServices" Version="1.3.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
