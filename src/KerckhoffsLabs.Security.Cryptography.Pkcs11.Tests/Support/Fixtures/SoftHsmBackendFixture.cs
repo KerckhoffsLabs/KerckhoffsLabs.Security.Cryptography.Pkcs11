@@ -77,6 +77,20 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         }
     }
 
+    /// <summary>True if the SoftHSM build we load has ML-KEM (FIPS 203) compiled in
+    /// (<see cref="CKM.CKM_ML_KEM_KEY_PAIR_GEN"/> / <see cref="CKM.CKM_ML_KEM"/>). Like ML-DSA, ML-KEM
+    /// only compiles in against OpenSSL 3.5+; reflects a <c>softhsm-mlkem.enabled</c> marker next to
+    /// the library, kept symmetric with <see cref="SoftHsmSupportsMlDsa"/>.</summary>
+    public static bool SoftHsmSupportsMlKem
+    {
+        get
+        {
+            string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
+            return lib is not null
+                && File.Exists(Path.Combine(Path.GetDirectoryName(lib)!, "softhsm-mlkem.enabled"));
+        }
+    }
+
     /// <summary>True if the SoftHSM build we load has SLH-DSA (FIPS 205) compiled in
     /// (<see cref="CKM.CKM_SLH_DSA_KEY_PAIR_GEN"/> / <see cref="CKM.CKM_SLH_DSA"/>). Upstream SoftHSM
     /// has no SLH-DSA support today, so this is effectively always false; the gate is kept symmetric

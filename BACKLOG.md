@@ -5,13 +5,13 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 ## Summary
 
 
-- **Total items:** 62
-- **Critical:** 0 | **High:** 5 | **Medium:** 14 | **Low:** 4
+- **Total items raised:** 63 _(since 2026-05-15)_
+- **Open by severity:** Critical 0 | High 7 | Medium 14 | Low 5 — 26 open; the remainder Resolved or Won't-Fix. _(Counts last refreshed 2026-06-04.)_
 - **Headline risks:**
-  - **Public API exposes the entire native interop layer.** ~85 `CK_*` structs, `IMechanismParams` returning `object`, and the `CK_MECHANISM.CreateMechanism` allocation factory are all `public`. This freezes marshalling internals into SemVer commitments and is AOT-hostile.
-  - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking changes ship silently.
+  - **Public API has no shape guard.** No `PublicApiAnalyzer`, no `PackageValidation`, no API-diff job — breaking surface changes ship silently (BL-027, open).
+  - _Resolved:_ the public API had exposed the entire native interop layer (~85 `CK_*` structs, `IMechanismParams`, the `CreateMechanism` factory). Closed by BL-022 / BL-023 / BL-024 — those types are now `internal`.
 
-- **Release-readiness assessment:** The library is **not ready for a 1.0 release.** The four Critical items are silent failures that would damage trust on first contact (Windows users see crashes / wrong attributes; pre-hash ML-DSA users produce signatures no other implementation can verify; any exception inside a multi-part operation leaves the session permanently broken). Past those, the public API surface itself needs scoping before 1.0 — exposing the raw P/Invoke types and a single-target net10.0 are SemVer-major changes after 1.0, so they have to land beforehand. The cryptographic correctness work, public-API redesign, P/Invoke layout fixes, and release-pipeline gaps together represent roughly 4-8 weeks of focused work before a defensible 1.0. The library has excellent bones: clean exception hierarchy, well-designed `SecurePin`/`SecureBuffer`, sound secure-by-default mechanism gating architecture, comprehensive enum coverage of v3.2, and a healthy test suite — but the pre-1.0 polish layer is missing.
+- **Release-readiness assessment:** Not yet 1.0-ready, but materially improved since the 2026-05-15 review. **All four Critical items are resolved** — Windows struct packing (BL-001), ML-DSA pre-hash semantics (BL-002), and multi-part / find-object state cleanup (BL-003/004) — as are most Highs (P/Invoke layout & AOT, secure-defaults gating, heap zeroing, the release pipeline). The remaining pre-1.0 work is predominantly **public-API scoping** — `[Experimental]` on the v3.2 surface (BL-005), vendor-mechanism overloads (BL-014), workspace forwarders for the secure key-gen helpers (BL-021) — and **release-engineering / QA breadth** — a public-API shape guard (BL-027), `SECURITY.md` (BL-028), macOS/ARM64 CI (BL-036), and exercising the OAEP / ECDH-KDF paths (BL-035). These are SemVer-sensitive shape decisions that must land before 1.0, not correctness fixes. The library has excellent bones: clean exception hierarchy, well-designed `SecurePin`/`SecureBuffer`, sound secure-by-default mechanism gating, comprehensive v3.2 enum coverage, and a healthy test suite.
 
 ---
 
@@ -434,6 +434,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-032] PQC adapters (`Pkcs11MlDsa`, `Pkcs11MlKem`) have zero tests
 
+- **Status: Resolved (2026-06-04)** — All PQC adapters now have test files under `Algorithms/`: `MLDsaPkcs11Tests` (11 cases), `SlhDsaPkcs11Tests` (8), and `MLKemPkcs11Tests` (8, added here alongside a `SoftHsmSupportsMlKem` fixture flag mirroring `SoftHsmSupportsMlDsa`). Each runs the argument/ctor checks (null-key → `ArgumentNullException`, wrong-key-type → `ArgumentException`) and gates the crypto round-trips/exports on the token implementing the mechanism. SoftHSM ships none of the PQC mechanisms, so those gate-skip but are ready for an OpenSSL-3.5 / capable backend (the ML-DSA enablement pattern). Note the adapters were renamed since this item was raised — `Pkcs11MlDsa`→`MLDsaPkcs11`, `Pkcs11MlKem`→`MLKemPkcs11`, now in the `…Pkcs11.Algorithms` namespace.
 - **Area:** QA
 - **Severity:** High
 - **Effort:** M
@@ -459,6 +460,7 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-034] No wrong-AAD negative test for any AEAD
 
+- **Status: Resolved (2026-06-04)** — `Decrypt_WrongAad_Throws` exists for all three AEAD adapters (`AesGcmPkcs11Tests`, `AesCcmPkcs11Tests`, `ChaCha20Poly1305Pkcs11Tests`): each encrypts with AAD, decrypts with a different AAD, and asserts failure. AES-GCM runs against SoftHSM in CI; AES-CCM / ChaCha20-Poly1305 gate on token support.
 - **Area:** QA
 - **Severity:** High
 - **Effort:** S
@@ -855,6 +857,21 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Proposed action:** (a) Pass the `-DDEFAULT_*` paths in `build-softhsmv2.ps1` to match `build-softhsmv2.sh`; verify the OpenSSL runtime DLLs land next to the module + util (and confirm with a dependency walk). (b) Make OpenSSL fast: cache the vcpkg build (`actions/cache` on the vcpkg binary cache) or use a prebuilt OpenSSL instead of from-source. (c) Once green and fast, re-enable the Windows leg (drop `SkipSoftHsmV2Build` there) and remove the Windows exemption in `SoftHsmAvailabilityTests`.
 - **Breaks public API?** No (CI/test infra only).
 - **Raised by:** First Windows CI run of the SoftHSM build (2026-05-21).
+
+### [BL-069] Managed verify fallback rejects raw `CKM_RSA_PKCS` / `CKM_RSA_X_509` for private-only keys
+
+- **Area:** Cryptography
+- **Severity:** Low
+- **Effort:** S (Option B — `CKM_RSA_PKCS` only) / M (Option C — adds `CKM_RSA_X_509`)
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs` (`VerifyRsaInManaged` / `MapRsaSignMechanism`, ~581-616)
+- **Problem:** When a key has no `CKO_PUBLIC_KEY` companion, `Pkcs11Key.Verify` falls back to managed verification using public params synthesized from the private object. The mechanism map now covers PKCS#1 v1.5 and RSA-PSS (combined `CKM_SHA*_RSA_PKCS[_PSS]`) and raw `CKM_ECDSA`, but still throws `NotSupportedException` for raw `CKM_RSA_PKCS` and `CKM_RSA_X_509`. This is **not reachable through any BCL adapter** — `RSAPkcs11` only ever produces combined `CKM_SHA*_RSA_PKCS[_PSS]` for verify and does not implement hash-level `VerifyHash` — so it affects only direct low-level `Pkcs11Key.Verify` callers with a private-only key. It is an availability gap (throws), never a wrong result, hence Low.
+- **Proposed action:** Three options, in increasing effort/risk:
+  - **A (recommended):** leave unsupported. The current explicit `NotSupportedException` ("provide a `CKO_PUBLIC_KEY` companion") already guides callers; no adapter exercises this path.
+  - **B:** support `CKM_RSA_PKCS` — parse the input DER `DigestInfo` (via `System.Formats.Asn1`, already used in this file) to recover `(hashAlgorithm, digest)`, then `rsa.VerifyHash(digest, sig, hashName, RSASignaturePadding.Pkcs1)`. Caveat: `VerifyHash` reconstructs the *canonical* DigestInfo, so a signature over a non-canonically-encoded DigestInfo would be rejected even though the token's byte-exact `C_Verify` accepts it. Covers v1.5 only.
+  - **C:** add `CKM_RSA_X_509` via a hand-rolled RSA public op (`BigInteger` `sᵉ mod n`) + `CryptographicOperations.FixedTimeEquals` block compare — low-risk (no padding parser). Achieving *byte-exact* `CKM_RSA_PKCS` would additionally require a strict EMSA-PKCS1-v1_5 unpad, which is a signature-forgery footgun (Bleichenbacher'06 / "BERserk" leniency class) and is **not** recommended for a non-adapter path.
+- **Breaks public API?** No (additive behavior on an internal verify path).
+- **Raised by:** Algorithms-review follow-up (2026-06-04); split from the managed-verify fix that closed RSA-PSS + raw-ECDSA.
+- **Spec / References:** PKCS#11 v3.2 (`CKM_RSA_PKCS` DigestInfo input; `CKM_RSA_X_509` raw); Bleichenbacher RSA signature-forgery / "BERserk" (padding-leniency class); relates to BL-018 (raw `CKM_RSA_X_509` gating), BL-047 (v1.5 gating split).
 
 ---
 
