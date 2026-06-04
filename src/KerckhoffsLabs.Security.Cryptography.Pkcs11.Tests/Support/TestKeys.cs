@@ -30,6 +30,24 @@ internal static class TestKeys
         return session.CreateObject(template);
     }
 
+    /// <summary>
+    /// Generates a random 256-bit AES key with wrap/unwrap usage — a session-only KEK.
+    /// </summary>
+    public static ObjectHandle GenerateAes256WrappingKey(Pkcs11Session session)
+    {
+        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);
+        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var attrWrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var attrUnwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+
+        var template = new List<ObjectAttribute>
+            { attrClass, attrKeyType, attrValueLen, attrToken, attrWrap, attrUnwrap };
+        using var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        return session.GenerateKey(mechanism, template);
+    }
+
     public static ObjectHandle CreateChaCha20Key(Pkcs11Session session, byte[] rawKey)
     {
         if (rawKey.Length != 32)

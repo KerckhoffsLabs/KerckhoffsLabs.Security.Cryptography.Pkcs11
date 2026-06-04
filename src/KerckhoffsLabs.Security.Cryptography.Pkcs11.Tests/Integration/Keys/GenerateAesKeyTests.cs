@@ -1,56 +1,37 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 internal static class GenerateAesKeyTestCases
 {
+    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
+        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+
     internal static void Assert_RejectsWrongBitLength(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateAesKey(bitLength: 64));
-            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateAesKey(bitLength: 100));
-            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateAesKey(bitLength: 512));
-        }
-        finally
-        {
-            session.Logout();
-            session.CloseSession();
-        }
+        using var workspace = OpenWorkspace(backend);
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateAesKey(bitLength: 64));
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateAesKey(bitLength: 100));
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateAesKey(bitLength: 512));
     }
 
     internal static void Assert_GeneratesAes256Key(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var workspace = OpenWorkspace(backend);
+        using var key = workspace.GenerateAesKey(bitLength: 256);
+
+        Assert.False(key.PrivateHandle.IsInvalid);
+
+        var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
         try
         {
-            ObjectHandle key = session.GenerateAesKey(bitLength: 256);
-            try
-            {
-                Assert.NotEqual(0UL, key.ObjectId);
-                var attrs = session.GetAttributeValue(key, [CKA.CKA_VALUE_LEN]);
-                try
-                {
-                    Assert.Single(attrs);
-                    Assert.Equal(32UL, attrs[0].GetValueAsUlong());
-                }
-                finally
-                {
-                    foreach (var a in attrs) a.Dispose();
-                }
-            }
-            finally
-            {
-                session.DestroyObject(key);
-            }
+            Assert.Single(attrs);
+            Assert.Equal(32UL, attrs[0].GetValueAsUlong());
         }
         finally
         {
-            session.Logout();
-            session.CloseSession();
+            foreach (var a in attrs) a.Dispose();
         }
     }
 }

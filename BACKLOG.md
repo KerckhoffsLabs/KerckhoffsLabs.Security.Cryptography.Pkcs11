@@ -295,13 +295,12 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-021] High-level secure key-generation helpers exist only on `internal Pkcs11Session`
 
+- **Status: Resolved (2026-06-04)** — The three helpers were **moved off** `internal Pkcs11Session` and re-implemented as public methods on `Pkcs11Workspace`, returning the owned `Pkcs11Key` wrapper (not the internal `ObjectHandle`): `GenerateAesKey(int bitLength = 256, …)`, `GenerateRsaKeyPair(int modulusBits = 4096, …)`, and `GenerateEcKeyPair(EcCurve curve = EcCurve.P256, …)`. Each builds a secure template via the public `ObjectTemplate` builders (sensitive + non-extractable + non-modifiable, RSA `e=65537`, RSA modulus floor ≥ 2048 / default 4096) and calls the existing `GenerateKey` overloads. `DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan<byte> peerPoint, …)` was surfaced on the workspace at the same time (see [BL-035]). The `EcCurve` cref now resolves. Tests migrated to the workspace API (`GenerateAesKeyTests`, `GenerateRsaKeyPairTests`, `GenerateEcKeyPairTests`); `WrapUnwrapKeyTests` now mints its KEK via the new `TestKeys.GenerateAes256WrappingKey` helper. Full suite green (879 passed / 76 skipped).
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.Keys.cs:211,252,307`
-- **Problem:** `GenerateAesKey`, `GenerateRsaKeyPair`, `GenerateEcKeyPair` are `public` on the `internal` `Pkcs11Session`. From a consumer's standpoint, the `Pkcs11Workspace` façade exposes only the generic `GenerateKey(Mechanism, ObjectTemplate)` overloads — defeating the "secure-by-default" intent of the helpers. The `EcCurve` enum is even cross-referenced in XML doc to a non-existent `Pkcs11Workspace.GenerateEcKeyPair`.
-- **Proposed action:** Add forwarding methods on `Pkcs11Workspace`. Match the helper signatures exactly so the XML doc cref resolves.
-- **Breaks public API?** No (additive). Land before 1.0 to set the API shape.
+- **Location (resolved):** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs`
+- **Problem:** `GenerateAesKey`, `GenerateRsaKeyPair`, `GenerateEcKeyPair` were `public` on the `internal` `Pkcs11Session`. From a consumer's standpoint, the `Pkcs11Workspace` façade exposed only the generic `GenerateKey(Mechanism, ObjectTemplate)` overloads — defeating the "secure-by-default" intent of the helpers. The `EcCurve` enum was even cross-referenced in XML doc to a non-existent `Pkcs11Workspace.GenerateEcKeyPair`.
 - **Raised by:** .NET Engineer A
 - **Spec / References:** —
 
@@ -474,11 +473,11 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-035] RSA-OAEP and ECDH-with-KDF are gated off — never run in CI
 
-- **Update (2026-06-04):** the ECDH half is now substantially covered. The new `ECDiffieHellmanPkcs11` adapter derives the raw shared secret with `CKD_NULL` and applies the hash/HMAC KDF in managed code; `ECDiffieHellmanPkcs11Tests` (12 cases) cross-check both parties against the BCL `ECDiffieHellman` and **run** on SoftHSM in CI. Remaining scope: RSA-OAEP (still gated, `SoftHsmSupportsOaepSha256 = false`) and ECDH1 with a *token-side* KDF (`CKD_SHA256_KDF`, `SoftHsmSupportsEcdh1WithKdf = false` — SoftHSM hardcodes `CKD_NULL`).
+- **Update (2026-06-04):** ECDH half resolved; **narrowed to RSA-OAEP only**. ECDH key agreement is now exercised in CI two ways: (1) the `ECDiffieHellmanPkcs11` adapter derives the raw shared secret with `CKD_NULL` and applies the hash/HMAC KDF in managed code, cross-checked against the BCL `ECDiffieHellman` (`ECDiffieHellmanPkcs11Tests`, 12 cases); and (2) the on-token AES-deriving helper, surfaced as public `Pkcs11Workspace.DeriveSharedSecretEcdh` (see [BL-021]), is covered by `DeriveSharedSecretEcdhTests.TwoParties_DeriveMatchingAesKey`, which runs `CKM_ECDH1_DERIVE` + `CKD_NULL` for two parties and proves the derived AES keys match via a cross-party AES-GCM round-trip — i.e. the `Ecdh_NullKdf_BothPartiesDeriveSameSecret` task below is **done**. The token-side-KDF variant (`CKD_SHA256_KDF`, the method's default) still skips on SoftHSM (only `CKD_NULL` is implemented; the `SoftHsmSupportsEcdh1WithKdf = false` flag documents this). Remaining: RSA-OAEP (still gated, `SoftHsmSupportsOaepSha256 = false`).
 - **Area:** QA
 - **Severity:** High
 - **Effort:** S
-- **Location:** `Integration/Encrypt/EncryptRsaTests.cs`; `Integration/Decrypt/DecryptRsaTests.cs`; `Integration/Derive/DeriveSharedSecretEcdhTests.cs`; ECDH now also `Algorithms/ECDiffieHellmanPkcs11Tests.cs`
+- **Location:** `Integration/Encrypt/EncryptRsaTests.cs`; `Integration/Decrypt/DecryptRsaTests.cs` (RSA-OAEP, still gated). ECDH now covered by `Algorithms/ECDiffieHellmanPkcs11Tests.cs`.
 - **Problem:** Both primary recommended paths are skipped by `SoftHsmSupportsOaepSha256 = false` and `SoftHsmSupportsEcdh1WithKdf = false`. SoftHSM 2.7 does support OAEP-SHA1 and ECDH with `CKD_NULL`; tests using those variants would exercise the marshalling paths in CI.
 - **Proposed action:** Add `EncryptDecrypt_OaepSha1_RoundTrips` (gated on `SoftHsmAvailable` only) and `Ecdh_NullKdf_BothPartiesDeriveSameSecret`. Keep the SHA-256 / SHA-256-KDF tests flagged for when SoftHSM is upgraded.
 - **Breaks public API?** No.

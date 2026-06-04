@@ -15,7 +15,7 @@ internal static class WrapUnwrapKeyTestCases
         try
         {
             // KEK can stay non-extractable — it's the wrapping key, not wrapped.
-            ObjectHandle kek = session.GenerateAesKey(bitLength: 256);
+            ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
 
             // Data key MUST be extractable to be wrappable. The secure-default
             // helper sets CKA_EXTRACTABLE=false, so build the template manually here.
@@ -84,7 +84,7 @@ internal static class WrapUnwrapKeyTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            ObjectHandle kek = session.GenerateAesKey(bitLength: 256);
+            ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
             using var dkClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             using var dkKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
             using var dkValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, 32UL);

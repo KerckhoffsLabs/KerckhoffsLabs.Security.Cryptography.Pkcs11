@@ -2,6 +2,7 @@ using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -311,6 +312,159 @@ public sealed class Pkcs11Workspace : IDisposable
         {
             foreach (var a in attrs) a.Dispose();
         }
+    }
+
+    // === Secure-default key-generation helpers =============================
+
+    /// <summary>
+    /// Generates an AES secret key — sensitive, non-extractable, usable for encryption,
+    /// decryption, and key wrapping. Session-only unless <paramref name="persistOnToken"/> is set.
+    /// </summary>
+    /// <param name="bitLength">Key length in bits — 128, 192, or 256. Default 256.</param>
+    /// <param name="label">Optional <c>CKA_LABEL</c> applied to the key. Default none.</param>
+    /// <param name="persistOnToken">If true, the key is a token object (<c>CKA_TOKEN=true</c>, persistent). Default false (session-only).</param>
+    /// <returns>The generated AES key.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="bitLength"/> is not 128, 192, or 256.</exception>
+    public Pkcs11Key GenerateAesKey(int bitLength = 256, string? label = null, bool persistOnToken = false)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (bitLength != 128 && bitLength != 192 && bitLength != 256)
+            throw new ArgumentOutOfRangeException(nameof(bitLength), "AES key length must be 128, 192, or 256 bits.");
+
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .ValueLen(bitLength / 8)
+            .Sensitive().NonExtractable()
+            .Encrypt().Decrypt().Wrap().Unwrap()
+            .OnToken(persistOnToken)
+            .Attribute(CKA.CKA_MODIFIABLE, false);
+        if (label is not null)
+            builder = builder.Label(label);
+
+        using var template = builder.Build();
+        using var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        return GenerateKey(mechanism, template);
+    }
+
+    /// <summary>
+    /// Generates an RSA key pair. The private key is sensitive and non-extractable; the public
+    /// exponent is fixed at 65537. The returned key carries both handles.
+    /// </summary>
+    /// <param name="modulusBits">RSA modulus size in bits. Must be ≥ 2048 (NIST SP 800-131A). Default 4096.</param>
+    /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
+    /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
+    /// <returns>The generated RSA key pair.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is &lt; 2048.</exception>
+    public Pkcs11Key GenerateRsaKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (modulusBits < 2048)
+            throw new ArgumentOutOfRangeException(nameof(modulusBits), "RSA modulus must be ≥ 2048 bits (NIST SP 800-131A).");
+
+        var pub = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .ModulusBits(modulusBits)
+            .PublicExponent([0x01, 0x00, 0x01])
+            .Encrypt().Verify().Wrap()
+            .OnToken(persistOnToken)
+            .Attribute(CKA.CKA_MODIFIABLE, false);
+        var priv = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Sensitive().NonExtractable()
+            .Sign().Decrypt().Unwrap()
+            .OnToken(persistOnToken)
+            .Attribute(CKA.CKA_MODIFIABLE, false);
+        if (label is not null)
+        {
+            pub = pub.Label(label);
+            priv = priv.Label(label);
+        }
+
+        using var pubTemplate = pub.Build();
+        using var privTemplate = priv.Build();
+        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        return GenerateKey(mechanism, privTemplate, pubTemplate);
+    }
+
+    /// <summary>
+    /// Generates an EC key pair on a NIST prime curve. The private key is sensitive,
+    /// non-extractable, and usable for signing and ECDH derivation.
+    /// </summary>
+    /// <param name="curve">Named curve — <see cref="EcCurve.P256"/>, <see cref="EcCurve.P384"/>, or <see cref="EcCurve.P521"/>. Default P-256.</param>
+    /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
+    /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
+    /// <returns>The generated EC key pair.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="curve"/> is not a supported curve.</exception>
+    public Pkcs11Key GenerateEcKeyPair(EcCurve curve = EcCurve.P256, string? label = null, bool persistOnToken = false)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        byte[] ecParams = curve switch
+        {
+            // prime256v1 (P-256): 1.2.840.10045.3.1.7
+            EcCurve.P256 => [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07],
+            // secp384r1 (P-384): 1.3.132.0.34
+            EcCurve.P384 => [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22],
+            // secp521r1 (P-521): 1.3.132.0.35
+            EcCurve.P521 => [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23],
+            _ => throw new ArgumentOutOfRangeException(nameof(curve), $"Unsupported curve: {curve}."),
+        };
+
+        var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
+            .EcParams(ecParams)
+            .Verify()
+            .Encrypt(false).Wrap(false)
+            .OnToken(persistOnToken)
+            .Attribute(CKA.CKA_MODIFIABLE, false);
+        var priv = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
+            .Sensitive().NonExtractable()
+            .Sign().Derive()
+            .OnToken(persistOnToken)
+            .Attribute(CKA.CKA_MODIFIABLE, false);
+        if (label is not null)
+        {
+            pub = pub.Label(label);
+            priv = priv.Label(label);
+        }
+
+        using var pubTemplate = pub.Build();
+        using var privTemplate = priv.Build();
+        using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        return GenerateKey(mechanism, privTemplate, pubTemplate);
+    }
+
+    /// <summary>
+    /// Performs ECDH1 key agreement using <paramref name="ecPrivateKey"/> and the peer's public
+    /// point, deriving an AES secret key on the token. The derived key is session-only, sensitive,
+    /// non-extractable, and non-modifiable — suitable for use with AES-GCM.
+    /// </summary>
+    /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
+    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value).</param>
+    /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
+    /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
+    /// pass <see cref="CKD.CKD_NULL"/> to take the raw shared secret as the key material (do your own KDF off-token).
+    /// Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
+    /// <returns>The derived AES key.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
+    public Pkcs11Key DeriveSharedSecretEcdh(
+        Pkcs11Key ecPrivateKey,
+        ReadOnlySpan<byte> peerPublicPoint,
+        int aesBitLength = 256,
+        CKD kdf = CKD.CKD_SHA256_KDF)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(ecPrivateKey);
+        if (aesBitLength != 128 && aesBitLength != 192 && aesBitLength != 256)
+            throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
+
+        using var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
+        using var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .ValueLen(aesBitLength / 8)
+            .Sensitive().NonExtractable()
+            .Encrypt().Decrypt()
+            .OnToken(false)
+            .Attribute(CKA.CKA_MODIFIABLE, false)
+            .Build();
+        return ecPrivateKey.Derive(mechanism, template);
     }
 
     /// <summary>

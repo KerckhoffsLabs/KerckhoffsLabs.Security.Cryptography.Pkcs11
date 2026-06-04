@@ -1,46 +1,28 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 internal static class GenerateRsaKeyPairTestCases
 {
+    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
+        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+
     internal static void Assert_RejectsTooSmallModulus(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateRsaKeyPair(modulusBits: 1024));
-            Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateRsaKeyPair(modulusBits: 0));
-        }
-        finally
-        {
-            session.Logout();
-            session.CloseSession();
-        }
+        using var workspace = OpenWorkspace(backend);
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateRsaKeyPair(modulusBits: 1024));
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateRsaKeyPair(modulusBits: 0));
     }
 
     internal static void Assert_GeneratesRsa2048KeyPair(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
-        try
-        {
-            var (pub, priv) = session.GenerateRsaKeyPair(modulusBits: 2048);
-            try
-            {
-                Assert.NotEqual(0UL, pub.ObjectId);
-                Assert.NotEqual(0UL, priv.ObjectId);
-            }
-            finally
-            {
-                session.DestroyObject(priv);
-                session.DestroyObject(pub);
-            }
-        }
-        finally
-        {
-            session.Logout();
-            session.CloseSession();
-        }
+        using var workspace = OpenWorkspace(backend);
+        // 2048 keeps the SoftHSM round-trip fast; the production default is 4096.
+        using var key = workspace.GenerateRsaKeyPair(modulusBits: 2048);
+
+        Assert.False(key.PrivateHandle.IsInvalid);
+        Assert.False(key.PublicHandle.IsInvalid);
     }
 }
 

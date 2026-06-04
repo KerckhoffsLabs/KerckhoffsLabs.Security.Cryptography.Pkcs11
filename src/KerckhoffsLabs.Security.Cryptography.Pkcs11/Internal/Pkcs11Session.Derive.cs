@@ -47,47 +47,4 @@ internal sealed partial class Pkcs11Session
 
         return new ObjectHandle((ulong)derivedKey);
     }
-
-    // === Secure-default derive helpers =====================================
-
-    /// <summary>
-    /// Performs ECDH1 key derivation using the caller's EC private key and the peer's public
-    /// point. The derived key is an AES secret key — session-only, sensitive, non-extractable,
-    /// non-modifiable — suitable for use with AES-GCM.
-    /// </summary>
-    /// <param name="myPrivateKeyHandle">Handle of the caller's EC private key (CKA_DERIVE=true).</param>
-    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> attribute value).</param>
-    /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
-    /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
-    /// pass <see cref="CKD.CKD_NULL"/> to receive the raw shared secret (do your own KDF off-token).
-    /// Some HSMs (e.g. SoftHSM 2.x) only accept <c>CKD_NULL</c>.</param>
-    /// <returns>Handle of the derived AES key.</returns>
-    public ObjectHandle DeriveSharedSecretEcdh(
-        ObjectHandle myPrivateKeyHandle,
-        ReadOnlySpan<byte> peerPublicPoint,
-        int aesBitLength = 256,
-        CKD kdf = CKD.CKD_SHA256_KDF)
-    {
-        using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (aesBitLength != 128 && aesBitLength != 192 && aesBitLength != 256)
-            throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
-
-        using var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
-        using var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
-
-        using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
-        using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
-        using var attrValueLen = new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)(aesBitLength / 8));
-        using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
-        using var attrSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        using var attrExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, false);
-        using var attrEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
-        using var attrDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
-        using var attrModifiable = new ObjectAttribute(CKA.CKA_MODIFIABLE, false);
-
-        var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrValueLen, attrToken, attrSensitive, attrExtract, attrEncrypt, attrDecrypt, attrModifiable };
-        return DeriveKey(mechanism, myPrivateKeyHandle, template);
-    }
 }
