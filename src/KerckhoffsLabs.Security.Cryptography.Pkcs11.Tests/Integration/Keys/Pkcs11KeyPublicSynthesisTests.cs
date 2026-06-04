@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -53,6 +55,53 @@ public sealed class Pkcs11KeyPublicSynthesisTests_SoftHsm(SoftHsmBackendFixture 
             var rsaParams = key.GetSynthesizedRsaParameters();
             Assert.NotNull(rsaParams);
             Assert.Equal(2048 / 8, rsaParams!.Value.Modulus!.Length);
+        }
+        finally
+        {
+            workspace.Session.DestroyObject(privHandle);
+        }
+    }
+
+    // A private-only RSA key (no CKO_PUBLIC_KEY companion) must still verify via the synthesized
+    // public params in managed code, for both PKCS#1 v1.5 (already supported) and RSA-PSS (the
+    // mechanism map previously rejected the PSS combined mechanism).
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
+    {
+        using var workspace = OpenWorkspace();
+        string label = $"rsa-managedverify-{Guid.NewGuid():N}";
+        byte[] id = Encoding.ASCII.GetBytes(label);
+
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Verify().ModulusBits(2048)
+            .PublicExponent([0x01, 0x00, 0x01]).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Sign().Build();
+
+        workspace.Session.GenerateKeyPair(
+            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
+            [.. pubTpl.Attributes], [.. privTpl.Attributes],
+            out var pubHandle, out var privHandle);
+        try
+        {
+            workspace.Session.DestroyObject(pubHandle); // leave only the private-side
+            using var key = workspace.OpenKey(label);
+            Assert.True(key.PublicHandle.IsInvalid);
+
+            using var rsa = new RSAPkcs11(key);
+            byte[] data = Encoding.UTF8.GetBytes("managed verify over a private-only RSA key");
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+
+            // RSA-PSS: signed on the token, verified in managed code via synthesized public params.
+            byte[] pss = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+            Assert.True(rsa.VerifyData(data, pss, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+            Assert.False(rsa.VerifyData(tampered, pss, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+            // PKCS#1 v1.5: still works through the same managed path.
+            byte[] pkcs1 = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            Assert.True(rsa.VerifyData(data, pkcs1, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+            Assert.False(rsa.VerifyData(tampered, pkcs1, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
         }
         finally
         {

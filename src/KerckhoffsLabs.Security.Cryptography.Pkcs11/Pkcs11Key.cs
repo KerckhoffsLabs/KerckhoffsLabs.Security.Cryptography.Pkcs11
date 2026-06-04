@@ -599,6 +599,12 @@ public sealed class Pkcs11Key : IDisposable
     {
         using var ec = System.Security.Cryptography.ECDsa.Create();
         ec.ImportParameters(ecParams);
+
+        // Raw CKM_ECDSA signs a pre-computed digest, so the input IS the hash — verify it directly.
+        // The token emits an IEEE P1363 (r‖s) signature, which is ECDsa.VerifyHash's default format.
+        if ((CKM)mechanism.Type == CKM.CKM_ECDSA)
+            return ec.VerifyHash(data, signature);
+
         var hashName = MapEcdsaMechanism(mechanism);
         return ec.VerifyData(data, signature, hashName);
     }
@@ -610,6 +616,14 @@ public sealed class Pkcs11Key : IDisposable
             CKM.CKM_SHA256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             CKM.CKM_SHA512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            // PSS: RSASignaturePadding.Pss uses a digest-length salt, matching the salt the
+            // RSA-PSS sign path (Pkcs11MechanismMap.RsaPssSign) defaults to.
+            CKM.CKM_SHA1_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pss),
+            CKM.CKM_SHA256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pss),
+            CKM.CKM_SHA384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pss),
+            CKM.CKM_SHA512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pss),
+            // Raw CKM_RSA_PKCS / CKM_RSA_X_509 carry the hash inside a DigestInfo, so there is no
+            // mechanism-level hash to map to a managed VerifyData call. Use a CKO_PUBLIC_KEY companion.
             _ => throw new NotSupportedException(
                 $"Managed RSA verify is not implemented for mechanism {mechanism.Type}. " +
                 "Provide a CKO_PUBLIC_KEY companion on the token to use the native verify path."),
