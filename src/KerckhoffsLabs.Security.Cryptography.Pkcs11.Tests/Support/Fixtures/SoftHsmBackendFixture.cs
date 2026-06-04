@@ -77,6 +77,21 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         }
     }
 
+    /// <summary>True if the SoftHSM build we load has SLH-DSA (FIPS 205) compiled in
+    /// (<see cref="CKM.CKM_SLH_DSA_KEY_PAIR_GEN"/> / <see cref="CKM.CKM_SLH_DSA"/>). Upstream SoftHSM
+    /// has no SLH-DSA support today, so this is effectively always false; the gate is kept symmetric
+    /// with <see cref="SoftHsmSupportsMlDsa"/> and reflects a <c>softhsm-slhdsa.enabled</c> marker
+    /// next to the library, so SLH-DSA tests light up automatically against a future capable build.</summary>
+    public static bool SoftHsmSupportsSlhDsa
+    {
+        get
+        {
+            string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
+            return lib is not null
+                && File.Exists(Path.Combine(Path.GetDirectoryName(lib)!, "softhsm-slhdsa.enabled"));
+        }
+    }
+
     // Parent directory that SoftHSM2 creates UUID token subdirs inside.
     private readonly string _tokenStoreDir;
     private readonly string _configPath;

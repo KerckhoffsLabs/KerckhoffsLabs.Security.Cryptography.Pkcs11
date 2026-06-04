@@ -96,6 +96,35 @@ public static class Pkcs11MechanismMap
         => new(CKM.CKM_ML_DSA, new CkmPqcSignParams(hedgeVariant, context));
 
     /// <summary>
+    /// Returns a <see cref="Mechanism"/> for combined hash-and-sign DSA with the given hash
+    /// (<c>CKM_DSA_SHA1/224/256/384/512</c>). The token hashes the message and signs in one call.
+    /// </summary>
+    /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
+    /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
+    public static Mechanism DsaSign(HashAlgorithmName hash) => hash.Name switch
+    {
+        "SHA1" => new Mechanism(CKM.CKM_DSA_SHA1),
+        "SHA224" => new Mechanism(CKM.CKM_DSA_SHA224),
+        "SHA256" => new Mechanism(CKM.CKM_DSA_SHA256),
+        "SHA384" => new Mechanism(CKM.CKM_DSA_SHA384),
+        "SHA512" => new Mechanism(CKM.CKM_DSA_SHA512),
+        _ => throw new NotSupportedException(
+            $"DSA does not support hash {hash.Name}."),
+    };
+
+    /// <summary>
+    /// Returns a <see cref="Mechanism"/> for pure SLH-DSA signing (CKM_SLH_DSA, PKCS#11 v3.2)
+    /// with the supplied context bytes and hedge mode. The mechanism takes ownership of the
+    /// underlying parameter struct — dispose the returned <see cref="Mechanism"/> when done.
+    /// </summary>
+    /// <param name="hedgeVariant">Hedge mode. Default is <see cref="CkhHedge.CKH_HEDGE_PREFERRED"/> (per FIPS 205).</param>
+    /// <param name="context">Optional context bytes (max 255 per FIPS 205 §10.2).</param>
+    public static Mechanism SlhDsaSign(
+        CkhHedge hedgeVariant = CkhHedge.CKH_HEDGE_PREFERRED,
+        ReadOnlySpan<byte> context = default)
+        => new(CKM.CKM_SLH_DSA, new CkmPqcSignParams(hedgeVariant, context));
+
+    /// <summary>
     /// Returns a <see cref="Mechanism"/> for HashML-DSA signing (CKM_HASH_ML_DSA_*,
     /// PKCS#11 v3.2). Maps the BCL hash name to the matching combined-hash mechanism.
     /// </summary>
