@@ -5,6 +5,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 
 /// <summary>

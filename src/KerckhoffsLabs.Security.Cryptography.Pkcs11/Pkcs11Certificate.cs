@@ -57,7 +57,7 @@ public sealed class Pkcs11Certificate : IDisposable
     /// <remarks>
     /// BCL-shaped convenience wrappers <c>GetRSAPrivateKey()</c> / <c>GetECDsaPrivateKey()</c>
     /// (mirroring <c>X509Certificate2</c>) live in the
-    /// <c>KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters</c> assembly as extension methods.
+    /// <c>KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms</c> namespace as extension methods.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
     public Pkcs11Key? TryOpenPrivateKey()

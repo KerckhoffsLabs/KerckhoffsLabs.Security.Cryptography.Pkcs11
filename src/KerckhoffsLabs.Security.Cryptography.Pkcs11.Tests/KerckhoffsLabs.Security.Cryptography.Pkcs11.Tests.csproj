@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
-    <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters\KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,11 +25,6 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- ECDsaPkcs11Tests in the .Adapters.Tests assembly uses the internal TestKeys helper. -->
-    <InternalsVisibleTo Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Adapters.Tests" />
   </ItemGroup>
 
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
