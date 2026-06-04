@@ -189,10 +189,15 @@ public sealed class AesPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     }
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((_, aes) =>
+    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((workspace, aes) =>
     {
-        // Empty input that yields empty output is a no-op returned without touching the token
-        // (so it does not trip SoftHSM's empty-buffer rejection on CKM_AES_CBC / CKM_AES_CBC_PAD).
+        // Even the empty-input fast path honors the secure-defaults gate: without AllowInsecure the
+        // gated mechanism throws before the (empty) buffer reaches the token.
+        Assert.Throws<InsecureOperationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+
+        // With AllowInsecure, empty input is a no-op returned without touching the token (so it does
+        // not trip SoftHSM's empty-buffer rejection on CKM_AES_CBC / CKM_AES_CBC_PAD).
+        workspace.AllowInsecure = true;
         Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
     });
 

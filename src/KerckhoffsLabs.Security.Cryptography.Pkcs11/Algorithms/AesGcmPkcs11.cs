@@ -129,10 +129,17 @@ public sealed class AesGcmPkcs11 : IDisposable
             using var msgParams = CkmGcmMessageParams.ForDecrypt(nonce, tag);
             using var mech = new Mechanism(CKM.CKM_AES_GCM);
             byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
-            if (pt.Length != plaintext.Length)
-                throw new InvalidOperationException(
-                    $"AES-GCM message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
-            pt.CopyTo(plaintext);
+            try
+            {
+                if (pt.Length != plaintext.Length)
+                    throw new InvalidOperationException(
+                        $"AES-GCM message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
+                pt.CopyTo(plaintext);
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(pt);
+            }
             return;
         }
 
@@ -143,9 +150,16 @@ public sealed class AesGcmPkcs11 : IDisposable
         ciphertext.CopyTo(combined);
         tag.CopyTo(combined.AsSpan(ciphertext.Length));
         byte[] result = _key.Decrypt(legacyMech, combined);
-        if (result.Length != plaintext.Length)
-            throw new InvalidOperationException(
-                $"AES-GCM decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
-        result.CopyTo(plaintext);
+        try
+        {
+            if (result.Length != plaintext.Length)
+                throw new InvalidOperationException(
+                    $"AES-GCM decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
+            result.CopyTo(plaintext);
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(result);
+        }
     }
 }

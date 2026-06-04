@@ -199,6 +199,11 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
                     "MLKemPkcs11 (shared-secret CKA_VALUE unreadable; token rejected the extractable template)");
 
             value = attrs[0].GetValueAsByteArray();
+            // Validate the length as strictly as the ciphertext path (CopyExact): a short CKA_VALUE
+            // must not silently leave a partially-filled shared secret.
+            if (value.Length != destination.Length)
+                throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
+                    $"Token returned {value.Length}-byte shared secret; expected {destination.Length} bytes.");
             value.CopyTo(destination);
         }
         finally

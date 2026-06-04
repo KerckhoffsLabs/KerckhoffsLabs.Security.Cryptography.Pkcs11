@@ -168,10 +168,18 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         try
         {
             var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "ECDiffieHellmanPkcs11.DeriveRawSecret (derived CKA_VALUE not readable)");
-            return attrs[0].GetValueAsByteArray();
+            try
+            {
+                if (attrs.Count == 0 || attrs[0].CannotBeRead)
+                    throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                        "ECDiffieHellmanPkcs11.DeriveRawSecret (derived CKA_VALUE not readable)");
+                return attrs[0].GetValueAsByteArray();
+            }
+            finally
+            {
+                // ObjectAttribute owns an unmanaged buffer holding the shared secret Z; free it.
+                foreach (var a in attrs) a.Dispose();
+            }
         }
         finally
         {

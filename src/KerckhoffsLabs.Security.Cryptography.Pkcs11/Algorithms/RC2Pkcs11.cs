@@ -110,9 +110,12 @@ public sealed class RC2Pkcs11 : RC2
     {
         using (mechanism)
         {
-            // Empty input is a no-op (0 bytes in → 0 bytes out) returned without touching the token,
-            // except padded encryption (CKM_RC2_CBC_PAD) which must emit a full padding block.
-            if (input.IsEmpty && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
+            // Empty input is a no-op (0 bytes in → 0 bytes out): skip the token (some reject an empty
+            // buffer) — but ONLY when AllowInsecure is set. With AllowInsecure off we fall through so
+            // GuardMechanism throws InsecureOperationException as documented (the gate runs before the
+            // empty buffer reaches the token). Padded encryption (CKM_RC2_CBC_PAD) must emit a full
+            // padding block, so that path always goes to the token.
+            if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
             {
                 bytesWritten = 0;
                 return true;

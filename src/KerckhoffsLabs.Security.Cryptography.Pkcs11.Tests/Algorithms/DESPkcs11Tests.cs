@@ -195,10 +195,16 @@ public sealed class DESPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedDes((_, des) =>
+    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedDes((workspace, des) =>
     {
-        // Empty input that yields empty output is a no-op returned without touching the token
-        // (so it neither trips SoftHSM's empty-buffer rejection nor needs single-DES support).
+        // Even the empty-input fast path honors the secure-defaults gate: without AllowInsecure the
+        // gated mechanism throws before the (empty) buffer reaches the token. The gate fires ahead of
+        // any token call, so this needs no single-DES support.
+        Assert.Throws<InsecureOperationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+
+        // With AllowInsecure, empty input is a no-op returned without touching the token (so it
+        // neither trips SoftHSM's empty-buffer rejection nor needs single-DES support).
+        workspace.AllowInsecure = true;
         Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
     });
 

@@ -132,10 +132,17 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
             using var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
             using var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
             byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
-            if (pt.Length != plaintext.Length)
-                throw new InvalidOperationException(
-                    $"ChaCha20-Poly1305 message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
-            pt.CopyTo(plaintext);
+            try
+            {
+                if (pt.Length != plaintext.Length)
+                    throw new InvalidOperationException(
+                        $"ChaCha20-Poly1305 message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
+                pt.CopyTo(plaintext);
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(pt);
+            }
             return;
         }
 
@@ -146,9 +153,16 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         ciphertext.CopyTo(combined);
         tag.CopyTo(combined.AsSpan(ciphertext.Length));
         byte[] result = _key.Decrypt(legacyMech, combined);
-        if (result.Length != plaintext.Length)
-            throw new InvalidOperationException(
-                $"ChaCha20-Poly1305 decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
-        result.CopyTo(plaintext);
+        try
+        {
+            if (result.Length != plaintext.Length)
+                throw new InvalidOperationException(
+                    $"ChaCha20-Poly1305 decrypt returned {result.Length} bytes; expected {plaintext.Length}.");
+            result.CopyTo(plaintext);
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(result);
+        }
     }
 }

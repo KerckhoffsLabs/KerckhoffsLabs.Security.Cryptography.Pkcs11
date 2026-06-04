@@ -120,11 +120,13 @@ public sealed class AesPkcs11 : Aes
     {
         using (mechanism)
         {
-            // Empty input is a no-op (0 bytes in → 0 bytes out) returned without touching the token:
-            // there is nothing to do, and some tokens (e.g. SoftHSM) reject an empty C_Encrypt /
-            // C_Decrypt buffer. The exception is padded encryption (CKM_AES_CBC_PAD), where the BCL
-            // contract requires a full padding block to be emitted, so that path goes to the token.
-            if (input.IsEmpty && !(encrypt && mechanism.Type == (ulong)CKM.CKM_AES_CBC_PAD))
+            // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens (e.g. SoftHSM) reject an
+            // empty C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when AllowInsecure is
+            // set (i.e. once the secure-defaults gate would pass). With AllowInsecure off we fall
+            // through so GuardMechanism throws InsecureOperationException as documented (the gate runs
+            // before the empty buffer reaches the token). Padded encryption (CKM_AES_CBC_PAD) must emit
+            // a full padding block, so that path always goes to the token.
+            if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_AES_CBC_PAD))
             {
                 bytesWritten = 0;
                 return true;
