@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// BCL-aligned <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/>-shaped wrapper that
+/// BCL-aligned <see cref="SP800108HmacCounterKdf"/>-shaped wrapper that
 /// runs NIST SP800-108 HMAC counter-mode key derivation on a PKCS#11 token
 /// (<c>CKM_SP800_108_COUNTER_KDF</c>, PKCS#11 v3.0). <c>SP800108HmacCounterKdf</c> is sealed in the
 /// BCL, so this is a wrapper, not a subclass; method shapes mirror the BCL.
@@ -69,7 +69,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     /// <summary>
     /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material. Mirrors
-    /// <see cref="System.Security.Cryptography.SP800108HmacCounterKdf.DeriveKey(byte[], byte[], int)"/>.
+    /// <see cref="SP800108HmacCounterKdf.DeriveKey(byte[], byte[], int)"/>.
     /// </summary>
     public byte[] DeriveKey(byte[] label, byte[] context, int derivedKeyLengthInBytes)
     {
@@ -80,7 +80,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     /// <summary>
     /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material. Mirrors the
-    /// span overload of <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/>.
+    /// span overload of <see cref="SP800108HmacCounterKdf"/>.
     /// </summary>
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
@@ -91,7 +91,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     /// <summary>
     /// Derives keying material into <paramref name="destination"/>. Mirrors the destination-span
-    /// overload of <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/>.
+    /// overload of <see cref="SP800108HmacCounterKdf"/>.
     /// </summary>
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
@@ -157,7 +157,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     /// <summary>
     /// Does not dispose the underlying <see cref="Pkcs11Key"/> — the caller retains ownership.
-    /// Provided for API symmetry with <see cref="System.Security.Cryptography.SP800108HmacCounterKdf"/>.
+    /// Provided for API symmetry with <see cref="SP800108HmacCounterKdf"/>.
     /// </summary>
     public void Dispose()
     {
