@@ -9,19 +9,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </summary>
 public static class Pkcs11CertificateExtensions
 {
-    private const string RsaOid = "1.2.840.113549.1.1.1";
+    private const string RsaOid = "1.2.840.113549.1.1.1";       // rsaEncryption
+    private const string RsaPssOid = "1.2.840.113549.1.1.10";  // id-RSASSA-PSS
     private const string EcOid = "1.2.840.10045.2.1";
 
     /// <summary>
     /// Returns the certificate's on-token RSA private key (located by <see cref="Pkcs11Certificate.Id"/>)
     /// as a token-backed <see cref="RSA"/>. Returns <c>null</c> when the certificate is not RSA, or
     /// no private key with this certificate's <c>CKA_ID</c> exists on the token. The caller owns
-    /// the returned instance.
+    /// the returned instance. Both <c>rsaEncryption</c> and <c>id-RSASSA-PSS</c> SubjectPublicKeyInfo
+    /// algorithm OIDs are recognized as RSA, mirroring the BCL.
     /// </summary>
     public static RSA? GetRSAPrivateKey(this Pkcs11Certificate certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);
-        if (certificate.Certificate.GetKeyAlgorithm() != RsaOid) return null;
+        if (certificate.Certificate.GetKeyAlgorithm() is not (RsaOid or RsaPssOid)) return null;
         var key = certificate.TryOpenPrivateKey();
         return key is null ? null : new RSAPkcs11(key);
     }

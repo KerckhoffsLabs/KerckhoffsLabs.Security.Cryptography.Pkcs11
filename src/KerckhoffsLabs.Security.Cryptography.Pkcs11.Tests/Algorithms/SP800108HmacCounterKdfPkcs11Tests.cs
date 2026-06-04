@@ -102,8 +102,16 @@ public sealed class SP800108HmacCounterKdfPkcs11Tests_SoftHsm(SoftHsmBackendFixt
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void DeriveKey_NonPositiveLength_Throws() => WithImportedKdf((_, kdf) =>
-        Assert.Throws<ArgumentOutOfRangeException>(() => kdf.DeriveKey(Label, Context, 0)));
+    public void DeriveKey_NegativeLength_Throws() => WithImportedKdf((_, kdf) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => kdf.DeriveKey(Label, Context, -1)));
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void DeriveKey_ZeroLength_IsNoOp() => WithImportedKdf((_, kdf) =>
+    {
+        // Zero length is a no-op, matching the BCL SP800108HmacCounterKdf (no token call).
+        Assert.Empty(kdf.DeriveKey(Label, Context, 0));
+        kdf.DeriveKey(Label, Context, Span<byte>.Empty); // must not throw
+    });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKey_AfterDispose_Throws() => WithImportedKdf((_, kdf) =>

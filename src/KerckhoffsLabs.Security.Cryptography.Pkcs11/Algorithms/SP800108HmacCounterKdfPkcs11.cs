@@ -85,7 +85,10 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(derivedKeyLengthInBytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(derivedKeyLengthInBytes);
+        // Zero length is a no-op (matches the BCL), and avoids deriving a 0-byte token key.
+        if (derivedKeyLengthInBytes == 0)
+            return [];
         return DeriveExtractable(label, context, derivedKeyLengthInBytes);
     }
 
@@ -96,8 +99,9 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        // Zero-length destination is a no-op, matching the BCL.
         if (destination.IsEmpty)
-            throw new ArgumentException("Destination must not be empty.", nameof(destination));
+            return;
 
         byte[] derived = DeriveExtractable(label, context, destination.Length);
         try

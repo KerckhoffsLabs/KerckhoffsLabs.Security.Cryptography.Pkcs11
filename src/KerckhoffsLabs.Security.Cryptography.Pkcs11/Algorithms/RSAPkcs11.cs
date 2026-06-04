@@ -90,7 +90,7 @@ public sealed class RSAPkcs11 : RSA
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(padding);
-        if (offset < 0 || count < 0 || offset + count > data.Length)
+        if (offset < 0 || count < 0 || offset > data.Length - count)
             throw new ArgumentOutOfRangeException(nameof(offset));
 
         using var mech = SignMechanismFor(hashAlgorithm, padding);
@@ -133,7 +133,7 @@ public sealed class RSAPkcs11 : RSA
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(signature);
         ArgumentNullException.ThrowIfNull(padding);
-        if (offset < 0 || count < 0 || offset + count > data.Length)
+        if (offset < 0 || count < 0 || offset > data.Length - count)
             throw new ArgumentOutOfRangeException(nameof(offset));
 
         using var mech = SignMechanismFor(hashAlgorithm, padding);
