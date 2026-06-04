@@ -88,10 +88,11 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-005] `[Experimental]` not applied — v3.2 surface locked in pre-1.0
 
+- **Update (2026-06-04):** scope grew and paths moved (still open). The PQC adapters were renamed and relocated into the `…Pkcs11.Algorithms` namespace (`Pkcs11MlDsa`→`MLDsaPkcs11`, `Pkcs11MlKem`→`MLKemPkcs11`), and a new `SlhDsaPkcs11` (FIPS 205) adapter was added — it must also carry `[Experimental]`. `SlhDsaPkcs11` currently has only the BCL's `SYSLIB5006` suppression (because `System.Security.Cryptography.SlhDsa` is itself evaluation-only), not the project's own `PKCS11NET001` marker.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11MlDsa.cs:29`; `Pkcs11MlKem.cs`; `Pkcs11Key.cs:452,475` (EncapsulateKey/DecapsulateKey)
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/MLDsaPkcs11.cs`; `Algorithms/MLKemPkcs11.cs`; `Algorithms/SlhDsaPkcs11.cs`; `Pkcs11Key.cs` (`EncapsulateKey`/`DecapsulateKey`)
 - **Problem:** PQC adapters and v3.2 KEM/auth-wrap methods are shipped without `[Experimental("PKCS11NET001")]`. Once 1.0 ships, any change to those signatures is a SemVer-major.
 - **Proposed action:** Apply `[Experimental("PKCS11NET001")]` to every v3.2-only public type/method now. Document the policy in a `STABILITY.md`.
 - **Breaks public API?** Yes (consumers get a compile-time warning). Must land before 1.0.
@@ -473,10 +474,11 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-035] RSA-OAEP and ECDH-with-KDF are gated off — never run in CI
 
+- **Update (2026-06-04):** the ECDH half is now substantially covered. The new `ECDiffieHellmanPkcs11` adapter derives the raw shared secret with `CKD_NULL` and applies the hash/HMAC KDF in managed code; `ECDiffieHellmanPkcs11Tests` (12 cases) cross-check both parties against the BCL `ECDiffieHellman` and **run** on SoftHSM in CI. Remaining scope: RSA-OAEP (still gated, `SoftHsmSupportsOaepSha256 = false`) and ECDH1 with a *token-side* KDF (`CKD_SHA256_KDF`, `SoftHsmSupportsEcdh1WithKdf = false` — SoftHSM hardcodes `CKD_NULL`).
 - **Area:** QA
 - **Severity:** High
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/HighLevel/Encrypt/EncryptRsaTests.cs:111`; `HighLevel/Decrypt/DecryptRsaTests.cs:124`; `HighLevel/Derive/DeriveSharedSecretEcdhTests.cs:81`
+- **Location:** `Integration/Encrypt/EncryptRsaTests.cs`; `Integration/Decrypt/DecryptRsaTests.cs`; `Integration/Derive/DeriveSharedSecretEcdhTests.cs`; ECDH now also `Algorithms/ECDiffieHellmanPkcs11Tests.cs`
 - **Problem:** Both primary recommended paths are skipped by `SoftHsmSupportsOaepSha256 = false` and `SoftHsmSupportsEcdh1WithKdf = false`. SoftHSM 2.7 does support OAEP-SHA1 and ECDH with `CKD_NULL`; tests using those variants would exercise the marshalling paths in CI.
 - **Proposed action:** Add `EncryptDecrypt_OaepSha1_RoundTrips` (gated on `SoftHsmAvailable` only) and `Ecdh_NullKdf_BothPartiesDeriveSameSecret`. Keep the SHA-256 / SHA-256-KDF tests flagged for when SoftHSM is upgraded.
 - **Breaks public API?** No.
@@ -561,13 +563,14 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 - **Proposed action:** Either correct the doc, or add an explicit `Logout()` call before close (swallow `CKR_USER_NOT_LOGGED_IN`).
 - **Raised by:** PKCS#11 Specialist B
 
-### [BL-043] `LoginUser`, `Pkcs11MlKem` extract-and-destroy paths don't zero transient buffers / swallow destroy errors
+### [BL-043] `LoginUser`, ML-KEM extract-and-destroy paths don't zero transient buffers / swallow destroy errors
 
+- **Update (2026-06-04):** still open; the ML-KEM adapter was renamed/moved (`Pkcs11MlKem`→`Algorithms/MLKemPkcs11.cs`). Verified both sub-issues remain: `LoginUser` does not zero `usernameBytes` (`Pkcs11Session.cs` ~474), and `MLKemPkcs11.TryDestroy` still swallows `Pkcs11Exception` (~219). The recent ML-KEM shared-secret length-check fix is unrelated to this.
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:434-446`; `Pkcs11MlKem.cs:241-246`
-- **Problem:** `LoginUser` zeroes `pinTmp` but not `usernameBytes` — inconsistent with the project's documented hygiene. `Pkcs11MlKem.TryDestroy` silently swallows `Pkcs11Exception`; if `C_DestroyObject` fails the extractable shared-secret object lingers on-token.
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs` (`LoginUser`); `Algorithms/MLKemPkcs11.cs` (`TryDestroy`)
+- **Problem:** `LoginUser` zeroes `pinTmp` but not `usernameBytes` — inconsistent with the project's documented hygiene. `MLKemPkcs11.TryDestroy` silently swallows `Pkcs11Exception`; if `C_DestroyObject` fails the extractable shared-secret object lingers on-token.
 - **Proposed action:** Zero `usernameBytes` in the `LoginUser` finally. Log the `TryDestroy` failure at warning and consider surfacing it to the caller after the copy completes.
 - **Raised by:** Cryptographer A, Cryptographer B, PKCS#11 Specialist B
 
@@ -603,10 +606,11 @@ _Generated 2026-05-15 from a multi-specialist deep review (cryptography, PKCS#11
 
 ### [BL-047] `RSAPkcs11.SignMechanismFor` inconsistently gates PKCS#1 v1.5
 
+- **Update (2026-06-04):** still open; `RSAPkcs11` moved to `Algorithms/RSAPkcs11.cs` (`SignMechanismFor` now ~219-227). The gating split is unchanged. Related: BL-069 and the recent managed-verify additions (RSA-PSS / raw-ECDSA) touch the RSA verify path, but the all-gated-vs-all-allowed *policy* decision for `CKM_SHA*_RSA_PKCS` is still pending.
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/RSAPkcs11.cs:238-241`; `Internal/Pkcs11Session.cs:516-563`
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/RSAPkcs11.cs` (`SignMechanismFor`, ~219-227); `Internal/Pkcs11Session.cs` (`GuardMechanism`)
 - **Problem:** `GuardMechanism` blocks `CKM_SHA1_RSA_PKCS` but allows `CKM_SHA256_RSA_PKCS` / `_SHA384_` / `_SHA512_`. The inline comment claims the SHA-N variants are "intentionally not gated." The split is inconsistent and creates false confidence.
 - **Proposed action:** Decide either all-gated or all-allowed for `CKM_SHA*_RSA_PKCS`. Document the policy explicitly in code and the security model doc.
 - **Raised by:** Cryptographer B
