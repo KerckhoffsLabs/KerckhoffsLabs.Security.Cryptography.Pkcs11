@@ -42,7 +42,7 @@ jobs:
 
     steps:
       # submodules: the test project builds pkcs11-mock (vendor/pkcs11-mock) and,
-      # on Linux/macOS, SoftHSM2 (vendor/softhsmv2) from source during `dotnet build`.
+      # on Linux only, SoftHSM2 (vendor/softhsmv2) from source during `dotnet build`.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
@@ -56,9 +56,11 @@ jobs:
       # pkcs11-mock builds with gcc/make (in build-essential); SoftHSM2 builds from source with
       # autotools (autoconf/automake/libtool). Both BeforeTargets fire during the Build step below,
       # placing the libraries next to the test assembly where the backend fixtures auto-discover them.
-      # Windows SoftHSM2 is gated off for now: the vendored build (build-softhsmv2.ps1) compiles,
-      # but token init fails to load the module and a from-source vcpkg OpenSSL build takes ~27 min.
-      # Tracked as a follow-up; until then Windows runs pkcs11-mock only and SoftHSM tests self-skip.
+      # SoftHSM2 is built from source on Linux only. Windows is gated off (the vendored
+      # build-softhsmv2.ps1 compiles, but token init fails to load the module and a from-source
+      # vcpkg OpenSSL build takes ~27 min); macOS is gated off too (no autotools/OpenSSL-3.5 setup
+      # here, and the managed-token tests already give cross-platform BCL coverage). Both run
+      # pkcs11-mock only and their SoftHSM-gated tests self-skip; tracked as a follow-up.
       - name: Install native build deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
@@ -101,7 +103,9 @@ jobs:
 
       - name: Build
         env:
-          SkipSoftHsmV2Build: ${{ runner.os == 'Windows' && 'true' || '' }}
+          # SoftHSM2 is built from source only on Linux. Windows and macOS run pkcs11-mock
+          # only (see the native-deps note above); their SoftHSM-gated tests self-skip.
+          SkipSoftHsmV2Build: ${{ runner.os != 'Linux' && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Auditable record of which SoftHSM the Linux job will exercise. The vendored
