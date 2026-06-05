@@ -115,7 +115,10 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     public override CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong objectId)
     {
-        objectId = (NativeCULong)Store(ReadTemplate(template, count));
+        var attrs = ReadTemplate(template, count);
+        ulong handle = Store(attrs);
+        RegisterImportedAsymKey(handle, attrs); // reconstructs a live BCL DSA for CKK_DSA imports
+        objectId = (NativeCULong)handle;
         return CKR.CKR_OK;
     }
 

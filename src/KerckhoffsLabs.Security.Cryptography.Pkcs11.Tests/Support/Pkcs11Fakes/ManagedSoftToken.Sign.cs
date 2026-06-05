@@ -109,7 +109,10 @@ internal sealed partial class ManagedSoftToken
         CKM.CKM_SHA1_RSA_PKCS or CKM.CKM_SHA256_RSA_PKCS or CKM.CKM_SHA384_RSA_PKCS or CKM.CKM_SHA512_RSA_PKCS
         or CKM.CKM_SHA1_RSA_PKCS_PSS or CKM.CKM_SHA256_RSA_PKCS_PSS or CKM.CKM_SHA384_RSA_PKCS_PSS or CKM.CKM_SHA512_RSA_PKCS_PSS;
 
-    private static bool IsAsymSign(CKM m) => IsEcdsaSign(m) || IsRsaSign(m);
+    private static bool IsDsaSign(CKM m) => m is
+        CKM.CKM_DSA or CKM.CKM_DSA_SHA1 or CKM.CKM_DSA_SHA256 or CKM.CKM_DSA_SHA384 or CKM.CKM_DSA_SHA512;
+
+    private static bool IsAsymSign(CKM m) => IsEcdsaSign(m) || IsRsaSign(m) || IsDsaSign(m);
 
     private static byte[] AsymSign(CKM m, AsymmetricAlgorithm alg, byte[] input) => m switch
     {
@@ -118,6 +121,11 @@ internal sealed partial class ManagedSoftToken
         CKM.CKM_ECDSA_SHA256 => ((ECDsa)alg).SignData(input, HashAlgorithmName.SHA256),
         CKM.CKM_ECDSA_SHA384 => ((ECDsa)alg).SignData(input, HashAlgorithmName.SHA384),
         CKM.CKM_ECDSA_SHA512 => ((ECDsa)alg).SignData(input, HashAlgorithmName.SHA512),
+        CKM.CKM_DSA => ((DSA)alg).CreateSignature(input), // input is the prehash; IEEE-P1363 (r‖s)
+        CKM.CKM_DSA_SHA1 => ((DSA)alg).SignData(input, HashAlgorithmName.SHA1),
+        CKM.CKM_DSA_SHA256 => ((DSA)alg).SignData(input, HashAlgorithmName.SHA256),
+        CKM.CKM_DSA_SHA384 => ((DSA)alg).SignData(input, HashAlgorithmName.SHA384),
+        CKM.CKM_DSA_SHA512 => ((DSA)alg).SignData(input, HashAlgorithmName.SHA512),
         _ when IsRsaSign(m) => RsaSignData(m, (RSA)alg, input),
         _ => throw new CryptographicException($"ManagedSoftToken: unsupported sign mechanism {m}."),
     };
@@ -129,6 +137,11 @@ internal sealed partial class ManagedSoftToken
         CKM.CKM_ECDSA_SHA256 => ((ECDsa)alg).VerifyData(input, sig, HashAlgorithmName.SHA256),
         CKM.CKM_ECDSA_SHA384 => ((ECDsa)alg).VerifyData(input, sig, HashAlgorithmName.SHA384),
         CKM.CKM_ECDSA_SHA512 => ((ECDsa)alg).VerifyData(input, sig, HashAlgorithmName.SHA512),
+        CKM.CKM_DSA => ((DSA)alg).VerifySignature(input, sig),
+        CKM.CKM_DSA_SHA1 => ((DSA)alg).VerifyData(input, sig, HashAlgorithmName.SHA1),
+        CKM.CKM_DSA_SHA256 => ((DSA)alg).VerifyData(input, sig, HashAlgorithmName.SHA256),
+        CKM.CKM_DSA_SHA384 => ((DSA)alg).VerifyData(input, sig, HashAlgorithmName.SHA384),
+        CKM.CKM_DSA_SHA512 => ((DSA)alg).VerifyData(input, sig, HashAlgorithmName.SHA512),
         _ when IsRsaSign(m) => RsaVerifyData(m, (RSA)alg, input, sig),
         _ => throw new CryptographicException($"ManagedSoftToken: unsupported verify mechanism {m}."),
     };
