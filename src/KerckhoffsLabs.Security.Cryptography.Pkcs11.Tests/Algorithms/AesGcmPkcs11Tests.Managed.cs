@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -15,6 +16,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class AesGcmPkcs11Tests_Managed
 {
+    // macOS BCL AesGcm requires a 16-byte tag (TagByteSizes is 16..16), so the 12-15 byte cases in
+    // the tag-size matrix below are gated. tag=16 is still covered cross-platform by the key-size
+    // matrix and the other cases.
+    public static bool SmallTagsSupported => AesGcm.TagByteSizes.MinSize < 16;
+
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     private static byte[] Iota(int length)
@@ -78,7 +84,7 @@ public sealed class AesGcmPkcs11Tests_Managed
         });
     }
 
-    [Theory]
+    [ConditionalTheory(nameof(SmallTagsSupported))]
     [InlineData(12)] // shortest tag
     [InlineData(13)]
     [InlineData(14)]

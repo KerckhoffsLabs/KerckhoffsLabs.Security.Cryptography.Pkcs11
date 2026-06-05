@@ -243,7 +243,11 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
 
     private void RunUtil(string args, bool ignoreFailure = false)
     {
-        var psi = new ProcessStartInfo(_utilPath, args)
+        // Point softhsm2-util at the libsofthsm2 we built and placed next to it. Without --module it
+        // falls back to a module path compiled in at build time (a CMake/autotools install prefix);
+        // that path doesn't exist in CI, so on Windows LoadLibrary fails with ERROR_MOD_NOT_FOUND
+        // (0x7E). (Linux happens to work because the autotools install dir persists in the workspace.)
+        var psi = new ProcessStartInfo(_utilPath, $"{args} --module \"{LibraryPath}\"")
         {
             RedirectStandardError = true,
             UseShellExecute = false,
