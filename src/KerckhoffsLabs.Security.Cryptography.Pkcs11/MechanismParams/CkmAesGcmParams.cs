@@ -40,7 +40,9 @@ public sealed class CkmAesGcmParams : MechanismParameters
         {
             Iv = _iv,
             IvLen = (NativeCULong)iv.Length,
-            IvBits = (NativeCULong)(iv.Length * 8),
+            // Legacy field; PKCS#11 v3.2 §2.5.13 allows 0 and the IV length is taken from IvLen.
+            // Some tokens reject a non-zero value, so leave it 0 for maximum interoperability.
+            IvBits = (NativeCULong)0,
             AAD = _aad,
             AADLen = (NativeCULong)aad.Length,
             TagBits = (NativeCULong)tagBits,

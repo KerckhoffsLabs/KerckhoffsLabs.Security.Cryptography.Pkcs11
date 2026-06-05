@@ -20,9 +20,11 @@ internal partial struct CK_GCM_PARAMS
     public NativeCULong IvLen;
 
     /// <summary>
-    /// Member is defined in PKCS#11 v2.40e1 headers but the description is not present in the specification
+    /// Length of initialization vector in bits. PKCS#11 v3.2 (§2.5.13, CK_GCM_PARAMS) retains this
+    /// as a legacy field whose value "may be 0"; the IV length is taken from <see cref="IvLen"/>.
+    /// Many tokens ignore it and some reject a non-zero value, so it should be left 0.
     /// </summary>
-    public NativeCULong IvBits; // TODO - Fix description when fixed in PKCS#11 specification
+    public NativeCULong IvBits;
 
     /// <summary>
     /// Pointer to additional authentication data

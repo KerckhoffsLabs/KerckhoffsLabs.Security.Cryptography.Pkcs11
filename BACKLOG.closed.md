@@ -552,6 +552,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Assert `CryptokiVersion` matches `\d+\.\d+`, major ≥ 2; assert `SlotCount > 0`.
 - **Raised by:** QA A
 
+### [BL-041] `CK_GCM_PARAMS.IvBits` carries a stale TODO and an undefined value
+
+- **Status: Resolved (2026-06-05)** — `IvBits` is now marshalled as `0` (PKCS#11 v3.2 §2.5.13 retains it as a legacy field whose value may be 0; the IV length is taken from `IvLen`). The stale `// TODO` was replaced with a doc comment citing §2.5.13 and noting that some tokens reject a non-zero value. The marshal round-trip test now asserts `IvBits == 0`; AES-GCM continues to pass against both pkcs11-mock and SoftHSM2.
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/RawMechanismParams/CK_GCM_PARAMS.cs:24`; `MechanismParams/CkmAesGcmParams.cs:43`
+- **Problem:** `IvBits` is set to `iv.Length * 8` with a TODO comment. SoftHSM and many vendors ignore or reject non-zero values; PKCS#11 v3.2 retains the field as legacy ("may be 0").
+- **Proposed action:** Set `IvBits = 0`, update comment to cite v3.2 §2.5.13.
+- **Raised by:** Cryptographer A, PKCS#11 Specialist A
+
 ---
 
 ## Low

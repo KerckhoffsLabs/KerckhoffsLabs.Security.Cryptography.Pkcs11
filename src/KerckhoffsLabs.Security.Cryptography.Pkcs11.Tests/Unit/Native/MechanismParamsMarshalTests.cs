@@ -41,7 +41,9 @@ public sealed class MechanismParamsMarshalTests
         var s = Marshalled<CK_GCM_PARAMS>(p.ToMarshalableStructure());
 
         Assert.Equal((ulong)iv.Length, (ulong)s.IvLen);
-        Assert.Equal((ulong)(iv.Length * 8), (ulong)s.IvBits);
+        // IvBits is a legacy field (PKCS#11 v3.2 §2.5.13); we always marshal it as 0 since the IV
+        // length is carried by IvLen and some tokens reject a non-zero value.
+        Assert.Equal(0UL, (ulong)s.IvBits);
         Assert.Equal((ulong)aad.Length, (ulong)s.AADLen);
         Assert.Equal(96UL, (ulong)s.TagBits);
         Assert.NotEqual(IntPtr.Zero, s.Iv);
