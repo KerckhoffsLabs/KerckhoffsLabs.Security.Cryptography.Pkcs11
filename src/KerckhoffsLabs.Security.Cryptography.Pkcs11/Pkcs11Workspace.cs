@@ -16,8 +16,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <para>
 /// Construction is exclusively via <see cref="Pkcs11Library.OpenWorkspace(string, CKU, SecurePin)"/>.
 /// The workspace does not own the library — callers continue to own and dispose the
-/// <see cref="Pkcs11Library"/>. The workspace owns the session it opened and closes it
-/// on <see cref="Dispose"/>; the session's own Dispose logs the user out before closing.
+/// <see cref="Pkcs11Library"/>. The workspace owns the session it opened. On
+/// <see cref="Dispose"/> it logs the user out (<c>C_Logout</c>, best-effort — a token-wide
+/// state change, since PKCS#11 login state is per-application/slot) and then closes the
+/// session (<c>C_CloseSession</c>), so the HSM audit log records an explicit logout, not just
+/// a session close. A logout that fails because no user was logged in is ignored.
 /// </para>
 /// <para>
 /// Keys obtained via the workspace's factory methods hold a non-owning reference to the
@@ -72,6 +75,22 @@ public sealed class Pkcs11Workspace : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+
+        // Explicitly log out before closing the session so the token's audit log records a
+        // logout, not just a session close. Best-effort: the caller may have already logged out
+        // (CKR_USER_NOT_LOGGED_IN), or the library/session may already be torn down — none of
+        // those should make disposal throw. C_Logout affects the whole application's login state
+        // on the slot, which is the intended end-of-context behaviour for an owned workspace.
+        try
+        {
+            _session.Logout();
+        }
+        catch (Pkcs11Exception)
+        {
+            // Already logged out, session/library already gone, or token rejected the logout
+            // during teardown — disposal proceeds regardless.
+        }
+
         _session.Dispose();
         _disposed = true;
         GC.SuppressFinalize(this);

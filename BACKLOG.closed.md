@@ -563,6 +563,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Set `IvBits = 0`, update comment to cite v3.2 §2.5.13.
 - **Raised by:** Cryptographer A, PKCS#11 Specialist A
 
+### [BL-042] `Pkcs11Workspace.Dispose` docstring claims it logs the user out — it doesn't
+
+- **Status: Resolved (2026-06-05)** — Took the stronger option: `Pkcs11Workspace.Dispose` now calls `_session.Logout()` (`C_Logout`) before closing the session, so the token's audit log records an explicit logout rather than a bare session close. The logout is best-effort — a `Pkcs11Exception` (e.g. `CKR_USER_NOT_LOGGED_IN`, or a session/library already torn down during shutdown) is swallowed so disposal never throws. The class-level doc was corrected to describe the logout-then-close behaviour and to note `C_Logout` changes the whole application's login state on the slot. Covered by `WorkspaceDisposeTests` (logout-on-dispose, swallowed-failure, and idempotent-dispose cases) via a `LogoutCallCount`/`LogoutResult` hook on `ManagedSoftToken`.
+- **Area:** PKCS#11 Conformance
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs:18-19,49-55`
+- **Problem:** The XML doc states "the session's own Dispose logs the user out before closing." `Pkcs11Session.Dispose` never calls `C_Logout`. The HSM audit log will show only close, not logout.
+- **Proposed action:** Either correct the doc, or add an explicit `Logout()` call before close (swallow `CKR_USER_NOT_LOGGED_IN`).
+- **Raised by:** PKCS#11 Specialist B
+
 ---
 
 ## Low

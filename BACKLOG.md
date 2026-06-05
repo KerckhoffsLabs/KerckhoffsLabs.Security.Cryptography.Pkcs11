@@ -69,16 +69,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Proposed action:** Add a `PKCS11_EXTRA_MODULE_PATH` env-var override that runs a subset of the smoke and round-trip tests against an arbitrary caller-supplied module. Document the matrix in a `TESTING.md`.
 - **Raised by:** QA A
 
-### [BL-042] `Pkcs11Workspace.Dispose` docstring claims it logs the user out — it doesn't
-
-- **Area:** PKCS#11 Conformance
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs:18-19,49-55`
-- **Problem:** The XML doc states "the session's own Dispose logs the user out before closing." `Pkcs11Session.Dispose` never calls `C_Logout`. The HSM audit log will show only close, not logout.
-- **Proposed action:** Either correct the doc, or add an explicit `Logout()` call before close (swallow `CKR_USER_NOT_LOGGED_IN`).
-- **Raised by:** PKCS#11 Specialist B
-
 ### [BL-043] `LoginUser`, ML-KEM extract-and-destroy paths don't zero transient buffers / swallow destroy errors
 
 - **Update (2026-06-04):** still open; the ML-KEM adapter was renamed/moved (`Pkcs11MlKem`→`Algorithms/MLKemPkcs11.cs`). Verified both sub-issues remain: `LoginUser` does not zero `usernameBytes` (`Pkcs11Session.cs` ~474), and `MLKemPkcs11.TryDestroy` still swallows `Pkcs11Exception` (~219). The recent ML-KEM shared-secret length-check fix is unrelated to this.

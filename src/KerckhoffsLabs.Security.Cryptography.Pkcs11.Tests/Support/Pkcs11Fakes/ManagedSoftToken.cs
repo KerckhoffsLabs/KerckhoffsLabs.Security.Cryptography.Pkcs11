@@ -91,7 +91,19 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     }
 
     public override CKR C_Login(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen) => CKR.CKR_OK;
-    public override CKR C_Logout(NativeCULong session) => CKR.CKR_OK;
+
+    /// <summary>Number of times <c>C_Logout</c> has been invoked. Used to assert logout-on-dispose.</summary>
+    public int LogoutCallCount { get; private set; }
+
+    /// <summary>Return value the next <c>C_Logout</c> should report. Lets tests exercise the
+    /// best-effort swallow path (e.g. <see cref="CKR.CKR_USER_NOT_LOGGED_IN"/>).</summary>
+    public CKR LogoutResult { get; set; } = CKR.CKR_OK;
+
+    public override CKR C_Logout(NativeCULong session)
+    {
+        LogoutCallCount++;
+        return LogoutResult;
+    }
 
     // === Objects =========================================================
 
