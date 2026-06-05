@@ -23,6 +23,11 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$TestOutputDir,
 
+    # Target RID (win-x64 / win-x86 / win-arm64). The MSBuild target passes the .NET SDK's RID so
+    # the library matches the testhost architecture, not the (64-bit) pwsh running this script.
+    # Defaults to the host architecture when omitted.
+    [string]$Rid = '',
+
     [string]$VcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
 )
 
@@ -38,10 +43,13 @@ if (-not $VcpkgRoot -or -not (Test-Path $VcpkgRoot)) {
     Write-Error "vcpkg not found. Pass -VcpkgRoot or set VCPKG_INSTALLATION_ROOT (needed for the OpenSSL dependency)."
 }
 
-$arch    = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-$rid     = if ($arch -eq [System.Runtime.InteropServices.Architecture]::Arm64) { 'win-arm64' } else { 'win-x64' }
-$triplet = if ($rid -eq 'win-arm64') { 'arm64-windows' } else { 'x64-windows' }
-$cmakeA  = if ($rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
+if (-not $Rid) {
+    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    $Rid  = if ($arch -eq [System.Runtime.InteropServices.Architecture]::Arm64) { 'win-arm64' } else { 'win-x64' }
+}
+$rid     = $Rid
+$triplet = switch ($rid) { 'win-arm64' { 'arm64-windows' } 'win-x86' { 'x86-windows' } default { 'x64-windows' } }
+$cmakeA  = switch ($rid) { 'win-arm64' { 'ARM64' } 'win-x86' { 'Win32' } default { 'x64' } }
 
 $destDir  = Join-Path $TestOutputDir "runtimes\$rid\native"
 $destLib  = Join-Path $destDir 'libsofthsm2.dll'
