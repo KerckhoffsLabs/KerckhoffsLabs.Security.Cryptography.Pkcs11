@@ -35,6 +35,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+          - os: macos-latest
           - os: windows-latest
           - os: windows-latest
             arch: x86
