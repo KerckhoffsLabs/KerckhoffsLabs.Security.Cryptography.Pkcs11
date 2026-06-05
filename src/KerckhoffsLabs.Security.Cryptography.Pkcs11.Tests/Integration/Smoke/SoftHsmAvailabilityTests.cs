@@ -6,9 +6,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// <summary>
 /// CI-health guard: makes a missing SoftHSM2 fail loudly instead of silently skipping the
 /// whole <c>[ConditionalFact(SoftHsmAvailable)]</c> integration suite while CI stays green.
-/// SoftHSM is built from the vendored submodule on Linux and Windows-x64; macOS and the
-/// Windows-x86 leg run pkcs11-mock only (the fixture does not auto-discover a system install),
-/// so the guard is scoped to the build platforms.
+/// SoftHSM is built from the vendored submodule on Linux, macOS, and Windows-x64; only the
+/// Windows-x86 leg runs pkcs11-mock only (an x86 testhost can't load the x64 library), so the
+/// guard is scoped to the build platforms.
 /// </summary>
 public sealed class SoftHsmAvailabilityTests
 {
@@ -18,11 +18,10 @@ public sealed class SoftHsmAvailabilityTests
         bool inCi = string.Equals(
             Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
 
-        // Enforced in CI only where the vendored SoftHSM is built: Linux and Windows-x64. macOS
-        // builds pkcs11-mock only, and the Windows-x86 leg can't load the x64 library the build
+        // Enforced in CI on every platform where the vendored SoftHSM is built: Linux, macOS, and
+        // Windows-x64. Only the Windows-x86 leg is exempt — it can't load the x64 library the build
         // produces. Locally a developer may skip the native build (SkipSoftHsmV2Build).
         if (!inCi) return;
-        if (OperatingSystem.IsMacOS()) return;
         if (OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X86) return;
 
         Assert.True(SoftHsmBackendFixture.SoftHsmAvailable,

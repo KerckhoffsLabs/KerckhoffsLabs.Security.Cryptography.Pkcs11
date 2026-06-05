@@ -61,10 +61,10 @@ jobs:
       # SoftHSM2 builds from source during the Build step below (BeforeTargets), placing the
       # libraries next to the test assembly where the backend fixtures auto-discover them:
       #   - Linux:        autotools (autoconf/automake/libtool) against an OpenSSL 3.5 we build below.
+      #   - macOS:        autotools against Homebrew OpenSSL 3 (native arm64).
       #   - Windows-x64:  CMake + vcpkg OpenSSL (build-softhsmv2.ps1); vcpkg OpenSSL is cached below.
-      #   - macOS / Windows-x86: gated off (pkcs11-mock only). macOS has no toolchain set up here and
-      #     the managed-token tests give cross-platform BCL coverage; the Windows-x86 leg can't load
-      #     the x64 library the script produces. Their SoftHSM-gated tests self-skip.
+      #   - Windows-x86:  gated off (pkcs11-mock only) — an x86 testhost can't load the x64 library
+      #     the script produces. Its SoftHSM-gated tests self-skip.
       - name: Install native build deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
@@ -102,6 +102,19 @@ jobs:
           echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
+      # macOS: SoftHSM builds with autotools against Homebrew OpenSSL 3. Unlike Linux, .NET on macOS
+      # uses Apple's crypto (not system OpenSSL), so there is no in-process libcrypto collision — no
+      # DYLD path needed. libsofthsm2.dylib records its libcrypto dependency by Homebrew's absolute
+      # install path, which persists on the runner, so the copied-out dylib resolves it at runtime.
+      - name: Install native build deps (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          brew install autoconf automake libtool openssl@3
+          echo "OPENSSL_PREFIX=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+
       # build-softhsmv2.ps1 runs `vcpkg install openssl:x64-windows` during the Build step — a
       # from-source OpenSSL build (~27 min cold). vcpkg's default binary cache makes a warm restore
       # near-instant. Split restore/save: actions/cache's single-step post-save is skipped when the
@@ -122,9 +135,9 @@ jobs:
 
       - name: Build
         env:
-          # SoftHSM2 is built on Linux (autotools) and Windows-x64 (CMake+vcpkg). macOS and the
-          # Windows-x86 leg skip it (pkcs11-mock only); their SoftHSM-gated tests self-skip.
-          SkipSoftHsmV2Build: ${{ (runner.os == 'macOS' || matrix.arch == 'x86') && 'true' || '' }}
+          # SoftHSM2 is built on Linux/macOS (autotools) and Windows-x64 (CMake+vcpkg). Only the
+          # Windows-x86 leg skips it (pkcs11-mock only); its SoftHSM-gated tests self-skip.
+          SkipSoftHsmV2Build: ${{ matrix.arch == 'x86' && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Persist the vcpkg OpenSSL build right after it's produced, even if the Test step later fails
@@ -140,8 +153,8 @@ jobs:
       # BuildSoftHsmV2 target places libsofthsm2.so + softhsm2-util next to the test
       # assembly; if the build silently failed to place them, this surfaces it in the
       # log and the SoftHsm_IsAvailable_OnCiBuildPlatforms test fails the job.
-      - name: Report SoftHSM build (Linux)
-        if: runner.os == 'Linux'
+      - name: Report SoftHSM build (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           util=$(find . -path '*runtimes*native*' -name 'softhsm2-util' | head -1)
           if [ -n "$util" ]; then echo "Built SoftHSM: $util"; "$util" --version; \
@@ -159,9 +172,9 @@ jobs:
           }
           else { Write-Host "::warning::built softhsm2-util.exe not found under runtimes/*/native" }
 
-      # Linux and Windows-x64 build both backends (pkcs11-mock + SoftHSM2), so the SoftHSM-gated
-      # [ConditionalFact] tests run there and the SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails
-      # the job if the build failed to place libsofthsm2. macOS and the Windows-x86 leg build
-      # pkcs11-mock only, so their SoftHSM tests self-skip and the guard is a no-op.
+      # Linux, macOS, and Windows-x64 build both backends (pkcs11-mock + SoftHSM2), so the
+      # SoftHSM-gated [ConditionalFact] tests run there and the SoftHsm_IsAvailable_OnCiBuildPlatforms
+      # guard fails the job if the build failed to place libsofthsm2. The Windows-x86 leg builds
+      # pkcs11-mock only, so its SoftHSM tests self-skip and the guard is a no-op.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
