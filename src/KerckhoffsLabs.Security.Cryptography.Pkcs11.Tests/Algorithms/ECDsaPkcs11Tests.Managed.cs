@@ -12,11 +12,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class ECDsaPkcs11Tests_Managed
 {
+    // ECCurve is a struct, so it can't be an [InlineData] constant — parameterize by name.
     [Theory]
-    [InlineData(EcCurve.P256)]
-    [InlineData(EcCurve.P384)]
-    public void SignVerify_RoundTrips_AndPublicMatchesBcl(EcCurve curve)
+    [InlineData("nistP256")]
+    [InlineData("nistP384")]
+    [InlineData("nistP521")]
+    public void SignVerify_RoundTrips_AndPublicMatchesBcl(string curveName)
     {
+        ECCurve curve = curveName switch
+        {
+            "nistP256" => ECCurve.NamedCurves.NistP256,
+            "nistP384" => ECCurve.NamedCurves.NistP384,
+            "nistP521" => ECCurve.NamedCurves.NistP521,
+            _ => throw new ArgumentOutOfRangeException(nameof(curveName)),
+        };
+
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
 

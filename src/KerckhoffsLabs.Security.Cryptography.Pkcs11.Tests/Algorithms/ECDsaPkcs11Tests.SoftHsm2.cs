@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using BclECCurve = System.Security.Cryptography.ECCurve;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -20,9 +21,9 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     // Curve under test -> (CKA_EC_PARAMS OID, hash paired with the curve, expected exported OID value).
     private static (byte[] oid, HashAlgorithmName hash, string? expectedOidValue) Spec(string curve) => curve switch
     {
-        "P-256" => (TestKeys.EcP256Oid, HashAlgorithmName.SHA256, ECCurve.NamedCurves.nistP256.Oid.Value),
-        "P-384" => (TestKeys.EcP384Oid, HashAlgorithmName.SHA384, ECCurve.NamedCurves.nistP384.Oid.Value),
-        "P-521" => (TestKeys.EcP521Oid, HashAlgorithmName.SHA512, ECCurve.NamedCurves.nistP521.Oid.Value),
+        "P-256" => (TestKeys.EcP256Oid, HashAlgorithmName.SHA256, BclECCurve.NamedCurves.nistP256.Oid.Value),
+        "P-384" => (TestKeys.EcP384Oid, HashAlgorithmName.SHA384, BclECCurve.NamedCurves.nistP384.Oid.Value),
+        "P-521" => (TestKeys.EcP521Oid, HashAlgorithmName.SHA512, BclECCurve.NamedCurves.nistP521.Oid.Value),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 
@@ -216,5 +217,5 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void GenerateKey_Throws() => WithEcDsa("P-256", (ec, _) =>
-        Assert.Throws<NotSupportedException>(() => ec.GenerateKey(ECCurve.NamedCurves.nistP256)));
+        Assert.Throws<NotSupportedException>(() => ec.GenerateKey(BclECCurve.NamedCurves.nistP256)));
 }

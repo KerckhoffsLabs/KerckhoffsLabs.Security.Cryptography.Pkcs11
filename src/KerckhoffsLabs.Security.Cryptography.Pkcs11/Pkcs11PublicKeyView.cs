@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using BclECCurve = System.Security.Cryptography.ECCurve;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -67,7 +68,7 @@ public static class Pkcs11PublicKeyView
         byte[] x = pointBytes.Slice(1, coordLen).ToArray();
         byte[] y = pointBytes.Slice(1 + coordLen, coordLen).ToArray();
 
-        ECCurve curve = ResolveNamedCurve(ecParams);
+        BclECCurve curve = ResolveNamedCurve(ecParams);
         return new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
     }
 
@@ -122,7 +123,7 @@ public static class Pkcs11PublicKeyView
         return der.AsSpan(offset, len);
     }
 
-    private static ECCurve ResolveNamedCurve(byte[] derOid)
+    private static BclECCurve ResolveNamedCurve(byte[] derOid)
     {
         // OID 1.2.840.10045.3.1.7 = secp256r1 (P-256)
         // OID 1.3.132.0.34       = secp384r1 (P-384)
@@ -132,11 +133,11 @@ public static class Pkcs11PublicKeyView
         ReadOnlySpan<byte> p521 = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23];
 
         if (derOid.AsSpan().SequenceEqual(p256))
-            return ECCurve.CreateFromFriendlyName("nistP256");
+            return BclECCurve.CreateFromFriendlyName("nistP256");
         if (derOid.AsSpan().SequenceEqual(p384))
-            return ECCurve.CreateFromFriendlyName("nistP384");
+            return BclECCurve.CreateFromFriendlyName("nistP384");
         if (derOid.AsSpan().SequenceEqual(p521))
-            return ECCurve.CreateFromFriendlyName("nistP521");
+            return BclECCurve.CreateFromFriendlyName("nistP521");
 
         return default;
     }

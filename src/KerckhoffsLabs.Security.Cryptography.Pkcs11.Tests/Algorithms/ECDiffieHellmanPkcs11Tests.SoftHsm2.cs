@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using BclECCurve = System.Security.Cryptography.ECCurve;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -93,7 +94,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKeyFromHash_AgreesWithBcl() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         byte[] aliceKey = alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256);
         byte[] bobKey = bob.DeriveKeyFromHash(alice.PublicKey, HashAlgorithmName.SHA256);
@@ -105,7 +106,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKeyFromHash_WithPrependAppend_AgreesWithBcl() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
         byte[] prepend = [1, 2, 3];
         byte[] append = [9, 8, 7, 6];
 
@@ -118,7 +119,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKeyFromHmac_AgreesWithBcl() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
         byte[] hmacKey = [0xAA, 0xBB, 0xCC, 0xDD];
 
         byte[] aliceKey = alice.DeriveKeyFromHmac(bob.PublicKey, HashAlgorithmName.SHA256, hmacKey, null, null);
@@ -130,7 +131,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKeyFromHmac_NullKey_UsesSecret_AgreesWithBcl() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         byte[] aliceKey = alice.DeriveKeyFromHmac(bob.PublicKey, HashAlgorithmName.SHA256, hmacKey: null, null, null);
         byte[] bobKey = bob.DeriveKeyFromHmac(alice.PublicKey, HashAlgorithmName.SHA256, hmacKey: null, null, null);
@@ -141,7 +142,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveRawSecretAgreement_MatchesBcl() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         byte[] aliceZ = alice.DeriveRawSecretAgreement(bob.PublicKey);
         byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
@@ -153,7 +154,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKeyMaterial_AgreesWithBcl() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         // DeriveKeyMaterial defaults to DeriveKeyFromHash with SHA-256.
         Assert.Equal(bob.DeriveKeyMaterial(alice.PublicKey), alice.DeriveKeyMaterial(bob.PublicKey));
@@ -167,13 +168,13 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
 
         Assert.Equal(fromExport.Q.X, fromPublicKey.Q.X);
         Assert.Equal(fromExport.Q.Y, fromPublicKey.Q.Y);
-        Assert.Equal(ECCurve.NamedCurves.nistP256.Oid.Value, fromPublicKey.Curve.Oid.Value);
+        Assert.Equal(BclECCurve.NamedCurves.nistP256.Oid.Value, fromPublicKey.Curve.Oid.Value);
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void DeriveKeyTls_NotSupported() => WithEcdh(alice =>
     {
-        using var bob = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
         Assert.Throws<NotSupportedException>(
             () => alice.DeriveKeyTls(bob.PublicKey, new byte[16], new byte[64]));
     });

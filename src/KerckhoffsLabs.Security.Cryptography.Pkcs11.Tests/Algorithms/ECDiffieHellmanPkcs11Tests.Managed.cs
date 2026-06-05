@@ -17,8 +17,8 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
 
-        using var aliceKey = workspace.GenerateEcKeyPair(EcCurve.P256);
-        using var bobKey = workspace.GenerateEcKeyPair(EcCurve.P256);
+        using var aliceKey = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var bobKey = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
         using var alice = new ECDiffieHellmanPkcs11(aliceKey);
         using var bob = new ECDiffieHellmanPkcs11(bobKey);
 
@@ -27,7 +27,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(aliceZ, bobZ);
 
         // Cross-check the token's ECDH against the BCL: alice-vs-BCL must agree in both directions.
-        using var bcl = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+        using var bcl = ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
         Assert.Equal(
             bcl.DeriveRawSecretAgreement(alice.PublicKey),
             alice.DeriveRawSecretAgreement(bcl.PublicKey));

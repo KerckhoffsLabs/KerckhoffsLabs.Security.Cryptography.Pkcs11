@@ -11,16 +11,17 @@ internal static class GenerateEcKeyPairTestCases
     internal static void Assert_GeneratesP256KeyPair(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
-        using var key = workspace.GenerateEcKeyPair(curve: EcCurve.P256);
+        using var key = workspace.GenerateEcKeyPair(curve: ECCurve.NamedCurves.NistP256);
 
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
     }
 
-    internal static void Assert_RejectsInvalidCurve(IPkcs11Backend backend)
+    internal static void Assert_RejectsUnspecifiedCurve(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateEcKeyPair(curve: (EcCurve)99));
+        // The uninitialized default(ECCurve) carries no OID and must be rejected.
+        Assert.Throws<ArgumentException>(() => workspace.GenerateEcKeyPair(curve: default(ECCurve)));
     }
 }
 
@@ -30,7 +31,7 @@ public sealed class GenerateEcKeyPairTests_Mock(MockBackendFixture f)
     private readonly MockBackendFixture _backend = f;
 
     [Fact]
-    public void RejectsInvalidCurve() => GenerateEcKeyPairTestCases.Assert_RejectsInvalidCurve(_backend);
+    public void RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_RejectsUnspecifiedCurve(_backend);
 }
 
 [Collection("SoftHsm")]
@@ -43,5 +44,5 @@ public sealed class GenerateEcKeyPairTests_SoftHsm(SoftHsmBackendFixture f)
     public void GeneratesP256KeyPair() => GenerateEcKeyPairTestCases.Assert_GeneratesP256KeyPair(_backend);
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void RejectsInvalidCurve() => GenerateEcKeyPairTestCases.Assert_RejectsInvalidCurve(_backend);
+    public void RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_RejectsUnspecifiedCurve(_backend);
 }

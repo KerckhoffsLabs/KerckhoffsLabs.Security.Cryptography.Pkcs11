@@ -387,28 +387,21 @@ public sealed class Pkcs11Workspace : IDisposable
     /// Generates an EC key pair on a NIST prime curve. The private key is sensitive,
     /// non-extractable, and usable for signing and ECDH derivation.
     /// </summary>
-    /// <param name="curve">Named curve — <see cref="EcCurve.P256"/>, <see cref="EcCurve.P384"/>, or <see cref="EcCurve.P521"/>. Default P-256.</param>
+    /// <param name="curve">Named curve from <see cref="ECCurve.NamedCurves"/> (or <see cref="ECCurve.CreateFromValue(string, string?)"/>).
+    /// Defaults to <see cref="ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated EC key pair.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="curve"/> is not a supported curve.</exception>
-    public Pkcs11Key GenerateEcKeyPair(EcCurve curve = EcCurve.P256, string? label = null, bool persistOnToken = false)
+    public Pkcs11Key GenerateEcKeyPair(ECCurve? curve = null, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        byte[] ecParams = curve switch
-        {
-            // prime256v1 (P-256): 1.2.840.10045.3.1.7
-            EcCurve.P256 => [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07],
-            // secp384r1 (P-384): 1.3.132.0.34
-            EcCurve.P384 => [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22],
-            // secp521r1 (P-521): 1.3.132.0.35
-            EcCurve.P521 => [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23],
-            _ => throw new ArgumentOutOfRangeException(nameof(curve), $"Unsupported curve: {curve}."),
-        };
+        ECCurve resolved = curve ?? ECCurve.NamedCurves.NistP256;
+        if (resolved.IsDefault)
+            throw new ArgumentException("An EC curve must be specified.", nameof(curve));
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .EcParams(ecParams)
+            .EcParams(resolved.EcParams)
             .Verify()
             .Encrypt(false).Wrap(false)
             .OnToken(persistOnToken)

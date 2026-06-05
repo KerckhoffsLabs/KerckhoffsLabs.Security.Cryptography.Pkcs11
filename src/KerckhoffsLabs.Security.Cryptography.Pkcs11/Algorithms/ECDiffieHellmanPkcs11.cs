@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using BclECCurve = System.Security.Cryptography.ECCurve;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -267,6 +268,6 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
-    public override void GenerateKey(ECCurve curve)
+    public override void GenerateKey(BclECCurve curve)
         => throw new NotSupportedException("Use Pkcs11Workspace.GenerateKey to generate keys on the token.");
 }
