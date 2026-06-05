@@ -89,17 +89,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Proposed action:** Validate that the asymmetric key type is wrap-capable; throw `ArgumentException` for unsupported types.
 - **Raised by:** Cryptographer B
 
-### [BL-047] `RSAPkcs11.SignMechanismFor` inconsistently gates PKCS#1 v1.5
-
-- **Update (2026-06-04):** still open; `RSAPkcs11` moved to `Algorithms/RSAPkcs11.cs` (`SignMechanismFor` now ~219-227). The gating split is unchanged. Related: BL-069 and the recent managed-verify additions (RSA-PSS / raw-ECDSA) touch the RSA verify path, but the all-gated-vs-all-allowed *policy* decision for `CKM_SHA*_RSA_PKCS` is still pending.
-- **Area:** Cryptography
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/RSAPkcs11.cs` (`SignMechanismFor`, ~219-227); `Internal/Pkcs11Session.cs` (`GuardMechanism`)
-- **Problem:** `GuardMechanism` blocks `CKM_SHA1_RSA_PKCS` but allows `CKM_SHA256_RSA_PKCS` / `_SHA384_` / `_SHA512_`. The inline comment claims the SHA-N variants are "intentionally not gated." The split is inconsistent and creates false confidence.
-- **Proposed action:** Decide either all-gated or all-allowed for `CKM_SHA*_RSA_PKCS`. Document the policy explicitly in code and the security model doc.
-- **Raised by:** Cryptographer B
-
 ### [BL-048] No `.editorconfig`, `dotnet format` not in CI, README references stale `third-party/` path
 
 - **Area:** Release Eng

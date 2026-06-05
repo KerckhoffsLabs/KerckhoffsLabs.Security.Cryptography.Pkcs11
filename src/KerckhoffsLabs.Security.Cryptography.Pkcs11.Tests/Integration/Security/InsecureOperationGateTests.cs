@@ -177,6 +177,59 @@ internal static class InsecureOperationGateTestCases
     }
 
     // ---------------------------------------------------------------------------
+    // Sign / Verify NOT gated (strong-hash RSA PKCS#1 v1.5 policy)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// A strong-hash RSASSA-PKCS1-v1_5 signature mechanism (e.g. <c>CKM_SHA256_RSA_PKCS</c>) must
+    /// NOT be gated: signing with it succeeds past the guard even with <see cref="Session.AllowInsecure"/>
+    /// left at its <c>false</c> default. The backend may still throw for unrelated reasons (the fake
+    /// handle is bogus), but MUST NOT throw <see cref="InsecureOperationException"/>.
+    /// </summary>
+    internal static void Assert_Sign_MechanismNotGated(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        // AllowInsecure deliberately left false — a strong-hash v1.5 signature is a secure,
+        // standard scheme and must not require an insecure opt-in.
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var fakeHandle = new ObjectHandle(0);
+            var ex = Record.Exception(() => session.Sign(mech, fakeHandle, []));
+            Assert.False(ex is InsecureOperationException,
+                $"Mechanism {(CKM)mechanismId} must not be gated by AllowInsecure.");
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Companion to <see cref="Assert_Sign_MechanismNotGated"/> for the verify direction. Verifying
+    /// a third-party strong-hash v1.5 signature must work without an insecure opt-in.
+    /// </summary>
+    internal static void Assert_Verify_MechanismNotGated(IPkcs11Backend backend, ulong mechanismId)
+    {
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            using var mech = new Mechanism((CKM)mechanismId);
+            var fakeHandle = new ObjectHandle(0);
+            var ex = Record.Exception(() =>
+                session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>(), out _));
+            Assert.False(ex is InsecureOperationException,
+                $"Mechanism {(CKM)mechanismId} must not be gated by AllowInsecure.");
+        }
+        finally
+        {
+            try { session.Logout(); } catch { }
+            try { session.CloseSession(); } catch { }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     // Digest gate
     // ---------------------------------------------------------------------------
 
@@ -335,6 +388,22 @@ public sealed class InsecureOperationGateTests_Mock(MockBackendFixture f)
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
     public void Verify_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Verify_InsecureMechanismThrows(_backend, mech);
+
+    // --- Strong-hash RSA PKCS#1 v1.5 signatures are NOT gated ---
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_SHA256_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA384_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA512_RSA_PKCS)]
+    public void Sign_StrongHashV15_NotGated(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Sign_MechanismNotGated(_backend, mech);
+
+    [Theory]
+    [InlineData((ulong)CKM.CKM_SHA256_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA384_RSA_PKCS)]
+    [InlineData((ulong)CKM.CKM_SHA512_RSA_PKCS)]
+    public void Verify_StrongHashV15_NotGated(ulong mech)
+        => InsecureOperationGateTestCases.Assert_Verify_MechanismNotGated(_backend, mech);
 
     // --- Digest gate ---
 

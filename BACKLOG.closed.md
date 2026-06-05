@@ -596,6 +596,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Add `CKS_LAST_VALIDATION_OK = 1` to `CK.cs`. Add a `CkpProfile` enum (or extend `CKP`) with the four v3.2 baseline/extended/complete/HSM profile IDs.
 - **Raised by:** PKCS#11 Specialist A
 
+### [BL-047] `RSAPkcs11.SignMechanismFor` inconsistently gates PKCS#1 v1.5
+
+- **Status: Resolved (2026-06-05)** — Chose **all-allowed for strong-hash v1.5 signatures** and documented the policy. The split is not "v1.5 vs. PSS" but two orthogonal axes: broken *hashes* (MD2/MD5/SHA-1/RIPEMD) are gated in every RSA-sign context, and PKCS#1 v1.5 *encryption* / raw RSA (`CKM_RSA_PKCS`, `CKM_RSA_X_509`, where Bleichenbacher/ROBOT live) are gated — but SHA-2/SHA-3 v1.5 *signatures* are allowed because they remain FIPS 186-5-approved and are mandated by JWT RS256 / TLS 1.2 / X.509 / code signing. Decisive factor: `GuardMechanism` is direction-agnostic (fires on verify too), so gating them would block verifying third-party signatures and dilute `AllowInsecure`. Reframed the misleading comment in `SignMechanismFor`, added a full policy `<remarks>` block to `GuardMechanism`, added a "Security model" section to the README, and added regression tests (`Sign_StrongHashV15_NotGated` / `Verify_StrongHashV15_NotGated` for SHA-256/384/512, alongside the existing SHA-1/MD5 gated cases). The all-gated alternative was rejected as over-gating a secure, ubiquitous scheme.
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/RSAPkcs11.cs` (`SignMechanismFor`, ~219-227); `Internal/Pkcs11Session.cs` (`GuardMechanism`)
+- **Problem:** `GuardMechanism` blocks `CKM_SHA1_RSA_PKCS` but allows `CKM_SHA256_RSA_PKCS` / `_SHA384_` / `_SHA512_`. The inline comment claims the SHA-N variants are "intentionally not gated." The split is inconsistent and creates false confidence.
+- **Proposed action:** Decide either all-gated or all-allowed for `CKM_SHA*_RSA_PKCS`. Document the policy explicitly in code and the security model doc.
+- **Raised by:** Cryptographer B
+
 ---
 
 ## Low

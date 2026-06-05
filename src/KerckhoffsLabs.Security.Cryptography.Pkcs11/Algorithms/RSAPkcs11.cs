@@ -218,9 +218,13 @@ public sealed class RSAPkcs11 : RSA
     /// </summary>
     private static Mechanism SignMechanismFor(HashAlgorithmName hash, RSASignaturePadding padding)
     {
-        // CKM_SHA*_RSA_PKCS is intentionally not gated: Bleichenbacher applies to PKCS#1 v1.5
-        // *encryption*, not combined hash-and-sign; these mechanisms are widely deployed (JWT RS256 etc.)
-        // and are left available for interop. Prefer PSS for new code.
+        // Policy (see Pkcs11Session.GuardMechanism and the README "Security model" section):
+        // strong-hash (SHA-2/SHA-3) RSASSA-PKCS1-v1_5 *signatures* are allowed by default. The
+        // AllowInsecure gate targets broken *hashes* (MD2/MD5/SHA-1/RIPEMD — rejected in every
+        // context, RsaPkcs1Sign won't map them) and PKCS#1 v1.5 *encryption* / raw RSA, not v1.5
+        // signing with a strong hash. The latter remains FIPS 186-5-approved and is mandated by
+        // ubiquitous interop (JWT RS256, TLS 1.2 CertificateVerify, X.509, code signing). Prefer
+        // PSS for new code, but do not require an insecure opt-in for a secure, standard scheme.
         if (padding == RSASignaturePadding.Pkcs1)
             return Pkcs11MechanismMap.RsaPkcs1Sign(hash);
         if (padding.Mode == RSASignaturePaddingMode.Pss)

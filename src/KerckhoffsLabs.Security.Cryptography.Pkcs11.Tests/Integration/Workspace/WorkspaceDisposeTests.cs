@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Workspac
 /// <summary>
 /// Verifies <see cref="Pkcs11Workspace.Dispose"/> logs the authenticated user out
 /// (<c>C_Logout</c>) before closing the session, so the token's audit log records an explicit
-/// logout — and that a failing logout never makes disposal throw (BL-042).
+/// logout — and that a failing logout never makes disposal throw.
 /// </summary>
 public sealed class WorkspaceDisposeTests
 {

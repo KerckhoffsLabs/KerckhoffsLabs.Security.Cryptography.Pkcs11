@@ -582,6 +582,29 @@ internal sealed partial class Pkcs11Session
     /// <see cref="InsecureOperationException"/> if it is insecure and <see cref="AllowInsecure"/>
     /// is false.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the single, mechanism-level secure-defaults gate; it fires identically for sign,
+    /// verify, encrypt, decrypt, derive, digest, and key generation (it has no notion of operation
+    /// direction).
+    /// </para>
+    /// <para><b>RSA PKCS#1 v1.5 policy.</b> The split is deliberate and along two axes —
+    /// broken hash vs. dangerous padding-use — not "v1.5 vs. PSS":
+    /// <list type="bullet">
+    /// <item>Gated: any <em>broken hash</em> in an RSA signature mechanism
+    /// (<c>CKM_MD2/MD5/SHA1/RIPEMD128/RIPEMD160_RSA_PKCS</c>, <c>CKM_SHA1_RSA_PKCS_PSS</c>).</item>
+    /// <item>Gated: PKCS#1 v1.5 <em>encryption</em> / raw RSA (<c>CKM_RSA_PKCS</c>, <c>CKM_RSA_X_509</c>)
+    /// — this is where Bleichenbacher/ROBOT padding-oracle attacks live.</item>
+    /// <item><b>Allowed:</b> strong-hash (SHA-2/SHA-3) v1.5 <em>signatures</em>
+    /// (<c>CKM_SHA256_RSA_PKCS</c> etc.). RSASSA-PKCS1-v1_5 with a strong hash is FIPS 186-5-approved
+    /// and mandated by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing. Because this
+    /// guard is direction-agnostic, gating it would also block <em>verifying</em> third-party
+    /// signatures — so gating a secure, ubiquitous scheme would both break interop and dilute the
+    /// meaning of <see cref="AllowInsecure"/>. PSS is preferred for new code but not required.</item>
+    /// </list>
+    /// Mirrored in <c>RSAPkcs11.SignMechanismFor</c> and the README "Security model" section.
+    /// </para>
+    /// </remarks>
     private void GuardMechanism(CKM mechanism)
     {
         if (AllowInsecure) return;
