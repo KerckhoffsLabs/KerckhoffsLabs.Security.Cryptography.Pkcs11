@@ -172,7 +172,11 @@ internal sealed partial class Pkcs11Session
             // cannot be revealed because the object is sensitive or unextractable, then the
             // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
             // CK_LONG, it holds -1).
-            if (template[i].valueLen.Value != nuint.MaxValue)
+            // Compare against the canonical sentinel (NativeCULong.MaxValue = uint.MaxValue on Windows,
+            // ulong.MaxValue on Linux-LP64), as ObjectAttribute.CannotBeRead does. The previous
+            // `.Value != nuint.MaxValue` only matched on Linux: on Win64 nuint is 8 bytes but CK_ULONG
+            // is 4, so the -1 sentinel went unrecognized and (int)valueLen overflowed.
+            if (template[i].valueLen != NativeCULong.MaxValue)
                 template[i].value = UnmanagedMemory.Allocate((int)(template[i].valueLen));
         }
 
@@ -192,7 +196,7 @@ internal sealed partial class Pkcs11Session
                 // cannot be revealed because the object is sensitive or unextractable, then the
                 // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
                 // CK_LONG, it holds -1).
-                if (template[i].valueLen.Value == nuint.MaxValue)
+                if (template[i].valueLen == NativeCULong.MaxValue)
                     continue;
 
                 int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
@@ -216,7 +220,7 @@ internal sealed partial class Pkcs11Session
                         IntPtr tempPointer = new(template[i].value.ToInt64() + (j * ckAttributeSize));
                         CK_ATTRIBUTE tempAttribute = UnmanagedMemory.Read<CK_ATTRIBUTE>(tempPointer);
 
-                        if (tempAttribute.valueLen.Value != nuint.MaxValue)
+                        if (tempAttribute.valueLen != NativeCULong.MaxValue)
                             tempAttribute.value = UnmanagedMemory.Allocate((int)(tempAttribute.valueLen));
 
                         UnmanagedMemory.Write(tempPointer, in tempAttribute);
