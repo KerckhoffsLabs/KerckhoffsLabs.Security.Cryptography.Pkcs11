@@ -69,16 +69,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Proposed action:** Add a `PKCS11_EXTRA_MODULE_PATH` env-var override that runs a subset of the smoke and round-trip tests against an arbitrary caller-supplied module. Document the matrix in a `TESTING.md`.
 - **Raised by:** QA A
 
-### [BL-040] Smoke test assertions are weak (non-empty string only)
-
-- **Area:** QA
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/SmokeTests.cs:14-16`
-- **Problem:** `GetInfo()` only checks non-empty strings. Version-parsing regressions would not be caught.
-- **Proposed action:** Assert `CryptokiVersion` matches `\d+\.\d+`, major ≥ 2; assert `SlotCount > 0`.
-- **Raised by:** QA A
-
 ### [BL-041] `CK_GCM_PARAMS.IvBits` carries a stale TODO and an undefined value
 
 - **Area:** Cryptography

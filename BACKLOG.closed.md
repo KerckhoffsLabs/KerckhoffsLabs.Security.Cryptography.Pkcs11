@@ -541,6 +541,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Raised by:** Public-surface review.
 - **Spec / References:** PKCS#11 v3.2 `C_FindObjects*`.
 
+### [BL-040] Smoke test assertions are weak (non-empty string only)
+
+- **Status: Resolved (2026-06-05)** — `SmokeTestAssertions.AssertLibraryInfoAndSlots_AreWellFormed` now asserts CryptokiVersion matches `^\d+\.\d+$` with major >= 2, LibraryVersion matches `^\d+\.\d+$`, ManufacturerId + LibraryDescription are non-empty, and `GetSlotList(tokenPresent: false)` reports at least one slot. Both the pkcs11-mock and SoftHSM2 smoke tests run it (`GetInfo_AndSlots_AreWellFormed`).
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/SmokeTests.cs:14-16`
+- **Problem:** `GetInfo()` only checks non-empty strings. Version-parsing regressions would not be caught.
+- **Proposed action:** Assert `CryptokiVersion` matches `\d+\.\d+`, major ≥ 2; assert `SlotCount > 0`.
+- **Raised by:** QA A
+
 ---
 
 ## Low
