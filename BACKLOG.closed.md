@@ -585,6 +585,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Zero `usernameBytes` in the `LoginUser` finally. Log the `TryDestroy` failure at warning and consider surfacing it to the caller after the copy completes.
 - **Raised by:** Cryptographer A, Cryptographer B, PKCS#11 Specialist B
 
+### [BL-044] `CKS_LAST_VALIDATION_OK`, `CKP_PKCS11_V3_2_*` profile constants are missing
+
+- **Status: Resolved (2026-06-05)** — Added `CksValidationFlagsType` (PKCS#11 v3.2 `CK_SESSION_VALIDATION_FLAGS_TYPE`) to `Common/CKS.cs` with `CKS_LAST_VALIDATION_OK = 1`, and a new `Common/CkpProfile.cs` defining the `CK_PROFILE_ID` values (`CKP_INVALID_ID` … `CKP_HKDF_TLS_TOKEN`) used by `CKA_PROFILE_ID` — matching the `CkpMlKem`/`CkpMlDsa` sub-grouping convention rather than overloading the `CKP` PRF enum. `CKS_LAST_VALIDATION_OK` lives in `CKS.cs` (not `CK.cs`) since it belongs with the session/validation enums; it could not be a `CKS` member because value `1` is already `CKS_RO_USER_FUNCTIONS`. `Pkcs11Session.GetSessionValidationFlags` now takes `CksValidationFlagsType` instead of a raw `ulong`, which also fixes the broken `<see cref>` in its doc. Constant values are pinned against the spec by `ProfileAndValidationEnumTests`. The four informal names in the original action (`CKP_PKCS11_V3_2_BASELINE/EXTENDED/COMPLETE/HSM`) do not exist in the spec; the actual `CK_PROFILE_ID` constants from the v3.2 headers were used.
+- **Area:** PKCS#11 Conformance
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/CK.cs`; `Common/CKP.cs`; `Internal/Pkcs11Session.V32.cs:291` (broken `<see cref>`)
+- **Problem:** XML doc on `GetSessionValidationFlags` tells callers to use `CKS_LAST_VALIDATION_OK`, which is undefined. Profile-ID constants (`CKP_PKCS11_V3_2_BASELINE` etc.) are not defined, so callers reading `CKA_PROFILE_ID` have no named constants.
+- **Proposed action:** Add `CKS_LAST_VALIDATION_OK = 1` to `CK.cs`. Add a `CkpProfile` enum (or extend `CKP`) with the four v3.2 baseline/extended/complete/HSM profile IDs.
+- **Raised by:** PKCS#11 Specialist A
+
 ---
 
 ## Low

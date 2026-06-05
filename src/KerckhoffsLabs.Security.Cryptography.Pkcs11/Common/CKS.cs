@@ -34,6 +34,21 @@ public enum CKS : uint
 }
 
 /// <summary>
+/// Session validation flags type (PKCS#11 v3.2 <c>CK_SESSION_VALIDATION_FLAGS_TYPE</c>). Selects
+/// which set of validation flags <c>C_GetSessionValidationFlags</c> returns for a session.
+/// </summary>
+public enum CksValidationFlagsType : uint
+{
+    /// <summary>
+    /// Request the flags describing whether the session's most recent validatable operation
+    /// completed successfully within the active validation profile. Each set bit in the returned
+    /// flags corresponds to a validation authority (cf. <see cref="CKA.CKA_VALIDATION_FLAG"/>) that
+    /// accepted the operation.
+    /// </summary>
+    CKS_LAST_VALIDATION_OK = 1,
+}
+
+/// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
 public static class CKSExtensions

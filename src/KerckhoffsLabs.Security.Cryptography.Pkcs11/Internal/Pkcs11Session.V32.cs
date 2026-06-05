@@ -295,19 +295,19 @@ internal sealed partial class Pkcs11Session
     /// <summary>
     /// Reads the session's validation flags for the requested validation-state type
     /// (PKCS#11 v3.2 §5.6.10). <paramref name="validationType"/> is typically
-    /// <c>CKS_LAST_VALIDATION_OK</c> to query whether the most recent
+    /// <see cref="CksValidationFlagsType.CKS_LAST_VALIDATION_OK"/> to query whether the most recent
     /// operation completed within the active validation profile.
     /// </summary>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>
-    public ulong GetSessionValidationFlags(ulong validationType)
+    public ulong GetSessionValidationFlags(CksValidationFlagsType validationType)
     {
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Log.SessionGetValidationFlags(_logger, (ulong)_sessionId, validationType);
+        Log.SessionGetValidationFlags(_logger, (ulong)_sessionId, (ulong)validationType);
 
         NativeCULong flags = (NativeCULong)0;
-        CKR rv = _pkcs11Library.C_GetSessionValidationFlags(_sessionId, (NativeCULong)validationType, ref flags);
+        CKR rv = _pkcs11Library.C_GetSessionValidationFlags(_sessionId, (NativeCULong)(ulong)validationType, ref flags);
         Pkcs11Exception.ThrowIfError(rv, "C_GetSessionValidationFlags");
 
         return (ulong)flags;

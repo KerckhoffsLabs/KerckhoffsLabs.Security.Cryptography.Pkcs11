@@ -69,16 +69,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Proposed action:** Add a `PKCS11_EXTRA_MODULE_PATH` env-var override that runs a subset of the smoke and round-trip tests against an arbitrary caller-supplied module. Document the matrix in a `TESTING.md`.
 - **Raised by:** QA A
 
-### [BL-044] `CKS_LAST_VALIDATION_OK`, `CKP_PKCS11_V3_2_*` profile constants are missing
-
-- **Area:** PKCS#11 Conformance
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/CK.cs`; `Common/CKP.cs`; `Internal/Pkcs11Session.V32.cs:291` (broken `<see cref>`)
-- **Problem:** XML doc on `GetSessionValidationFlags` tells callers to use `CKS_LAST_VALIDATION_OK`, which is undefined. Profile-ID constants (`CKP_PKCS11_V3_2_BASELINE` etc.) are not defined, so callers reading `CKA_PROFILE_ID` have no named constants.
-- **Proposed action:** Add `CKS_LAST_VALIDATION_OK = 1` to `CK.cs`. Add a `CkpProfile` enum (or extend `CKP`) with the four v3.2 baseline/extended/complete/HSM profile IDs.
-- **Raised by:** PKCS#11 Specialist A
-
 ### [BL-045] Async API (`C_AsyncComplete`/`GetID`/`Join`) has no high-level wrapper
 
 - **Area:** PKCS#11 Conformance
@@ -223,7 +213,7 @@ Condensed from PKCS#11 Specialist A's full matrix.
 | Status | Count | Notes |
 |---|---|---|
 | Covered (v2.40 / v3.0 / v3.2) | ~85 | Including all message-AEAD, `C_LoginUser`, `C_SessionCancel`, `C_VerifySignature*`, `C_DecapsulateKey`, `C_UnwrapKeyAuthenticated` |
-| Partial | 6 | `C_EncapsulateKey` and `C_WrapKeyAuthenticated` (BL-011); `C_GetSessionValidationFlags` (BL-044); `C_AsyncComplete`/`GetID`/`Join` (BL-045) |
+| Partial | 5 | `C_EncapsulateKey` and `C_WrapKeyAuthenticated` (BL-011); `C_AsyncComplete`/`GetID`/`Join` (BL-045) |
 | Missing | 1 | `C_GetInterfaceList` (BL-013) |
 
 Notable gap not on the backlog because the function is technically covered: `C_GetMechanismInfo` is implemented but only accepts `CKM` enum values (BL-014).
@@ -250,7 +240,7 @@ All present: `CKF_ASYNC_SESSION`, `CKF_ASYNC_SESSION_SUPPORTED`, `CKF_ENCAPSULAT
 
 ### Profile / Validation Constants
 
-Missing: `CKP_PKCS11_V3_2_BASELINE/EXTENDED_PROVIDER/COMPLETE_PROVIDER/HSM_PROVIDER`, `CKS_LAST_VALIDATION_OK` (BL-044).
+Present (BL-044 resolved): `CkpProfile` enum (`CKP_INVALID_ID` … `CKP_HKDF_TLS_TOKEN`, the `CK_PROFILE_ID` values) and `CksValidationFlagsType.CKS_LAST_VALIDATION_OK`.
 
 ---
 
