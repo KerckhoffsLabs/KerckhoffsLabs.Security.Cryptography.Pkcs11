@@ -89,16 +89,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Proposed action:** Validate that the asymmetric key type is wrap-capable; throw `ArgumentException` for unsupported types.
 - **Raised by:** Cryptographer B
 
-### [BL-048] No `.editorconfig`, `dotnet format` not in CI, README references stale `third-party/` path
-
-- **Area:** Release Eng
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `absent: .editorconfig`; `.github/workflows/ci.yml`; `README.md:26`
-- **Problem:** No root `.editorconfig`. No `dotnet format --verify-no-changes` CI step. Formatting regressions are caught only by manual commits. README still mentions `third-party/pkcs11-mock` though the submodule was renamed to `vendor/pkcs11-mock` in commit 6c5014e.
-- **Proposed action:** Add a root `.editorconfig`, add the verify step to CI, update README.
-- **Raised by:** QA C
-
 ### [BL-050] No SBOM / dependency-vulnerability scan
 
 - **Area:** Release Eng

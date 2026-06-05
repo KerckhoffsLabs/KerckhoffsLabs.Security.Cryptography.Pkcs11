@@ -607,6 +607,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Decide either all-gated or all-allowed for `CKM_SHA*_RSA_PKCS`. Document the policy explicitly in code and the security model doc.
 - **Raised by:** Cryptographer B
 
+### [BL-048] No `.editorconfig`, `dotnet format` not in CI, README references stale `third-party/` path
+
+- **Status: Resolved (2026-06-05)** — Added a root `.editorconfig` codifying the conventions the code already follows: LF / UTF-8 / 4-space indent, final newline + trailing-whitespace trim, 2-space for json/yml/csproj/props, and C#-style preferences at `suggestion` severity so `dotnet format` documents intent without rewriting existing code. Import-ordering and detailed brace/space formatting are intentionally left to the tool defaults the code already satisfies, to avoid churn (an early attempt enabling system-first sorting + explicit `new_line`/`space` rules reformatted ~186 files and was reverted). Enabling `insert_final_newline` did normalize 69 files that were missing a trailing newline (pure `+\n`-at-EOF, no other change). The CI `dotnet format --verify-no-changes --no-restore` lint job was already present (a prior change), and is now consistent with the new config. Fixed the stale README path (`third-party/pkcs11-mock` → `vendor/pkcs11-mock`).
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `absent: .editorconfig`; `.github/workflows/ci.yml`; `README.md:26`
+- **Problem:** No root `.editorconfig`. No `dotnet format --verify-no-changes` CI step. Formatting regressions are caught only by manual commits. README still mentions `third-party/pkcs11-mock` though the submodule was renamed to `vendor/pkcs11-mock` in commit 6c5014e.
+- **Proposed action:** Add a root `.editorconfig`, add the verify step to CI, update README.
+- **Raised by:** QA C
+
 ---
 
 ## Low

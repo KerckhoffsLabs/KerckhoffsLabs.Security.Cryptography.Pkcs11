@@ -37,7 +37,7 @@ git submodule update --init --recursive
 dotnet test src/KerckhoffsLabs.sln
 ```
 
-Tests load `pkcs11-mock` (built from `third-party/pkcs11-mock` as a
+Tests load `pkcs11-mock` (built from `vendor/pkcs11-mock` as a
 submodule). The build is triggered automatically by an MSBuild target
 in the test project. On Linux/macOS this requires `make` and `gcc`; on
 Windows it requires `pwsh` and MSVC build tools.
