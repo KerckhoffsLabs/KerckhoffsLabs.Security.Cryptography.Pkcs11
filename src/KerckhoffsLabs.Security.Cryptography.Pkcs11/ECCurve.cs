@@ -55,6 +55,15 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
     public bool IsDefault => Oid is null;
 
     /// <summary>
+    /// True when this is a known catalog curve providing less than 128-bit security (field size
+    /// &lt; 256-bit): the 160/192/224-bit NIST and Brainpool curves.
+    /// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/> refuses these unless
+    /// <see cref="Pkcs11Workspace.AllowInsecure"/> is set. An OID outside the catalog reports
+    /// <see langword="false"/> — its strength can't be inferred from the OID alone.
+    /// </summary>
+    internal bool IsBelowSecurityBaseline => Oid is not null && s_belowBaselineOids.Contains(Oid);
+
+    /// <summary>
     /// The <c>CKA_EC_PARAMS</c> value for this curve: the DER encoding of the curve OID as an ASN.1
     /// <c>OBJECT IDENTIFIER</c> (the PKCS#11 <i>namedCurve</i> choice). Returns a fresh copy.
     /// </summary>

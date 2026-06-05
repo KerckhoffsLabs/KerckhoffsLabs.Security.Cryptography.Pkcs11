@@ -392,6 +392,8 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated EC key pair.</returns>
+    /// <exception cref="Exceptions.InsecureOperationException">The curve provides less than 128-bit
+    /// security (the 160/192/224-bit NIST and Brainpool curves) and <see cref="AllowInsecure"/> is false.</exception>
     public Pkcs11Key GenerateEcKeyPair(ECCurve? curve = null, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -399,6 +401,10 @@ public sealed class Pkcs11Workspace : IDisposable
         ECCurve resolved = curve ?? ECCurve.NamedCurves.NistP256;
         if (resolved.IsDefault)
             throw new ArgumentException("An EC curve must be specified.", nameof(curve));
+        if (resolved.IsBelowSecurityBaseline && !AllowInsecure)
+            throw new InsecureOperationException(
+                $"EC curve {resolved} provides less than 128-bit security. Use NistP256 or stronger, " +
+                "or set Pkcs11Workspace.AllowInsecure = true for legacy interop.");
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .EcParams(resolved.EcParams)

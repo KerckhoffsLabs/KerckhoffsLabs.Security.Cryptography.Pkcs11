@@ -165,11 +165,39 @@ public sealed class ECCurveTests
     }
 
     [Fact]
+    public void IsBelowSecurityBaseline_FlagsSub128BitCurves()
+    {
+#pragma warning disable CS0618 // deliberately referencing the obsolete sub-128-bit curves
+        ECCurve[] weak =
+        [
+            ECCurve.NamedCurves.NistP192, ECCurve.NamedCurves.NistP224,
+            ECCurve.NamedCurves.BrainpoolP160r1, ECCurve.NamedCurves.BrainpoolP160t1,
+            ECCurve.NamedCurves.BrainpoolP192r1, ECCurve.NamedCurves.BrainpoolP192t1,
+            ECCurve.NamedCurves.BrainpoolP224r1, ECCurve.NamedCurves.BrainpoolP224t1,
+        ];
+#pragma warning restore CS0618
+        Assert.All(weak, c => Assert.True(c.IsBelowSecurityBaseline, $"{c} should be sub-baseline"));
+
+        ECCurve[] strong =
+        [
+            ECCurve.NamedCurves.NistP256, ECCurve.NamedCurves.NistP384, ECCurve.NamedCurves.NistP521,
+            ECCurve.NamedCurves.Secp256k1, ECCurve.NamedCurves.BrainpoolP256r1,
+            ECCurve.NamedCurves.BrainpoolP512t1, ECCurve.NamedCurves.Sm2,
+        ];
+        Assert.All(strong, c => Assert.False(c.IsBelowSecurityBaseline, $"{c} should meet baseline"));
+
+        // An OID outside the catalog can't be classified from the OID alone -> not flagged.
+        Assert.False(ECCurve.CreateFromValue("1.2.3.4").IsBelowSecurityBaseline);
+    }
+
+    [Fact]
     public void NamedCurves_Catalog_OidsNamesAndEncodingAreConsistent()
     {
         // Every entry pairs the NamedCurves property with an independently written OID + name, so a
         // typo in any catalog OID (e.g. a swapped Brainpool r1/t1 index) fails here. Covers all of
-        // the PKCS#11 v3.2 prime-field named curves.
+        // the PKCS#11 v3.2 prime-field named curves. The sub-128-bit curves are intentionally
+        // [Obsolete]; this catalog test references them on purpose.
+#pragma warning disable CS0618
         (ECCurve curve, string oid, string name)[] catalog =
         [
             (ECCurve.NamedCurves.NistP192, "1.2.840.10045.3.1.1", "nistP192"),
@@ -194,6 +222,7 @@ public sealed class ECCurveTests
             (ECCurve.NamedCurves.BrainpoolP512t1, "1.3.36.3.3.2.8.1.1.14", "brainpoolP512t1"),
             (ECCurve.NamedCurves.Sm2, "1.2.156.10197.1.301", "sm2"),
         ];
+#pragma warning restore CS0618
 
         Assert.Equal(21, catalog.Length);
         foreach (var (curve, oid, name) in catalog)
