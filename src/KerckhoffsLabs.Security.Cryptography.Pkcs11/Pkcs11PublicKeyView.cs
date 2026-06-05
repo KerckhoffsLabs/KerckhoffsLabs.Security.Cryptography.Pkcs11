@@ -46,8 +46,9 @@ public static class Pkcs11PublicKeyView
 
     /// <summary>
     /// Parses raw <c>CKA_EC_POINT</c> + <c>CKA_EC_PARAMS</c> bytes into an <see cref="ECParameters"/>
-    /// for a named curve (P-256/P-384/P-521). Returns <c>null</c> when the inputs don't decode as
-    /// a DER-OCTET-wrapped uncompressed point or the curve OID isn't recognised.
+    /// for a named curve (any curve in <see cref="ECCurve.NamedCurves"/>, and any other named-curve
+    /// OID the host BCL recognises). Returns <c>null</c> when the inputs don't decode as a
+    /// DER-OCTET-wrapped uncompressed point or <c>CKA_EC_PARAMS</c> isn't a DER-encoded curve OID.
     /// </summary>
     /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (DER OCTET STRING containing the uncompressed point).</param>
     /// <param name="ecParams">Raw <c>CKA_EC_PARAMS</c> bytes (DER-encoded named-curve OID).</param>
@@ -68,7 +69,7 @@ public static class Pkcs11PublicKeyView
         byte[] x = pointBytes.Slice(1, coordLen).ToArray();
         byte[] y = pointBytes.Slice(1 + coordLen, coordLen).ToArray();
 
-        BclECCurve curve = ResolveNamedCurve(ecParams);
+        if (ResolveNamedCurve(ecParams) is not { } curve) return null;
         return new ECParameters { Curve = curve, Q = new ECPoint { X = x, Y = y } };
     }
 
@@ -123,22 +124,18 @@ public static class Pkcs11PublicKeyView
         return der.AsSpan(offset, len);
     }
 
-    private static BclECCurve ResolveNamedCurve(byte[] derOid)
+    // CKA_EC_PARAMS for a named curve is the DER-encoded curve OID; bridge it to a BCL named curve
+    // over that OID. Covers the whole ECCurve.NamedCurves catalog (NIST, secp256k1, Brainpool, SM2),
+    // not just the NIST primes. Returns null when the bytes aren't a DER-encoded OID.
+    private static BclECCurve? ResolveNamedCurve(byte[] derOid)
     {
-        // OID 1.2.840.10045.3.1.7 = secp256r1 (P-256)
-        // OID 1.3.132.0.34       = secp384r1 (P-384)
-        // OID 1.3.132.0.35       = secp521r1 (P-521)
-        ReadOnlySpan<byte> p256 = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
-        ReadOnlySpan<byte> p384 = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x22];
-        ReadOnlySpan<byte> p521 = [0x06, 0x05, 0x2B, 0x81, 0x04, 0x00, 0x23];
-
-        if (derOid.AsSpan().SequenceEqual(p256))
-            return BclECCurve.CreateFromFriendlyName("nistP256");
-        if (derOid.AsSpan().SequenceEqual(p384))
-            return BclECCurve.CreateFromFriendlyName("nistP384");
-        if (derOid.AsSpan().SequenceEqual(p521))
-            return BclECCurve.CreateFromFriendlyName("nistP521");
-
-        return default;
+        try
+        {
+            return ECCurve.FromEcParams(derOid).ToECCurve();
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 }
