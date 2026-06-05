@@ -11,9 +11,11 @@
 #
 # Mirrors build-softhsmv2.sh in option set (ECC/EDDSA on, p11-kit and non-paged-memory off),
 # output layout, idempotency, and the ML-DSA marker. It stays on CMake+vcpkg rather than
-# autotools because that is the practical Windows toolchain; consequently it cannot produce an
-# ML-DSA-capable token (the CMake ENABLE_MLDSA option is a no-op — only the autotools path used
-# by the .sh wires ML-DSA), so the marker stays absent and ML-DSA tests self-skip on Windows.
+# autotools because that is the practical Windows toolchain. ML-DSA: the vendored CMake's
+# ENABLE_MLDSA option is a no-op (CompilerOptions.cmake has ECC/EDDSA probe blocks but none for
+# ML-DSA, so WITH_ML_DSA is never set). config.h.in.cmake *does* have a `#cmakedefine WITH_ML_DSA`
+# slot, so we force it with -DWITH_ML_DSA=1; the ML-DSA sources are already in the build, and the
+# vcpkg OpenSSL (3.6+) has ML-DSA, so the token becomes ML-DSA-capable and the marker is written.
 #
 # Idempotent: skips rebuild when outputs are newer than the submodule HEAD.
 
@@ -80,6 +82,8 @@ cmake -S $srcDir -B $buildDir `
     -DWITH_OBJECTSTORE_BACKEND_DB=OFF `
     -DENABLE_ECC=ON `
     -DENABLE_EDDSA=ON `
+    -DENABLE_MLDSA=ON `
+    -DWITH_ML_DSA=1 `
     -DENABLE_P11_KIT=OFF `
     -DDISABLE_NON_PAGED_MEMORY=ON `
     -Wno-dev | Write-Host
@@ -149,11 +153,10 @@ Write-Host "Installed $destLib"
 Write-Host "Installed $destUtil"
 
 # Mirror build-softhsmv2.sh: record whether ML-DSA was compiled in, so the test suite can gate
-# its ML-DSA cases on a cheap file check. ML-DSA only compiles in when WITH_ML_DSA is defined,
-# which requires OpenSSL 3.5+ AND the autotools build (the CMake ENABLE_MLDSA option is a no-op
-# that never sets WITH_ML_DSA). This Windows CMake build therefore never produces an ML-DSA-capable
-# token, so the marker stays absent and the ML-DSA tests self-skip — but we honour config.h so the
-# gate stays correct if the CMake build ever wires ML-DSA up.
+# its ML-DSA cases on a cheap file check. We force -DWITH_ML_DSA=1 above and the vcpkg OpenSSL has
+# ML-DSA, so config.h (generated from config.h.in.cmake) should carry `#define WITH_ML_DSA 1` and
+# the marker is written. Honouring config.h keeps the gate correct if the build's ML-DSA support
+# ever changes.
 $destMarker = Join-Path $destDir 'softhsm-mldsa.enabled'
 $configH = Join-Path $buildDir 'config.h'
 if ((Test-Path $configH) -and (Select-String -Path $configH -Pattern '^#define WITH_ML_DSA' -Quiet)) {
