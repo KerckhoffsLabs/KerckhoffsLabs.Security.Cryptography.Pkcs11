@@ -104,12 +104,15 @@ jobs:
 
       # build-softhsmv2.ps1 runs `vcpkg install openssl:x64-windows` during the Build step — a
       # from-source OpenSSL build (~27 min cold). vcpkg's default binary cache makes a warm restore
-      # near-instant; preserve it across runs. The post-cache save runs even when the job fails, so
-      # iterating on the SoftHSM build stays fast. vcpkg keys archives by ABI hash internally, so a
-      # coarse cache key is safe (a mismatch just rebuilds).
-      - name: Cache vcpkg OpenSSL (Windows x64)
+      # near-instant. Split restore/save: actions/cache's single-step post-save is skipped when the
+      # job fails (and these runs fail at Test while we iterate on SoftHSM), so the archive would
+      # never persist. The dedicated save step runs with if: always() — it saves the OpenSSL build
+      # right after Build regardless of the later Test outcome. vcpkg keys archives by ABI hash
+      # internally, so a coarse cache key is safe (a mismatch just rebuilds).
+      - name: Restore vcpkg OpenSSL cache (Windows x64)
         if: runner.os == 'Windows' && matrix.arch != 'x86'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        id: vcpkg-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~\AppData\Local\vcpkg\archives
           key: vcpkg-openssl-x64-windows-v1
@@ -123,6 +126,15 @@ jobs:
           # Windows-x86 leg skip it (pkcs11-mock only); their SoftHSM-gated tests self-skip.
           SkipSoftHsmV2Build: ${{ (runner.os == 'macOS' || matrix.arch == 'x86') && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+
+      # Persist the vcpkg OpenSSL build right after it's produced, even if the Test step later fails
+      # (if: always()). Only saves on a cache miss — an existing key can't be overwritten anyway.
+      - name: Save vcpkg OpenSSL cache (Windows x64)
+        if: always() && runner.os == 'Windows' && matrix.arch != 'x86' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~\AppData\Local\vcpkg\archives
+          key: vcpkg-openssl-x64-windows-v1
 
       # Auditable record of which SoftHSM the Linux job will exercise. The vendored
       # BuildSoftHsmV2 target places libsofthsm2.so + softhsm2-util next to the test
