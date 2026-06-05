@@ -154,16 +154,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 
 ## Low
 
-### [BL-059] `EncryptDecryptStressTests` swallows `Pkcs11Exception` — could mask handle leaks
-
-- **Area:** QA
-- **Severity:** Low
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/HighLevel/MemoryLeaks/EncryptDecryptStressTests.cs:58-77`
-- **Problem:** Both `Encrypt` and `DestroyObject` are wrapped in `catch (Pkcs11Exception) {}`. The baseline-count comparison only tracks `UnmanagedMemory` blocks, not PKCS#11 object handles, so a `CreateObject` success + `DestroyObject` failure pattern would not be flagged.
-- **Proposed action:** Track whether `CreateObject` succeeded; ensure `DestroyObject` runs for any successfully-created key regardless of encrypt outcome.
-- **Raised by:** QA A
-
 ### [BL-061] `CancelOperations(ulong flags)` takes raw flags — no typed `[Flags]` surface
 
 - **Area:** .NET API Design

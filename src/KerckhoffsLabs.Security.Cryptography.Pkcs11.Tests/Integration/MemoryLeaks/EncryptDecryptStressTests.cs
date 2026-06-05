@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLeaks;
@@ -10,7 +11,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLe
 /// (CreateObject + Encrypt + DestroyObject) against the Mock backend with
 /// forced GC + WaitForPendingFinalizers before the final assertion. The
 /// purpose is allocation discipline, not crypto correctness; mock-specific
-/// CKR codes are caught and swallowed.
+/// <c>CreateObject</c> and <c>Encrypt</c> CKR codes are caught and swallowed.
+/// A <c>DestroyObject</c> failure for a key that <c>CreateObject</c> did create
+/// is NOT swallowed — that would leak a token-object handle the unmanaged-memory
+/// baseline cannot see, so it must fail the test.
 /// </summary>
 [Collection("MemoryLeaks")]
 public sealed class EncryptDecryptStressTests : IDisposable
@@ -51,6 +55,12 @@ public sealed class EncryptDecryptStressTests : IDisposable
         // AES-CBC requires a 16-byte IV; use a fixed all-zeros IV (fine for stress testing).
         byte[] iv = new byte[16];
 
+        // Track token-object handles independently of unmanaged-memory blocks: every key the
+        // mock actually creates must be destroyed exactly once. A CreateObject success paired with
+        // a DestroyObject failure would leak a handle that OutstandingAllocationCount never sees.
+        int created = 0;
+        int destroyed = 0;
+
         for (int i = 0; i < 100; i++)
         {
             var session = TestKeys.OpenLoggedInSession(_backend);
@@ -60,29 +70,39 @@ public sealed class EncryptDecryptStressTests : IDisposable
             try
             {
                 // Build the Mechanism and attempt a realistic create+encrypt+destroy cycle.
-                // The mock backend may reject C_EncryptInit with a CKR_* code; that is fine —
-                // the assertion is about unmanaged-allocation discipline, not crypto output.
                 using var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
+
+                // The mock may reject C_CreateObject outright; if it does, nothing was created and
+                // there is nothing to clean up for this cycle.
+                ObjectHandle key;
                 try
                 {
-                    var key = TestKeys.CreateAes256Key(session, rawKey);
-                    try
-                    {
-                        byte[] plaintext = new byte[16];
-                        _ = session.Encrypt(mech, key, plaintext);
-                    }
-                    catch (Pkcs11Exception)
-                    {
-                        // Mock-specific CKR codes are not the point.
-                    }
-                    finally
-                    {
-                        session.DestroyObject(key);
-                    }
+                    key = TestKeys.CreateAes256Key(session, rawKey);
                 }
                 catch (Pkcs11Exception)
                 {
-                    // CreateObject can also be rejected by the mock; clean up gracefully.
+                    continue;
+                }
+
+                created++;
+                try
+                {
+                    // The mock backend may reject C_EncryptInit with a CKR_* code; that is fine —
+                    // the assertion is about allocation discipline, not crypto output.
+                    byte[] plaintext = new byte[16];
+                    _ = session.Encrypt(mech, key, plaintext);
+                }
+                catch (Pkcs11Exception)
+                {
+                    // Mock-specific encrypt CKR codes are not the point.
+                }
+                finally
+                {
+                    // A key that was successfully created MUST be destroyed regardless of the
+                    // encrypt outcome. Do NOT swallow a DestroyObject failure here — it would leave
+                    // the token-object handle leaked, which is exactly what this test guards against.
+                    session.DestroyObject(key);
+                    destroyed++;
                 }
             }
             finally
@@ -99,5 +119,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
         GC.Collect();
 
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
+        // Every key the mock created was destroyed — no leaked token-object handles.
+        Assert.Equal(created, destroyed);
     }
 }

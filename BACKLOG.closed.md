@@ -655,6 +655,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Pin a stable release if/when one is published; otherwise document the override feed in CONTRIBUTING.
 - **Raised by:** QA C
 
+### [BL-059] `EncryptDecryptStressTests` swallows `Pkcs11Exception` — could mask handle leaks
+
+- **Status: Resolved (2026-06-05)** — Restructured the cycle so `CreateObject`, `Encrypt`, and `DestroyObject` are handled separately: a `CreateObject` rejection skips the cycle, `Encrypt` failures are still swallowed (mock CKR codes aren't the point), and `DestroyObject` now runs in a `finally` for every successfully-created key with its failure deliberately **not** caught — a destroy failure on a created object leaks a token-object handle the unmanaged-memory baseline can't see, so it now fails the test. Added explicit `created`/`destroyed` handle accounting with a final `Assert.Equal(created, destroyed)` alongside the existing `OutstandingAllocationCount` check.
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/HighLevel/MemoryLeaks/EncryptDecryptStressTests.cs:58-77`
+- **Problem:** Both `Encrypt` and `DestroyObject` are wrapped in `catch (Pkcs11Exception) {}`. The baseline-count comparison only tracks `UnmanagedMemory` blocks, not PKCS#11 object handles, so a `CreateObject` success + `DestroyObject` failure pattern would not be flagged.
+- **Proposed action:** Track whether `CreateObject` succeeded; ensure `DestroyObject` runs for any successfully-created key regardless of encrypt outcome.
+- **Raised by:** QA A
+
 ### [BL-065] No public PIN management (SetPin / InitPin)
 
 - **Status: Resolved (2026-05-20)** — Surfaced `Pkcs11Workspace.SetPin(SecurePin oldPin, SecurePin newPin)` (`C_SetPIN`) and `InitPin(SecurePin userPin)` (`C_InitPIN`), delegating to the existing internal `Pkcs11Session` methods after a disposed-guard + null-guard (matching the established workspace delegation style; `SecurePin` zeroize handling is unchanged). Tests: mock-backend guard tests (null args → `ArgumentNullException`, after-dispose → `ObjectDisposedException`) that run cross-platform and never touch a real PIN, plus a SoftHSM `SetPin` round-trip that performs a real `C_SetPIN` change and restores the shared token's user PIN (self-restoring, with a finally fallback; SoftHSM tests run serially so the change is contained). InitPin's SoftHSM integration was intentionally not added — exercising it resets the user PIN via an SO session, a high-blast-radius change to the shared token, and it's the same thin delegation pattern that the SetPin round-trip already proves end-to-end. 606 tests pass.
