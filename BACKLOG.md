@@ -212,9 +212,9 @@ Condensed from PKCS#11 Specialist A's full matrix.
 
 | Status | Count | Notes |
 |---|---|---|
-| Covered (v2.40 / v3.0 / v3.2) | ~85 | Including all message-AEAD, `C_LoginUser`, `C_SessionCancel`, `C_VerifySignature*`, `C_DecapsulateKey`, `C_UnwrapKeyAuthenticated` |
-| Partial | 5 | `C_EncapsulateKey` and `C_WrapKeyAuthenticated` (BL-011); `C_AsyncComplete`/`GetID`/`Join` (BL-045) |
-| Missing | 1 | `C_GetInterfaceList` (BL-013) |
+| Covered (v2.40 / v3.0 / v3.2) | ~88 | Including all message-AEAD, `C_LoginUser`, `C_SessionCancel`, `C_VerifySignature*`, `C_DecapsulateKey`, `C_UnwrapKeyAuthenticated`, `C_EncapsulateKey` + `C_WrapKeyAuthenticated` (BL-011 resolved), `C_GetInterfaceList` (BL-013 resolved, surfaced as `Pkcs11Library.GetInterfaces()`) |
+| Partial | 3 | `C_AsyncComplete`/`GetID`/`Join` (BL-045) |
+| Missing | 0 | — |
 
 Notable gap not on the backlog because the function is technically covered: `C_GetMechanismInfo` is implemented but only accepts `CKM` enum values (BL-014).
 
@@ -224,7 +224,7 @@ Notable gap not on the backlog because the function is technically covered: `C_G
 |---|---|
 | Covered with high-level wrapper | RSA (PKCS#1 / OAEP / PSS), ECDSA, ECDH1, EdDSA, AES (GCM / CCM / CBC / CTR / KEY_WRAP / KEY_WRAP_PAD), ChaCha20-Poly1305, HMAC (SHA-2 family), ML-DSA, ML-KEM, SHA-2/SHA-3 digests, HKDF (raw struct only) |
 | Covered (enum + raw struct only — no high-level helper) | XEDDSA, SLH-DSA, HSS, SP800-108 KDF (counter + feedback), IKE family, X3DH, X2-Ratchet, Salsa20, PBKDF2, RSA-AES-KEY-WRAP |
-| Hash-ML-DSA variants | Mapped for SHA-224/256/384/512 and SHA3 variants. SHAKE128/SHAKE256 listed in doc but **not implemented** (BL-010). Note BL-002: the entire `SignPreHash` path is semantically wrong. |
+| Hash-ML-DSA variants | Mapped for SHA-224/256/384/512 and SHA3 variants. SHAKE128/SHAKE256 intentionally deferred (BL-010 resolved): v3.2 defines no standalone `CKM_SHAKE_128/256` hash CKM for the pre-hash field. The caller-supplied-prehash `SignPreHash`/`VerifyPreHash` path now throws `NotSupportedException` — no v3.2 mechanism accepts an external digest (BL-002 resolved). |
 
 ### Attributes (v3.2 additions)
 
