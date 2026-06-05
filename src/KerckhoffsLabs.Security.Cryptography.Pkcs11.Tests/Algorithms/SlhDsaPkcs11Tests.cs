@@ -1,5 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
+#pragma warning disable SYSLIB5006 // SlhDsaPkcs11 wraps the experimental BCL SlhDsa and is itself [Experimental].
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // Tests for SlhDsaPkcs11 are split by backend across sibling files (each a distinct class — they

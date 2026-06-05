@@ -1,11 +1,13 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
-// SlhDsa (FIPS 205) is an evaluation-only BCL type in .NET 10 (SYSLIB5006). This adapter wraps it,
-// so it necessarily takes on that experimental status; consumers treating the result as a BCL SlhDsa
-// suppress the same diagnostic. Unlike MLDsa, the entire SlhDsa type — not just a few methods — is
-// experimental, so the suppression is file-scoped.
+// SlhDsa (FIPS 205) is an evaluation-only BCL type in .NET 10 (SYSLIB5006), so this adapter is itself
+// marked [Experimental("SYSLIB5006")] (see the class) to propagate that status to its consumers —
+// exactly as the BCL marks SlhDsa. (MLDsa and MLKem were stabilized in .NET 10, so MLDsaPkcs11 /
+// MLKemPkcs11 are not marked.) The file-scoped pragma below suppresses the diagnostic for this
+// adapter's own internal use of the experimental SlhDsa type.
 #pragma warning disable SYSLIB5006
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -36,6 +38,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <param name="key">A token-resident SLH-DSA key (<see cref="CKK.CKK_SLH_DSA"/>).</param>
 /// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
 /// <exception cref="ArgumentException"><paramref name="key"/> is not an SLH-DSA key, or its parameter set is unrecognized / unreadable.</exception>
+[Experimental("SYSLIB5006", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
 public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
 {
     private readonly Pkcs11Key _key = key;
