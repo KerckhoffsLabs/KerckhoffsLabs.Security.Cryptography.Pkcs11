@@ -238,17 +238,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Raised by:** Public-surface review.
 - **Spec / References:** PKCS#11 v3.2 §5.9–5.12 (multi-part operations).
 
-### [BL-068] Windows SoftHSM2 CI build is unusable (token init fails + ~27 min build)
-
-- **Area:** Release Eng
-- **Severity:** Low
-- **Effort:** M
-- **Location:** `build/build-softhsmv2.ps1`; `.github/workflows/ci.yml` (Windows legs, currently `SkipSoftHsmV2Build=true`).
-- **Problem:** The Windows SoftHSM2 build (`build-softhsmv2.ps1`) compiles successfully, but the first CI run surfaced two blockers, so it's gated off on the Windows legs (Windows runs pkcs11-mock only; SoftHSM tests self-skip there). (1) **Token init fails:** `softhsm2-util --init-token` errors with `Could not load the PKCS#11 library/module: LoadLibraryA failed: 0x0000007E` (ERROR_MOD_NOT_FOUND). Likely causes: the Windows build omits the `-DDEFAULT_PKCS11_LIB` / `-DDEFAULT_SOFTHSM2_CONF` / `-DDEFAULT_TOKENDIR` defaults the Linux script bakes in, and/or the vcpkg OpenSSL runtime DLLs (`libcrypto-3-x64.dll`) aren't resolvable next to `softhsm2-util.exe` / `libsofthsm2.dll` at load time. (2) **~27 min build:** vcpkg compiles OpenSSL from source on every run with no caching — impractical for routine CI.
-- **Proposed action:** (a) Pass the `-DDEFAULT_*` paths in `build-softhsmv2.ps1` to match `build-softhsmv2.sh`; verify the OpenSSL runtime DLLs land next to the module + util (and confirm with a dependency walk). (b) Make OpenSSL fast: cache the vcpkg build (`actions/cache` on the vcpkg binary cache) or use a prebuilt OpenSSL instead of from-source. (c) Once green and fast, re-enable the Windows leg (drop `SkipSoftHsmV2Build` there) and remove the Windows exemption in `SoftHsmAvailabilityTests`.
-- **Breaks public API?** No (CI/test infra only).
-- **Raised by:** First Windows CI run of the SoftHSM build (2026-05-21).
-
 ### [BL-069] Managed verify fallback rejects raw `CKM_RSA_PKCS` / `CKM_RSA_X_509` for private-only keys
 
 - **Area:** Cryptography

@@ -625,3 +625,15 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Breaks public API?** No (additive gate; opt-out via `AllowInsecure`).
 - **Raised by:** BL-018 follow-up (2026-05-20).
 - **Spec / References:** NIST SP 800-131A Rev. 2; Sweet32 (CVE-2016-2183) for 64-bit-block ciphers.
+
+### [BL-068] Windows SoftHSM2 CI build is unusable (token init fails + ~27 min build)
+
+- **Status: Resolved (2026-06-05)** — Windows-x64 and Windows-x86 now build and use SoftHSM2 in CI (ML-DSA-capable; see BL-049's Validated/Extended notes). (1) The `0x7E` / ERROR_MOD_NOT_FOUND was not a missing DLL — `softhsm2-util` loaded a module path compiled in at build time (a CMake install prefix absent in CI). `SoftHsmBackendFixture.RunUtil` now passes `--module "<built libsofthsm2>"`; the vcpkg OpenSSL runtime DLLs are also copied next to the module. (2) The ~27 min OpenSSL build is cached (vcpkg `actions/cache` restore + `if: always()` save), and the whole built native tree (libsofthsm2 + util + OpenSSL DLLs) is cached so the native build is skipped entirely on a hit — Windows runs dropped to ~4 min. (3) The Windows legs are re-enabled (`SkipSoftHsmV2Build` dropped), the Windows exemption was removed from `SoftHsmAvailabilityTests`, and Windows ML-DSA was wired up. Commits `2795aaf`, `0e0522b`, `30d319a`, `fdc6de7`, `1f3e6e7`, `1797b44`, `e8d900e`, `b2c97fa`, `70fe425`.
+- **Area:** Release Eng
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `build/build-softhsmv2.ps1`; `.github/workflows/ci.yml` (Windows legs, currently `SkipSoftHsmV2Build=true`).
+- **Problem:** The Windows SoftHSM2 build (`build-softhsmv2.ps1`) compiles successfully, but the first CI run surfaced two blockers, so it's gated off on the Windows legs (Windows runs pkcs11-mock only; SoftHSM tests self-skip there). (1) **Token init fails:** `softhsm2-util --init-token` errors with `Could not load the PKCS#11 library/module: LoadLibraryA failed: 0x0000007E` (ERROR_MOD_NOT_FOUND). Likely causes: the Windows build omits the `-DDEFAULT_PKCS11_LIB` / `-DDEFAULT_SOFTHSM2_CONF` / `-DDEFAULT_TOKENDIR` defaults the Linux script bakes in, and/or the vcpkg OpenSSL runtime DLLs (`libcrypto-3-x64.dll`) aren't resolvable next to `softhsm2-util.exe` / `libsofthsm2.dll` at load time. (2) **~27 min build:** vcpkg compiles OpenSSL from source on every run with no caching — impractical for routine CI.
+- **Proposed action:** (a) Pass the `-DDEFAULT_*` paths in `build-softhsmv2.ps1` to match `build-softhsmv2.sh`; verify the OpenSSL runtime DLLs land next to the module + util (and confirm with a dependency walk). (b) Make OpenSSL fast: cache the vcpkg build (`actions/cache` on the vcpkg binary cache) or use a prebuilt OpenSSL instead of from-source. (c) Once green and fast, re-enable the Windows leg (drop `SkipSoftHsmV2Build` there) and remove the Windows exemption in `SoftHsmAvailabilityTests`.
+- **Breaks public API?** No (CI/test infra only).
+- **Raised by:** First Windows CI run of the SoftHSM build (2026-05-21).
