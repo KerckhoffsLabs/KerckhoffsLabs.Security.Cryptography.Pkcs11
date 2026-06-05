@@ -129,10 +129,32 @@ jobs:
           path: ~\AppData\Local\vcpkg\archives
           key: vcpkg-openssl-${{ matrix.arch || 'x64' }}-windows-v1
 
+      # Cache the *built* native libraries (pkcs11-mock + SoftHSM2 + its OpenSSL runtime DLLs) so the
+      # whole native build — vcpkg install, CMake/autotools compile, link — is skipped on a hit. Keyed
+      # on both vendored submodule SHAs and the build scripts, so a submodule bump or script change
+      # rebuilds. On a hit we set SkipPkcs11MockBuild/SkipSoftHsmV2Build so the BeforeTargets don't run
+      # and the restored artifacts are used as-is (the vcpkg/OpenSSL caches stay as the miss fallback).
+      - name: Native build cache key
+        id: native-key
+        shell: bash
+        run: echo "key=native-${{ runner.os }}-${{ matrix.arch || 'x64' }}-mock_$(git -C vendor/pkcs11-mock rev-parse HEAD)-hsm_$(git -C vendor/softhsmv2 rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache built native libraries
+        id: native-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
+          key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1') }}-v1
+
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
 
       - name: Build
+        env:
+          # On a native-cache hit the prebuilt pkcs11-mock + SoftHSM2 are already in place; skip both
+          # native build scripts so the BeforeTargets don't recompile from the vendored submodules.
+          SkipPkcs11MockBuild: ${{ steps.native-cache.outputs.cache-hit == 'true' && 'true' || '' }}
+          SkipSoftHsmV2Build: ${{ steps.native-cache.outputs.cache-hit == 'true' && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Persist the vcpkg OpenSSL build right after it's produced, even if the Test step later fails
