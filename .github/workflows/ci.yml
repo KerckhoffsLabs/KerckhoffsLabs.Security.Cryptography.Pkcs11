@@ -35,14 +35,19 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
+            arch: arm64
           - os: macos-latest
           - os: windows-latest
           - os: windows-latest
             arch: x86
+          - os: windows-11-arm
+            arch: arm64
 
     steps:
       # submodules: the test project builds pkcs11-mock (vendor/pkcs11-mock) and,
-      # on Linux/macOS and Windows (x64+x86), SoftHSM2 (vendor/softhsmv2) from source during `dotnet build`.
+      # on Linux (x64+arm64), macOS, and Windows (x64+x86+arm64), SoftHSM2 (vendor/softhsmv2)
+      # from source during `dotnet build`.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
@@ -62,8 +67,8 @@ jobs:
       # libraries next to the test assembly where the backend fixtures auto-discover them:
       #   - Linux:        autotools (autoconf/automake/libtool) against an OpenSSL 3.5 we build below.
       #   - macOS:        autotools against Homebrew OpenSSL 3 (native arm64).
-      #   - Windows x64/x86: CMake + vcpkg OpenSSL (build-softhsmv2.ps1), each for its own triplet so
-      #     the library matches the testhost arch. vcpkg OpenSSL is cached per-arch below.
+      #   - Windows x64/x86/arm64: CMake + vcpkg OpenSSL (build-softhsmv2.ps1), each for its own triplet
+      #     so the library matches the testhost arch. vcpkg OpenSSL is cached per-arch below.
       - name: Install native build deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
@@ -190,8 +195,8 @@ jobs:
           }
           else { Write-Host "::warning::built softhsm2-util.exe not found under runtimes/*/native" }
 
-      # All legs (Linux, macOS, Windows x64+x86) build both backends (pkcs11-mock + SoftHSM2), so the
-      # SoftHSM-gated [ConditionalFact] tests run everywhere and the SoftHsm_IsAvailable_OnCiBuildPlatforms
-      # guard fails the job if the build failed to place libsofthsm2.
+      # All legs (Linux x64+arm64, macOS, Windows x64+x86+arm64) build both backends (pkcs11-mock +
+      # SoftHSM2), so the SoftHSM-gated [ConditionalFact] tests run everywhere and the
+      # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
