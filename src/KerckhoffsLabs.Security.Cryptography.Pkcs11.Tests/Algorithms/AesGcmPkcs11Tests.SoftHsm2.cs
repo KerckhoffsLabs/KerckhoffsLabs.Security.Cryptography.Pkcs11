@@ -14,6 +14,10 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     private readonly SoftHsmBackendFixture _backend = backend;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
+    // AesGcmPkcs11.TagByteSizes mirrors the BCL AesGcm, which on macOS is 16..16 — so the wrapper
+    // rejects sub-16-byte tags there regardless of what SoftHSM supports. Gate the small-tag case.
+    public static bool SmallTagsSupported => AesGcm.TagByteSizes.MinSize < 16;
+
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     private static byte[] Iota(int length)
@@ -204,7 +208,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         Assert.Equal(plaintext, decrypted);
     });
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(nameof(SoftHsmAvailable), nameof(SmallTagsSupported))]
     [InlineData(12)]
     [InlineData(16)]
     public void EncryptDecrypt_RoundTrips_VariousTagSizes(int tagLen) => WithGcm(gcm =>

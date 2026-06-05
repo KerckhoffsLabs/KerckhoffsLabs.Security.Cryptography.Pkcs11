@@ -22,6 +22,23 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     private readonly SoftHsmBackendFixture _backend = f;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
+    // macOS BCL (DSASecurityTransforms) can't import/verify a 2048-bit DSA key — DSA.Create(2048)
+    // throws — so the BCL cross-check below can't run there even though SoftHSM signs fine.
+    public static bool DsaSupported { get; } = ProbeDsa();
+
+    private static bool ProbeDsa()
+    {
+        try
+        {
+            using var d = DSA.Create(2048);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     // Fixed 2048-bit prime / 256-bit subprime DSA domain parameters (generated with the BCL).
     private static readonly byte[] P = Convert.FromHexString(
         "F2936B4861E422E0CA0A75FD0F4E5F4771302F0B930048297ECF2B58D586436C79D6A4E2D82A8DB56B4C73094FEB91FC204FA0CF01D0EEF11C669E8BC793A9EB5DEA5B7CC8A8A30623539FA2869CBF16D6DDCD087AFEE2CC22A638B0740B7CA00A7835A28A886FE1C3342A1A84FED1F1D2BD2FA9979EA93497A81D11622AE005B31DAC41740C1C22946D26E48CCEFD03C058A74B9089D055BE2846F12B010B08BC07C40595508BB575A8B4180C9ED2BC4A138B896AAF4DFBCC6B7F2E684E612CCA77AD20130021B83AE12151CA226D33E392A076E5F3825974CA8922CC0EB172F1FC312CE31F92F615E7C92ED747F9B3455883C75FEA4C2B4067B483185F90C3");
@@ -111,7 +128,7 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         Assert.False(dsa.VerifyData(tampered, sig, HashAlgorithmName.SHA256));
     });
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(nameof(SoftHsmAvailable), nameof(DsaSupported))]
     public void SignData_VerifiesUnderBclWithExportedPublicKey() => WithDsa(dsa =>
     {
         byte[] data = Encoding.UTF8.GetBytes("interop with the BCL");
