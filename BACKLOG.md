@@ -179,7 +179,7 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
   - **C:** add `CKM_RSA_X_509` via a hand-rolled RSA public op (`BigInteger` `sᵉ mod n`) + `CryptographicOperations.FixedTimeEquals` block compare — low-risk (no padding parser). Achieving *byte-exact* `CKM_RSA_PKCS` would additionally require a strict EMSA-PKCS1-v1_5 unpad, which is a signature-forgery footgun (Bleichenbacher'06 / "BERserk" leniency class) and is **not** recommended for a non-adapter path.
 - **Breaks public API?** No (additive behavior on an internal verify path).
 - **Raised by:** Algorithms-review follow-up (2026-06-04); split from the managed-verify fix that closed RSA-PSS + raw-ECDSA.
-- **Spec / References:** PKCS#11 v3.2 (`CKM_RSA_PKCS` DigestInfo input; `CKM_RSA_X_509` raw); Bleichenbacher RSA signature-forgery / "BERserk" (padding-leniency class); relates to BL-018 (raw `CKM_RSA_X_509` gating), BL-047 (v1.5 gating split).
+- **Spec / References:** PKCS#11 v3.2 (`CKM_RSA_PKCS` DigestInfo input; `CKM_RSA_X_509` raw); Bleichenbacher RSA signature-forgery / "BERserk" (padding-leniency class); relates to BL-018 (raw `CKM_RSA_X_509` gating).
 
 ---
 
@@ -261,5 +261,5 @@ Items raised by specialists that could not be substantiated from code, or that r
 | Module → host (memory safety) | P/Invoke layer | BL-001 packing on Windows is the primary risk; BL-026 SSL3 IsExport; rest is sound |
 | Module → host (state corruption) | Session lifecycle | BL-003, BL-004 (op state); BL-015, BL-016 (init/finalize pairing) |
 | Caller → key material (extraction) | Wrap/unwrap, ML-KEM extract-and-destroy | BL-017 (unwrap defaults); BL-008 (AllowInsecure scope); BL-009 (heap residue) |
-| Caller → mechanism choice (cryptographic agility) | `GuardMechanism`, `Pkcs11MechanismMap` | BL-018 missing entries; BL-047 PKCS#1 v1.5 split inconsistency |
+| Caller → mechanism choice (cryptographic agility) | `GuardMechanism`, `Pkcs11MechanismMap` | BL-018 missing entries |
 | Logging side channel | `Logging/`, exception messages | No PIN leakage found; BL-007 references internal type name; BL-055 logs pointer addresses in debug mode |
