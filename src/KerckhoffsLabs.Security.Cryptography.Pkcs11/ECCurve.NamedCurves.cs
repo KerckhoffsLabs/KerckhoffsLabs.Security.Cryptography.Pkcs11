@@ -27,6 +27,14 @@ public readonly partial struct ECCurve
         /// <summary>NIST P-521 / secp521r1.</summary>
         public static ECCurve NistP521 { get; } = CreateFromValue("1.3.132.0.35", "nistP521");
 
+        /// <summary>Koblitz curve secp192k1 (SEC 2).</summary>
+        [Obsolete("secp192k1 provides ~96-bit security, below the 112-bit floor (NIST SP 800-57). Use Secp256k1 or NistP256 or stronger. " +
+                  "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.")]
+        public static ECCurve Secp192k1 { get; } = CreateFromValue("1.3.132.0.31", "secp192k1");
+        /// <summary>Koblitz curve secp224k1 (SEC 2).</summary>
+        [Obsolete("secp224k1 provides ~112-bit security, below the 128-bit baseline. Use Secp256k1 or NistP256 or stronger. " +
+                  "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.")]
+        public static ECCurve Secp224k1 { get; } = CreateFromValue("1.3.132.0.32", "secp224k1");
         /// <summary>Koblitz curve secp256k1 (SEC 2).</summary>
         public static ECCurve Secp256k1 { get; } = CreateFromValue("1.3.132.0.10", "secp256k1");
 
@@ -83,6 +91,8 @@ public readonly partial struct ECCurve
         ["1.2.840.10045.3.1.7"] = "nistP256",
         ["1.3.132.0.34"] = "nistP384",
         ["1.3.132.0.35"] = "nistP521",
+        ["1.3.132.0.31"] = "secp192k1",
+        ["1.3.132.0.32"] = "secp224k1",
         ["1.3.132.0.10"] = "secp256k1",
         ["1.3.36.3.3.2.8.1.1.1"] = "brainpoolP160r1",
         ["1.3.36.3.3.2.8.1.1.2"] = "brainpoolP160t1",
@@ -110,6 +120,8 @@ public readonly partial struct ECCurve
     {
         "1.2.840.10045.3.1.1",   // nistP192        ~96-bit
         "1.3.132.0.33",          // nistP224        ~112-bit
+        "1.3.132.0.31",          // secp192k1       ~96-bit
+        "1.3.132.0.32",          // secp224k1       ~112-bit
         "1.3.36.3.3.2.8.1.1.1",  // brainpoolP160r1 ~80-bit
         "1.3.36.3.3.2.8.1.1.2",  // brainpoolP160t1 ~80-bit
         "1.3.36.3.3.2.8.1.1.3",  // brainpoolP192r1 ~96-bit

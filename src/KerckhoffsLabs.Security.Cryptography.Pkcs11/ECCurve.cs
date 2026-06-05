@@ -13,8 +13,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <remarks>
 /// <para>
 /// The <see cref="NamedCurves"/> nested class provides the prime-field (Weierstrass) curves a PKCS#11
-/// v3.2 token may implement via <c>CKM_EC_KEY_PAIR_GEN</c> — the NIST primes, the Koblitz curve
-/// secp256k1, the Brainpool family (RFC 5639), and SM2. Any other curve can be selected with
+/// v3.2 token may implement via <c>CKM_EC_KEY_PAIR_GEN</c> — the NIST primes, the Koblitz curves
+/// (secp192k1/secp224k1/secp256k1), the Brainpool family (RFC 5639), and SM2. Any other curve can be selected with
 /// <see cref="CreateFromValue(string, string?)"/>. Twisted-Edwards (Ed25519/Ed448) and Montgomery
 /// (X25519/X448) curves use different key types and key-pair-gen mechanisms and are intentionally
 /// outside this type.

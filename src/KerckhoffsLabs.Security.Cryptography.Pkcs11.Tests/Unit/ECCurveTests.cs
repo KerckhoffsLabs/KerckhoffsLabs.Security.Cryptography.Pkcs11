@@ -174,6 +174,7 @@ public sealed class ECCurveTests
             ECCurve.NamedCurves.BrainpoolP160r1, ECCurve.NamedCurves.BrainpoolP160t1,
             ECCurve.NamedCurves.BrainpoolP192r1, ECCurve.NamedCurves.BrainpoolP192t1,
             ECCurve.NamedCurves.BrainpoolP224r1, ECCurve.NamedCurves.BrainpoolP224t1,
+            ECCurve.NamedCurves.Secp192k1, ECCurve.NamedCurves.Secp224k1,
         ];
 #pragma warning restore CS0618
         Assert.All(weak, c => Assert.True(c.IsBelowSecurityBaseline, $"{c} should be sub-baseline"));
@@ -205,6 +206,8 @@ public sealed class ECCurveTests
             (ECCurve.NamedCurves.NistP256, "1.2.840.10045.3.1.7", "nistP256"),
             (ECCurve.NamedCurves.NistP384, "1.3.132.0.34", "nistP384"),
             (ECCurve.NamedCurves.NistP521, "1.3.132.0.35", "nistP521"),
+            (ECCurve.NamedCurves.Secp192k1, "1.3.132.0.31", "secp192k1"),
+            (ECCurve.NamedCurves.Secp224k1, "1.3.132.0.32", "secp224k1"),
             (ECCurve.NamedCurves.Secp256k1, "1.3.132.0.10", "secp256k1"),
             (ECCurve.NamedCurves.BrainpoolP160r1, "1.3.36.3.3.2.8.1.1.1", "brainpoolP160r1"),
             (ECCurve.NamedCurves.BrainpoolP160t1, "1.3.36.3.3.2.8.1.1.2", "brainpoolP160t1"),
@@ -224,7 +227,7 @@ public sealed class ECCurveTests
         ];
 #pragma warning restore CS0618
 
-        Assert.Equal(21, catalog.Length);
+        Assert.Equal(23, catalog.Length);
         foreach (var (curve, oid, name) in catalog)
         {
             Assert.Equal(oid, curve.Oid);
