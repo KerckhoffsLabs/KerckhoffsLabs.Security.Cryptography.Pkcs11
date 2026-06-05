@@ -102,16 +102,47 @@ if (-not $srcUtil) { Write-Error "build succeeded but softhsm2-util.exe not foun
 Copy-Item $srcLib.FullName  $destLib  -Force
 Copy-Item $srcUtil.FullName $destUtil -Force
 
-# libsofthsm2.dll and softhsm2-util.exe depend on the vcpkg OpenSSL runtime DLLs
-# (libcrypto-*.dll); place them next to the library so LoadLibrary/the util resolve them.
-$vcpkgBin = Join-Path $VcpkgRoot "installed\$triplet\bin"
-if (Test-Path $vcpkgBin) {
-    Get-ChildItem -Path $vcpkgBin -Filter 'libcrypto*.dll' | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $destDir $_.Name) -Force
+# libsofthsm2.dll (and softhsm2-util.exe) dynamically link the vcpkg OpenSSL runtime
+# (libcrypto-*.dll / libssl-*.dll). They MUST sit next to libsofthsm2.dll or LoadLibrary fails with
+# ERROR_MOD_NOT_FOUND (0x7E) when a token is initialised — softhsm2-util resolves them from its own
+# directory (the native dir), and the .NET host loads libsofthsm2.dll with LOAD_WITH_ALTERED_SEARCH_PATH
+# so the DLL's directory is searched for its dependencies. The release DLLs live under the vcpkg
+# install tree; search a few known locations, then fall back to a recursive search, and fail loudly
+# if none are found (a missing copy here is the difference between a working token and a 0x7E at runtime).
+$searchDirs = @(
+    (Join-Path $VcpkgRoot "installed\$triplet\bin"),
+    (Join-Path $VcpkgRoot "packages\openssl_$triplet\bin")
+) | Where-Object { Test-Path $_ }
+
+$copied = 0
+foreach ($dir in $searchDirs) {
+    Get-ChildItem -Path $dir -Filter 'lib*.dll' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^lib(crypto|ssl)' } | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $destDir $_.Name) -Force
+            Write-Host "Copied OpenSSL runtime: $($_.Name) (from $dir)"
+            $copied++
+        }
+    if ($copied -gt 0) { break }
+}
+
+if ($copied -eq 0) {
+    # Fall back to a recursive search of the vcpkg tree for the release (non-debug) libcrypto, and
+    # grab libssl from the same directory.
+    $crypto = Get-ChildItem -Path $VcpkgRoot -Recurse -Filter 'libcrypto*.dll' -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match [regex]::Escape($triplet) -and $_.FullName -notmatch '\\debug\\' } |
+              Select-Object -First 1
+    if ($crypto) {
+        Get-ChildItem -Path $crypto.DirectoryName -Filter 'lib*.dll' |
+            Where-Object { $_.Name -match '^lib(crypto|ssl)' } | ForEach-Object {
+                Copy-Item $_.FullName (Join-Path $destDir $_.Name) -Force
+                Write-Host "Copied OpenSSL runtime (fallback): $($_.FullName)"
+                $copied++
+            }
     }
-    Get-ChildItem -Path $vcpkgBin -Filter 'libssl*.dll' | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $destDir $_.Name) -Force
-    }
+}
+
+if ($copied -eq 0) {
+    Write-Error "Could not find the vcpkg OpenSSL runtime DLLs (libcrypto/libssl) to place next to libsofthsm2.dll; the token would fail to load with ERROR_MOD_NOT_FOUND."
 }
 
 Write-Host "Installed $destLib"

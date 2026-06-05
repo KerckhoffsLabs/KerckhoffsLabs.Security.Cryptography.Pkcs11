@@ -140,7 +140,11 @@ jobs:
         shell: pwsh
         run: |
           $util = Get-ChildItem -Recurse -Path . -Filter softhsm2-util.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($util) { Write-Host "Built SoftHSM: $($util.FullName)"; & $util.FullName --version }
+          if ($util) {
+            Write-Host "Built SoftHSM: $($util.FullName)"; & $util.FullName --version
+            Write-Host "Native dir contents (libsofthsm2.dll + OpenSSL runtime must be present):"
+            Get-ChildItem (Split-Path $util.FullName) | Select-Object Length, Name | Format-Table -AutoSize | Out-String | Write-Host
+          }
           else { Write-Host "::warning::built softhsm2-util.exe not found under runtimes/*/native" }
 
       # Linux and Windows-x64 build both backends (pkcs11-mock + SoftHSM2), so the SoftHSM-gated
