@@ -42,7 +42,7 @@ jobs:
 
     steps:
       # submodules: the test project builds pkcs11-mock (vendor/pkcs11-mock) and,
-      # on Linux only, SoftHSM2 (vendor/softhsmv2) from source during `dotnet build`.
+      # on Linux and Windows-x64, SoftHSM2 (vendor/softhsmv2) from source during `dotnet build`.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
@@ -53,14 +53,14 @@ jobs:
           dotnet-version: '10.0.x'
           architecture: ${{ matrix.arch || 'x64' }}
 
-      # pkcs11-mock builds with gcc/make (in build-essential); SoftHSM2 builds from source with
-      # autotools (autoconf/automake/libtool). Both BeforeTargets fire during the Build step below,
-      # placing the libraries next to the test assembly where the backend fixtures auto-discover them.
-      # SoftHSM2 is built from source on Linux only. Windows is gated off (the vendored
-      # build-softhsmv2.ps1 compiles, but token init fails to load the module and a from-source
-      # vcpkg OpenSSL build takes ~27 min); macOS is gated off too (no autotools/OpenSSL-3.5 setup
-      # here, and the managed-token tests already give cross-platform BCL coverage). Both run
-      # pkcs11-mock only and their SoftHSM-gated tests self-skip; tracked as a follow-up.
+      # pkcs11-mock builds with gcc/make (in build-essential) on Linux/macOS and MSVC on Windows.
+      # SoftHSM2 builds from source during the Build step below (BeforeTargets), placing the
+      # libraries next to the test assembly where the backend fixtures auto-discover them:
+      #   - Linux:        autotools (autoconf/automake/libtool) against an OpenSSL 3.5 we build below.
+      #   - Windows-x64:  CMake + vcpkg OpenSSL (build-softhsmv2.ps1); vcpkg OpenSSL is cached below.
+      #   - macOS / Windows-x86: gated off (pkcs11-mock only). macOS has no toolchain set up here and
+      #     the managed-token tests give cross-platform BCL coverage; the Windows-x86 leg can't load
+      #     the x64 library the script produces. Their SoftHSM-gated tests self-skip.
       - name: Install native build deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
@@ -98,14 +98,26 @@ jobs:
           echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
+      # build-softhsmv2.ps1 runs `vcpkg install openssl:x64-windows` during the Build step — a
+      # from-source OpenSSL build (~27 min cold). vcpkg's default binary cache makes a warm restore
+      # near-instant; preserve it across runs. The post-cache save runs even when the job fails, so
+      # iterating on the SoftHSM build stays fast. vcpkg keys archives by ABI hash internally, so a
+      # coarse cache key is safe (a mismatch just rebuilds).
+      - name: Cache vcpkg OpenSSL (Windows x64)
+        if: runner.os == 'Windows' && matrix.arch != 'x86'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~\AppData\Local\vcpkg\archives
+          key: vcpkg-openssl-x64-windows-v1
+
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
 
       - name: Build
         env:
-          # SoftHSM2 is built from source only on Linux. Windows and macOS run pkcs11-mock
-          # only (see the native-deps note above); their SoftHSM-gated tests self-skip.
-          SkipSoftHsmV2Build: ${{ runner.os != 'Linux' && 'true' || '' }}
+          # SoftHSM2 is built on Linux (autotools) and Windows-x64 (CMake+vcpkg). macOS and the
+          # Windows-x86 leg skip it (pkcs11-mock only); their SoftHSM-gated tests self-skip.
+          SkipSoftHsmV2Build: ${{ (runner.os == 'macOS' || matrix.arch == 'x86') && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Auditable record of which SoftHSM the Linux job will exercise. The vendored
@@ -119,9 +131,17 @@ jobs:
           if [ -n "$util" ]; then echo "Built SoftHSM: $util"; "$util" --version; \
           else echo "::warning::built softhsm2-util not found under runtimes/*/native"; fi
 
-      # Linux builds both backends (pkcs11-mock + SoftHSM2 via build-softhsmv2.sh), so the
-      # SoftHSM-gated [ConditionalFact] tests run there and the SoftHsm_IsAvailable_OnCiBuildPlatforms
-      # guard fails the job if the build failed to place libsofthsm2. Windows builds pkcs11-mock
-      # only (SoftHSM2 gated off above), so its SoftHSM tests self-skip and the guard is a no-op.
+      - name: Report SoftHSM build (Windows x64)
+        if: runner.os == 'Windows' && matrix.arch != 'x86'
+        shell: pwsh
+        run: |
+          $util = Get-ChildItem -Recurse -Path . -Filter softhsm2-util.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($util) { Write-Host "Built SoftHSM: $($util.FullName)"; & $util.FullName --version }
+          else { Write-Host "::warning::built softhsm2-util.exe not found under runtimes/*/native" }
+
+      # Linux and Windows-x64 build both backends (pkcs11-mock + SoftHSM2), so the SoftHSM-gated
+      # [ConditionalFact] tests run there and the SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails
+      # the job if the build failed to place libsofthsm2. macOS and the Windows-x86 leg build
+      # pkcs11-mock only, so their SoftHSM tests self-skip and the guard is a no-op.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
