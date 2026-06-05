@@ -14,31 +14,32 @@ public sealed class Pkcs11PublicKeyViewTests
         byte[] point = new byte[1 + 2 * coordLen];
         point[0] = 0x04;
         for (int i = 1; i < point.Length; i++) point[i] = (byte)(i & 0xFF);
-
-        byte[] der = new byte[2 + point.Length];
-        der[0] = 0x04;
-        der[1] = (byte)point.Length; // coordLen 32 -> 65 bytes, fits a single short-form length byte
-        point.CopyTo(der, 2);
-        return der;
+        return DerOctetString(point);
     }
 
+    private static byte[] DerOctetString(byte[] content) =>
+        content.Length <= 0x7F
+            ? [0x04, (byte)content.Length, .. content]
+            : [0x04, 0x81, (byte)content.Length, .. content]; // long-form length (fits one byte up to 255)
+
     [Theory]
-    [InlineData("nistP256")]      // previously hardcoded
-    [InlineData("secp256k1")]     // previously unsupported -> returned a broken default curve
-    [InlineData("brainpoolP256r1")]
-    public void TryParseEcPublicKey_ResolvesNamedCurveFromEcParams(string curveName)
+    [InlineData("nistP256", 32)]      // previously hardcoded
+    [InlineData("secp256k1", 32)]     // previously unsupported -> returned a broken default curve
+    [InlineData("brainpoolP256r1", 32)]
+    [InlineData("nistP521", 66)]      // 133-byte point -> exercises the long-form DER length branch
+    public void TryParseEcPublicKey_ResolvesNamedCurveFromEcParams(string curveName, int coordLen)
     {
         ECCurve curve = ECCurve.CreateFromFriendlyName(curveName);
         byte[] ecParams = curve.EcParams;
-        byte[] ecPoint = EcPoint(coordLen: 32);
+        byte[] ecPoint = EcPoint(coordLen);
 
         ECParameters? parsed = Pkcs11PublicKeyView.TryParseEcPublicKey(ecPoint, ecParams);
 
         Assert.NotNull(parsed);
         Assert.True(parsed.Value.Curve.IsNamed);
         Assert.Equal(curve.Oid, parsed.Value.Curve.Oid.Value);
-        Assert.Equal(32, parsed.Value.Q.X!.Length);
-        Assert.Equal(32, parsed.Value.Q.Y!.Length);
+        Assert.Equal(coordLen, parsed.Value.Q.X!.Length);
+        Assert.Equal(coordLen, parsed.Value.Q.Y!.Length);
     }
 
     [Fact]
