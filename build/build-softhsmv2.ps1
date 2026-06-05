@@ -72,11 +72,21 @@ $buildDir  = Join-Path $srcDir '_cmake_build_win'
 $toolchain = Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake'
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
+# The vendored CMake crypto target's INCLUDE_DIRS lists common/data_mgr/pkcs11 but omits slot_mgr
+# and object_store, which the ML-DSA sources need (MLDSAUtil.h -> Token.h is in slot_mgr, OSObject.h
+# in object_store). The autotools build adds them globally; inject them as MSVC /I flags so the
+# ML-DSA translation units compile. (CI paths have no spaces, so no quoting needed.)
+$libDir = Join-Path $srcDir 'src\lib'
+$mldsaIncludes = @('slot_mgr', 'object_store', 'handle_mgr', 'session_mgr') |
+    ForEach-Object { "/I$(Join-Path $libDir $_)" }
+$cxxFlags = $mldsaIncludes -join ' '
+
 # Multi-config VS generator (default on windows-latest); --config Release selects the config.
 cmake -S $srcDir -B $buildDir `
     -A $cmakeA `
     "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
     "-DVCPKG_TARGET_TRIPLET=$triplet" `
+    "-DCMAKE_CXX_FLAGS=$cxxFlags" `
     -DBUILD_TESTS=OFF `
     -DWITH_CRYPTO_BACKEND=openssl `
     -DWITH_OBJECTSTORE_BACKEND_DB=OFF `
