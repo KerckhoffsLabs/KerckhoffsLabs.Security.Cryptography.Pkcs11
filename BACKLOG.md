@@ -69,17 +69,6 @@ _Resolved and won't-fix items have been moved to [BACKLOG.closed.md](BACKLOG.clo
 - **Proposed action:** Add a `PKCS11_EXTRA_MODULE_PATH` env-var override that runs a subset of the smoke and round-trip tests against an arbitrary caller-supplied module. Document the matrix in a `TESTING.md`.
 - **Raised by:** QA A
 
-### [BL-043] `LoginUser`, ML-KEM extract-and-destroy paths don't zero transient buffers / swallow destroy errors
-
-- **Update (2026-06-04):** still open; the ML-KEM adapter was renamed/moved (`Pkcs11MlKem`→`Algorithms/MLKemPkcs11.cs`). Verified both sub-issues remain: `LoginUser` does not zero `usernameBytes` (`Pkcs11Session.cs` ~474), and `MLKemPkcs11.TryDestroy` still swallows `Pkcs11Exception` (~219). The recent ML-KEM shared-secret length-check fix is unrelated to this.
-- **Area:** Cryptography
-- **Severity:** Medium
-- **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs` (`LoginUser`); `Algorithms/MLKemPkcs11.cs` (`TryDestroy`)
-- **Problem:** `LoginUser` zeroes `pinTmp` but not `usernameBytes` — inconsistent with the project's documented hygiene. `MLKemPkcs11.TryDestroy` silently swallows `Pkcs11Exception`; if `C_DestroyObject` fails the extractable shared-secret object lingers on-token.
-- **Proposed action:** Zero `usernameBytes` in the `LoginUser` finally. Log the `TryDestroy` failure at warning and consider surfacing it to the caller after the copy completes.
-- **Raised by:** Cryptographer A, Cryptographer B, PKCS#11 Specialist B
-
 ### [BL-044] `CKS_LAST_VALIDATION_OK`, `CKP_PKCS11_V3_2_*` profile constants are missing
 
 - **Area:** PKCS#11 Conformance

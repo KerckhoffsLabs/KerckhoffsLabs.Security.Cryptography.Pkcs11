@@ -483,6 +483,7 @@ internal sealed partial class Pkcs11Session
         finally
         {
             CryptographicOperations.ZeroMemory(pinTmp);
+            CryptographicOperations.ZeroMemory(usernameBytes);
         }
     }
 

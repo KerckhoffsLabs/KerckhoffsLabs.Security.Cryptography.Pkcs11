@@ -134,8 +134,16 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
+    /// <summary>When set, the next <c>C_DestroyObject</c> reports this code and leaves the object
+    /// in place — lets tests exercise the path where a token rejects the destroy.</summary>
+    public CKR? DestroyObjectResultOverride { get; set; }
+
     public override CKR C_DestroyObject(NativeCULong session, NativeCULong objectId)
-        => _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
+    {
+        if (DestroyObjectResultOverride is { } forced)
+            return forced;
+        return _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
+    }
 
     public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
     {

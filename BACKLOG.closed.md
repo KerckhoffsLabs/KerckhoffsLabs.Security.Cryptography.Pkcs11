@@ -574,6 +574,17 @@ _Items resolved or marked won't-fix, moved out of [BACKLOG.md](BACKLOG.md). Grou
 - **Proposed action:** Either correct the doc, or add an explicit `Logout()` call before close (swallow `CKR_USER_NOT_LOGGED_IN`).
 - **Raised by:** PKCS#11 Specialist B
 
+### [BL-043] `LoginUser`, ML-KEM extract-and-destroy paths don't zero transient buffers / swallow destroy errors
+
+- **Status: Resolved (2026-06-05)** — Both sub-issues fixed. `Pkcs11Session.LoginUser` now zeroes `usernameBytes` alongside `pinTmp` in its `finally`. `MLKemPkcs11` no longer swallows destroy failures: `TryDestroy` was replaced by `DestroyExtractedSecret`, which rethrows a `Pkcs11Exception` (preserving the underlying `ReturnValue`) if `C_DestroyObject` fails, so a lingering extractable shared-secret object is surfaced rather than hidden. `EncapsulateCore`/`DecapsulateCore` were restructured to copy the outputs, then destroy, and on any failure zero the caller's shared-secret buffer before rethrowing (never hand back a secret next to a failed cleanup); the managed `Pkcs11Key` wrapper is still disposed in `finally`. Covered by a new managed test (`Encapsulate_WhenDestroyFails_SurfacesPkcs11Exception`) using a `DestroyObjectResultOverride` hook on `ManagedSoftToken`.
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs` (`LoginUser`); `Algorithms/MLKemPkcs11.cs` (`TryDestroy`)
+- **Problem:** `LoginUser` zeroes `pinTmp` but not `usernameBytes` — inconsistent with the project's documented hygiene. `MLKemPkcs11.TryDestroy` silently swallows `Pkcs11Exception`; if `C_DestroyObject` fails the extractable shared-secret object lingers on-token.
+- **Proposed action:** Zero `usernameBytes` in the `LoginUser` finally. Log the `TryDestroy` failure at warning and consider surfacing it to the caller after the copy completes.
+- **Raised by:** Cryptographer A, Cryptographer B, PKCS#11 Specialist B
+
 ---
 
 ## Low

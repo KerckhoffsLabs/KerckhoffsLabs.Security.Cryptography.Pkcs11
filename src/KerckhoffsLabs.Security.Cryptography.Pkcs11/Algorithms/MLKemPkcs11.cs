@@ -63,13 +63,21 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         try
         {
             ReadAndCopySecret(sharedKey, sharedSecret);
+            CopyExact(ct, ciphertext, Algorithm.CiphertextSizeInBytes);
+            // Destroy the extracted, extractable shared-secret object now that we hold its bytes.
+            // Surfaced (not swallowed): a failure here would leave the secret lingering on-token.
+            DestroyExtractedSecret(sharedKey);
+        }
+        catch
+        {
+            // Never hand back a shared secret alongside a failure (copy or cleanup).
+            CryptographicOperations.ZeroMemory(sharedSecret);
+            throw;
         }
         finally
         {
-            TryDestroy(sharedKey);
+            sharedKey.Dispose();
         }
-
-        CopyExact(ct, ciphertext, Algorithm.CiphertextSizeInBytes);
     }
 
     /// <inheritdoc/>
@@ -85,10 +93,17 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         try
         {
             ReadAndCopySecret(sharedKey, sharedSecret);
+            // Surfaced (not swallowed): a destroy failure would leave the secret lingering on-token.
+            DestroyExtractedSecret(sharedKey);
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(sharedSecret);
+            throw;
         }
         finally
         {
-            TryDestroy(sharedKey);
+            sharedKey.Dispose();
         }
     }
 
@@ -213,11 +228,25 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         }
     }
 
-    private static void TryDestroy(Pkcs11Key sharedKey)
+    /// <summary>
+    /// Destroys the extracted, extractable shared-secret object on the token (<c>C_DestroyObject</c>).
+    /// Unlike a fully best-effort cleanup, a destroy failure is surfaced to the caller: if the
+    /// object cannot be destroyed, an extractable copy of the shared secret lingers on-token, which
+    /// the callers must not silently ignore. Disposal of the managed <see cref="Pkcs11Key"/> wrapper
+    /// is handled by the callers' <c>finally</c>.
+    /// </summary>
+    private static void DestroyExtractedSecret(Pkcs11Key sharedKey)
     {
-        try { sharedKey.Delete(); }
-        catch (Pkcs11Exception) { /* best-effort cleanup */ }
-        finally { sharedKey.Dispose(); }
+        try
+        {
+            sharedKey.Delete();
+        }
+        catch (Pkcs11Exception ex)
+        {
+            throw Pkcs11Exception.Create(ex.ReturnValue,
+                "MLKemPkcs11: C_DestroyObject failed for the extracted shared-secret object — an " +
+                "extractable copy of the shared secret may remain on-token and must be destroyed manually");
+        }
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)

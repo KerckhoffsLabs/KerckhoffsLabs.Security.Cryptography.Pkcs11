@@ -149,6 +149,50 @@ public sealed class MLKemPkcs11Tests_Managed
             Assert.Throws<InsecureOperationException>(() => mlkem.Encapsulate(out _, out _));
         });
 
+    // === Extract-and-destroy cleanup failures =============================
+
+    // The extract-and-destroy path creates a transient, extractable shared-secret object on the
+    // token, reads its bytes, then destroys it. If C_DestroyObject fails, that extractable copy
+    // lingers on-token — the adapter must surface the failure (not swallow it) and must not hand
+    // back a shared secret alongside a failed cleanup.
+    [ConditionalFact(nameof(Supported))]
+    public void Encapsulate_WhenDestroyFails_SurfacesPkcs11Exception()
+    {
+        var token = new ManagedSoftToken();
+        using var library = new Pkcs11Library(token);
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        workspace.AllowInsecure = true;
+
+        string label = $"mlkem-{Guid.NewGuid():N}";
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
+            .Label(label)
+            .Attribute(CKA.CKA_ENCAPSULATE, true)
+            .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlKem.CKP_ML_KEM_768).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
+            .Label(label)
+            .Attribute(CKA.CKA_DECAPSULATE, true).Build();
+
+        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), privTpl, pubTpl);
+        try
+        {
+            using var mlkem = new MLKemPkcs11(key);
+
+            // Make every C_DestroyObject report failure so the shared-secret object cannot be removed.
+            token.DestroyObjectResultOverride = CKR.CKR_FUNCTION_FAILED;
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mlkem.Encapsulate(out _, out _));
+            Assert.Equal(CKR.CKR_FUNCTION_FAILED, ex.ReturnValue);
+        }
+        finally
+        {
+            // Lift the override so the key can actually be cleaned up.
+            token.DestroyObjectResultOverride = null;
+            try { key.Delete(); }
+            catch { /* best-effort cleanup */ }
+            key.Dispose();
+        }
+    }
+
     // === Key material export ==============================================
 
     [ConditionalTheory(nameof(Supported))]
