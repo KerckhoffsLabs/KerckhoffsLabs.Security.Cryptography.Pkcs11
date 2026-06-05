@@ -113,6 +113,30 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
+    /// Test seam: binds to an in-process <see cref="ILowLevelPkcs11Library"/> implementation
+    /// (e.g. a managed fake token) instead of a dynamically loaded native module, then drives
+    /// <c>C_Initialize</c> exactly as the production ctor does. Lets the high-level API and the
+    /// <c>Algorithms</c> adapters be exercised end-to-end without a native PKCS#11 library.
+    /// </summary>
+    internal Pkcs11Library(ILowLevelPkcs11Library lowLevel)
+    {
+        ArgumentNullException.ThrowIfNull(lowLevel);
+        _libraryPath = "<in-process>";
+        _pkcs11Library = lowLevel;
+
+        try
+        {
+            Initialize();
+        }
+        catch
+        {
+            lowLevel.Dispose();
+            _pkcs11Library = null;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Initializes the PKCS#11 library. Probes with <c>CKF_OS_LOCKING_OK</c>
     /// first (the safe default for multi-threaded callers); falls back to a
     /// null-args call if the token returns <c>CKR_CANT_LOCK</c>.
