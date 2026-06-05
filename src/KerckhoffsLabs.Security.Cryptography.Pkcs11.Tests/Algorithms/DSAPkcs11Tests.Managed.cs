@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -15,7 +16,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class DSAPkcs11Tests_Managed
 {
-    [Fact]
+    // macOS's BCL (DSASecurityTransforms) can't generate a 2048-bit DSA key — DSA.Create(2048)
+    // throws — so the managed token can't reconstruct one there. Gate on a one-time probe.
+    public static bool DsaSupported { get; } = ProbeDsa();
+
+    private static bool ProbeDsa()
+    {
+        try
+        {
+            using var d = DSA.Create(2048);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    [ConditionalFact(nameof(DsaSupported))]
     public void SignVerify_RoundTrips_AndPublicMatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();

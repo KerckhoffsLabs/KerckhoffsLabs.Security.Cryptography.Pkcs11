@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -16,6 +17,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class AesCcmPkcs11Tests_Managed
 {
+    // macOS BCL has no AES-CCM (AesCcm.IsSupported == false), so the managed token can't run
+    // it there; the real-crypto cases below are gated. The argument-validation tests throw
+    // before any native call, so they stay unconditional.
+    public static bool AesCcmSupported => AesCcm.IsSupported;
+
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     private static byte[] Iota(int length)
@@ -49,7 +55,7 @@ public sealed class AesCcmPkcs11Tests_Managed
 
     // === Real crypto: cross-checked against the BCL ======================================
 
-    [Theory]
+    [ConditionalTheory(nameof(AesCcmSupported))]
     [InlineData(16)] // AES-128
     [InlineData(24)] // AES-192
     [InlineData(32)] // AES-256
@@ -79,7 +85,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    [Theory]
+    [ConditionalTheory(nameof(AesCcmSupported))]
     [InlineData(7, 16)]  // shortest nonce, longest tag
     [InlineData(13, 4)]  // longest nonce, shortest tag
     [InlineData(12, 8)]
@@ -111,7 +117,7 @@ public sealed class AesCcmPkcs11Tests_Managed
     }
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Decrypt_BclCiphertext_RoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -132,7 +138,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void EncryptDecrypt_EmptyPlaintext_AadOnly_MatchesBcl()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -153,7 +159,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void EncryptDecrypt_NoAad_RoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(16);
@@ -173,7 +179,7 @@ public sealed class AesCcmPkcs11Tests_Managed
 
     // Known-answer test: expected bytes pinned from the BCL AesCcm primitive for a fixed
     // AES-256 key / 96-bit nonce / AAD (NIST SP 800-38C semantics).
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector()
     {
         byte[] key = H("404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f");
@@ -199,7 +205,7 @@ public sealed class AesCcmPkcs11Tests_Managed
 
     // === Authenticity: every input the tag covers must be rejected when altered ===========
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Decrypt_TamperedTag_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -211,7 +217,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, new byte[pt.Length]));
     });
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Decrypt_TamperedCiphertext_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -223,7 +229,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, new byte[pt.Length]));
     });
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Decrypt_WrongAad_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -234,7 +240,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, new byte[pt.Length], "aad-B"u8.ToArray()));
     });
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Decrypt_WrongNonce_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -247,7 +253,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(wrongNonce, ct, tag, new byte[pt.Length]));
     });
 
-    [Fact]
+    [ConditionalFact(nameof(AesCcmSupported))]
     public void Decrypt_WrongKey_Throws()
     {
         byte[] keyA = RandomNumberGenerator.GetBytes(32);

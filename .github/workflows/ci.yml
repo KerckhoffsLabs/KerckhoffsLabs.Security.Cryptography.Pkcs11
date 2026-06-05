@@ -51,7 +51,11 @@ jobs:
         uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
           dotnet-version: '10.0.x'
-          architecture: ${{ matrix.arch || 'x64' }}
+          # macOS runners are Apple Silicon: use the native arm64 SDK. Forcing x64 there runs
+          # dotnet under Rosetta, so the pkcs11-mock build script's `uname -m` reports x86_64
+          # (places the lib under osx-x64) while the testhost resolves osx-arm64 — a mismatch that
+          # makes every Mock-backend test fail to find pkcs11-mock.dylib.
+          architecture: ${{ matrix.arch || (runner.os == 'macOS' && 'arm64' || 'x64') }}
 
       # pkcs11-mock builds with gcc/make (in build-essential) on Linux/macOS and MSVC on Windows.
       # SoftHSM2 builds from source during the Build step below (BeforeTargets), placing the
