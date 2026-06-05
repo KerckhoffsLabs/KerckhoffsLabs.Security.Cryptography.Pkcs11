@@ -45,7 +45,9 @@ case "${UNAME_S}" in
       arm64)  RID="osx-arm64" ;;
       *) echo "unsupported macOS arch: ${UNAME_M}" >&2; exit 1 ;;
     esac
-    LIB_NAME="libsofthsm2.dylib"
+    # libsofthsm2 is built with libtool `-module`, which produces a `.so` bundle on macOS (not a
+    # `.dylib`). dlopen and .NET's NativeLibrary.Load load `.so` bundles fine, so keep the `.so` name.
+    LIB_NAME="libsofthsm2.so"
     ;;
   *)
     echo "unsupported OS: ${UNAME_S}" >&2; exit 1 ;;

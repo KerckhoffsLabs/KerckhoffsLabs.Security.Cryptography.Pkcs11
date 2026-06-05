@@ -187,7 +187,8 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     private static string? BuiltLibraryPath()
     {
         string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-        string ext = OperatingSystem.IsWindows() ? "dll" : OperatingSystem.IsMacOS() ? "dylib" : "so";
+        // macOS uses `.so` too: libsofthsm2 is a libtool `-module` bundle (.so), not a .dylib.
+        string ext = OperatingSystem.IsWindows() ? "dll" : "so";
         string candidate = Path.Combine(asmDir, "runtimes", GetRid(), "native", $"libsofthsm2.{ext}");
         return File.Exists(candidate) ? candidate : null;
     }
