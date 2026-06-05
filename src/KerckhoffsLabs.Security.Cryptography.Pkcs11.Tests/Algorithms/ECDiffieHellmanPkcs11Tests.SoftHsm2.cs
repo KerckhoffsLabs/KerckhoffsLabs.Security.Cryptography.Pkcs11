@@ -23,9 +23,6 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     private readonly SoftHsmBackendFixture _backend = f;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    // ASN.1 DER OID for the P-256 named curve (prime256v1 / secp256r1).
-    private static readonly byte[] EcP256Oid = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
-
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
@@ -55,7 +52,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .Label(label).Id(id).EcParams(EcP256Oid).Build();
+            .Label(label).Id(id).EcParams(TestKeys.EcP256Oid).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Derive().Build();
 

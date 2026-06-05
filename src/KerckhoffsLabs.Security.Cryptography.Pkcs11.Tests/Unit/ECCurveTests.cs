@@ -7,11 +7,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 public sealed class ECCurveTests
 {
     [Fact]
-    public void NistP256_EcParams_IsDerEncodedCurveOid()
+    public void EcParams_MatchIndependentDerVectors()
     {
-        // OBJECT IDENTIFIER 1.2.840.10045.3.1.7 (prime256v1) = 06 08 2A 86 48 CE 3D 03 01 07.
-        byte[] expected = [0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
-        Assert.Equal(expected, ECCurve.NamedCurves.NistP256.EcParams);
+        // TestKeys holds hand-encoded DER OIDs — an oracle independent of ECCurve's AsnWriter path,
+        // so this pins the encoding for every NIST prime (e.g. P-256 = 06 08 2A 86 48 CE 3D 03 01 07).
+        Assert.Equal(TestKeys.EcP256Oid, ECCurve.NamedCurves.NistP256.EcParams);
+        Assert.Equal(TestKeys.EcP384Oid, ECCurve.NamedCurves.NistP384.EcParams);
+        Assert.Equal(TestKeys.EcP521Oid, ECCurve.NamedCurves.NistP521.EcParams);
     }
 
     [Fact]
