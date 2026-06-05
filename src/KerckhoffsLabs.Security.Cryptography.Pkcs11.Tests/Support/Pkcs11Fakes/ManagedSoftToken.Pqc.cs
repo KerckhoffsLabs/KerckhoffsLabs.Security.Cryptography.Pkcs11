@@ -21,23 +21,23 @@ internal sealed partial class ManagedSoftToken
         switch (mech)
         {
             case CKM.CKM_ML_DSA_KEY_PAIR_GEN:
-            {
-                var key = MLDsa.GenerateKey(MapMlDsa((CkpMlDsa)paramSet));
-                StorePqc(CKK.CKK_ML_DSA, paramSet, key.ExportMLDsaPublicKey(), key, pub, priv, ref publicKey, ref privateKey);
-                return CKR.CKR_OK;
-            }
+                {
+                    var key = MLDsa.GenerateKey(MapMlDsa((CkpMlDsa)paramSet));
+                    StorePqc(CKK.CKK_ML_DSA, paramSet, key.ExportMLDsaPublicKey(), key, pub, priv, ref publicKey, ref privateKey);
+                    return CKR.CKR_OK;
+                }
             case CKM.CKM_SLH_DSA_KEY_PAIR_GEN:
-            {
-                var key = SlhDsa.GenerateKey(MapSlhDsa((CkpSlhDsa)paramSet));
-                StorePqc(CKK.CKK_SLH_DSA, paramSet, key.ExportSlhDsaPublicKey(), key, pub, priv, ref publicKey, ref privateKey);
-                return CKR.CKR_OK;
-            }
+                {
+                    var key = SlhDsa.GenerateKey(MapSlhDsa((CkpSlhDsa)paramSet));
+                    StorePqc(CKK.CKK_SLH_DSA, paramSet, key.ExportSlhDsaPublicKey(), key, pub, priv, ref publicKey, ref privateKey);
+                    return CKR.CKR_OK;
+                }
             case CKM.CKM_ML_KEM_KEY_PAIR_GEN:
-            {
-                var key = MLKem.GenerateKey(MapMlKem((CkpMlKem)paramSet));
-                StorePqc(CKK.CKK_ML_KEM, paramSet, key.ExportEncapsulationKey(), key, pub, priv, ref publicKey, ref privateKey);
-                return CKR.CKR_OK;
-            }
+                {
+                    var key = MLKem.GenerateKey(MapMlKem((CkpMlKem)paramSet));
+                    StorePqc(CKK.CKK_ML_KEM, paramSet, key.ExportEncapsulationKey(), key, pub, priv, ref publicKey, ref privateKey);
+                    return CKR.CKR_OK;
+                }
             default:
                 return CKR.CKR_MECHANISM_INVALID;
         }

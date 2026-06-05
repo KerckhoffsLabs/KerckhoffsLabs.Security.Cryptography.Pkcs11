@@ -38,4 +38,32 @@ public sealed class RSAPkcs11Tests_Managed
         using var bcl = RSA.Create(pub);
         Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, padding));
     }
+
+    public static TheoryData<string> OaepHashes => ["SHA1", "SHA256"];
+
+    // RSA-OAEP is gated off on SoftHSM (SoftHsmSupportsOaepSha256 = false), so its KAT skips there —
+    // the managed token runs it: token round-trip plus decrypting a BCL-produced ciphertext.
+    [Theory]
+    [MemberData(nameof(OaepHashes))]
+    public void OaepEncryptDecrypt_RoundTrips_AndDecryptsBclCiphertext(string oaepHash)
+    {
+        var oaep = oaepHash == "SHA256" ? RSAEncryptionPadding.OaepSHA256 : RSAEncryptionPadding.OaepSHA1;
+
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+
+        using var key = workspace.GenerateRsaKeyPair(modulusBits: 2048);
+        using var rsa = new RSAPkcs11(key);
+
+        byte[] plaintext = RandomNumberGenerator.GetBytes(32);
+
+        // Encrypt + decrypt on the token.
+        byte[] ciphertext = rsa.Encrypt(plaintext, oaep);
+        Assert.Equal(plaintext, rsa.Decrypt(ciphertext, oaep));
+
+        // Decrypt a ciphertext the BCL produced with the token's exported public key.
+        using var bcl = RSA.Create(rsa.ExportParameters(includePrivateParameters: false));
+        byte[] bclCiphertext = bcl.Encrypt(plaintext, oaep);
+        Assert.Equal(plaintext, rsa.Decrypt(bclCiphertext, oaep));
+    }
 }

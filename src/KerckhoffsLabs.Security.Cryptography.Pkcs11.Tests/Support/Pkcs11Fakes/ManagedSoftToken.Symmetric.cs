@@ -17,17 +17,27 @@ internal sealed partial class ManagedSoftToken
     private readonly record struct SymOp(
         ulong Mechanism, byte[] Key, byte[]? Iv, byte[]? Aad, int TagLen, int Rc2EffectiveBits);
 
+    // RSA encryption (CKM_RSA_PKCS / CKM_RSA_PKCS_OAEP) routes to the asymmetric path in
+    // ManagedSoftToken.RsaCipher.cs; everything else is a symmetric cipher.
     public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
-        => InitSym((ulong)session, ref mechanism, (ulong)key);
+        => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
+            ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
+            : InitSym((ulong)session, ref mechanism, (ulong)key);
 
     public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
-        => InitSym((ulong)session, ref mechanism, (ulong)key);
+        => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
+            ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
+            : InitSym((ulong)session, ref mechanism, (ulong)key);
 
     public override CKR C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? encryptedData, ref NativeCULong encryptedDataLen)
-        => TransformSym((ulong)session, data, (int)dataLen, encryptedData, ref encryptedDataLen, encrypt: true);
+        => _rsaEncOps.ContainsKey((ulong)session)
+            ? RsaTransform((ulong)session, data, (int)dataLen, encryptedData, ref encryptedDataLen, encrypt: true)
+            : TransformSym((ulong)session, data, (int)dataLen, encryptedData, ref encryptedDataLen, encrypt: true);
 
     public override CKR C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[]? data, ref NativeCULong dataLen)
-        => TransformSym((ulong)session, encryptedData, (int)encryptedDataLen, data, ref dataLen, encrypt: false);
+        => _rsaEncOps.ContainsKey((ulong)session)
+            ? RsaTransform((ulong)session, encryptedData, (int)encryptedDataLen, data, ref dataLen, encrypt: false)
+            : TransformSym((ulong)session, encryptedData, (int)encryptedDataLen, data, ref dataLen, encrypt: false);
 
     private CKR InitSym(ulong session, ref CK_MECHANISM mech, ulong key)
     {
@@ -42,43 +52,43 @@ internal sealed partial class ManagedSoftToken
         switch (m)
         {
             case CKM.CKM_AES_GCM:
-            {
-                var p = UnmanagedMemory.Read<CK_GCM_PARAMS>(mech.Parameter);
-                iv = ReadPtr(p.Iv, (int)p.IvLen);
-                aad = ReadPtr(p.AAD, (int)p.AADLen);
-                tagLen = (int)p.TagBits / 8;
-                break;
-            }
+                {
+                    var p = UnmanagedMemory.Read<CK_GCM_PARAMS>(mech.Parameter);
+                    iv = ReadPtr(p.Iv, (int)p.IvLen);
+                    aad = ReadPtr(p.AAD, (int)p.AADLen);
+                    tagLen = (int)p.TagBits / 8;
+                    break;
+                }
             case CKM.CKM_AES_CCM:
-            {
-                var p = UnmanagedMemory.Read<CK_CCM_PARAMS>(mech.Parameter);
-                iv = ReadPtr(p.Nonce, (int)p.NonceLen);
-                aad = ReadPtr(p.AAD, (int)p.AADLen);
-                tagLen = (int)p.MACLen;
-                break;
-            }
+                {
+                    var p = UnmanagedMemory.Read<CK_CCM_PARAMS>(mech.Parameter);
+                    iv = ReadPtr(p.Nonce, (int)p.NonceLen);
+                    aad = ReadPtr(p.AAD, (int)p.AADLen);
+                    tagLen = (int)p.MACLen;
+                    break;
+                }
             case CKM.CKM_CHACHA20_POLY1305:
-            {
-                var p = UnmanagedMemory.Read<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(mech.Parameter);
-                iv = ReadPtr(p.Nonce, (int)p.NonceLen);
-                aad = ReadPtr(p.AAD, (int)p.AADLen);
-                tagLen = 16;
-                break;
-            }
+                {
+                    var p = UnmanagedMemory.Read<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(mech.Parameter);
+                    iv = ReadPtr(p.Nonce, (int)p.NonceLen);
+                    aad = ReadPtr(p.AAD, (int)p.AADLen);
+                    tagLen = 16;
+                    break;
+                }
             case CKM.CKM_RC2_CBC:
             case CKM.CKM_RC2_CBC_PAD:
-            {
-                var p = UnmanagedMemory.Read<CK_RC2_CBC_PARAMS>(mech.Parameter);
-                rc2Bits = (int)p.EffectiveBits;
-                iv = p.Iv; // inline 8-byte IV
-                break;
-            }
+                {
+                    var p = UnmanagedMemory.Read<CK_RC2_CBC_PARAMS>(mech.Parameter);
+                    rc2Bits = (int)p.EffectiveBits;
+                    iv = p.Iv; // inline 8-byte IV
+                    break;
+                }
             case CKM.CKM_RC2_ECB:
-            {
-                var p = UnmanagedMemory.Read<CK_RC2_PARAMS>(mech.Parameter);
-                rc2Bits = (int)p.EffectiveBits;
-                break;
-            }
+                {
+                    var p = UnmanagedMemory.Read<CK_RC2_PARAMS>(mech.Parameter);
+                    rc2Bits = (int)p.EffectiveBits;
+                    break;
+                }
             default:
                 // Raw-IV block ciphers (AES/DES/3DES CBC carry the IV directly; ECB has no parameter).
                 if (mech.Parameter != IntPtr.Zero && (int)mech.ParameterLen > 0)

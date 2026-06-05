@@ -23,7 +23,10 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     private readonly HashSet<ulong> _sessions = [];
     private readonly Dictionary<ulong, Queue<ulong>> _finds = [];
 
-    private static readonly NativeCULong AttrUnavailable = (NativeCULong)(ulong)nuint.MaxValue;
+    // PKCS#11 "attribute unavailable" sentinel: (CK_ULONG)-1, all-ones at the platform's CK_ULONG
+    // width (4 bytes on Windows, 8 on Linux-LP64). NativeCULong.MaxValue is exactly that on both —
+    // building it from nuint.MaxValue overflows the checked narrowing on Windows.
+    private static readonly NativeCULong AttrUnavailable = NativeCULong.MaxValue;
 
     // === Lifecycle / discovery ===========================================
 
