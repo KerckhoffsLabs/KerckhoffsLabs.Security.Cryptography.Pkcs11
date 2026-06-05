@@ -207,15 +207,21 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
 
     private static string GetRid()
     {
+        // The native library must match the *process* architecture (the testhost), not the OS:
+        // the win-x86 leg runs a 32-bit testhost under WOW64 on a 64-bit OS, so OSArchitecture would
+        // wrongly resolve win-x64 and miss the win-x86 library the build placed.
+        var arch = RuntimeInformation.ProcessArchitecture;
         if (OperatingSystem.IsLinux())
-            return RuntimeInformation.OSArchitecture == Architecture.Arm64
-                ? "linux-arm64" : "linux-x64";
+            return arch == Architecture.Arm64 ? "linux-arm64" : "linux-x64";
         if (OperatingSystem.IsMacOS())
-            return RuntimeInformation.OSArchitecture == Architecture.Arm64
-                ? "osx-arm64" : "osx-x64";
+            return arch == Architecture.Arm64 ? "osx-arm64" : "osx-x64";
         if (OperatingSystem.IsWindows())
-            return RuntimeInformation.OSArchitecture == Architecture.Arm64
-                ? "win-arm64" : "win-x64";
+            return arch switch
+            {
+                Architecture.Arm64 => "win-arm64",
+                Architecture.X86 => "win-x86",
+                _ => "win-x64",
+            };
         return "linux-x64";
     }
 
