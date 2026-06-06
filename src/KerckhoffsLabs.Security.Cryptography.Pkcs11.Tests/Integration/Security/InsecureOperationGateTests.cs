@@ -17,9 +17,9 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.Encrypt(Mechanism, ObjectHandle, byte[])"/> with an insecure
+    /// Calling <c>Session.Encrypt</c> with an insecure
     /// mechanism must throw <see cref="InsecureOperationException"/> when
-    /// <see cref="Session.AllowInsecure"/> is false (the default).
+    /// <c>Session.AllowInsecure</c> is false (the default).
     /// </summary>
     internal static void Assert_Encrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
@@ -41,7 +41,7 @@ internal static class InsecureOperationGateTestCases
     }
 
     /// <summary>
-    /// With <see cref="Session.AllowInsecure"/> set to <c>true</c> the Encrypt gate is
+    /// With <c>Session.AllowInsecure</c> set to <c>true</c> the Encrypt gate is
     /// bypassed. The backend may still throw for unrelated reasons (bad handle, etc.), but
     /// MUST NOT throw <see cref="InsecureOperationException"/>.
     /// </summary>
@@ -71,9 +71,9 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.Decrypt(Mechanism, ObjectHandle, byte[])"/> with an insecure
+    /// Calling <c>Session.Decrypt</c> with an insecure
     /// mechanism must throw <see cref="InsecureOperationException"/> when
-    /// <see cref="Session.AllowInsecure"/> is false (the default).
+    /// <c>Session.AllowInsecure</c> is false (the default).
     /// </summary>
     internal static void Assert_Decrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
@@ -95,7 +95,7 @@ internal static class InsecureOperationGateTestCases
     }
 
     /// <summary>
-    /// With <see cref="Session.AllowInsecure"/> set to <c>true</c> the Decrypt gate is
+    /// With <c>Session.AllowInsecure</c> set to <c>true</c> the Decrypt gate is
     /// bypassed. The backend may still throw for unrelated reasons, but MUST NOT throw
     /// <see cref="InsecureOperationException"/>.
     /// </summary>
@@ -125,9 +125,9 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.Sign(Mechanism, ObjectHandle, ReadOnlySpan{byte})"/> with an
+    /// Calling <c>Session.Sign</c> with an
     /// insecure mechanism must throw <see cref="InsecureOperationException"/> when
-    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// <c>Session.AllowInsecure</c> is false (the default). The guard fires in managed
     /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
     /// </summary>
     internal static void Assert_Sign_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
@@ -153,9 +153,9 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.Verify(Mechanism, ObjectHandle, ReadOnlySpan{byte}, ReadOnlySpan{byte}, out bool)"/>
+    /// Calling <c>Session.Verify</c>
     /// with an insecure mechanism must throw <see cref="InsecureOperationException"/> when
-    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// <c>Session.AllowInsecure</c> is false (the default). The guard fires in managed
     /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
     /// </summary>
     internal static void Assert_Verify_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
@@ -182,7 +182,7 @@ internal static class InsecureOperationGateTestCases
 
     /// <summary>
     /// A strong-hash RSASSA-PKCS1-v1_5 signature mechanism (e.g. <c>CKM_SHA256_RSA_PKCS</c>) must
-    /// NOT be gated: signing with it succeeds past the guard even with <see cref="Session.AllowInsecure"/>
+    /// NOT be gated: signing with it succeeds past the guard even with <c>Session.AllowInsecure</c>
     /// left at its <c>false</c> default. The backend may still throw for unrelated reasons (the fake
     /// handle is bogus), but MUST NOT throw <see cref="InsecureOperationException"/>.
     /// </summary>
@@ -234,8 +234,8 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.Digest(Mechanism, byte[])"/> with an insecure mechanism must
-    /// throw <see cref="InsecureOperationException"/> when <see cref="Session.AllowInsecure"/> is
+    /// Calling <c>Session.Digest</c> with an insecure mechanism must
+    /// throw <see cref="InsecureOperationException"/> when <c>Session.AllowInsecure</c> is
     /// false (the default). The guard fires in managed code before any P/Invoke call, so no real
     /// key material is needed.
     /// </summary>
@@ -261,9 +261,9 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.GenerateKey(Mechanism, List{ObjectAttribute})"/> with an
+    /// Calling <c>Session.GenerateKey</c> with an
     /// insecure mechanism must throw <see cref="InsecureOperationException"/> when
-    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// <c>Session.AllowInsecure</c> is false (the default). The guard fires in managed
     /// code before any P/Invoke call, so no real token is needed.
     /// </summary>
     internal static void Assert_GenerateKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
@@ -288,9 +288,9 @@ internal static class InsecureOperationGateTestCases
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Calling <see cref="Session.DeriveKey(Mechanism, ObjectHandle, List{ObjectAttribute})"/>
+    /// Calling <c>Session.DeriveKey</c>
     /// with an insecure mechanism must throw <see cref="InsecureOperationException"/> when
-    /// <see cref="Session.AllowInsecure"/> is false (the default). The guard fires in managed
+    /// <c>Session.AllowInsecure</c> is false (the default). The guard fires in managed
     /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
     /// </summary>
     internal static void Assert_DeriveKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)

@@ -10,11 +10,11 @@
     <LangVersion>13.0</LangVersion>
     <!--
       GenerateDocumentationFile is on repo-wide (Directory.Build.props) only so IDE0005
-      (unused usings) runs at build. Test XML docs are never published, so suppress the whole
-      doc-comment diagnostic family here: missing (CS1591), unresolved/malformed crefs
-      (CS1574/CS1580/CS1584), param mismatches (CS1572/CS1573), and malformed XML (CS1570/CS1734).
+      (unused usings) runs at build. Individual test methods are not XML-documented, so the
+      missing-doc warning (CS1591) is suppressed; every other doc-comment diagnostic
+      (unresolved/malformed crefs, param mismatches, malformed XML) is fixed at the source.
     -->
-    <NoWarn>$(NoWarn);CS1591;CS1572;CS1573;CS1574;CS1580;CS1584;CS1570;CS1734</NoWarn>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

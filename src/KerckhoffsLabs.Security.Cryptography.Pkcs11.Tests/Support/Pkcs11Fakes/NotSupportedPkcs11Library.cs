@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 /// <summary>
 /// Base managed <see cref="ILowLevelPkcs11Library"/> where every Cryptoki entry point returns
 /// <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/>. Derive and override only the functions a given
-/// fake token needs (see <see cref="ManagedAesToken"/>). Generated from the interface so the
+/// fake token needs (see <c>ManagedSoftToken</c>). Generated from the interface so the
 /// signatures stay in lock-step; regenerate if ILowLevelPkcs11Library changes.
 /// </summary>
 internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library

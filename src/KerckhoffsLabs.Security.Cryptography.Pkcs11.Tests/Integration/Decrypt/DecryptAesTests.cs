@@ -52,7 +52,7 @@ internal static class DecryptAesTestCases
     }
 
     /// <summary>
-    /// With <see cref="Session.AllowInsecure"/> set to <c>true</c> the gate is bypassed.
+    /// With <c>Session.AllowInsecure</c> set to <c>true</c> the gate is bypassed.
     /// The backend may still fail for unrelated reasons (wrong ciphertext etc.), but MUST
     /// NOT throw <see cref="InsecureOperationException"/>.
     /// </summary>

@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Random;
 /// <summary>
 /// Workspace-facade RNG tests: verify <see cref="Pkcs11Workspace.GenerateRandom(int)"/>
 /// delegates to the session and enforces its argument guard. Session-level RNG behavior
-/// across backends lives in <see cref="RandomTests"/>.
+/// across backends lives in <c>RandomTests</c>.
 /// </summary>
 [Collection("Mock")]
 public sealed class WorkspaceRandomTests(MockBackendFixture backend)

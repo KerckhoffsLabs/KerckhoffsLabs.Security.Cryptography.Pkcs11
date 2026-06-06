@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Digest;
 /// <summary>
 /// Workspace-facade digest tests: verify <see cref="Pkcs11Workspace.Digest"/> delegates to
 /// the session, firing the insecure-mechanism gate and null-argument guard in managed code
-/// before any native call. Backend digest correctness lives in <see cref="DigestSha2Tests"/>
-/// and <see cref="DigestMd5Sha1Tests"/>.
+/// before any native call. Backend digest correctness lives in <c>DigestSha2Tests</c>
+/// and <c>DigestMd5Sha1Tests</c>.
 /// </summary>
 [Collection("Mock")]
 public sealed class WorkspaceDigestTests(MockBackendFixture backend)
