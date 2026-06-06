@@ -55,31 +55,3 @@ internal static class RandomTestCases
         }
     }
 }
-
-[Collection("Mock")]
-public sealed class RandomTests_Mock(MockBackendFixture f)
-{
-    private readonly MockBackendFixture _backend = f;
-
-    [Fact]
-    public void GenerateRandom_ProducesRequestedLength() => RandomTestCases.Assert_GenerateRandom_ProducesRequestedLength(_backend);
-
-    // ConsecutiveCallsDiffer is SoftHsm-only — pkcs11-mock returns the same canned bytes.
-    // SpanOverload_FillsBuffer is SoftHsm-only for the same reason.
-}
-
-[Collection("SoftHsm")]
-public sealed class RandomTests_SoftHsm(SoftHsmBackendFixture f)
-{
-    private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void GenerateRandom_ProducesRequestedLength() => RandomTestCases.Assert_GenerateRandom_ProducesRequestedLength(_backend);
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void GenerateRandom_ConsecutiveCallsDiffer() => RandomTestCases.Assert_GenerateRandom_ConsecutiveCallsDiffer(_backend);
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void GenerateRandom_SpanOverload_FillsBuffer() => RandomTestCases.Assert_GenerateRandom_SpanOverload_FillsBuffer(_backend);
-}

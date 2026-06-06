@@ -3,6 +3,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
+/// <summary>
+/// Backend-agnostic assertions for <c>Pkcs11Workspace.GenerateAesKey</c>. The per-backend test
+/// classes live in <c>GenerateAesKeyTests.Pkcs11Mock.cs</c> and <c>GenerateAesKeyTests.SoftHsm2.cs</c>.
+/// </summary>
 internal static class GenerateAesKeyTestCases
 {
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
@@ -34,26 +38,4 @@ internal static class GenerateAesKeyTestCases
             foreach (var a in attrs) a.Dispose();
         }
     }
-}
-
-[Collection("Mock")]
-public sealed class GenerateAesKeyTests_Mock(MockBackendFixture f)
-{
-    private readonly MockBackendFixture _backend = f;
-
-    [Fact]
-    public void RejectsWrongBitLength() => GenerateAesKeyTestCases.Assert_RejectsWrongBitLength(_backend);
-}
-
-[Collection("SoftHsm")]
-public sealed class GenerateAesKeyTests_SoftHsm(SoftHsmBackendFixture f)
-{
-    private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void RejectsWrongBitLength() => GenerateAesKeyTestCases.Assert_RejectsWrongBitLength(_backend);
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void GeneratesAes256Key() => GenerateAesKeyTestCases.Assert_GeneratesAes256Key(_backend);
 }

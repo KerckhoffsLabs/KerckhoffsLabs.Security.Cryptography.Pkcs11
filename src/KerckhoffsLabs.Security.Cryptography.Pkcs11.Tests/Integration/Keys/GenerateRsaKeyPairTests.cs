@@ -3,6 +3,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
+/// <summary>
+/// Backend-agnostic assertions for <c>Pkcs11Workspace.GenerateRsaKeyPair</c>. The per-backend test
+/// classes live in <c>GenerateRsaKeyPairTests.Pkcs11Mock.cs</c> and <c>GenerateRsaKeyPairTests.SoftHsm2.cs</c>.
+/// </summary>
 internal static class GenerateRsaKeyPairTestCases
 {
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
@@ -24,26 +28,4 @@ internal static class GenerateRsaKeyPairTestCases
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
     }
-}
-
-[Collection("Mock")]
-public sealed class GenerateRsaKeyPairTests_Mock(MockBackendFixture f)
-{
-    private readonly MockBackendFixture _backend = f;
-
-    [Fact]
-    public void RejectsTooSmallModulus() => GenerateRsaKeyPairTestCases.Assert_RejectsTooSmallModulus(_backend);
-}
-
-[Collection("SoftHsm")]
-public sealed class GenerateRsaKeyPairTests_SoftHsm(SoftHsmBackendFixture f)
-{
-    private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void RejectsTooSmallModulus() => GenerateRsaKeyPairTestCases.Assert_RejectsTooSmallModulus(_backend);
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void GeneratesRsa2048KeyPair() => GenerateRsaKeyPairTestCases.Assert_GeneratesRsa2048KeyPair(_backend);
 }

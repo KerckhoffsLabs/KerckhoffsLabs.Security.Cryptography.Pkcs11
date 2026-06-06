@@ -36,8 +36,9 @@ internal static class DecryptAesTestCases
                 byte[] ciphertext = new byte[16];
                 using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                Assert.Throws<InsecureOperationException>(() =>
+                var ex = Assert.Throws<InsecureOperationException>(() =>
                     session.Decrypt(mechanism, keyHandle, ciphertext));
+                Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
             }
             finally
             {
@@ -84,49 +85,4 @@ internal static class DecryptAesTestCases
             session.CloseSession();
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Concrete test class: Mock backend
-// ---------------------------------------------------------------------------
-
-/// <summary>
-/// AES decrypt gate tests against pkcs11-mock.
-/// Both gate-throws and gate-bypass run unconditionally: <see cref="InsecureOperationException"/>
-/// is thrown (or bypassed) in managed code before any P/Invoke call.
-/// </summary>
-[Collection("Mock")]
-public sealed class DecryptAesTests_Mock(MockBackendFixture f)
-{
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
-    private readonly MockBackendFixture _backend = f;
-
-    [Fact]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault_Mock()
-        => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
-
-    [Fact]
-    public void AesEcb_AllowedWhenAllowInsecureTrue_Mock()
-        => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
-}
-
-// ---------------------------------------------------------------------------
-// Concrete test class: SoftHSM backend
-// ---------------------------------------------------------------------------
-
-[Collection("SoftHsm")]
-public sealed class DecryptAesTests_SoftHsm(SoftHsmBackendFixture f)
-{
-    private readonly SoftHsmBackendFixture _backend = f;
-
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault_SoftHsm()
-        => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void AesEcb_AllowedWhenAllowInsecureTrue_SoftHsm()
-        => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

@@ -6,8 +6,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
 /// <summary>
-/// The RSA PKCS#1 v1.5 encryption gate. RSA-OAEP round-trips are covered by the RSAPkcs11 adapter
-/// tests (<c>Integration/Adapters/RSAPkcs11Tests.EncryptDecrypt_OaepSha</c>).
+/// The RSA PKCS#1 v1.5 encryption gate (backend-agnostic assertions; the per-backend test classes
+/// live in <c>EncryptRsaTests.Pkcs11Mock.cs</c> and <c>EncryptRsaTests.SoftHsm2.cs</c>). RSA-OAEP
+/// round-trips are covered by the RSAPkcs11 adapter tests
+/// (<c>Integration/Adapters/RSAPkcs11Tests.EncryptDecrypt_OaepSha</c>).
 /// </summary>
 internal static class EncryptRsaTestCases
 {
@@ -26,8 +28,9 @@ internal static class EncryptRsaTestCases
                 // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by Session.GuardMechanism; the same gate the
                 // RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.
                 using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-                Assert.Throws<InsecureOperationException>(() =>
+                var ex = Assert.Throws<InsecureOperationException>(() =>
                     session.Encrypt(mech, pub, plaintext));
+                Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
             }
             finally
             {
@@ -40,27 +43,4 @@ internal static class EncryptRsaTestCases
             session.CloseSession();
         }
     }
-}
-
-/// <summary>RSA PKCS#1 v1.5 gate against pkcs11-mock (the managed gate fires before C_EncryptInit).</summary>
-[Collection("Mock")]
-public sealed class EncryptRsaTests_Mock(MockBackendFixture f)
-{
-    private readonly MockBackendFixture _backend = f;
-
-    [Fact]
-    public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_Mock()
-        => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
-}
-
-[Collection("SoftHsm")]
-public sealed class EncryptRsaTests_SoftHsm(SoftHsmBackendFixture f)
-{
-    private readonly SoftHsmBackendFixture _backend = f;
-
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
-    [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_SoftHsm()
-        => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }
