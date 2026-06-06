@@ -67,7 +67,7 @@ public sealed class CkmSp800108CounterKdfParams : MechanismParameters
 
         _label = AllocateBytes(label);
         _separator = UnmanagedMemory.Allocate(1);
-        UnmanagedMemory.Write(_separator, (ReadOnlySpan<byte>)stackalloc byte[] { 0x00 });
+        UnmanagedMemory.Write(_separator, (ReadOnlySpan<byte>)[0x00]);
         _context = AllocateBytes(context);
 
         int elemSize = UnmanagedMemory.SizeOf(typeof(CK_PRF_DATA_PARAM));

@@ -347,7 +347,7 @@ public sealed class Pkcs11Workspace : IDisposable
     public Pkcs11Key GenerateAesKey(int bitLength = 256, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (bitLength != 128 && bitLength != 192 && bitLength != 256)
+        if (bitLength is not 128 and not 192 and not 256)
             throw new ArgumentOutOfRangeException(nameof(bitLength), "AES key length must be 128, 192, or 256 bits.");
 
         var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
@@ -470,7 +470,7 @@ public sealed class Pkcs11Workspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
-        if (aesBitLength != 128 && aesBitLength != 192 && aesBitLength != 256)
+        if (aesBitLength is not 128 and not 192 and not 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
 
         using var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);

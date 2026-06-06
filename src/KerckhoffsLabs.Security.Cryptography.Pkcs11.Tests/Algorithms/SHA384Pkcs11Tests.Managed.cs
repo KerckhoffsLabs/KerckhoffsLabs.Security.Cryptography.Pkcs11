@@ -60,8 +60,8 @@ public sealed class SHA384Pkcs11_Managed
         using var workspace = ManagedToken.OpenWorkspace(library);
         using var sha = new SHA384Pkcs11(workspace);
 
-        byte[] digest = sha.ComputeHash(Array.Empty<byte>());
-        Assert.Equal(SHA384.HashData(Array.Empty<byte>()), digest);
+        byte[] digest = sha.ComputeHash([]);
+        Assert.Equal(SHA384.HashData([]), digest);
     }
 
     [ConditionalFact(nameof(Supported))]

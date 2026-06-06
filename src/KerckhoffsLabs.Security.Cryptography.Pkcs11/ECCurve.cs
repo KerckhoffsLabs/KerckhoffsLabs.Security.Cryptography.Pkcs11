@@ -147,9 +147,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
     {
         if (!curve.IsNamed)
             throw new ArgumentException("Only named ECCurves (with an OID) can be converted.", nameof(curve));
-        string? oid = curve.Oid.Value;
-        if (oid is null)
-            throw new ArgumentException("The ECCurve has no OID value.", nameof(curve));
+        string? oid = curve.Oid.Value ?? throw new ArgumentException("The ECCurve has no OID value.", nameof(curve));
         return new ECCurve(oid, curve.Oid.FriendlyName);
     }
 

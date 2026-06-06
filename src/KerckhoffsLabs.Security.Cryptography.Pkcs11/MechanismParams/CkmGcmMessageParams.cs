@@ -29,7 +29,7 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     private CkmGcmMessageParams(ReadOnlySpan<byte> iv, int tagLen, ReadOnlySpan<byte> tagInput)
     {
         if (iv.IsEmpty) throw new ArgumentException("IV must not be empty.", nameof(iv));
-        if (tagLen < 4 || tagLen > 16) throw new ArgumentOutOfRangeException(nameof(tagLen), "GCM tag length must be 4..16 bytes.");
+        if (tagLen is < 4 or > 16) throw new ArgumentOutOfRangeException(nameof(tagLen), "GCM tag length must be 4..16 bytes.");
 
         _tagLen = tagLen;
         _iv = UnmanagedMemory.Allocate(iv.Length);

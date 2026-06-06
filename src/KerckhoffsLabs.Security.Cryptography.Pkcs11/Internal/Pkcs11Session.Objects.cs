@@ -402,9 +402,9 @@ internal sealed partial class Pkcs11Session
     /// attribute's value-length sentinel rather than thrown.
     /// </summary>
     private static bool IsGetAttributeValueFatal(CKR rv)
-        => rv != CKR.CKR_OK
-        && rv != CKR.CKR_ATTRIBUTE_SENSITIVE
-        && rv != CKR.CKR_ATTRIBUTE_TYPE_INVALID;
+        => rv is not CKR.CKR_OK
+        and not CKR.CKR_ATTRIBUTE_SENSITIVE
+        and not CKR.CKR_ATTRIBUTE_TYPE_INVALID;
 
     /// <summary>
     /// True when the attribute type is one of the three PKCS#11 attributes whose

@@ -145,7 +145,7 @@ internal sealed partial class Pkcs11Session
             {
                 encryptedPartLen = (NativeCULong)(encryptedPart.Length);
                 rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
                     Pkcs11Exception.ThrowIfError(rv, "C_EncryptUpdate");
 
                 if (rv == CKR.CKR_BUFFER_TOO_SMALL)

@@ -518,7 +518,7 @@ internal sealed partial class Pkcs11Session
         try
         {
             CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, flags);
-            if (rv != CKR.CKR_OK && rv != CKR.CKR_FUNCTION_NOT_SUPPORTED)
+            if (rv is not CKR.CKR_OK and not CKR.CKR_FUNCTION_NOT_SUPPORTED)
             {
                 _logger.LogWarning(
                     "Session({SessionId})::{Operation}: C_SessionCancel returned {Rv} during cleanup",

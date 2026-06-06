@@ -7,6 +7,24 @@
       source with a justified #pragma / [SuppressMessage], never silently leave it.
     -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!--
+      .NET analyzers and .editorconfig code-style rules, enabled once for every
+      project instead of per-csproj. EnforceCodeStyleInBuild runs the IDExxxx style
+      rules during `dotnet build`, so the .editorconfig style block has teeth on the
+      build and in CI — not just as IDE hints. Combined with TreatWarningsAsErrors
+      above, a `:warning`-severity style rule fails the build.
+    -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!--
+      IDE0005 (remove unnecessary usings) only runs at build when a documentation file
+      is generated (dotnet/roslyn#41640), so turn it on repo-wide. The library documents
+      its public surface; projects without public XML docs (tests, the Roslyn generator)
+      silence CS1591 in their own csproj.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
 </Project>

@@ -34,8 +34,7 @@ public sealed class NativeStructLayoutTests
         t.GetCustomAttributes().Any(a => a.GetType().Name == "PackedForPkcs11Attribute");
 
     private static string[] FieldNames(Type t) =>
-        t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .Select(f => f.Name).ToArray();
+        [.. t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Select(f => f.Name)];
 
     // === #3 — field-offset pins (LP64: CK_ULONG = 8, pointer = 8, natural align) ==========
 

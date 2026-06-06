@@ -1,0 +1,20 @@
+# Normalize all text files to LF in the repository and on checkout, on every
+# platform. This backs up `.editorconfig`'s `end_of_line = lf`: editorconfig
+# governs editors and `dotnet format`, while this governs what git stores and
+# writes out — so a Windows contributor can't introduce CRLF that would then
+# fail the `dotnet format --verify-no-changes` CI lint.
+* text=auto eol=lf
+
+# Binary files git must never touch (no EOL conversion, no diff).
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.exe   binary
+*.snk   binary
+*.pfx   binary
+*.nupkg binary

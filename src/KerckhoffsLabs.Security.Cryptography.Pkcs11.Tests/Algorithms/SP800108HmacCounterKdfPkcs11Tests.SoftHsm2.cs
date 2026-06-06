@@ -101,7 +101,7 @@ public sealed class SP800108HmacCounterKdfPkcs11Tests_SoftHsm(SoftHsmBackendFixt
     {
         // Zero length is a no-op, matching the BCL SP800108HmacCounterKdf (no token call).
         Assert.Empty(kdf.DeriveKey(Label, Context, 0));
-        kdf.DeriveKey(Label, Context, Span<byte>.Empty); // must not throw
+        kdf.DeriveKey(Label, Context, []); // must not throw
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]

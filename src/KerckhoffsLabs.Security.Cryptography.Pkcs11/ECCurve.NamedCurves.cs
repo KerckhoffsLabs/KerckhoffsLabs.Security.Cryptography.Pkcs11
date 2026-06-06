@@ -1,5 +1,3 @@
-using System.Linq;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 public readonly partial struct ECCurve

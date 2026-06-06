@@ -3,7 +3,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -65,7 +64,7 @@ internal sealed partial class Pkcs11Session
         // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
         // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
         // Only a genuine error aborts the probe.
-        if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+        if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
             Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
 
         byte[] ct = new byte[(int)ctLen];
@@ -151,7 +150,7 @@ internal sealed partial class Pkcs11Session
         // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome (PKCS#11 v3.2 §5.2):
         // the token populated wrappedLen despite the (null) output buffer. Only a genuine
         // error aborts the probe.
-        if (rv != CKR.CKR_OK && rv != CKR.CKR_BUFFER_TOO_SMALL)
+        if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
             Pkcs11Exception.ThrowIfError(rv, "C_WrapKeyAuthenticated (length probe)");
 
         byte[] wrapped = new byte[(int)wrappedLen];
