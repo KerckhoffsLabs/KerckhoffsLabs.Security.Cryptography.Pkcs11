@@ -1,26 +1,53 @@
-name: coverage
+name: code-quality
+
+# CI-based SonarCloud analysis + Codecov coverage upload, sharing a single build and
+# test pass. The SonarCloud half REPLACES SonarCloud's Automatic Analysis: disable it
+# under Project > Administration > Analysis Method, or this scan is rejected (the two
+# modes are mutually exclusive). Unlike Automatic Analysis, the SonarScanner for .NET
+# sees the MSBuild graph and imports test coverage.
+#
+# Unlike a pure-managed project, the build/tests here need the native PKCS#11 backends
+# present, so this job builds the pkcs11-mock and SoftHSM2 submodules from source and
+# links SoftHSM against OpenSSL 3.5+ (for ML-DSA). Without them the scan and upload
+# would report near-empty coverage.
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
-  coverage:
-    name: coverage
+  sonar:
+    name: sonar
     runs-on: ubuntu-latest
+    # The scanner reads the token from SONAR_TOKEN; pass it via the environment rather
+    # than expanding the secret inside a run block, where it can leak (githubactions:S7636).
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       # submodules: pkcs11-mock (vendor/pkcs11-mock) and SoftHSM2 (vendor/softhsmv2)
       # are built from source during `dotnet build` so both backends are exercised.
+      # fetch-depth 0: Sonar needs full history for new-code detection and blame.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
           dotnet-version: '10.0.x'
+
+      # The Sonar analysis engine is JVM-based; the .NET scanner shells out to it.
+      - name: Setup Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
 
       # pkcs11-mock: gcc/make (build-essential); SoftHSM2: autotools (autoconf/automake/libtool).
       - name: Install native build deps
@@ -53,25 +80,48 @@ jobs:
           echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
+
+      - name: Begin analysis
+        run: >
+          dotnet sonarscanner begin
+          /k:"KerckhoffsLabs_KerckhoffsLabs.Security.Cryptography.Pkcs11"
+          /o:"kerckhoffslabs"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml"
 
       - name: Build
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
-      # Both backends present on Linux → coverage spans the mock and SoftHSM2 paths.
+      # Both backends present on Linux → coverage spans the mock and SoftHSM2 paths. A single
+      # pass emits BOTH coverage formats — OpenCover (Sonar's first-class .NET format, imported
+      # by the begin-step glob) and Cobertura (uploaded to Codecov below) — so the suite is built
+      # and run once instead of duplicated across a separate workflow. Only the wide (nuint)
+      # NativeCULong layout exists on Linux; the narrow (Windows uint) build is resolved per-RID
+      # and can't be selected here.
       - name: Test with coverage
         run: >
           dotnet test src/KerckhoffsLabs.sln --no-build -c Release
-          --collect:"XPlat Code Coverage"
+          --collect:"XPlat Code Coverage;Format=opencover,cobertura"
           --results-directory ./coverage
           --logger "console;verbosity=normal"
 
+      # Upload the Cobertura reports to Codecov. Push-only to preserve the previous coverage
+      # workflow's trigger (and to avoid touching fork PRs, where the token is unavailable).
+      # Runs before End analysis so a Codecov hiccup is independent of the Sonar import.
       - name: Upload coverage
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        if: github.event_name == 'push'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: ./coverage/**/coverage.cobertura.xml
           fail_ci_if_error: true
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: End analysis
+        run: dotnet sonarscanner end
