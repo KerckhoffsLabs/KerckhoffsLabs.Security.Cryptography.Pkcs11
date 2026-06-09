@@ -125,7 +125,25 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         try
         {
             _library = new Pkcs11ModuleHandle(NativeLibrary.Load(libraryPath));
-            _delegates = new Delegates(_library.DangerousGetHandle());
+
+            // Delegates resolves the function-pointer table via NativeLibrary.GetExport, which
+            // needs the raw module handle. DangerousGetHandle is the only way to obtain it from the
+            // SafeHandle; bracket it with DangerousAddRef/DangerousRelease so the module cannot be
+            // unloaded while symbols are resolved. The raw pointer is consumed entirely within the
+            // Delegates constructor and never retained, so it cannot outlive the ref.
+            bool addedRef = false;
+            try
+            {
+                _library.DangerousAddRef(ref addedRef);
+#pragma warning disable S3869 // DangerousGetHandle is unavoidable for NativeLibrary.GetExport and is bracketed by DangerousAddRef/Release.
+                _delegates = new Delegates(_library.DangerousGetHandle());
+#pragma warning restore S3869
+            }
+            finally
+            {
+                if (addedRef)
+                    _library.DangerousRelease();
+            }
         }
         catch
         {
