@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// <summary>
 /// Class representing a logical connection between an application and a token
 /// </summary>
-internal sealed partial class Pkcs11Session
+internal sealed partial class Pkcs11Session : IDisposable
 {
     /// <summary>
     /// Flag indicating whether instance has been disposed
