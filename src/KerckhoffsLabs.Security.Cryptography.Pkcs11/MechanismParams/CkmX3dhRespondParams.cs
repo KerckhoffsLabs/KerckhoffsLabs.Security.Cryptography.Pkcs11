@@ -69,7 +69,7 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _identityId);
@@ -81,9 +81,8 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
         _lowLevelParams.OnetimeId = IntPtr.Zero;
         _lowLevelParams.InitiatorEphemeral = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmX3dhRespondParams() => Dispose();
+    ~CkmX3dhRespondParams() => Dispose(false);
 }

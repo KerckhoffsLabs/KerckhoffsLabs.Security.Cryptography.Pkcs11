@@ -113,7 +113,7 @@ public sealed class CkmSp800108CounterKdfParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _dataParams);
@@ -124,9 +124,8 @@ public sealed class CkmSp800108CounterKdfParams : MechanismParameters
         UnmanagedMemory.Free(ref _context);
         _lowLevelParams.DataParams = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSp800108CounterKdfParams() => Dispose();
+    ~CkmSp800108CounterKdfParams() => Dispose(false);
 }

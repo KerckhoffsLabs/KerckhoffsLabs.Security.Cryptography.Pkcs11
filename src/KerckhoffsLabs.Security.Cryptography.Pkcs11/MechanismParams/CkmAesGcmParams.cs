@@ -57,7 +57,7 @@ public sealed class CkmAesGcmParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _iv);
@@ -65,9 +65,8 @@ public sealed class CkmAesGcmParams : MechanismParameters
         _lowLevelParams.Iv = IntPtr.Zero;
         _lowLevelParams.AAD = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmAesGcmParams() => Dispose();
+    ~CkmAesGcmParams() => Dispose(false);
 }

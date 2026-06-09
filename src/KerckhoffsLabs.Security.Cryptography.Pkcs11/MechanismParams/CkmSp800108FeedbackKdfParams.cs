@@ -53,15 +53,14 @@ public sealed class CkmSp800108FeedbackKdfParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _iv);
         _lowLevelParams.IV = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSp800108FeedbackKdfParams() => Dispose();
+    ~CkmSp800108FeedbackKdfParams() => Dispose(false);
 }

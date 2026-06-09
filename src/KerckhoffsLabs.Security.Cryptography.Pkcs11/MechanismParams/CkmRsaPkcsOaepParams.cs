@@ -47,13 +47,12 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _sourceData);
         _lowLevelParams.SourceData = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Hash algorithm used in the OAEP encoding.</summary>
@@ -63,5 +62,5 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     public CKG Mgf => _lowLevelParams.Mgf.ToCKG();
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmRsaPkcsOaepParams() => Dispose();
+    ~CkmRsaPkcsOaepParams() => Dispose(false);
 }

@@ -57,7 +57,7 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _prekeySignature);
@@ -65,9 +65,8 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
         _lowLevelParams.PrekeySignature = IntPtr.Zero;
         _lowLevelParams.OnetimeKey = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmX3dhInitiateParams() => Dispose();
+    ~CkmX3dhInitiateParams() => Dispose(false);
 }

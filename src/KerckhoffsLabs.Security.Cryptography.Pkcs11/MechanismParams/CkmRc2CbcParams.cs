@@ -39,10 +39,9 @@ public sealed class CkmRc2CbcParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 }

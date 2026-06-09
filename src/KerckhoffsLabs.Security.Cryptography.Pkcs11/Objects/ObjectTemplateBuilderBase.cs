@@ -83,13 +83,25 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     /// <summary>Disposes any attributes the builder still owns. Safe to call before <see cref="Build"/>.</summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        foreach (var attr in _attributes.Values) attr.Dispose();
-        _attributes.Clear();
-        _disposed = true;
+        Dispose(true);
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Finalizer safety net.</summary>
-    ~ObjectTemplateBuilderBase() => Dispose();
+    /// <summary>
+    /// Disposes the attributes the builder still owns. The builder holds only managed
+    /// <see cref="ObjectAttribute"/> values — each with its own finalizer — so cleanup runs only on
+    /// the deterministic (<paramref name="disposing"/> = <see langword="true"/>) path and this type
+    /// needs no finalizer of its own.
+    /// </summary>
+    /// <param name="disposing"><see langword="true"/> when called from <see cref="Dispose()"/>.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        if (disposing)
+        {
+            foreach (var attr in _attributes.Values) attr.Dispose();
+            _attributes.Clear();
+        }
+        _disposed = true;
+    }
 }

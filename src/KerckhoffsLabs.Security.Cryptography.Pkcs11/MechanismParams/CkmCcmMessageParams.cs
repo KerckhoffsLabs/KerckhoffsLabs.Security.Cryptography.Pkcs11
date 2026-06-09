@@ -69,7 +69,7 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);
@@ -77,9 +77,8 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         _lowLevelParams.Nonce = IntPtr.Zero;
         _lowLevelParams.Mac = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmCcmMessageParams() => Dispose();
+    ~CkmCcmMessageParams() => Dispose(false);
 }

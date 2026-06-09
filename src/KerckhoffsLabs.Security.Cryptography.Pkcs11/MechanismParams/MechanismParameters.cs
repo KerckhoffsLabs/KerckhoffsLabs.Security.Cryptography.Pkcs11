@@ -21,6 +21,20 @@ public abstract class MechanismParameters : IDisposable
     /// </summary>
     internal abstract object ToMarshalableStructure();
 
-    /// <inheritdoc/>
-    public abstract void Dispose();
+    /// <summary>
+    /// Releases the unmanaged parameter buffers held by this instance, then suppresses finalization.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases the unmanaged parameter buffers. <paramref name="disposing"/> is <see langword="true"/>
+    /// when called from <see cref="Dispose()"/> and <see langword="false"/> from a finalizer; the
+    /// concrete parameter types own only unmanaged memory, so they free it on both paths.
+    /// </summary>
+    /// <param name="disposing"><see langword="true"/> if called deterministically from <see cref="Dispose()"/>.</param>
+    protected abstract void Dispose(bool disposing);
 }

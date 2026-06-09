@@ -60,7 +60,7 @@ public sealed class CkmHkdfParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _salt);
@@ -68,9 +68,8 @@ public sealed class CkmHkdfParams : MechanismParameters
         _lowLevelParams.Salt = IntPtr.Zero;
         _lowLevelParams.Info = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmHkdfParams() => Dispose();
+    ~CkmHkdfParams() => Dispose(false);
 }

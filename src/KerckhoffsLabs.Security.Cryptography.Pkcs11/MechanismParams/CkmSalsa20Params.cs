@@ -45,7 +45,7 @@ public sealed class CkmSalsa20Params : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _blockCounter);
@@ -53,9 +53,8 @@ public sealed class CkmSalsa20Params : MechanismParameters
         _lowLevelParams.BlockCounter = IntPtr.Zero;
         _lowLevelParams.Nonce = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20Params() => Dispose();
+    ~CkmSalsa20Params() => Dispose(false);
 }

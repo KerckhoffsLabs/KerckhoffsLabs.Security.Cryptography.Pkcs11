@@ -39,11 +39,10 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Hash algorithm used in the PSS encoding.</summary>
@@ -56,5 +55,5 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     public int SaltLength => (int)(ulong)_lowLevelParams.Len;
 
     /// <summary>No-op finalizer for symmetry with the other params wrappers; this type owns no unmanaged memory.</summary>
-    ~CkmRsaPkcsPssParams() => Dispose();
+    ~CkmRsaPkcsPssParams() => Dispose(false);
 }

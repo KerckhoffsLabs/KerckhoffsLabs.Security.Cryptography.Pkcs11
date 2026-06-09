@@ -58,7 +58,7 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _ni);
@@ -66,9 +66,8 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
         _lowLevelParams.Ni = IntPtr.Zero;
         _lowLevelParams.Nr = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmIkePrfDeriveParams() => Dispose();
+    ~CkmIkePrfDeriveParams() => Dispose(false);
 }

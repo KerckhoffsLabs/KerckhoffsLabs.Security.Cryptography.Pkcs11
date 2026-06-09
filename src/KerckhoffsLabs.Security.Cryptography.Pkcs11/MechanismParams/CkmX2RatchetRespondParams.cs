@@ -51,15 +51,14 @@ public sealed class CkmX2RatchetRespondParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _sk);
         _lowLevelParams.Sk = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmX2RatchetRespondParams() => Dispose();
+    ~CkmX2RatchetRespondParams() => Dispose(false);
 }

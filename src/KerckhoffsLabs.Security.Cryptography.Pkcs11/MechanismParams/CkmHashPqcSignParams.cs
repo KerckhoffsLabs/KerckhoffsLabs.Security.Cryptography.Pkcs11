@@ -50,15 +50,14 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _context);
         _lowLevelParams.Context = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer.</summary>
-    ~CkmHashPqcSignParams() => Dispose();
+    ~CkmHashPqcSignParams() => Dispose(false);
 }

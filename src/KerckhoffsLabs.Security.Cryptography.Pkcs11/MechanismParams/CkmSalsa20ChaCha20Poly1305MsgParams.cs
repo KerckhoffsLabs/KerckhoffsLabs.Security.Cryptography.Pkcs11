@@ -65,7 +65,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    public override void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         UnmanagedMemory.Free(ref _nonce);
@@ -73,9 +73,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
         _lowLevelParams.Nonce = IntPtr.Zero;
         _lowLevelParams.Tag = IntPtr.Zero;
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20ChaCha20Poly1305MsgParams() => Dispose();
+    ~CkmSalsa20ChaCha20Poly1305MsgParams() => Dispose(false);
 }
