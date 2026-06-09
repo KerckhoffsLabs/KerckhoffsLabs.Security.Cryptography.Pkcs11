@@ -256,19 +256,19 @@ jobs:
           sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
           sudo chmod -R g+rwx /var/lib/opencryptoki || true
 
-          # Drive the daemon through the shipped systemd unit — the same mechanism the distro
-          # package uses (proven on this runner). It runs pkcsslotd as root:pkcs11 and, with the
-          # tmpfiles entries, creates the runtime dirs (/run/opencryptoki) with the right ownership
-          # so pkcs11-group clients can attach (a hand-rolled launch left clients failing
-          # C_Initialize with CKR_FUNCTION_FAILED). The unit installs under /usr/local/lib/systemd;
-          # copy it where systemd is guaranteed to find it.
-          sudo cp /usr/local/lib/systemd/system/pkcsslotd.service /etc/systemd/system/pkcsslotd.service
+          # tmpfiles provisions the runtime dir (/run/opencryptoki) with root:pkcs11 ownership.
           sudo systemd-tmpfiles --create 2>/dev/null || true
-          sudo systemctl daemon-reload
-          sudo systemctl start pkcsslotd
-          sleep 3
-          sudo systemctl --no-pager -l status pkcsslotd || true
-          echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s" || true
+          # Start pkcsslotd detached as root:pkcs11 (so its socket/shm are group-accessible).
+          sudo setsid sg pkcs11 -c '/usr/local/sbin/pkcsslotd >/tmp/pkcsslotd.log 2>&1 </dev/null' &
+          sleep 5
+          echo "=== pkcsslotd log ==="; cat /tmp/pkcsslotd.log 2>/dev/null || true
+          pgrep -a pkcsslotd || echo "::warning::pkcsslotd not running"
+          echo "=== /run/opencryptoki ==="; sudo ls -la /run/opencryptoki/ 2>/dev/null || true
+          echo "=== /dev/shm ==="; ls -la /dev/shm/ 2>/dev/null || true
+          echo "=== ldd pkcsconf (opencryptoki) ==="; ldd /usr/local/sbin/pkcsconf | grep -i opencryptoki || true
+          # Trace C_Initialize to find why it fails (CKR_FUNCTION_FAILED gives no detail otherwise).
+          echo "=== pkcsconf -s (traced) ==="; sg pkcs11 -c "OPENCRYPTOKI_TRACE_LEVEL=5 /usr/local/sbin/pkcsconf -s" || true
+          echo "=== trace log ==="; sudo cat /var/log/opencryptoki/trace.* 2>/dev/null | tail -80 || true
           echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t" || true
 
           # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
