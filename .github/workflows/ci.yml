@@ -236,7 +236,7 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y build-essential autoconf automake libtool flex bison libssl-dev libcap-dev pkg-config
+          sudo apt-get install -y build-essential autoconf automake libtool flex bison libssl-dev libcap-dev libldap2-dev pkg-config
           # The pkcs11 group must exist before `make install` (it chgrp's the token store to it).
           sudo groupadd -f pkcs11
           ./build/build-opencryptoki.sh
