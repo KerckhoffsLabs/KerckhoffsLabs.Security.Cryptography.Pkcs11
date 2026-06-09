@@ -18,7 +18,7 @@
 # Override PREFIX / SYSCONFDIR / LOCALSTATEDIR via the environment if needed.
 #
 # Requires (Debian/Ubuntu): build-essential autoconf automake libtool flex bison
-#                           libssl-dev pkg-config
+#                           libssl-dev libcap-dev pkg-config
 # `make install` needs root (sudo); the pkcs11 group must already exist (make install
 # chgrp's the token store to it).
 #
