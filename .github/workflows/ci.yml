@@ -254,7 +254,16 @@ jobs:
           make install_sw >/dev/null
           ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
 
+      # opencryptoki is built against this OpenSSL (headers + rpath) so the ML-DSA sign-message path
+      # (#ifdef EVP_PKEY_OP_SIGNMSG, OpenSSL 3.5 only) is compiled in. The daemon runs under the unit's
+      # ProtectHome=yes sandbox and so cannot read ~/openssl-3.5; stage a world-readable copy under /opt
+      # (outside /home) that both the daemon (via rpath) and the test host can load.
+      - name: Stage OpenSSL 3.5 outside /home
+        run: sudo cp -a "$HOME/openssl-3.5" /opt/openssl-3.5
+
       - name: Build opencryptoki from source
+        env:
+          OPENSSL_PREFIX: /opt/openssl-3.5
         run: |
           set -euxo pipefail
           sudo apt-get update
@@ -319,4 +328,4 @@ jobs:
       # LD_LIBRARY_PATH points the whole test process (and the soft-token STDLL it loads) at OpenSSL
       # 3.5 so ML-DSA / ML-KEM are advertised and exercised; without it those tests skip.
       - name: Test (opencryptoki backend)
-        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
+        run: sg pkcs11 -c "LD_LIBRARY_PATH=/opt/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"

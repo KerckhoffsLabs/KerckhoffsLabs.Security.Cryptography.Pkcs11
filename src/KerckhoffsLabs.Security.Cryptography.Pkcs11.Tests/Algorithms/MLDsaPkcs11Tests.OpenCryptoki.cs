@@ -53,19 +53,6 @@ public sealed class MLDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
         }
     }
 
-    // opencryptoki 3.27.0's software token generates and exports ML-DSA keys, but its C_Sign path
-    // for CKM_ML_DSA fails with CKR_FUNCTION_FAILED (keygen, key export and all of ML-KEM work). The
-    // wrapper's signing is covered against SoftHSM; here we skip rather than fail on that specific
-    // backend limitation so a future opencryptoki fix activates the test automatically.
-    private static byte[] SignOrSkip(Func<byte[]> sign)
-    {
-        try { return sign(); }
-        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_FUNCTION_FAILED)
-        {
-            throw new SkipTestException("opencryptoki: soft token does not sign ML-DSA (C_Sign returned CKR_FUNCTION_FAILED).");
-        }
-    }
-
     [ConditionalTheory(nameof(Available))]
     [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
@@ -73,7 +60,7 @@ public sealed class MLDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
     public void SignVerifyData_RoundTrips(CkpMlDsa parameterSet) => WithMlDsa(parameterSet, mldsa =>
     {
         byte[] data = Encoding.UTF8.GetBytes("ml-dsa round trip");
-        byte[] sig = SignOrSkip(() => mldsa.SignData(data));
+        byte[] sig = mldsa.SignData(data);
         Assert.Equal(mldsa.Algorithm.SignatureSizeInBytes, sig.Length);
         Assert.True(mldsa.VerifyData(data, sig));
 
@@ -88,7 +75,7 @@ public sealed class MLDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
         byte[] data = Encoding.UTF8.GetBytes("context-bound message");
         byte[] context = Encoding.UTF8.GetBytes("app-context");
 
-        byte[] sig = SignOrSkip(() => mldsa.SignData(data, context));
+        byte[] sig = mldsa.SignData(data, context);
         Assert.True(mldsa.VerifyData(data, sig, context));
         Assert.False(mldsa.VerifyData(data, sig)); // a context-bound signature must not verify without it
     });

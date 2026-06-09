@@ -63,6 +63,26 @@ fi
 NPROC="$(nproc 2>/dev/null || echo 4)"
 echo "Building opencryptoki ($(git -C "${SRC_DIR}" describe --tags 2>/dev/null || echo HEAD)) -> ${PREFIX}"
 
+# Build against a specific OpenSSL when OPENSSL_PREFIX is set (else the system OpenSSL). This matters
+# for the soft token's ML-DSA signing: that code path is gated behind `#ifdef EVP_PKEY_OP_SIGNMSG`,
+# a macro that only exists in OpenSSL >= 3.5 headers. Built against OpenSSL 3.0 headers the sign-message
+# path is compiled out, and at runtime OpenSSL 3.5 rejects the legacy EVP_PKEY_sign_init for ML-DSA, so
+# C_Sign returns CKR_FUNCTION_FAILED. Building against 3.5 headers (and baking an rpath so the daemon
+# and tools load that OpenSSL) compiles the sign-message path in and makes ML-DSA signing work.
+OPENSSL_CONFIGURE_ARGS=()
+if [[ -n "${OPENSSL_PREFIX:-}" && -d "${OPENSSL_PREFIX}" ]]; then
+  OPENSSL_CONFIGURE_ARGS+=("--with-openssl=${OPENSSL_PREFIX}")
+  # OpenSSL installs to lib64 (with a lib -> lib64 symlink); cover both. Bake an rpath so the
+  # built libraries load this OpenSSL at runtime without LD_LIBRARY_PATH (needed for the daemon).
+  for libdir in "${OPENSSL_PREFIX}/lib64" "${OPENSSL_PREFIX}/lib"; do
+    if [[ -d "${libdir}" ]]; then
+      export LDFLAGS="-Wl,-rpath,${libdir} -L${libdir} ${LDFLAGS:-}"
+      export PKG_CONFIG_PATH="${libdir}/pkgconfig:${PKG_CONFIG_PATH:-}"
+    fi
+  done
+  echo "Using OpenSSL from ${OPENSSL_PREFIX}"
+fi
+
 # bootstrap.sh runs autoreconf in-tree to generate ./configure.
 ( cd "${SRC_DIR}" && sh ./bootstrap.sh ) 2>&1
 
@@ -88,7 +108,8 @@ echo "Building opencryptoki ($(git -C "${SRC_DIR}" describe --tags 2>/dev/null |
     --disable-p11sak \
     --disable-p11kmip \
     --disable-pkcsstats \
-    --disable-testcases
+    --disable-testcases \
+    "${OPENSSL_CONFIGURE_ARGS[@]}"
   make -j"${NPROC}"
 ) 2>&1
 
