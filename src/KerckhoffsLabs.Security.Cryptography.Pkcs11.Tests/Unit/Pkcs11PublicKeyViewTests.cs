@@ -30,7 +30,7 @@ public sealed class Pkcs11PublicKeyViewTests
     public void TryParseEcPublicKey_ResolvesNamedCurveFromEcParams(string curveName, int coordLen)
     {
         ECCurve curve = ECCurve.CreateFromFriendlyName(curveName);
-        byte[] ecParams = curve.EcParams;
+        byte[] ecParams = curve.GetEcParams();
         byte[] ecPoint = EcPoint(coordLen);
 
         ECParameters? parsed = Pkcs11PublicKeyView.TryParseEcPublicKey(ecPoint, ecParams);
@@ -53,7 +53,7 @@ public sealed class Pkcs11PublicKeyViewTests
     public void TryParseEcPublicKey_NonUncompressedPoint_ReturnsNull()
     {
         // 0x02-prefixed compressed point is not supported by the uncompressed-only parser.
-        byte[] ecParams = ECCurve.NamedCurves.NistP256.EcParams;
+        byte[] ecParams = ECCurve.NamedCurves.NistP256.GetEcParams();
         byte[] compressed = [0x04, 0x21, 0x02, .. new byte[32]];
         Assert.Null(Pkcs11PublicKeyView.TryParseEcPublicKey(compressed, ecParams));
     }

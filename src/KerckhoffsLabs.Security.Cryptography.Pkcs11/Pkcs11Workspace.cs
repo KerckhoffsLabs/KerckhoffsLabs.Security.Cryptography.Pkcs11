@@ -426,7 +426,7 @@ public sealed class Pkcs11Workspace : IDisposable
                 "or set Pkcs11Workspace.AllowInsecure = true for legacy interop.");
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .EcParams(resolved.EcParams)
+            .EcParams(resolved.GetEcParams())
             .Verify()
             .Encrypt(false).Wrap(false)
             .OnToken(persistOnToken)

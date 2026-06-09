@@ -12,9 +12,9 @@ public sealed class ECCurveTests
     {
         // TestKeys holds hand-encoded DER OIDs — an oracle independent of ECCurve's AsnWriter path,
         // so this pins the encoding for every NIST prime (e.g. P-256 = 06 08 2A 86 48 CE 3D 03 01 07).
-        Assert.Equal(TestKeys.EcP256Oid, ECCurve.NamedCurves.NistP256.EcParams);
-        Assert.Equal(TestKeys.EcP384Oid, ECCurve.NamedCurves.NistP384.EcParams);
-        Assert.Equal(TestKeys.EcP521Oid, ECCurve.NamedCurves.NistP521.EcParams);
+        Assert.Equal(TestKeys.EcP256Oid, ECCurve.NamedCurves.NistP256.GetEcParams());
+        Assert.Equal(TestKeys.EcP384Oid, ECCurve.NamedCurves.NistP384.GetEcParams());
+        Assert.Equal(TestKeys.EcP521Oid, ECCurve.NamedCurves.NistP521.GetEcParams());
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public sealed class ECCurveTests
     public void FromEcParams_RoundTrips_OidAndName()
     {
         ECCurve original = ECCurve.NamedCurves.BrainpoolP256r1;
-        ECCurve parsed = ECCurve.FromEcParams(original.EcParams);
+        ECCurve parsed = ECCurve.FromEcParams(original.GetEcParams());
 
         Assert.Equal(original.Oid, parsed.Oid);
         Assert.Equal("brainpoolP256r1", parsed.FriendlyName);
@@ -52,7 +52,7 @@ public sealed class ECCurveTests
         ECCurve curve = ECCurve.CreateFromValue("1.2.3.4");
         Assert.Null(curve.FriendlyName);
         // Still encodes a valid DER OID, so a token could be asked for an unlisted curve.
-        Assert.Equal(curve, ECCurve.FromEcParams(curve.EcParams));
+        Assert.Equal(curve, ECCurve.FromEcParams(curve.GetEcParams()));
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class ECCurveTests
         Assert.False(def.IsNamed);
         Assert.Equal(ECCurve.ECCurveType.Implicit, def.CurveType);
         Assert.Null(def.Oid);
-        Assert.Throws<InvalidOperationException>(() => def.EcParams);
+        Assert.Throws<InvalidOperationException>(() => def.GetEcParams());
     }
 
     [Fact]
@@ -140,10 +140,10 @@ public sealed class ECCurveTests
     {
         ECCurve curve = ECCurve.NamedCurves.NistP256;
 
-        byte[] first = curve.EcParams;
+        byte[] first = curve.GetEcParams();
         first[0] = 0xFF; // a caller mutating the returned buffer must not corrupt the curve
-        Assert.Equal(TestKeys.EcP256Oid, curve.EcParams);
-        Assert.NotSame(curve.EcParams, curve.EcParams); // a fresh array each call
+        Assert.Equal(TestKeys.EcP256Oid, curve.GetEcParams());
+        Assert.NotSame(curve.GetEcParams(), curve.GetEcParams()); // a fresh array each call
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public sealed class ECCurveTests
             Assert.Equal(name, curve.FriendlyName);
             Assert.Equal(ECCurve.ECCurveType.Named, curve.CurveType);
             Assert.Equal(curve, ECCurve.CreateFromValue(oid));          // property == factory
-            Assert.Equal(curve, ECCurve.FromEcParams(curve.EcParams));  // CKA_EC_PARAMS round-trip
+            Assert.Equal(curve, ECCurve.FromEcParams(curve.GetEcParams()));  // CKA_EC_PARAMS round-trip
         }
     }
 }

@@ -64,8 +64,8 @@ public sealed class HMACPkcs11 : HMAC
     public override void Initialize() => _buffer.SetLength(0);
 
     /// <inheritdoc/>
-    protected override void HashCore(byte[] array, int ibStart, int cbSize)
-        => _buffer.Write(array, ibStart, cbSize);
+    protected override void HashCore(byte[] rgb, int ib, int cb)
+        => _buffer.Write(rgb, ib, cb);
 
     /// <inheritdoc/>
     protected override void HashCore(ReadOnlySpan<byte> source)

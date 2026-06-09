@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// Identifies a named elliptic curve by its object identifier (OID), mirroring the shape of the BCL
 /// <see cref="System.Security.Cryptography.ECCurve"/>. A PKCS#11 EC key pair selects its curve through
 /// the <c>CKA_EC_PARAMS</c> attribute, which for a named curve is the DER-encoded curve OID — exposed
-/// here as <see cref="EcParams"/>.
+/// here via <see cref="GetEcParams"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -20,7 +20,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// outside this type.
 /// </para>
 /// <para>This is a value type; the uninitialized <c>default</c> has no OID and throws from
-/// <see cref="EcParams"/>.</para>
+/// <see cref="GetEcParams"/>.</para>
 /// </remarks>
 public readonly partial struct ECCurve : IEquatable<ECCurve>
 {
@@ -64,11 +64,12 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
     internal bool IsBelowSecurityBaseline => Oid is not null && s_belowBaselineOids.Contains(Oid);
 
     /// <summary>
-    /// The <c>CKA_EC_PARAMS</c> value for this curve: the DER encoding of the curve OID as an ASN.1
-    /// <c>OBJECT IDENTIFIER</c> (the PKCS#11 <i>namedCurve</i> choice). Returns a fresh copy.
+    /// Gets the <c>CKA_EC_PARAMS</c> value for this curve: the DER encoding of the curve OID as an
+    /// ASN.1 <c>OBJECT IDENTIFIER</c> (the PKCS#11 <i>namedCurve</i> choice). Returns a fresh copy on
+    /// each call, so this is a method rather than a property.
     /// </summary>
     /// <exception cref="InvalidOperationException">The curve is the uninitialized <c>default</c>.</exception>
-    public byte[] EcParams => _ecParams is null
+    public byte[] GetEcParams() => _ecParams is null
         ? throw new InvalidOperationException("The ECCurve is uninitialized (default); specify a curve.")
         : (byte[])_ecParams.Clone();
 
