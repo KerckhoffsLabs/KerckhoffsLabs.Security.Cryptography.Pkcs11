@@ -55,8 +55,9 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     public static bool SoftHsmSupportsAesCcm => false;
 
     /// <summary>True if the token accepts SHA-256 (and modern hashes) as the OAEP <c>hashAlg</c>.
-    /// SoftHSM 2.7 hardcodes <c>hashAlg == CKM_SHA_1</c>; see <c>SoftHSM.cpp:MechParamCheckRSAPKCSOAEP</c>.</summary>
-    public static bool SoftHsmSupportsOaepSha256 => false;
+    /// Older SoftHSM hardcoded <c>hashAlg == CKM_SHA_1</c> in <c>SoftHSM.cpp:MechParamCheckRSAPKCSOAEP</c>;
+    /// upstream #833 (vendored commit de25233) added configurable OAEP parameters, lifting that limit.</summary>
+    public static bool SoftHsmSupportsOaepSha256 => true;
 
     /// <summary>True if the token accepts an ECDH1 KDF other than <c>CKD_NULL</c>.
     /// SoftHSM 2.7 hardcodes <c>kdf == CKD_NULL</c>; see <c>SoftHSM.cpp:deriveECDH</c>.</summary>

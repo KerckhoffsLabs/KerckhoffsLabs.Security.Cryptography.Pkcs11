@@ -141,9 +141,10 @@ public sealed class RSAPkcs11Tests_Managed
 
     public static TheoryData<string> OaepHashes => ["SHA1", "SHA256"];
 
-    // RSA-OAEP is gated off on SoftHSM (SoftHsmSupportsOaepSha256 = false), so its KAT skips there —
-    // the managed token runs it: token round-trip plus decrypting a BCL-produced ciphertext, and
-    // confirming the BCL can decrypt a token-produced ciphertext from the exported public key.
+    // The managed token runs the OAEP KAT for both hashes: token round-trip plus decrypting a
+    // BCL-produced ciphertext, and confirming the BCL can decrypt a token-produced ciphertext from the
+    // exported public key. SoftHSM now also covers OAEP-SHA256 (since the de25233 bump); this remains
+    // the managed-backend coverage and the BCL-interop check.
     [Theory]
     [MemberData(nameof(OaepHashes))]
     public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithRsa((_, rsa) =>
