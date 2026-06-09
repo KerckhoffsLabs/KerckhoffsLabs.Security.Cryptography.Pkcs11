@@ -55,26 +55,40 @@ jobs:
 
       - name: Install and provision opencryptoki soft token
         run: |
-          set -euxo pipefail
+          set -uxo pipefail
           sudo apt-get update
           sudo apt-get install -y opencryptoki
           sudo usermod -a -G pkcs11 "$(id -un)"
-          sudo systemctl restart pkcsslotd || (sudo pkcsslotd && sleep 2)
-          sleep 2
-          # The packaged opencryptoki.conf already defines a software token (swtok). With no crypto
-          # hardware on the runner it is the only slot pkcsslotd presents, so discover its number
-          # rather than rewriting the conf (a mismatched 'version' line yields zero slots).
-          cat /etc/opencryptoki/opencryptoki.conf || true
-          sg pkcs11 -c "pkcsconf -s" || true
-          SLOT="$(sg pkcs11 -c 'pkcsconf -s' | grep -oE 'Slot[ #]+[0-9]+' | grep -oE '[0-9]+' | head -1)"
+
+          echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf || true
+          echo "=== stdll ==="; ls -la /usr/lib/*/opencryptoki/stdll/ 2>/dev/null || true
+          echo "=== /var/lib/opencryptoki before ==="; ls -la /var/lib/opencryptoki/ 2>/dev/null || true
+
+          # The software token's object store must exist and be writable by the pkcs11 group, else the
+          # soft-token STDLL fails to initialize and C_GetSlotList reports zero tokens.
+          sudo mkdir -p /var/lib/opencryptoki/swtok/TOK_OBJ
+          sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
+          sudo chmod -R g+rwx /var/lib/opencryptoki || true
+
+          sudo systemctl restart pkcsslotd || true
+          sudo pkcsslotd 2>/dev/null || true
+          sleep 3
+          echo "=== pkcsconf -s ==="; sg pkcs11 -c "pkcsconf -s" || true
+          echo "=== pkcsconf -t ==="; sg pkcs11 -c "pkcsconf -t" || true
+
+          # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
+          # straight from the conf so we initialize the right one (not an ICA/CCA/EP11/TPM slot).
+          SLOT="$(awk '/^[[:space:]]*slot[[:space:]]/{s=$2} /libpkcs11_sw\.so/{print s; exit}' /etc/opencryptoki/opencryptoki.conf)"
+          echo "soft-token slot: ${SLOT:-<none>}"
           test -n "$SLOT"
-          echo "soft-token slot: $SLOT"
-          # Initialize the soft token. opencryptoki's default (pre-init) SO PIN is 87654321.
+
+          set -e
+          # opencryptoki's default (pre-init) SO PIN is 87654321.
           # pkcsconf -I prompts for: SO PIN, then a token label.
           sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c $SLOT -I"
           # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
           sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c $SLOT -u"
-          sg pkcs11 -c "pkcsconf -t" || true
+          sg pkcs11 -c "pkcsconf -t"
           LIB="$(find /usr/lib -name libopencryptoki.so 2>/dev/null | head -1)"
           test -n "$LIB"
           {
