@@ -52,7 +52,7 @@ public sealed class SecureBufferTests
     {
         var buf = new SecureBuffer(4);
         buf.Dispose();
-        buf.Dispose();
+        Assert.Null(Record.Exception(buf.Dispose)); // idempotent — must not throw
     }
 
     [Fact]

@@ -55,7 +55,7 @@ public sealed class ObjectTemplateTests
 
         template.Dispose();
         // Disposing twice must be a no-op.
-        template.Dispose();
+        Assert.Null(Record.Exception(template.Dispose));
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class ObjectTemplateTests
         // when garbage-collected; the test exercises the Dispose path that the builder
         // exposes so an explicit cleanup is possible.
         var builder = (IDisposable)ObjectTemplate.Empty().Attribute(CKA.CKA_LABEL, "k");
-        builder.Dispose();
+        Assert.Null(Record.Exception(builder.Dispose));
     }
 
     [Fact]

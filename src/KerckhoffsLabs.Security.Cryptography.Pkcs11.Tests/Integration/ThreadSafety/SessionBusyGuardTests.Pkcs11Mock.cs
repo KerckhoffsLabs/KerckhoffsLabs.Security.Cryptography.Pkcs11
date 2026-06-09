@@ -72,7 +72,7 @@ public sealed class SessionBusyGuardTests(MockBackendFixture f)
         {
             using var outerLease = session.AcquireExclusive(nameof(ReentrantCall_FromSameThread_Succeeds));
             // Same thread — calling a public method that internally re-acquires must succeed.
-            _ = session.GetSessionInfo();
+            Assert.NotNull(session.GetSessionInfo());
         }
         finally
         {

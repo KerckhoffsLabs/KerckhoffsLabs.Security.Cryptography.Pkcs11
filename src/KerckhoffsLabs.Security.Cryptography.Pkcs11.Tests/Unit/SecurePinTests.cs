@@ -54,7 +54,7 @@ public sealed class SecurePinTests
     {
         var pin = new SecurePin("hunter2");
         pin.Dispose();
-        pin.Dispose(); // must not throw
+        Assert.Null(Record.Exception(pin.Dispose)); // idempotent — must not throw
     }
 
     [Fact]

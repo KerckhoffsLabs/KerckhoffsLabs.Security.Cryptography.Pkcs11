@@ -74,7 +74,7 @@ public sealed class Pkcs11ExceptionTests
     public void ThrowIfError_CkrOk_DoesNotThrow()
     {
         // Should return without throwing.
-        Pkcs11Exception.ThrowIfError(CKR.CKR_OK, "C_Initialize");
+        Assert.Null(Record.Exception(() => Pkcs11Exception.ThrowIfError(CKR.CKR_OK, "C_Initialize")));
     }
 
     [Fact]

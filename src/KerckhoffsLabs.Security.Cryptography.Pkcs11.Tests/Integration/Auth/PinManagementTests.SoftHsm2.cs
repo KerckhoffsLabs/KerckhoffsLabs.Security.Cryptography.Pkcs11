@@ -47,5 +47,9 @@ public sealed class PinManagementTests_SoftHsm(SoftHsmBackendFixture f)
                 try { workspace.SetPin(o, n); } catch { /* best-effort restore of shared token */ }
             }
         }
+
+        // Reaching here with atTemp == false proves both changes succeeded: the restoring SetPin
+        // (temp -> original) only works if the first change actually took effect.
+        Assert.False(atTemp);
     }
 }

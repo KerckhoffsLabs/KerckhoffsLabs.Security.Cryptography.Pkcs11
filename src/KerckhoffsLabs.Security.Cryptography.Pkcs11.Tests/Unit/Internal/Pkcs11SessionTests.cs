@@ -180,8 +180,11 @@ public sealed class Pkcs11SessionTests
     public void Logout_And_CancelOperations_Ok_DoNotThrow()
     {
         var s = NewSession();
-        s.Logout();
-        s.CancelOperations(0);
+        Assert.Null(Record.Exception(() =>
+        {
+            s.Logout();
+            s.CancelOperations(0);
+        }));
     }
 
     // === Secure-defaults gate (GuardMechanism) ==============================================
@@ -392,7 +395,7 @@ public sealed class Pkcs11SessionTests
     public void DestroyObject_Ok_DoesNotThrow()
     {
         var s = NewSession(new CryptoFake());
-        s.DestroyObject(new ObjectHandle(1));
+        Assert.Null(Record.Exception(() => s.DestroyObject(new ObjectHandle(1))));
     }
 
     [Fact]

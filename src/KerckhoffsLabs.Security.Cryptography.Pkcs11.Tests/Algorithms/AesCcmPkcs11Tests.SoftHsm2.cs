@@ -232,7 +232,10 @@ public sealed class AesCcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         byte[] tag = new byte[16];
 
         ccm.Encrypt(nonce, [], [], tag, aad);
-        ccm.Decrypt(nonce, [], tag, [], aad); // must not throw — tag authenticates the AAD
+
+        // The tag authenticates the AAD even with empty plaintext, so a decrypt supplying the
+        // matching AAD must succeed — the empty round-trip must not throw.
+        Assert.Null(Record.Exception(() => ccm.Decrypt(nonce, [], tag, [], aad)));
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsAesCcm))]

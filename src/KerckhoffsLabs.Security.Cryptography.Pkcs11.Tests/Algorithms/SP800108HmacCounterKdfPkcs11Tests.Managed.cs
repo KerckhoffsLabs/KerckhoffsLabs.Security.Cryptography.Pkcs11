@@ -263,6 +263,6 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     public void Dispose_IsIdempotent() => WithImportedKdf((_, kdf) =>
     {
         kdf.Dispose();
-        kdf.Dispose(); // second dispose must not throw
+        Assert.Null(Record.Exception(kdf.Dispose)); // second dispose must not throw
     });
 }

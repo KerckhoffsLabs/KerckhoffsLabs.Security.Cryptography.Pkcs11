@@ -197,7 +197,7 @@ public sealed class ObjectAttributeTests
     {
         var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
         attr.Dispose();
-        attr.Dispose(); // must not throw
+        Assert.Null(Record.Exception(attr.Dispose)); // must not throw
     }
 
     [Fact]

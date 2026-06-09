@@ -386,7 +386,7 @@ public sealed class MechanismParamsLifecycleTests
     {
         var p = new CkmAesGcmParams([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], default, 128);
         p.Dispose();
-        p.Dispose(); // must not throw or double-free
+        Assert.Null(Record.Exception(p.Dispose)); // must not throw or double-free
     }
 
     [Fact]
