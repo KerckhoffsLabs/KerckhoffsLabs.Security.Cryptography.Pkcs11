@@ -98,6 +98,10 @@ case "${UNAME_S}" in
     # build.sh produces a universal pkcs11-mock.dylib via lipo.
     bash build.sh
     ;;
+  *)
+    echo "unsupported OS: ${UNAME_S}" >&2
+    exit 1
+    ;;
 esac
 
 popd >/dev/null
@@ -109,6 +113,10 @@ case "${UNAME_S}" in
     ;;
   Darwin)
     SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock.${LIB_EXT}"
+    ;;
+  *)
+    echo "unsupported OS: ${UNAME_S}" >&2
+    exit 1
     ;;
 esac
 
