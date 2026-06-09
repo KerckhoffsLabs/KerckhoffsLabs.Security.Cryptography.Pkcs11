@@ -220,12 +220,23 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         Assert.Throws<ArgumentNullException>(() => rsa.Decrypt(new byte[4], null!));
     });
 
-    [ConditionalFact(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsOaepSha256))]
-    public void EncryptDecrypt_OaepSha256_RoundTrips() => WithRsa((_, rsa) =>
+    // SoftHSM gained configurable OAEP parameters in the de25233 bump (upstream #833), so the OAEP
+    // hashAlg/MGF is no longer hardcoded to SHA-1 — SHA-256/384/512 all round-trip on a 2048-bit key.
+    [ConditionalTheory(nameof(SoftHsmAvailable), nameof(SoftHsmSupportsOaepSha256))]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void EncryptDecrypt_OaepModernHash_RoundTrips(string hash) => WithRsa((_, rsa) =>
     {
+        RSAEncryptionPadding padding = hash switch
+        {
+            "SHA384" => RSAEncryptionPadding.OaepSHA384,
+            "SHA512" => RSAEncryptionPadding.OaepSHA512,
+            _ => RSAEncryptionPadding.OaepSHA256,
+        };
         byte[] plaintext = Encoding.UTF8.GetBytes("secret payload");
-        byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256);
-        byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA256);
+        byte[] ct = rsa.Encrypt(plaintext, padding);
+        byte[] recovered = rsa.Decrypt(ct, padding);
         Assert.Equal(plaintext, recovered);
     });
 
