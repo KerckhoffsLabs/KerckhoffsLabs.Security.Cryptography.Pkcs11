@@ -34,75 +34,6 @@ jobs:
 
       - run: dotnet format src/KerckhoffsLabs.sln --verify-no-changes --no-restore
 
-  # Second independent real backend: a system-installed opencryptoki software token. Running the
-  # same operations against a module unrelated to SoftHSM catches a mis-encoding the wrapper and
-  # SoftHSM happen to share. Only the OpenCryptoki-tagged tests run here; everything else skips
-  # because no PKCS11_TEST_OPENCRYPTOKI_LIBRARY is set on the other legs.
-  opencryptoki:
-    name: opencryptoki (linux-x64)
-    runs-on: ubuntu-latest
-    env:
-      # No vendor native builds needed: this job runs only the opencryptoki-backed tests.
-      SkipPkcs11MockBuild: true
-      SkipSoftHsmV2Build: true
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Install and provision opencryptoki soft token
-        run: |
-          set -uxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y opencryptoki
-          sudo usermod -a -G pkcs11 "$(id -un)"
-
-          echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf || true
-          echo "=== stdll ==="; ls -la /usr/lib/*/opencryptoki/stdll/ 2>/dev/null || true
-          echo "=== /var/lib/opencryptoki before ==="; ls -la /var/lib/opencryptoki/ 2>/dev/null || true
-
-          # The software token's object store must exist and be writable by the pkcs11 group, else the
-          # soft-token STDLL fails to initialize and C_GetSlotList reports zero tokens.
-          sudo mkdir -p /var/lib/opencryptoki/swtok/TOK_OBJ
-          sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
-          sudo chmod -R g+rwx /var/lib/opencryptoki || true
-
-          sudo systemctl restart pkcsslotd || true
-          sudo pkcsslotd 2>/dev/null || true
-          sleep 3
-          echo "=== pkcsconf -s ==="; sg pkcs11 -c "pkcsconf -s" || true
-          echo "=== pkcsconf -t ==="; sg pkcs11 -c "pkcsconf -t" || true
-
-          # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
-          # straight from the conf so we initialize the right one (not an ICA/CCA/EP11/TPM slot).
-          SLOT="$(awk '/^[[:space:]]*slot[[:space:]]/{s=$2} /libpkcs11_sw\.so/{print s; exit}' /etc/opencryptoki/opencryptoki.conf)"
-          echo "soft-token slot: ${SLOT:-<none>}"
-          test -n "$SLOT"
-
-          set -e
-          # opencryptoki's default (pre-init) SO PIN is 87654321.
-          # pkcsconf -I prompts for: SO PIN, then a token label.
-          sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c $SLOT -I"
-          # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
-          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c $SLOT -u"
-          sg pkcs11 -c "pkcsconf -t"
-          LIB="$(find /usr/lib -name libopencryptoki.so 2>/dev/null | head -1)"
-          test -n "$LIB"
-          {
-            echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$LIB"
-            echo "PKCS11_TEST_OPENCRYPTOKI_TOKEN=kl-octk"
-          } >> "$GITHUB_ENV"
-
-      - run: dotnet restore src/KerckhoffsLabs.sln
-
-      # Run under the pkcs11 group (usermod above does not affect the current shell) so the test
-      # host can read the token store; the PKCS11_TEST_OPENCRYPTOKI_* env vars are inherited.
-      - name: Test (opencryptoki backend)
-        run: sg pkcs11 -c "dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
-
   build-and-test:
     name: ${{ matrix.os }}${{ matrix.arch == 'x86' && ' (x86)' || '' }}
     runs-on: ${{ matrix.os }}
@@ -276,3 +207,72 @@ jobs:
       # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
+
+  # Second independent real backend: a system-installed opencryptoki software token. Running the
+  # same operations against a module unrelated to SoftHSM catches a mis-encoding the wrapper and
+  # SoftHSM happen to share. Only the OpenCryptoki-tagged tests run here; everything else skips
+  # because no PKCS11_TEST_OPENCRYPTOKI_LIBRARY is set on the other legs.
+  opencryptoki:
+    name: opencryptoki (linux-x64)
+    runs-on: ubuntu-latest
+    env:
+      # No vendor native builds needed: this job runs only the opencryptoki-backed tests.
+      SkipPkcs11MockBuild: true
+      SkipSoftHsmV2Build: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install and provision opencryptoki soft token
+        run: |
+          set -uxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y opencryptoki
+          sudo usermod -a -G pkcs11 "$(id -un)"
+
+          echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf || true
+          echo "=== stdll ==="; ls -la /usr/lib/*/opencryptoki/stdll/ 2>/dev/null || true
+          echo "=== /var/lib/opencryptoki before ==="; ls -la /var/lib/opencryptoki/ 2>/dev/null || true
+
+          # The software token's object store must exist and be writable by the pkcs11 group, else the
+          # soft-token STDLL fails to initialize and C_GetSlotList reports zero tokens.
+          sudo mkdir -p /var/lib/opencryptoki/swtok/TOK_OBJ
+          sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
+          sudo chmod -R g+rwx /var/lib/opencryptoki || true
+
+          sudo systemctl restart pkcsslotd || true
+          sudo pkcsslotd 2>/dev/null || true
+          sleep 3
+          echo "=== pkcsconf -s ==="; sg pkcs11 -c "pkcsconf -s" || true
+          echo "=== pkcsconf -t ==="; sg pkcs11 -c "pkcsconf -t" || true
+
+          # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
+          # straight from the conf so we initialize the right one (not an ICA/CCA/EP11/TPM slot).
+          SLOT="$(awk '/^[[:space:]]*slot[[:space:]]/{s=$2} /libpkcs11_sw\.so/{print s; exit}' /etc/opencryptoki/opencryptoki.conf)"
+          echo "soft-token slot: ${SLOT:-<none>}"
+          test -n "$SLOT"
+
+          set -e
+          # opencryptoki's default (pre-init) SO PIN is 87654321.
+          # pkcsconf -I prompts for: SO PIN, then a token label.
+          sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c $SLOT -I"
+          # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
+          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c $SLOT -u"
+          sg pkcs11 -c "pkcsconf -t"
+          LIB="$(find /usr/lib -name libopencryptoki.so 2>/dev/null | head -1)"
+          test -n "$LIB"
+          {
+            echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$LIB"
+            echo "PKCS11_TEST_OPENCRYPTOKI_TOKEN=kl-octk"
+          } >> "$GITHUB_ENV"
+
+      - run: dotnet restore src/KerckhoffsLabs.sln
+
+      # Run under the pkcs11 group (usermod above does not affect the current shell) so the test
+      # host can read the token store; the PKCS11_TEST_OPENCRYPTOKI_* env vars are inherited.
+      - name: Test (opencryptoki backend)
+        run: sg pkcs11 -c "dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
