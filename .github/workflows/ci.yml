@@ -244,10 +244,16 @@ jobs:
 
       - name: Provision software token
         run: |
-          set -uxo pipefail
+          set -euxo pipefail
           sudo usermod -a -G pkcs11 "$(id -un)"
 
-          echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf || true
+          # Our minimal build installs only the software-token STDLL (libpkcs11_sw.so). The default
+          # config declares five slots (TPM/ICA/CCA/SW/EP11); pkcsslotd then spins trying to load the
+          # four STDLLs that don't exist and never creates its socket, so clients fail C_Initialize
+          # with CKR_FUNCTION_FAILED. Replace it with a single soft-token slot.
+          printf 'version opencryptoki-3.27\n\nslot 0\n{\n    stdll = libpkcs11_sw.so\n    tokversion = 3.12\n}\n' \
+            | sudo tee /etc/opencryptoki/opencryptoki.conf >/dev/null
+          echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf
           echo "=== stdll ==="; ls -la /usr/local/lib/opencryptoki/stdll/ 2>/dev/null || true
 
           # The software token's object store must exist and be writable by the pkcs11 group, else the
@@ -258,26 +264,16 @@ jobs:
 
           # tmpfiles provisions the runtime dir (/run/opencryptoki) with root:pkcs11 ownership.
           sudo systemd-tmpfiles --create 2>/dev/null || true
-          # Start pkcsslotd detached as root:pkcs11 (so its socket/shm are group-accessible).
+          # Start pkcsslotd detached as root:pkcs11 (so its socket/shm are group-accessible) and so
+          # this step never blocks on the foreground daemon.
           sudo setsid sg pkcs11 -c '/usr/local/sbin/pkcsslotd >/tmp/pkcsslotd.log 2>&1 </dev/null' &
           sleep 5
-          echo "=== pkcsslotd log ==="; cat /tmp/pkcsslotd.log 2>/dev/null || true
-          pgrep -a pkcsslotd || echo "::warning::pkcsslotd not running"
-          echo "=== /run/opencryptoki ==="; sudo ls -la /run/opencryptoki/ 2>/dev/null || true
-          echo "=== /dev/shm ==="; ls -la /dev/shm/ 2>/dev/null || true
-          echo "=== pkcsslotd proc state ==="; ps -o pid,stat,wchan:24,etime,cmd -C pkcsslotd || true
-          echo "=== daemon syslog/journal ==="; sudo journalctl --no-pager 2>/dev/null | grep -iE "slotmgr|pkcsslotd|opencryptoki" | tail -40 || true
-          sudo grep -iE "slotmgr|pkcsslotd|opencryptoki" /var/log/syslog 2>/dev/null | tail -40 || true
-          echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s" || true
-          echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t" || true
+          cat /tmp/pkcsslotd.log 2>/dev/null || true
+          pgrep -a pkcsslotd || { echo "::error::pkcsslotd not running"; exit 1; }
+          echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s"
+          echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t"
 
-          # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
-          # straight from the conf so we initialize the right one (not an ICA/CCA/EP11/TPM slot).
-          SLOT="$(awk '/^[[:space:]]*slot[[:space:]]/{s=$2} /libpkcs11_sw\.so/{print s; exit}' /etc/opencryptoki/opencryptoki.conf)"
-          echo "soft-token slot: ${SLOT:-<none>}"
-          test -n "$SLOT"
-
-          set -e
+          SLOT=0
           # opencryptoki's default (pre-init) SO PIN is 87654321.
           # pkcsconf -I prompts for: SO PIN, then a token label.
           sg pkcs11 -c "printf '87654321\nkl-octk\n' | /usr/local/sbin/pkcsconf -c $SLOT -I"
