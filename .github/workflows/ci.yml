@@ -208,10 +208,12 @@ jobs:
       - name: Test
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
 
-  # Second independent real backend: a system-installed opencryptoki software token. Running the
-  # same operations against a module unrelated to SoftHSM catches a mis-encoding the wrapper and
-  # SoftHSM happen to share. Only the OpenCryptoki-tagged tests run here; everything else skips
-  # because no PKCS11_TEST_OPENCRYPTOKI_LIBRARY is set on the other legs.
+  # Second independent real backend: opencryptoki's software token, built from source from the
+  # pinned vendor/opencryptoki submodule (v3.27.0) rather than the distro package, so the exact
+  # opencryptoki version is reproducible and independent of what ubuntu-latest happens to ship.
+  # Running the same operations against a module unrelated to SoftHSM catches a mis-encoding the
+  # wrapper and SoftHSM happen to share. Only the OpenCryptoki-tagged tests run here; everything
+  # else skips because no PKCS11_TEST_OPENCRYPTOKI_LIBRARY is set on the other legs.
   opencryptoki:
     name: opencryptoki (linux-x64)
     runs-on: ubuntu-latest
@@ -220,23 +222,33 @@ jobs:
       SkipPkcs11MockBuild: true
       SkipSoftHsmV2Build: true
     steps:
+      # Only vendor/opencryptoki is needed here; pull just that submodule (not SoftHSM/mock).
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Check out opencryptoki submodule
+        run: git submodule update --init --depth 1 vendor/opencryptoki
 
       - name: Setup .NET
         uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install and provision opencryptoki soft token
+      - name: Build opencryptoki from source
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool flex bison libssl-dev pkg-config
+          # The pkcs11 group must exist before `make install` (it chgrp's the token store to it).
+          sudo groupadd -f pkcs11
+          ./build/build-opencryptoki.sh
+          sudo ldconfig
+
+      - name: Provision software token
         run: |
           set -uxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y opencryptoki
           sudo usermod -a -G pkcs11 "$(id -un)"
 
           echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf || true
-          echo "=== stdll ==="; ls -la /usr/lib/*/opencryptoki/stdll/ 2>/dev/null || true
-          echo "=== /var/lib/opencryptoki before ==="; ls -la /var/lib/opencryptoki/ 2>/dev/null || true
+          echo "=== stdll ==="; ls -la /usr/local/lib/opencryptoki/stdll/ 2>/dev/null || true
 
           # The software token's object store must exist and be writable by the pkcs11 group, else the
           # soft-token STDLL fails to initialize and C_GetSlotList reports zero tokens.
@@ -244,11 +256,11 @@ jobs:
           sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
           sudo chmod -R g+rwx /var/lib/opencryptoki || true
 
-          sudo systemctl restart pkcsslotd || true
-          sudo pkcsslotd 2>/dev/null || true
+          # No systemd unit for a from-source build; pkcsslotd daemonizes itself.
+          sudo /usr/local/sbin/pkcsslotd 2>/dev/null || true
           sleep 3
-          echo "=== pkcsconf -s ==="; sg pkcs11 -c "pkcsconf -s" || true
-          echo "=== pkcsconf -t ==="; sg pkcs11 -c "pkcsconf -t" || true
+          echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s" || true
+          echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t" || true
 
           # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
           # straight from the conf so we initialize the right one (not an ICA/CCA/EP11/TPM slot).
@@ -259,12 +271,12 @@ jobs:
           set -e
           # opencryptoki's default (pre-init) SO PIN is 87654321.
           # pkcsconf -I prompts for: SO PIN, then a token label.
-          sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c $SLOT -I"
+          sg pkcs11 -c "printf '87654321\nkl-octk\n' | /usr/local/sbin/pkcsconf -c $SLOT -I"
           # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
-          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c $SLOT -u"
-          sg pkcs11 -c "pkcsconf -t"
-          echo "=== mechanisms (pkcsconf -m) ==="; sg pkcs11 -c "pkcsconf -m -c $SLOT" || true
-          LIB="$(find /usr/lib -name libopencryptoki.so 2>/dev/null | head -1)"
+          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | /usr/local/sbin/pkcsconf -c $SLOT -u"
+          sg pkcs11 -c "/usr/local/sbin/pkcsconf -t"
+          echo "=== mechanisms (pkcsconf -m) ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -m -c $SLOT" || true
+          LIB="$(find /usr/local/lib -name libopencryptoki.so 2>/dev/null | head -1)"
           test -n "$LIB"
           {
             echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$LIB"

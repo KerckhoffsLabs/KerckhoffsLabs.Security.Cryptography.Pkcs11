@@ -4,3 +4,6 @@
 [submodule "vendor/softhsmv2"]
 	path = vendor/softhsmv2
 	url = https://github.com/softhsm/SoftHSMv2
+[submodule "vendor/opencryptoki"]
+	path = vendor/opencryptoki
+	url = https://github.com/opencryptoki/opencryptoki
