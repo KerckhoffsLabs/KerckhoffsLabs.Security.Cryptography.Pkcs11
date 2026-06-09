@@ -58,17 +58,22 @@ jobs:
           set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y opencryptoki
-          # Deterministic single software-token slot (slot 0), so we know the slot to initialize.
-          printf 'version opencryptoki-3.0\n\nslot 0\n{\nstdll = libpkcs11_sw.so\n}\n' \
-            | sudo tee /etc/opencryptoki/opencryptoki.conf >/dev/null
           sudo usermod -a -G pkcs11 "$(id -un)"
           sudo systemctl restart pkcsslotd || (sudo pkcsslotd && sleep 2)
           sleep 2
-          # Initialize the soft token in slot 0. opencryptoki's default (pre-init) SO PIN is 87654321.
+          # The packaged opencryptoki.conf already defines a software token (swtok). With no crypto
+          # hardware on the runner it is the only slot pkcsslotd presents, so discover its number
+          # rather than rewriting the conf (a mismatched 'version' line yields zero slots).
+          cat /etc/opencryptoki/opencryptoki.conf || true
+          sg pkcs11 -c "pkcsconf -s" || true
+          SLOT="$(sg pkcs11 -c 'pkcsconf -s' | grep -oE 'Slot[ #]+[0-9]+' | grep -oE '[0-9]+' | head -1)"
+          test -n "$SLOT"
+          echo "soft-token slot: $SLOT"
+          # Initialize the soft token. opencryptoki's default (pre-init) SO PIN is 87654321.
           # pkcsconf -I prompts for: SO PIN, then a token label.
-          sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c 0 -I"
+          sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c $SLOT -I"
           # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
-          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c 0 -u"
+          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c $SLOT -u"
           sg pkcs11 -c "pkcsconf -t" || true
           LIB="$(find /usr/lib -name libopencryptoki.so 2>/dev/null | head -1)"
           test -n "$LIB"
