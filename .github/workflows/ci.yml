@@ -256,10 +256,12 @@ jobs:
           sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
           sudo chmod -R g+rwx /var/lib/opencryptoki || true
 
-          # Start pkcsslotd fully detached (new session + redirected stdio) so this step never
-          # blocks on it and the daemon survives into the later test step — regardless of whether
-          # it double-forks on this runner.
-          sudo setsid sh -c '/usr/local/sbin/pkcsslotd >/tmp/pkcsslotd.log 2>&1 </dev/null' &
+          # Start pkcsslotd as root but with effective group pkcs11 (what the shipped systemd unit
+          # does via Group=pkcs11): the daemon creates its shared memory / socket owned by that
+          # group, so pkcs11-group clients can attach. Started as root:root the clients get
+          # CKR_FUNCTION_FAILED at C_Initialize. Fully detached (new session + redirected stdio) so
+          # this step never blocks on it and the daemon survives into the later test step.
+          sudo setsid sg pkcs11 -c '/usr/local/sbin/pkcsslotd >/tmp/pkcsslotd.log 2>&1 </dev/null' &
           sleep 5
           echo "=== pkcsslotd log ==="; cat /tmp/pkcsslotd.log 2>/dev/null || true
           pgrep -a pkcsslotd || echo "::warning::pkcsslotd not running"
