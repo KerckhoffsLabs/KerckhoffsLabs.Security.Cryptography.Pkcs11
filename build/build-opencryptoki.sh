@@ -94,7 +94,9 @@ echo "Building opencryptoki ($(git -C "${SRC_DIR}" describe --tags 2>/dev/null |
 ${SUDO} make -C "${SRC_DIR}" install 2>&1
 ${SUDO} ldconfig 2>/dev/null || true
 
-LIB="$(find "${PREFIX}" -name libopencryptoki.so -type f 2>/dev/null | head -1)"
+# Note: libopencryptoki.so is a symlink to libopencryptoki.so.0.0.0, so don't restrict to -type f.
+# Scope the search to ${PREFIX}/lib — searching all of /usr/local is needlessly slow on a runner.
+LIB="$(find "${PREFIX}/lib" -name 'libopencryptoki.so' 2>/dev/null | head -1)"
 if [[ -z "${LIB}" || ! -x "${DAEMON}" ]]; then
   echo "build succeeded but libopencryptoki.so / pkcsslotd not found under ${PREFIX}" >&2
   exit 1
