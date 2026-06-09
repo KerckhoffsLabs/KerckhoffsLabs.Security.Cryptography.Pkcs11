@@ -54,7 +54,8 @@ jobs:
     steps:
       # submodules: the test project builds pkcs11-mock (vendor/pkcs11-mock) and,
       # on Linux (x64+arm64), macOS, and Windows (x64+x86+arm64), SoftHSM2 (vendor/softhsmv2)
-      # from source during `dotnet build`.
+      # from source during `dotnet build`. The ubuntu-latest leg additionally builds opencryptoki
+      # (vendor/opencryptoki) from source as a second real backend — recursive pulls all three.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
@@ -83,7 +84,8 @@ jobs:
       # SoftHSM is built against OpenSSL 3.5+ so ML-DSA (CKM_ML_DSA) compiles in — ubuntu-latest
       # ships OpenSSL 3.0, so we build 3.5.6 from source (the same release the upstream SoftHSM CI
       # uses) into a user-writable prefix (cache-friendly, no sudo). build-softhsmv2.sh reads
-      # OPENSSL_PREFIX and bakes an rpath so libsofthsm2 loads this OpenSSL at runtime.
+      # OPENSSL_PREFIX and bakes an rpath so libsofthsm2 loads this OpenSSL at runtime. The same
+      # OpenSSL 3.5 is reused by opencryptoki on the ubuntu-latest leg (ML-DSA/ML-KEM, incl. signing).
       - name: Cache OpenSSL 3.5
         if: runner.os == 'Linux'
         id: cache-openssl
@@ -106,7 +108,8 @@ jobs:
       # LD_LIBRARY_PATH: at runtime the .NET host loads the system libcrypto.so.3 (OpenSSL 3.0)
       # first, so the rpath in libsofthsm2 loses to the already-loaded soname and ML-DSA symbols
       # (OPENSSL_3.4.0+) are missing. Putting the 3.5 libdir on the loader path makes the whole
-      # process use OpenSSL 3.5 (which .NET also supports), resolving the collision.
+      # process use OpenSSL 3.5 (which .NET also supports), resolving the collision. opencryptoki's
+      # ML-DSA/ML-KEM tests rely on the same loader path.
       - name: Point SoftHSM at OpenSSL 3.5 (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -202,78 +205,32 @@ jobs:
           }
           else { Write-Host "::warning::built softhsm2-util.exe not found under runtimes/*/native" }
 
-      # All legs (Linux x64+arm64, macOS, Windows x64+x86+arm64) build both backends (pkcs11-mock +
-      # SoftHSM2), so the SoftHSM-gated [ConditionalFact] tests run everywhere and the
-      # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
-      - name: Test
-        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
-
-  # Second independent real backend: opencryptoki's software token, built from source from the
-  # pinned vendor/opencryptoki submodule (v3.27.0) rather than the distro package, so the exact
-  # opencryptoki version is reproducible and independent of what ubuntu-latest happens to ship.
-  # Running the same operations against a module unrelated to SoftHSM catches a mis-encoding the
-  # wrapper and SoftHSM happen to share. Only the OpenCryptoki-tagged tests run here; everything
-  # else skips because no PKCS11_TEST_OPENCRYPTOKI_LIBRARY is set on the other legs.
-  opencryptoki:
-    name: opencryptoki (linux-x64)
-    runs-on: ubuntu-latest
-    env:
-      # No vendor native builds needed: this job runs only the opencryptoki-backed tests.
-      SkipPkcs11MockBuild: true
-      SkipSoftHsmV2Build: true
-    steps:
-      # Only vendor/opencryptoki is needed here; pull just that submodule (not SoftHSM/mock).
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Check out opencryptoki submodule
-        run: git submodule update --init --depth 1 vendor/opencryptoki
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
-        with:
-          dotnet-version: '10.0.x'
-
-      # opencryptoki's software token advertises ML-DSA / ML-KEM only when the OpenSSL it loads at
-      # runtime is >= 3.5 (it probes the PQC OIDs at token init, in the *client* process). ubuntu-latest
-      # ships OpenSSL 3.0, so build 3.5.6 into a user-writable prefix (cached, no sudo) and put it on the
-      # test host's loader path below. Same release/cache the build-and-test job uses for SoftHSM ML-DSA.
-      - name: Cache OpenSSL 3.5
-        id: cache-openssl
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/openssl-3.5
-          key: openssl-3.5.6-${{ runner.arch }}
-      - name: Build OpenSSL 3.5.6 (on cache miss)
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          work="$(mktemp -d)"; cd "$work"
-          curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.6/openssl-3.5.6.tar.gz
-          echo "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736  openssl-3.5.6.tar.gz" | sha256sum -c -
-          tar -xf openssl-3.5.6.tar.gz && cd openssl-3.5.6
-          ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
-          make -j"$(nproc)" >/dev/null
-          make install_sw >/dev/null
-          ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
-
-      # opencryptoki is built against this OpenSSL (headers + rpath) so the ML-DSA sign-message path
-      # (#ifdef EVP_PKEY_OP_SIGNMSG, OpenSSL 3.5 only) is compiled in. The daemon runs under the unit's
-      # ProtectHome=yes sandbox and so cannot read ~/openssl-3.5; stage a world-readable copy under /opt
-      # (outside /home) that both the daemon (via rpath) and the test host can load.
-      - name: Stage OpenSSL 3.5 outside /home
+      # Second independent real backend, on the Linux x64 leg only: opencryptoki's software token,
+      # built from source from the pinned vendor/opencryptoki submodule (v3.27.0) — reproducible and
+      # independent of what ubuntu-latest ships. Running the same operations against a module unrelated
+      # to SoftHSM catches a mis-encoding the wrapper and SoftHSM happen to share. It is built against
+      # the OpenSSL 3.5 above, staged to /opt (outside /home) so the daemon — which runs under the
+      # shipped unit's ProtectHome=yes — can load it via the baked rpath; that compiles in the ML-DSA
+      # sign-message path (#ifdef EVP_PKEY_OP_SIGNMSG, OpenSSL 3.5 only) so ML-DSA signing works.
+      - name: Stage OpenSSL 3.5 outside /home (opencryptoki)
+        if: matrix.os == 'ubuntu-latest'
         run: sudo cp -a "$HOME/openssl-3.5" /opt/openssl-3.5
 
       - name: Build opencryptoki from source
+        if: matrix.os == 'ubuntu-latest'
         env:
           OPENSSL_PREFIX: /opt/openssl-3.5
         run: |
           set -euxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y build-essential autoconf automake libtool flex bison libssl-dev libcap-dev libldap2-dev pkg-config
+          # autoconf/automake/libtool/build-essential/libssl-dev come from the Linux deps step above.
+          sudo apt-get install -y flex bison libcap-dev libldap2-dev pkg-config
           # The pkcs11 group must exist before `make install` (it chgrp's the token store to it).
           sudo groupadd -f pkcs11
           ./build/build-opencryptoki.sh
           sudo ldconfig
 
-      - name: Provision software token
+      - name: Provision opencryptoki software token
+        if: matrix.os == 'ubuntu-latest'
         run: |
           set -euxo pipefail
           sudo usermod -a -G pkcs11 "$(id -un)"
@@ -321,11 +278,17 @@ jobs:
             echo "PKCS11_TEST_OPENCRYPTOKI_TOKEN=kl-octk"
           } >> "$GITHUB_ENV"
 
-      - run: dotnet restore src/KerckhoffsLabs.sln
+      # All legs (Linux x64+arm64, macOS, Windows x64+x86+arm64) build both backends (pkcs11-mock +
+      # SoftHSM2), so the SoftHSM-gated [ConditionalFact] tests run everywhere and the
+      # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
+      - name: Test
+        if: matrix.os != 'ubuntu-latest'
+        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
 
-      # Run under the pkcs11 group (usermod above does not affect the current shell) so the test
-      # host can read the token store; the PKCS11_TEST_OPENCRYPTOKI_* env vars are inherited.
-      # LD_LIBRARY_PATH points the whole test process (and the soft-token STDLL it loads) at OpenSSL
-      # 3.5 so ML-DSA / ML-KEM are advertised and exercised; without it those tests skip.
-      - name: Test (opencryptoki backend)
-        run: sg pkcs11 -c "LD_LIBRARY_PATH=/opt/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
+      # ubuntu-latest also exercises the opencryptoki backend. Run under the pkcs11 group so the test
+      # host can read the token store; PKCS11_TEST_OPENCRYPTOKI_* and LD_LIBRARY_PATH (OpenSSL 3.5, for
+      # ML-DSA/ML-KEM) are inherited from the env set above (sg preserves the environment). The
+      # opencryptoki-gated tests run alongside the SoftHSM and mock suites in a single pass.
+      - name: Test (incl. opencryptoki)
+        if: matrix.os == 'ubuntu-latest'
+        run: sg pkcs11 -c "dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
