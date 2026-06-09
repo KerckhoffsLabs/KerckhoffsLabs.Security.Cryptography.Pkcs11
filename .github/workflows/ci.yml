@@ -232,6 +232,28 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # opencryptoki's software token advertises ML-DSA / ML-KEM only when the OpenSSL it loads at
+      # runtime is >= 3.5 (it probes the PQC OIDs at token init, in the *client* process). ubuntu-latest
+      # ships OpenSSL 3.0, so build 3.5.6 into a user-writable prefix (cached, no sudo) and put it on the
+      # test host's loader path below. Same release/cache the build-and-test job uses for SoftHSM ML-DSA.
+      - name: Cache OpenSSL 3.5
+        id: cache-openssl
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/openssl-3.5
+          key: openssl-3.5.6-${{ runner.arch }}
+      - name: Build OpenSSL 3.5.6 (on cache miss)
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          work="$(mktemp -d)"; cd "$work"
+          curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.6/openssl-3.5.6.tar.gz
+          echo "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736  openssl-3.5.6.tar.gz" | sha256sum -c -
+          tar -xf openssl-3.5.6.tar.gz && cd openssl-3.5.6
+          ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
+          make -j"$(nproc)" >/dev/null
+          make install_sw >/dev/null
+          ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
+
       - name: Build opencryptoki from source
         run: |
           set -euxo pipefail
@@ -294,5 +316,7 @@ jobs:
 
       # Run under the pkcs11 group (usermod above does not affect the current shell) so the test
       # host can read the token store; the PKCS11_TEST_OPENCRYPTOKI_* env vars are inherited.
+      # LD_LIBRARY_PATH points the whole test process (and the soft-token STDLL it loads) at OpenSSL
+      # 3.5 so ML-DSA / ML-KEM are advertised and exercised; without it those tests skip.
       - name: Test (opencryptoki backend)
-        run: sg pkcs11 -c "dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
+        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
