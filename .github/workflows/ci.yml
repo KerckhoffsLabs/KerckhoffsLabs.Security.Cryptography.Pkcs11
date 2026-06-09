@@ -262,21 +262,16 @@ jobs:
           sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
           sudo chmod -R g+rwx /var/lib/opencryptoki || true
 
-          # Start pkcsslotd via the shipped systemd unit. systemd manages the (forking) daemon and,
-          # crucially, captures its stderr to the journal — the daemon closes stderr after forking,
-          # so a manual launch hides any startup error. Relax the unit's heavy sandboxing for CI
-          # (it otherwise mounts /run read-only, blocking the daemon's socket).
+          # Start pkcsslotd via the shipped systemd unit (the same mechanism the distro package
+          # uses): it runs the daemon as the dedicated pkcsslotd user / pkcs11 group — systemd
+          # performs the uid/gid switch with its own capabilities, and creates the runtime dirs.
           sudo cp /usr/local/lib/systemd/system/pkcsslotd.service /etc/systemd/system/pkcsslotd.service
-          sudo mkdir -p /etc/systemd/system/pkcsslotd.service.d
-          printf '[Service]\nProtectSystem=no\nProtectHome=no\nReadWritePaths=/run /var\n' \
-            | sudo tee /etc/systemd/system/pkcsslotd.service.d/ci.conf >/dev/null
           sudo systemd-tmpfiles --create 2>/dev/null || true
           sudo systemctl daemon-reload
-          sudo systemctl start pkcsslotd || true
+          sudo systemctl start pkcsslotd
           sleep 2
           sudo systemctl --no-pager -l status pkcsslotd || true
-          echo "=== pkcsslotd journal ==="; sudo journalctl -u pkcsslotd --no-pager | tail -60 || true
-          sudo ls -la /run/opencryptoki/ || true
+          echo "=== pkcsslotd journal ==="; sudo journalctl -u pkcsslotd --no-pager | tail -30 || true
           echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s"
           echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t"
 

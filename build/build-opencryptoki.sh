@@ -71,8 +71,10 @@ echo "Building opencryptoki ($(git -C "${SRC_DIR}" describe --tags 2>/dev/null |
   # Build only what the software token needs. The software token (swtok) is enabled by default
   # and is the only token whose prerequisites (OpenSSL) are met on a stock runner; explicitly
   # disabling the hardware tokens and optional tools keeps the dependency surface minimal and
-  # the build deterministic. Run the daemon as root (no separate pkcsslotd system user to
-  # provision on an ephemeral CI host).
+  # the build deterministic. Keep the default pkcsslotd user (not root): `make install` creates
+  # that system user, and the shipped systemd unit's CapabilityBoundingSet strips CAP_SETGID, so
+  # a root daemon that calls initgroups() itself fails ("Failed to set the group access list");
+  # with a dedicated user, systemd (PID 1) performs the uid/gid switch with its own capabilities.
   ./configure \
     --prefix="${PREFIX}" \
     --sysconfdir="${SYSCONFDIR}" \
@@ -86,8 +88,7 @@ echo "Building opencryptoki ($(git -C "${SRC_DIR}" describe --tags 2>/dev/null |
     --disable-p11sak \
     --disable-p11kmip \
     --disable-pkcsstats \
-    --disable-testcases \
-    --with-pkcsslotd-user=root
+    --disable-testcases
   make -j"${NPROC}"
 ) 2>&1
 
