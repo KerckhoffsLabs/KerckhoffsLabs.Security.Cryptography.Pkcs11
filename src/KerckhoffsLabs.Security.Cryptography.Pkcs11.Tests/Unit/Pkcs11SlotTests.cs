@@ -39,17 +39,17 @@ public sealed class Pkcs11SlotTests
         { LastSlotId = slotId; info = TokenInfo; return TokenInfoRv; }
         public override CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, ref CK_MECHANISM_INFO info)
         { LastSlotId = slotId; info = MechInfo; return MechInfoRv; }
-        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? list, ref NativeCULong count)
+        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
         {
-            if (list is null) { count = FirstCallCount ?? (NativeCULong)Mechs.Length; return MechListRv1; }
+            if (mechanismList is null) { count = FirstCallCount ?? (NativeCULong)Mechs.Length; return MechListRv1; }
             int n = Math.Min((int)count, Mechs.Length);
-            for (int i = 0; i < n; i++) list[i] = Mechs[i];
+            for (int i = 0; i < n; i++) mechanismList[i] = Mechs[i];
             count = (NativeCULong)Mechs.Length; // token may report fewer than the probe (shrink)
             return MechListRv2;
         }
         public override CKR C_InitToken(NativeCULong slotId, byte[] pin, NativeCULong pinLen, byte[] label)
         { CapturedPin = (byte[])pin.Clone(); CapturedPinLen = pinLen; CapturedLabel = (byte[])label.Clone(); return InitTokenRv; }
-        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr a, IntPtr n, ref NativeCULong session)
+        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
         { CapturedOpenFlags = flags; session = OpenSessionId; return OpenRv; }
         public override CKR C_CloseAllSessions(NativeCULong slotId) { CloseAllCalled = true; return CloseAllRv; }
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK; // let opened sessions dispose cleanly
