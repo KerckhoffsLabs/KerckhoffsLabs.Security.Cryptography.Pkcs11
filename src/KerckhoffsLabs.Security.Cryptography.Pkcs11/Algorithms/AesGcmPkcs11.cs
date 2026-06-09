@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -85,16 +86,25 @@ public sealed class AesGcmPkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            // PKCS#11 v3.0 message-mode path — tag is returned via params, not appended.
-            using var msgParams = CkmGcmMessageParams.ForEncrypt(nonce, tag.Length);
-            using var mech = new Mechanism(CKM.CKM_AES_GCM);
-            byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
-            if (ct.Length != plaintext.Length)
-                throw new InvalidOperationException(
-                    $"AES-GCM message encrypt returned {ct.Length} bytes; expected {plaintext.Length}.");
-            ct.CopyTo(ciphertext);
-            msgParams.CopyTagTo(tag);
-            return;
+            try
+            {
+                // PKCS#11 v3.0 message-mode path — tag is returned via params, not appended.
+                using var msgParams = CkmGcmMessageParams.ForEncrypt(nonce, tag.Length);
+                using var mech = new Mechanism(CKM.CKM_AES_GCM);
+                byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
+                if (ct.Length != plaintext.Length)
+                    throw new InvalidOperationException(
+                        $"AES-GCM message encrypt returned {ct.Length} bytes; expected {plaintext.Length}.");
+                ct.CopyTo(ciphertext);
+                msgParams.CopyTagTo(tag);
+                return;
+            }
+            catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_FUNCTION_NOT_SUPPORTED)
+            {
+                // Some modules export the v3.0 message-API entry points but do not implement AES-GCM
+                // through them (e.g. opencryptoki). C_MessageEncryptInit is the first call, so nothing
+                // was written yet — fall through to the v2.40 single-part path.
+            }
         }
 
         // v2.40 fallback: ciphertext || tag concatenated.
@@ -126,21 +136,30 @@ public sealed class AesGcmPkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            using var msgParams = CkmGcmMessageParams.ForDecrypt(nonce, tag);
-            using var mech = new Mechanism(CKM.CKM_AES_GCM);
-            byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
             try
             {
-                if (pt.Length != plaintext.Length)
-                    throw new InvalidOperationException(
-                        $"AES-GCM message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
-                pt.CopyTo(plaintext);
+                using var msgParams = CkmGcmMessageParams.ForDecrypt(nonce, tag);
+                using var mech = new Mechanism(CKM.CKM_AES_GCM);
+                byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
+                try
+                {
+                    if (pt.Length != plaintext.Length)
+                        throw new InvalidOperationException(
+                            $"AES-GCM message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
+                    pt.CopyTo(plaintext);
+                }
+                finally
+                {
+                    System.Security.Cryptography.CryptographicOperations.ZeroMemory(pt);
+                }
+                return;
             }
-            finally
+            catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_FUNCTION_NOT_SUPPORTED)
             {
-                System.Security.Cryptography.CryptographicOperations.ZeroMemory(pt);
+                // Module advertises but does not implement AES-GCM via the message API (e.g.
+                // opencryptoki). C_MessageDecryptInit is the first call — fall through to v2.40. A
+                // genuine tag failure surfaces a different return code and still propagates.
             }
-            return;
         }
 
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
