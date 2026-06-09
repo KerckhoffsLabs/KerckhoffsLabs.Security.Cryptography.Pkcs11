@@ -62,12 +62,16 @@ public sealed class MLKemPkcs11Tests_Managed
         }
     }
 
-    public static TheoryData<CkpMlKem> ParameterSets => new()
-    {
+    // CA1825 false-positives on the xUnit TheoryData collection expression (it is not a zero-length
+    // array); the collection expression is the form IDE0028 and the repo .editorconfig prefer.
+#pragma warning disable CA1825
+    public static TheoryData<CkpMlKem> ParameterSets =>
+    [
         CkpMlKem.CKP_ML_KEM_512,
         CkpMlKem.CKP_ML_KEM_768,
         CkpMlKem.CKP_ML_KEM_1024,
-    };
+    ];
+#pragma warning restore CA1825
 
     // === Encapsulate / decapsulate round-trips ============================
 

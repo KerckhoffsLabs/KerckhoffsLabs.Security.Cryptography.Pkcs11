@@ -45,7 +45,10 @@ public sealed class RSAPkcs11Tests_Managed
 
     // === Sign/verify — byte[] overloads, with BCL cross-check ==============
 
-    public static TheoryData<string> Paddings => new() { "Pkcs1", "Pss" };
+    // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
+#pragma warning disable CA1825
+    public static TheoryData<string> Paddings => ["Pkcs1", "Pss"];
+#pragma warning restore CA1825
 
     [Theory]
     [MemberData(nameof(Paddings))]
@@ -139,7 +142,10 @@ public sealed class RSAPkcs11Tests_Managed
 
     // === Encryption / decryption ===========================================
 
-    public static TheoryData<string> OaepHashes => new() { "SHA1", "SHA256" };
+    // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
+#pragma warning disable CA1825
+    public static TheoryData<string> OaepHashes => ["SHA1", "SHA256"];
+#pragma warning restore CA1825
 
     // The managed token runs the OAEP KAT for both hashes: token round-trip plus decrypting a
     // BCL-produced ciphertext, and confirming the BCL can decrypt a token-produced ciphertext from the

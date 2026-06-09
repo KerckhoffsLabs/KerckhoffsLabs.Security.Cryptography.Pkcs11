@@ -23,8 +23,11 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     // expose the internal Pkcs11Session type. The gate fires before the native call; under
     // AllowInsecure the call proceeds to the mock, which fails the dummy/unsupported call with a
     // (non-insecure) Pkcs11Exception.
+    // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
+#pragma warning disable CA1825
     public static TheoryData<string> Operations() =>
-        new() { "DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated" };
+        ["DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated"];
+#pragma warning restore CA1825
 
     private static void Invoke(string operation, Pkcs11Session s, List<ObjectAttribute> template)
     {
