@@ -36,6 +36,26 @@ public static class Settings
     public static string SoPin =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_SO_PIN") ?? "11111111";
 
+    /// <summary>
+    /// Optional path to a system-installed opencryptoki PKCS#11 library — a second, independent real
+    /// backend for cross-implementation coverage. Tests skip when this resolves to null; the token is
+    /// provisioned out-of-band (by CI), not by the fixture.
+    /// </summary>
+    public static string? OpenCryptokiLibraryPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_OPENCRYPTOKI_LIBRARY");
+
+    /// <summary>Token label of the provisioned opencryptoki token (must match what CI initialized).</summary>
+    public static string OpenCryptokiTokenLabel =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_OPENCRYPTOKI_TOKEN") ?? "kl-octk";
+
+    /// <summary>Normal-user PIN for the opencryptoki token.</summary>
+    public static string OpenCryptokiUserPin =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_OPENCRYPTOKI_USER_PIN") ?? "12345678";
+
+    /// <summary>SO PIN for the opencryptoki token (opencryptoki's default is 87654321).</summary>
+    public static string OpenCryptokiSoPin =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_OPENCRYPTOKI_SO_PIN") ?? "87654321";
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;

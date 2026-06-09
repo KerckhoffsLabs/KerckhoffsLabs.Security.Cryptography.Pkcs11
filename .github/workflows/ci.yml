@@ -34,6 +34,56 @@ jobs:
 
       - run: dotnet format src/KerckhoffsLabs.sln --verify-no-changes --no-restore
 
+  # Second independent real backend: a system-installed opencryptoki software token. Running the
+  # same operations against a module unrelated to SoftHSM catches a mis-encoding the wrapper and
+  # SoftHSM happen to share. Only the OpenCryptoki-tagged tests run here; everything else skips
+  # because no PKCS11_TEST_OPENCRYPTOKI_LIBRARY is set on the other legs.
+  opencryptoki:
+    name: opencryptoki (linux-x64)
+    runs-on: ubuntu-latest
+    env:
+      # No vendor native builds needed: this job runs only the opencryptoki-backed tests.
+      SkipPkcs11MockBuild: true
+      SkipSoftHsmV2Build: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install and provision opencryptoki soft token
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y opencryptoki
+          # Deterministic single software-token slot (slot 0), so we know the slot to initialize.
+          printf 'version opencryptoki-3.0\n\nslot 0\n{\nstdll = libpkcs11_sw.so\n}\n' \
+            | sudo tee /etc/opencryptoki/opencryptoki.conf >/dev/null
+          sudo usermod -a -G pkcs11 "$(id -un)"
+          sudo systemctl restart pkcsslotd || (sudo pkcsslotd && sleep 2)
+          sleep 2
+          # Initialize the soft token in slot 0. opencryptoki's default (pre-init) SO PIN is 87654321.
+          # pkcsconf -I prompts for: SO PIN, then a token label.
+          sg pkcs11 -c "printf '87654321\nkl-octk\n' | pkcsconf -c 0 -I"
+          # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
+          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | pkcsconf -c 0 -u"
+          sg pkcs11 -c "pkcsconf -t" || true
+          LIB="$(find /usr/lib -name libopencryptoki.so 2>/dev/null | head -1)"
+          test -n "$LIB"
+          {
+            echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$LIB"
+            echo "PKCS11_TEST_OPENCRYPTOKI_TOKEN=kl-octk"
+          } >> "$GITHUB_ENV"
+
+      - run: dotnet restore src/KerckhoffsLabs.sln
+
+      # Run under the pkcs11 group (usermod above does not affect the current shell) so the test
+      # host can read the token store; the PKCS11_TEST_OPENCRYPTOKI_* env vars are inherited.
+      - name: Test (opencryptoki backend)
+        run: sg pkcs11 -c "dotnet test src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj -c Debug --filter 'FullyQualifiedName~OpenCryptoki'"
+
   build-and-test:
     name: ${{ matrix.os }}${{ matrix.arch == 'x86' && ' (x86)' || '' }}
     runs-on: ${{ matrix.os }}
