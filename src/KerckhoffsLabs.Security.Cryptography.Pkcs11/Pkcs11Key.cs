@@ -553,9 +553,22 @@ public sealed class Pkcs11Key : IDisposable
     }
 
     /// <summary>
-    /// Derives a new key from this key.
+    /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
+    /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
+    /// non-sensitive key requires opting in via the workspace's <c>AllowInsecure</c> gate.
     /// </summary>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
+        => DeriveCore(mechanism, template, enforceSecureDefaults: true);
+
+    /// <summary>
+    /// Derives a key without the secure-default gate, for the library's own extract-and-destroy
+    /// raw-secret helpers (the derived ephemeral key is read back and immediately destroyed). Not
+    /// exposed publicly so external callers cannot silently create an extractable derived key.
+    /// </summary>
+    internal Pkcs11Key DeriveExtractable(Mechanism mechanism, ObjectTemplate template)
+        => DeriveCore(mechanism, template, enforceSecureDefaults: false);
+
+    private Pkcs11Key DeriveCore(Mechanism mechanism, ObjectTemplate template, bool enforceSecureDefaults)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -567,7 +580,7 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.Derive (base-key handle unavailable)");
 
         ObjectHandle resulting = _workspace.Session.DeriveKey(
-            mechanism, baseHandle, [.. template.Attributes]);
+            mechanism, baseHandle, [.. template.Attributes], enforceSecureDefaults);
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
 

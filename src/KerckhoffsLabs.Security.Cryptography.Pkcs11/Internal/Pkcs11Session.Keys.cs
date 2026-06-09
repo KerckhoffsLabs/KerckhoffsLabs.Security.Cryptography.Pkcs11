@@ -182,7 +182,7 @@ internal sealed partial class Pkcs11Session
         // could land an extractable, non-sensitive key — silently downgrading the posture the key
         // template builders establish. Append CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the
         // caller omitted them; an explicit insecure value requires AllowInsecure (throws otherwise).
-        List<ObjectAttribute> secureDefaults = BuildSecureUnwrapDefaults(attributes);
+        List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
         try
         {
             int attrCount = attributes?.Count ?? 0;
@@ -214,12 +214,15 @@ internal sealed partial class Pkcs11Session
 
     /// <summary>
     /// Returns the secure-default attributes (<c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c>)
-    /// to append to an unwrap template for any the caller omitted. If the caller supplied an explicit
-    /// insecure value (<c>CKA_SENSITIVE=false</c> or <c>CKA_EXTRACTABLE=true</c>), it is permitted only
-    /// when <see cref="AllowInsecure"/> is set; otherwise <see cref="InsecureOperationException"/> is
-    /// thrown. The returned attributes own unmanaged buffers and must be disposed by the caller.
+    /// to append to a key-creation template for any the caller omitted. Shared by every operation that
+    /// produces a key object from a template — unwrap, derive, KEM encapsulate/decapsulate, and
+    /// authenticated unwrap — so they all establish the same secure posture. If the caller supplied an
+    /// explicit insecure value (<c>CKA_SENSITIVE=false</c> or <c>CKA_EXTRACTABLE=true</c>), it is
+    /// permitted only when <see cref="AllowInsecure"/> is set; otherwise
+    /// <see cref="InsecureOperationException"/> is thrown. The returned attributes own unmanaged buffers
+    /// and must be disposed by the caller.
     /// </summary>
-    private List<ObjectAttribute> BuildSecureUnwrapDefaults(List<ObjectAttribute>? attributes)
+    private List<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes)
     {
         bool hasSensitive = false;
         bool hasExtractable = false;
@@ -233,7 +236,7 @@ internal sealed partial class Pkcs11Session
                     hasSensitive = true;
                     if (!a.GetValueAsBool() && !AllowInsecure)
                         throw new InsecureOperationException(
-                            "UnwrapKey with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
+                            "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
                             "Pass AllowInsecure (or use AllowInsecureScope) to override.");
                 }
                 else if (a.Type == (ulong)CKA.CKA_EXTRACTABLE)
@@ -241,7 +244,7 @@ internal sealed partial class Pkcs11Session
                     hasExtractable = true;
                     if (a.GetValueAsBool() && !AllowInsecure)
                         throw new InsecureOperationException(
-                            "UnwrapKey with CKA_EXTRACTABLE=true would create an extractable key. " +
+                            "Creating a key with CKA_EXTRACTABLE=true would create an extractable key. " +
                             "Pass AllowInsecure (or use AllowInsecureScope) to override.");
                 }
             }

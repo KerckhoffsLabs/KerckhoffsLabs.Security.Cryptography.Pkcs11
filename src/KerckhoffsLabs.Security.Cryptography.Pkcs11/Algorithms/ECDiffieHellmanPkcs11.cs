@@ -165,7 +165,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             .Sensitive(false)
             .Build();
 
-        Pkcs11Key derived = _key.Derive(mech, template);
+        Pkcs11Key derived = _key.DeriveExtractable(mech, template);
         try
         {
             var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
