@@ -256,15 +256,18 @@ jobs:
           sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
           sudo chmod -R g+rwx /var/lib/opencryptoki || true
 
-          # Start pkcsslotd as root but with effective group pkcs11 (what the shipped systemd unit
-          # does via Group=pkcs11): the daemon creates its shared memory / socket owned by that
-          # group, so pkcs11-group clients can attach. Started as root:root the clients get
-          # CKR_FUNCTION_FAILED at C_Initialize. Fully detached (new session + redirected stdio) so
-          # this step never blocks on it and the daemon survives into the later test step.
-          sudo setsid sg pkcs11 -c '/usr/local/sbin/pkcsslotd >/tmp/pkcsslotd.log 2>&1 </dev/null' &
-          sleep 5
-          echo "=== pkcsslotd log ==="; cat /tmp/pkcsslotd.log 2>/dev/null || true
-          pgrep -a pkcsslotd || echo "::warning::pkcsslotd not running"
+          # Drive the daemon through the shipped systemd unit — the same mechanism the distro
+          # package uses (proven on this runner). It runs pkcsslotd as root:pkcs11 and, with the
+          # tmpfiles entries, creates the runtime dirs (/run/opencryptoki) with the right ownership
+          # so pkcs11-group clients can attach (a hand-rolled launch left clients failing
+          # C_Initialize with CKR_FUNCTION_FAILED). The unit installs under /usr/local/lib/systemd;
+          # copy it where systemd is guaranteed to find it.
+          sudo cp /usr/local/lib/systemd/system/pkcsslotd.service /etc/systemd/system/pkcsslotd.service
+          sudo systemd-tmpfiles --create 2>/dev/null || true
+          sudo systemctl daemon-reload
+          sudo systemctl start pkcsslotd
+          sleep 3
+          sudo systemctl --no-pager -l status pkcsslotd || true
           echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s" || true
           echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t" || true
 
