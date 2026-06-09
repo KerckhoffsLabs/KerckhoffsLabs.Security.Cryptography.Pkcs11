@@ -17,6 +17,9 @@ internal partial class Delegates
     /// </summary>
     internal readonly FunctionPointers _fp = new();
 
+    /// <summary>Native cryptoki bootstrap symbol name, used for export lookup and error context (S1192).</summary>
+    private const string GetFunctionListSymbol = "C_GetFunctionList";
+
     /// <summary>
     /// Definition of unmanaged methods (used on iOS)
     /// </summary>
@@ -73,7 +76,7 @@ internal partial class Delegates
     public unsafe NativeCULong C_GetFunctionList(out IntPtr functionList)
     {
         if (_fp.C_GetFunctionList is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetFunctionList");
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, GetFunctionListSymbol);
         IntPtr local = IntPtr.Zero;
         NativeCULong rv = _fp.C_GetFunctionList(&local);
         functionList = local;
@@ -1773,13 +1776,13 @@ internal partial class Delegates
     /// <param name="libraryHandle">Handle to the PKCS#11 library</param>
     private unsafe void InitializeWithGetFunctionList(IntPtr libraryHandle)
     {
-        IntPtr getFunctionListPtr = NativeLibrary.GetExport(libraryHandle, "C_GetFunctionList");
+        IntPtr getFunctionListPtr = NativeLibrary.GetExport(libraryHandle, GetFunctionListSymbol);
         var getFunctionList = (delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)getFunctionListPtr;
 
         IntPtr functionList = IntPtr.Zero;
 
         CKR returnValue = getFunctionList(&functionList).ToCKR();
-        Pkcs11Exception.ThrowIfError(returnValue, "C_GetFunctionList");
+        Pkcs11Exception.ThrowIfError(returnValue, GetFunctionListSymbol);
         if (functionList == IntPtr.Zero)
             throw new InvalidOperationException(
                 "C_GetFunctionList succeeded but returned a null function-list pointer.");
@@ -1794,7 +1797,7 @@ internal partial class Delegates
     private void InitializeWithGetFunctionList()
     {
         CKR returnValue = NativeMethods.C_GetFunctionList(out IntPtr functionList).ToCKR();
-        Pkcs11Exception.ThrowIfError(returnValue, "C_GetFunctionList");
+        Pkcs11Exception.ThrowIfError(returnValue, GetFunctionListSymbol);
         if (functionList == IntPtr.Zero)
             throw new InvalidOperationException(
                 "C_GetFunctionList succeeded but returned a null function-list pointer.");

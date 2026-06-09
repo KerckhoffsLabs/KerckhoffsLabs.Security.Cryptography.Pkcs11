@@ -7,6 +7,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 internal sealed partial class Pkcs11Session
 {
+    // Native function names for error context, used across the digest paths below (S1192).
+    private const string OpDigestInit = "C_DigestInit";
+    private const string OpDigestFinal = "C_DigestFinal";
+
     /// <summary>
     /// Digests the value of a secret key
     /// </summary>
@@ -28,18 +32,18 @@ internal sealed partial class Pkcs11Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, "C_DigestKey");
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));
@@ -87,7 +91,7 @@ internal sealed partial class Pkcs11Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
         NativeCULong digestLen = (NativeCULong)0;
         rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), null, ref digestLen);
@@ -151,7 +155,7 @@ internal sealed partial class Pkcs11Session
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
         bool finalized = false;
         try
@@ -167,11 +171,11 @@ internal sealed partial class Pkcs11Session
 
             NativeCULong digestLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
             byte[] digest = new byte[(int)digestLen];
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             finalized = true;
 
             if (digest.Length != (int)(digestLen))
@@ -283,7 +287,7 @@ internal sealed partial class Pkcs11Session
         CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
         bool encryptInited = false;
         bool encryptFinalized = false;
@@ -334,11 +338,11 @@ internal sealed partial class Pkcs11Session
 
             NativeCULong digestLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
             byte[] digest = new byte[(int)digestLen];
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             digestFinalized = true;
 
             if (digest.Length != (int)(digestLen))
@@ -455,7 +459,7 @@ internal sealed partial class Pkcs11Session
         CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        Pkcs11Exception.ThrowIfError(rv, "C_DigestInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
         bool decryptInited = false;
         bool decryptFinalized = false;
@@ -506,11 +510,11 @@ internal sealed partial class Pkcs11Session
 
             NativeCULong digestLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
             byte[] digest = new byte[(int)digestLen];
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DigestFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             digestFinalized = true;
 
             if (digest.Length != (int)(digestLen))

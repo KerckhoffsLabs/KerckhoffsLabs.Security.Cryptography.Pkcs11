@@ -11,6 +11,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </summary>
 public static class Pkcs11MechanismMap
 {
+    // BCL HashAlgorithmName.Name values used as switch keys throughout this map (S1192).
+    private const string Sha1 = "SHA1";
+    private const string Sha256 = "SHA256";
+    private const string Sha384 = "SHA384";
+    private const string Sha512 = "SHA512";
+
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for RSA PKCS#1 v1.5 signing with the given hash.
     /// </summary>
@@ -18,10 +24,10 @@ public static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism RsaPkcs1Sign(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1" => new Mechanism(CKM.CKM_SHA1_RSA_PKCS),
-        "SHA256" => new Mechanism(CKM.CKM_SHA256_RSA_PKCS),
-        "SHA384" => new Mechanism(CKM.CKM_SHA384_RSA_PKCS),
-        "SHA512" => new Mechanism(CKM.CKM_SHA512_RSA_PKCS),
+        Sha1 => new Mechanism(CKM.CKM_SHA1_RSA_PKCS),
+        Sha256 => new Mechanism(CKM.CKM_SHA256_RSA_PKCS),
+        Sha384 => new Mechanism(CKM.CKM_SHA384_RSA_PKCS),
+        Sha512 => new Mechanism(CKM.CKM_SHA512_RSA_PKCS),
         _ => throw new NotSupportedException(
             $"RSA PKCS#1 sign does not support hash {hash.Name}."),
     };
@@ -39,10 +45,10 @@ public static class Pkcs11MechanismMap
     {
         var (ckm, innerHash, mgf, effectiveSalt) = hash.Name switch
         {
-            "SHA1" => (CKM.CKM_SHA1_RSA_PKCS_PSS, CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1, saltLength < 0 ? 20 : saltLength),
-            "SHA256" => (CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength < 0 ? 32 : saltLength),
-            "SHA384" => (CKM.CKM_SHA384_RSA_PKCS_PSS, CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, saltLength < 0 ? 48 : saltLength),
-            "SHA512" => (CKM.CKM_SHA512_RSA_PKCS_PSS, CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, saltLength < 0 ? 64 : saltLength),
+            Sha1 => (CKM.CKM_SHA1_RSA_PKCS_PSS, CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1, saltLength < 0 ? 20 : saltLength),
+            Sha256 => (CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength < 0 ? 32 : saltLength),
+            Sha384 => (CKM.CKM_SHA384_RSA_PKCS_PSS, CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, saltLength < 0 ? 48 : saltLength),
+            Sha512 => (CKM.CKM_SHA512_RSA_PKCS_PSS, CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, saltLength < 0 ? 64 : saltLength),
             _ => throw new NotSupportedException(
                 $"RSA-PSS does not support hash {hash.Name}."),
         };
@@ -58,10 +64,10 @@ public static class Pkcs11MechanismMap
     {
         var (innerHash, mgf) = hash.Name switch
         {
-            "SHA1" => (CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1),
-            "SHA256" => (CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256),
-            "SHA384" => (CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384),
-            "SHA512" => (CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512),
+            Sha1 => (CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1),
+            Sha256 => (CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256),
+            Sha384 => (CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384),
+            Sha512 => (CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512),
             _ => throw new NotSupportedException(
                 $"RSA-OAEP does not support hash {hash.Name}."),
         };
@@ -75,10 +81,10 @@ public static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism EcdsaSign(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1" => new Mechanism(CKM.CKM_ECDSA_SHA1),
-        "SHA256" => new Mechanism(CKM.CKM_ECDSA_SHA256),
-        "SHA384" => new Mechanism(CKM.CKM_ECDSA_SHA384),
-        "SHA512" => new Mechanism(CKM.CKM_ECDSA_SHA512),
+        Sha1 => new Mechanism(CKM.CKM_ECDSA_SHA1),
+        Sha256 => new Mechanism(CKM.CKM_ECDSA_SHA256),
+        Sha384 => new Mechanism(CKM.CKM_ECDSA_SHA384),
+        Sha512 => new Mechanism(CKM.CKM_ECDSA_SHA512),
         _ => throw new NotSupportedException(
             $"ECDSA does not support hash {hash.Name}."),
     };
@@ -103,11 +109,11 @@ public static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism DsaSign(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1" => new Mechanism(CKM.CKM_DSA_SHA1),
+        Sha1 => new Mechanism(CKM.CKM_DSA_SHA1),
         "SHA224" => new Mechanism(CKM.CKM_DSA_SHA224),
-        "SHA256" => new Mechanism(CKM.CKM_DSA_SHA256),
-        "SHA384" => new Mechanism(CKM.CKM_DSA_SHA384),
-        "SHA512" => new Mechanism(CKM.CKM_DSA_SHA512),
+        Sha256 => new Mechanism(CKM.CKM_DSA_SHA256),
+        Sha384 => new Mechanism(CKM.CKM_DSA_SHA384),
+        Sha512 => new Mechanism(CKM.CKM_DSA_SHA512),
         _ => throw new NotSupportedException(
             $"DSA does not support hash {hash.Name}."),
     };
@@ -148,9 +154,9 @@ public static class Pkcs11MechanismMap
         var (ckm, innerHash) = hash.Name switch
         {
             "SHA224" => (CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_SHA224),
-            "SHA256" => (CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256),
-            "SHA384" => (CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384),
-            "SHA512" => (CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512),
+            Sha256 => (CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256),
+            Sha384 => (CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384),
+            Sha512 => (CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512),
             "SHA3-224" => (CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224),
             "SHA3-256" => (CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256),
             "SHA3-384" => (CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384),
@@ -172,10 +178,10 @@ public static class Pkcs11MechanismMap
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism Hmac(HashAlgorithmName hash) => hash.Name switch
     {
-        "SHA1" => new Mechanism(CKM.CKM_SHA_1_HMAC),
-        "SHA256" => new Mechanism(CKM.CKM_SHA256_HMAC),
-        "SHA384" => new Mechanism(CKM.CKM_SHA384_HMAC),
-        "SHA512" => new Mechanism(CKM.CKM_SHA512_HMAC),
+        Sha1 => new Mechanism(CKM.CKM_SHA_1_HMAC),
+        Sha256 => new Mechanism(CKM.CKM_SHA256_HMAC),
+        Sha384 => new Mechanism(CKM.CKM_SHA384_HMAC),
+        Sha512 => new Mechanism(CKM.CKM_SHA512_HMAC),
         _ => throw new NotSupportedException(
             $"HMAC does not support hash {hash.Name}."),
     };
