@@ -240,6 +240,37 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         Assert.Equal(plaintext, recovered);
     });
 
+    // OAEP carries its own padding integrity, so a corrupted ciphertext must fail to decrypt rather
+    // than silently return garbage.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Decrypt_TamperedOaepCiphertext_Throws() => WithRsa((_, rsa) =>
+    {
+        byte[] ct = rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1);
+        ct[ct.Length / 2] ^= 0xFF; // flip one ciphertext byte
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+    });
+
+    // A ciphertext produced under a different key pair must not decrypt under this key: the OAEP
+    // padding check rejects it instead of yielding plaintext.
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void Decrypt_OaepCiphertextFromDifferentKey_Throws() => WithRsa((workspace, rsa) =>
+    {
+        Pkcs11Key other = GenerateRsaKey(workspace);
+        try
+        {
+            using var otherRsa = new RSAPkcs11(other);
+            byte[] ct = otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1);
+
+            Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+        }
+        finally
+        {
+            try { other.Delete(); } catch { /* best-effort cleanup of the second key */ }
+            other.Dispose();
+        }
+    });
+
     // === Key material export ===============================================
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
