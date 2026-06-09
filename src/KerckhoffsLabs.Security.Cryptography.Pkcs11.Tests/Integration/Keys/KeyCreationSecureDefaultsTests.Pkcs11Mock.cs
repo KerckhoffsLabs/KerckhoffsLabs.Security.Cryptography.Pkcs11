@@ -24,7 +24,7 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     // AllowInsecure the call proceeds to the mock, which fails the dummy/unsupported call with a
     // (non-insecure) Pkcs11Exception.
     public static TheoryData<string> Operations() =>
-        ["DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated"];
+        new() { "DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated" };
 
     private static void Invoke(string operation, Pkcs11Session s, List<ObjectAttribute> template)
     {

@@ -45,7 +45,7 @@ public sealed class RSAPkcs11Tests_Managed
 
     // === Sign/verify — byte[] overloads, with BCL cross-check ==============
 
-    public static TheoryData<string> Paddings => ["Pkcs1", "Pss"];
+    public static TheoryData<string> Paddings => new() { "Pkcs1", "Pss" };
 
     [Theory]
     [MemberData(nameof(Paddings))]
@@ -139,7 +139,7 @@ public sealed class RSAPkcs11Tests_Managed
 
     // === Encryption / decryption ===========================================
 
-    public static TheoryData<string> OaepHashes => ["SHA1", "SHA256"];
+    public static TheoryData<string> OaepHashes => new() { "SHA1", "SHA256" };
 
     // The managed token runs the OAEP KAT for both hashes: token round-trip plus decrypting a
     // BCL-produced ciphertext, and confirming the BCL can decrypt a token-produced ciphertext from the

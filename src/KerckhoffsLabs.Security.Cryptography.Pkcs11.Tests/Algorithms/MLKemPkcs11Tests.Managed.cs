@@ -62,12 +62,12 @@ public sealed class MLKemPkcs11Tests_Managed
         }
     }
 
-    public static TheoryData<CkpMlKem> ParameterSets =>
-    [
+    public static TheoryData<CkpMlKem> ParameterSets => new()
+    {
         CkpMlKem.CKP_ML_KEM_512,
         CkpMlKem.CKP_ML_KEM_768,
         CkpMlKem.CKP_ML_KEM_1024,
-    ];
+    };
 
     // === Encapsulate / decapsulate round-trips ============================
 

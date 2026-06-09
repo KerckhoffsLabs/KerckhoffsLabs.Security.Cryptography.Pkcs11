@@ -147,8 +147,10 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     public void DeriveKey_EmptyLabelAndContext_MatchesBcl() => WithImportedKdf((_, kdf) =>
     {
         const int length = 32;
+        // Typed empty span disambiguates DeriveBytes' byte[] vs ReadOnlySpan<byte> overloads.
+        ReadOnlySpan<byte> empty = [];
         byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
-            KeyBytes, HashAlgorithmName.SHA256, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty, length);
+            KeyBytes, HashAlgorithmName.SHA256, empty, empty, length);
 
         byte[] actual = kdf.DeriveKey([], [], length);
 
@@ -188,7 +190,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     {
         // Zero length is a no-op, matching the BCL SP800108HmacCounterKdf (no token call).
         Assert.Empty(kdf.DeriveKey(Label, Context, 0));
-        kdf.DeriveKey(Label, Context, Span<byte>.Empty); // must not throw
+        kdf.DeriveKey(Label, Context, []); // must not throw
     });
 
     // === Argument and construction validation (run before the native call) ===============
