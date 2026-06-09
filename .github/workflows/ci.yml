@@ -265,10 +265,10 @@ jobs:
           pgrep -a pkcsslotd || echo "::warning::pkcsslotd not running"
           echo "=== /run/opencryptoki ==="; sudo ls -la /run/opencryptoki/ 2>/dev/null || true
           echo "=== /dev/shm ==="; ls -la /dev/shm/ 2>/dev/null || true
-          echo "=== ldd pkcsconf (opencryptoki) ==="; ldd /usr/local/sbin/pkcsconf | grep -i opencryptoki || true
-          # Trace C_Initialize to find why it fails (CKR_FUNCTION_FAILED gives no detail otherwise).
-          echo "=== pkcsconf -s (traced) ==="; sg pkcs11 -c "OPENCRYPTOKI_TRACE_LEVEL=5 /usr/local/sbin/pkcsconf -s" || true
-          echo "=== trace log ==="; sudo cat /var/log/opencryptoki/trace.* 2>/dev/null | tail -80 || true
+          echo "=== pkcsslotd proc state ==="; ps -o pid,stat,wchan:24,etime,cmd -C pkcsslotd || true
+          echo "=== daemon syslog/journal ==="; sudo journalctl --no-pager 2>/dev/null | grep -iE "slotmgr|pkcsslotd|opencryptoki" | tail -40 || true
+          sudo grep -iE "slotmgr|pkcsslotd|opencryptoki" /var/log/syslog 2>/dev/null | tail -40 || true
+          echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s" || true
           echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t" || true
 
           # Soft-token slot = the slot whose STDLL is the software token (libpkcs11_sw.so), read
