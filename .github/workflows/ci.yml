@@ -286,9 +286,12 @@ jobs:
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
 
       # ubuntu-latest also exercises the opencryptoki backend. Run under the pkcs11 group so the test
-      # host can read the token store; PKCS11_TEST_OPENCRYPTOKI_* and LD_LIBRARY_PATH (OpenSSL 3.5, for
-      # ML-DSA/ML-KEM) are inherited from the env set above (sg preserves the environment). The
-      # opencryptoki-gated tests run alongside the SoftHSM and mock suites in a single pass.
+      # host can read the token store. LD_LIBRARY_PATH must be re-set *inside* the sg command: sg is
+      # set-group-ID, so the loader runs it in secure-execution mode and strips LD_LIBRARY_PATH from
+      # the environment it passes on — without it, both libsofthsm2.so and the opencryptoki soft-token
+      # STDLL (each built against OpenSSL 3.5) resolve against the system OpenSSL 3.0 and fail to load.
+      # PKCS11_TEST_OPENCRYPTOKI_* survive (they are not security-sensitive). The opencryptoki-gated
+      # tests run alongside the SoftHSM and mock suites in a single pass.
       - name: Test (incl. opencryptoki)
         if: matrix.os == 'ubuntu-latest'
-        run: sg pkcs11 -c "dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
+        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
