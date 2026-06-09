@@ -61,7 +61,7 @@ mkdir -p "${DEST_DIR}"
 
 # Skip rebuild if both outputs are newer than the submodule HEAD commit.
 HEAD_TS="$(git -C "${SRC_DIR}" log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
-_ts() { [[ -f "$1" ]] && (stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0) || echo 0; }
+_ts() { local f="$1"; [[ -f "$f" ]] && (stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0) || echo 0; }
 LIB_TS="$(_ts "${DEST_LIB}")"
 UTIL_TS="$(_ts "${DEST_UTIL}")"
 if (( LIB_TS > HEAD_TS && UTIL_TS > HEAD_TS )); then
