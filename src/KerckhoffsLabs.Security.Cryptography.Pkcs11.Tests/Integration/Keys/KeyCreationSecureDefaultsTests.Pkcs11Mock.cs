@@ -31,29 +31,29 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
         switch (operation)
         {
             case "DeriveKey":
-            {
-                using var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
-                s.DeriveKey(mech, new ObjectHandle(1UL), template);
-                break;
-            }
+                {
+                    using var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
+                    s.DeriveKey(mech, new ObjectHandle(1UL), template);
+                    break;
+                }
             case "EncapsulateKey":
-            {
-                using var mech = new Mechanism(CKM.CKM_ML_KEM);
-                s.EncapsulateKey(mech, new ObjectHandle(1UL), template);
-                break;
-            }
+                {
+                    using var mech = new Mechanism(CKM.CKM_ML_KEM);
+                    s.EncapsulateKey(mech, new ObjectHandle(1UL), template);
+                    break;
+                }
             case "DecapsulateKey":
-            {
-                using var mech = new Mechanism(CKM.CKM_ML_KEM);
-                s.DecapsulateKey(mech, new ObjectHandle(1UL), new byte[16], template);
-                break;
-            }
+                {
+                    using var mech = new Mechanism(CKM.CKM_ML_KEM);
+                    s.DecapsulateKey(mech, new ObjectHandle(1UL), new byte[16], template);
+                    break;
+                }
             case "UnwrapKeyAuthenticated":
-            {
-                using var mech = new Mechanism(CKM.CKM_AES_GCM);
-                s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1UL), new byte[16], [], template);
-                break;
-            }
+                {
+                    using var mech = new Mechanism(CKM.CKM_AES_GCM);
+                    s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1UL), new byte[16], [], template);
+                    break;
+                }
             default:
                 throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unknown operation.");
         }
