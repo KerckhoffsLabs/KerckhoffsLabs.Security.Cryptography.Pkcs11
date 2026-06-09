@@ -250,7 +250,7 @@ internal sealed partial class Pkcs11Session : IDisposable
     /// <param name="sessionId">PKCS#11 handle of session</param>
     internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)
     {
-        Log.SessionTrace(_logger, (ulong)sessionId, "ctor");
+        Log.SessionTrace(_logger, sessionId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
 

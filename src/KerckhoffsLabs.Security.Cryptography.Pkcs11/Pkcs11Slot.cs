@@ -41,7 +41,7 @@ public sealed class Pkcs11Slot
     /// <param name="slotId">PKCS#11 handle of slot</param>
     internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId)
     {
-        Log.SlotTrace(_logger, (ulong)slotId, "ctor");
+        Log.SlotTrace(_logger, slotId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
 
