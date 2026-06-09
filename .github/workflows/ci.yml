@@ -12,7 +12,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     env:
-      # Lint only verifies formatting; skip the native vendor builds so this job
+      # Lint builds managed code only; skip the native vendor builds so this job
       # needs neither the submodules nor a C toolchain.
       SkipPkcs11MockBuild: true
       SkipSoftHsmV2Build: true
@@ -24,6 +24,12 @@ jobs:
           dotnet-version: '10.0.x'
 
       - run: dotnet restore src/KerckhoffsLabs.sln
+
+      # `dotnet format` loads source generators from the built analyzer assemblies, so the
+      # solution must be built first — otherwise the generated `CK_*_Windows` types are absent
+      # and format aborts with CS0246 before it can check formatting. The native vendor builds
+      # are skipped (env above), so this compiles managed code only.
+      - run: dotnet build src/KerckhoffsLabs.sln --no-restore
 
       - run: dotnet format src/KerckhoffsLabs.sln --verify-no-changes --no-restore
 
