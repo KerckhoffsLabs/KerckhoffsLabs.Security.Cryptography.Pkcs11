@@ -347,10 +347,7 @@ public enum CKK : uint
 public static class CKKExtensions
 {
     /// <summary>Converts <see cref="CKK"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKK value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKK value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKK"/>, validating that the value

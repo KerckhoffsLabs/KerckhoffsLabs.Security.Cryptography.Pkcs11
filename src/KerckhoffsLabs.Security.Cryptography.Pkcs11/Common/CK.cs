@@ -22,10 +22,7 @@ public static class CK
     /// </summary>
     /// <param name="value">Number to be checked</param>
     /// <returns>True if number has value of CK_UNAVAILABLE_INFORMATION constant false otherwise</returns>
-    public static bool IsCkInformationUnavailable(NativeCULong value)
-    {
-        return value.Equals(CK_UNAVAILABLE_INFORMATION);
-    }
+    public static bool IsCkInformationUnavailable(NativeCULong value) => value.Equals(CK_UNAVAILABLE_INFORMATION);
 
     /// <summary>
     /// Specifies no practical limit

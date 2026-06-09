@@ -27,10 +27,7 @@ public sealed class UnmanagedMemoryTests
     }
 
     [Fact]
-    public void Allocate_ZeroFills()
-    {
-        WithBuffer(8, p => Assert.Equal(new byte[8], UnmanagedMemory.Read(p, 8)));
-    }
+    public void Allocate_ZeroFills() => WithBuffer(8, p => Assert.Equal(new byte[8], UnmanagedMemory.Read(p, 8)));
 
     [Fact]
     public void Allocate_Zero_IsTrackedAndFreeable()

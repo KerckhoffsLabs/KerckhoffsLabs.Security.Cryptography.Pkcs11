@@ -30,13 +30,7 @@ public sealed class Pkcs11SessionHandleTests(MockBackendFixture f)
     }
 
     [Fact]
-    public void Constructor_RejectsNullLibrary()
-    {
-        Assert.Throws<ArgumentNullException>(() => new Pkcs11SessionHandle(null!, (NativeCULong)1));
-    }
+    public void Constructor_RejectsNullLibrary() => Assert.Throws<ArgumentNullException>(() => new Pkcs11SessionHandle(null!, (NativeCULong)1));
 
-    private LowLevelPkcs11Library GetLowLevelLibrary()
-    {
-        return new LowLevelPkcs11Library(_backend.LibraryPath);
-    }
+    private LowLevelPkcs11Library GetLowLevelLibrary() => new LowLevelPkcs11Library(_backend.LibraryPath);
 }

@@ -79,10 +79,7 @@ public enum CKO : uint
 public static class CKOExtensions
 {
     /// <summary>Converts <see cref="CKO"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKO value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKO value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKO"/>, validating that the value

@@ -813,10 +813,7 @@ public static class CKAExtensions
     /// </summary>
     /// <param name="value">CKA that should be converted</param>
     /// <returns>NativeCULong with value from CKA</returns>
-    public static NativeCULong ToCULong(this CKA value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKA value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKA"/>, validating that the value

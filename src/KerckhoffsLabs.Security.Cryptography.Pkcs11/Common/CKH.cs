@@ -34,10 +34,7 @@ public enum CKH : uint
 public static class CKHExtensions
 {
     /// <summary>Converts <see cref="CKH"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKH value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKH value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKH"/>, validating that the value

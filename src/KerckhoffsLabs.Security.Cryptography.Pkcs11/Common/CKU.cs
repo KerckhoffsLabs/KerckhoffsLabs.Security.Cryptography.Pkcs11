@@ -29,10 +29,7 @@ public enum CKU : uint
 public static class CKUExtensions
 {
     /// <summary>Converts <see cref="CKU"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKU value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKU value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKU"/>, validating that the value

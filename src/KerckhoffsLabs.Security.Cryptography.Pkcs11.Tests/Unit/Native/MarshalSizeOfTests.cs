@@ -26,10 +26,7 @@ public sealed class MarshalSizeOfTests
     public static bool IsWindows64 => OperatingSystem.IsWindows() && Environment.Is64BitProcess;
 
     [Fact]
-    public void CK_VERSION_SizeIs2()
-    {
-        Assert.Equal(2, Marshal.SizeOf<CK_VERSION>());
-    }
+    public void CK_VERSION_SizeIs2() => Assert.Equal(2, Marshal.SizeOf<CK_VERSION>());
 
     [Fact]
     public void CK_INFO_Windows_SiblingIsGenerated()
@@ -144,10 +141,7 @@ public sealed class MarshalSizeOfTests
     [InlineData(typeof(CK_X9_42_MQV_DERIVE_PARAMS), 80)]
     [InlineData(typeof(CK_XEDDSA_PARAMS), 8)]
     // END PROBED InlineData
-    public void UnifiedStructSize_OnUnix(Type t, int expectedSize)
-    {
-        Assert.Equal(expectedSize, Marshal.SizeOf(t));
-    }
+    public void UnifiedStructSize_OnUnix(Type t, int expectedSize) => Assert.Equal(expectedSize, Marshal.SizeOf(t));
 
     /// <summary>
     /// Pins the Pack=1 layout emitted by the source generator for Windows-bound siblings.

@@ -39,10 +39,7 @@ public enum CKG : uint
 public static class CKGExtensions
 {
     /// <summary>Converts <see cref="CKG"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKG value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKG value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKG"/>, validating that the value

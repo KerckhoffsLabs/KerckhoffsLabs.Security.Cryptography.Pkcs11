@@ -38,10 +38,7 @@ public static class CKCExtensions
     /// </summary>
     /// <param name="value">CKC that should be converted</param>
     /// <returns>NativeCULong with value from CKC</returns>
-    public static NativeCULong ToCULong(this CKC value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKC value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKC"/>, validating that the value

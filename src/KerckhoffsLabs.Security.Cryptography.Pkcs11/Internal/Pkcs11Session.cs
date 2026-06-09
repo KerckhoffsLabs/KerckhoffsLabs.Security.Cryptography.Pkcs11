@@ -42,10 +42,7 @@ internal sealed partial class Pkcs11Session : IDisposable
     /// if the session is not yet open or has been closed. Read-only; assignments go through
     /// <see cref="_sessionHandle"/>.
     /// </summary>
-    private NativeCULong _sessionId
-    {
-        get => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
-    }
+    private NativeCULong _sessionId => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
 
     /// <summary>
     /// Lock object guarding concurrent native-call access to this <see cref="Pkcs11Session"/>.

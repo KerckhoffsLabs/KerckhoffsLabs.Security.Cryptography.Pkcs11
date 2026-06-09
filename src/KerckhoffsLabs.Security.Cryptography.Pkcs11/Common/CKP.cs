@@ -54,10 +54,7 @@ public enum CKP : uint
 public static class CKPExtensions
 {
     /// <summary>Converts <see cref="CKP"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKP value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKP value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKP"/>, validating that the value

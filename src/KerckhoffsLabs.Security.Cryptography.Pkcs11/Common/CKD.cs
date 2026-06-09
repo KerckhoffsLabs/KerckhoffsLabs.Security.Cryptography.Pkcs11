@@ -59,10 +59,7 @@ public enum CKD : uint
 public static class CKDExtensions
 {
     /// <summary>Converts <see cref="CKD"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKD value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKD value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKD"/>, validating that the value

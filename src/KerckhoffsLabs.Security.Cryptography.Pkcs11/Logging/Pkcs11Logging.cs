@@ -37,10 +37,7 @@ public static class Pkcs11Logging
     /// resets to <see cref="NullLoggerFactory.Instance"/>.
     /// </summary>
     /// <param name="loggerFactory">Logger factory to install, or <c>null</c> to disable logging.</param>
-    public static void SetLoggerFactory(ILoggerFactory? loggerFactory)
-    {
-        _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
-    }
+    public static void SetLoggerFactory(ILoggerFactory? loggerFactory) => _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
 
     /// <summary>
     /// Creates an <see cref="ILogger"/> categorized for <typeparamref name="T"/>.

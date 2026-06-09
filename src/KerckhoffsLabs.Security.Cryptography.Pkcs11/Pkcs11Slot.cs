@@ -32,13 +32,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// PKCS#11 handle of slot
     /// </summary>
-    public ulong SlotId
-    {
-        get
-        {
-            return (ulong)_slotId;
-        }
-    }
+    public ulong SlotId => (ulong)_slotId;
 
     /// <summary>
     /// Initializes new instance of Pkcs11Slot class

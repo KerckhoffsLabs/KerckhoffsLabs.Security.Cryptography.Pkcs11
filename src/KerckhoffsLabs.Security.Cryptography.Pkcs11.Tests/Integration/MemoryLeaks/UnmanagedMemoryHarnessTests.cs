@@ -14,10 +14,7 @@ public sealed class UnmanagedMemoryHarnessTests : IDisposable
         UnmanagedMemory.DebugModeEnabled = true;
     }
 
-    public void Dispose()
-    {
-        UnmanagedMemory.DebugModeEnabled = _wasDebug;
-    }
+    public void Dispose() => UnmanagedMemory.DebugModeEnabled = _wasDebug;
 
     [Fact]
     public void OutstandingAllocationCount_IsAccessible()

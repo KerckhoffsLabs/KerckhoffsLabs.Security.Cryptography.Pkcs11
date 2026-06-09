@@ -71,11 +71,9 @@ public sealed class Pkcs11ExceptionTests
             new Pkcs11UnclassifiedException(CKR.CKR_GENERAL_ERROR, "C_Finalize", null));
 
     [Fact]
-    public void ThrowIfError_CkrOk_DoesNotThrow()
-    {
+    public void ThrowIfError_CkrOk_DoesNotThrow() =>
         // Should return without throwing.
         Assert.Null(Record.Exception(() => Pkcs11Exception.ThrowIfError(CKR.CKR_OK, "C_Initialize")));
-    }
 
     [Fact]
     public void ThrowIfError_AuthenticationCkr_ThrowsTypedSubclass()

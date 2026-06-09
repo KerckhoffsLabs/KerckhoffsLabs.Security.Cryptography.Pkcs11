@@ -24,10 +24,7 @@ public enum CKN : uint
 public static class CKNExtensions
 {
     /// <summary>Converts <see cref="CKN"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKN value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKN value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKN"/>, validating that the value

@@ -52,14 +52,7 @@ internal static class UnmanagedMemory
     /// </summary>
     public static bool DebugModeEnabled
     {
-        get
-        {
-            return _debugModeEnabled;
-        }
-        set
-        {
-            _debugModeEnabled = value;
-        }
+        get => _debugModeEnabled; set => _debugModeEnabled = value;
     }
 
     /// <summary>

@@ -17,10 +17,7 @@ internal static class WorkspaceKeyTestCases
         Assert.Equal(label, key.Label);
     }
 
-    public static void Assert_OpenKey_NotFound_Throws(Pkcs11Workspace workspace)
-    {
-        Assert.Throws<Pkcs11ObjectException>(() => workspace.OpenKey("does-not-exist-zzzz"));
-    }
+    public static void Assert_OpenKey_NotFound_Throws(Pkcs11Workspace workspace) => Assert.Throws<Pkcs11ObjectException>(() => workspace.OpenKey("does-not-exist-zzzz"));
 
     public static void Assert_FindKeys_NoMatch_ReturnsEmpty(Pkcs11Workspace workspace)
     {

@@ -54,10 +54,7 @@ public enum CksValidationFlagsType : uint
 public static class CKSExtensions
 {
     /// <summary>Converts <see cref="CKS"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKS value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKS value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKS"/>, validating that the value

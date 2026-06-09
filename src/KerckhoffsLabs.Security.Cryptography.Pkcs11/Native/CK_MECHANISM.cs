@@ -30,20 +30,14 @@ internal partial struct CK_MECHANISM
     /// </summary>
     /// <param name="mechanism">Mechanism type</param>
     /// <returns>Mechanism of given type with no parameter</returns>
-    internal static CK_MECHANISM CreateMechanism(CKM mechanism)
-    {
-        return CreateMechanism(mechanism.ToCULong());
-    }
+    internal static CK_MECHANISM CreateMechanism(CKM mechanism) => CreateMechanism(mechanism.ToCULong());
 
     /// <summary>
     /// Creates mechanism of given type with no parameter
     /// </summary>
     /// <param name="mechanism">Mechanism type</param>
     /// <returns>Mechanism of given type with no parameter</returns>
-    internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism)
-    {
-        return CreateMechanism(mechanism, []);
-    }
+    internal static CK_MECHANISM CreateMechanism(NativeCULong mechanism) => CreateMechanism(mechanism, []);
 
     /// <summary>
     /// Creates mechanism of given type with byte array parameter

@@ -9,23 +9,15 @@ public sealed class Pkcs11MarshalTests
     public static bool IsUnix => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
 
     [Fact]
-    public void IsWindows_ReflectsOperatingSystem()
-    {
-        Assert.Equal(OperatingSystem.IsWindows(), Pkcs11Marshal.IsWindows);
-    }
+    public void IsWindows_ReflectsOperatingSystem() => Assert.Equal(OperatingSystem.IsWindows(), Pkcs11Marshal.IsWindows);
 
     [Fact]
-    public void SizeOf_ReturnsNativeSize_ForCK_VERSION()
-    {
+    public void SizeOf_ReturnsNativeSize_ForCK_VERSION() =>
         // CK_VERSION is not [PackedForPkcs11] -> always the natural Marshal size, both platforms.
         Assert.Equal(Marshal.SizeOf<CK_VERSION>(), Pkcs11Marshal.SizeOf<CK_VERSION>());
-    }
 
     [ConditionalFact(nameof(IsUnix))]
-    public void SizeOf_ForCK_INFO_MatchesMarshalSizeOf_OnUnix()
-    {
-        Assert.Equal(Marshal.SizeOf<CK_INFO>(), Pkcs11Marshal.SizeOf<CK_INFO>());
-    }
+    public void SizeOf_ForCK_INFO_MatchesMarshalSizeOf_OnUnix() => Assert.Equal(Marshal.SizeOf<CK_INFO>(), Pkcs11Marshal.SizeOf<CK_INFO>());
 
     [Fact]
     public void RoundTrip_CK_VERSION_ThroughWriteRead()
@@ -93,10 +85,7 @@ public sealed class Pkcs11MarshalTests
     }
 
     [ConditionalFact(nameof(IsUnix))]
-    public void SizeOf_ForCK_MECHANISM_INFO_MatchesMarshalSizeOf_OnUnix()
-    {
-        Assert.Equal(Marshal.SizeOf<CK_MECHANISM_INFO>(), Pkcs11Marshal.SizeOf<CK_MECHANISM_INFO>());
-    }
+    public void SizeOf_ForCK_MECHANISM_INFO_MatchesMarshalSizeOf_OnUnix() => Assert.Equal(Marshal.SizeOf<CK_MECHANISM_INFO>(), Pkcs11Marshal.SizeOf<CK_MECHANISM_INFO>());
 
     [Fact]
     public void WriteStructure_OverwritesPreviousContent()

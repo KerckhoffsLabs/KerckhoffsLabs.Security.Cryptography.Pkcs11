@@ -539,10 +539,7 @@ public enum CKR : uint
 public static class CKRExtensions
 {
     /// <summary>Converts <see cref="CKR"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKR value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKR value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKR"/>, validating that the value

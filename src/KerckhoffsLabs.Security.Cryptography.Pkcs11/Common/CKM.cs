@@ -2381,10 +2381,7 @@ public static class CKMExtensions
     /// </summary>
     /// <param name="value">CKM that should be converted</param>
     /// <returns>NativeCULong with value from CKM</returns>
-    public static NativeCULong ToCULong(this CKM value)
-    {
-        return (NativeCULong)(ulong)value;
-    }
+    public static NativeCULong ToCULong(this CKM value) => (NativeCULong)(ulong)value;
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKM"/>, validating that the value

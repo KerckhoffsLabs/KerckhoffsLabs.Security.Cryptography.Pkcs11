@@ -15,13 +15,7 @@ public sealed class AttributeValueException : Exception
     /// <summary>
     /// Attribute whose value could not be read or converted
     /// </summary>
-    public CKA Attribute
-    {
-        get
-        {
-            return _attribute;
-        }
-    }
+    public CKA Attribute => _attribute;
 
     /// <summary>
     /// Initializes new instance of AttributeValueException class

@@ -10,8 +10,5 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 public sealed class RSAPkcs11ArgumentTests
 {
     [Fact]
-    public void Ctor_NullKey_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() => new RSAPkcs11(key: null!));
-    }
+    public void Ctor_NullKey_Throws() => Assert.Throws<ArgumentNullException>(() => new RSAPkcs11(key: null!));
 }
