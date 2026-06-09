@@ -256,9 +256,13 @@ jobs:
           sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
           sudo chmod -R g+rwx /var/lib/opencryptoki || true
 
-          # No systemd unit for a from-source build; pkcsslotd daemonizes itself.
-          sudo /usr/local/sbin/pkcsslotd 2>/dev/null || true
-          sleep 3
+          # Start pkcsslotd fully detached (new session + redirected stdio) so this step never
+          # blocks on it and the daemon survives into the later test step — regardless of whether
+          # it double-forks on this runner.
+          sudo setsid sh -c '/usr/local/sbin/pkcsslotd >/tmp/pkcsslotd.log 2>&1 </dev/null' &
+          sleep 5
+          echo "=== pkcsslotd log ==="; cat /tmp/pkcsslotd.log 2>/dev/null || true
+          pgrep -a pkcsslotd || echo "::warning::pkcsslotd not running"
           echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s" || true
           echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t" || true
 
