@@ -6,7 +6,7 @@ _Generated 2026-06-08 from a multi-specialist deep review (cryptography ×2, PKC
 
 - Total items: 62
 - Critical: 1 | High: 13 | Medium: 33 | Low: 15
-- Resolved so far (2026-06-09): BL-001, BL-044, BL-045, BL-046, BL-047 — see each item's **Status** line.
+- Resolved so far: BL-001, BL-002, BL-044, BL-045, BL-046, BL-047 — see each item's **Status** line.
 - Headline risks:
   - **Secure-by-default is not uniform.** The `UnwrapKey` path enforces `CKA_SENSITIVE=true` / `CKA_EXTRACTABLE=false` via `BuildSecureUnwrapDefaults`, but the sibling key-creating paths (`DeriveKey`, `EncapsulateKey`, `DecapsulateKey`, `UnwrapKeyAuthenticated`) forward the caller template verbatim — a consumer can silently land an extractable ML-KEM shared secret. This is the one defect that touches key material directly (BL-001).
   - **Backward-compat & v3.x surface gaps that ship permanently.** `ToCKR()`/`ToCKM()` throw on every vendor-defined code (BL-005), `CKF_END_OF_MESSAGE` is undefined so the streaming AEAD API is unusable (BL-006), and the v3.2 async-session surface is unreachable.
@@ -36,6 +36,7 @@ _Generated 2026-06-08 from a multi-specialist deep review (cryptography ×2, PKC
 ## High
 
 ### [BL-002] `Pkcs11PublicKeyView` is `public static` but documented as an internal helper
+- **Status:** ✅ Resolved 2026-06-10 — `Pkcs11PublicKeyView` and `TryParseEcPublicKey` are now `internal` (only consumers are `ECDsaPkcs11`/`ECDiffieHellmanPkcs11`; the unit test reaches it via `InternalsVisibleTo`). The "Internal helper" doc is now accurate.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** S

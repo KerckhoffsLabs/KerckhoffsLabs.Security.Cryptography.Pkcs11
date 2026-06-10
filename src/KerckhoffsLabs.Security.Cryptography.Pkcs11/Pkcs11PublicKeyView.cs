@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// token. Used by <see cref="Pkcs11Key"/> to support verify-only / encrypt-only paths
 /// that need only public material.
 /// </summary>
-public static class Pkcs11PublicKeyView
+internal static class Pkcs11PublicKeyView
 {
     /// <summary>
     /// Reads CKA_MODULUS + CKA_PUBLIC_EXPONENT from the private-key object identified by
@@ -52,7 +52,7 @@ public static class Pkcs11PublicKeyView
     /// </summary>
     /// <param name="ecPoint">Raw <c>CKA_EC_POINT</c> bytes (DER OCTET STRING containing the uncompressed point).</param>
     /// <param name="ecParams">Raw <c>CKA_EC_PARAMS</c> bytes (DER-encoded named-curve OID).</param>
-    public static ECParameters? TryParseEcPublicKey(byte[] ecPoint, byte[] ecParams)
+    internal static ECParameters? TryParseEcPublicKey(byte[] ecPoint, byte[] ecParams)
     {
         ArgumentNullException.ThrowIfNull(ecPoint);
         ArgumentNullException.ThrowIfNull(ecParams);
