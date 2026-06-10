@@ -71,6 +71,25 @@ public sealed class Pkcs11MechanismMapTests
         Assert.Equal(expectedCkm, mech.Type);
     }
 
+    [Theory]
+    [InlineData("SHA1", (ulong)CKM.CKM_DSA_SHA1)]
+    [InlineData("SHA224", (ulong)CKM.CKM_DSA_SHA224)]
+    [InlineData("SHA256", (ulong)CKM.CKM_DSA_SHA256)]
+    [InlineData("SHA384", (ulong)CKM.CKM_DSA_SHA384)]
+    [InlineData("SHA512", (ulong)CKM.CKM_DSA_SHA512)]
+    public void DsaSign_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
+    {
+        using var mech = Pkcs11MechanismMap.DsaSign(new HashAlgorithmName(hashName));
+        Assert.Equal(expectedCkm, mech.Type);
+    }
+
+    [Fact]
+    public void DsaSign_UnsupportedHash_Throws()
+    {
+        Assert.Throws<NotSupportedException>(() =>
+            Pkcs11MechanismMap.DsaSign(HashAlgorithmName.MD5));
+    }
+
     [Fact]
     public void RsaPkcs1Sign_UnsupportedHash_Throws()
     {
