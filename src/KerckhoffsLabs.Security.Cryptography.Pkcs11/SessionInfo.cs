@@ -4,9 +4,11 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Information about a session.
+/// Information about a session. Internal until a reachable producer is exposed on the high-level
+/// surface (e.g. <c>Pkcs11Workspace</c>); the only producer today is the internal
+/// <c>Pkcs11Session.GetSessionInfo()</c>.
 /// </summary>
-public sealed record SessionInfo
+internal sealed record SessionInfo
 {
     /// <summary>PKCS#11 handle of session.</summary>
     public ulong SessionId { get; }
