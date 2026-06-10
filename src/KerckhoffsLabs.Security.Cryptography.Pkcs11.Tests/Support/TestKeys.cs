@@ -310,4 +310,97 @@ internal static class TestKeys
         session.GenerateKeyPair(mechanism, pubTemplate, privTemplate, out var pub, out var priv);
         return (pub, priv);
     }
+
+    // === Fixed-key imports for known-answer tests =========================================
+
+    /// <summary>Imports an RSA public key from its big-endian modulus and exponent (verify/encrypt).</summary>
+    public static ObjectHandle ImportRsaPublicKey(Pkcs11Session session, byte[] modulus, byte[] exponent)
+    {
+        using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var enc = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var n = new ObjectAttribute(CKA.CKA_MODULUS, modulus);
+        using var e = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, exponent);
+        return session.CreateObject([c, t, tok, verify, enc, n, e]);
+    }
+
+    /// <summary>Imports an RSA private key from its CRT components (big-endian), usable for decrypt.</summary>
+    public static ObjectHandle ImportRsaPrivateKey(
+        Pkcs11Session session, byte[] modulus, byte[] publicExponent, byte[] privateExponent,
+        byte[] prime1, byte[] prime2, byte[] exponent1, byte[] exponent2, byte[] coefficient)
+    {
+        using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
+        using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var dec = new ObjectAttribute(CKA.CKA_DECRYPT, true);
+        using var n = new ObjectAttribute(CKA.CKA_MODULUS, modulus);
+        using var e = new ObjectAttribute(CKA.CKA_PUBLIC_EXPONENT, publicExponent);
+        using var d = new ObjectAttribute(CKA.CKA_PRIVATE_EXPONENT, privateExponent);
+        using var p = new ObjectAttribute(CKA.CKA_PRIME_1, prime1);
+        using var q = new ObjectAttribute(CKA.CKA_PRIME_2, prime2);
+        using var dp = new ObjectAttribute(CKA.CKA_EXPONENT_1, exponent1);
+        using var dq = new ObjectAttribute(CKA.CKA_EXPONENT_2, exponent2);
+        using var iq = new ObjectAttribute(CKA.CKA_COEFFICIENT, coefficient);
+        return session.CreateObject([c, t, tok, dec, n, e, d, p, q, dp, dq, iq]);
+    }
+
+    /// <summary>
+    /// Encodes a NIST P-curve public point as the PKCS#11 CKA_EC_POINT / ECDH peer-point form:
+    /// the uncompressed point (0x04 ‖ X ‖ Y) wrapped in a DER OCTET STRING.
+    /// </summary>
+    public static byte[] DerEcPoint(byte[] x, byte[] y)
+    {
+        byte[] raw = [0x04, .. x, .. y];
+        return [0x04, (byte)raw.Length, .. raw];
+    }
+
+    /// <summary>Imports a NIST P-256 public key from its affine coordinates (verify/derive peer).</summary>
+    public static ObjectHandle ImportEcP256PublicKey(Pkcs11Session session, byte[] x, byte[] y)
+    {
+        using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
+        using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var verify = new ObjectAttribute(CKA.CKA_VERIFY, true);
+        using var prm = new ObjectAttribute(CKA.CKA_EC_PARAMS, EcP256Oid);
+        using var pt = new ObjectAttribute(CKA.CKA_EC_POINT, DerEcPoint(x, y));
+        return session.CreateObject([c, t, tok, verify, prm, pt]);
+    }
+
+    /// <summary>Imports a NIST P-256 private key from its scalar (big-endian), usable for ECDH derive.</summary>
+    public static ObjectHandle ImportEcP256PrivateKey(Pkcs11Session session, byte[] scalar)
+    {
+        using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
+        using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
+        using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var derive = new ObjectAttribute(CKA.CKA_DERIVE, true);
+        using var prm = new ObjectAttribute(CKA.CKA_EC_PARAMS, EcP256Oid);
+        using var v = new ObjectAttribute(CKA.CKA_VALUE, scalar);
+        return session.CreateObject([c, t, tok, derive, prm, v]);
+    }
+
+    /// <summary>Imports an AES key wrapping key (CKA_WRAP/CKA_UNWRAP) from raw bytes.</summary>
+    public static ObjectHandle ImportAesWrappingKey(Pkcs11Session session, byte[] rawKey)
+    {
+        using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var wrap = new ObjectAttribute(CKA.CKA_WRAP, true);
+        using var unwrap = new ObjectAttribute(CKA.CKA_UNWRAP, true);
+        using var v = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
+        return session.CreateObject([c, t, tok, wrap, unwrap, v]);
+    }
+
+    /// <summary>Imports an extractable AES key (a wrap target) from raw bytes.</summary>
+    public static ObjectHandle ImportExtractableAesKey(Pkcs11Session session, byte[] rawKey)
+    {
+        using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+        using var tok = new ObjectAttribute(CKA.CKA_TOKEN, false);
+        using var extract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
+        using var enc = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
+        using var v = new ObjectAttribute(CKA.CKA_VALUE, rawKey);
+        return session.CreateObject([c, t, tok, extract, enc, v]);
+    }
 }
