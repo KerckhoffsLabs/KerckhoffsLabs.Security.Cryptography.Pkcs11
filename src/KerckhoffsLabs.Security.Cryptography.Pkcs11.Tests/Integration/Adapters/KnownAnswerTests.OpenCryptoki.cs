@@ -51,10 +51,10 @@ public sealed class KnownAnswerTests_OpenCryptoki(OpenCryptokiBackendFixture bac
     [ConditionalFact(nameof(Available))]
     public void EcdhP256_Kat() { Require(CKM.CKM_ECDH1_DERIVE); KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend); }
 
-    // Verify-only Ed25519 KAT: opencryptoki advertises CKM_EDDSA but its software token rejects
-    // *importing* a raw private seed via C_CreateObject (CKR_FUNCTION_FAILED), so the full sign+verify
-    // KAT can't run here. Verification needs only the public key, which it does accept — so this still
-    // pins the EdDSA verify path and signature/point marshalling on the second backend.
-    [ConditionalFact(nameof(Available))]
-    public void Ed25519_Verify_Kat() { Require(CKM.CKM_EDDSA); KnownAnswerTestCases.Assert_Ed25519_Verify_Kat(_backend); }
+    // No Ed25519 KAT here. A fixed-vector KAT requires importing a known key, but opencryptoki's
+    // software token rejects importing EdDSA keys via C_CreateObject entirely — both private (raw seed)
+    // and public (point) imports return CKR_FUNCTION_FAILED; it only generates EdDSA keys on-token.
+    // A generated-key round-trip would be self-consistent (the weakness KATs exist to avoid) and .NET
+    // has no built-in Ed25519 to cross-check against, so it adds nothing. Ed25519 stays KAT-covered on
+    // SoftHSM (KnownAnswerTests_SoftHsm.Ed25519_Kat).
 }
