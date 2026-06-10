@@ -99,6 +99,35 @@ internal static class KnownAnswerTestCases
         finally { session.Logout(); session.CloseSession(); }
     }
 
+    // Ed25519 verify-only KAT, RFC 8032 test 3 — needs only the public key, so it runs on tokens that
+    // implement CKM_EDDSA but cannot import a raw private seed via C_CreateObject (e.g. opencryptoki).
+    internal static void Assert_Ed25519_Verify_Kat(IPkcs11Backend backend)
+    {
+        byte[] point = H("fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025");
+        byte[] message = H("af82");
+        byte[] expectedSig = H(
+            "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac" +
+            "18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a");
+
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            ObjectHandle pub = TestKeys.CreateEd25519PublicKey(session, point);
+            try
+            {
+                session.VerifyEd25519(pub, message, expectedSig, out bool ok);
+                Assert.True(ok, "RFC 8032 Ed25519 signature should verify against the imported public key.");
+
+                byte[] tampered = (byte[])expectedSig.Clone();
+                tampered[0] ^= 0xFF;
+                session.VerifyEd25519(pub, message, tampered, out bool bad);
+                Assert.False(bad, "A tampered Ed25519 signature must not verify.");
+            }
+            finally { session.DestroyObject(pub); }
+        }
+        finally { session.Logout(); session.CloseSession(); }
+    }
+
     // ChaCha20-Poly1305, RFC 8439 section 2.8.2. SoftHSM does not implement this mechanism, so the
     // test is gated off there; the vector is kept ready (BCL-confirmed) for backends that support it.
     internal static void Assert_ChaCha20Poly1305_Kat(IPkcs11Backend backend)
