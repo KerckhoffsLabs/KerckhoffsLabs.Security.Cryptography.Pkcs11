@@ -71,6 +71,19 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     public IDisposable AllowInsecureScope() => _session.AllowInsecureScope();
 
+    /// <summary>
+    /// Returns a snapshot of the underlying session's state (slot, session state, flags, and the
+    /// device-specific error code), as reported by <c>C_GetSessionInfo</c>.
+    /// </summary>
+    /// <returns>A <see cref="SessionInfo"/> describing the current session.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown if the underlying <c>C_GetSessionInfo</c> call fails.</exception>
+    public SessionInfo GetSessionInfo()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _session.GetSessionInfo();
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {

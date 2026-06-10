@@ -47,7 +47,7 @@ _Generated 2026-06-08 from a multi-specialist deep review (cryptography ×2, PKC
 - **Raised by:** .NET Engineer A, Cryptographer B
 
 ### [BL-003] `SessionInfo` is a public type no public member can produce
-- **Status:** ✅ Resolved 2026-06-10 — `SessionInfo` is now `internal` (its ctor and only producer `Pkcs11Session.GetSessionInfo()` were already internal; the unit test reaches it via `InternalsVisibleTo`). Re-expose deliberately on `Pkcs11Workspace` if/when the feature is wanted.
+- **Status:** ✅ Resolved 2026-06-10 — `SessionInfo` is now reachable: added the public `Pkcs11Workspace.GetSessionInfo()` (disposed-guarded, delegates to the session). The type stays a public record with an internal constructor (library-produced, not consumer-constructed). Covered by `WorkspaceSessionInfoTests`.
 - **Area:** .NET API Design
 - **Severity:** High
 - **Effort:** S
