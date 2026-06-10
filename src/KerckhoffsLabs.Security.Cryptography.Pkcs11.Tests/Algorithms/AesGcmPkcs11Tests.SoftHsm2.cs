@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -228,6 +229,15 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
     // === Authenticity negatives ===========================================
 
+    // SoftHSM surfaces an AES-GCM tag-verification failure as CKR_ENCRYPTED_DATA_INVALID, matching the
+    // managed sibling. Assert that exact failure rather than ThrowsAny<Exception> so a crash
+    // (NullReferenceException / AccessViolationException) can't masquerade as "authentication rejected".
+    private static void AssertAuthFailure(Action decrypt)
+    {
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(decrypt);
+        Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, ex.ReturnValue);
+    }
+
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void Decrypt_TamperedTag_Throws() => WithGcm(gcm =>
     {
@@ -240,7 +250,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         tag[0] ^= 0xFF;
 
         byte[] dest = new byte[plaintext.Length];
-        Assert.ThrowsAny<Exception>(() => gcm.Decrypt(nonce, ciphertext, tag, dest));
+        AssertAuthFailure(() => gcm.Decrypt(nonce, ciphertext, tag, dest));
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
@@ -255,7 +265,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         ciphertext[0] ^= 0xFF;
 
         byte[] dest = new byte[plaintext.Length];
-        Assert.ThrowsAny<Exception>(() => gcm.Decrypt(nonce, ciphertext, tag, dest));
+        AssertAuthFailure(() => gcm.Decrypt(nonce, ciphertext, tag, dest));
     });
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
@@ -269,7 +279,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         gcm.Encrypt(nonce, plaintext, ciphertext, tag, Encoding.UTF8.GetBytes("aad-A"));
 
         byte[] dest = new byte[plaintext.Length];
-        Assert.ThrowsAny<Exception>(() =>
+        AssertAuthFailure(() =>
             gcm.Decrypt(nonce, ciphertext, tag, dest, Encoding.UTF8.GetBytes("aad-B")));
     });
 
@@ -286,7 +296,7 @@ public sealed class AesGcmPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         wrongNonce[0] ^= 0xFF;
 
         byte[] dest = new byte[plaintext.Length];
-        Assert.ThrowsAny<Exception>(() => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
+        AssertAuthFailure(() => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
     });
 
     // Known-answer test: McGrew & Viega AES-GCM test case 16 (256-bit key, 96-bit IV, with AAD).
