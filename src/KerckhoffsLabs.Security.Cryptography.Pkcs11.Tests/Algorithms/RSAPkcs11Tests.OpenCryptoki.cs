@@ -93,4 +93,31 @@ public sealed class RSAPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backe
         ct[ct.Length / 2] ^= 0xFF;
         Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
     });
+
+    // A ciphertext produced under a different key pair must not decrypt under this key: the OAEP
+    // padding check rejects it instead of yielding plaintext (mirrors the SoftHSM wrong-key test).
+    [ConditionalFact(nameof(Available))]
+    public void Decrypt_OaepCiphertextFromDifferentKey_Throws() => WithRsa((workspace, rsa) =>
+    {
+        Require(CKM.CKM_RSA_PKCS_OAEP);
+        string otherLabel = $"octk-rsa-other-{Guid.NewGuid():N}";
+        byte[] otherId = Encoding.ASCII.GetBytes(otherLabel);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .Label(otherLabel).Id(otherId).Encrypt().ModulusBits(2048)
+            .PublicExponent([0x01, 0x00, 0x01]).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Label(otherLabel).Id(otherId).Decrypt().Build();
+        var otherKey = workspace.GenerateKey(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
+        try
+        {
+            using var otherRsa = new RSAPkcs11(otherKey);
+            byte[] ct = otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1);
+            Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+        }
+        finally
+        {
+            try { DestroyByLabel(workspace, otherLabel); } catch { /* best-effort */ }
+            otherKey.Dispose();
+        }
+    });
 }
