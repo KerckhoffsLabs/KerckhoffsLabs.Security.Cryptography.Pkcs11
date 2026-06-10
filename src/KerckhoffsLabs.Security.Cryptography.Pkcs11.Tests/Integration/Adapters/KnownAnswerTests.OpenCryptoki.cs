@@ -51,6 +51,8 @@ public sealed class KnownAnswerTests_OpenCryptoki(OpenCryptokiBackendFixture bac
     [ConditionalFact(nameof(Available))]
     public void EcdhP256_Kat() { Require(CKM.CKM_ECDH1_DERIVE); KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
-    public void Ed25519_Kat() { Require(CKM.CKM_EDDSA); KnownAnswerTestCases.Assert_Ed25519_Kat(_backend); }
+    // No Ed25519 KAT here: opencryptoki advertises CKM_EDDSA but its software token rejects *importing*
+    // a raw Ed25519 private key (seed) via C_CreateObject (CKR_FUNCTION_FAILED) — it only generates EdDSA
+    // keys on-token. A fixed-vector KAT requires a known imported key, so it can't run here; the Ed25519
+    // KAT stays on SoftHSM (KnownAnswerTests_SoftHsm.Ed25519_Kat).
 }
