@@ -377,15 +377,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetOperationState");
 
-        NativeCULong operationStateLen = (NativeCULong)0;
-        CKR rv = _pkcs11Library.C_GetOperationState(_sessionId, null, ref operationStateLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetOperationState");
-
-        byte[] operationState = new byte[(int)operationStateLen];
-        rv = _pkcs11Library.C_GetOperationState(_sessionId, operationState, ref operationStateLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetOperationState");
-
-        return operationState;
+        return CallWithLengthProbe(
+            (byte[]? buffer, ref NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, ref len),
+            "C_GetOperationState");
     }
 
     /// <summary>
@@ -822,16 +816,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
-        CK_ATTRIBUTE[]? template = null;
-        NativeCULong templateLength = (NativeCULong)0;
-
-        if (attributes != null)
-        {
-            templateLength = (NativeCULong)(attributes.Count);
-            template = new CK_ATTRIBUTE[(int)templateLength];
-            for (int i = 0; i < (int)(templateLength); i++)
-                template[i] = attributes[i].CkAttribute;
-        }
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, templateLength, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, "C_CreateObject");
@@ -855,16 +840,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
-        CK_ATTRIBUTE[]? template = null;
-        NativeCULong templateLength = (NativeCULong)0;
-
-        if (attributes != null)
-        {
-            templateLength = (NativeCULong)(attributes.Count);
-            template = new CK_ATTRIBUTE[(int)templateLength];
-            for (int i = 0; i < (int)(templateLength); i++)
-                template[i] = attributes[i].CkAttribute;
-        }
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, templateLength, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, "C_CopyObject");
@@ -1081,16 +1057,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsInit");
 
-        CK_ATTRIBUTE[]? template = null;
-        NativeCULong templateLength = (NativeCULong)0;
-
-        if (attributes != null)
-        {
-            templateLength = (NativeCULong)(attributes.Count);
-            template = new CK_ATTRIBUTE[(int)templateLength];
-            for (int i = 0; i < (int)(templateLength); i++)
-                template[i] = attributes[i].CkAttribute;
-        }
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
         Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsInit");
@@ -1149,16 +1116,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         List<ObjectHandle> foundObjects = [];
 
-        CK_ATTRIBUTE[]? template = null;
-        NativeCULong templateLength = (NativeCULong)0;
-
-        if (attributes != null)
-        {
-            templateLength = (NativeCULong)(attributes.Count);
-            template = new CK_ATTRIBUTE[(int)templateLength];
-            for (int i = 0; i < (int)(templateLength); i++)
-                template[i] = attributes[i].CkAttribute;
-        }
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
         Pkcs11Exception.ThrowIfError(rv, "C_FindObjectsInit");
@@ -1243,16 +1201,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[]? template = null;
-        NativeCULong templateLength = (NativeCULong)0;
-
-        if (attributes != null)
-        {
-            templateLength = (NativeCULong)(attributes.Count);
-            template = new CK_ATTRIBUTE[(int)templateLength];
-            for (int i = 0; i < (int)(templateLength); i++)
-                template[i] = attributes[i].CkAttribute;
-        }
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         NativeCULong keyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
@@ -1282,27 +1231,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        CK_ATTRIBUTE[]? publicKeyTemplate = null;
-        NativeCULong publicKeyTemplateLength = (NativeCULong)0;
-
-        if (publicKeyAttributes != null)
-        {
-            publicKeyTemplateLength = (NativeCULong)(publicKeyAttributes.Count);
-            publicKeyTemplate = new CK_ATTRIBUTE[(int)publicKeyTemplateLength];
-            for (int i = 0; i < (int)(publicKeyTemplateLength); i++)
-                publicKeyTemplate[i] = publicKeyAttributes[i].CkAttribute;
-        }
-
-        CK_ATTRIBUTE[]? privateKeyTemplate = null;
-        NativeCULong privateKeyTemplateLength = (NativeCULong)0;
-
-        if (privateKeyAttributes != null)
-        {
-            privateKeyTemplateLength = (NativeCULong)(privateKeyAttributes.Count);
-            privateKeyTemplate = new CK_ATTRIBUTE[(int)privateKeyTemplateLength];
-            for (int i = 0; i < (int)(privateKeyTemplateLength); i++)
-                privateKeyTemplate[i] = privateKeyAttributes[i].CkAttribute;
-        }
+        CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
+        CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
 
         NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
         NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
@@ -1334,18 +1264,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
-        NativeCULong wrappedKeyLen = (NativeCULong)0;
-        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), null, ref wrappedKeyLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_WrapKey");
-
-        byte[] wrappedKey = new byte[(int)wrappedKeyLen];
-        rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), wrappedKey, ref wrappedKeyLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_WrapKey");
-
-        if (wrappedKey.Length != (int)(wrappedKeyLen))
-            Array.Resize(ref wrappedKey, (int)(wrappedKeyLen));
-
-        return wrappedKey;
+        return CallWithLengthProbe(
+            (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, ref len),
+            "C_WrapKey");
     }
 
     /// <summary>
@@ -1401,19 +1322,7 @@ internal sealed class Pkcs11Session : IDisposable
         List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
         try
         {
-            int attrCount = attributes?.Count ?? 0;
-            int total = attrCount + secureDefaults.Count;
-            CK_ATTRIBUTE[]? template = total > 0 ? new CK_ATTRIBUTE[total] : null;
-            NativeCULong templateLen = (NativeCULong)0;
-            if (template != null)
-            {
-                int idx = 0;
-                for (int i = 0; i < attrCount; i++)
-                    template[idx++] = attributes![i].CkAttribute;
-                foreach (ObjectAttribute d in secureDefaults)
-                    template[idx++] = d.CkAttribute;
-                templateLen = (NativeCULong)total;
-            }
+            CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
             NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
             CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
@@ -1472,6 +1381,89 @@ internal sealed class Pkcs11Session : IDisposable
         if (!hasExtractable)
             added.Add(new ObjectAttribute(CKA.CKA_EXTRACTABLE, false));
         return added;
+    }
+
+    // ---- Marshalling helpers (shared by the wrapper methods) ----
+
+    /// <summary>
+    /// Marshals a managed attribute list into a <c>CK_ATTRIBUTE[]</c> template, returning <c>null</c>
+    /// (and length 0) when <paramref name="attributes"/> is <c>null</c> — the PKCS#11 convention of a
+    /// null template meaning "no attributes".
+    /// </summary>
+    private static CK_ATTRIBUTE[]? BuildTemplate(List<ObjectAttribute>? attributes, out NativeCULong length)
+    {
+        if (attributes is null)
+        {
+            length = (NativeCULong)0;
+            return null;
+        }
+
+        length = (NativeCULong)attributes.Count;
+        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
+        for (int i = 0; i < attributes.Count; i++)
+            template[i] = attributes[i].CkAttribute;
+        return template;
+    }
+
+    /// <summary>
+    /// Builds a key-creation template from the caller's <paramref name="attributes"/> followed by the
+    /// appended <paramref name="secureDefaults"/>. Returns <c>null</c> (length 0) only when both are
+    /// empty, matching the "null template = no attributes" convention.
+    /// </summary>
+    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, List<ObjectAttribute> secureDefaults, out NativeCULong length)
+    {
+        int attrCount = attributes?.Count ?? 0;
+        int total = attrCount + secureDefaults.Count;
+        if (total == 0)
+        {
+            length = (NativeCULong)0;
+            return null;
+        }
+
+        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[total];
+        int idx = 0;
+        for (int i = 0; i < attrCount; i++)
+            template[idx++] = attributes![i].CkAttribute;
+        foreach (ObjectAttribute d in secureDefaults)
+            template[idx++] = d.CkAttribute;
+        length = (NativeCULong)total;
+        return template;
+    }
+
+    /// <summary>
+    /// Interprets a verify return value: <c>true</c> on <see cref="CKR.CKR_OK"/>, <c>false</c> on
+    /// <see cref="CKR.CKR_SIGNATURE_INVALID"/>, and throws <see cref="Pkcs11Exception"/> for any other
+    /// code (tagged with <paramref name="operation"/>).
+    /// </summary>
+    private static bool IsVerified(CKR rv, string operation)
+    {
+        if (rv == CKR.CKR_OK) return true;
+        if (rv == CKR.CKR_SIGNATURE_INVALID) return false;
+        throw Pkcs11Exception.Create(rv, operation);
+    }
+
+    /// <summary>One step of a Cryptoki two-call length probe: invoke with a null buffer to learn the
+    /// size, then again with the allocated buffer.</summary>
+    private delegate CKR LengthProbedCall(byte[]? buffer, ref NativeCULong length);
+
+    /// <summary>
+    /// Runs the standard PKCS#11 two-call pattern — probe the output length with a null buffer,
+    /// allocate, fill, then trim to the reported length — throwing on any non-OK return from either
+    /// call (both tagged with <paramref name="operation"/>).
+    /// </summary>
+    private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation)
+    {
+        NativeCULong length = (NativeCULong)0;
+        CKR rv = call(null, ref length);
+        Pkcs11Exception.ThrowIfError(rv, operation);
+
+        byte[] buffer = new byte[(int)length];
+        rv = call(buffer, ref length);
+        Pkcs11Exception.ThrowIfError(rv, operation);
+
+        if (buffer.Length != (int)length)
+            Array.Resize(ref buffer, (int)length);
+        return buffer;
     }
 
     /// <summary>
@@ -2007,18 +1999,9 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, "C_SignInit");
 
-        NativeCULong signatureLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_Sign(_sessionId, buffer, (NativeCULong)buffer.Length, null, ref signatureLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_Sign");
-
-        byte[] signature = new byte[(int)signatureLen];
-        rv = _pkcs11Library.C_Sign(_sessionId, buffer, (NativeCULong)buffer.Length, signature, ref signatureLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_Sign");
-
-        if (signature.Length != (int)signatureLen)
-            Array.Resize(ref signature, (int)signatureLen);
-
-        return signature;
+        return CallWithLengthProbe(
+            (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, buffer, (NativeCULong)buffer.Length, buf, ref len),
+            "C_Sign");
     }
 
     /// <summary>
@@ -2070,12 +2053,7 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, "C_VerifyInit");
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, (NativeCULong)(data.Length), signature, (NativeCULong)(signature.Length));
-        if (rv == CKR.CKR_OK)
-            isValid = true;
-        else if (rv == CKR.CKR_SIGNATURE_INVALID)
-            isValid = false;
-        else
-            throw Pkcs11Exception.Create(rv, "C_Verify");
+        isValid = IsVerified(rv, "C_Verify");
     }
 
     /// <summary>
@@ -2154,12 +2132,7 @@ internal sealed class Pkcs11Session : IDisposable
             // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
             // the call failed with any other CKR — the verify operation is consumed.
             finalized = true;
-            if (rv == CKR.CKR_OK)
-                isValid = true;
-            else if (rv == CKR.CKR_SIGNATURE_INVALID)
-                isValid = false;
-            else
-                throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
+            isValid = IsVerified(rv, "C_VerifyFinal");
         }
         finally
         {
@@ -2201,12 +2174,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         byte[] data = new byte[(int)dataLen];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), data, ref dataLen);
-        if (rv == CKR.CKR_OK)
-            isValid = true;
-        else if (rv == CKR.CKR_SIGNATURE_INVALID)
-            isValid = false;
-        else
-            throw Pkcs11Exception.Create(rv, "C_VerifyRecover");
+        isValid = IsVerified(rv, "C_VerifyRecover");
 
         if (data.Length != (int)(dataLen))
             Array.Resize(ref data, (int)(dataLen));
@@ -2369,12 +2337,7 @@ internal sealed class Pkcs11Session : IDisposable
             outputStream.Write(lastPart, 0, (int)(lastPartLen));
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
-        if (rv == CKR.CKR_OK)
-            isValid = true;
-        else if (rv == CKR.CKR_SIGNATURE_INVALID)
-            isValid = false;
-        else
-            throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
+        isValid = IsVerified(rv, "C_VerifyFinal");
     }
 
     // Native function names for error context, used across the digest paths below (S1192).
@@ -2463,18 +2426,9 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
-        NativeCULong digestLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), null, ref digestLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_Digest");
-
-        byte[] digest = new byte[(int)digestLen];
-        rv = _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), digest, ref digestLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_Digest");
-
-        if (digest.Length != (int)(digestLen))
-            Array.Resize(ref digest, (int)(digestLen));
-
-        return digest;
+        return CallWithLengthProbe(
+            (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), buf, ref len),
+            "C_Digest");
     }
 
     /// <summary>
@@ -2942,19 +2896,7 @@ internal sealed class Pkcs11Session : IDisposable
         List<ObjectAttribute> secureDefaults = enforceSecureDefaults ? BuildSecureKeyDefaults(attributes) : [];
         try
         {
-            int attrCount = attributes?.Count ?? 0;
-            int total = attrCount + secureDefaults.Count;
-            CK_ATTRIBUTE[]? template = total > 0 ? new CK_ATTRIBUTE[total] : null;
-            NativeCULong templateLen = (NativeCULong)0;
-            if (template != null)
-            {
-                int idx = 0;
-                for (int i = 0; i < attrCount; i++)
-                    template[idx++] = attributes![i].CkAttribute;
-                foreach (ObjectAttribute d in secureDefaults)
-                    template[idx++] = d.CkAttribute;
-                templateLen = (NativeCULong)total;
-            }
+            CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
             NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
             CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
@@ -3310,9 +3252,7 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, "C_VerifySignatureInit");
 
         rv = _pkcs11Library.C_VerifySignature(_sessionId, dataBuf, (NativeCULong)dataBuf.Length);
-        if (rv == CKR.CKR_OK) return true;
-        if (rv == CKR.CKR_SIGNATURE_INVALID) return false;
-        throw Pkcs11Exception.Create(rv, "C_VerifySignature");
+        return IsVerified(rv, "C_VerifySignature");
     }
 
     /// <summary>
@@ -3356,9 +3296,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
-        if (rv == CKR.CKR_OK) return true;
-        if (rv == CKR.CKR_SIGNATURE_INVALID) return false;
-        throw Pkcs11Exception.Create(rv, "C_VerifySignatureFinal");
+        return IsVerified(rv, "C_VerifySignatureFinal");
     }
 
     // === Validation flags ==================================================
