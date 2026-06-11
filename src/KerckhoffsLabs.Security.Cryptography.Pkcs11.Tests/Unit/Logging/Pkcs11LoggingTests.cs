@@ -61,6 +61,24 @@ public sealed class Pkcs11LoggingTests
     }
 
     [Fact]
+    public void CreateLogger_ByType_NullFullName_FallsBackToName()
+    {
+        // A generic type parameter has a null Type.FullName, so the category must fall back to
+        // Type.Name — the only branch of CreateLogger(Type) the other tests don't reach.
+        Type genericParam = typeof(List<>).GetGenericArguments()[0];
+        Assert.Null(genericParam.FullName); // precondition that selects the fallback
+
+        var factory = new CapturingLoggerFactory(new CapturingLogger());
+        Pkcs11Logging.SetLoggerFactory(factory);
+        try
+        {
+            Pkcs11Logging.CreateLogger(genericParam);
+            Assert.Equal(genericParam.Name, factory.LastCategory);
+        }
+        finally { Pkcs11Logging.SetLoggerFactory(null); }
+    }
+
+    [Fact]
     public void CreateLoggerGeneric_DispatchesToInstalledFactory()
     {
         var captured = new CapturingLogger();
