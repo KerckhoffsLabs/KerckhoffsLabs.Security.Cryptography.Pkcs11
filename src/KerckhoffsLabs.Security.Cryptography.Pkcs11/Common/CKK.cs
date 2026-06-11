@@ -321,6 +321,16 @@ public enum CKK : uint
     CKK_HSS = 0x00000046,
 
     /// <summary>
+    /// XMSS stateful hash-based signature key per RFC 8391 (PKCS#11 v3.2)
+    /// </summary>
+    CKK_XMSS = 0x00000047,
+
+    /// <summary>
+    /// XMSS^MT (multi-tree XMSS) stateful hash-based signature key per RFC 8391 (PKCS#11 v3.2)
+    /// </summary>
+    CKK_XMSSMT = 0x00000048,
+
+    /// <summary>
     /// ML-KEM (FIPS 203) key type — Kyber-derived (PKCS#11 v3.2)
     /// </summary>
     CKK_ML_KEM = 0x00000049,

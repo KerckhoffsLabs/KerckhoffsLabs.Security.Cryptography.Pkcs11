@@ -82,5 +82,9 @@ public sealed record TokenFlags
     public bool SoPinToBeChanged
         => (Flags & CKF.CKF_SO_PIN_TO_BE_CHANGED.Value) == CKF.CKF_SO_PIN_TO_BE_CHANGED.Value;
 
+    /// <summary>True if the token's RNG must be seeded (or re-seeded) via C_SeedRandom before use (PKCS#11 v3.0).</summary>
+    public bool SeedRandomRequired
+        => (Flags & CKF.CKF_SEED_RANDOM_REQUIRED.Value) == CKF.CKF_SEED_RANDOM_REQUIRED.Value;
+
     internal TokenFlags(NativeCULong flags) => Flags = (ulong)flags;
 }

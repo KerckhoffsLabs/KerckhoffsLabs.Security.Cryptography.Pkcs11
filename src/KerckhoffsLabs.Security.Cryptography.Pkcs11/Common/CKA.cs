@@ -262,6 +262,9 @@ public enum CKA : uint
     /// </summary>
     CKA_SUBPRIME_BITS = 0x00000134,
 
+    /// <summary>Header alias for <see cref="CKA_SUBPRIME_BITS"/> (PKCS#11 v3.2 spelling).</summary>
+    CKA_SUB_PRIME_BITS = CKA_SUBPRIME_BITS,
+
     /// <summary>
     /// Length in bits of private value x [uint]
     /// </summary>

@@ -303,4 +303,49 @@ public static class CKF
     /// Mechanism-info flag: mechanism can be used with C_DecapsulateKey (PKCS#11 v3.2).
     /// </summary>
     public static readonly NativeCULong CKF_DECAPSULATE = new(0x20000000);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism supports the message-based encrypt API (C_EncryptMessage) (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_MESSAGE_ENCRYPT = new(0x00000002);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism supports the message-based decrypt API (C_DecryptMessage) (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_MESSAGE_DECRYPT = new(0x00000004);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism supports the message-based sign API (C_SignMessage) (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_MESSAGE_SIGN = new(0x00000008);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism supports the message-based verify API (C_VerifyMessage) (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_MESSAGE_VERIFY = new(0x00000010);
+
+    /// <summary>
+    /// Mechanism-info flag: mechanism supports processing multiple messages in a single operation (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_MULTI_MESSAGE = new(0x00000020);
+
+    /// <summary>
+    /// Operation flag (for C_SessionCancel): cancels an active object-search operation (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_FIND_OBJECTS = new(0x00000040);
+
+    /// <summary>
+    /// Mechanism-info flag: EC mechanism accepts/returns the curve as an OID (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_EC_OID = new(0x00800000);
+
+    /// <summary>
+    /// Mechanism-info flag: EC mechanism accepts/returns the curve as a printable name (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_EC_CURVENAME = new(0x04000000);
+
+    /// <summary>
+    /// Token-info flag: the token's RNG must be seeded via C_SeedRandom before use (PKCS#11 v3.0).
+    /// </summary>
+    public static readonly NativeCULong CKF_SEED_RANDOM_REQUIRED = new(0x02000000);
 }

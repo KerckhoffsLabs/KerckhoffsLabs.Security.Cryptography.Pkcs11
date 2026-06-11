@@ -90,5 +90,33 @@ public sealed record MechanismFlags
     public bool EcCompress
         => (Flags & CKF.CKF_EC_COMPRESS.Value) == CKF.CKF_EC_COMPRESS.Value;
 
+    /// <summary>True if the mechanism accepts/returns the EC curve as an OID (PKCS#11 v3.0).</summary>
+    public bool EcOid
+        => (Flags & CKF.CKF_EC_OID.Value) == CKF.CKF_EC_OID.Value;
+
+    /// <summary>True if the mechanism accepts/returns the EC curve as a printable name (PKCS#11 v3.0).</summary>
+    public bool EcCurveName
+        => (Flags & CKF.CKF_EC_CURVENAME.Value) == CKF.CKF_EC_CURVENAME.Value;
+
+    /// <summary>True if the mechanism supports the message-based encrypt API (C_EncryptMessage) (PKCS#11 v3.0).</summary>
+    public bool MessageEncrypt
+        => (Flags & CKF.CKF_MESSAGE_ENCRYPT.Value) == CKF.CKF_MESSAGE_ENCRYPT.Value;
+
+    /// <summary>True if the mechanism supports the message-based decrypt API (C_DecryptMessage) (PKCS#11 v3.0).</summary>
+    public bool MessageDecrypt
+        => (Flags & CKF.CKF_MESSAGE_DECRYPT.Value) == CKF.CKF_MESSAGE_DECRYPT.Value;
+
+    /// <summary>True if the mechanism supports the message-based sign API (C_SignMessage) (PKCS#11 v3.0).</summary>
+    public bool MessageSign
+        => (Flags & CKF.CKF_MESSAGE_SIGN.Value) == CKF.CKF_MESSAGE_SIGN.Value;
+
+    /// <summary>True if the mechanism supports the message-based verify API (C_VerifyMessage) (PKCS#11 v3.0).</summary>
+    public bool MessageVerify
+        => (Flags & CKF.CKF_MESSAGE_VERIFY.Value) == CKF.CKF_MESSAGE_VERIFY.Value;
+
+    /// <summary>True if the mechanism supports processing multiple messages in a single operation (PKCS#11 v3.0).</summary>
+    public bool MultiMessage
+        => (Flags & CKF.CKF_MULTI_MESSAGE.Value) == CKF.CKF_MULTI_MESSAGE.Value;
+
     internal MechanismFlags(NativeCULong flags) => Flags = (ulong)flags;
 }

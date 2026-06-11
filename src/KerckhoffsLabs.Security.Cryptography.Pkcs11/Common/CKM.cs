@@ -1853,6 +1853,24 @@ public enum CKM : uint
     /// </summary>
     CKM_SHAKE_256_KEY_DERIVATION = 0x0000039C,
 
+    /// <summary>Header alias for <see cref="CKM_SHA3_224_KEY_DERIVATION"/> (PKCS#11 v3.2 spelling).</summary>
+    CKM_SHA3_224_KEY_DERIVE = CKM_SHA3_224_KEY_DERIVATION,
+
+    /// <summary>Header alias for <see cref="CKM_SHA3_256_KEY_DERIVATION"/> (PKCS#11 v3.2 spelling).</summary>
+    CKM_SHA3_256_KEY_DERIVE = CKM_SHA3_256_KEY_DERIVATION,
+
+    /// <summary>Header alias for <see cref="CKM_SHA3_384_KEY_DERIVATION"/> (PKCS#11 v3.2 spelling).</summary>
+    CKM_SHA3_384_KEY_DERIVE = CKM_SHA3_384_KEY_DERIVATION,
+
+    /// <summary>Header alias for <see cref="CKM_SHA3_512_KEY_DERIVATION"/> (PKCS#11 v3.2 spelling).</summary>
+    CKM_SHA3_512_KEY_DERIVE = CKM_SHA3_512_KEY_DERIVATION,
+
+    /// <summary>Header alias for <see cref="CKM_SHAKE_128_KEY_DERIVATION"/> (PKCS#11 v3.2 spelling).</summary>
+    CKM_SHAKE_128_KEY_DERIVE = CKM_SHAKE_128_KEY_DERIVATION,
+
+    /// <summary>Header alias for <see cref="CKM_SHAKE_256_KEY_DERIVATION"/> (PKCS#11 v3.2 spelling).</summary>
+    CKM_SHAKE_256_KEY_DERIVE = CKM_SHAKE_256_KEY_DERIVATION,
+
     /// <summary>
     /// NIST SP 800-108 counter-mode KDF (PKCS#11 v3.0)
     /// </summary>
