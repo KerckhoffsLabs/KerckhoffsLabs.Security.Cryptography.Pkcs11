@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
-/// Verifies that <see cref="CkmSp800108CounterKdfParams"/> marshals the exact NIST SP800-108
+/// Verifies that <see cref="CkmSp800108KdfParams.CounterModeHmac"/> marshals the exact NIST SP800-108
 /// counter-mode fixed-input sequence the BCL <c>SP800108HmacCounterKdf</c> uses:
 /// <c>[i]₃₂ ‖ Label ‖ 0x00 ‖ Context ‖ [L]₃₂</c>. This exercises the unmanaged marshalling without a
 /// token (the bundled SoftHSM does not implement the mechanism), so it is the primary correctness
@@ -26,7 +26,7 @@ public sealed class Sp800108CounterKdfParamsTests
         byte[] label = Encoding.UTF8.GetBytes("lbl");
         byte[] context = Encoding.UTF8.GetBytes("ctx-xyz");
 
-        using var p = new CkmSp800108CounterKdfParams(CKM.CKM_SHA256_HMAC, label, context);
+        using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, label, context);
         var kdf = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)kdf.PrfType);
@@ -75,7 +75,7 @@ public sealed class Sp800108CounterKdfParamsTests
     [Fact]
     public void EmptyLabelAndContext_StillEmitsFiveParamsWithSeparator()
     {
-        using var p = new CkmSp800108CounterKdfParams(CKM.CKM_SHA384_HMAC, label: default, context: default);
+        using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA384_HMAC, label: default, context: default);
         var kdf = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
         Assert.Equal(5UL, (ulong)kdf.NumberOfDataParams);
 

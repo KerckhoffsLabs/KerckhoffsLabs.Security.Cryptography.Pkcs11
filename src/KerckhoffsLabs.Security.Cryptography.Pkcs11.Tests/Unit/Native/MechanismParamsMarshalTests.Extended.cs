@@ -225,7 +225,9 @@ public sealed class MechanismKdfParamsTests
     [Fact]
     public void Sp800108Kdf_MarshalsPrfAndDataParamCount()
     {
-        using var p = new CkmSp800108KdfParams(CKM.CKM_SHA256_HMAC, dataParams: IntPtr.Zero, numberOfDataParams: 5);
+        using var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray([1, 2, 3]).ByteArray([0x00]).ByteArray([4, 5])
+            .DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
         var s = ParamMarshal.RoundTrip<CK_SP800_108_KDF_PARAMS>(p.ToMarshalableStructure());
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
@@ -236,8 +238,9 @@ public sealed class MechanismKdfParamsTests
     public void Sp800108FeedbackKdf_MarshalsIvAndPrf()
     {
         byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8];
-        using var p = new CkmSp800108FeedbackKdfParams(CKM.CKM_SHA256_HMAC, dataParams: IntPtr.Zero,
-            numberOfDataParams: 3, iv);
+        using var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray([9]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
+            .WithIV(iv).Build();
         var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.ToMarshalableStructure());
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
@@ -249,7 +252,8 @@ public sealed class MechanismKdfParamsTests
     [Fact]
     public void Sp800108FeedbackKdf_EmptyIv_NullPointer()
     {
-        using var p = new CkmSp800108FeedbackKdfParams(CKM.CKM_SHA256_HMAC, IntPtr.Zero, 3, default);
+        using var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
+            .IterationCounter().ByteArray([9]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
         var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.ToMarshalableStructure());
 
         Assert.Equal(0UL, (ulong)s.IVLen);

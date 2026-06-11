@@ -90,7 +90,7 @@ public sealed class MechanismParamsLeakTests : IDisposable
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < 10; i++)
         {
-            using var p = new CkmSp800108CounterKdfParams(
+            using var p = CkmSp800108KdfParams.CounterModeHmac(
                 prfType: CKM.CKM_SHA256_HMAC,
                 label: new byte[9],
                 context: new byte[11]);
@@ -105,7 +105,7 @@ public sealed class MechanismParamsLeakTests : IDisposable
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < 10; i++)
         {
-            using var p = new CkmSp800108CounterKdfParams(
+            using var p = CkmSp800108KdfParams.CounterModeHmac(
                 prfType: CKM.CKM_SHA256_HMAC,
                 label: default,
                 context: default);
