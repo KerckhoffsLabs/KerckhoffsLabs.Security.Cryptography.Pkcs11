@@ -208,6 +208,19 @@ public sealed class Pkcs11SessionTests
     [InlineData(CKM.CKM_AES_CBC)]
     [InlineData(CKM.CKM_AES_CBC_PAD)]
     [InlineData(CKM.CKM_AES_CFB128)]
+    [InlineData(CKM.CKM_DES3_ECB_ENCRYPT_DATA)]
+    [InlineData(CKM.CKM_RC4)]
+    [InlineData(CKM.CKM_RC2_CBC)]
+    [InlineData(CKM.CKM_SEED_CBC)]
+    [InlineData(CKM.CKM_MD2)]
+    [InlineData(CKM.CKM_RIPEMD160)]
+    [InlineData(CKM.CKM_SHA_1_HMAC)]
+    [InlineData(CKM.CKM_ECDSA_SHA1)]
+    [InlineData(CKM.CKM_RSA_X_509)]
+    [InlineData(CKM.CKM_CAST128_CBC)]
+    [InlineData(CKM.CKM_RC5_CBC)]
+    [InlineData(CKM.CKM_BLOWFISH_CBC)]
+    [InlineData(CKM.CKM_SKIPJACK_WRAP)]
     public void InsecureMechanism_IsRejected(CKM insecure)
     {
         var s = NewSession();
