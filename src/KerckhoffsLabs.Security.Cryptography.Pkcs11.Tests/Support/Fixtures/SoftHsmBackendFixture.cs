@@ -41,6 +41,16 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     // which is evaluated before any fixture instance exists. They encode the
     // capability gaps of the SoftHSM build we ship in vendor/softhsmv2 — when
     // we move to a newer SoftHSM or a real HSM, flip the relevant flag.
+    //
+    // Real-token coverage gap (tracked for BL-011): AES-CCM, ChaCha20-Poly1305, SP800-108 counter KDF,
+    // and SLH-DSA are NOT implemented by either CI real backend — SoftHSM (these flags) nor opencryptoki
+    // (see [[project_opencryptoki_soft_token_matrix]]: its soft token also lacks all four). Their
+    // parameter marshalling is therefore exercised in CI only by the in-process ManagedSoftToken fake
+    // (the *.Managed.cs tests), which implements each over the BCL primitive. To keep that path honest
+    // the managed KATs pin a published vector where one is compact (AES-CCM: RFC 3610 #1;
+    // ChaCha20-Poly1305: RFC 8439 §2.8.2) and otherwise cross-check against the BCL computed *outside*
+    // the marshalling path (SP800-108: CAVP vectors are variable-format ACVP JSON; SLH-DSA: FIPS 205
+    // signatures are ~17 KB+). Lighting these up on a real token requires a backend that implements them.
 
     /// <summary>True if the token supports <see cref="CKM.CKM_CHACHA20_POLY1305"/>.
     /// SoftHSM 2.7 omits the entire ChaCha20 family.</summary>

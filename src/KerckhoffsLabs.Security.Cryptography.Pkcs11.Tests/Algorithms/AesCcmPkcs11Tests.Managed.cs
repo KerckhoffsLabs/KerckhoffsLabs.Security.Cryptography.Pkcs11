@@ -176,17 +176,20 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    // Known-answer test: expected bytes pinned from the BCL AesCcm primitive for a fixed
-    // AES-256 key / 96-bit nonce / AAD (NIST SP 800-38C semantics).
+    // Known-answer test: RFC 3610 Packet Vector #1 — a published AES-128-CCM vector (13-byte nonce,
+    // 8-byte tag), not a value re-derived from the BCL. Driving it through the adapter -> managed-token
+    // marshalling path and matching the published ciphertext/tag byte-for-byte catches a parameter
+    // mis-encoding even if it were shared by the adapter and the fake. (Independently confirmed against
+    // the BCL AesCcm primitive, which reproduces the same bytes.)
     [ConditionalFact(nameof(AesCcmSupported))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector()
     {
-        byte[] key = H("404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f");
-        byte[] nonce = H("101112131415161718191a1b");
-        byte[] aad = H("000102030405060708090a0b0c0d0e0f10111213");
-        byte[] pt = H("202122232425262728292a2b2c2d2e2f3031323334353637");
-        byte[] expectedCt = H("04f883aeb3bd0730eaf50bb6de4fa2212034e4e41b0e75e5");
-        byte[] expectedTag = H("9bba3f3a107f3239bd63902923f80371");
+        byte[] key = H("c0c1c2c3c4c5c6c7c8c9cacbcccdcecf");
+        byte[] nonce = H("00000003020100a0a1a2a3a4a5");
+        byte[] aad = H("0001020304050607");
+        byte[] pt = H("08090a0b0c0d0e0f101112131415161718191a1b1c1d1e");
+        byte[] expectedCt = H("588c979a61c663d2f066d0c2c0f989806d5f6b61dac384");
+        byte[] expectedTag = H("17e8d12cfdf926e0");
 
         WithImportedCcm(key, ccm =>
         {

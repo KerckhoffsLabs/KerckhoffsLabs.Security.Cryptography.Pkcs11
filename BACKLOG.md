@@ -6,7 +6,7 @@ _Generated 2026-06-08 from a multi-specialist deep review (cryptography ×2, PKC
 
 - Total items: 62
 - Critical: 1 | High: 13 | Medium: 33 | Low: 15
-- Resolved so far: BL-001, BL-002, BL-003, BL-044, BL-045, BL-046, BL-047 — see each item's **Status** line.
+- Resolved so far: BL-001, BL-002, BL-003, BL-011, BL-044, BL-045, BL-046, BL-047 — see each item's **Status** line.
 - Headline risks:
   - **Secure-by-default is not uniform.** The `UnwrapKey` path enforces `CKA_SENSITIVE=true` / `CKA_EXTRACTABLE=false` via `BuildSecureUnwrapDefaults`, but the sibling key-creating paths (`DeriveKey`, `EncapsulateKey`, `DecapsulateKey`, `UnwrapKeyAuthenticated`) forward the caller template verbatim — a consumer can silently land an extractable ML-KEM shared secret. This is the one defect that touches key material directly (BL-001).
   - **Backward-compat & v3.x surface gaps that ship permanently.** `ToCKR()`/`ToCKM()` throw on every vendor-defined code (BL-005), `CKF_END_OF_MESSAGE` is undefined so the streaming AEAD API is unusable (BL-006), and the v3.2 async-session surface is unreachable.
@@ -133,6 +133,7 @@ _Generated 2026-06-08 from a multi-specialist deep review (cryptography ×2, PKC
 - **Spec / References:** PKCS#11 v2.40 §2.2; v3.0 §3.4.
 
 ### [BL-011] Several shipped mechanisms have no real-token test execution
+- **Status:** ✅ Resolved 2026-06-10 — AES-CCM, ChaCha20-Poly1305, SP800-108 counter KDF and SLH-DSA are implemented in `ManagedSoftToken` over the BCL primitive, so their parameter-marshalling path runs in CI via the `*.Managed.cs` tests. KATs now pin a published vector where one is compact (AES-CCM: RFC 3610 #1 — was BCL-derived; ChaCha20-Poly1305: RFC 8439 §2.8.2) and otherwise cross-check the BCL computed outside the marshalling path (SP800-108: CAVP vectors are variable-format ACVP JSON; SLH-DSA: FIPS 205 signatures are ~17 KB+). The real-token gap (no CI backend — neither SoftHSM nor opencryptoki — implements these four) is documented in `SoftHsmBackendFixture`.
 - **Area:** QA
 - **Severity:** High
 - **Effort:** L
