@@ -649,6 +649,27 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     }
 
     /// <summary>
+    /// Obtains a single interface descriptor by name (PKCS#11 v3.0 §5.4.5). The returned struct is
+    /// read with the platform-correct layout, so no separate Windows path is needed.
+    /// </summary>
+    /// <param name="interfaceName">NUL-terminated UTF-8 interface name, or <c>null</c> for the default.</param>
+    /// <param name="flags">Interface flags constraining the request (typically 0).</param>
+    /// <param name="iface">Receives the token-owned interface descriptor on success.</param>
+    /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
+    public CKR C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (!_delegates.HasC_GetInterface)
+        {
+            iface = default;
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+        }
+
+        return _delegates.C_GetInterface(interfaceName, flags, out iface).ToCKR();
+    }
+
+    /// <summary>
     /// Begins an AEAD encrypt-message sequence (PKCS#11 v3.0 §5.9.4). Pair with C_EncryptMessage or C_EncryptMessageBegin/Next + C_MessageEncryptFinal.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -272,6 +273,33 @@ public sealed class Pkcs11Library : IDisposable
         }
 
         return list;
+    }
+
+    /// <summary>
+    /// Obtains a single interface descriptor by name (PKCS#11 v3.0 <c>C_GetInterface</c>) — a direct
+    /// lookup, versus enumerating every interface with <see cref="GetInterfaces"/>.
+    /// </summary>
+    /// <param name="interfaceName">The interface name to request (e.g. <c>"PKCS 11"</c>), or <c>null</c> for the module's default interface.</param>
+    /// <returns>The matching interface descriptor.</returns>
+    /// <exception cref="Exceptions.Pkcs11Exception">
+    /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules (which have no interface
+    /// concept), or with the token's error code when the named interface is not available.
+    /// </exception>
+    public InterfaceInfo GetInterface(string? interfaceName = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        Log.LibraryTrace(_logger, _libraryPath, "GetInterface");
+
+        // pInterfaceName is a NUL-terminated C string; null requests the module's default interface.
+        byte[]? nameBytes = interfaceName is null ? null : Encoding.UTF8.GetBytes(interfaceName + '\0');
+        CKR rv = LowLevel.C_GetInterface(nameBytes, new NativeCULong(0), out CK_INTERFACE iface);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetInterface");
+
+        string name = iface.InterfaceName != IntPtr.Zero
+            ? Marshal.PtrToStringUTF8(iface.InterfaceName) ?? string.Empty
+            : string.Empty;
+        return new InterfaceInfo(name, iface.Flags);
     }
 
     /// <summary>

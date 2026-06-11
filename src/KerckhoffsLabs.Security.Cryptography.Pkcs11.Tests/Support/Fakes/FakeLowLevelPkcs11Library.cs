@@ -43,6 +43,7 @@ internal class FakeLowLevelPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_LoginUser(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen) => throw new NotSupportedException("C_LoginUser");
     public virtual CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => throw new NotSupportedException("C_SessionCancel");
     public virtual CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count) => throw new NotSupportedException("C_GetInterfaceList");
+    public virtual CKR C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface) => throw new NotSupportedException("C_GetInterface");
     public virtual CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => throw new NotSupportedException("C_MessageEncryptInit");
     public virtual CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen) => throw new NotSupportedException("C_EncryptMessage");
     public virtual CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen) => throw new NotSupportedException("C_EncryptMessageBegin");

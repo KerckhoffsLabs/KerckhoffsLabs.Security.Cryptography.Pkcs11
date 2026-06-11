@@ -762,6 +762,34 @@ internal partial class Delegates
             return _fp.C_GetInterfaceList_Windows(list, c);
     }
 
+    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_GetInterface</c> (PKCS#11 v3.0+).</summary>
+    internal unsafe bool HasC_GetInterface => _fp.C_GetInterface is not null;
+
+    /// <summary>
+    /// Wrapper for <c>C_GetInterface</c> (PKCS#11 v3.0). Requests the interface named
+    /// <paramref name="interfaceName"/> (a NUL-terminated UTF-8 string, or <c>null</c> for the module's
+    /// default interface) and reads back the token-owned <see cref="CK_INTERFACE"/> descriptor (the
+    /// version argument is always passed as <c>NULL</c> — any version). The returned struct is read via
+    /// <see cref="UnmanagedMemory.Read{T}"/>, which applies the correct platform layout, so no Pack=1
+    /// sibling wrapper is needed (unlike <c>C_GetInterfaceList</c>, the token owns the memory and we
+    /// only read it).
+    /// </summary>
+    public unsafe NativeCULong C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface)
+    {
+        iface = default;
+        if (_fp.C_GetInterface is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInterface");
+
+        IntPtr interfacePtr;
+        NativeCULong rv;
+        fixed (byte* namePtr = interfaceName)
+            rv = _fp.C_GetInterface(namePtr, IntPtr.Zero, &interfacePtr, flags);
+
+        if (rv.ToCKR() == CKR.CKR_OK && interfacePtr != IntPtr.Zero)
+            iface = UnmanagedMemory.Read<CK_INTERFACE>(interfacePtr);
+        return rv;
+    }
+
     // ── Has* availability properties for optional v3.0/v3.2 functions ─────────────
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_MessageEncryptInit</c> (PKCS#11 v3.0+).</summary>

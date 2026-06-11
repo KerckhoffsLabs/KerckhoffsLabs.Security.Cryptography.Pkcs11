@@ -44,6 +44,7 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_LoginUser(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     public virtual CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     public virtual CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    public virtual CKR C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface) { iface = default; return CKR.CKR_FUNCTION_NOT_SUPPORTED; }
     public virtual CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     public virtual CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     public virtual CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
