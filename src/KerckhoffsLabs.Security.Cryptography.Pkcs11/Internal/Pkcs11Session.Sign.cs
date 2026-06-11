@@ -48,34 +48,4 @@ internal sealed partial class Pkcs11Session
         return signature;
     }
 
-    // === Secure-default signing helpers ====================================
-
-    /// <summary>
-    /// Signs <paramref name="data"/> using Ed25519 (EdDSA over Curve25519).
-    /// Output is a fixed 64-byte signature.
-    /// </summary>
-    /// <param name="privateKeyHandle">Handle of an Ed25519 private key (CKK_EC_EDWARDS, CKA_EC_PARAMS=Ed25519 OID).</param>
-    /// <param name="data">Data to sign.</param>
-    /// <returns>64-byte Ed25519 signature.</returns>
-    public byte[] SignEd25519(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_EDDSA);
-        return Sign(mechanism, privateKeyHandle, data);
-    }
-
-    /// <summary>
-    /// Signs <paramref name="data"/> using Ed448 (EdDSA over Curve448).
-    /// Output is a fixed 114-byte signature.
-    /// </summary>
-    /// <param name="privateKeyHandle">Handle of an Ed448 private key (CKK_EC_EDWARDS, CKA_EC_PARAMS=Ed448 OID).</param>
-    /// <param name="data">Data to sign.</param>
-    /// <returns>114-byte Ed448 signature.</returns>
-    public byte[] SignEd448(ObjectHandle privateKeyHandle, ReadOnlySpan<byte> data)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_EDDSA);
-        return Sign(mechanism, privateKeyHandle, data);
-    }
-
 }

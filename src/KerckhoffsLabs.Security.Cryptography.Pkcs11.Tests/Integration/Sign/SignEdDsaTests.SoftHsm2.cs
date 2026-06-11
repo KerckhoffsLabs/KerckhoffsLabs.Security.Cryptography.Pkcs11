@@ -1,4 +1,5 @@
 using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
@@ -18,10 +19,11 @@ internal static class SignEdDsaTestCases
             try
             {
                 byte[] data = Encoding.UTF8.GetBytes("phase-2 Ed25519 round-trip");
-                byte[] sig = session.SignEd25519(priv, data);
+                using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(64, sig.Length);
 
-                session.VerifyEd25519(pub, data, sig, out bool isValid);
+                session.Verify(eddsa, pub, data, sig, out bool isValid);
                 Assert.True(isValid, "Ed25519 round-trip should verify.");
             }
             finally
@@ -46,10 +48,11 @@ internal static class SignEdDsaTestCases
             try
             {
                 byte[] data = Encoding.UTF8.GetBytes("phase-2 Ed448 round-trip");
-                byte[] sig = session.SignEd448(priv, data);
+                using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(114, sig.Length);
 
-                session.VerifyEd448(pub, data, sig, out bool isValid);
+                session.Verify(eddsa, pub, data, sig, out bool isValid);
                 Assert.True(isValid, "Ed448 round-trip should verify.");
             }
             finally

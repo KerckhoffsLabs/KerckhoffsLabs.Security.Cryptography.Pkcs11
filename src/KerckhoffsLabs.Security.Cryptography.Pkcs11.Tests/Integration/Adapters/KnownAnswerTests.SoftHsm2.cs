@@ -83,15 +83,16 @@ internal static class KnownAnswerTestCases
             ObjectHandle pub = TestKeys.CreateEd25519PublicKey(session, point);
             try
             {
-                byte[] sig = session.SignEd25519(priv, message);
+                using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                byte[] sig = session.Sign(eddsa, priv, message);
                 Assert.Equal(expectedSig, sig);
 
-                session.VerifyEd25519(pub, message, expectedSig, out bool ok);
+                session.Verify(eddsa, pub, message, expectedSig, out bool ok);
                 Assert.True(ok, "RFC 8032 test 1 signature should verify against the imported public key.");
 
                 byte[] tampered = (byte[])expectedSig.Clone();
                 tampered[0] ^= 0xFF;
-                session.VerifyEd25519(pub, message, tampered, out bool bad);
+                session.Verify(eddsa, pub, message, tampered, out bool bad);
                 Assert.False(bad, "A tampered signature must not verify.");
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }

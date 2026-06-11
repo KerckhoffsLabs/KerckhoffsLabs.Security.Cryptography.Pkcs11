@@ -363,30 +363,4 @@ internal sealed partial class Pkcs11Session
             throw Pkcs11Exception.Create(rv, "C_VerifyFinal");
     }
 
-    // === Secure-default verification helpers ===============================
-
-    /// <summary>Verifies an Ed25519 signature.</summary>
-    /// <param name="publicKeyHandle">Handle of an Ed25519 public key.</param>
-    /// <param name="data">Data the signature was computed over.</param>
-    /// <param name="signature">64-byte Ed25519 signature to verify.</param>
-    /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
-    public void VerifyEd25519(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_EDDSA);
-        Verify(mechanism, publicKeyHandle, data, signature, out isValid);
-    }
-
-    /// <summary>Verifies an Ed448 signature.</summary>
-    /// <param name="publicKeyHandle">Handle of an Ed448 public key.</param>
-    /// <param name="data">Data the signature was computed over.</param>
-    /// <param name="signature">114-byte Ed448 signature to verify.</param>
-    /// <param name="isValid">Set to true if the signature verifies; false otherwise.</param>
-    public void VerifyEd448(ObjectHandle publicKeyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
-    {
-        using var _ = AcquireExclusive();
-        using var mechanism = new Mechanism(CKM.CKM_EDDSA);
-        Verify(mechanism, publicKeyHandle, data, signature, out isValid);
-    }
-
 }

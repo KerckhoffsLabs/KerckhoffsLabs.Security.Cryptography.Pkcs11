@@ -1,4 +1,5 @@
 using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
@@ -12,11 +13,12 @@ internal static class VerifyEdDsaTestCases
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("Ed25519 tamper");
-            byte[] sig = session.SignEd25519(priv, data);
+            using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+            byte[] sig = session.Sign(eddsa, priv, data);
             byte[] tampered = (byte[])data.Clone();
             tampered[0] ^= 0xFF;
 
-            session.VerifyEd25519(pub, tampered, sig, out bool isValid);
+            session.Verify(eddsa, pub, tampered, sig, out bool isValid);
             Assert.False(isValid, "Tampered data must not verify.");
         }
         finally
