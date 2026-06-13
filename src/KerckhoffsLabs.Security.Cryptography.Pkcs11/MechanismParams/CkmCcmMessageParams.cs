@@ -58,7 +58,7 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _macLen)
             throw new ArgumentException($"Destination must be at least {_macLen} bytes.", nameof(destination));
-        unsafe { fixed (byte* d = destination) Buffer.MemoryCopy((void*)_mac, d, destination.Length, _macLen); }
+        UnmanagedMemory.Read(_mac, destination[.._macLen]);
     }
 
     /// <inheritdoc/>

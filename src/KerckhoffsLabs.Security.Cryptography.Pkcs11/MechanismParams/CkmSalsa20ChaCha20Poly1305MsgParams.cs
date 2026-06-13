@@ -54,7 +54,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < Poly1305TagLen)
             throw new ArgumentException($"Destination must be at least {Poly1305TagLen} bytes.", nameof(destination));
-        unsafe { fixed (byte* d = destination) Buffer.MemoryCopy((void*)_tag, d, destination.Length, Poly1305TagLen); }
+        UnmanagedMemory.Read(_tag, destination[..Poly1305TagLen]);
     }
 
     /// <inheritdoc/>

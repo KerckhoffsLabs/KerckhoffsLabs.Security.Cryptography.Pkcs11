@@ -56,7 +56,7 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _tagLen)
             throw new ArgumentException($"Destination must be at least {_tagLen} bytes.", nameof(destination));
-        unsafe { fixed (byte* d = destination) Buffer.MemoryCopy((void*)_tag, d, destination.Length, _tagLen); }
+        UnmanagedMemory.Read(_tag, destination[.._tagLen]);
     }
 
     /// <inheritdoc/>

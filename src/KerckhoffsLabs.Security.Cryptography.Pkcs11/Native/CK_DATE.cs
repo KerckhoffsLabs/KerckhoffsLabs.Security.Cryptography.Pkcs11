@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -8,14 +9,28 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// identical on every platform (all single-byte fields), so no Windows-packed sibling is needed.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-internal unsafe struct CK_DATE
+internal struct CK_DATE
 {
     /// <summary>Year, four ASCII digits ("1900"–"9999").</summary>
-    public fixed byte Year[4];
+    public Char4 Year;
 
     /// <summary>Month, two ASCII digits ("01"–"12").</summary>
-    public fixed byte Month[2];
+    public Char2 Month;
 
     /// <summary>Day, two ASCII digits ("01"–"31").</summary>
-    public fixed byte Day[2];
+    public Char2 Day;
+
+    /// <summary>Fixed 4-byte inline buffer (replaces <c>fixed byte[4]</c> — no <c>unsafe</c>).</summary>
+    [InlineArray(4)]
+    internal struct Char4
+    {
+        private byte _element0;
+    }
+
+    /// <summary>Fixed 2-byte inline buffer (replaces <c>fixed byte[2]</c> — no <c>unsafe</c>).</summary>
+    [InlineArray(2)]
+    internal struct Char2
+    {
+        private byte _element0;
+    }
 }

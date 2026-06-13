@@ -145,17 +145,22 @@ public sealed class ObjectAttribute : IDisposable
         ArgumentNullException.ThrowIfNull(value);
         int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         byte[] flat = new byte[stride * value.Count];
-        // Marshal each child's CK_ATTRIBUTE into the flat buffer.
-        unsafe
+        if (value.Count > 0)
         {
-            fixed (byte* p = flat)
+            // Marshal each child's CK_ATTRIBUTE (platform-correct, packed-aware layout) into an
+            // unmanaged scratch block, then copy it back into the managed flat buffer. Going through
+            // the UnmanagedMemory helpers keeps the pinning/pointer work — and the only `unsafe` — in
+            // the Native layer rather than here.
+            IntPtr scratch = UnmanagedMemory.Allocate(stride * value.Count);
+            try
             {
-                IntPtr basePtr = (IntPtr)p;
                 for (int i = 0; i < value.Count; i++)
-                {
-                    IntPtr slot = new(basePtr.ToInt64() + (long)i * stride);
-                    UnmanagedMemory.Write(slot, in value[i]._ckAttribute);
-                }
+                    UnmanagedMemory.Write(scratch + (i * stride), in value[i]._ckAttribute);
+                UnmanagedMemory.Read(scratch, flat);
+            }
+            finally
+            {
+                UnmanagedMemory.Free(ref scratch);
             }
         }
         _ckAttribute = CreateAttribute((NativeCULong)type, flat);
