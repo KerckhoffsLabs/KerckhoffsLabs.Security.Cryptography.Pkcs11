@@ -58,7 +58,9 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
-        var (ct, sharedKey) = _key.EncapsulateKey(mech, template);
+        // The ML-KEM ciphertext length is fixed by the parameter set, so hand the token a pre-sized
+        // buffer in one call rather than a NULL-buffer length probe (which SoftHSM does not honour).
+        var (ct, sharedKey) = _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
 
         try
         {

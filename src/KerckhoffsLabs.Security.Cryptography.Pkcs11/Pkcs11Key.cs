@@ -509,11 +509,17 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <param name="mechanism">Encapsulation mechanism.</param>
     /// <param name="sharedSecretTemplate">Template applied to the freshly-derived shared-secret key.</param>
+    /// <param name="expectedCiphertextLen">
+    /// When &gt; 0, the exact ciphertext length is already known (e.g. fixed by the ML-KEM parameter
+    /// set), letting the token fill a pre-sized buffer in a single call instead of a NULL-buffer length
+    /// probe — required for tokens (SoftHSM) that do not honour the probe for <c>C_EncapsulateKey</c>.
+    /// </param>
     /// <returns>Tuple of (ciphertext to send to the decapsulator, on-token <see cref="Pkcs11Key"/> wrapping the shared secret).</returns>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries, or <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable.</exception>
     public (byte[] Ciphertext, Pkcs11Key SharedSecret) EncapsulateKey(
         Mechanism mechanism,
-        ObjectTemplate sharedSecretTemplate)
+        ObjectTemplate sharedSecretTemplate,
+        int expectedCiphertextLen = 0)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
@@ -524,7 +530,7 @@ public sealed class Pkcs11Key : IDisposable
                 "Pkcs11Key.EncapsulateKey (no public handle)");
 
         var (ct, sharedHandle) = _workspace.Session.EncapsulateKey(
-            mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes]);
+            mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
         return (ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
     }
 

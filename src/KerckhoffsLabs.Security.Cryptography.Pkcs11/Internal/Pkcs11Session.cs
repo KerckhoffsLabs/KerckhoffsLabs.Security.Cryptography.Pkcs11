@@ -2999,12 +2999,21 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="mechanism">Encapsulation mechanism (e.g. <see cref="CKM.CKM_ML_KEM"/>).</param>
     /// <param name="encapsulatingPublicKey">Handle of the public key to encapsulate against.</param>
     /// <param name="sharedKeyTemplate">Template applied to the derived shared-secret key.</param>
+    /// <param name="expectedCiphertextLen">
+    /// When &gt; 0, the exact ciphertext length is already known (e.g. fixed by the ML-KEM parameter
+    /// set), so a single <c>C_EncapsulateKey</c> call is made with a pre-sized buffer. This skips the
+    /// NULL-buffer length probe, which some tokens (SoftHSM) do not honour for <c>C_EncapsulateKey</c>:
+    /// they leave <c>*pulCipherTextLen</c> untouched on a NULL buffer yet still run a full,
+    /// side-effectful encapsulation per call, so a probe would both fail to report the size and leak an
+    /// extra shared-secret object. When 0, the two-call probe is used (caller does not know the size).
+    /// </param>
     /// <returns>Tuple of (ciphertext, sharedKeyHandle).</returns>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>
     public (byte[] Ciphertext, ObjectHandle SharedKey) EncapsulateKey(
         Mechanism mechanism,
         ObjectHandle encapsulatingPublicKey,
-        List<ObjectAttribute> sharedKeyTemplate)
+        List<ObjectAttribute> sharedKeyTemplate,
+        int expectedCiphertextLen = 0)
     {
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -3031,25 +3040,45 @@ internal sealed class Pkcs11Session : IDisposable
             foreach (ObjectAttribute d in secureDefaults)
                 template[idx++] = d.CkAttribute;
 
-            // Two-call: query size first, then real encaps.
             NativeCULong ctLen = (NativeCULong)0;
             NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_EncapsulateKey(
-                _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                template, (NativeCULong)template.Length,
-                null!, ref ctLen, ref sharedHandle);
-            // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
-            // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
-            // Only a genuine error aborts the probe.
-            if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
+            CKR rv;
+            byte[] ct;
 
-            byte[] ct = new byte[(int)ctLen];
-            rv = _pkcs11Library.C_EncapsulateKey(
-                _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                template, (NativeCULong)template.Length,
-                ct, ref ctLen, ref sharedHandle);
-            Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey");
+            if (expectedCiphertextLen > 0)
+            {
+                // Single-call: the exact ciphertext size is known, so hand the token a correctly-sized
+                // buffer and let it fill it in one shot. This is the spec-correct path on every token
+                // and the only correct path on SoftHSM, whose C_EncapsulateKey ignores a NULL buffer
+                // (no length probe) and performs a side-effectful encapsulation on each call.
+                ct = new byte[expectedCiphertextLen];
+                ctLen = (NativeCULong)expectedCiphertextLen;
+                rv = _pkcs11Library.C_EncapsulateKey(
+                    _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
+                    template, (NativeCULong)template.Length,
+                    ct, ref ctLen, ref sharedHandle);
+                Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey");
+            }
+            else
+            {
+                // Two-call: query size first, then real encaps (size unknown to the caller).
+                rv = _pkcs11Library.C_EncapsulateKey(
+                    _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
+                    template, (NativeCULong)template.Length,
+                    null!, ref ctLen, ref sharedHandle);
+                // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
+                // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
+                // Only a genuine error aborts the probe.
+                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
+                    Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
+
+                ct = new byte[(int)ctLen];
+                rv = _pkcs11Library.C_EncapsulateKey(
+                    _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
+                    template, (NativeCULong)template.Length,
+                    ct, ref ctLen, ref sharedHandle);
+                Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey");
+            }
 
             if (ct.Length != (int)ctLen)
                 Array.Resize(ref ct, (int)ctLen);
