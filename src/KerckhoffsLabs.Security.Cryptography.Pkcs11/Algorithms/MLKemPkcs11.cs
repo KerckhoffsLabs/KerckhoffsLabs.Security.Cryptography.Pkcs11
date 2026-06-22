@@ -89,8 +89,21 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         GuardExtraction(encapsulating: false);
 
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
-        using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen: false);
-        Pkcs11Key sharedKey = _key.DecapsulateKey(mech, ciphertext, template);
+
+        // Token quirk: the decapsulated shared-secret key is created via unwrap semantics, and tokens
+        // disagree on CKA_VALUE_LEN there. opencryptoki *requires* it (CKR_TEMPLATE_INCONSISTENT
+        // without), while SoftHSM treats it as read-only on unwrap (CKR_ATTRIBUTE_READ_ONLY with).
+        // Default to the conventional form that includes it, and fall back to omitting it on SoftHSM's
+        // rejection. The shared-secret length is fixed by the parameter set, so both forms are correct.
+        Pkcs11Key sharedKey;
+        try
+        {
+            sharedKey = DecapsulateWith(mech, ciphertext, includeValueLen: true);
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
+        {
+            sharedKey = DecapsulateWith(mech, ciphertext, includeValueLen: false);
+        }
 
         try
         {
@@ -107,6 +120,14 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         {
             sharedKey.Dispose();
         }
+    }
+
+    // Single decapsulation attempt with a shared-secret template that optionally carries CKA_VALUE_LEN.
+    // Split out so DecapsulateCore can retry the other form on a token-specific template rejection.
+    private Pkcs11Key DecapsulateWith(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, bool includeValueLen)
+    {
+        using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen);
+        return _key.DecapsulateKey(mechanism, ciphertext, template);
     }
 
     // -----------------------------------------------------------------------
