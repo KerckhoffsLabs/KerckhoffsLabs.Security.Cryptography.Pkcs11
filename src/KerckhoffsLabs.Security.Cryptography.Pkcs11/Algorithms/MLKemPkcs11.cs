@@ -93,17 +93,16 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         // Token quirk: the decapsulated shared-secret key is created via unwrap semantics, and tokens
         // disagree on CKA_VALUE_LEN there. opencryptoki *requires* it (CKR_TEMPLATE_INCONSISTENT
         // without), while SoftHSM treats it as read-only on unwrap (CKR_ATTRIBUTE_READ_ONLY with).
-        // Default to the conventional form that includes it, and fall back to omitting it on SoftHSM's
-        // rejection. The shared-secret length is fixed by the parameter set, so both forms are correct.
-        Pkcs11Key sharedKey;
-        try
+        // PKCS#11 has no way to query this, so the first decapsulation against a token probes (try the
+        // conventional form that includes CKA_VALUE_LEN, fall back to omitting it on SoftHSM's
+        // rejection) and the answer is cached on the library — every later call goes straight to the
+        // right form, so the probe's exception is one-time discovery, not steady-state control flow.
+        Pkcs11Library library = _key.Workspace.Library;
+        Pkcs11Key sharedKey = library.MlKemDecapsulateOmitsValueLen switch
         {
-            sharedKey = DecapsulateWith(mech, ciphertext, includeValueLen: true);
-        }
-        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
-        {
-            sharedKey = DecapsulateWith(mech, ciphertext, includeValueLen: false);
-        }
+            bool omit => DecapsulateWith(mech, ciphertext, includeValueLen: !omit),
+            null => DecapsulateProbing(mech, ciphertext, library),
+        };
 
         try
         {
@@ -122,8 +121,26 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         }
     }
 
+    // First decapsulation against a token: try the conventional CKA_VALUE_LEN form, fall back to
+    // omitting it on SoftHSM's read-only rejection, and record the winning form on the library so
+    // subsequent calls skip the probe (and the failed, side-effect-free first attempt).
+    private Pkcs11Key DecapsulateProbing(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, Pkcs11Library library)
+    {
+        try
+        {
+            Pkcs11Key key = DecapsulateWith(mechanism, ciphertext, includeValueLen: true);
+            library.MlKemDecapsulateOmitsValueLen = false;
+            return key;
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
+        {
+            Pkcs11Key key = DecapsulateWith(mechanism, ciphertext, includeValueLen: false);
+            library.MlKemDecapsulateOmitsValueLen = true;
+            return key;
+        }
+    }
+
     // Single decapsulation attempt with a shared-secret template that optionally carries CKA_VALUE_LEN.
-    // Split out so DecapsulateCore can retry the other form on a token-specific template rejection.
     private Pkcs11Key DecapsulateWith(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, bool includeValueLen)
     {
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen);

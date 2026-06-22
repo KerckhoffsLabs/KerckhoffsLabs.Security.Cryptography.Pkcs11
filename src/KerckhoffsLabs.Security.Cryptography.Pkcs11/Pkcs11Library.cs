@@ -63,6 +63,15 @@ public sealed class Pkcs11Library : IDisposable
     internal ILowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
     /// <summary>
+    /// Cached per-token quirk for ML-KEM decapsulation: whether the shared-secret template must
+    /// omit <c>CKA_VALUE_LEN</c>. Tokens disagree on the unwrap-created key — SoftHSM rejects
+    /// <c>CKA_VALUE_LEN</c> as read-only, opencryptoki requires it — and PKCS#11 offers no way to
+    /// query this, so it is learned the first time <see cref="Algorithms.MLKemPkcs11"/> decapsulates
+    /// against this token and reused thereafter. <c>null</c> until probed; constant for a given module.
+    /// </summary>
+    internal bool? MlKemDecapsulateOmitsValueLen { get; set; }
+
+    /// <summary>
     /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
     /// Function pointers are acquired via <c>C_GetFunctionList</c> (the PKCS#11
     /// v2.20+ recommended path).
