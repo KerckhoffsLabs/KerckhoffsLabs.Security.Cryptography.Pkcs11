@@ -89,7 +89,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         GuardExtraction(encapsulating: false);
 
         using var mech = new Mechanism(CKM.CKM_ML_KEM);
-        using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
+        using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen: false);
         Pkcs11Key sharedKey = _key.DecapsulateKey(mech, ciphertext, template);
 
         try
@@ -197,13 +197,21 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         }
     }
 
-    private static ObjectTemplate ExtractableSharedSecretTemplate(int sharedSecretLen)
-        => ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+    // includeValueLen: encapsulate creates the shared secret via C_DeriveKey-style semantics
+    // (CKA_VALUE_LEN is settable), but decapsulate creates it via unwrap semantics, where some tokens
+    // (SoftHSM) treat CKA_VALUE_LEN as read-only and reject it (CKR_ATTRIBUTE_READ_ONLY). The ML-KEM
+    // shared-secret length is fixed by the parameter set, so the token does not need to be told it —
+    // omit CKA_VALUE_LEN on the decapsulate template for portability.
+    private static ObjectTemplate ExtractableSharedSecretTemplate(int sharedSecretLen, bool includeValueLen = true)
+    {
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .OnToken(false)
             .Sensitive(false)
-            .Extractable()
-            .ValueLen(sharedSecretLen)
-            .Build();
+            .Extractable();
+        if (includeValueLen)
+            builder = builder.ValueLen(sharedSecretLen);
+        return builder.Build();
+    }
 
     private static void ReadAndCopySecret(Pkcs11Key sharedKey, Span<byte> destination)
     {
