@@ -7,12 +7,14 @@
 # tests run as (the testhost), which is the .NET SDK's architecture — the build target
 # passes $(NETCoreSdkPortableRuntimeIdentifier). The x86 test process cannot load an x64
 # mock (BadImageFormat), so this must not be guessed from the (64-bit) pwsh host.
-# build.bat builds Win32 + x64 (pkcs11-mock-x86.dll / pkcs11-mock-x64.dll); the upstream solution
-# has no ARM64 platform, so win-arm64 is compiled directly with the native ARM64 cl.exe below.
 #
-# NOTE: Windows build uses build.bat + the Visual Studio solution under
-# vendor/pkcs11-mock/build/windows. Requires VS Build Tools or a
-# full Visual Studio installation with the C++ workload.
+# pkcs11-mock is a single translation unit that exports its PKCS#11 entry points via
+# CRYPTOKI_EXPORTS (__declspec(dllexport)). We drive the build ourselves rather than the
+# upstream build.bat: build.bat only probes three hardcoded VS editions
+# (Community/Professional/Enterprise) for vcvarsall.bat and returns exit 0 even when it
+# fails to find them, so a runner image that ships only Build Tools (or installs VS at a
+# vswhere-locatable path) silently produces no DLL. We locate vcvarsall via vswhere (with a
+# hardcoded-edition fallback) and propagate the real exit code.
 
 param(
     [Parameter(Mandatory=$true)]
@@ -52,23 +54,38 @@ if (Test-Path $destFile) {
     }
 }
 
+# Locate vcvarsall.bat: prefer vswhere (canonical, finds any edition/install path incl.
+# Build Tools), and fall back to the well-known per-edition paths for older images.
+function Find-VcVarsAll {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (Test-Path $vswhere) {
+        $installPath = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath 2>$null | Select-Object -First 1
+        if ($installPath) {
+            $cand = Join-Path $installPath 'VC\Auxiliary\Build\vcvarsall.bat'
+            if (Test-Path $cand) { return $cand }
+        }
+    }
+    foreach ($ed in 'Enterprise','Professional','Community','BuildTools') {
+        $cand = "C:\Program Files\Microsoft Visual Studio\2022\$ed\VC\Auxiliary\Build\vcvarsall.bat"
+        if (Test-Path $cand) { return $cand }
+    }
+    return $null
+}
+
 Write-Host "Building pkcs11-mock for $rid..."
 
 $winBuildDir = Join-Path $mockDir 'build\windows'
+$vcvars = Find-VcVarsAll
+if (-not $vcvars) { Write-Error "vcvarsall.bat (VS 2022 with the C++ toolset) not found via vswhere or the standard install paths." }
+Write-Host "Using vcvarsall: $vcvars"
 
 if ($rid -eq 'win-arm64') {
     # Upstream build.bat / pkcs11-mock.sln only define Win32 + x64 platforms — there is no ARM64
-    # configuration to drive via msbuild. pkcs11-mock is a single translation unit that exports its
-    # PKCS#11 entry points via CRYPTOKI_EXPORTS (__declspec(dllexport)), so compile it directly with
-    # the native ARM64 toolchain. /MT statically links the CRT so the produced DLL has no vcruntime
-    # dependency to resolve at load time (matching the /MT x86/x64 builds).
-    $vcvars = $null
-    foreach ($ed in 'Enterprise','Professional','Community','BuildTools') {
-        $cand = "C:\Program Files\Microsoft Visual Studio\2022\$ed\VC\Auxiliary\Build\vcvarsall.bat"
-        if (Test-Path $cand) { $vcvars = $cand; break }
-    }
-    if (-not $vcvars) { Write-Error "vcvarsall.bat (VS 2022 with the ARM64 C++ toolset) not found." }
-
+    # configuration to drive via msbuild. Compile the single source directly with the native ARM64
+    # toolchain. /MT statically links the CRT so the produced DLL has no vcruntime dependency to
+    # resolve at load time (matching the /MT x86/x64 builds).
     $srcDir  = Join-Path $mockDir 'src'
     $srcFile = Join-Path $srcDir 'pkcs11-mock.c'
     $outDll  = Join-Path $winBuildDir 'pkcs11-mock-arm64.dll'
@@ -86,19 +103,25 @@ if ($rid -eq 'win-arm64') {
     }
 }
 else {
+    # x86 / x64: build the upstream solution with msbuild for just the target platform. The
+    # GitHub Windows runners are x64 hosts, so use the amd64 host toolset (it cross-compiles
+    # Win32 fine) and select the target via /p:Platform.
+    $platform = if ($rid -eq 'win-x86') { 'Win32' } else { 'x64' }
+
     Push-Location $winBuildDir
     try {
-        $result = cmd /c 'build.bat' '2>&1'
+        $msbuild = "msbuild pkcs11-mock.sln /nologo /v:minimal /p:Configuration=Release /p:Platform=$platform /target:Rebuild"
+        $cmd = "call `"$vcvars`" amd64 && $msbuild"
+        Write-Host "msbuild ($rid -> $platform): $msbuild"
+        $result = cmd /c $cmd '2>&1'
         $result | Write-Host
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "build.bat exited with code $LASTEXITCODE"
-        }
+        if ($LASTEXITCODE -ne 0) { Write-Error "msbuild ($rid) failed ($LASTEXITCODE)" }
     } finally {
         Pop-Location
     }
 }
 
-# Upstream produces pkcs11-mock-x64.dll, pkcs11-mock-x86.dll (and arm64 where supported).
+# Upstream produces pkcs11-mock-x64.dll, pkcs11-mock-x86.dll (and arm64 from the cl build above).
 # Select the architecture that matches the target RID.
 $archSuffix = switch ($rid) {
     'win-x86'   { 'x86' }

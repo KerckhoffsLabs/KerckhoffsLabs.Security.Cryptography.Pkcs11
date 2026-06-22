@@ -15,8 +15,9 @@ public sealed class MLKemPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 {
     private readonly SoftHsmBackendFixture _backend = backend;
     public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-    // The vendored SoftHSM is not built WITH_ML_KEM, so CKM_ML_KEM_KEY_PAIR_GEN is unavailable.
-    // Tests needing a real ML-KEM key gate on this flag and skip here, ready for a capable backend.
+    // The vendored SoftHSM is built WITH_ML_KEM when it detects OpenSSL 3.5+ (the CI Linux leg).
+    // Tests needing a real ML-KEM key gate on this flag, so they run on an OpenSSL-3.5 build and
+    // skip on a system-OpenSSL-3.0 build where CKM_ML_KEM_KEY_PAIR_GEN is unavailable.
     public static bool SoftHsmSupportsMlKem => SoftHsmBackendFixture.SoftHsmSupportsMlKem;
 
     private Pkcs11Workspace OpenWorkspace() =>

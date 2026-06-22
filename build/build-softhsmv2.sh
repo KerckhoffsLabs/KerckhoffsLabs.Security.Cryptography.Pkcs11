@@ -71,12 +71,13 @@ fi
 
 echo "Building SoftHSMv2 for ${RID}..."
 
-# We build with autotools: only the autotools path wires up ML-DSA
-# (CKM_ML_DSA), via `--enable-mldsa` defaulting to "detect" — it auto-enables when the
-# OpenSSL backend exposes ML-DSA (OpenSSL 3.5+). The CMake build's ENABLE_MLDSA option is a
-# no-op (it never sets WITH_ML_DSA), so it can never produce an ML-DSA-capable token.
+# We build with autotools: only the autotools path wires up ML-DSA (CKM_ML_DSA) and
+# ML-KEM (CKM_ML_KEM), via `--enable-mldsa` / `--enable-mlkem` defaulting to "detect" — each
+# auto-enables when the OpenSSL backend exposes the algorithm (OpenSSL 3.5+). The CMake build's
+# ENABLE_MLDSA option is a no-op (it never sets WITH_ML_DSA), so it can never produce a
+# post-quantum-capable token.
 #
-# To build against a non-system OpenSSL (e.g. 3.5+ for ML-DSA), set OPENSSL_PREFIX to its
+# To build against a non-system OpenSSL (e.g. 3.5+ for ML-DSA/ML-KEM), set OPENSSL_PREFIX to its
 # install dir; we point configure at it and bake an rpath so libsofthsm2 loads that OpenSSL
 # at runtime. When unset, the system OpenSSL is used (ML-DSA simply detects off).
 NPROC="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
@@ -142,4 +143,14 @@ if grep -q '^#define WITH_ML_DSA' "${BUILD_DIR}/config.h" 2>/dev/null; then
 else
   rm -f "${MLDSA_MARKER}"
   echo "ML-DSA: not available in this build (OpenSSL < 3.5)"
+fi
+
+# Same for ML-KEM (CKM_ML_KEM): compiled in via `--enable-mlkem=detect` against OpenSSL 3.5+.
+MLKEM_MARKER="${DEST_DIR}/softhsm-mlkem.enabled"
+if grep -q '^#define WITH_ML_KEM' "${BUILD_DIR}/config.h" 2>/dev/null; then
+  : > "${MLKEM_MARKER}"
+  echo "ML-KEM: enabled (marker written)"
+else
+  rm -f "${MLKEM_MARKER}"
+  echo "ML-KEM: not available in this build (OpenSSL < 3.5)"
 fi
