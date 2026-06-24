@@ -89,13 +89,16 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     // RSA < 2048 is gated behind AllowInsecure (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
 
-    // The SoftHSM suite runs on every platform leg, so the slow large keys (8192/16384) live in the
-    // opencryptoki suite instead (ubuntu-latest only) to avoid multi-minute keygen on all legs.
+    // Full size sweep including the OpenSSL max modulus. The SoftHSM suite runs on every platform leg,
+    // so 8192/16384 keygen happens on all of them; the measured cost is modest (tens of seconds — the
+    // OpenSSL-backed soft token is fast), which is acceptable for full cross-platform large-key coverage.
     [ConditionalTheory(nameof(SoftHsmAvailable))]
     [InlineData(1024)]
     [InlineData(2048)]
     [InlineData(3072)]
     [InlineData(4096)]
+    [InlineData(8192)]
+    [InlineData(16384)]
     public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits)
     {
         using var workspace = OpenWorkspace();
