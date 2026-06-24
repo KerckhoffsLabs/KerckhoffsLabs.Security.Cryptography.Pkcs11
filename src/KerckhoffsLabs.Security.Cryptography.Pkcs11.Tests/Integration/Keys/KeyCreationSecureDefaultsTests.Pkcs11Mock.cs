@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// BL-001: every key-producing operation must apply the same secure-default gate as
+/// Every key-producing operation must apply the same secure-default gate as
 /// <c>UnwrapKey</c> — reject an explicitly insecure result template (CKA_EXTRACTABLE=true or
 /// CKA_SENSITIVE=false) unless AllowInsecure is set. This covers <c>DeriveKey</c> and the v3.2
 /// <c>EncapsulateKey</c> / <c>DecapsulateKey</c> / <c>UnwrapKeyAuthenticated</c> paths. The gate

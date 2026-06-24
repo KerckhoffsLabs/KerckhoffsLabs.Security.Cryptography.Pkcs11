@@ -42,7 +42,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     // capability gaps of the SoftHSM build we ship in vendor/softhsmv2 — when
     // we move to a newer SoftHSM or a real HSM, flip the relevant flag.
     //
-    // Real-token coverage gap (tracked for BL-011): AES-CCM, ChaCha20-Poly1305, SP800-108 counter KDF,
+    // Real-token coverage gap: AES-CCM, ChaCha20-Poly1305, SP800-108 counter KDF,
     // and SLH-DSA are NOT implemented by either CI real backend — SoftHSM (these flags) nor opencryptoki
     // (see [[project_opencryptoki_soft_token_matrix]]: its soft token also lacks all four). Their
     // parameter marshalling is therefore exercised in CI only by the in-process ManagedSoftToken fake
