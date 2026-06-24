@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -15,8 +16,10 @@ internal static class GenerateRsaKeyPairTestCases
     internal static void Assert_RejectsTooSmallModulus(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateRsaKeyPair(modulusBits: 1024));
+        // A non-positive size is always an argument error.
         Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateRsaKeyPair(modulusBits: 0));
+        // Sub-2048 (NIST SP 800-131A) is gated behind AllowInsecure, not silently produced.
+        Assert.Throws<InsecureOperationException>(() => workspace.GenerateRsaKeyPair(modulusBits: 1024));
     }
 
     internal static void Assert_GeneratesRsa2048KeyPair(IPkcs11Backend backend)

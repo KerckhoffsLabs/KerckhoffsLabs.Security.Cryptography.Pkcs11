@@ -43,6 +43,41 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.Equal("key", ex.ParamName);
     }
 
+    // === Key sizes: sign/verify round-trips scale with the modulus =========
+    // RSA < 2048 is gated behind AllowInsecure (NIST SP 800-131A), so the 1024 case generates under an
+    // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
+
+    [Theory]
+    [InlineData(1024)]
+    [InlineData(2048)]
+    [InlineData(3072)]
+    [InlineData(4096)]
+    public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+
+        using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
+        using var key = workspace.GenerateRsaKeyPair(modulusBits);
+        using var rsa = new RSAPkcs11(key);
+
+        byte[] data = Encoding.UTF8.GetBytes($"rsa-{modulusBits} payload");
+        byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        Assert.Equal(modulusBits / 8, sig.Length);
+        Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+        // Cross-verify under the BCL from the exported public key; modulus length scales with the size.
+        var pub = rsa.ExportParameters(includePrivateParameters: false);
+        Assert.Equal(modulusBits / 8, pub.Modulus!.Length);
+        using var bcl = RSA.Create();
+        bcl.ImportParameters(pub);
+        Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        Assert.False(rsa.VerifyData(tampered, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+    }
+
     // === Sign/verify — byte[] overloads, with BCL cross-check ==============
 
     // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).

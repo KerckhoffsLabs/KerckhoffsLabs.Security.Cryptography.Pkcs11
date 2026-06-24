@@ -761,6 +761,33 @@ internal sealed class Pkcs11Session : IDisposable
         }
     }
 
+    /// <summary>
+    /// Secure-defaults gate for key-pair generation strength. RSA moduli below 2048 bits are under the
+    /// NIST SP 800-131A floor and are refused unless <see cref="AllowInsecure"/> is set — the same
+    /// opt-in model as the weak-mechanism gate, so a sub-2048 RSA key is a deliberate, audited choice
+    /// (e.g. legacy interop) rather than a silent default. Reads <c>CKA_MODULUS_BITS</c> from the public
+    /// template; non-RSA mechanisms and templates without the attribute are not affected.
+    /// </summary>
+    private void GuardKeyPairStrength(CKM mechanism, List<ObjectAttribute> publicKeyAttributes)
+    {
+        if (AllowInsecure) return;
+        if (mechanism is not (CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or CKM.CKM_RSA_X9_31_KEY_PAIR_GEN))
+            return;
+
+        foreach (ObjectAttribute attr in publicKeyAttributes)
+        {
+            if ((CKA)attr.Type != CKA.CKA_MODULUS_BITS)
+                continue;
+
+            ulong bits = attr.GetValueAsUlong();
+            if (bits < 2048)
+                throw new InsecureOperationException(
+                    $"RSA-{bits} is below the NIST SP 800-131A 2048-bit minimum. Set Pkcs11Workspace.AllowInsecure " +
+                    "to opt in (e.g. legacy interop), or generate a key of at least 2048 bits.");
+            return;
+        }
+    }
+
     #region IDisposable
 
     /// <summary>
@@ -1234,6 +1261,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
         GuardMechanism((CKM)mechanism.Type);
+        GuardKeyPairStrength((CKM)mechanism.Type, publicKeyAttributes);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKeyPair");
 

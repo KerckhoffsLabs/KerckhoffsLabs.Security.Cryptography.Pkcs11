@@ -82,6 +82,50 @@ public sealed class RSAPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backe
         Assert.False(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
     });
 
+    // Key sizes against a second real backend. RSA < 2048 is gated behind AllowInsecure (NIST SP
+    // 800-131A), so the 1024 case generates under an opt-in scope; 2048/3072/4096 need no opt-in.
+    [ConditionalTheory(nameof(Available))]
+    [InlineData(1024)]
+    [InlineData(2048)]
+    [InlineData(3072)]
+    [InlineData(4096)]
+    public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits)
+    {
+        Require(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        using var workspace = OpenWorkspace();
+        using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
+        string label = $"octk-rsa-{Guid.NewGuid():N}";
+        byte[] id = Encoding.ASCII.GetBytes(label);
+        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Verify().Encrypt().ModulusBits(modulusBits)
+            .PublicExponent([0x01, 0x00, 0x01]).Build();
+        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .Label(label).Id(id).Sign().Decrypt().Build();
+        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
+        try
+        {
+            using var rsa = new RSAPkcs11(key);
+            byte[] data = Encoding.UTF8.GetBytes($"rsa-{modulusBits} payload");
+            byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+            Assert.Equal(modulusBits / 8, sig.Length);
+            Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+            var pub = rsa.ExportParameters(includePrivateParameters: false);
+            Assert.Equal(modulusBits / 8, pub.Modulus!.Length);
+            using var bcl = RSA.Create();
+            bcl.ImportParameters(pub);
+            Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+            sig[0] ^= 0xFF;
+            Assert.False(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        }
+        finally
+        {
+            try { DestroyByLabel(workspace, label); } catch { /* best-effort */ }
+            key.Dispose();
+        }
+    }
+
     [ConditionalFact(nameof(Available))]
     public void EncryptDecrypt_OaepSha1_RoundTrips_AndRejectsTamper() => WithRsa((_, rsa) =>
     {

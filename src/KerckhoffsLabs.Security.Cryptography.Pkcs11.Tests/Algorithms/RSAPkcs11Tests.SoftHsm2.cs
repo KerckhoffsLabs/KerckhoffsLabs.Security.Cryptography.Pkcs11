@@ -20,13 +20,13 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace)
+    private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace, int modulusBits = 2048)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
-            .Label(label).Id(id).Verify().Encrypt().ModulusBits(2048)
+            .Label(label).Id(id).Verify().Encrypt().ModulusBits(modulusBits)
             .PublicExponent([0x01, 0x00, 0x01]).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Decrypt().Build();
@@ -83,6 +83,45 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
             Assert.Equal("key", ex.ParamName);
         }
         finally { DestroyByLabel(workspace, label); }
+    }
+
+    // === Key sizes: sign/verify round-trips scale with the modulus =========
+    // RSA < 2048 is gated behind AllowInsecure (NIST SP 800-131A), so the 1024 case generates under an
+    // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData(1024)]
+    [InlineData(2048)]
+    [InlineData(3072)]
+    [InlineData(4096)]
+    public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits)
+    {
+        using var workspace = OpenWorkspace();
+        using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
+        var key = GenerateRsaKey(workspace, modulusBits);
+        try
+        {
+            using var rsa = new RSAPkcs11(key);
+            byte[] data = Encoding.UTF8.GetBytes($"rsa-{modulusBits} payload");
+            byte[] sig = rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+            Assert.Equal(modulusBits / 8, sig.Length);
+            Assert.True(rsa.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+            var pub = rsa.ExportParameters(includePrivateParameters: false);
+            Assert.Equal(modulusBits / 8, pub.Modulus!.Length);
+            using var bcl = RSA.Create();
+            bcl.ImportParameters(pub);
+            Assert.True(bcl.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            Assert.False(rsa.VerifyData(tampered, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        }
+        finally
+        {
+            try { key.Delete(); } catch { /* best-effort cleanup */ }
+            key.Dispose();
+        }
     }
 
     // === Sign/verify — byte[] overloads ====================================

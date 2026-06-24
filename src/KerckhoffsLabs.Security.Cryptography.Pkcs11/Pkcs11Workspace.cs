@@ -381,16 +381,19 @@ public sealed class Pkcs11Workspace : IDisposable
     /// Generates an RSA key pair. The private key is sensitive and non-extractable; the public
     /// exponent is fixed at 65537. The returned key carries both handles.
     /// </summary>
-    /// <param name="modulusBits">RSA modulus size in bits. Must be ≥ 2048 (NIST SP 800-131A). Default 4096.</param>
+    /// <param name="modulusBits">RSA modulus size in bits. Default 4096. Sizes below 2048 (NIST SP
+    /// 800-131A) are refused unless <see cref="AllowInsecure"/> is set.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated RSA key pair.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is &lt; 2048.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is not positive.</exception>
+    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and <see cref="AllowInsecure"/> is false.</exception>
     public Pkcs11Key GenerateRsaKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (modulusBits < 2048)
-            throw new ArgumentOutOfRangeException(nameof(modulusBits), "RSA modulus must be ≥ 2048 bits (NIST SP 800-131A).");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(modulusBits);
+        // The sub-2048 secure-defaults gate is enforced once in the session layer (GuardKeyPairStrength),
+        // so it applies uniformly to this helper and to direct low-level GenerateKey callers.
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .ModulusBits(modulusBits)
