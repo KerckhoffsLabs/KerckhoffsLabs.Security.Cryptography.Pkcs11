@@ -77,40 +77,31 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     // === Sign/verify data — byte[] overloads (BCL hashes managed-side, then SignHash) =======
 
+    // Curve × hash matrix: ECDSA signs whatever digest it is handed, so the curve and the
+    // message-digest algorithm are independent. Exercise the full cross-product (every NIST curve
+    // against SHA-256/384/512) rather than only each curve's "matched" hash, and cross-verify each
+    // signature under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
+    // SHA-1 requires AllowInsecure and has its own gating tests below.
     [Theory]
-    [InlineData("P-256")]
-    [InlineData("P-384")]
-    [InlineData("P-521")]
-    public void SignVerifyData_RoundTrips(string curve) => WithEcDsa(curve, (ec, hash) =>
-    {
-        byte[] data = Encoding.UTF8.GetBytes("ecdsa test");
-        byte[] sig = ec.SignData(data, hash);
-        Assert.True(ec.VerifyData(data, sig, hash));
-        data[0] ^= 0xFF;
-        Assert.False(ec.VerifyData(data, sig, hash));
-    });
-
-    // === Sign/verify data across hash algorithms (fixed curve; hash is independent of the curve) ====
-    // The per-curve tests pair each curve with its matched hash; this pins P-256 and varies the hash so
-    // the adapter's managed-side HashData dispatch (SHA-256/384/512) is covered on one key. SHA-1 is
-    // excluded here — it requires AllowInsecure and has its own gating tests below.
-
-    [Theory]
-    [InlineData("SHA256")]
-    [InlineData("SHA384")]
-    [InlineData("SHA512")]
-    public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => WithEcDsa("P-256", (_, ec) =>
+    [InlineData("P-256", "SHA256")]
+    [InlineData("P-256", "SHA384")]
+    [InlineData("P-256", "SHA512")]
+    [InlineData("P-384", "SHA256")]
+    [InlineData("P-384", "SHA384")]
+    [InlineData("P-384", "SHA512")]
+    [InlineData("P-521", "SHA256")]
+    [InlineData("P-521", "SHA384")]
+    [InlineData("P-521", "SHA512")]
+    public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName) => WithEcDsa(curve, (_, ec) =>
     {
         var hash = new HashAlgorithmName(hashName);
-        byte[] data = Encoding.UTF8.GetBytes($"ecdsa over {hashName}");
+        byte[] data = Encoding.UTF8.GetBytes($"ecdsa {curve}/{hashName}");
         byte[] sig = ec.SignData(data, hash);
         Assert.True(ec.VerifyData(data, sig, hash));
 
-        // Cross-verify under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
         using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
         Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
 
-        // Tamper the message: verify must fail.
         byte[] tampered = [.. data];
         tampered[0] ^= 0xFF;
         Assert.False(ec.VerifyData(tampered, sig, hash));

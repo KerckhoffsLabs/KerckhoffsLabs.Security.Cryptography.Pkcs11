@@ -104,35 +104,28 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
     // === Sign/verify data — byte[] overloads (BCL hashes managed-side, then SignHash) =======
 
+    // Curve × hash matrix: ECDSA signs whatever digest it is handed, so the curve and the
+    // message-digest algorithm are independent. Exercise the full cross-product (every NIST curve
+    // against SHA-256/384/512 — combined CKM_ECDSA_SHA* on-token) rather than only each curve's
+    // "matched" hash, and cross-verify each signature under the BCL from the exported public key
+    // (CKM_ECDSA emits raw r‖s = IEEE P1363).
     [ConditionalTheory(nameof(SoftHsmAvailable))]
-    [InlineData("P-256")]
-    [InlineData("P-384")]
-    [InlineData("P-521")]
-    public void SignVerifyData_RoundTrips(string curve) => WithEcDsa(curve, (ec, hash) =>
-    {
-        byte[] data = Encoding.UTF8.GetBytes("ecdsa test");
-        byte[] sig = ec.SignData(data, hash);
-        Assert.True(ec.VerifyData(data, sig, hash));
-        data[0] ^= 0xFF;
-        Assert.False(ec.VerifyData(data, sig, hash));
-    });
-
-    // === Sign/verify data across hash algorithms (fixed P-256 key; hash independent of the curve) ====
-    // Pins P-256 and varies the hash so the combined CKM_ECDSA_SHA* mechanism mapping is exercised
-    // across digests on one key (the per-curve tests pair each curve with its matched hash).
-
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
-    [InlineData("SHA256")]
-    [InlineData("SHA384")]
-    [InlineData("SHA512")]
-    public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => WithEcDsa("P-256", ec =>
+    [InlineData("P-256", "SHA256")]
+    [InlineData("P-256", "SHA384")]
+    [InlineData("P-256", "SHA512")]
+    [InlineData("P-384", "SHA256")]
+    [InlineData("P-384", "SHA384")]
+    [InlineData("P-384", "SHA512")]
+    [InlineData("P-521", "SHA256")]
+    [InlineData("P-521", "SHA384")]
+    [InlineData("P-521", "SHA512")]
+    public void SignVerifyData_CurveHashMatrix_RoundTrips(string curve, string hashName) => WithEcDsa(curve, ec =>
     {
         var hash = new HashAlgorithmName(hashName);
-        byte[] data = Encoding.UTF8.GetBytes($"ecdsa over {hashName}");
+        byte[] data = Encoding.UTF8.GetBytes($"ecdsa {curve}/{hashName}");
         byte[] sig = ec.SignData(data, hash);
         Assert.True(ec.VerifyData(data, sig, hash));
 
-        // Cross-verify under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
         using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
         Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
 
