@@ -57,13 +57,21 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     // adapter and the curve-matched hash, then destroys both objects.
     private void WithEcDsa(string curve, Action<ECDsaPkcs11, HashAlgorithmName> body)
     {
-        var (oid, hash, _) = Spec(curve);
+        var (_, hash, _) = Spec(curve);
+        WithEcDsa(curve, ec => body(ec, hash));
+    }
+
+    // As above, but leaves the hash to the caller so the same key can be exercised across hash
+    // algorithms independent of the curve.
+    private void WithEcDsa(string curve, Action<ECDsaPkcs11> body)
+    {
+        var (oid, _, _) = Spec(curve);
         using var workspace = OpenWorkspace();
         var key = GenerateEcKey(workspace, oid);
         try
         {
             using var ec = new ECDsaPkcs11(key);
-            body(ec, hash);
+            body(ec);
         }
         finally
         {
@@ -107,6 +115,30 @@ public sealed class ECDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
         Assert.True(ec.VerifyData(data, sig, hash));
         data[0] ^= 0xFF;
         Assert.False(ec.VerifyData(data, sig, hash));
+    });
+
+    // === Sign/verify data across hash algorithms (fixed P-256 key; hash independent of the curve) ====
+    // Pins P-256 and varies the hash so the combined CKM_ECDSA_SHA* mechanism mapping is exercised
+    // across digests on one key (the per-curve tests pair each curve with its matched hash).
+
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => WithEcDsa("P-256", ec =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] data = Encoding.UTF8.GetBytes($"ecdsa over {hashName}");
+        byte[] sig = ec.SignData(data, hash);
+        Assert.True(ec.VerifyData(data, sig, hash));
+
+        // Cross-verify under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
+        using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+        Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        Assert.False(ec.VerifyData(tampered, sig, hash));
     });
 
     // === Sign/verify data — span overloads (the adapter's combined on-token hash+sign path) ==

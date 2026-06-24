@@ -57,15 +57,21 @@ public sealed class ECDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
         }
     }
 
-    [ConditionalFact(nameof(Available))]
-    public void SignVerifyData_P256_RoundTrips() => WithEcDsaP256(ec =>
+    // P-256 across hash algorithms on a second real backend: re-runs sign/verify per digest so an
+    // opencryptoki-specific signature-encoding or hash-dispatch bug surfaces independently of SoftHSM.
+    [ConditionalTheory(nameof(Available))]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void SignVerifyData_P256_AcrossHashAlgorithms_RoundTrips(string hashName) => WithEcDsaP256(ec =>
     {
-        byte[] data = Encoding.UTF8.GetBytes("cross-backend ecdsa payload");
-        byte[] sig = ec.SignData(data, HashAlgorithmName.SHA256);
+        var hash = new HashAlgorithmName(hashName);
+        byte[] data = Encoding.UTF8.GetBytes($"cross-backend ecdsa over {hashName}");
+        byte[] sig = ec.SignData(data, hash);
 
-        Assert.True(ec.VerifyData(data, sig, HashAlgorithmName.SHA256));
+        Assert.True(ec.VerifyData(data, sig, hash));
 
         data[0] ^= 0xFF;
-        Assert.False(ec.VerifyData(data, sig, HashAlgorithmName.SHA256));
+        Assert.False(ec.VerifyData(data, sig, hash));
     });
 }

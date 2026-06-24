@@ -144,6 +144,23 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         Assert.Throws<InsecureOperationException>(
             () => dsa.SignData(Encoding.UTF8.GetBytes("x"), HashAlgorithmName.SHA256)));
 
+    // Vary the hash on the token key (CKM_DSA_SHA* combined, or managed hash + raw CKM_DSA fallback).
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => WithDsa(dsa =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] data = Encoding.UTF8.GetBytes($"dsa over {hashName}");
+        byte[] sig = dsa.SignData(data, hash);
+        Assert.True(dsa.VerifyData(data, sig, hash));
+
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        Assert.False(dsa.VerifyData(tampered, sig, hash));
+    });
+
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(DsaSupported))]
     public void SignData_VerifiesUnderBclWithExportedPublicKey() => WithDsa(dsa =>
     {

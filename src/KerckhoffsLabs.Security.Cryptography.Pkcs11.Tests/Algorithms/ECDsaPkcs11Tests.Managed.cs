@@ -44,12 +44,20 @@ public sealed class ECDsaPkcs11Tests_Managed
     // adapter and the curve-matched hash.
     private static void WithEcDsa(string curve, Action<ECDsaPkcs11, HashAlgorithmName> body)
     {
-        var (eccurve, hash, _) = Spec(curve);
+        var (_, hash, _) = Spec(curve);
+        WithEcDsa(curve, (_, ec) => body(ec, hash));
+    }
+
+    // As above, but hands the workspace to the body (for AllowInsecure scoping) and leaves the hash to
+    // the caller — so the same key can be exercised across hash algorithms independent of the curve.
+    private static void WithEcDsa(string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
+    {
+        var (eccurve, _, _) = Spec(curve);
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
         using var key = workspace.GenerateEcKeyPair(eccurve);
         using var ec = new ECDsaPkcs11(key);
-        body(ec, hash);
+        body(workspace, ec);
     }
 
     // === Construction =====================================================
@@ -80,6 +88,32 @@ public sealed class ECDsaPkcs11Tests_Managed
         Assert.True(ec.VerifyData(data, sig, hash));
         data[0] ^= 0xFF;
         Assert.False(ec.VerifyData(data, sig, hash));
+    });
+
+    // === Sign/verify data across hash algorithms (fixed curve; hash is independent of the curve) ====
+    // The per-curve tests pair each curve with its matched hash; this pins P-256 and varies the hash so
+    // the adapter's managed-side HashData dispatch (SHA-256/384/512) is covered on one key. SHA-1 is
+    // excluded here — it requires AllowInsecure and has its own gating tests below.
+
+    [Theory]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => WithEcDsa("P-256", (_, ec) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] data = Encoding.UTF8.GetBytes($"ecdsa over {hashName}");
+        byte[] sig = ec.SignData(data, hash);
+        Assert.True(ec.VerifyData(data, sig, hash));
+
+        // Cross-verify under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
+        using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+        Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+
+        // Tamper the message: verify must fail.
+        byte[] tampered = [.. data];
+        tampered[0] ^= 0xFF;
+        Assert.False(ec.VerifyData(tampered, sig, hash));
     });
 
     // === Sign/verify data — span overloads (TrySignData / VerifyData(span)) ================
@@ -130,25 +164,13 @@ public sealed class ECDsaPkcs11Tests_Managed
     // is gated the same way regardless of whether the token exposes CKM_ECDSA_SHA1 natively.
 
     [Fact]
-    public void SignData_Sha1_GatedByDefault_Throws()
-    {
-        using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
-        using var ec = new ECDsaPkcs11(key);
-
+    public void SignData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (_, ec) =>
         Assert.Throws<InsecureOperationException>(
-            () => ec.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1));
-    }
+            () => ec.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1)));
 
     [Fact]
-    public void VerifyData_Sha1_GatedByDefault_Throws()
+    public void VerifyData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (workspace, ec) =>
     {
-        using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
-        using var ec = new ECDsaPkcs11(key);
-
         byte[] data = Encoding.UTF8.GetBytes("legacy");
         byte[] sig;
         using (workspace.AllowInsecureScope())
@@ -156,23 +178,18 @@ public sealed class ECDsaPkcs11Tests_Managed
 
         Assert.Throws<InsecureOperationException>(
             () => ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
-    }
+    });
 
     [Fact]
-    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips()
+    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithEcDsa("P-256", (workspace, ec) =>
     {
-        using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
-        using var ec = new ECDsaPkcs11(key);
-
         byte[] data = Encoding.UTF8.GetBytes("legacy");
         using (workspace.AllowInsecureScope())
         {
             byte[] sig = ec.SignData(data, HashAlgorithmName.SHA1);
             Assert.True(ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
         }
-    }
+    });
 
     // === Sign/verify hash — raw ECDSA, no on-token hashing ==================
 
