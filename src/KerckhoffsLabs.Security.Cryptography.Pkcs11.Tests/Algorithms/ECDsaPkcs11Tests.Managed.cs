@@ -125,6 +125,55 @@ public sealed class ECDsaPkcs11Tests_Managed
         Assert.False(ec.VerifyData(data, sig, hash));
     });
 
+    // === SHA-1 gating: the managed-side hash fallback is refused unless AllowInsecure ===========
+    // Mirrors GuardMechanism's rejection of the combined CKM_ECDSA_SHA1 mechanism, so SHA-1 signing
+    // is gated the same way regardless of whether the token exposes CKM_ECDSA_SHA1 natively.
+
+    [Fact]
+    public void SignData_Sha1_GatedByDefault_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var ec = new ECDsaPkcs11(key);
+
+        Assert.Throws<InsecureOperationException>(
+            () => ec.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1));
+    }
+
+    [Fact]
+    public void VerifyData_Sha1_GatedByDefault_Throws()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var ec = new ECDsaPkcs11(key);
+
+        byte[] data = Encoding.UTF8.GetBytes("legacy");
+        byte[] sig;
+        using (workspace.AllowInsecureScope())
+            sig = ec.SignData(data, HashAlgorithmName.SHA1);
+
+        Assert.Throws<InsecureOperationException>(
+            () => ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
+    }
+
+    [Fact]
+    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var ec = new ECDsaPkcs11(key);
+
+        byte[] data = Encoding.UTF8.GetBytes("legacy");
+        using (workspace.AllowInsecureScope())
+        {
+            byte[] sig = ec.SignData(data, HashAlgorithmName.SHA1);
+            Assert.True(ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
+        }
+    }
+
     // === Sign/verify hash — raw ECDSA, no on-token hashing ==================
 
     [Fact]

@@ -128,8 +128,39 @@ public sealed class ECDsaPkcs11 : ECDsa
         return _key.Sign(raw, hash);
     }
 
-    private static byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data) =>
-        hashAlgorithm.Name switch
+    // Refuse SHA-1 unless the workspace opts in via AllowInsecure, mirroring GuardMechanism's rejection
+    // of the combined CKM_ECDSA_SHA1 mechanism. Gating here (the managed-side pre-hash) closes the gap
+    // for tokens that lack the combined mechanism. SHA-1 is gated on every entry point that knows the
+    // hash algorithm — the BCL byte[]/Stream SignData/VerifyData overloads pre-hash through the
+    // protected HashData overrides below, the span overloads through the private hasher. SignHash /
+    // VerifyHash(byte[]) sign caller-supplied digest bytes and cannot know the algorithm, so they are
+    // inherently outside this gate.
+    private void GuardWeakHash(HashAlgorithmName hashAlgorithm)
+    {
+        if (hashAlgorithm.Name == "SHA1" && !_key.Workspace.AllowInsecure)
+            throw new InsecureOperationException(
+                "SHA-1 is collision-broken and deprecated in signature contexts. Set Pkcs11Workspace.AllowInsecure " +
+                "to opt in (e.g. to verify a legacy signature), or use SHA-256 or stronger.");
+    }
+
+    /// <inheritdoc/>
+    protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
+    {
+        GuardWeakHash(hashAlgorithm);
+        return base.HashData(data, offset, count, hashAlgorithm);
+    }
+
+    /// <inheritdoc/>
+    protected override byte[] HashData(Stream data, HashAlgorithmName hashAlgorithm)
+    {
+        GuardWeakHash(hashAlgorithm);
+        return base.HashData(data, hashAlgorithm);
+    }
+
+    private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data)
+    {
+        GuardWeakHash(hashAlgorithm);
+        return hashAlgorithm.Name switch
         {
             "SHA1" => System.Security.Cryptography.SHA1.HashData(data),
             "SHA256" => System.Security.Cryptography.SHA256.HashData(data),
@@ -137,6 +168,7 @@ public sealed class ECDsaPkcs11 : ECDsa
             "SHA512" => System.Security.Cryptography.SHA512.HashData(data),
             _ => throw new NotSupportedException($"ECDSA does not support hash {hashAlgorithm.Name}.")
         };
+    }
 
     // -----------------------------------------------------------------------
     // Key material

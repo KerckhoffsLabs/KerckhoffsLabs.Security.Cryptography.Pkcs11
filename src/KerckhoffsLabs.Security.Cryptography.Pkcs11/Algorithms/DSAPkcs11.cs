@@ -23,6 +23,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) from the public handle.
 /// </para>
 /// </remarks>
+[Obsolete("DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern " +
+          "deployments. Use ECDsaPkcs11 (ECDSA) or MLDsaPkcs11 (ML-DSA). DSAPkcs11 remains only for interop " +
+          "with existing DSA keys; SHA-1 hashing additionally requires the wrapped key's Pkcs11Workspace.AllowInsecure = true.")]
 public sealed class DSAPkcs11 : DSA
 {
     private readonly Pkcs11Key _key;
@@ -104,8 +107,38 @@ public sealed class DSAPkcs11 : DSA
         return _key.Sign(raw, hash);
     }
 
-    private static byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data) =>
-        hashAlgorithm.Name switch
+    // Refuse SHA-1 unless the workspace opts in via AllowInsecure, mirroring GuardMechanism's rejection
+    // of the combined CKM_DSA_SHA1 mechanism. SHA-1 is gated on every entry point that knows the hash
+    // algorithm — the BCL byte[]/Stream SignData/VerifyData overloads pre-hash through the protected
+    // HashData overrides below, the span overloads through the private hasher. CreateSignature /
+    // VerifySignature(byte[]) operate on caller-supplied digest bytes and cannot know the algorithm,
+    // so they are inherently outside this gate.
+    private void GuardWeakHash(HashAlgorithmName hashAlgorithm)
+    {
+        if (hashAlgorithm.Name == "SHA1" && !_key.Workspace.AllowInsecure)
+            throw new InsecureOperationException(
+                "SHA-1 is collision-broken and deprecated in signature contexts. Set Pkcs11Workspace.AllowInsecure " +
+                "to opt in (e.g. to verify a legacy signature), or use SHA-256 or stronger.");
+    }
+
+    /// <inheritdoc/>
+    protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
+    {
+        GuardWeakHash(hashAlgorithm);
+        return base.HashData(data, offset, count, hashAlgorithm);
+    }
+
+    /// <inheritdoc/>
+    protected override byte[] HashData(Stream data, HashAlgorithmName hashAlgorithm)
+    {
+        GuardWeakHash(hashAlgorithm);
+        return base.HashData(data, hashAlgorithm);
+    }
+
+    private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data)
+    {
+        GuardWeakHash(hashAlgorithm);
+        return hashAlgorithm.Name switch
         {
             "SHA1" => SHA1.HashData(data),
             "SHA256" => SHA256.HashData(data),
@@ -113,6 +146,7 @@ public sealed class DSAPkcs11 : DSA
             "SHA512" => SHA512.HashData(data),
             _ => throw new NotSupportedException($"DSA does not support hash {hashAlgorithm.Name}."),
         };
+    }
 
     // -----------------------------------------------------------------------
     // Key material

@@ -6,6 +6,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
+// DSAPkcs11 is intentionally [Obsolete] (DSA is disallowed by FIPS 186-5); exercising it here is deliberate.
+#pragma warning disable CS0618
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
@@ -39,6 +42,9 @@ public sealed class DSAPkcs11Tests_Managed
     // it as DSAPkcs11, and hands both the adapter and the originating BCL key to the body so tests can
     // cross-check in either direction.
     private static void WithDsa(Action<DSAPkcs11, DSA> body)
+        => WithDsa((dsa, bcl, _) => body(dsa, bcl));
+
+    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Workspace> body)
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
@@ -64,13 +70,12 @@ public sealed class DSAPkcs11Tests_Managed
             .Sign().Build();
         using var key = workspace.ImportKey(privTpl);
         using var dsa = new DSAPkcs11(key);
-        body(dsa, bcl);
+        body(dsa, bcl, workspace);
     }
 
     // === Sign / verify data: on-token round-trip + tamper rejection =======================
 
     [ConditionalTheory(nameof(DsaSupported))]
-    [InlineData("SHA1")]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
@@ -92,10 +97,40 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.False(dsa.VerifyData(data, badSig, hash));
     });
 
+    // === SHA-1 gating: the managed-side hash fallback is refused unless AllowInsecure ============
+    // Mirrors GuardMechanism's rejection of the combined CKM_DSA_SHA1 mechanism.
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void SignData_Sha1_GatedByDefault_Throws() => WithDsa((dsa, _, _) =>
+        Assert.Throws<InsecureOperationException>(
+            () => dsa.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1)));
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void VerifyData_Sha1_GatedByDefault_Throws() => WithDsa((dsa, _, workspace) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("legacy");
+        byte[] sig;
+        using (workspace.AllowInsecureScope())
+            sig = dsa.SignData(data, HashAlgorithmName.SHA1);
+
+        Assert.Throws<InsecureOperationException>(
+            () => dsa.VerifyData(data, sig, HashAlgorithmName.SHA1));
+    });
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithDsa((dsa, _, workspace) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("legacy");
+        using (workspace.AllowInsecureScope())
+        {
+            byte[] sig = dsa.SignData(data, HashAlgorithmName.SHA1);
+            Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA1));
+        }
+    });
+
     // === BCL cross-check: token signature verifies under the exported public key ==========
 
     [ConditionalTheory(nameof(DsaSupported))]
-    [InlineData("SHA1")]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
