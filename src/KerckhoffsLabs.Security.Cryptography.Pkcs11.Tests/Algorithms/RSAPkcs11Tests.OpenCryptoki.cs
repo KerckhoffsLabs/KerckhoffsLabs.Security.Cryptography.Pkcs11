@@ -84,8 +84,9 @@ public sealed class RSAPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backe
 
     // Key sizes against a second real backend. RSA < 2048 is gated behind AllowInsecure (NIST SP
     // 800-131A), so the 1024 case generates under an opt-in scope; 2048/3072/4096 need no opt-in.
-    // 8192/16384 keygen is slow (seconds to minutes) but exercises 1024/2048-byte signatures and the
-    // length-probe buffers at the OpenSSL max modulus; run only on the real backends (ubuntu legs).
+    // opencryptoki runs only on ubuntu-latest (one leg), so this is where the slow large keys live:
+    // 8192/16384 (the OpenSSL max modulus) exercise 1024/2048-byte signatures and the length-probe
+    // buffers without multiplying multi-minute keygen across every platform leg.
     [ConditionalTheory(nameof(Available))]
     [InlineData(1024)]
     [InlineData(2048)]

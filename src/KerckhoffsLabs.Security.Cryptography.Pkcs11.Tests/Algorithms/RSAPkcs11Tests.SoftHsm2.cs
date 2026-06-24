@@ -89,15 +89,13 @@ public sealed class RSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     // RSA < 2048 is gated behind AllowInsecure (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
 
-    // 8192/16384 keygen is slow (seconds to minutes) but exercises 1024/2048-byte signatures and the
-    // length-probe buffers at the OpenSSL max modulus; run only on the real backends (ubuntu legs).
+    // The SoftHSM suite runs on every platform leg, so the slow large keys (8192/16384) live in the
+    // opencryptoki suite instead (ubuntu-latest only) to avoid multi-minute keygen on all legs.
     [ConditionalTheory(nameof(SoftHsmAvailable))]
     [InlineData(1024)]
     [InlineData(2048)]
     [InlineData(3072)]
     [InlineData(4096)]
-    [InlineData(8192)]
-    [InlineData(16384)]
     public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits)
     {
         using var workspace = OpenWorkspace();
