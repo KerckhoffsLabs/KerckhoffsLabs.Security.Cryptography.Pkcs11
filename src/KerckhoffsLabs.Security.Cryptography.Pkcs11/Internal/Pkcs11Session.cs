@@ -700,6 +700,14 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_RSA_X_509:
                 throw new InsecureOperationException(mechanism,
                     "Raw RSA (X.509, no padding) is malleable and forgeable; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
+            case CKM.CKM_DSA:
+            case CKM.CKM_DSA_SHA1:
+            case CKM.CKM_DSA_SHA224:
+            case CKM.CKM_DSA_SHA256:
+            case CKM.CKM_DSA_SHA384:
+            case CKM.CKM_DSA_SHA512:
+                throw new InsecureOperationException(mechanism,
+                    "DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys; use CKM_ECDSA_SHA256 or CKM_ML_DSA.");
             case CKM.CKM_CAST_ECB:
             case CKM.CKM_CAST_CBC:
             case CKM.CKM_CAST_CBC_PAD:

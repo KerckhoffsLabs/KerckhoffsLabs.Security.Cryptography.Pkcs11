@@ -79,54 +79,40 @@ public sealed class DSAPkcs11Tests_Managed
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
-    public void SignVerifyData_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _) =>
+    public void SignVerifyData_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _, workspace) =>
     {
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes($"dsa round trip over {hashName}");
-        byte[] sig = dsa.SignData(data, hash);
-        Assert.True(dsa.VerifyData(data, sig, hash));
-
-        // Tamper the message: verify must fail.
-        byte[] tampered = (byte[])data.Clone();
-        tampered[0] ^= 0xFF;
-        Assert.False(dsa.VerifyData(tampered, sig, hash));
-
-        // Tamper the signature: verify must fail.
-        byte[] badSig = (byte[])sig.Clone();
-        badSig[0] ^= 0xFF;
-        Assert.False(dsa.VerifyData(data, badSig, hash));
-    });
-
-    // === SHA-1 gating: the managed-side hash fallback is refused unless AllowInsecure ============
-    // Mirrors GuardMechanism's rejection of the combined CKM_DSA_SHA1 mechanism.
-
-    [ConditionalFact(nameof(DsaSupported))]
-    public void SignData_Sha1_GatedByDefault_Throws() => WithDsa((dsa, _, _) =>
-        Assert.Throws<InsecureOperationException>(
-            () => dsa.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1)));
-
-    [ConditionalFact(nameof(DsaSupported))]
-    public void VerifyData_Sha1_GatedByDefault_Throws() => WithDsa((dsa, _, workspace) =>
-    {
-        byte[] data = Encoding.UTF8.GetBytes("legacy");
-        byte[] sig;
-        using (workspace.AllowInsecureScope())
-            sig = dsa.SignData(data, HashAlgorithmName.SHA1);
-
-        Assert.Throws<InsecureOperationException>(
-            () => dsa.VerifyData(data, sig, HashAlgorithmName.SHA1));
-    });
-
-    [ConditionalFact(nameof(DsaSupported))]
-    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithDsa((dsa, _, workspace) =>
-    {
-        byte[] data = Encoding.UTF8.GetBytes("legacy");
+        // DSA is FIPS-186-5-disallowed and gated at the mechanism layer; opt in to exercise it.
         using (workspace.AllowInsecureScope())
         {
-            byte[] sig = dsa.SignData(data, HashAlgorithmName.SHA1);
-            Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA1));
+            byte[] sig = dsa.SignData(data, hash);
+            Assert.True(dsa.VerifyData(data, sig, hash));
+
+            // Tamper the message: verify must fail.
+            byte[] tampered = (byte[])data.Clone();
+            tampered[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData(tampered, sig, hash));
+
+            // Tamper the signature: verify must fail.
+            byte[] badSig = (byte[])sig.Clone();
+            badSig[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData(data, badSig, hash));
         }
     });
+
+    // === Secure-defaults gate: DSA is insecure as an algorithm, so every sign/verify is refused =====
+    // unless AllowInsecure (GuardMechanism gates all CKM_DSA* — raw and combined, every hash).
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void SignData_GatedByDefault_Throws() => WithDsa((dsa, _) =>
+        Assert.Throws<InsecureOperationException>(
+            () => dsa.SignData(Encoding.UTF8.GetBytes("x"), HashAlgorithmName.SHA256)));
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void CreateSignature_GatedByDefault_Throws() => WithDsa((dsa, _) =>
+        Assert.Throws<InsecureOperationException>(
+            () => dsa.CreateSignature(SHA256.HashData("x"u8.ToArray()))));
 
     // === BCL cross-check: token signature verifies under the exported public key ==========
 
@@ -134,11 +120,13 @@ public sealed class DSAPkcs11Tests_Managed
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
-    public void SignData_VerifiesUnderBclWithExportedPublicKey(string hashName) => WithDsa((dsa, _) =>
+    public void SignData_VerifiesUnderBclWithExportedPublicKey(string hashName) => WithDsa((dsa, _, workspace) =>
     {
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes("interop with the BCL");
-        byte[] sig = dsa.SignData(data, hash);
+        byte[] sig;
+        using (workspace.AllowInsecureScope())
+            sig = dsa.SignData(data, hash);
 
         // Export the token's public parameters and verify the token signature with the BCL.
         DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
@@ -149,37 +137,43 @@ public sealed class DSAPkcs11Tests_Managed
 
     // Reverse direction: a signature produced by the originating BCL key must verify on-token.
     [ConditionalFact(nameof(DsaSupported))]
-    public void VerifyData_BclSignature_OnToken() => WithDsa((dsa, bcl) =>
+    public void VerifyData_BclSignature_OnToken() => WithDsa((dsa, bcl, workspace) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("signed by the BCL, verified on the token");
         byte[] sig = bcl.SignData(data, HashAlgorithmName.SHA256);
-        Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
+        using (workspace.AllowInsecureScope())
+            Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
     });
 
     // === Sign / verify a hash: raw CKM_DSA, IEEE P1363 (r‖s) ==============================
 
     [ConditionalFact(nameof(DsaSupported))]
-    public void CreateSignature_VerifySignature_OverHash_RoundTrips() => WithDsa((dsa, _) =>
+    public void CreateSignature_VerifySignature_OverHash_RoundTrips() => WithDsa((dsa, _, workspace) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("hash to sign"));
-        byte[] sig = dsa.CreateSignature(hash);
-        Assert.True(dsa.VerifySignature(hash, sig));
+        using (workspace.AllowInsecureScope())
+        {
+            byte[] sig = dsa.CreateSignature(hash);
+            Assert.True(dsa.VerifySignature(hash, sig));
 
-        // P1363 r‖s: each component is q-sized (the subprime length of the exported domain).
-        DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
-        Assert.Equal(2 * pub.Q!.Length, sig.Length);
+            // P1363 r‖s: each component is q-sized (the subprime length of the exported domain).
+            DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
+            Assert.Equal(2 * pub.Q!.Length, sig.Length);
 
-        byte[] badSig = (byte[])sig.Clone();
-        badSig[0] ^= 0xFF;
-        Assert.False(dsa.VerifySignature(hash, badSig));
+            byte[] badSig = (byte[])sig.Clone();
+            badSig[0] ^= 0xFF;
+            Assert.False(dsa.VerifySignature(hash, badSig));
+        }
     });
 
     // The raw-hash signature must also verify under the BCL public key.
     [ConditionalFact(nameof(DsaSupported))]
-    public void CreateSignature_VerifiesUnderBcl() => WithDsa((dsa, _) =>
+    public void CreateSignature_VerifiesUnderBcl() => WithDsa((dsa, _, workspace) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("raw hash interop"));
-        byte[] sig = dsa.CreateSignature(hash);
+        byte[] sig;
+        using (workspace.AllowInsecureScope())
+            sig = dsa.CreateSignature(hash);
 
         DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
         using var bcl = DSA.Create();

@@ -70,11 +70,17 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
             throw new SkipTestException("Token does not implement CKM_DSA.");
     }
 
-    // Generates a DSA key pair on the token from the fixed domain parameters and hands DSAPkcs11 to the body.
+    // Generates a DSA key pair on the token from the fixed domain parameters and hands DSAPkcs11 to the
+    // body. DSA is FIPS-186-5-disallowed and every CKM_DSA* sign/verify is gated at the mechanism layer,
+    // so the functional overload opts into AllowInsecure; the gated-by-default test passes false.
     private void WithDsa(Action<DSAPkcs11> body)
+        => WithDsa(allowInsecure: true, (_, dsa) => body(dsa));
+
+    private void WithDsa(bool allowInsecure, Action<Pkcs11Workspace, DSAPkcs11> body)
     {
         RequireDsa();
         using var workspace = OpenWorkspace();
+        if (allowInsecure) workspace.AllowInsecure = true;
         string label = $"dsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -91,7 +97,7 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         try
         {
             using var dsa = new DSAPkcs11(key);
-            body(dsa);
+            body(workspace, dsa);
         }
         finally
         {
@@ -130,6 +136,13 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
         tampered[0] ^= 0xFF;
         Assert.False(dsa.VerifyData(tampered, sig, HashAlgorithmName.SHA256));
     });
+
+    // DSA is gated at the mechanism layer against the real token: signing is refused without AllowInsecure,
+    // even though SoftHSM advertises CKM_DSA_SHA256. (Key generation is not gated, so this still sets up.)
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void SignData_GatedByDefault_Throws() => WithDsa(allowInsecure: false, (_, dsa) =>
+        Assert.Throws<InsecureOperationException>(
+            () => dsa.SignData(Encoding.UTF8.GetBytes("x"), HashAlgorithmName.SHA256)));
 
     [ConditionalFact(nameof(SoftHsmAvailable), nameof(DsaSupported))]
     public void SignData_VerifiesUnderBclWithExportedPublicKey() => WithDsa(dsa =>
