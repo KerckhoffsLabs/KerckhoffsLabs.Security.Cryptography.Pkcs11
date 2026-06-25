@@ -1,59 +1,23 @@
-using System.Security.Cryptography;
-using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
-/// <summary>
-/// SHA3-512 against the second real backend (opencryptoki), whose software token implements
-/// <c>CKM_SHA3_512</c> (since the 3.27 series). Checked against the FIPS 202 vector and the BCL.
-/// </summary>
+/// <summary>SHA3_512Pkcs11 over opencryptoki — thin wrapper over <see cref="SHA3_512Pkcs11TestCases"/>.</summary>
 [Collection("OpenCryptoki")]
 public sealed class SHA3_512Pkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
     public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    // Opens a workspace (logging in) and a digest, runs the body, then disposes both. The workspace
-    // MUST be disposed so the per-token login is released — otherwise the next test's C_Login fails
-    // with CKR_USER_ALREADY_LOGGED_IN.
-    private void WithSha(Action<SHA3_512Pkcs11> body)
-    {
-        if (!_backend.Supports(CKM.CKM_SHA3_512))
-            throw new SkipTestException("opencryptoki: CKM_SHA3_512 not available");
-        using var workspace = _backend.Library.OpenWorkspace(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
-        using var sha = new SHA3_512Pkcs11(workspace);
-        body(sha);
-    }
+    [ConditionalFact(nameof(Available))]
+    public void ComputeHash_KnownAnswer() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_KnownAnswer(_backend);
 
     [ConditionalFact(nameof(Available))]
-    public void ComputeHash_KnownAnswer_MatchesFips202Vector() => WithSha(sha =>
-    {
-        byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes("abc"));
-        byte[] expected = Convert.FromHexString(
-            "B751850B1A57168A5693CD924B6B096E08F621827444F70D884F5D0240D2712E10E116E9192AF3C91A7EC57647E3934057340B4CF408D5A56592F8274EEC53F0");
-        Assert.Equal(64, digest.Length);
-        Assert.Equal(expected, digest);
-    });
+    public void ComputeHash_MatchesBcl() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_MatchesBcl(_backend);
 
     [ConditionalFact(nameof(Available))]
-    public void ComputeHash_MatchesBcl() => WithSha(sha =>
-    {
-        byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
-        Assert.Equal(SHA3_512.HashData(data), sha.ComputeHash(data));
-    });
+    public void ComputeHash_Streamed_MatchesOneShot() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_Streamed_MatchesOneShot(_backend);
 
     [ConditionalFact(nameof(Available))]
-    public void ComputeHash_Streamed_MatchesOneShot() => WithSha(sha =>
-    {
-        byte[] part1 = Encoding.UTF8.GetBytes("hello ");
-        byte[] part2 = Encoding.UTF8.GetBytes("world");
-        sha.TransformBlock(part1, 0, part1.Length, null, 0);
-        sha.TransformFinalBlock(part2, 0, part2.Length);
-        Assert.Equal(SHA3_512.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash!);
-    });
+    public void Reuse_AfterInitialize_ProducesFreshHash() => SHA3_512Pkcs11TestCases.Assert_Reuse_AfterInitialize_ProducesFreshHash(_backend);
 }

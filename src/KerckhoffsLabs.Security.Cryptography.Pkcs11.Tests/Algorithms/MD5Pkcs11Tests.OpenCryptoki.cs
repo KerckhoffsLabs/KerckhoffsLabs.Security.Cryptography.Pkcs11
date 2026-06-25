@@ -1,20 +1,8 @@
-using System.Security.Cryptography;
-using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
-// MD5Pkcs11 is [Obsolete] (broken crypto); the gate is the point of the type, so CS0618 is
-// suppressed deliberately at the use sites.
-#pragma warning disable CS0618
-
-/// <summary>
-/// MD5 digest against the second real backend (opencryptoki). MD5 is gated by the secure-defaults
-/// policy; under AllowInsecure the token digest must match the BCL.
-/// </summary>
+/// <summary>MD5Pkcs11 over opencryptoki — thin wrapper over <see cref="MD5Pkcs11TestCases"/>.</summary>
 [Collection("OpenCryptoki")]
 public sealed class MD5Pkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
@@ -22,18 +10,8 @@ public sealed class MD5Pkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backe
     public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
     [ConditionalFact(nameof(Available))]
-    public void ComputeHash_UnderAllowInsecure_MatchesBcl()
-    {
-        if (!_backend.Supports(CKM.CKM_MD5))
-            throw new SkipTestException("opencryptoki: CKM_MD5 not available");
+    public void ComputeHash_GatedByDefault_Throws() => MD5Pkcs11TestCases.Assert_ComputeHash_GatedByDefault_Throws(_backend);
 
-        using var workspace = _backend.Library.OpenWorkspace(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
-        workspace.AllowInsecure = true;
-        using var md5 = new MD5Pkcs11(workspace);
-
-        byte[] data = Encoding.UTF8.GetBytes("abc");
-        Assert.Equal(MD5.HashData(data), md5.ComputeHash(data));
-    }
+    [ConditionalFact(nameof(Available))]
+    public void ComputeHash_WithAllowInsecure_MatchesBcl() => MD5Pkcs11TestCases.Assert_ComputeHash_WithAllowInsecure_MatchesBcl(_backend);
 }
-#pragma warning restore CS0618
