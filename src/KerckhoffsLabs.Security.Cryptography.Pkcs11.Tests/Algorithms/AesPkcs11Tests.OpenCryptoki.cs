@@ -1,71 +1,53 @@
-using System.Security.Cryptography;
-using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
-/// <summary>
-/// AES-CBC against the second real backend (opencryptoki), cross-checked against the BCL for the same
-/// imported key. CBC is unauthenticated and gated by the secure-defaults policy, so it needs AllowInsecure.
-/// </summary>
+/// <summary>AesPkcs11 over OpenCryptoki — thin wrapper over <see cref="AesPkcs11TestCases"/>.</summary>
 [Collection("OpenCryptoki")]
 public sealed class AesPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
     public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    private static readonly byte[] Key256 =
-        Convert.FromHexString("000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F");
-    private static readonly byte[] Iv16 =
-        Convert.FromHexString("0F0E0D0C0B0A09080706050403020100");
-
-    private void Require(CKM mechanism)
-    {
-        if (!_backend.Supports(mechanism))
-            throw new SkipTestException($"opencryptoki: {mechanism} not available");
-    }
-
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspace(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
-
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
-    {
-        using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter)) { k.Delete(); k.Dispose(); }
-    }
-
-    private void WithImportedAes(Action<Pkcs11Workspace, AesPkcs11> body)
-    {
-        Require(CKM.CKM_AES_CBC);
-        using var workspace = OpenWorkspace();
-        string label = $"octk-aes-{Guid.NewGuid():N}";
-        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).Value(Key256).Encrypt().Decrypt().OnToken().Build();
-        try
-        {
-            using var key = workspace.ImportKey(tpl);
-            using var aes = new AesPkcs11(key);
-            body(workspace, aes);
-        }
-        finally { DestroyByLabel(workspace, label); }
-    }
+    [ConditionalFact(nameof(Available))]
+    public void Ctor_NonAesKey_Throws() => AesPkcs11TestCases.Assert_Ctor_NonAesKey_Throws(_backend);
 
     [ConditionalFact(nameof(Available))]
-    public void EncryptCbc_Pkcs7_UnderAllowInsecure_MatchesBcl() => WithImportedAes((workspace, aes) =>
-    {
-        byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC over an opencryptoki token key — variable length.");
+    public void EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl() => AesPkcs11TestCases.Assert_EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl(_backend);
 
-        workspace.AllowInsecure = true;
-        using var bcl = Aes.Create();
-        bcl.Key = Key256;
+    [ConditionalFact(nameof(Available))]
+    public void EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl() => AesPkcs11TestCases.Assert_EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl(_backend);
 
-        byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
-        Assert.Equal(bcl.EncryptCbc(plaintext, Iv16), ct);
-        Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16));
-    });
+    [ConditionalFact(nameof(Available))]
+    public void Cfb_GatedByDefault_Throws() => AesPkcs11TestCases.Assert_Cfb_GatedByDefault_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void Cfb_WithAllowInsecure_GateBypassed() => AesPkcs11TestCases.Assert_Cfb_WithAllowInsecure_GateBypassed(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void Cfb_NonNonePadding_Throws() => AesPkcs11TestCases.Assert_Cfb_NonNonePadding_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void EncryptCbc_UnsupportedPadding_Throws() => AesPkcs11TestCases.Assert_EncryptCbc_UnsupportedPadding_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void EncryptEcb_GatedByDefault_Throws() => AesPkcs11TestCases.Assert_EncryptEcb_GatedByDefault_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void EncryptEcb_WithAllowInsecure_MatchesBcl() => AesPkcs11TestCases.Assert_EncryptEcb_WithAllowInsecure_MatchesBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void GenerateIV_ProducesBlockSizedIv() => AesPkcs11TestCases.Assert_GenerateIV_ProducesBlockSizedIv(_backend);
+
+    [ConditionalTheory(nameof(Available))]
+    [InlineData(16, 128)]
+    [InlineData(32, 256)]
+    public void KeySize_ReflectsTokenKeyLength(int keyBytes, int expectedBits)
+        => AesPkcs11TestCases.Assert_KeySize_ReflectsTokenKeyLength(_backend, keyBytes, expectedBits);
+
+    [ConditionalFact(nameof(Available))]
+    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => AesPkcs11TestCases.Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void ManagedKeyAndStreamingSurface_NotSupported() => AesPkcs11TestCases.Assert_ManagedKeyAndStreamingSurface_NotSupported(_backend);
 }
