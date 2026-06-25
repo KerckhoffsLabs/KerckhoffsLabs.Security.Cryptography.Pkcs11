@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -26,4 +27,11 @@ public interface IPkcs11Backend
 
     /// <summary>Label of the fixture's token.</summary>
     string TokenLabel { get; }
+
+    /// <summary>Mechanisms the loaded token advertises (from <c>C_GetMechanismList</c>). Lets shared,
+    /// backend-agnostic test cases gate per mechanism and skip where a backend lacks support.</summary>
+    IReadOnlySet<CKM> SupportedMechanisms { get; }
+
+    /// <summary>True if the token advertises <paramref name="mechanism"/>.</summary>
+    bool Supports(CKM mechanism);
 }

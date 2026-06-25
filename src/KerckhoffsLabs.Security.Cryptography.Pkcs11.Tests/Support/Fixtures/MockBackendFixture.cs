@@ -1,5 +1,6 @@
 using System.Text;
 using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -16,6 +17,9 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
     public ReadOnlyMemory<byte> SoPin { get; } = Encoding.UTF8.GetBytes(Settings.SoPin);
     public ReadOnlyMemory<byte> UserPin { get; } = Encoding.UTF8.GetBytes(Settings.UserPin);
     public string TokenLabel { get; } = "Pkcs11Interop";
+    public IReadOnlySet<CKM> SupportedMechanisms { get; } = new HashSet<CKM>();
+
+    public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
     public MockBackendFixture()
     {
@@ -34,6 +38,7 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
 
             // Slot.SlotId is ulong; cast to NativeCULong via the explicit operator.
             SlotId = (NativeCULong)slots[0].SlotId;
+            SupportedMechanisms = new HashSet<CKM>(slots[0].GetMechanismList());
         }
         catch
         {
