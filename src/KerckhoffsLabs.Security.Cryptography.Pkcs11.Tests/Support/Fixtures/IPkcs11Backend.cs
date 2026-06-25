@@ -34,4 +34,17 @@ public interface IPkcs11Backend
 
     /// <summary>True if the token advertises <paramref name="mechanism"/>.</summary>
     bool Supports(CKM mechanism);
+
+    /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the
+    /// advertised <see cref="CKM.CKM_ML_DSA"/>; SoftHSM overrides this with a build marker because the
+    /// real capability depends on the OpenSSL it was built against, not just the mechanism list.</summary>
+    bool SupportsMlDsa => Supports(CKM.CKM_ML_DSA);
+
+    /// <summary>True if the backend can generate and operate ML-KEM (FIPS 203) keys. Defaults to the
+    /// advertised <see cref="CKM.CKM_ML_KEM"/>; SoftHSM overrides this with a build marker.</summary>
+    bool SupportsMlKem => Supports(CKM.CKM_ML_KEM);
+
+    /// <summary>True if the backend can generate and operate SLH-DSA (FIPS 205) keys. Defaults to the
+    /// advertised <see cref="CKM.CKM_SLH_DSA"/>; SoftHSM overrides this with a build marker.</summary>
+    bool SupportsSlhDsa => Supports(CKM.CKM_SLH_DSA);
 }

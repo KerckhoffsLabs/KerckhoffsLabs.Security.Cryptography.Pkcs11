@@ -36,6 +36,15 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
+    // PQC capability is gated by the build marker, not the advertised mechanism list: a SoftHSM build
+    // can list a PQC mechanism without a working operation path (it depends on the OpenSSL it links).
+    /// <inheritdoc/>
+    public bool SupportsMlDsa => SoftHsmSupportsMlDsa;
+    /// <inheritdoc/>
+    public bool SupportsMlKem => SoftHsmSupportsMlKem;
+    /// <inheritdoc/>
+    public bool SupportsSlhDsa => SoftHsmSupportsSlhDsa;
+
     // === SoftHSM 2.7 capability gates ======================================
     // These are static so they can be passed to [ConditionalFact(nameof(...))],
     // which is evaluated before any fixture instance exists. They encode the
