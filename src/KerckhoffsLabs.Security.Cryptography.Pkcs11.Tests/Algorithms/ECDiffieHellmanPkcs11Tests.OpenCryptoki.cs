@@ -1,71 +1,44 @@
-using System.Security.Cryptography;
-using BclECCurve = System.Security.Cryptography.ECCurve;
-using System.Text;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
-/// <summary>
-/// ECDH (P-256, CKD_NULL) against the second real backend (opencryptoki): the raw shared secret a
-/// token key derives against a BCL peer must equal the secret the BCL derives against the token's
-/// public key.
-/// </summary>
+/// <summary>ECDiffieHellmanPkcs11Tests over OpenCryptoki — thin wrapper over <see cref="ECDiffieHellmanPkcs11TestCases"/>.</summary>
 [Collection("OpenCryptoki")]
 public sealed class ECDiffieHellmanPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
     public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    private void Require(params CKM[] mechanisms)
-    {
-        foreach (var m in mechanisms)
-            if (!_backend.Supports(m))
-                throw new SkipTestException($"opencryptoki: {m} not available");
-    }
-
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspace(
-            _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
-
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
-    {
-        using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter)) { k.Delete(); k.Dispose(); }
-    }
-
-    private void WithEcdh(Action<ECDiffieHellmanPkcs11> body)
-    {
-        Require(CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_ECDH1_DERIVE);
-        using var workspace = OpenWorkspace();
-        string label = $"octk-ecdh-{Guid.NewGuid():N}";
-        byte[] id = Encoding.ASCII.GetBytes(label);
-        using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .Label(label).Id(id).EcParams(TestKeys.EcP256Oid).Build();
-        using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
-            .Label(label).Id(id).Derive().Build();
-        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl);
-        try
-        {
-            using var ecdh = new ECDiffieHellmanPkcs11(key);
-            body(ecdh);
-        }
-        finally
-        {
-            try { DestroyByLabel(workspace, label); } catch { /* best-effort */ }
-            key.Dispose();
-        }
-    }
+    [ConditionalFact(nameof(Available))]
+    public void Ctor_NonEcKey_Throws() => ECDiffieHellmanPkcs11TestCases.Assert_Ctor_NonEcKey_Throws(_backend);
 
     [ConditionalFact(nameof(Available))]
-    public void DeriveRawSecretAgreement_MatchesBcl() => WithEcdh(alice =>
-    {
-        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
-        byte[] aliceZ = alice.DeriveRawSecretAgreement(bob.PublicKey);
-        byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
-        Assert.Equal(bobZ, aliceZ);
-    });
+    public void DeriveKeyFromHash_AgreesWithBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyFromHash_AgreesWithBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void DeriveKeyFromHash_WithPrependAppend_AgreesWithBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyFromHash_WithPrependAppend_AgreesWithBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void DeriveKeyFromHmac_AgreesWithBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyFromHmac_AgreesWithBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void DeriveKeyFromHmac_NullKey_UsesSecret_AgreesWithBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyFromHmac_NullKey_UsesSecret_AgreesWithBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void DeriveRawSecretAgreement_MatchesBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveRawSecretAgreement_MatchesBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void DeriveKeyMaterial_AgreesWithBcl() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyMaterial_AgreesWithBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void PublicKey_ExportsTokenPoint() => ECDiffieHellmanPkcs11TestCases.Assert_PublicKey_ExportsTokenPoint(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void DeriveKeyTls_NotSupported() => ECDiffieHellmanPkcs11TestCases.Assert_DeriveKeyTls_NotSupported(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void ExportParameters_Private_ThrowsInsecure() => ECDiffieHellmanPkcs11TestCases.Assert_ExportParameters_Private_ThrowsInsecure(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void ImportParameters_NotSupported() => ECDiffieHellmanPkcs11TestCases.Assert_ImportParameters_NotSupported(_backend);
 }
