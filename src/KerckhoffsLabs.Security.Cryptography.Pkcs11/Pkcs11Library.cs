@@ -364,18 +364,9 @@ public sealed class Pkcs11Library : IDisposable
         ArgumentNullException.ThrowIfNull(slotLabel);
         ArgumentNullException.ThrowIfNull(pin);
 
-        Pkcs11Slot? matched = null;
-        foreach (var slot in GetSlotList())
-        {
-            if (slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
-            {
-                matched = slot;
-                break;
-            }
-        }
-
-        if (matched is null)
-            throw new ArgumentException(
+        Pkcs11Slot matched = GetSlotList()
+            .FirstOrDefault(slot => slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
+            ?? throw new ArgumentException(
                 $"No slot found with token label '{slotLabel}'.", nameof(slotLabel));
 
         var session = matched.OpenSession();

@@ -811,15 +811,12 @@ internal sealed class Pkcs11Session : IDisposable
 
         if (!_disposed)
         {
-            if (disposing)
+            // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
+            // Honour _closeWhenDisposed: only close if the caller wants automatic close on dispose.
+            if (disposing && _closeWhenDisposed)
             {
-                // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
-                // Honour _closeWhenDisposed: only close if the caller wants automatic close on dispose.
-                if (_closeWhenDisposed)
-                {
-                    _sessionHandle?.Dispose();
-                    _sessionHandle = null!;
-                }
+                _sessionHandle?.Dispose();
+                _sessionHandle = null!;
             }
 
             // No unmanaged resources owned by Session directly — Pkcs11SessionHandle owns the
@@ -1619,7 +1616,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -1655,11 +1652,11 @@ internal sealed class Pkcs11Session : IDisposable
             byte[]? lastEncryptedPart = null;
             NativeCULong lastEncryptedPartLen = (NativeCULong)0;
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
             lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
             finalized = true;
 
             if (lastEncryptedPartLen > (NativeCULong)0)
@@ -1802,7 +1799,7 @@ internal sealed class Pkcs11Session : IDisposable
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
 
         // Use input length as the initial output buffer size — avoids a null-probe call
         // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
@@ -1875,12 +1872,12 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
 
         bool finalized = false;
         try
@@ -1911,11 +1908,11 @@ internal sealed class Pkcs11Session : IDisposable
             byte[]? lastPart = null;
             NativeCULong lastPartLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
             lastPart = new byte[(int)lastPartLen];
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
             finalized = true;
 
             if (lastPartLen > (NativeCULong)0)
@@ -2145,7 +2142,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(signature);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -2325,7 +2322,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(signature);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckVerificationMechanism = (CK_MECHANISM)verificationMechanism.ToMarshalableStructure();
 
@@ -2335,7 +2332,7 @@ internal sealed class Pkcs11Session : IDisposable
         CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
 
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
 
         byte[] encryptedPart = new byte[bufferLength];
         byte[] part = new byte[bufferLength];
@@ -2363,11 +2360,11 @@ internal sealed class Pkcs11Session : IDisposable
         byte[]? lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[(int)lastPartLen];
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-        Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         if (lastPartLen > (NativeCULong)0)
             outputStream.Write(lastPart, 0, (int)(lastPartLen));
@@ -2376,9 +2373,13 @@ internal sealed class Pkcs11Session : IDisposable
         isValid = IsVerified(rv, "C_VerifyFinal");
     }
 
-    // Native function names for error context, used across the digest paths below (S1192).
+    // Native function names and shared messages for error context, deduplicated per S1192.
     private const string OpDigestInit = "C_DigestInit";
     private const string OpDigestFinal = "C_DigestFinal";
+    private const string OpEncryptFinal = "C_EncryptFinal";
+    private const string OpDecryptInit = "C_DecryptInit";
+    private const string OpDecryptFinal = "C_DecryptFinal";
+    private const string ValueMustBePositive = "Value has to be positive number";
 
     /// <summary>
     /// Digests the value of a secret key
@@ -2510,7 +2511,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(inputStream);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
 
@@ -2642,7 +2643,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
 
@@ -2686,11 +2687,11 @@ internal sealed class Pkcs11Session : IDisposable
             byte[]? lastEncryptedPart = null;
             NativeCULong lastEncryptedPartLen = (NativeCULong)0;
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
             lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_EncryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
             encryptFinalized = true;
 
             if (lastEncryptedPartLen > (NativeCULong)0)
@@ -2814,7 +2815,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(outputStream);
 
         if (bufferLength < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(bufferLength));
+            throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
 
@@ -2829,7 +2830,7 @@ internal sealed class Pkcs11Session : IDisposable
             CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
 
             rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
-            Pkcs11Exception.ThrowIfError(rv, "C_DecryptInit");
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
             decryptInited = true;
 
             byte[] encryptedPart = new byte[bufferLength];
@@ -2858,11 +2859,11 @@ internal sealed class Pkcs11Session : IDisposable
             byte[]? lastPart = null;
             NativeCULong lastPartLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
             lastPart = new byte[(int)lastPartLen];
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DecryptFinal");
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
             decryptFinalized = true;
 
             if (lastPartLen > (NativeCULong)0)
@@ -3006,7 +3007,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateRandom");
 
         if (length < 1)
-            throw new ArgumentException("Value has to be positive number", nameof(length));
+            throw new ArgumentException(ValueMustBePositive, nameof(length));
 
         byte[] randomData = new byte[length];
         CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, (NativeCULong)(length));
