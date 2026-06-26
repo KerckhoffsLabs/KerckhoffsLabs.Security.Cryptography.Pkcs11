@@ -82,7 +82,7 @@ public sealed class UnmanagedMemoryTests
         try
         {
             UnmanagedMemory.Write(p, new byte[] { 1, 2, 3, 4 });
-            Assert.Equal(new byte[] { 1, 2, 3, 4 }, UnmanagedMemory.Read(p, 4));
+            Assert.Equal([1, 2, 3, 4], UnmanagedMemory.Read(p, 4));
 
             byte[] into = new byte[4];
             UnmanagedMemory.Read(p, into);
@@ -102,7 +102,7 @@ public sealed class UnmanagedMemoryTests
         try
         {
             UnmanagedMemory.Write(p, (ReadOnlySpan<byte>)new byte[] { 7, 8, 9 });
-            Assert.Equal(new byte[] { 7, 8, 9 }, UnmanagedMemory.Read(p, 3));
+            Assert.Equal([7, 8, 9], UnmanagedMemory.Read(p, 3));
         }
         finally { UnmanagedMemory.Free(ref p); }
     }

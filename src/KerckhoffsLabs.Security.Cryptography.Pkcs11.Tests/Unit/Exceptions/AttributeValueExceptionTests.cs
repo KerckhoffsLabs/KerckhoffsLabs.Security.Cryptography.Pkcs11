@@ -77,10 +77,8 @@ public sealed class AttributeValueExceptionTests
         Assert.Contains("could not be converted", ex.Message);
     }
 
+    // The ulong overloads narrow via Convert.ToUInt32, which throws on values that don't fit.
     [Fact]
-    public void UlongCtor_OutOfUintRange_Throws()
-    {
-        // The ulong overloads narrow via Convert.ToUInt32, which throws on values that don't fit.
+    public void UlongCtor_OutOfUintRange_Throws() =>
         Assert.Throws<OverflowException>(() => new AttributeValueException(ulong.MaxValue));
-    }
 }

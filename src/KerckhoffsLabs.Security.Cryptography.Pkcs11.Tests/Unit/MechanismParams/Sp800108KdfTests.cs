@@ -146,12 +146,12 @@ public sealed class Sp800108KdfTests
             Assert.NotEqual(IntPtr.Zero, dk1.Template);
 
             // Slots start at CK_INVALID_HANDLE (0) until the token populates them.
-            Assert.Equal(new ulong[] { 0, 0 }, p.AdditionalDerivedKeys);
+            Assert.Equal([0, 0], p.AdditionalDerivedKeys);
 
             // Simulate the token writing the derived handles into the phKey slots.
             WriteHandle(dk0.Key, 0x111);
             WriteHandle(dk1.Key, 0x222);
-            Assert.Equal(new ulong[] { 0x111, 0x222 }, p.AdditionalDerivedKeys);
+            Assert.Equal([0x111, 0x222], p.AdditionalDerivedKeys);
         }
         finally
         {

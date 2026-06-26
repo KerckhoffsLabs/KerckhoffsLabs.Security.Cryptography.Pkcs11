@@ -13,7 +13,7 @@ public sealed class ObjectTemplateBuilderHelpersTests
     {
         using var template = ObjectTemplate.Empty()
             .Label("my-key")
-            .Id(new byte[] { 0x01, 0x02 })
+            .Id([0x01, 0x02])
             .OnToken()
             .Build();
 

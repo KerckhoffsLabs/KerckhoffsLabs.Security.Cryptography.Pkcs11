@@ -103,7 +103,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     {
         var s = NewSession(new KeyFake { UnwrappedId = 0x77 });
         using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
-        Assert.Equal(0x77UL, s.UnwrapKey(mech, new ObjectHandle(1), new byte[] { 1, 2, 3 }, []).ObjectId);
+        Assert.Equal(0x77UL, s.UnwrapKey(mech, new ObjectHandle(1), [1, 2, 3], []).ObjectId);
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     {
         var s = NewSession(new KeyFake { UnwrapRv = CKR.CKR_WRAPPED_KEY_INVALID });
         using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.UnwrapKey(mech, new ObjectHandle(1), new byte[] { 1, 2, 3 }, []));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.UnwrapKey(mech, new ObjectHandle(1), [1, 2, 3], []));
     }
 
     // === DeriveKey ==========================================================

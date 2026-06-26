@@ -222,7 +222,7 @@ public sealed class Pkcs11SessionLifecycleTests
     public void GenerateRandom_Span_Empty_ReturnsZero()
     {
         var s = NewSession();
-        Assert.Equal(0, s.GenerateRandom(Span<byte>.Empty));
+        Assert.Equal(0, s.GenerateRandom([]));
     }
 
     [Fact]
@@ -231,14 +231,14 @@ public sealed class Pkcs11SessionLifecycleTests
         var fake = new LifecycleFake();
         var s = NewSession(fake);
         s.SeedRandom(new byte[] { 0xDE, 0xAD });
-        Assert.Equal(new byte[] { 0xDE, 0xAD }, fake.CapturedSeed);
+        Assert.Equal([0xDE, 0xAD], fake.CapturedSeed);
     }
 
     [Fact]
     public void SeedRandom_Error_Throws()
     {
         var s = NewSession(new LifecycleFake { SeedRv = CKR.CKR_RANDOM_SEED_NOT_SUPPORTED });
-        Assert.ThrowsAny<Pkcs11Exception>(() => s.SeedRandom(new byte[] { 1 }));
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.SeedRandom([1]));
     }
 
     // === Legacy parallel-function stubs (always map their CKR to an exception) ===

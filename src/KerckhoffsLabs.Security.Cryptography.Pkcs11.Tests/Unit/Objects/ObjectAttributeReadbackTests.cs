@@ -42,7 +42,7 @@ public sealed class ObjectAttributeReadbackTests
     [Fact]
     public void GetValueAsUlong_WrongLength_Throws()
     {
-        using var a = new ObjectAttribute(CKA.CKA_ID, new byte[] { 1, 2, 3 });
+        using var a = new ObjectAttribute(CKA.CKA_ID, [1, 2, 3]);
         Assert.Throws<AttributeValueException>(() => a.GetValueAsUlong());
     }
 
@@ -50,7 +50,7 @@ public sealed class ObjectAttributeReadbackTests
     public void GetValueAsUlongArray_MisalignedLength_Throws()
     {
         // 3 bytes is not a whole number of CK_ULONGs (4 or 8 bytes each).
-        using var a = new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, new byte[] { 1, 2, 3 });
+        using var a = new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, [1, 2, 3]);
         Assert.Throws<AttributeValueException>(() => a.GetValueAsUlongArray());
     }
 
@@ -58,7 +58,7 @@ public sealed class ObjectAttributeReadbackTests
     public void GetValueAsAttributeArray_MisalignedLength_Throws()
     {
         // 3 bytes is not a whole number of CK_ATTRIBUTEs.
-        using var a = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, new byte[] { 1, 2, 3 });
+        using var a = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [1, 2, 3]);
         Assert.Throws<AttributeValueException>(() => a.GetValueAsAttributeArray());
     }
 
