@@ -36,39 +36,33 @@ public sealed class Pkcs11ExceptionTests
     {
         var ex = new Pkcs11AuthenticationException(CKR.CKR_PIN_INCORRECT, "C_Login", null);
 
-        Assert.IsAssignableFrom<Pkcs11Exception>(ex);
+        Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
         Assert.Equal(CKR.CKR_PIN_INCORRECT, ex.ReturnValue);
     }
 
     [Fact]
     public void SessionException_DerivesFromPkcs11Exception()
-        => Assert.IsAssignableFrom<Pkcs11Exception>(
-            new Pkcs11SessionException(CKR.CKR_SESSION_HANDLE_INVALID, "C_GetSessionInfo", null));
+        => Assert.IsType<Pkcs11Exception>(new Pkcs11SessionException(CKR.CKR_SESSION_HANDLE_INVALID, "C_GetSessionInfo", null), exactMatch: false);
 
     [Fact]
     public void TokenException_DerivesFromPkcs11Exception()
-        => Assert.IsAssignableFrom<Pkcs11Exception>(
-            new Pkcs11TokenException(CKR.CKR_TOKEN_NOT_PRESENT, "C_GetTokenInfo", null));
+        => Assert.IsType<Pkcs11Exception>(new Pkcs11TokenException(CKR.CKR_TOKEN_NOT_PRESENT, "C_GetTokenInfo", null), exactMatch: false);
 
     [Fact]
     public void MechanismException_DerivesFromPkcs11Exception()
-        => Assert.IsAssignableFrom<Pkcs11Exception>(
-            new Pkcs11MechanismException(CKR.CKR_MECHANISM_INVALID, "C_SignInit", null));
+        => Assert.IsType<Pkcs11Exception>(new Pkcs11MechanismException(CKR.CKR_MECHANISM_INVALID, "C_SignInit", null), exactMatch: false);
 
     [Fact]
     public void ObjectException_DerivesFromPkcs11Exception()
-        => Assert.IsAssignableFrom<Pkcs11Exception>(
-            new Pkcs11ObjectException(CKR.CKR_OBJECT_HANDLE_INVALID, "C_DestroyObject", null));
+        => Assert.IsType<Pkcs11Exception>(new Pkcs11ObjectException(CKR.CKR_OBJECT_HANDLE_INVALID, "C_DestroyObject", null), exactMatch: false);
 
     [Fact]
     public void ArgumentException_DerivesFromPkcs11Exception()
-        => Assert.IsAssignableFrom<Pkcs11Exception>(
-            new Pkcs11ArgumentException(CKR.CKR_ARGUMENTS_BAD, "C_GenerateKey", null));
+        => Assert.IsType<Pkcs11Exception>(new Pkcs11ArgumentException(CKR.CKR_ARGUMENTS_BAD, "C_GenerateKey", null), exactMatch: false);
 
     [Fact]
     public void UnclassifiedException_DerivesFromPkcs11Exception()
-        => Assert.IsAssignableFrom<Pkcs11Exception>(
-            new Pkcs11UnclassifiedException(CKR.CKR_GENERAL_ERROR, "C_Finalize", null));
+        => Assert.IsType<Pkcs11Exception>(new Pkcs11UnclassifiedException(CKR.CKR_GENERAL_ERROR, "C_Finalize", null), exactMatch: false);
 
     [Fact]
     public void ThrowIfError_CkrOk_DoesNotThrow() =>
@@ -101,6 +95,6 @@ public sealed class Pkcs11ExceptionTests
         var ex = Assert.Throws<Pkcs11AuthenticationException>(
             () => Pkcs11Exception.ThrowIfError(CKR.CKR_PIN_INCORRECT, "C_Login"));
 
-        Assert.IsAssignableFrom<Pkcs11Exception>(ex);
+        Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
     }
 }

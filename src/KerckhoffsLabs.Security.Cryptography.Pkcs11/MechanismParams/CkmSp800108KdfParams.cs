@@ -143,7 +143,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
 
     private IntPtr MarshalDataParams(IReadOnlyList<Sp800108Segment> segments, out NativeCULong count)
     {
-        int prfSize = UnmanagedMemory.SizeOf(typeof(CK_PRF_DATA_PARAM));
+        int prfSize = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
         IntPtr array = Track(prfSize * segments.Count);
 
         for (int i = 0; i < segments.Count; i++)
@@ -169,7 +169,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
             case Sp800108SegmentKind.IterationCounter:
             case Sp800108SegmentKind.OptionalCounter:
                 {
-                    int size = UnmanagedMemory.SizeOf(typeof(CK_SP800_108_COUNTER_FORMAT));
+                    int size = UnmanagedMemory.SizeOf<CK_SP800_108_COUNTER_FORMAT>();
                     IntPtr p = Track(size);
                     UnmanagedMemory.Write(p, (object)new CK_SP800_108_COUNTER_FORMAT
                     {
@@ -184,7 +184,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
 
             case Sp800108SegmentKind.DkmLength:
                 {
-                    int size = UnmanagedMemory.SizeOf(typeof(CK_SP800_108_DKM_LENGTH_FORMAT));
+                    int size = UnmanagedMemory.SizeOf<CK_SP800_108_DKM_LENGTH_FORMAT>();
                     IntPtr p = Track(size);
                     UnmanagedMemory.Write(p, (object)new CK_SP800_108_DKM_LENGTH_FORMAT
                     {
@@ -220,8 +220,8 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
             return IntPtr.Zero;
         }
 
-        int dkSize = UnmanagedMemory.SizeOf(typeof(CK_DERIVED_KEY));
-        int attrSize = UnmanagedMemory.SizeOf(typeof(CK_ATTRIBUTE));
+        int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
+        int attrSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         IntPtr array = Track(dkSize * derivedKeys.Count);
         handleSlots = new IntPtr[derivedKeys.Count];
 

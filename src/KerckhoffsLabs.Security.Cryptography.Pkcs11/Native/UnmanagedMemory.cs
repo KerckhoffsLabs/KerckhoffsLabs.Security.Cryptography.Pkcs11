@@ -38,22 +38,12 @@ internal static class UnmanagedMemory
     private static readonly Dictionary<IntPtr, int> _allocations = [];
 
     /// <summary>
-    /// Flag indicating whether per-allocation messages should be written to the
-    /// debug log. The allocation dictionary is populated <em>unconditionally</em>
-    /// (independent of this flag); only the log output is gated. Toggling this at
-    /// runtime is therefore safe — pointers allocated with the flag off can still
-    /// be freed after it is turned on without tripping the untracked-memory check.
+    /// When <c>true</c>, every <see cref="Allocate"/> / <see cref="Free"/> writes a debug log line.
+    /// The allocation dictionary is populated <em>unconditionally</em> (independent of this flag); only
+    /// the log output is gated, so toggling at runtime is safe — pointers allocated with the flag off
+    /// can still be freed after it is turned on without tripping the untracked-memory check.
     /// </summary>
-    private static bool _debugModeEnabled = false;
-
-    /// <summary>
-    /// When <c>true</c>, every <see cref="Allocate"/> / <see cref="Free"/> writes a
-    /// debug log line. The allocation tracker itself is always on (see <see cref="OutstandingAllocationCount"/>).
-    /// </summary>
-    public static bool DebugModeEnabled
-    {
-        get => _debugModeEnabled; set => _debugModeEnabled = value;
-    }
+    public static bool DebugModeEnabled { get; set; }
 
     /// <summary>
     /// Number of unmanaged allocations currently outstanding (allocated but not yet freed).
@@ -103,7 +93,7 @@ internal static class UnmanagedMemory
                     $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
             }
 
-            if (_debugModeEnabled)
+            if (DebugModeEnabled)
                 Log.AllocatedMemory(_logger, size, memory, _allocations.Count);
         }
 
@@ -132,7 +122,7 @@ internal static class UnmanagedMemory
                     $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
             }
 
-            if (_debugModeEnabled)
+            if (DebugModeEnabled)
                 Log.FreeingMemory(_logger, size, memory, _allocations.Count);
         }
 

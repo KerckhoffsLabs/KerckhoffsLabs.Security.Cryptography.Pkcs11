@@ -18,7 +18,7 @@ public sealed class Rc2ParamsMarshalTests
         using var p = new CkmRc2Params(64);
         var s = (CK_RC2_PARAMS)p.ToMarshalableStructure();
 
-        int size = UnmanagedMemory.SizeOf(typeof(CK_RC2_PARAMS));
+        int size = UnmanagedMemory.SizeOf<CK_RC2_PARAMS>();
         IntPtr mem = UnmanagedMemory.Allocate(size);
         try
         {
@@ -36,7 +36,7 @@ public sealed class Rc2ParamsMarshalTests
         using var p = new CkmRc2CbcParams(128, iv);
         var s = (CK_RC2_CBC_PARAMS)p.ToMarshalableStructure();
 
-        int size = UnmanagedMemory.SizeOf(typeof(CK_RC2_CBC_PARAMS));
+        int size = UnmanagedMemory.SizeOf<CK_RC2_CBC_PARAMS>();
         IntPtr mem = UnmanagedMemory.Allocate(size);
         try
         {

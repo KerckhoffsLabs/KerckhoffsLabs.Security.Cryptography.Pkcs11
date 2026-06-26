@@ -20,7 +20,7 @@ public sealed class MechanismParamsMarshalTests
     // alive (a `using` in scope) while dereferencing them.
     private static T Marshalled<T>(object raw) where T : struct
     {
-        int size = UnmanagedMemory.SizeOf(typeof(T));
+        int size = UnmanagedMemory.SizeOf<T>();
         IntPtr mem = UnmanagedMemory.Allocate(size);
         try
         {
