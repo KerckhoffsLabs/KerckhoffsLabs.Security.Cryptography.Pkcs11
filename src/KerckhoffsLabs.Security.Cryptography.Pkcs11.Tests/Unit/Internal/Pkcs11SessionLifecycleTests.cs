@@ -230,7 +230,7 @@ public sealed class Pkcs11SessionLifecycleTests
     {
         var fake = new LifecycleFake();
         var s = NewSession(fake);
-        s.SeedRandom(new byte[] { 0xDE, 0xAD });
+        s.SeedRandom([0xDE, 0xAD]);
         Assert.Equal([0xDE, 0xAD], fake.CapturedSeed);
     }
 

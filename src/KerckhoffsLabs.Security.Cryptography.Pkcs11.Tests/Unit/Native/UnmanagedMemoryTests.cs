@@ -101,7 +101,7 @@ public sealed class UnmanagedMemoryTests
         IntPtr p = UnmanagedMemory.Allocate(3);
         try
         {
-            UnmanagedMemory.Write(p, (ReadOnlySpan<byte>)new byte[] { 7, 8, 9 });
+            UnmanagedMemory.Write(p, [7, 8, 9]);
             Assert.Equal([7, 8, 9], UnmanagedMemory.Read(p, 3));
         }
         finally { UnmanagedMemory.Free(ref p); }
