@@ -127,20 +127,33 @@ You understand how PKCS#11 is used in real cryptographic systems and design the 
 
 ## Testing and validation
 
-- **Unit tests:**
-  - Abstract the interop behind interfaces to allow mocking.
-  - Provide tests for:
-    - Marshalling correctness.
-    - Error mapping (return codes → exceptions).
-    - Session and handle lifecycle.
-- **Integration tests:**
-  - When possible, support running tests against:
-    - A real HSM/token.
-    - A software PKCS#11 implementation (for CI).
-- **Interoperability:**
-  - Expect vendor quirks; design extension points or configuration hooks for:
-    - Mechanism support differences.
-    - Non-standard attributes or behaviors.
+- **Backends under test:** the same tests run against multiple real PKCS#11 modules plus an
+  in-process fake — **SoftHSM2** and **opencryptoki** (real software tokens, built in CI),
+  **pkcs11-mock** (interop/marshalling), and an in-process **ManagedSoftToken** (BCL-backed) for fast
+  unit coverage.
+- **Write each backend test once.** Put the assertions in a backend-agnostic `*TestCases` class whose
+  methods take an `IPkcs11Backend` (e.g. `AesGcmPkcs11TestCases.Assert_*`). Each backend gets a thin
+  wrapper class bound to its xUnit `[Collection]` fixture that just forwards to those shared methods.
+  Do **not** duplicate test bodies per backend.
+- **Gate per capability, skip otherwise.** Use `IPkcs11Backend.Supports(CKM)` and the capability
+  properties (`SupportsMlDsa`/`SupportsMlKem`/`SupportsSlhDsa`, `AeadAuthFailureCode`, …) with
+  `[ConditionalFact]`/`[ConditionalTheory]` and `SkipTestException`, so a suite runs wherever the
+  backend supports the mechanism and skips cleanly elsewhere. To express a new per-backend difference,
+  add a capability to `IPkcs11Backend` (with a sensible default) rather than branching on the concrete
+  fixture type.
+- **Declare vendor quirks per backend instead of weakening shared assertions.** Prefer a
+  backend-declared expectation over a lowest-common-denominator assert — e.g. `AeadAuthFailureCode`
+  pins SoftHSM's exact `CKR_ENCRYPTED_DATA_INVALID` for an AEAD tag failure while backends that don't
+  pin a code assert any `Pkcs11Exception`. Turn "advertises-but-rejects" cases into skips on the
+  specific `CKR` (e.g. FIPS-built tokens that list `CKM_DES_*` but reject the operation).
+- **Cross-check against the BCL** where the platform allows it (verify an on-token signature with the
+  exported public key, compare an on-token cipher against `System.Security.Cryptography`); make the
+  cross-check best-effort when a platform can't represent the key (e.g. macOS RSA-16384 / 2048-bit DSA).
+- **Unit tests** (behind interfaces, no hardware): marshalling correctness, error mapping (return
+  codes → exceptions), and session/handle lifecycle.
+- **Weak/deprecated crypto** (MD5, SHA-1, DES/3DES/RC2, RSA PKCS#1 v1.5, DSA) stays `[Obsolete]` and is
+  gated behind `Pkcs11Workspace.AllowInsecure`; tests assert the gate throws by default and opt in
+  explicitly to exercise the algorithm.
 
 ---
 
