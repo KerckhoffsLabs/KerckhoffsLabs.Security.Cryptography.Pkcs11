@@ -45,6 +45,11 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <inheritdoc/>
     public bool SupportsSlhDsa => SoftHsmSupportsSlhDsa;
 
+    /// <inheritdoc/>
+    // SoftHSM returns CKR_ENCRYPTED_DATA_INVALID for an AEAD tag-verification failure; pin it so the
+    // authenticity tests assert the exact code rather than just "some Pkcs11Exception".
+    public CKR? AeadAuthFailureCode => CKR.CKR_ENCRYPTED_DATA_INVALID;
+
     // === SoftHSM 2.7 capability gates ======================================
     // These are static so they can be passed to [ConditionalFact(nameof(...))],
     // which is evaluated before any fixture instance exists. They encode the

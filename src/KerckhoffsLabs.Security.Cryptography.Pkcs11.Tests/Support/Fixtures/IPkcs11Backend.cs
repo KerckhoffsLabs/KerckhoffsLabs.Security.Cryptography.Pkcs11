@@ -47,4 +47,12 @@ public interface IPkcs11Backend
     /// <summary>True if the backend can generate and operate SLH-DSA (FIPS 205) keys. Defaults to the
     /// advertised <see cref="CKM.CKM_SLH_DSA"/>; SoftHSM overrides this with a build marker.</summary>
     bool SupportsSlhDsa => Supports(CKM.CKM_SLH_DSA);
+
+    /// <summary>The <see cref="CKR"/> an AEAD decryption (AES-GCM/CCM, ChaCha20-Poly1305) returns when
+    /// the authentication tag check fails, for backends that return a stable, specific code. When set,
+    /// AEAD authenticity tests assert it exactly; <see langword="null"/> (the default) means the code is
+    /// not pinned for this backend, so those tests only assert that some <c>Pkcs11Exception</c> is
+    /// thrown (forgery rejected). SoftHSM returns <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/>;
+    /// opencryptoki's code is not pinned here.</summary>
+    CKR? AeadAuthFailureCode => null;
 }

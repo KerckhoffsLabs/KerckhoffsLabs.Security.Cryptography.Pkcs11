@@ -82,11 +82,6 @@ internal static class AesGcmPkcs11TestCases
         finally { DestroyByLabel(workspace, label); }
     }
 
-    // The GCM tag-verification failure surfaces as a Pkcs11Exception on any conforming backend. Assert
-    // that (forgery rejected, no crash) rather than the exact CKR, which varies between backends.
-    private static void AssertAuthFailure(Action decrypt) =>
-        Assert.ThrowsAny<Pkcs11Exception>(decrypt);
-
     // === Construction =====================================================
 
     internal static void Assert_Ctor_NonAesKey_Throws(IPkcs11Backend backend)
@@ -242,7 +237,7 @@ internal static class AesGcmPkcs11TestCases
             tag[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AssertAuthFailure(() => gcm.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, () => gcm.Decrypt(nonce, ciphertext, tag, dest));
         });
 
     internal static void Assert_Decrypt_TamperedCiphertext_Throws(IPkcs11Backend backend) =>
@@ -257,7 +252,7 @@ internal static class AesGcmPkcs11TestCases
             ciphertext[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AssertAuthFailure(() => gcm.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, () => gcm.Decrypt(nonce, ciphertext, tag, dest));
         });
 
     internal static void Assert_Decrypt_WrongAad_Throws(IPkcs11Backend backend) =>
@@ -271,7 +266,7 @@ internal static class AesGcmPkcs11TestCases
             gcm.Encrypt(nonce, plaintext, ciphertext, tag, Encoding.UTF8.GetBytes("aad-A"));
 
             byte[] dest = new byte[plaintext.Length];
-            AssertAuthFailure(() =>
+            AeadTestSupport.AssertAuthFailure(backend, () =>
                 gcm.Decrypt(nonce, ciphertext, tag, dest, Encoding.UTF8.GetBytes("aad-B")));
         });
 
@@ -288,7 +283,7 @@ internal static class AesGcmPkcs11TestCases
             wrongNonce[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AssertAuthFailure(() => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, () => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
 
     // === Known-answer test ================================================
