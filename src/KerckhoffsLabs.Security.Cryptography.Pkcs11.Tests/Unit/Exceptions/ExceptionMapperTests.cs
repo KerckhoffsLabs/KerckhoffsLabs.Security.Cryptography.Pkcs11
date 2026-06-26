@@ -6,8 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 
 public sealed class ExceptionMapperTests
 {
-    public static TheoryData<CKR> AuthenticationCases() => new()
-    {
+    public static TheoryData<CKR> AuthenticationCases() => new(
         CKR.CKR_PIN_INCORRECT,
         CKR.CKR_PIN_INVALID,
         CKR.CKR_PIN_LEN_RANGE,
@@ -19,8 +18,7 @@ public sealed class ExceptionMapperTests
         CKR.CKR_USER_PIN_NOT_INITIALIZED,
         CKR.CKR_USER_TYPE_INVALID,
         CKR.CKR_USER_ANOTHER_ALREADY_LOGGED_IN,
-        CKR.CKR_USER_TOO_MANY_TYPES,
-    };
+        CKR.CKR_USER_TOO_MANY_TYPES);
 
     [Theory]
     [MemberData(nameof(AuthenticationCases))]
@@ -33,8 +31,7 @@ public sealed class ExceptionMapperTests
         Assert.Equal("C_Login", ex.Method);
     }
 
-    public static TheoryData<CKR> SessionCases() => new()
-    {
+    public static TheoryData<CKR> SessionCases() => new(
         CKR.CKR_SESSION_CLOSED,
         CKR.CKR_SESSION_COUNT,
         CKR.CKR_SESSION_HANDLE_INVALID,
@@ -42,63 +39,54 @@ public sealed class ExceptionMapperTests
         CKR.CKR_SESSION_READ_ONLY,
         CKR.CKR_SESSION_EXISTS,
         CKR.CKR_SESSION_READ_ONLY_EXISTS,
-        CKR.CKR_SESSION_READ_WRITE_SO_EXISTS,
-    };
+        CKR.CKR_SESSION_READ_WRITE_SO_EXISTS);
 
     [Theory]
     [MemberData(nameof(SessionCases))]
     public void Map_SessionCkr_ReturnsSessionException(CKR ckr)
         => Assert.IsType<Pkcs11SessionException>(ExceptionMapper.Map(ckr, "C_OpenSession"));
 
-    public static TheoryData<CKR> TokenCases() => new()
-    {
+    public static TheoryData<CKR> TokenCases() => new(
         CKR.CKR_TOKEN_NOT_PRESENT,
         CKR.CKR_TOKEN_NOT_RECOGNIZED,
         CKR.CKR_TOKEN_WRITE_PROTECTED,
         CKR.CKR_TOKEN_RESOURCE_EXCEEDED,
         CKR.CKR_DEVICE_ERROR,
         CKR.CKR_DEVICE_MEMORY,
-        CKR.CKR_DEVICE_REMOVED,
-    };
+        CKR.CKR_DEVICE_REMOVED);
 
     [Theory]
     [MemberData(nameof(TokenCases))]
     public void Map_TokenAndDeviceCkr_ReturnsTokenException(CKR ckr)
         => Assert.IsType<Pkcs11TokenException>(ExceptionMapper.Map(ckr, "C_GetTokenInfo"));
 
-    public static TheoryData<CKR> MechanismCases() => new()
-    {
+    public static TheoryData<CKR> MechanismCases() => new(
         CKR.CKR_MECHANISM_INVALID,
         CKR.CKR_MECHANISM_PARAM_INVALID,
-        CKR.CKR_KEY_FUNCTION_NOT_PERMITTED,
-    };
+        CKR.CKR_KEY_FUNCTION_NOT_PERMITTED);
 
     [Theory]
     [MemberData(nameof(MechanismCases))]
     public void Map_MechanismCkr_ReturnsMechanismException(CKR ckr)
         => Assert.IsType<Pkcs11MechanismException>(ExceptionMapper.Map(ckr, "C_SignInit"));
 
-    public static TheoryData<CKR> ObjectCases() => new()
-    {
+    public static TheoryData<CKR> ObjectCases() => new(
         CKR.CKR_OBJECT_HANDLE_INVALID,
         CKR.CKR_ATTRIBUTE_READ_ONLY,
         CKR.CKR_ATTRIBUTE_SENSITIVE,
         CKR.CKR_ATTRIBUTE_TYPE_INVALID,
-        CKR.CKR_ATTRIBUTE_VALUE_INVALID,
-    };
+        CKR.CKR_ATTRIBUTE_VALUE_INVALID);
 
     [Theory]
     [MemberData(nameof(ObjectCases))]
     public void Map_ObjectAndAttributeCkr_ReturnsObjectException(CKR ckr)
         => Assert.IsType<Pkcs11ObjectException>(ExceptionMapper.Map(ckr, "C_DestroyObject"));
 
-    public static TheoryData<CKR> ArgumentCases() => new()
-    {
+    public static TheoryData<CKR> ArgumentCases() => new(
         CKR.CKR_ARGUMENTS_BAD,
         CKR.CKR_DATA_INVALID,
         CKR.CKR_DATA_LEN_RANGE,
-        CKR.CKR_BUFFER_TOO_SMALL,
-    };
+        CKR.CKR_BUFFER_TOO_SMALL);
 
     [Theory]
     [MemberData(nameof(ArgumentCases))]
