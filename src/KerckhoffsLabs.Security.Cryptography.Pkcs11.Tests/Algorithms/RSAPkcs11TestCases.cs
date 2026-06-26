@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -125,11 +126,20 @@ internal static class RSAPkcs11TestCases
         finally { DestroyByLabel(workspace, label); }
     }
 
+    // Large RSA key generation (8192/16384) is only exercised on the Linux x64 CI leg (ubuntu-latest):
+    // it is slow enough on macOS / Windows / arm runners to dominate the job. The smaller sizes still
+    // run everywhere, so exported-encoding and round-trip correctness keep full cross-platform coverage.
+    private static bool LargeRsaKeysEnabled =>
+        RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X64;
+
     // === Key sizes: sign/verify round-trips scale with the modulus =========
     // RSA < 2048 is gated behind AllowInsecure (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048+ need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
     internal static void Assert_SignVerifyData_AcrossKeySizes_RoundTrips(IPkcs11Backend backend, int modulusBits)
     {
+        if (modulusBits >= 8192 && !LargeRsaKeysEnabled)
+            throw new SkipTestException($"RSA-{modulusBits} keygen is restricted to the Linux x64 CI leg (too slow elsewhere).");
+
         Require(backend, CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var workspace = OpenWorkspace(backend);
         using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
