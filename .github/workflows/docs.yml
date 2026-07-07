@@ -37,6 +37,12 @@ jobs:
       - name: Restore local tools (docfx)
         run: dotnet tool restore
 
+      # docfx's metadata step compiles the library via Roslyn; build it first (Release) so the
+      # source generator runs and the generated *_Windows interop types resolve (otherwise docfx
+      # reports FailedToResolveAnalyzer + CS0246 and produces no API metadata).
+      - name: Build library (runs the source generator for docfx)
+        run: dotnet build src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj -c Release
+
       - name: Build documentation (metadata + site)
         run: dotnet docfx docs/docfx.json --warningsAsErrors
 
