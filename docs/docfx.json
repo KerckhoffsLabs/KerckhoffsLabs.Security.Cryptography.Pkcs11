@@ -46,7 +46,7 @@
       "templates/kl"
     ],
     "globalMetadata": {
-      "_appName": "PKCS11.NET",
+      "_appName": "KerckhoffsLabs.Security.Cryptography.Pkcs11",
       "_appTitle": "KerckhoffsLabs.Security.Cryptography.Pkcs11",
       "_appLogoPath": "images/icon.png",
       "_appFaviconPath": "images/favicon.ico",
