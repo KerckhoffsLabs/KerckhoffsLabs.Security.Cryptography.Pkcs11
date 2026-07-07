@@ -96,7 +96,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
 
       # SoftHSM is built against OpenSSL 3.5+ so ML-DSA (CKM_ML_DSA) compiles in — ubuntu-latest
-      # ships OpenSSL 3.0, so we build 3.5.6 from source (the same release the upstream SoftHSM CI
+      # ships OpenSSL 3.0, so we build 3.5.7 from source (the same release the upstream SoftHSM CI
       # uses) into a user-writable prefix (cache-friendly, no sudo). build-softhsmv2.sh reads
       # OPENSSL_PREFIX and bakes an rpath so libsofthsm2 loads this OpenSSL at runtime. The same
       # OpenSSL 3.5 is reused by opencryptoki on the ubuntu-latest leg (ML-DSA/ML-KEM, incl. signing).
@@ -106,14 +106,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/openssl-3.5
-          key: openssl-3.5.6-${{ runner.arch }}
-      - name: Build OpenSSL 3.5.6 (on cache miss)
+          key: openssl-3.5.7-${{ runner.arch }}
+      - name: Build OpenSSL 3.5.7 (on cache miss)
         if: runner.os == 'Linux' && steps.cache-openssl.outputs.cache-hit != 'true'
         run: |
           work="$(mktemp -d)"; cd "$work"
-          curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.6/openssl-3.5.6.tar.gz
-          echo "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736  openssl-3.5.6.tar.gz" | sha256sum -c -
-          tar -xf openssl-3.5.6.tar.gz && cd openssl-3.5.6
+          curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
+          echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c -
+          tar -xf openssl-3.5.7.tar.gz && cd openssl-3.5.7
           ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
           make -j"$(nproc)" >/dev/null
           make install_sw >/dev/null
