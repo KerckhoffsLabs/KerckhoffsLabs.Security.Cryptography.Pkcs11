@@ -1,0 +1,21 @@
+/* ---- KerckhoffsLabs DocFX theme overrides ---- */
+
+/* Navbar emblem: constrain the square logo to the navbar height and align it with
+   the "PKCS11.NET" wordmark. Neutralize the modern template's SVG dark-mode filter
+   (our logo is a coloured raster, not a monochrome SVG). */
+#logo {
+  height: 30px;
+  width: auto;
+  margin-right: .5rem;
+}
+#logo.svg {
+  filter: none;
+}
+
+/* Homepage hero lockup: centered, responsive, never oversized. */
+.hero-logo {
+  display: block;
+  margin: 1.75rem auto 2rem;
+  width: min(300px, 70%);
+  height: auto;
+}

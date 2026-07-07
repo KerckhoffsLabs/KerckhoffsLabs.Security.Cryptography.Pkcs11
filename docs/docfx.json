@@ -1,0 +1,58 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../src/KerckhoffsLabs.Security.Cryptography.Pkcs11",
+          "files": [
+            "**/*.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "outputFormat": "mref",
+      "properties": {
+        "TargetFramework": "net10.0",
+        "Configuration": "Release"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "api/**.yml",
+          "api/index.md"
+        ]
+      },
+      {
+        "files": [
+          "*.md",
+          "toc.yml"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "images/**"
+        ]
+      }
+    ],
+    "output": "_site",
+    "template": [
+      "default",
+      "modern",
+      "templates/kl"
+    ],
+    "globalMetadata": {
+      "_appName": "PKCS11.NET",
+      "_appTitle": "KerckhoffsLabs.Security.Cryptography.Pkcs11",
+      "_appLogoPath": "images/icon.png",
+      "_appFaviconPath": "images/favicon.ico",
+      "_description": "Modern, secure-by-default PKCS#11 v3.2 interop for .NET.",
+      "_enableSearch": true,
+      "_disableContribution": true
+    }
+  }
+}
