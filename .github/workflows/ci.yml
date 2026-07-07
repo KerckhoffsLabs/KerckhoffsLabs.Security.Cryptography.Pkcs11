@@ -309,3 +309,47 @@ jobs:
       - name: Test (incl. opencryptoki)
         if: matrix.os == 'ubuntu-latest'
         run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
+
+  # Native-AOT smoke test (linux-x64): publishes tests/AotSmoke — a standalone app that
+  # references only the main library (not the test project) — with PublishAot, then runs the
+  # native binary against pkcs11-mock. A publish failure catches trim/reflection/AOT-incompat
+  # regressions in the wrapper before consumers hit them; the run proves C_GetInfo actually
+  # works through the AOT-compiled interop layer. Linux-only: AOT publish warnings (the main
+  # thing this guards) are platform-independent.
+  aot-smoke:
+    name: AOT smoke (linux-x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Only pkcs11-mock is needed here, so skip the (large) SoftHSM/opencryptoki submodules
+      # that `submodules: recursive` would pull — init just the one module after checkout.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Init pkcs11-mock submodule
+        run: git submodule update --init --depth 1 vendor/pkcs11-mock
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # Native AOT links with clang against zlib; build-essential also provides the gcc/make
+      # that build-pkcs11-mock.sh uses to compile the mock module below.
+      - name: Install AOT + native build deps
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev build-essential
+
+      # Build the mock so the published binary has a real PKCS#11 module to load. The script
+      # drops it at <out>/runtimes/linux-x64/native/pkcs11-mock.so.
+      - name: Build pkcs11-mock
+        run: ./build/build-pkcs11-mock.sh "$RUNNER_TEMP/mock"
+
+      - name: Publish AotSmoke (Native AOT)
+        run: dotnet publish tests/AotSmoke/AotSmoke.csproj -c Release -r linux-x64
+
+      - name: Run AOT smoke against pkcs11-mock
+        run: |
+          set -euxo pipefail
+          bin="tests/AotSmoke/bin/Release/net10.0/linux-x64/publish/AotSmoke"
+          test -x "$bin"
+          "$bin" "$RUNNER_TEMP/mock/runtimes/linux-x64/native/pkcs11-mock.so"
