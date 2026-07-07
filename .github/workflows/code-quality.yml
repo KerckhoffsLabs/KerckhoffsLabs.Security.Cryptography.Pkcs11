@@ -16,14 +16,22 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# Cancel superseded runs for the same ref on pull requests; always run every push to main
+# (each commit needs its own coverage + Sonar new-code analysis).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   sonar:
     name: sonar
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     # The scanner reads the token from SONAR_TOKEN; pass it via the environment rather
     # than expanding the secret inside a run block, where it can leak (githubactions:S7636).
     env:
@@ -36,6 +44,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0

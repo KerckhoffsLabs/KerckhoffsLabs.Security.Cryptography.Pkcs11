@@ -5,13 +5,21 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Cancel superseded runs for the same ref on pull requests (a new push obsoletes the
+# in-flight matrix); always let every push to main run to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # Lint builds managed code only; skip the native vendor builds so this job
       # needs neither the submodules nor a C toolchain.
@@ -19,6 +27,8 @@ jobs:
       SkipSoftHsmV2Build: true
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
         with:
@@ -37,6 +47,9 @@ jobs:
   build-and-test:
     name: ${{ matrix.os }}${{ matrix.arch == 'x86' && ' (x86)' || '' }}
     runs-on: ${{ matrix.os }}
+    # Generous ceiling: a cold cache builds OpenSSL 3.5 + SoftHSM (+ opencryptoki on ubuntu-latest)
+    # from source, but a hung native build should not run for GitHub's 6-hour default.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +72,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: recursive
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5.3.0
