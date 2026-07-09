@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (2 resolved)
-- Critical: 0 | High: 7 (6 open, 1 resolved) | Medium: 30 (29 open, 1 resolved) | Low: 17
+- Total items: 54 (3 resolved)
+- Critical: 0 | High: 7 (6 open, 1 resolved) | Medium: 30 (28 open, 2 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -186,7 +186,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist B
 
-### [BL-017] PIN material is copied into an unpinned managed array on every login/PIN path, defeating `SecurePin`'s pinning
+### [BL-017] ✅ RESOLVED — PIN material is copied into an unpinned managed array on every login/PIN path, defeating `SecurePin`'s pinning
+- **Status:** Resolved 2026-07-09. Added internal `SecurePin.ToPinnedArray()`, which copies the PIN into a pinned-object-heap array (`GC.AllocateArray(pinned: true)`) that the GC never relocates, so the existing `finally` zeroing destroys the only transient copy. All six call sites switched (`InitPin`, `SetPin` ×2, `Login`, `LoginUser`, `Pkcs11Slot.InitToken`); the `SecurePin(string)` constructor's UTF-8 transient was pinned the same way. No public-API change. Unit tests added; SoftHSM login paths verified green end-to-end.
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** M

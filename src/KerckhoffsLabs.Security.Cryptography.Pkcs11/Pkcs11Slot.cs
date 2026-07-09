@@ -161,9 +161,9 @@ public sealed class Pkcs11Slot
         Array.Fill(tokenLabel, (byte)0x20);
         Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
 
-        // Copy the SecurePin into a transient buffer for the native call and
-        // zero it on the way out. Matches Pkcs11Session.Login's pattern.
-        byte[] pinBuffer = soPin.Pin.ToArray();
+        // Copy the SecurePin into a pinned transient buffer for the native call
+        // and zero it on the way out. Matches Pkcs11Session.Login's pattern.
+        byte[] pinBuffer = soPin.ToPinnedArray();
         try
         {
             CKR rv = _pkcs11Library.C_InitToken(

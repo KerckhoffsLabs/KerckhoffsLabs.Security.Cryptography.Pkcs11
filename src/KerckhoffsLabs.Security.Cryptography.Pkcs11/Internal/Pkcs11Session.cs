@@ -300,7 +300,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
 
-        byte[] tmp = userPin.Pin.ToArray();
+        byte[] tmp = userPin.ToPinnedArray();
         try
         {
             CKR rv = _pkcs11Library.C_InitPIN(_sessionId, tmp, (NativeCULong)tmp.Length);
@@ -331,8 +331,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin");
 
-        byte[] oldTmp = oldPin.Pin.ToArray();
-        byte[] newTmp = newPin.Pin.ToArray();
+        byte[] oldTmp = oldPin.ToPinnedArray();
+        byte[] newTmp = newPin.ToPinnedArray();
         try
         {
             CKR rv = _pkcs11Library.C_SetPIN(
@@ -423,7 +423,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Logging as {UserType} into session {SessionId}", Pkcs11LogUtils.ToString(userType), _sessionId);
 
-        byte[] tmp = pin.Pin.ToArray();
+        byte[] tmp = pin.ToPinnedArray();
         try
         {
             CKR rv = _pkcs11Library.C_Login(_sessionId, userType, tmp, (NativeCULong)tmp.Length);
@@ -463,7 +463,7 @@ internal sealed class Pkcs11Session : IDisposable
                 "Logging in as {UserType} (username supplied) on session {SessionId}",
                 Pkcs11LogUtils.ToString(userType), _sessionId);
 
-        byte[] pinTmp = pin.Pin.ToArray();
+        byte[] pinTmp = pin.ToPinnedArray();
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
         {

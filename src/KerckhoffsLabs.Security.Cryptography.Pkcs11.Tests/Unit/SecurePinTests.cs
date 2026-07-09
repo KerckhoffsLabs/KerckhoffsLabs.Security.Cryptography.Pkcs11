@@ -66,6 +66,31 @@ public sealed class SecurePinTests
     }
 
     [Fact]
+    public void ToPinnedArray_CopiesBytes_IndependentOfSource()
+    {
+        byte[] source = Encoding.UTF8.GetBytes("hunter2");
+        using var pin = new SecurePin(source);
+
+        byte[] first = pin.ToPinnedArray();
+        byte[] second = pin.ToPinnedArray();
+
+        Assert.Equal(source, first);
+        Assert.NotSame(first, second); // fresh transient per call — each is zeroed by its own consumer
+
+        // Zeroing the transient (the consumer's contract) must not disturb the SecurePin itself.
+        Array.Clear(first);
+        Assert.Equal(source, pin.Pin.ToArray());
+    }
+
+    [Fact]
+    public void ToPinnedArray_AfterDispose_ThrowsObjectDisposed()
+    {
+        var pin = new SecurePin("hunter2");
+        pin.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => pin.ToPinnedArray());
+    }
+
+    [Fact]
     public void Dispose_ZeroesUnderlyingBuffer()
     {
         var pin = new SecurePin("hunter2");
