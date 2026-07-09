@@ -514,9 +514,13 @@ public sealed class Pkcs11Key : IDisposable
     /// set), letting the token fill a pre-sized buffer in a single call instead of a NULL-buffer length
     /// probe — required for tokens (SoftHSM) that do not honour the probe for <c>C_EncapsulateKey</c>.
     /// </param>
-    /// <returns>Tuple of (ciphertext to send to the decapsulator, on-token <see cref="Pkcs11Key"/> wrapping the shared secret).</returns>
+    /// <returns>
+    /// An <see cref="EncapsulationResult"/> pairing the ciphertext to send to the decapsulator with
+    /// the on-token <see cref="Pkcs11Key"/> wrapping the shared secret. The caller owns the result's
+    /// <see cref="EncapsulationResult.SharedSecret"/> — dispose the result (or the key) when done.
+    /// </returns>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries, or <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable.</exception>
-    public (byte[] Ciphertext, Pkcs11Key SharedSecret) EncapsulateKey(
+    public EncapsulationResult EncapsulateKey(
         Mechanism mechanism,
         ObjectTemplate sharedSecretTemplate,
         int expectedCiphertextLen = 0)
@@ -531,7 +535,7 @@ public sealed class Pkcs11Key : IDisposable
 
         var (ct, sharedHandle) = _workspace.Session.EncapsulateKey(
             mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
-        return (ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
+        return new EncapsulationResult(ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
     }
 
     /// <summary>
