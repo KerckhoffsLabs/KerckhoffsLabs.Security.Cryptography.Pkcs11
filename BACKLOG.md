@@ -1,0 +1,615 @@
+# Library Review Backlog
+
+_Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11 v3.2 conformance, .NET library design, P/Invoke, QA & release engineering). Nine specialists reviewed in parallel; findings were deduplicated, and every Critical/High citation was re-verified against the source by the coordinator._
+
+## Summary
+
+- Total items: 54 (2 resolved)
+- Critical: 0 | High: 7 (6 open, 1 resolved) | Medium: 30 (29 open, 1 resolved) | Low: 17
+- Headline risks:
+  - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
+  - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
+  - **The highest-risk native code has no hermetic tests.** The function-list loader (version dispatch, pointer binding) is bypassed by every test fake, and the promised v2.40-only fallback path is never exercised by any CI backend.
+  - **Flagship PQC mechanisms are verified only by self-round-trips on real backends** — no ACVP vectors, no independent cross-check, so a shared mis-encoding in sign+verify would pass green. _(Resolved 2026-07-09 — see BL-007.)_
+- Release-readiness assessment: The foundations are unusually strong for a pre-1.0 library — the Windows Pack=1/`NativeCULong` marshalling scheme is complete, coherent, and CI-validated across six platforms; the native layer is fully quarantined behind an idiomatic, secure-by-default public API; zeroization and SafeHandle discipline are consistent; and v3.2 coverage at the interop layer is complete. No memory-corruption or key-leak defect was confirmed. What stands between this codebase and a confident 1.0 is not the crypto core but the release scaffolding (broken publish flow, no API-contract gate, no SECURITY.md, no versioning automation), a handful of real-token robustness fixes (vendor CKR, NUL padding, `valueLen` clamping), hermetic loader/back-compat test coverage, independent PQC verification, and a short list of public-API decisions (tuple return, enum naming, mechanism ownership, TFM strategy, strong naming, ECDH extraction gating) that are cheap now and breaking later. With the High items and the "Breaks public API? Yes" Mediums landed, this is a credible 1.0.
+
+## Critical
+
+_None. No memory-safety, key-leakage, or silent-data-corruption defect was confirmed at the P/Invoke boundary._
+
+## High
+
+### [BL-001] Publish workflow cannot succeed: no submodules, but solution-wide build/test triggers native vendor builds
+- **Area:** Release Eng
+- **Severity:** High
+- **Effort:** S
+- **Location:** `.github/workflows/publish.yml:17-36`
+- **Problem:** The publish job checks out without `submodules:` yet runs `dotnet build`/`dotnet test` on the full solution. Building the test project fires the `BuildPkcs11Mock`/`BuildSoftHsmV2` targets (`src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj:36,49`, gated only on unset `Skip*` properties) against uninitialized `vendor/` directories with no native toolchain installed. A `v*` tag push can never reach the pack/push steps. Verified by the coordinator.
+- **Proposed action:** Build and pack only the shippable library project in `publish.yml` (release gating stays in `ci.yml`), or add `submodules: recursive` plus the native deps and cache. The dedicated release build of just `KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj` is the cleaner fix.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-002] No public-API contract gate: no PublicApiAnalyzers, no API snapshot test, no package validation
+- **Area:** Cross-cutting
+- **Severity:** High
+- **Effort:** S
+- **Location:** repo-wide — no `PublicAPI.Shipped.txt`/`Unshipped.txt`, no `EnablePackageValidation`, no PublicApiGenerator/ApiCompat anywhere (verified); `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj`, `Directory.Build.props`
+- **Problem:** Nothing fails a build or PR when the public surface changes. For a library whose stated #1 concern is that public-surface mistakes are permanent under SemVer, an accidental `public`, a widened signature, or a dropped overload ships silently. This also leaves the `NativeCULong` per-RID asset layout unguarded across releases.
+- **Proposed action:** Add `Microsoft.CodeAnalysis.PublicApiAnalyzers` with checked-in `Shipped`/`Unshipped` files (every PR then carries a reviewable surface diff), and/or a PublicApiGenerator golden-file test. Enable `Microsoft.DotNet.PackageValidation` with a baseline once 1.0.0 ships. Must land before 1.0 so the 1.0 surface is the frozen baseline.
+- **Breaks public API?** No
+- **Raised by:** QA A, QA C, .NET Engineer A, .NET Engineer B
+
+### [BL-003] Vendor-defined / unknown return codes throw a bare `InvalidEnumValueException` instead of a typed `Pkcs11Exception`
+- **Area:** PKCS#11 Conformance
+- **Severity:** High
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/CKR.cs:548-554` (`ToCKR`); consumed on ~130 return paths in `Native/LowLevelPkcs11Library.cs`; parallel issue in `Common/CKM.cs` (`ToCKM`)
+- **Problem:** `ToCKR()` validates with `Enum.IsDefined` and throws `InvalidEnumValueException` — which derives from `Exception`, not `Pkcs11Exception` (verified: `Exceptions/InvalidEnumValueException.cs:14`) — for any value not in the enum. PKCS#11 explicitly permits vendor-defined codes ≥ `CKR_VENDOR_DEFINED = 0x80000000` and real HSMs return them; a spec-legal code bypasses the entire typed error model. The Windows struct paths cast directly and pass vendor codes through, so behavior is also platform-inconsistent. Same forward-compat trap for future standard codes.
+- **Proposed action:** Make `ToCKR()` a non-validating cast (the mechanism-list path already does this deliberately at `LowLevelPkcs11Library.cs:358-361`) and ensure `Pkcs11Exception` surfaces the raw numeric code for unknown values. `CKR` is ulong-backed so unknown values round-trip losslessly; the fix is non-breaking.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist A
+- **Spec / References:** PKCS#11 v3.2 §3.1; `CKR_VENDOR_DEFINED`
+
+### [BL-004] No SECURITY.md / vulnerability disclosure policy for a cryptography library
+- **Area:** Release Eng
+- **Severity:** High
+- **Effort:** S
+- **Location:** MISSING: `SECURITY.md` (verified absent from repo root and `.github/`)
+- **Problem:** An HSM/crypto interop library has no documented private disclosure channel, response expectation, or supported-versions statement. Researchers finding a marshalling or key-handling bug have nowhere to report it privately.
+- **Proposed action:** Add `SECURITY.md` (enable GitHub Private Vulnerability Reporting, state response SLA and supported versions). Must land before 1.0.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-005] The native function-list loader — the code most able to corrupt the process — has no hermetic test
+- **Area:** QA
+- **Severity:** High
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/Delegates.cs:1521-1760` (`TryLoadFromGetInterface`, per-symbol fallback), `Native/LowLevelPkcs11Library.cs`
+- **Problem:** The loader binds every Cryptoki function pointer by reading raw unmanaged struct offsets and selects v2.40/v3.0/v3.2 from the `CK_VERSION` header. Every test fake implements the managed `ILowLevelPkcs11Library` seam and bypasses this code entirely; a transposed field or mis-sized pointer in `CK_FUNCTION_LIST_3_0`/`_3_2` would surface only if a real CI module happens to exercise the specific mis-bound slot.
+- **Proposed action:** Add a hermetic test that constructs synthetic `CK_FUNCTION_LIST_3_0`/`_3_2` tables in unmanaged memory with sentinel pointers, drives the real loader, and asserts each delegate binds to the expected slot. Complements BL-006 and the struct-pin work in BL-024.
+- **Breaks public API?** No
+- **Raised by:** QA A
+
+### [BL-006] The promised v2.40-only fallback path (`C_GetFunctionList`, no `C_GetInterface`) is never exercised
+- **Area:** QA
+- **Severity:** High
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/Delegates.cs:1529-1532` (fallback branch), `:1802-1851` (bootstrap)
+- **Problem:** Backward compatibility with v2.40 modules is a non-negotiable goal, but all three CI backends (pkcs11-mock, SoftHSMv2, opencryptoki) export `C_GetInterface`, so the per-symbol legacy fallback binding never runs anywhere. The spec-conformance reviewer confirmed the path is *correct by reading* (nulls leave `IsV32ApiSupported == false`, unsupported calls return `CKR_FUNCTION_NOT_SUPPORTED`), but it has zero executed coverage.
+- **Proposed action:** Force the fallback deterministically — a loader shim/test module that hides `C_GetInterface`, or the BL-005 synthetic-loader harness driven through the fallback branch — and assert the resulting library degrades as documented.
+- **Breaks public API?** No
+- **Raised by:** QA A
+
+### [BL-007] ✅ RESOLVED — ML-DSA / ML-KEM have no independent verification on real backends — flagship PQC ships KAT-free
+- **Status:** Resolved 2026-07-09. BCL cross-checks hoisted into the shared backend-agnostic test cases: `MLDsaPkcs11TestCases.Assert_SignData_VerifiesWithBcl` (token signs → BCL `MLDsa` rebuilt from the exported public key verifies, rejects tamper, agrees on context binding; all three parameter sets) and `MLKemPkcs11TestCases.Assert_Decapsulate_BclEncapsulation_MatchesSharedSecret` (BCL encapsulates off-token → token decapsulation must match), both gated on `MLDsa.IsSupported`/`MLKem.IsSupported` and wired into the SoftHSM and opencryptoki wrappers. Fixed ACVP vector files were deliberately deferred (vectors must be sourced from `usnistgov/ACVP-Server`, not fabricated) — track as a follow-up if file-based KATs are still wanted.
+- **Area:** QA
+- **Severity:** High
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Algorithms/MLDsaPkcs11TestCases.cs:85`, `MLKemPkcs11TestCases.cs:85`; `Integration/Adapters/KnownAnswerTests.SoftHsm2.cs` (no PQC entries — verified)
+- **Problem:** Every real-backend PQC test is a self-consistent round-trip (the token both produces and checks), so a wrapper mis-encoding of parameter-set or context that sign and verify share passes silently. The BCL cross-checks exist only in the managed-fake suite, where the "token" is itself BCL-backed. No ACVP/NIST vector for any PQC mechanism exists anywhere — for the library's headline v3.2 differentiator.
+- **Proposed action:** Hoist the BCL cross-check (export the token's public/encapsulation key; verify the token's signature / re-encapsulate off-token) into the shared test cases so it runs on SoftHSM and opencryptoki; add NIST ACVP sigVer (ML-DSA) and decapsulation (ML-KEM) vectors where key import is supported. Land pre-1.0.
+- **Breaks public API?** No
+- **Raised by:** QA B
+- **Spec / References:** NIST ACVP; FIPS 203/204
+
+## Medium
+
+### [BL-008] ✅ RESOLVED — `Pkcs11Key.EncapsulateKey` returns a `ValueTuple` containing a disposable, hiding ownership
+- **Status:** Resolved 2026-07-09. `EncapsulateKey` now returns a public `readonly record struct EncapsulationResult` (`EncapsulationResult.cs`) with documented `Ciphertext`/`SharedSecret` properties. The result is `IDisposable` (disposes `SharedSecret`, so `using var result = key.EncapsulateKey(...)` works), documents caller ownership on the type, the properties, and the `<returns>` tag, and keeps an explicit `Deconstruct` so tuple-style call sites still compile. Full test suite green (1637 passed / 0 failed).
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs:519`
+- **Problem:** The returned `SharedSecret` is an `IDisposable` `Pkcs11Key`, but the anonymous tuple obscures that the caller owns and must dispose it; the `<returns>` doc says nothing about disposal and `using` cannot destructure a tuple. FDG discourages tuples in public signatures, doubly so when an element owns a resource.
+- **Proposed action:** Return a named `readonly struct` (e.g. `EncapsulationResult`) or use an `out` parameter, and document the disposal obligation.
+- **Breaks public API?** Yes — must land before 1.0
+- **Raised by:** .NET Engineer A
+
+### [BL-009] C-style ALL_CAPS enum members and 2–3 letter type names must be a conscious, documented pre-1.0 decision
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** S (decision + docs; L if renamed)
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Common/CKM.cs:8`, `Common/CKA.cs:8`, `Common/CKR.cs:8`, `Common/CKO.cs:8`, `Common/CKK.cs:8` and ~15 siblings
+- **Problem:** `enum CKM : uint { CKM_RSA_PKCS, ... }` violates Framework Design Guidelines naming and threads through the entire public API, so it is effectively unchangeable after 1.0. It is very likely a deliberate spec-fidelity choice (greppable against the OASIS spec, familiar from Pkcs11Interop) — but that rationale is recorded nowhere.
+- **Proposed action:** Do not rename blindly. Make the call explicitly, record the spec-traceability rationale in the docs/README, and lock it. If the project ever wanted idiomatic names, pre-1.0 is the only time.
+- **Breaks public API?** Yes if ever changed — decide before 1.0
+- **Raised by:** .NET Engineer A
+
+### [BL-010] Strong-naming decision is unmade and undocumented (irreversible after 1.0)
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj` (no `SignAssembly`/`PublicSign`)
+- **Problem:** Strong-named consumers cannot reference an un-strong-named assembly, and adding a strong name after 1.0 is itself a breaking change — this is a one-way door either way.
+- **Proposed action:** Decide (the OSS norm is to strong-name with a checked-in key, treating it as identity not security) and document the decision either way.
+- **Breaks public API?** Yes if changed later — decide before 1.0
+- **Raised by:** .NET Engineer B
+
+### [BL-011] ECDH raw shared-secret extraction bypasses the `AllowInsecure` gate that the analogous ML-KEM path enforces
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/ECDiffieHellmanPkcs11.cs:150-190` (contrast `Algorithms/MLKemPkcs11.cs:197-207`, `Pkcs11Key.cs:569-591`)
+- **Problem:** `DeriveRawSecret` derives Z into an extractable, non-sensitive session object via `DeriveExtractable` (`enforceSecureDefaults: false`) and reads `CKA_VALUE` back with no `AllowInsecure` check, while the structurally identical ML-KEM shared-secret extraction is gated behind `GuardExtraction`. The two extract-and-read-back paths apply inconsistent security policy.
+- **Proposed action:** Settle it now: either gate `DeriveRawSecretAgreement` like ML-KEM, or document why ECDH extraction is inherent to the `ECDiffeHellman` contract while ML-KEM is gated. Adding a throwing gate after release is a behavioral break.
+- **Breaks public API?** Behavioral — decide before 1.0
+- **Raised by:** Cryptographer A
+
+### [BL-012] `Mechanism` does not own its `MechanismParameters`; ordered two-object disposal is easy to misuse
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Mechanism.cs:107-164`; e.g. `MechanismParams/CkmAesGcmParams.cs:60-71`
+- **Problem:** `Mechanism.Dispose` frees only the top-level parameter block, never the `MechanismParameters` that owns nested unmanaged IV/AAD buffers. Disposing only the `Mechanism` (the natural assumption) leaks sensitive buffers until finalization; disposing params first leaves the marshalled block dangling for subsequent calls. The correct order lives only in a per-type doc remark.
+- **Proposed action:** Have `Mechanism` take ownership and dispose its params in `Dispose(true)` (or move buffer ownership into `Mechanism`). If caller ownership is kept, promote the ordering contract to a first-class documented invariant.
+- **Breaks public API?** Yes (ownership semantics) — land before 1.0
+- **Raised by:** .NET Engineer B
+
+### [BL-013] `C_GetAttributeValue` read-back trusts the module's post-call `valueLen` without clamping to the allocated buffer
+- **Area:** P/Invoke
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:986-1052`; `Objects/ObjectAttribute.cs:257-282`
+- **Problem:** Buffers are sized from the first call's `valueLen`, but after the second call the wrapper reads back using whatever `valueLen` the module last wrote, unchecked. A buggy or hostile module that inflates `valueLen` on the second call causes an out-of-bounds read of adjacent unmanaged heap into the returned array (info disclosure / AV). The overflow-to-write variant is already blocked by `NativeCULong` checked casts; this is the in-range-but-oversized case.
+- **Proposed action:** Record the allocated size per attribute and reject `valueLen > allocated` on read-back with a typed exception. Cheap defense-in-depth squarely within the "expect vendor quirks" mandate.
+- **Breaks public API?** No
+- **Raised by:** Cryptographer B
+
+### [BL-014] Fixed-length token strings NUL-padded by real tokens are not trimmed, breaking label matching
+- **Area:** P/Invoke
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/TokenInfo.cs:74-91`, `SlotInfo.cs:32-33`, `LibraryInfo.cs:29-31`, `Pkcs11Library.cs:368`
+- **Problem:** CK_UTF8CHAR fields are decoded with argless `TrimEnd()`, which strips whitespace but not `'\0'`. The spec mandates space padding but many real tokens NUL-pad; a NUL-padded label decodes to `"mytoken\0\0…"`, the token-by-label lookup silently fails, and every info string carries embedded NULs.
+- **Proposed action:** Truncate at the first `'\0'` or use `TrimEnd(' ', '\0')` across all fixed-length string decodes.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer B
+- **Spec / References:** PKCS#11 v3.1 §3.2 (blank-padded fields)
+
+### [BL-015] `Pkcs11Session.Dispose` bypasses the busy-lock every operation acquires — close can race an in-flight native call
+- **Area:** P/Invoke
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:796-827` (Dispose) vs `:269-284` (CloseSession)
+- **Problem:** Every native operation and `CloseSession` acquire `AcquireExclusive()`, but `Dispose` does not, and P/Invokes pass the raw session id by value so SafeHandle ref-counting cannot protect them. A `Dispose` racing an in-flight `Sign`/`Encrypt` on another thread lets `C_CloseSession` run concurrently with an active call on the same session — UB at the boundary. `_disposed` is also a plain non-volatile bool written outside the lock.
+- **Proposed action:** Acquire `AcquireExclusive()` in `Dispose(true)` before releasing the handle (mirroring `CloseSession`); make `_disposed` visibility-safe.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist B
+
+### [BL-016] `SupportsMechanism` issues native calls and mutates cached state without the concurrency guard
+- **Area:** P/Invoke
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:225-246`; publicly reachable via `Pkcs11Key.cs:93`
+- **Problem:** It calls `C_GetSessionInfo` + `C_GetMechanismList` and lazily writes `_supportedMechanisms` with no `AcquireExclusive()` — the only native-touching method outside the single-thread contract, and the unsynchronized `HashSet` write is a managed data race.
+- **Proposed action:** Route the lazy population through `AcquireExclusive()` (or a dedicated lock) so it obeys the same contract as the rest of the class.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist B
+
+### [BL-017] PIN material is copied into an unpinned managed array on every login/PIN path, defeating `SecurePin`'s pinning
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:303` (InitPin), `:334-335` (SetPin), `:426` (Login), `:466` (LoginUser); `Pkcs11Slot.cs:166` (InitToken)
+- **Problem:** Each path does `pin.Pin.ToArray()` then zeroes the copy in a `finally` — but the fresh array is unpinned, so a GC compaction between allocation and `ZeroMemory` can leave an unzeroed PIN copy on the heap: exactly the leak `SecurePin`'s pinned buffer (`SecurePin.cs:26-40`) exists to prevent.
+- **Proposed action:** Marshal directly from the already-pinned `SecurePin` buffer (span-taking interop overload), or pin the transient with `GCHandleType.Pinned` for its lifetime. Internal plumbing only; public signatures already take `SecurePin`.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist B
+
+### [BL-018] Wrap-hardening attributes (`CKA_WRAP_WITH_TRUSTED`, `CKA_TRUSTED`, `CKA_WRAP_TEMPLATE`/`CKA_UNWRAP_TEMPLATE`) have no first-class template-builder support
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Objects/SecretKeyTemplateBuilder.cs:57-64`, `Objects/PrivateKeyTemplateBuilder.cs:22-28`
+- **Problem:** Secure defaults close the direct wrap-exfiltration path, but for keys deliberately made wrappable the standard defense-in-depth controls are reachable only through the generic `Attribute(CKA, …)` escape hatch; the nested-template form is awkward and undocumented. A hard-to-misuse library leaves its main wrap-hardening controls off the beaten path.
+- **Proposed action:** Add fluent helpers (`WrapWithTrusted()`, `Trusted()`, `WrapTemplate(...)`/`UnwrapTemplate(...)`) and document the wrap/unwrap-template threat in the security-model docs. Additive.
+- **Breaks public API?** No
+- **Raised by:** Cryptographer B
+
+### [BL-019] v3.2 functions bound at the interop layer but unreachable from the public API (verify-signature, authenticated wrap, async, validation flags)
+- **Area:** PKCS#11 Conformance
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/ILowLevelPkcs11Library.cs:76-85`, `Native/FunctionPointers.cs:336-364`; no public callers (verified by the specialist)
+- **Problem:** `C_VerifySignature*`, `C_WrapKeyAuthenticated`/`C_UnwrapKeyAuthenticated`, `C_AsyncComplete`/`C_AsyncGetID`/`C_AsyncJoin`, and `C_GetSessionValidationFlags` are fully wired and gated but have no public wrapper, so consumers cannot use them without forking. (KEM and message-AEAD are exposed.)
+- **Proposed action:** Add high-level wrappers for verify-signature streaming, authenticated wrap/unwrap, and validation-flags inspection; make an explicit, documented in/out-of-scope call on async for 1.0. Additive post-1.0, so not a release blocker — but decide deliberately.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist A
+- **Spec / References:** PKCS#11 v3.2 §5.16, §5.17, §5.20
+
+### [BL-020] `InterfaceInfo` omits the interface version, defeating the point of interface enumeration
+- **Area:** PKCS#11 Conformance
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/InterfaceInfo.cs:8-21`; producers `Pkcs11Library.cs:276-282`, `:308-311`
+- **Problem:** `GetInterfaces()` returns only `Name` + flags. The interface's cryptoki version sits in the `CK_VERSION` header of the function list the descriptor points to, but is never surfaced — a consumer cannot tell a token's 2.40 / 3.0 / 3.2 "PKCS 11" interfaces apart.
+- **Proposed action:** Read the `CK_VERSION` from `CK_INTERFACE.FunctionList` and add a `Version` property. Additive.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist A
+
+### [BL-021] Inconsistent XML-doc `<exception>` coverage on the shipped surface
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** e.g. `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Key.cs:304,359,379,462,489,566` (throw `ObjectDisposedException`/`ArgumentNullException`, document at most one); contrast `Pkcs11Workspace.cs:120-121`
+- **Problem:** Flagship types are documented excellently, but many operational methods omit `<exception>` tags for exceptions they demonstrably throw, so IntelliSense under-reports what callers must catch. Summary style is uneven; these docs ship in the package XML.
+- **Proposed action:** A systematic `<exception>`-completeness pass over every public method plus summary-style normalization.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer A
+
+### [BL-022] net10.0-only targeting is a major reach cut with no documented rationale
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj` (`<TargetFramework>net10.0</TargetFramework>`); `README.md:15`
+- **Problem:** net8.0 (LTS through Nov 2026) and netstandard2.0 consumers are excluded entirely. The csproj comment justifies net10 via the `NativeCULong` RID assets, but the real blocker is the net10 BCL PQC types (`MLDsa`, `MLKem`, `SlhDsa`, `SP800108HmacCounterKdf`); neither the trade-off nor the rationale is stated anywhere a consumer sees.
+- **Proposed action:** Either multi-target (net8.0 classical surface with `#if`-gated PQC façades) or explicitly document the net10-only decision and its PQC rationale in the README. Adding TFMs later is non-breaking, but the positioning decision belongs pre-1.0.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer A
+
+### [BL-023] Windows consumers without a resolved RID asset hit a hard `PlatformNotSupportedException` at first load
+- **Area:** P/Invoke
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/LowLevelPkcs11Library.cs:184-196`; csproj (no `net10.0-windows` TFM)
+- **Problem:** Windows correctness depends on `NativeCULong` resolving its 4-byte per-RID asset. The width guard fails loudly instead of mis-marshalling (correct), but in AnyCPU/no-RID, single-file, or transitive-reference configurations the library is simply unusable on Windows at first load — a consumer trap with no guidance. (CI validates the packed path itself on win x64/x86/arm64.)
+- **Proposed action:** Ship a Windows consumption guide (RID-specific restore/publish) or a `net10.0-windows` TFM hard-referencing the 4-byte build, and add a CI job that consumes the packed .nupkg from a no-RID Windows app to prove asset resolution as shipped.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer B
+
+### [BL-024] Native struct-layout pin coverage has three systematic gaps (FUNCTION_LIST on Unix, win-x86 absolutes, offset pins for pointer+length structs)
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Native/MarshalSizeOfTests.cs:26,42-43,155,160-162`; `Unit/Native/NativeStructLayoutTests.cs:41-90`
+- **Problem:** (a) `CK_FUNCTION_LIST*` — the structs the loader depends on — are size-pinned only via their `_Windows` siblings, excluded from the Unix census; (b) absolute size pins run only on `IsWindows64`, so the win-x86 ILP32 leg (the ABI most different from LP64) has no absolute expectations even though CI runs it; (c) LP64 field-offset pins cover only 5 of ~90 param structs, and the size census cannot catch same-width transpositions (pointer/length swaps) in the many unpinned buffer-carrying structs.
+- **Proposed action:** Add Unix size pins for the three `CK_FUNCTION_LIST*` structs (or sentinel fptr offset pins), a `ConditionalTheory(IsWindows32)` with absolute win-x86 sizes, and extend offset pins to the remaining pointer+length / hash+MGF structs.
+- **Breaks public API?** No
+- **Raised by:** QA A, QA B
+
+### [BL-025] "v3.2 methods fail cleanly on sub-v3.2 modules" contract is unverified
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:3018-3026`; `Tests/Unit/Internal/Pkcs11SessionV32Tests.cs`
+- **Problem:** Every hermetic v3.2 test uses a fake reporting `IsV32ApiSupported => true`; nothing drives `EncapsulateKey`/`DecapsulateKey`/`WrapKeyAuthenticated`/`VerifySignature`/`GetSessionValidationFlags` against a backend reporting false to confirm the documented `CKR_FUNCTION_NOT_SUPPORTED` exception rather than a null-delegate NRE.
+- **Proposed action:** Add a not-supported-fake test asserting each v3.2 method throws the documented typed exception.
+- **Breaks public API?** No
+- **Raised by:** QA A
+
+### [BL-026] No assembly-level test-parallelization policy around the process-global native module
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/` (no `xunit.runner.json`; safety rests on per-file `[Collection]` attributes)
+- **Problem:** pkcs11-mock is single-session and process-global; a new Integration test class that forgets its backend `[Collection]` attribute runs in parallel with the collection and corrupts shared native state — an intermittent failure with no guardrail against the omission.
+- **Proposed action:** Add an explicit parallelization policy (`xunit.runner.json`/assembly attribute) plus a convention test that every `Integration/**` class carries a backend collection.
+- **Breaks public API?** No
+- **Raised by:** QA A
+
+### [BL-027] No CI-health guard for opencryptoki — the second real backend can silently stop running
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/OpenCryptokiBackendFixture.cs:34`; contrast `Integration/Smoke/SoftHsmAvailabilityTests.cs:14`; provisioning `ci.yml:288-293`
+- **Problem:** SoftHSM has an availability guard that fails the job if missing; opencryptoki's availability is a bare `File.Exists` on an env var written by multi-step CI provisioning. If provisioning regresses, every opencryptoki KAT and integration test skips and the second-implementation cross-check vanishes under a green build.
+- **Proposed action:** Add an `OpenCryptoki_IsAvailable` guard gated on a CI marker env var (e.g. `EXPECT_OPENCRYPTOKI=1` on the ubuntu-latest leg), mirroring the SoftHSM guard.
+- **Breaks public API?** No
+- **Raised by:** QA B
+
+### [BL-028] AES-CCM, ChaCha20-Poly1305, SP800-108 KDF, and SLH-DSA have zero real-backend coverage
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/SoftHsmBackendFixture.cs:59-88`; the four `*.Managed.cs` suites under `Tests/Algorithms/`
+- **Problem:** Neither CI real backend implements these four mechanism families, so their `CK_*_PARAMS` are validated on the wire only by the in-process `ManagedSoftToken` — a strict real token rejecting a field the fake tolerates would never surface. (Managed KATs and struct-size pins do exist.)
+- **Proposed action:** Add a third soft-token backend that implements them (e.g. Kryoptic covers AES-CCM, ChaCha20-Poly1305, ML-KEM, SLH-DSA), at least as a nightly/optional CI leg, and light up the existing capability-gated cases.
+- **Breaks public API?** No
+- **Raised by:** QA B
+
+### [BL-029] No fuzzing of the inbound marshalling layer
+- **Area:** QA
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Native/` (no SharpFuzz or similar anywhere)
+- **Problem:** The highest-risk direction — a buggy/hostile token controlling returned lengths in the two-call probe and attribute read-back — is covered only by example-based tests.
+- **Proposed action:** Add a SharpFuzz harness over (1) `CK_ATTRIBUTE[]` template build/read-back and (2) length-probe read-back with adversarial `ulValueLen`. Pairs with BL-013.
+- **Breaks public API?** No
+- **Raised by:** QA B, Cryptographer B
+
+### [BL-030] Docs site is API-reference-only; README fails the 60-second use-case test
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `docs/toc.yml`, `docs/index.md`, `README.md`
+- **Problem:** `toc.yml` has only Home + API; there is no getting-started or end-to-end flow (load → initialize → session → login → operate → dispose) anywhere, and the README contains no usage code at all.
+- **Proposed action:** Add a `docs/articles/` getting-started walkthrough wired into `toc.yml`, and a minimal end-to-end snippet at the top of the README.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-031] No migration guide from Pkcs11Interop
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** MISSING: `MIGRATION.md` / docs article
+- **Problem:** Pkcs11Interop is the incumbent .NET PKCS#11 binding and the most likely source of adopters; no concept/API mapping exists — a real adoption barrier.
+- **Proposed action:** Add a migration article mapping common Pkcs11Interop patterns (slots/sessions/attributes/mechanisms) to this library's façades; link from the README.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-032] No dependency-update automation (dependabot/renovate) or dependency-review gate
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** MISSING: `.github/dependabot.yml` (verified)
+- **Problem:** Actions are SHA-pinned (good) but nothing keeps the pins current or flags vulnerable NuGet dependencies.
+- **Proposed action:** Add `dependabot.yml` for the `nuget` and `github-actions` ecosystems (grouped); optionally `dependency-review-action` on PRs.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-033] No CHANGELOG or GitHub Release / release-notes flow
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** MISSING: `CHANGELOG.md` (verified); `.github/workflows/publish.yml` (no release step)
+- **Problem:** Publishing pushes to NuGet with no per-version record of changes — especially important for a security library where gate/behavior changes matter.
+- **Proposed action:** Adopt Keep-a-Changelog (or Conventional Commits-generated notes) and create a GitHub Release from the tag-triggered publish.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-034] No CONTRIBUTING.md, CODE_OF_CONDUCT.md, or issue/PR templates
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** MISSING: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` (all verified absent)
+- **Problem:** Contribution prerequisites here are non-trivial (submodules, from-source OpenSSL 3.5, format/warnings gates) and entirely undocumented; no triage structure exists.
+- **Proposed action:** Add the standard community-health files, with CONTRIBUTING covering submodule init, native prerequisites, and the formatting/warnings expectations.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-035] No SBOM generated or attached at publish
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** `.github/workflows/publish.yml` (provenance attestation present at `:41-43`; no SBOM step)
+- **Problem:** Supply-chain-conscious consumers increasingly require a CycloneDX/SPDX SBOM; provenance attestation alone doesn't provide the dependency graph.
+- **Proposed action:** Generate a CycloneDX SBOM (dotnet tool or `Microsoft.Sbom.Targets`) during publish and attach it to the release; optionally attest it.
+- **Breaks public API?** No
+- **Raised by:** QA C, .NET Engineer B
+
+### [BL-036] No CodeQL SAST workflow
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** S
+- **Location:** MISSING: `.github/workflows/codeql.yml`
+- **Problem:** SonarCloud runs in `code-quality.yml`, but CodeQL is the expected baseline SAST for a security-sensitive library and feeds GitHub's security tab/advisory flow, which Sonar does not.
+- **Proposed action:** Add the standard CodeQL `csharp` workflow on push/PR/schedule.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+### [BL-037] No automated versioning source — the version exists only as a tag stamp
+- **Area:** Release Eng
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj` (`<Version>0.0.0</Version>`); `.github/workflows/publish.yml:29-30`
+- **Problem:** No MinVer/Nerdbank.GitVersioning; CI and local builds always produce 0.0.0; nothing verifies a publish tag is on `main`, annotated, or intentional before pushing to an immutable package ID.
+- **Proposed action:** Adopt MinVer (or NBGV) so every build derives a deterministic version from git, and guard publish on the tag being reachable from `main`.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+## Low
+
+### [BL-038] `WaitForSlotEvent` uses `void` + two `out` params instead of a Try/result shape, with a raw `ulong` slot id
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Library.cs:324`
+- **Problem:** Classic Try-pattern case shipped as `void WaitForSlotEvent(bool, out bool, out ulong)`; the returned slot id has no path back to a `Pkcs11Slot`.
+- **Proposed action:** Reshape as `bool TryWaitForSlotEvent(bool nonBlocking, out Pkcs11Slot? slot)` (or a result struct) before the signature is permanent.
+- **Breaks public API?** Yes — land before 1.0
+- **Raised by:** .NET Engineer A
+
+### [BL-039] Slot/session identifiers surface as raw `ulong`, contrary to the project's own handle-wrapping rule
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Slot.cs:35`, `SessionInfo.cs:14`, `SlotInfo.cs:12`, `TokenInfo.cs:12`
+- **Problem:** `ObjectHandle` is wrapped internally, but slot/session ids leak as bare `ulong` — defensible, yet inconsistent with CLAUDE.md's dedicated-handle-type rule, and changing the type later is breaking.
+- **Proposed action:** Introduce `readonly struct SlotId` (and optionally `SessionId`) or consciously accept and document the raw `ulong` — decide before 1.0.
+- **Breaks public API?** Yes if changed — decide before 1.0
+- **Raised by:** .NET Engineer A
+
+### [BL-040] `Mechanism.Type` exposes only a raw `ulong`; no `CKM`-typed accessor
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Mechanism.cs:25`; cast sites `Pkcs11Key.cs:624,632,652`
+- **Problem:** Consumers (and the library itself) must write `(CKM)mechanism.Type`; there is a `CKM` constructor but no typed getter.
+- **Proposed action:** Add `public CKM MechanismType` (or `TryGetMechanism(out CKM)`), keeping `ulong` for vendor mechanisms. Additive.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer A
+
+### [BL-041] Legacy-crypto `[Obsolete]` attributes lack `DiagnosticId`, forcing blanket CS0618 suppression
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/SHA1Pkcs11.cs:27`, `MD5Pkcs11.cs:27`, `DESPkcs11.cs:42`, `TripleDESPkcs11.cs:47`, `RC2Pkcs11.cs:43`, `DSAPkcs11.cs:26`
+- **Problem:** Deliberate legacy use under `AllowInsecure` can only be suppressed globally, hiding every other obsoletion in the consumer's code.
+- **Proposed action:** Give each a stable `DiagnosticId` (e.g. `KLPKCS11001`) + `UrlFormat`, BCL `SYSLIB*`-style.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer A
+
+### [BL-042] No documented SemVer/stability policy; own v3.2-only surface carries no `[Experimental]`
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `README.md` (no stability section); `Pkcs11Key.cs:415,438,519,543`
+- **Problem:** `SlhDsaPkcs11` correctly propagates `[Experimental("SYSLIB5006")]`, but the library's own newest v3.2 surface (encapsulation, message-AEAD) has no stability signal, and nothing states what consumers may rely on across versions.
+- **Proposed action:** Add a README stability/SemVer section; consider a project-specific `[Experimental]` diagnostic for the v3.2-only surface so 1.0 can ship a stable classical core.
+- **Breaks public API?** No (attribute is breaking to *add* post-1.0 — another reason to do it now)
+- **Raised by:** .NET Engineer A
+
+### [BL-043] `CkmAesGcmParams` accepts 32-bit GCM tags with no gate or warning
+- **Area:** Cryptography
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismParams/CkmAesGcmParams.cs:24-28`
+- **Problem:** The public low-level params type validates `tagBits` to any multiple of 8 in [32, 128]; short tags materially raise forgery probability and are restricted by SP 800-38D. (The high-level `AesGcmPkcs11` already enforces 12–16 bytes.)
+- **Proposed action:** Floor at 96 bits unless `AllowInsecure`, or at minimum document the SP 800-38D constraint on the parameter.
+- **Breaks public API?** Behavioral if gated — decide before 1.0
+- **Raised by:** Cryptographer A
+- **Spec / References:** NIST SP 800-38D §5.2.1.2, Appendix C
+
+### [BL-044] `CkmHashPqcSignParams` doc suggests `CKM_SHAKE_*` hashes the library deliberately does not map
+- **Area:** Cryptography
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismParams/CkmHashPqcSignParams.cs:19` (contrast `Algorithms/Pkcs11MechanismMap.cs:140-147`)
+- **Problem:** The param doc's example list includes `CKM_SHAKE_*`, which the mechanism map documents as intentionally unmapped (no standalone SHAKE hash mechanism in OASIS v3.2).
+- **Proposed action:** Drop `CKM_SHAKE_*` from the example or add the map's rationale so low- and high-level docs agree.
+- **Breaks public API?** No
+- **Raised by:** Cryptographer A
+
+### [BL-045] No sanity ceiling on module-reported lengths before allocation (length-probe DoS)
+- **Area:** P/Invoke
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:1487-1499` (`CallWithLengthProbe`), `:986-987`; `Native/UnmanagedMemory.cs:75-101`
+- **Problem:** Every two-call probe allocates exactly the module-reported length; a buggy token claiming 2 GB for a label forces a giant allocation (checked casts prevent corruption, not OOM).
+- **Proposed action:** Add a configurable conservative ceiling with a typed exception in the probe and attribute-allocation loops.
+- **Breaks public API?** No
+- **Raised by:** Cryptographer B
+
+### [BL-046] Intermediate RNG/seed copies are not zeroized
+- **Area:** Cryptography
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:2988-2995` (`GenerateRandom(Span<byte>)`), `:2958-2962` (`SeedRandom(ReadOnlySpan<byte>)`)
+- **Problem:** The span overloads copy through un-zeroized temporaries — potential key material lingering on the GC heap, inconsistent with the codebase's otherwise-strict zeroization discipline.
+- **Proposed action:** Zero the intermediates in a `finally` (or fill the destination directly).
+- **Breaks public API?** No
+- **Raised by:** Cryptographer B
+
+### [BL-047] Base v2.40 function pointers are never re-sourced from the negotiated v3.x interface table
+- **Area:** PKCS#11 Conformance
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/Delegates.cs:1487-1516`, `:1647-1799`
+- **Problem:** After `TryLoadFromGetInterface` succeeds, only v3.x additions are bound from the interface table; the ~68 base pointers stay bound from legacy `C_GetFunctionList`, mixing two tables the spec allows to differ. Theoretical with real modules.
+- **Proposed action:** Rebind the full base surface from the returned v3.x function list when the interface path succeeds.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist A
+- **Spec / References:** PKCS#11 v3.0 §5.4.5
+
+### [BL-048] No consumer control over which interface/version is dispatched
+- **Area:** PKCS#11 Conformance
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/Delegates.cs:1653-1658`; `Pkcs11Library.cs:297-312`
+- **Problem:** The library always negotiates the module's default (highest) interface; there is no way to pin dispatch to a named/lower-version interface — a common interop workaround for buggy v3.x implementations.
+- **Proposed action:** Consider an opt-in on load (interface name / max version); at minimum document the default-interface behavior.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist A
+
+### [BL-049] Streaming `DecryptVerify` lacks the unwind-cancel its sibling multi-part methods have
+- **Area:** P/Invoke
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:2302-2374` (contrast `:1921-1925`, `:2714-2723`, `:2886-2893`)
+- **Problem:** A mid-stream exception leaves both `C_VerifyInit` and `C_DecryptInit` operations active on the shared per-workspace session, wedging the next unrelated operation with `CKR_OPERATION_ACTIVE`. Latent today (not publicly surfaced) but inconsistent with the otherwise-uniform pattern.
+- **Proposed action:** Add the same `finalized`-flag `try/finally` + `TryCancelOperation` unwind before this is ever exposed publicly.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist B
+
+### [BL-050] `CloseWhenDisposed = false` does not actually keep the session open
+- **Area:** P/Invoke
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:808-827`
+- **Problem:** The retained `Pkcs11SessionHandle`'s critical finalizer still calls `C_CloseSession` once the disposed session becomes unreachable — the session closes anyway, just nondeterministically, and could in principle finalize after `C_Finalize`. The flag's contract is misleading (internal type, limited blast radius).
+- **Proposed action:** Remove the flag, or implement a real detach that suppresses/transfers the SafeHandle release.
+- **Breaks public API?** No
+- **Raised by:** PKCS#11 Specialist B
+
+### [BL-051] `NativeLibrary.Load` resolves bare names via the OS search path, undocumented
+- **Area:** P/Invoke
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Native/LowLevelPkcs11Library.cs:127`; public entry `Pkcs11Library.cs:80`
+- **Problem:** A non-absolute module name triggers platform search heuristics (cwd/PATH/LD_LIBRARY_PATH) — a DLL-planting vector inherent to consumer-chosen modules, but unmentioned in the docs.
+- **Proposed action:** Document that an absolute, trusted path should be passed; consider warning on (or rejecting) non-rooted paths.
+- **Breaks public API?** No
+- **Raised by:** .NET Engineer B
+
+### [BL-052] Token-removed / device-error mid-operation is only tested at the CKR-mapping level
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Exceptions/ExceptionMapperTests.cs:49-61`
+- **Problem:** No test injects `CKR_DEVICE_REMOVED` between Init and Final to prove the session is left usable (busy-guard released, no unmanaged leak); the `ManagedSoftToken` fault-injection hooks already exist.
+- **Proposed action:** Add a fake-injected device-removed mid-digest/mid-sign case asserting clean teardown.
+- **Breaks public API?** No
+- **Raised by:** QA B
+
+### [BL-053] Adapter-level ChaCha20-Poly1305 KAT is dormant — reads as covered but never executes
+- **Area:** QA
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Adapters/KnownAnswerTests.SoftHsm2.cs:350`; gate hardcoded false at `Support/Fixtures/SoftHsmBackendFixture.cs:71`
+- **Problem:** The KAT is gated on a capability flag that is hardcoded `false` and wired to no other backend. Coverage exists via the managed RFC 8439 KAT, but the dormant adapter code gives a false impression of real-backend coverage.
+- **Proposed action:** Wire it to a backend that can run it (see BL-028) or delete it.
+- **Breaks public API?** No
+- **Raised by:** QA B
+
+### [BL-054] Publish-trigger and artifact hardening gaps (no environment gate, no concurrency guard, snupkg unattested)
+- **Area:** Release Eng
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `.github/workflows/publish.yml:4-5,41-55`
+- **Problem:** Any `v*` tag triggers a push to an immutable package ID with no protected-environment approval or `concurrency` group; the symbol package is not attested; determinism is configured but never verified post-build.
+- **Proposed action:** Gate publish behind a protected GitHub Environment, add a `concurrency` group, and consider attesting the snupkg. The OIDC + provenance flow itself is already strong.
+- **Breaks public API?** No
+- **Raised by:** QA C
+
+## PKCS#11 v3.2 Coverage Matrix
+
+Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_3_2`, `CK_INTERFACE`, and `CK_ASYNC_DATA` field-by-field against the vendored v3.2 header (`vendor/opencryptoki/usr/include/pkcs11types.h`) — exact match, including the 12 v3.2 additions in declaration order. **No v3.2 `C_*` function is missing at the interop layer.**
+
+| Function group | Low-level (P/Invoke) | High-level (public façade) |
+|---|---|---|
+| v2.40 general / slot / token (`C_Initialize` … `C_WaitForSlotEvent`) | ✅ | ✅ |
+| v2.40 session / PIN / login (`C_OpenSession` … `C_Logout`) | ✅ | ✅ |
+| v2.40 object / attribute (`C_CreateObject` … `C_FindObjectsFinal`) | ✅ | ✅ |
+| v2.40 crypto (single/multi-part, SignRecover/VerifyRecover, dual-function) | ✅ | ✅ (dual-function combos low-level only) |
+| v2.40 key management / RNG | ✅ | ✅ |
+| v2.40 legacy (`C_GetFunctionStatus`, `C_CancelFunction`) | ✅ | low-level only (legacy no-ops) |
+| v3.0 interfaces / login / cancel (`C_GetInterfaceList`, `C_GetInterface`, `C_LoginUser`, `C_SessionCancel`) | ✅ | ✅ |
+| v3.0 message-based AEAD (`C_MessageEncryptInit` family + Decrypt/Sign/Verify) | ✅ | ✅ |
+| v3.2 KEM (`C_EncapsulateKey`, `C_DecapsulateKey`) | ✅ | ✅ |
+| v3.2 verify-signature streaming (`C_VerifySignature*`) | ✅ | ❌ — BL-019 |
+| v3.2 authenticated wrap (`C_WrapKeyAuthenticated`, `C_UnwrapKeyAuthenticated`) | ✅ | ❌ — BL-019 |
+| v3.2 async (`C_AsyncComplete`, `C_AsyncGetID`, `C_AsyncJoin`) | ✅ | ❌ — BL-019 |
+| v3.2 validation (`C_GetSessionValidationFlags`) | ✅ | ❌ — BL-019 |
+
+Mechanisms (`CKM`, 480 members): RSA (PSS/OAEP), EC/EdDSA/Montgomery, AES (GCM/CCM/CTR/KW/message), ChaCha20/Salsa20/Poly1305, ML-DSA/ML-KEM/SLH-DSA, HSS/LMS, SHA-2/-3/SHAKE, HMAC, KDFs, legacy `[Obsolete]`-gated — comprehensive, spot-checked constant values correct, raw-`ulong` vendor escape hatch present. Attributes (`CKA`, 160 members): all v3.2 additions present (trust, validation, profile, HSS, parameter-set, encapsulate/decapsulate templates); `CKO_PROFILE`/`VALIDATION`/`TRUST` defined but have no dedicated template builders (GenericTemplateBuilder suffices). Return codes (`CKR`, 105 members): all v3.2 additions present; vendor-code handling gap is BL-003.
+
+## Appendix A — Unverified / Speculative
+
+- **KEM/authenticated-unwrap secure-defaults application** (Cryptographer B): whether `EncapsulateKey`/`DecapsulateKey` and `UnwrapKeyAuthenticated` call `BuildSecureKeyDefaults` like `UnwrapKey`/`DeriveKey` do — a shared comment claims so, but the reviewer read only the latter two call sites in full. Confirm before 1.0.
+- **`[InlineArray]` structs through `Marshal.SizeOf`/`PtrToStructure`** (.NET Engineer B): currently avoided at runtime (the `CK_*_INFO_Windows` siblings pass by direct blittable pointer), but the interaction should be re-verified if future code routes an InlineArray-bearing struct through `UnmanagedMemory.Read<T>/Write<T>`.
+- **GitHub repository settings** (QA C): branch protections, required status checks, tag protection, Environment approvals, and Private Vulnerability Reporting enablement are not verifiable from the repo — confirm in Settings.
+
+## Appendix B — Out of Scope Observations
+
+Positive findings worth preserving (multiple specialists, independently):
+
+- **The Windows packing scheme is complete and coherent.** `CK_FUNCTION_LIST` (whose natural alignment would shift every pointer by 6 bytes on Win64) is `[PackedForPkcs11]`; every mechanism/attribute-bearing entry point has unified + `_Windows` function pointers bound from the same slot with matching dispatch branches; every raw param struct carries the attribute; `EnsureCkUlongWidthMatchesPlatform` fails loud on a mis-resolved `NativeCULong` asset instead of corrupting memory. Parameter struct layouts and CKM constants were verified against the vendored v3.2 headers.
+- **Integer overflow at the length boundary is handled by design:** `CheckForOverflowUnderflow` + `NativeCULong`'s `operator checked int` route every length cast through a throwing conversion.
+- **The native interop layer is fully quarantined** — every type under `Native/` is `internal`; no raw `IntPtr`, `delegate*`, or `CK_*` type appears on the public surface.
+- **AOT/trim posture is sound:** `[assembly: DisableRuntimeMarshalling]`, `delegate* unmanaged[Cdecl]` dispatch, generator-emitted `typeof` chains with no reflection, `IsAotCompatible` + analyzers, CI AOT smoke job.
+- **Zeroization and SafeHandle discipline are consistent:** unmanaged buffers zeroized on free; `SecurePin`/`SecureBuffer` pinned, zeroed, and `ToString()`-redacted; no log statement formats key/PIN/plaintext material (verified by grep); sessions closed before `C_Finalize`; `Pkcs11SessionHandle` keeps the module reachable; `C_Initialize` probes `CKF_OS_LOCKING_OK` with `CKR_CANT_LOCK` fallback.
+- **Secure-by-default is consistently enforced** in key-producing operations via `BuildSecureKeyDefaults` (sensitive/non-extractable appended, explicit insecure values refused without `AllowInsecure`); template builders default correctly; verification is delegated to the token with `CKR_SIGNATURE_INVALID → false` mapping and no managed-side secret comparisons.
+- **PQC handling is unusually careful:** ML-DSA pre-hash/SHAKE arms refused with accurate FIPS 204 domain-separation reasoning rather than emitting non-interoperable signatures; ML-KEM probes and caches the `CKA_VALUE_LEN` token quirk.
+- **The test suite is mature where it covers:** ~90 struct sizes pinned per-platform with a reflection census over the packed siblings; strong classical KATs (NIST/RFC vectors) on two real backends, capability-gated; AEAD negative tests assert exact CKRs; thread-safety tests are gate-based, not sleep-based; assertions check exact bytes/handles.
+- **CI/publish hygiene is modern:** OIDC trusted publishing (no long-lived NuGet key), build-provenance attestation, SHA-pinned actions with least-privilege permissions, `persist-credentials: false`, commit-pinned submodules, enforced `.editorconfig` + `dotnet format` gate, package source mapping.
+- **Deliberate design notes:** no async surface anywhere (defensible for a blocking C API — document the stance); digest/HMAC façades buffer entire inputs in unzeroized `MemoryStream`s (memory growth + lingering message bytes; no public incremental multi-part sign/digest API); `WaitForSlotEvent` should document the spec's single-caller-thread expectation; `LangVersion` is pinned to 13.0 while CLAUDE.md says `latest`.
