@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -13,9 +14,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
 /// Backend-agnostic MLKemPkcs11 (FIPS 203) tests: encapsulate/decapsulate round-trip (extracting the
-/// shared secret is gated by the secure-defaults policy), and key-material export (encapsulation key
-/// encoding; private export refused). The non-ML-KEM-key constructor check runs anywhere; the
-/// real-crypto cases skip where the backend cannot operate ML-KEM (<see cref="IPkcs11Backend.SupportsMlKem"/>).
+/// shared secret is gated by the secure-defaults policy), independent BCL cross-encapsulation against
+/// the token's decapsulation, and key-material export (encapsulation key encoding; private export
+/// refused). The non-ML-KEM-key constructor check runs anywhere; the real-crypto cases skip where the
+/// backend cannot operate ML-KEM (<see cref="IPkcs11Backend.SupportsMlKem"/>).
 /// </summary>
 internal static class MLKemPkcs11TestCases
 {
@@ -95,6 +97,38 @@ internal static class MLKemPkcs11TestCases
             byte[] sharedSecretDec = mlkem.Decapsulate(ciphertext);
             Assert.Equal(sharedSecretEnc, sharedSecretDec);
         });
+
+    private static MLKemAlgorithm BclAlgorithm(CkpMlKem parameterSet) => parameterSet switch
+    {
+        CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
+        CkpMlKem.CKP_ML_KEM_768 => MLKemAlgorithm.MLKem768,
+        CkpMlKem.CKP_ML_KEM_1024 => MLKemAlgorithm.MLKem1024,
+        _ => throw new ArgumentOutOfRangeException(nameof(parameterSet)),
+    };
+
+    // Independent verification: encapsulate off-token with a BCL MLKem built from the exported
+    // encapsulation key, then decapsulate on the token — the shared secrets must match. A round-trip
+    // alone cannot catch a mis-encoding that the token's own encapsulate and decapsulate share; a
+    // second implementation can.
+    internal static void Assert_Decapsulate_BclEncapsulation_MatchesSharedSecret(IPkcs11Backend backend, CkpMlKem parameterSet)
+    {
+        if (!MLKem.IsSupported)
+            throw new SkipTestException("Host BCL cannot operate ML-KEM (needs OpenSSL 3.5+ or a recent Windows).");
+
+        WithMlKem(backend, parameterSet, (workspace, mlkem) =>
+        {
+            // Reading the token's decapsulated secret is the extract-and-destroy path, gated by the
+            // secure-defaults policy.
+            workspace.AllowInsecure = true;
+
+            byte[] ek = mlkem.ExportEncapsulationKey();
+            using var bcl = MLKem.ImportEncapsulationKey(BclAlgorithm(parameterSet), ek);
+            bcl.Encapsulate(out byte[] ciphertext, out byte[] bclSharedSecret);
+
+            byte[] tokenSharedSecret = mlkem.Decapsulate(ciphertext);
+            Assert.Equal(bclSharedSecret, tokenSharedSecret);
+        });
+    }
 
     internal static void Assert_Encapsulate_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>

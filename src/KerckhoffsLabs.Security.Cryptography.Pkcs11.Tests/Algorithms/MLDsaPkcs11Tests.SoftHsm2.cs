@@ -16,6 +16,12 @@ public sealed class MLDsaPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
     [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
     public void SignVerifyData_RoundTrips(CkpMlDsa parameterSet) => MLDsaPkcs11TestCases.Assert_SignVerifyData_RoundTrips(_backend, parameterSet);
 
+    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
+    [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
+    public void SignData_VerifiesWithBcl(CkpMlDsa parameterSet) => MLDsaPkcs11TestCases.Assert_SignData_VerifiesWithBcl(_backend, parameterSet);
+
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void Ctor_NonMlDsaKey_Throws() => MLDsaPkcs11TestCases.Assert_Ctor_NonMlDsaKey_Throws(_backend);
 

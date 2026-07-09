@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -14,9 +15,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
 /// Backend-agnostic MLDsaPkcs11 (FIPS 204) tests: sign/verify across parameter sets and with context,
-/// external-mu (unsupported on PKCS#11 v3.2), and key-material export (public encoding; private export
-/// refused). The non-ML-DSA-key constructor check runs anywhere; the real-crypto cases skip where the
-/// backend cannot operate ML-DSA (<see cref="IPkcs11Backend.SupportsMlDsa"/>).
+/// independent BCL cross-verification of token signatures, external-mu (unsupported on PKCS#11 v3.2),
+/// and key-material export (public encoding; private export refused). The non-ML-DSA-key constructor
+/// check runs anywhere; the real-crypto cases skip where the backend cannot operate ML-DSA
+/// (<see cref="IPkcs11Backend.SupportsMlDsa"/>).
 /// </summary>
 internal static class MLDsaPkcs11TestCases
 {
@@ -94,6 +96,44 @@ internal static class MLDsaPkcs11TestCases
             tampered[0] ^= 0xFF;
             Assert.False(mldsa.VerifyData(tampered, sig));
         });
+
+    private static MLDsaAlgorithm BclAlgorithm(CkpMlDsa parameterSet) => parameterSet switch
+    {
+        CkpMlDsa.CKP_ML_DSA_44 => MLDsaAlgorithm.MLDsa44,
+        CkpMlDsa.CKP_ML_DSA_65 => MLDsaAlgorithm.MLDsa65,
+        CkpMlDsa.CKP_ML_DSA_87 => MLDsaAlgorithm.MLDsa87,
+        _ => throw new ArgumentOutOfRangeException(nameof(parameterSet)),
+    };
+
+    // Independent verification: the token's signature must verify under a BCL MLDsa rebuilt from the
+    // exported public key. A round-trip alone cannot catch a mechanism-params mis-encoding (context,
+    // parameter set) that the token's own sign and verify paths share; a second implementation can.
+    internal static void Assert_SignData_VerifiesWithBcl(IPkcs11Backend backend, CkpMlDsa parameterSet)
+    {
+        if (!MLDsa.IsSupported)
+            throw new SkipTestException("Host BCL cannot operate ML-DSA (needs OpenSSL 3.5+ or a recent Windows).");
+
+        WithMlDsa(backend, parameterSet, mldsa =>
+        {
+            byte[] data = Encoding.UTF8.GetBytes("token-signed, bcl-verified");
+            byte[] context = Encoding.UTF8.GetBytes("app-context");
+            byte[] sig = mldsa.SignData(data);
+            byte[] contextSig = mldsa.SignData(data, context);
+
+            byte[] pub = mldsa.ExportMLDsaPublicKey();
+            using var bcl = MLDsa.ImportMLDsaPublicKey(BclAlgorithm(parameterSet), pub);
+
+            Assert.True(bcl.VerifyData(data, sig));
+
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            Assert.False(bcl.VerifyData(tampered, sig));
+
+            // The BCL agrees on context binding: valid with the context, invalid without.
+            Assert.True(bcl.VerifyData(data, contextSig, context));
+            Assert.False(bcl.VerifyData(data, contextSig));
+        });
+    }
 
     internal static void Assert_SignVerifyData_WithContext_RoundTrips(IPkcs11Backend backend) =>
         WithMlDsa(backend, CkpMlDsa.CKP_ML_DSA_65, mldsa =>

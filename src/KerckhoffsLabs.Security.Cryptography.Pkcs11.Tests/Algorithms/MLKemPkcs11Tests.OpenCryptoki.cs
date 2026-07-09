@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
@@ -14,6 +15,10 @@ public sealed class MLKemPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
 
     [ConditionalFact(nameof(Available))]
     public void EncapsulateDecapsulate_RoundTrips() => MLKemPkcs11TestCases.Assert_EncapsulateDecapsulate_RoundTrips(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void Decapsulate_BclEncapsulation_MatchesSharedSecret() =>
+        MLKemPkcs11TestCases.Assert_Decapsulate_BclEncapsulation_MatchesSharedSecret(_backend, CkpMlKem.CKP_ML_KEM_768);
 
     [ConditionalFact(nameof(Available))]
     public void Encapsulate_GatedByDefault_Throws() => MLKemPkcs11TestCases.Assert_Encapsulate_GatedByDefault_Throws(_backend);
