@@ -13,7 +13,7 @@ internal static class SecurePinLoginTestCases
     internal static void Assert_Login_AcceptsSecurePin(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList()
-            .First(s => (NativeCULong)s.SlotId == backend.SlotId);
+            .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
         var session = slot.OpenSession();
         try
         {
@@ -30,7 +30,7 @@ internal static class SecurePinLoginTestCases
     internal static void Assert_Login_RejectsNullSecurePin(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList()
-            .First(s => (NativeCULong)s.SlotId == backend.SlotId);
+            .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
         var session = slot.OpenSession();
         try
         {

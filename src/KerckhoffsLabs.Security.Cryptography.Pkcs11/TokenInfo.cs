@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 public sealed record TokenInfo
 {
-    /// <summary>PKCS#11 handle of slot.</summary>
-    public ulong SlotId { get; }
+    /// <summary>Identifier of the slot holding this token.</summary>
+    public SlotId SlotId { get; }
 
     /// <summary>Application-defined label, assigned during token initialization.</summary>
     public string Label { get; }
@@ -70,7 +70,7 @@ public sealed record TokenInfo
 
     internal TokenInfo(NativeCULong slotId, CK_TOKEN_INFO ck_token_info)
     {
-        SlotId = (ulong)slotId;
+        SlotId = new SlotId((ulong)slotId);
         Label = Encoding.UTF8.GetString(ck_token_info.Label).TrimEnd();
         ManufacturerId = Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd();
         Model = Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd();

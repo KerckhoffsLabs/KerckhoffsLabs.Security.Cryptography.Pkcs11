@@ -21,8 +21,8 @@ public sealed class SessionInfoTests
 
         var info = new SessionInfo((NativeCULong)42UL, native);
 
-        Assert.Equal(42UL, info.SessionId);
-        Assert.Equal(4UL, info.SlotId);
+        Assert.Equal(42UL, info.SessionId.Value);
+        Assert.Equal(4UL, info.SlotId.Value);
         Assert.Equal(CKS.CKS_RW_USER_FUNCTIONS, info.State);
         Assert.Equal(0UL, info.DeviceError);
         Assert.True(info.SessionFlags.RwSession);

@@ -65,7 +65,7 @@ public sealed class Pkcs11SlotTests
 
     [Fact]
     public void SlotId_ReturnsConstructedValue() =>
-        Assert.Equal(SlotId, NewSlot(new SlotFake()).SlotId);
+        Assert.Equal(SlotId, NewSlot(new SlotFake()).SlotId.Value);
 
     // === GetSlotInfo ======================================================
 
@@ -76,7 +76,7 @@ public sealed class Pkcs11SlotTests
         var info = NewSlot(fake).GetSlotInfo();
 
         Assert.Equal(SlotId, (ulong)fake.LastSlotId);
-        Assert.Equal(SlotId, info.SlotId);
+        Assert.Equal(SlotId, info.SlotId.Value);
         Assert.True(info.SlotFlags.TokenPresent);
     }
 
@@ -95,7 +95,7 @@ public sealed class Pkcs11SlotTests
         var fake = new SlotFake { TokenInfo = new CK_TOKEN_INFO { Flags = CKF.CKF_TOKEN_INITIALIZED } };
         var info = NewSlot(fake).GetTokenInfo();
 
-        Assert.Equal(SlotId, info.SlotId);
+        Assert.Equal(SlotId, info.SlotId.Value);
         Assert.True(info.TokenFlags.TokenInitialized);
     }
 

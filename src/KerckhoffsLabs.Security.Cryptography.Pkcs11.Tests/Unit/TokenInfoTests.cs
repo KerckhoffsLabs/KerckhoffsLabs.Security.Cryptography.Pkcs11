@@ -37,7 +37,7 @@ public sealed class TokenInfoTests
     {
         var info = new TokenInfo((NativeCULong)7UL, Sample());
 
-        Assert.Equal(7UL, info.SlotId);
+        Assert.Equal(7UL, info.SlotId.Value);
         Assert.Equal("My Token", info.Label);
         Assert.Equal("Acme Corp", info.ManufacturerId);
         Assert.Equal("Model-X", info.Model);

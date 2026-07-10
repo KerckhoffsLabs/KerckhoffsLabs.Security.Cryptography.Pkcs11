@@ -10,11 +10,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 public sealed record SessionInfo
 {
-    /// <summary>PKCS#11 handle of session.</summary>
-    public ulong SessionId { get; }
+    /// <summary>Identifier of the session this information describes.</summary>
+    public SessionId SessionId { get; }
 
-    /// <summary>PKCS#11 handle of slot that interfaces with the token.</summary>
-    public ulong SlotId { get; }
+    /// <summary>Identifier of the slot that interfaces with the token.</summary>
+    public SlotId SlotId { get; }
 
     /// <summary>The state of the session.</summary>
     public CKS State { get; }
@@ -27,8 +27,8 @@ public sealed record SessionInfo
 
     internal SessionInfo(NativeCULong sessionId, CK_SESSION_INFO ck_session_info)
     {
-        SessionId = (ulong)sessionId;
-        SlotId = (ulong)ck_session_info.SlotId;
+        SessionId = new SessionId((ulong)sessionId);
+        SlotId = new SlotId((ulong)ck_session_info.SlotId);
         State = (CKS)ck_session_info.State.Value;
         SessionFlags = new SessionFlags(ck_session_info.Flags);
         DeviceError = (ulong)ck_session_info.DeviceError;

@@ -50,7 +50,7 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
             Pkcs11Slot found = Library.GetSlotList().FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel)
                 ?? throw new InvalidOperationException(
                     $"opencryptoki token '{TokenLabel}' did not appear in the slot list.");
-            SlotId = (NativeCULong)found.SlotId;
+            SlotId = (NativeCULong)found.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(found.GetMechanismList());
         }
         catch

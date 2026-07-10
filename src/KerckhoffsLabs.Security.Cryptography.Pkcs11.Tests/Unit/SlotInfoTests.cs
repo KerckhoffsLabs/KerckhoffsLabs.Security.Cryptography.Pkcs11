@@ -18,7 +18,7 @@ public sealed class SlotInfoTests
 
         var info = new SlotInfo((NativeCULong)9UL, native);
 
-        Assert.Equal(9UL, info.SlotId);
+        Assert.Equal(9UL, info.SlotId.Value);
         Assert.Equal("USB Reader Slot 0", info.SlotDescription);
         Assert.Equal("Acme Corp", info.ManufacturerId);
         Assert.Equal("1.0", info.HardwareVersion);   // minor 0 -> "M.0"

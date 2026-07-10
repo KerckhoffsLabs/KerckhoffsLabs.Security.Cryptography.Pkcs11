@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (9 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17
+- Total items: 54 (10 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17 (16 open, 1 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -416,7 +416,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Yes — land before 1.0
 - **Raised by:** .NET Engineer A
 
-### [BL-039] Slot/session identifiers surface as raw `ulong`, contrary to the project's own handle-wrapping rule
+### [BL-039] ✅ RESOLVED — Slot/session identifiers surface as raw `ulong`, contrary to the project's own handle-wrapping rule
+- **Status:** Resolved 2026-07-10 by introducing the dedicated types (the pre-1.0 window made the breaking change free). New public `readonly record struct SlotId` (public ctor — slot numbers are config-driven, externally meaningful values) and `SessionId` (internal ctor — session handles are library-produced, surfaced for diagnostics only), both following the `ObjectHandle` idiom with a `Value` accessor and purposeful `ToString` (decimal for slots matching vendor tooling, hex for opaque session handles). Adopted on `Pkcs11Slot.SlotId`, `SlotInfo.SlotId`, `TokenInfo.SlotId`, `SessionInfo.SessionId`/`SlotId`. `WaitForSlotEvent`'s `out ulong` was deliberately left for BL-038, which replaces that signature wholesale. Full suite green (1679 passed).
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** M

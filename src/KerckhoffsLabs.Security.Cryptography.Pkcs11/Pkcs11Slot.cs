@@ -32,9 +32,9 @@ public sealed class Pkcs11Slot
     private readonly NativeCULong _slotId = new(0);
 
     /// <summary>
-    /// PKCS#11 handle of slot
+    /// Identifier of this slot (<c>CK_SLOT_ID</c>).
     /// </summary>
-    public ulong SlotId => (ulong)_slotId;
+    public SlotId SlotId => new((ulong)_slotId);
 
     /// <summary>
     /// Initializes new instance of Pkcs11Slot class

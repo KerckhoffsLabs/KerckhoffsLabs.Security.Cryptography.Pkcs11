@@ -36,8 +36,8 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
             if (slots.Count == 0)
                 throw new InvalidOperationException("pkcs11-mock reported no slots with token present.");
 
-            // Slot.SlotId is ulong; cast to NativeCULong via the explicit operator.
-            SlotId = (NativeCULong)slots[0].SlotId;
+            // Slot.SlotId is the typed wrapper; unwrap to the raw value for the interop-typed fixture field.
+            SlotId = (NativeCULong)slots[0].SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(slots[0].GetMechanismList());
         }
         catch

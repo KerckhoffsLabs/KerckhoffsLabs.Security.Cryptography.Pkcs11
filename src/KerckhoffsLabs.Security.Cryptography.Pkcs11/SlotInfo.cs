@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 public sealed record SlotInfo
 {
-    /// <summary>PKCS#11 handle of slot.</summary>
-    public ulong SlotId { get; }
+    /// <summary>Identifier of the slot this information describes.</summary>
+    public SlotId SlotId { get; }
 
     /// <summary>Description of the slot.</summary>
     public string SlotDescription { get; }
@@ -28,7 +28,7 @@ public sealed record SlotInfo
 
     internal SlotInfo(NativeCULong slotId, CK_SLOT_INFO ck_slot_info)
     {
-        SlotId = (ulong)slotId;
+        SlotId = new SlotId((ulong)slotId);
         SlotDescription = Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
         ManufacturerId = Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
         SlotFlags = new SlotFlags(ck_slot_info.Flags);

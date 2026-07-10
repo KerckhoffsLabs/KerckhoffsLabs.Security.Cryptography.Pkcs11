@@ -104,7 +104,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
             var slots = Library.GetSlotList();
             Pkcs11Slot? found = slots.FirstOrDefault(s => s.GetTokenInfo().Label == TokenLabel)
                 ?? throw new InvalidOperationException($"Gate token '{TokenLabel}' did not appear in slot list.");
-            SlotId = (NativeCULong)found.SlotId;
+            SlotId = (NativeCULong)found.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(found.GetMechanismList());
         }
         catch

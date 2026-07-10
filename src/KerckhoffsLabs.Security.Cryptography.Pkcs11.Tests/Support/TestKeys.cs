@@ -133,7 +133,7 @@ internal static class TestKeys
     public static Pkcs11Session OpenLoggedInSession(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList()
-            .First(s => (NativeCULong)s.SlotId == backend.SlotId);
+            .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
         var session = slot.OpenSession();
         using var pin = new SecurePin(backend.UserPin.Span);
         session.Login(CKU.CKU_USER, pin);
