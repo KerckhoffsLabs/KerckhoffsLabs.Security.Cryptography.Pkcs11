@@ -54,6 +54,9 @@ public sealed class RSAPkcs11 : RSA
     /// here. The full un-hashed data is forwarded to PKCS#11; the token hashes and signs
     /// in one <c>C_Sign</c> call.
     /// </remarks>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown for a broken-hash signature (e.g. SHA-1, which maps to <c>CKM_SHA1_RSA_PKCS</c> / <c>CKM_SHA1_RSA_PKCS_PSS</c>) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set; strong-hash PKCS#1 v1.5 and PSS are allowed by default.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data,
         Span<byte> destination,
@@ -81,6 +84,11 @@ public sealed class RSAPkcs11 : RSA
     /// implementation calls the unimplemented <c>SignHash(byte[], …)</c> and throws
     /// <see cref="NotImplementedException"/>.
     /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown for a broken-hash signature (e.g. SHA-1) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignData(
         byte[] data,
         int offset,
@@ -106,6 +114,9 @@ public sealed class RSAPkcs11 : RSA
     /// Span entry-point — the .NET 10 BCL routes <c>VerifyData(ReadOnlySpan, ReadOnlySpan, …)</c>
     /// here.
     /// </remarks>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown for a broken-hash signature (e.g. SHA-1) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data,
         ReadOnlySpan<byte> signature,
@@ -122,6 +133,11 @@ public sealed class RSAPkcs11 : RSA
     /// Byte-array entry-point — the .NET 10 BCL routes
     /// <c>VerifyData(byte[], byte[], …)</c> through here, NOT through the span overload.
     /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/>, <paramref name="signature"/>, or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="offset"/> or <paramref name="count"/> is negative or outside the bounds of <paramref name="data"/>.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is an unsupported signature padding, or <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown for a broken-hash signature (e.g. SHA-1) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         byte[] data,
         int offset,
@@ -145,6 +161,10 @@ public sealed class RSAPkcs11 : RSA
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set; use OAEP instead.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public override byte[] Encrypt(byte[] data, RSAEncryptionPadding padding)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -154,6 +174,10 @@ public sealed class RSAPkcs11 : RSA
     }
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> or <paramref name="padding"/> is <c>null</c>.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="padding"/> is neither PKCS#1 v1.5 nor OAEP, or the OAEP hash is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <paramref name="padding"/> is PKCS#1 v1.5 (<c>CKM_RSA_PKCS</c>) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set; use OAEP instead.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public override byte[] Decrypt(byte[] data, RSAEncryptionPadding padding)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -171,6 +195,7 @@ public sealed class RSAPkcs11 : RSA
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
+    /// <exception cref="Pkcs11Exception">Thrown when the public material (<c>CKA_MODULUS</c> / <c>CKA_PUBLIC_EXPONENT</c>) is sensitive or cannot be read from any available handle.</exception>
     public override RSAParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)

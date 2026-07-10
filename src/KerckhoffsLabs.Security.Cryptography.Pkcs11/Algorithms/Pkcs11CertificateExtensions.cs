@@ -20,6 +20,8 @@ public static class Pkcs11CertificateExtensions
     /// the returned instance. Both <c>rsaEncryption</c> and <c>id-RSASSA-PSS</c> SubjectPublicKeyInfo
     /// algorithm OIDs are recognized as RSA, mirroring the BCL.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> is <c>null</c>.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> lookup.</exception>
     public static RSA? GetRSAPrivateKey(this Pkcs11Certificate certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);
@@ -34,6 +36,8 @@ public static class Pkcs11CertificateExtensions
     /// or no private key with this certificate's <c>CKA_ID</c> exists on the token. The caller owns
     /// the returned instance.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="certificate"/> is <c>null</c>.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> lookup.</exception>
     public static ECDsa? GetECDsaPrivateKey(this Pkcs11Certificate certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate);

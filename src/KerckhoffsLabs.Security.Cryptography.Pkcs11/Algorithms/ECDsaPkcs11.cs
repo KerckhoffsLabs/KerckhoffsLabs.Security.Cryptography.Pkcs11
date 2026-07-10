@@ -55,6 +55,9 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// un-hashed data. The PKCS#11 mechanism performs hashing on-token
     /// (e.g. <c>CKM_ECDSA_SHA256</c> for SHA-256).
     /// </remarks>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data,
         Span<byte> destination,
@@ -78,6 +81,9 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// <c>VerifyData(byte[], byte[], HashAlgorithmName)</c> dispatches here with the
     /// complete, un-hashed data.
     /// </remarks>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data,
         ReadOnlySpan<byte> signature,
@@ -101,6 +107,12 @@ public sealed class ECDsaPkcs11 : ECDsa
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Signs the caller-supplied digest with raw <c>CKM_ECDSA</c>. The hash algorithm is not
+    /// conveyed on this path, so the SHA-1 secure-defaults gate does not apply here.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="hash"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignHash(byte[] hash)
     {
         ArgumentNullException.ThrowIfNull(hash);
@@ -109,6 +121,8 @@ public sealed class ECDsaPkcs11 : ECDsa
     }
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="hash"/> or <paramref name="signature"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyHash(byte[] hash, byte[] signature)
     {
         ArgumentNullException.ThrowIfNull(hash);
@@ -179,6 +193,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
+    /// <exception cref="Pkcs11Exception">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) is sensitive, cannot be read from any available handle, or cannot be parsed as a named-curve uncompressed point.</exception>
     public override ECParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)

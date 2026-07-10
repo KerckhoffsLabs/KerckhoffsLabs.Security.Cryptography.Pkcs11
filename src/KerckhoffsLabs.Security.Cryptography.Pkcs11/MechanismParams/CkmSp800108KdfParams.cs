@@ -105,6 +105,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <c>C_DeriveKey</c> call; values are <c>CK_INVALID_HANDLE</c> (0) until the token populates them.
     /// Empty when none were requested.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
     public IReadOnlyList<ulong> AdditionalDerivedKeys
     {
         get

@@ -19,6 +19,7 @@ public sealed class CkmSalsa20Params : MechanismParameters
     /// <param name="blockCounter">Initial block counter (8 bytes).</param>
     /// <param name="nonce">Nonce bytes (typically 8).</param>
     /// <param name="nonceBits">Nonce length in bits (typically 64).</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="blockCounter"/> or <paramref name="nonce"/> is empty.</exception>
     public CkmSalsa20Params(ReadOnlySpan<byte> blockCounter, ReadOnlySpan<byte> nonce, int nonceBits)
     {
         if (blockCounter.IsEmpty) throw new ArgumentException("Block counter must not be empty.", nameof(blockCounter));

@@ -5,7 +5,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Mechanism and its parameters (CK_MECHANISM alternative)
+/// The strongly-typed managed counterpart of <c>CK_MECHANISM</c>, pairing a mechanism type with its
+/// parameters.
 /// </summary>
 public sealed class Mechanism : IDisposable
 {
@@ -22,6 +23,7 @@ public sealed class Mechanism : IDisposable
     /// <summary>
     /// The type of mechanism
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
     public ulong Type
     {
         get
@@ -104,6 +106,7 @@ public sealed class Mechanism : IDisposable
     /// </summary>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(ulong type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
@@ -120,6 +123,7 @@ public sealed class Mechanism : IDisposable
     /// </summary>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(CKM type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);

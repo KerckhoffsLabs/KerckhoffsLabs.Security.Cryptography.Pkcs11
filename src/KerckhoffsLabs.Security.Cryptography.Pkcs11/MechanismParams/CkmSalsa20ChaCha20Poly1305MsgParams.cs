@@ -18,10 +18,12 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates a 16-byte zero-filled tag buffer.</summary>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is empty.</exception>
     public static CkmSalsa20ChaCha20Poly1305MsgParams ForEncrypt(ReadOnlySpan<byte> nonce)
         => new(nonce, default);
 
     /// <summary>For decryption — wrapper stores caller's 16-byte tag for the library to verify.</summary>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is empty, or <paramref name="tag"/> is not 16 bytes long.</exception>
     public static CkmSalsa20ChaCha20Poly1305MsgParams ForDecrypt(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
     {
         if (tag.Length != Poly1305TagLen)
@@ -49,6 +51,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     }
 
     /// <summary>Copies the 16-byte tag (output of encrypt) into the caller's buffer.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than 16 bytes.</exception>
     public void CopyTagTo(Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

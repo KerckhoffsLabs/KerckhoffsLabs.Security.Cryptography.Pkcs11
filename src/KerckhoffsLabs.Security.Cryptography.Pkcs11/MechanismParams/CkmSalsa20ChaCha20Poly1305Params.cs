@@ -20,6 +20,7 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     /// </summary>
     /// <param name="nonce">Nonce (typically 12 bytes / 96 bits for ChaCha20-Poly1305).</param>
     /// <param name="aad">Additional authenticated data; pass <c>default</c> for none.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is empty.</exception>
     public CkmSalsa20ChaCha20Poly1305Params(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> aad)
     {
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));

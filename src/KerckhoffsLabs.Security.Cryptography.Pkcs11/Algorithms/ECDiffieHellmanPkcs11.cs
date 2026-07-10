@@ -49,6 +49,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     }
 
     /// <inheritdoc/>
+    /// <exception cref="Pkcs11Exception">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) is sensitive, cannot be read, or cannot be parsed as a named-curve uncompressed point.</exception>
     public override ECDiffieHellmanPublicKey PublicKey
     {
         get
@@ -65,11 +66,17 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <inheritdoc/>
     /// <remarks>Hashes the raw agreement Z with SHA-256, matching the BCL's legacy default.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveKeyMaterial(ECDiffieHellmanPublicKey otherPartyPublicKey)
         => DeriveKeyFromHash(otherPartyPublicKey, HashAlgorithmName.SHA256, null, null);
 
     /// <inheritdoc/>
     /// <remarks>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
         ArgumentNullException.ThrowIfNull(otherPartyPublicKey);
@@ -78,6 +85,9 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <inheritdoc/>
     /// <remarks>Computes <c>Hash(secretPrepend ‖ Z ‖ secretAppend)</c> over the raw agreement Z.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveKeyFromHash(
         ECDiffieHellmanPublicKey otherPartyPublicKey,
         HashAlgorithmName hashAlgorithm,
@@ -109,6 +119,9 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// HMAC key is <paramref name="hmacKey"/>, or Z itself when <paramref name="hmacKey"/> is null
     /// (matching the BCL).
     /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveKeyFromHmac(
         ECDiffieHellmanPublicKey otherPartyPublicKey,
         HashAlgorithmName hashAlgorithm,
@@ -229,6 +242,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
+    /// <exception cref="Pkcs11Exception">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) is sensitive, cannot be read, or cannot be parsed as a named-curve uncompressed point.</exception>
     public override ECParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)

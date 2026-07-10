@@ -21,6 +21,8 @@ public sealed class CkmAesGcmParams : MechanismParameters
     /// <param name="iv">Initialization vector (typically 12 bytes / 96 bits).</param>
     /// <param name="aad">Additional authenticated data; pass <c>default</c> for none.</param>
     /// <param name="tagBits">Authentication tag length in bits; must be a multiple of 8 in [32, 128]. Use 128 unless you have a specific reason.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="iv"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="tagBits"/> is not a multiple of 8 in [32, 128].</exception>
     public CkmAesGcmParams(ReadOnlySpan<byte> iv, ReadOnlySpan<byte> aad, int tagBits)
     {
         if (iv.IsEmpty) throw new ArgumentException("IV must not be empty.", nameof(iv));

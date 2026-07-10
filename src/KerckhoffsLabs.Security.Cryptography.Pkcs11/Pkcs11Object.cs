@@ -72,6 +72,7 @@ public sealed class Pkcs11Object : IDisposable
     /// to the token's <c>CKA_DESTROYABLE</c>/read-only permissions.
     /// </summary>
     /// <exception cref="ObjectDisposedException">The view has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
     public void Delete()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

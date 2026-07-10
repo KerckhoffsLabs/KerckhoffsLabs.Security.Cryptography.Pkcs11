@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (3 resolved)
-- Critical: 0 | High: 7 (6 open, 1 resolved) | Medium: 30 (28 open, 2 resolved) | Low: 17
+- Total items: 54 (4 resolved)
+- Critical: 0 | High: 7 (6 open, 1 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -228,7 +228,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist A
 
-### [BL-021] Inconsistent XML-doc `<exception>` coverage on the shipped surface
+### [BL-021] ✅ RESOLVED — Inconsistent XML-doc `<exception>` coverage on the shipped surface
+- **Status:** Resolved 2026-07-09. Systematic `<exception>`-completeness pass across the public surface: `Pkcs11Key` (all operational methods: Sign/Verify/Encrypt/Decrypt/Wrap/Unwrap/Encapsulate/Decapsulate/Derive/Message* now document ObjectDisposed/ArgumentNull/InsecureOperation/Pkcs11Exception incl. the underlying C_ function; Verify's managed-fallback NotSupportedException caught too), `Pkcs11Workspace` (18 members), `Pkcs11Library`/`Pkcs11Slot`/`Pkcs11Object`/`Pkcs11Certificate`/`Mechanism`/`SecurePin`, `Objects/` (ObjectAttribute read-backs with per-condition AttributeValueException tags; builder guards documented at `ObjectTemplateBuilderBase`), `MechanismParams/` validating constructors, and `Algorithms/` (AEAD Encrypt/Decrypt incl. auth-failure CKRs, DSA/ECDH/ECDsa/RSA overrides, SP800-108 KDF, certificate extensions). The two cited terse summaries (`Pkcs11Slot`, `Mechanism`) rewritten as proper sentences. Session-layer `AllowInsecure` guards documented as part of the public contract (consistent convention across files). Verified: docs-only diff (zero non-`///` lines changed), build green with warnings-as-errors (CS1570/CS1574 enforced), 791 unit tests pass.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** M

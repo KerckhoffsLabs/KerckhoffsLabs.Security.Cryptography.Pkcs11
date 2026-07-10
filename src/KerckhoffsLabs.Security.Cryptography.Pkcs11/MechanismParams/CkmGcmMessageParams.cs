@@ -18,11 +18,15 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     /// <summary>For encryption — the wrapper allocates a zero-filled tag buffer of
     /// <paramref name="tagBytes"/>; the library writes into it during C_EncryptMessage.
     /// Read the result via <see cref="CopyTagTo"/> after the call.</summary>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="iv"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="tagBytes"/> is not in [4, 16].</exception>
     public static CkmGcmMessageParams ForEncrypt(ReadOnlySpan<byte> iv, int tagBytes)
         => new(iv, tagBytes, default);
 
     /// <summary>For decryption — the wrapper stores the caller's tag bytes; the library
     /// reads them during C_DecryptMessage and verifies the AEAD authentication.</summary>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="iv"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if the length of <paramref name="tag"/> is not in [4, 16] bytes.</exception>
     public static CkmGcmMessageParams ForDecrypt(ReadOnlySpan<byte> iv, ReadOnlySpan<byte> tag)
         => new(iv, tag.Length, tag);
 
@@ -51,6 +55,8 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     }
 
     /// <summary>Copies the tag bytes (output of encrypt) into the caller's buffer.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than the tag length.</exception>
     public void CopyTagTo(Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

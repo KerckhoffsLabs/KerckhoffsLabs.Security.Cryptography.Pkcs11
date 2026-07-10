@@ -71,6 +71,10 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material. Mirrors
     /// <see cref="SP800108HmacCounterKdf.DeriveKey(byte[], byte[], int)"/>.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> or <paramref name="context"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
     public byte[] DeriveKey(byte[] label, byte[] context, int derivedKeyLengthInBytes)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -82,6 +86,9 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material. Mirrors the
     /// span overload of <see cref="SP800108HmacCounterKdf"/>.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -96,6 +103,8 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// Derives keying material into <paramref name="destination"/>. Mirrors the destination-span
     /// overload of <see cref="SP800108HmacCounterKdf"/>.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -122,6 +131,10 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <param name="label">SP800-108 label bytes.</param>
     /// <param name="context">SP800-108 context bytes.</param>
     /// <param name="template">Template describing the derived key (class, type, length, attributes).</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="template"/> explicitly requests an extractable or non-sensitive key while the workspace's <c>AllowInsecure</c> gate is off.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

@@ -77,6 +77,7 @@ public sealed class Pkcs11Library : IDisposable
     /// v2.20+ recommended path).
     /// </summary>
     /// <param name="libraryPath">Library name or path.</param>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public Pkcs11Library(string libraryPath)
         : this(libraryPath, useStaticLink: false) { }
 
@@ -92,6 +93,8 @@ public sealed class Pkcs11Library : IDisposable
     /// through the function-pointer table returned by that single call — no
     /// other unmanaged bindings are required.
     /// </remarks>
+    /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library LoadStaticallyLinked()
         => new(libraryPath: "<statically-linked>", useStaticLink: true);
 
@@ -189,6 +192,8 @@ public sealed class Pkcs11Library : IDisposable
     /// Gets general information about loaded PKCS#11 library
     /// </summary>
     /// <returns>General information about loaded PKCS#11 library</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetInfo</c> call.</exception>
     public LibraryInfo GetInfo()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -211,6 +216,8 @@ public sealed class Pkcs11Library : IDisposable
     /// useful for diagnostic enumeration.
     /// </param>
     /// <returns>Read-only list of available slots.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetSlotList</c> call.</exception>
     public IReadOnlyList<Pkcs11Slot> GetSlotList(bool tokenPresent = true)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -249,6 +256,7 @@ public sealed class Pkcs11Library : IDisposable
     /// to discover vendor interface tables a token offers.
     /// </summary>
     /// <returns>The interface descriptors, or an empty list if the module reports none.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">
     /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules, which have no
     /// interface concept.
@@ -290,6 +298,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     /// <param name="interfaceName">The interface name to request (e.g. <c>"PKCS 11"</c>), or <c>null</c> for the module's default interface.</param>
     /// <returns>The matching interface descriptor.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">
     /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules (which have no interface
     /// concept), or with the token's error code when the named interface is not available.
@@ -321,6 +330,8 @@ public sealed class Pkcs11Library : IDisposable
     /// </param>
     /// <param name="eventOccurred">True when a slot event was reported.</param>
     /// <param name="slotId">PKCS#11 handle of the slot the event occurred in. Zero when no event.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
     public void WaitForSlotEvent(bool nonBlocking, out bool eventOccurred, out ulong slotId)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

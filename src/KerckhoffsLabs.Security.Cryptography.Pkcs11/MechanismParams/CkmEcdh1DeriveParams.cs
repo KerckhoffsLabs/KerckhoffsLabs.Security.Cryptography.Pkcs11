@@ -23,6 +23,7 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     /// <param name="kdf">Key derivation function (typically <see cref="CKD.CKD_SHA256_KDF"/> or stronger). Use <see cref="CKD.CKD_NULL"/> only if the caller will derive separately.</param>
     /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value).</param>
     /// <param name="sharedData">Optional shared data to mix into the KDF; pass <c>default</c> for none.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicPoint"/> is empty.</exception>
     public CkmEcdh1DeriveParams(CKD kdf, ReadOnlySpan<byte> peerPublicPoint, ReadOnlySpan<byte> sharedData = default)
     {
         if (peerPublicPoint.IsEmpty)

@@ -17,10 +17,14 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is not 7 to 13 bytes long.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative, or <paramref name="macBytes"/> is not one of {4, 6, 8, 10, 12, 14, 16}.</exception>
     public static CkmCcmMessageParams ForEncrypt(int dataLen, ReadOnlySpan<byte> nonce, int macBytes)
         => new(dataLen, nonce, macBytes, default);
 
     /// <summary>For decryption — wrapper stores caller's MAC bytes for the library to verify.</summary>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is not 7 to 13 bytes long.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative, or the length of <paramref name="mac"/> is not one of {4, 6, 8, 10, 12, 14, 16} bytes.</exception>
     public static CkmCcmMessageParams ForDecrypt(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> mac)
         => new(dataLen, nonce, mac.Length, mac);
 
@@ -53,6 +57,8 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     }
 
     /// <summary>Copies the MAC bytes (output of encrypt) into the caller's buffer.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than the MAC length.</exception>
     public void CopyMacTo(Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

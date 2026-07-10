@@ -10,7 +10,9 @@ using Microsoft.Extensions.Logging;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Logical reader that potentially contains a token
+/// Represents a PKCS#11 slot: a logical reader or site that may hold a token. It is the entry
+/// point for querying slot and token information and for opening sessions against the token it
+/// contains.
 /// </summary>
 public sealed class Pkcs11Slot
 {
@@ -53,6 +55,7 @@ public sealed class Pkcs11Slot
     /// Obtains information about a particular slot in the system
     /// </summary>
     /// <returns>Slot information</returns>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetSlotInfo</c> call.</exception>
     public SlotInfo GetSlotInfo()
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetSlotInfo");
@@ -68,6 +71,7 @@ public sealed class Pkcs11Slot
     /// Obtains information about a particular token in the system.
     /// </summary>
     /// <returns>Token information</returns>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetTokenInfo</c> call.</exception>
     public TokenInfo GetTokenInfo()
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetTokenInfo");
@@ -89,6 +93,7 @@ public sealed class Pkcs11Slot
     /// <see cref="ulong"/> values may surface them.
     /// </remarks>
     /// <returns>Read-only list of mechanism types supported by a token.</returns>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetMechanismList</c> call.</exception>
     public IReadOnlyList<CKM> GetMechanismList()
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetMechanismList");
@@ -115,6 +120,7 @@ public sealed class Pkcs11Slot
     /// </summary>
     /// <param name="mechanism">Mechanism</param>
     /// <returns>Information about mechanism</returns>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetMechanismInfo</c> call.</exception>
     public MechanismInfo GetMechanismInfo(CKM mechanism)
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetMechanismInfo");
@@ -208,6 +214,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// Closes all sessions an application has with a token
     /// </summary>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CloseAllSessions</c> call.</exception>
     public void CloseAllSessions()
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "CloseAllSessions");

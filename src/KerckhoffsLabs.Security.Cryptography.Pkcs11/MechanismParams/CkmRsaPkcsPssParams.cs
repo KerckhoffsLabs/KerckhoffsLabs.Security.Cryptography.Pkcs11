@@ -19,6 +19,7 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     /// <param name="hashAlg">Hash mechanism (typically <see cref="CKM.CKM_SHA256"/>).</param>
     /// <param name="mgf">Mask generation function (typically <see cref="CKG.CKG_MGF1_SHA256"/>).</param>
     /// <param name="saltLength">Salt length in bytes. RFC 8017 recommends matching the hash output length (32 for SHA-256).</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="saltLength"/> is negative.</exception>
     public CkmRsaPkcsPssParams(CKM hashAlg, CKG mgf, int saltLength)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(saltLength);

@@ -19,6 +19,8 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     private bool _disposed;
 
     /// <summary>Sets an attribute. If the same CKA is already present, the previous value is disposed and replaced.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     protected void Set(ObjectAttribute attr)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -31,6 +33,8 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>Sets an arbitrary attribute as a ulong value. Escape hatch for attributes the typed API does not cover.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf Attribute(CKA attribute, ulong value)
     {
         Set(new ObjectAttribute(attribute, value));
@@ -38,6 +42,8 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>Sets an arbitrary attribute as a bool value.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf Attribute(CKA attribute, bool value)
     {
         Set(new ObjectAttribute(attribute, value));
@@ -45,6 +51,9 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>Sets an arbitrary attribute as a string value.</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf Attribute(CKA attribute, string value)
     {
         Set(new ObjectAttribute(attribute, value));
@@ -52,6 +61,8 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>Sets an arbitrary attribute as a byte buffer.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf Attribute(CKA attribute, ReadOnlySpan<byte> value)
     {
         Set(new ObjectAttribute(attribute, value));
@@ -59,16 +70,25 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>Sets CKA_LABEL.</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf Label(string label) => Attribute(CKA.CKA_LABEL, label);
 
     /// <summary>Sets CKA_ID.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf Id(ReadOnlySpan<byte> id) => Attribute(CKA.CKA_ID, id);
 
     /// <summary>Sets CKA_TOKEN (true = token object, false = session object).</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public TSelf OnToken(bool value = true) => Attribute(CKA.CKA_TOKEN, value);
 
     /// <summary>Finalises the builder and returns an owning <see cref="ObjectTemplate"/>.
     /// The builder cannot be reused after this call — start a new builder for a new template.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public ObjectTemplate Build()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

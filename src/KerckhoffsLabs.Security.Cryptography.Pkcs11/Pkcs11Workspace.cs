@@ -117,8 +117,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="label">The CKA_LABEL string to match.</param>
     /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
     /// <exception cref="Pkcs11ObjectException">Thrown if no matching key is found.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public Pkcs11Key OpenKey(string label)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -133,8 +135,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="id">The CKA_ID bytes to match.</param>
     /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="id"/> is empty.</exception>
     /// <exception cref="Pkcs11ObjectException">Thrown if no matching key is found.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public Pkcs11Key OpenKey(ReadOnlySpan<byte> id)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -149,6 +153,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder.</param>
     /// <returns>A list of <see cref="Pkcs11Key"/>. May be empty. Caller disposes each.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public IReadOnlyList<Pkcs11Key> FindKeys(ObjectTemplate filter)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -170,6 +177,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder
     /// (e.g. filter on <c>CKA_CLASS = CKO_CERTIFICATE</c>).</param>
     /// <returns>A list of <see cref="Pkcs11Object"/>. May be empty. Caller disposes each.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public IReadOnlyList<Pkcs11Object> FindObjects(ObjectTemplate filter)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -189,6 +199,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <c>CKA_ID</c>.
     /// </summary>
     /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. Caller disposes each.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if a certificate's
+    /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
     public IReadOnlyList<Pkcs11Certificate> FindCertificates()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -267,6 +280,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="template">A fully-built template. Will not be modified.</param>
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the created object.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CreateObject</c> call.</exception>
     public Pkcs11Key ImportKey(ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -281,6 +297,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <see cref="Pkcs11Key"/>. For asymmetric key generation, use the two-template
     /// overload.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -298,6 +318,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="mechanism">Key-pair generation mechanism (e.g. <see cref="CKM.CKM_RSA_PKCS_KEY_PAIR_GEN"/>).</param>
     /// <param name="privateTemplate">Template for the private key half.</param>
     /// <param name="publicTemplate">Template for the public key half.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="privateTemplate"/>, or <paramref name="publicTemplate"/> is <c>null</c>.</exception>
+    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateKey(
         Mechanism mechanism,
         ObjectTemplate privateTemplate,
@@ -356,7 +380,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to the key. Default none.</param>
     /// <param name="persistOnToken">If true, the key is a token object (<c>CKA_TOKEN=true</c>, persistent). Default false (session-only).</param>
     /// <returns>The generated AES key.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="bitLength"/> is not 128, 192, or 256.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateAesKey(int bitLength = 256, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -386,8 +412,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated RSA key pair.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is not positive.</exception>
     /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateRsaKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -427,8 +455,11 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated EC key pair.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="curve"/> is the default (uninitialized) <see cref="ECCurve"/>.</exception>
     /// <exception cref="Exceptions.InsecureOperationException">The curve provides less than 128-bit
     /// security (the 160/192/224-bit NIST and Brainpool curves) and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateEcKeyPair(ECCurve? curve = null, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -476,8 +507,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// pass <see cref="CKD.CKD_NULL"/> to take the raw shared secret as the key material (do your own KDF off-token).
     /// Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
     /// <returns>The derived AES key.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
         ReadOnlySpan<byte> peerPublicPoint,
@@ -506,7 +539,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="length">Number of bytes to generate. Must be &gt; 0.</param>
     /// <returns>A newly allocated byte array of length <paramref name="length"/>.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="length"/> is &lt;= 0.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateRandom</c> call.</exception>
     public byte[] GenerateRandom(int length)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -519,6 +554,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// data because they use hardware entropy.
     /// </summary>
     /// <param name="seed">Seed bytes. Must not be empty.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="seed"/> is empty.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_SeedRandom</c> call.</exception>
     public void SeedRandom(ReadOnlySpan<byte> seed)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -533,6 +571,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="oldPin">The current PIN.</param>
     /// <param name="newPin">The replacement PIN.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change (e.g. wrong old PIN, policy violation).</exception>
     public void SetPin(SecurePin oldPin, SecurePin newPin)
@@ -548,6 +587,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// the Security Officer (SO).
     /// </summary>
     /// <param name="userPin">The user PIN to set.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
     public void InitPin(SecurePin userPin)
@@ -563,6 +603,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="mechanism">Digest mechanism (e.g. <see cref="Mechanism"/> wrapping <see cref="CKM.CKM_SHA256"/>).</param>
     /// <param name="data">The data to digest.</param>
     /// <returns>The digest bytes.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="mechanism"/> is a broken digest (e.g. <see cref="CKM.CKM_MD5"/> or <see cref="CKM.CKM_SHA_1"/>) and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Digest</c> call.</exception>
     public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

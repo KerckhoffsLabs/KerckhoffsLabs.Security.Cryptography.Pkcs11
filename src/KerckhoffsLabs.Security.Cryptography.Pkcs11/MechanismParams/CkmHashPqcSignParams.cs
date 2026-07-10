@@ -19,6 +19,7 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
     /// <param name="hash">Hash mechanism applied to the data before signing (CKM_SHA256, CKM_SHA3_256, CKM_SHAKE_*, etc.).</param>
     /// <param name="hedgeVariant">Hedge mode.</param>
     /// <param name="context">Optional context string (max 255 bytes).</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="context"/> exceeds 255 bytes.</exception>
     public CkmHashPqcSignParams(
         CKM hash,
         CkhHedge hedgeVariant = CkhHedge.CKH_HEDGE_PREFERRED,

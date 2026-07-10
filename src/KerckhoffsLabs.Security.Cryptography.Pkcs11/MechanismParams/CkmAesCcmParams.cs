@@ -21,6 +21,8 @@ public sealed class CkmAesCcmParams : MechanismParameters
     /// <param name="nonce">Nonce (BCL: 7-13 bytes). Must not be empty.</param>
     /// <param name="aad">Additional authenticated data; pass <c>default</c> for none.</param>
     /// <param name="macLen">MAC (tag) length in bytes; must be one of {4, 6, 8, 10, 12, 14, 16}.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative, or <paramref name="macLen"/> is not one of {4, 6, 8, 10, 12, 14, 16}.</exception>
     public CkmAesCcmParams(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> aad, int macLen)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(dataLen);

@@ -59,6 +59,7 @@ public sealed class Pkcs11Certificate : IDisposable
     /// <c>KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms</c> namespace as extension methods.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call that locates the private key.</exception>
     public Pkcs11Key? TryOpenPrivateKey()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -71,6 +72,7 @@ public sealed class Pkcs11Certificate : IDisposable
     /// token's <c>CKA_DESTROYABLE</c>/read-only permissions. Does not remove the associated key.
     /// </summary>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
     public void Delete()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

@@ -20,6 +20,7 @@ public sealed class CkmChaCha20Params : MechanismParameters
     /// <param name="blockCounterBits">Counter width in bits (32 for IETF, 64 for legacy).</param>
     /// <param name="nonce">Nonce bytes (12 for IETF, 8 for legacy).</param>
     /// <param name="nonceBits">Nonce length in bits.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="blockCounter"/> or <paramref name="nonce"/> is empty.</exception>
     public CkmChaCha20Params(ReadOnlySpan<byte> blockCounter, int blockCounterBits, ReadOnlySpan<byte> nonce, int nonceBits)
     {
         if (blockCounter.IsEmpty) throw new ArgumentException("Block counter must not be empty.", nameof(blockCounter));

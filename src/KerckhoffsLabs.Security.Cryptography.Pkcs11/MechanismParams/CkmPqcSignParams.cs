@@ -17,7 +17,7 @@ public sealed class CkmPqcSignParams : MechanismParameters
     /// <summary>Initializes pure-PQC signing parameters.</summary>
     /// <param name="hedgeVariant">Hedge mode (default <see cref="CkhHedge.CKH_HEDGE_PREFERRED"/>).</param>
     /// <param name="context">Optional context string (max 255 bytes per FIPS 204 §5.2.1 / FIPS 205 §10.2.1). Empty for default.</param>
-    /// <exception cref="ArgumentException">If <paramref name="context"/> exceeds 255 bytes.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="context"/> exceeds 255 bytes.</exception>
     public CkmPqcSignParams(CkhHedge hedgeVariant = CkhHedge.CKH_HEDGE_PREFERRED, ReadOnlySpan<byte> context = default)
     {
         if (context.Length > 255)

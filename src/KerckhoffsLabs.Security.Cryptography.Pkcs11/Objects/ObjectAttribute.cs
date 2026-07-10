@@ -18,6 +18,7 @@ public sealed class ObjectAttribute : IDisposable
     // --- Public read surface -------------------------------------------------
 
     /// <summary>Attribute type (raw, e.g. 0x00000000 for CKA_CLASS).</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
     public ulong Type
     {
         get
@@ -28,6 +29,7 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Length in bytes of the attribute's value, or 0 if no value.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
     public int ValueLength
     {
         get
@@ -42,6 +44,7 @@ public sealed class ObjectAttribute : IDisposable
     /// True when the underlying CK_ATTRIBUTE's valueLen is the sentinel -1, indicating
     /// the module refused to disclose the attribute (sensitive/unextractable).
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
     public bool CannotBeRead
     {
         get
@@ -105,6 +108,7 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute(CKA type, bool value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a UTF-8 string with no null terminator.</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(ulong type, string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -112,6 +116,7 @@ public sealed class ObjectAttribute : IDisposable
         _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a UTF-8 string with no null terminator.</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(CKA type, string value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding the bytes of <paramref name="value"/>.</summary>
@@ -140,6 +145,7 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute(CKA type, DateTime value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(ulong type, List<ObjectAttribute> value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -166,9 +172,11 @@ public sealed class ObjectAttribute : IDisposable
         _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(CKA type, List<ObjectAttribute> value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(ulong type, List<ulong> value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -187,9 +195,11 @@ public sealed class ObjectAttribute : IDisposable
         _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(CKA type, List<ulong> value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(ulong type, List<CKM> value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -211,11 +221,14 @@ public sealed class ObjectAttribute : IDisposable
         _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     public ObjectAttribute(CKA type, List<CKM> value) : this((ulong)type, value) { }
 
     // --- Read-back -----------------------------------------------------------
 
     /// <summary>Reads the value as a PKCS#11 <c>CK_BBOOL</c> (single byte; non-zero is <c>true</c>).</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or is not exactly one byte.</exception>
     public bool GetValueAsBool()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -227,6 +240,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as a platform-width PKCS#11 <c>CK_ULONG</c>.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not that of a platform-width <c>CK_ULONG</c>.</exception>
     public ulong GetValueAsUlong()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -242,6 +257,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as a UTF-8 string (trailing NUL padding trimmed).</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
     public string GetValueAsString()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -254,6 +271,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Returns a copy of the raw value bytes.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
     public byte[] GetValueAsByteArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -269,7 +288,9 @@ public sealed class ObjectAttribute : IDisposable
     /// number of bytes written. Allocates nothing. Use <see cref="ValueLength"/> to size the
     /// destination buffer.
     /// </summary>
-    /// <exception cref="ArgumentException">if <paramref name="destination"/> is too small.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is too small.</exception>
     public int CopyValueTo(Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -282,6 +303,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as a PKCS#11 <c>CK_DATE</c> (UTC); returns <c>null</c> when empty or unparseable.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is neither 0 nor 8 bytes.</exception>
     public DateTime? GetValueAsDateTime()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -301,6 +324,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as a PKCS#11 attribute array (a contiguous <c>CK_ATTRIBUTE[]</c>).</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ATTRIBUTE</c> size.</exception>
     public ObjectAttribute[] GetValueAsAttributeArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -321,6 +346,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as a contiguous array of platform-width <c>CK_ULONG</c> values.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ULONG</c> size.</exception>
     public ulong[] GetValueAsUlongArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -344,6 +371,8 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as an array of <see cref="CKM"/> mechanism types (unvalidated cast from <c>CK_ULONG[]</c>).</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ULONG</c> size.</exception>
     public CKM[] GetValueAsCkmArray()
     {
         ulong[] raw = GetValueAsUlongArray();

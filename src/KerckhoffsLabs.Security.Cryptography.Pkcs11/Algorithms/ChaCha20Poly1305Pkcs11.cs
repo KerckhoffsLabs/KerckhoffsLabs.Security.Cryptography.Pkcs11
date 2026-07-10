@@ -75,6 +75,9 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
     /// Encrypts data and writes the authentication tag using the token-resident ChaCha20 key —
     /// one-shot ChaCha20-Poly1305 AEAD, mirroring <see cref="System.Security.Cryptography.ChaCha20Poly1305"/>.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if this provider has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> or <paramref name="tag"/> has an invalid length, or <paramref name="ciphertext"/> length does not equal <paramref name="plaintext"/> length.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_Encrypt</c> / <c>C_EncryptMessage</c> call.</exception>
     public void Encrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> plaintext,
@@ -115,6 +118,9 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
     /// Verifies the authentication tag and decrypts using the token-resident ChaCha20 key —
     /// one-shot ChaCha20-Poly1305 AEAD, mirroring <see cref="System.Security.Cryptography.ChaCha20Poly1305"/>.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if this provider has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> or <paramref name="tag"/> has an invalid length, or <paramref name="plaintext"/> length does not equal <paramref name="ciphertext"/> length.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> / <c>C_DecryptMessage</c> call; an authentication failure surfaces as <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/> or <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/>.</exception>
     public void Decrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> ciphertext,

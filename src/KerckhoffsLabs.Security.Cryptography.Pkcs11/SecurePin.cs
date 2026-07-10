@@ -78,6 +78,7 @@ public sealed class SecurePin : IDisposable
     }
 
     /// <summary>Returns a read-only span over the PIN bytes. Valid until <see cref="Dispose"/> is called.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed.</exception>
     public ReadOnlySpan<byte> Pin
     {
         get
@@ -88,6 +89,7 @@ public sealed class SecurePin : IDisposable
     }
 
     /// <summary>The length of the PIN in bytes.</summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed.</exception>
     public int Length
     {
         get

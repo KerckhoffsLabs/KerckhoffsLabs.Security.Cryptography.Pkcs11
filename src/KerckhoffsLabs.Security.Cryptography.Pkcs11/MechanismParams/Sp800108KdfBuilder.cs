@@ -125,6 +125,7 @@ public sealed class Sp800108KdfBuilder
     /// The caller retains ownership of the <paramref name="template"/> attributes and must keep them
     /// alive (undisposed) until after the derive call.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
     public Sp800108KdfBuilder AddDerivedKey(IReadOnlyList<ObjectAttribute> template)
     {
         ArgumentNullException.ThrowIfNull(template);

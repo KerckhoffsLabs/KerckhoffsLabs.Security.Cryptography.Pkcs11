@@ -103,7 +103,7 @@ public sealed class Pkcs11Key : IDisposable
     /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set.</returns>
     /// <exception cref="ObjectDisposedException">Thrown when the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="types"/> is null.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from <c>C_GetAttributeValue</c> on fatal errors.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key exposes no readable handle; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
     public IReadOnlyList<ObjectAttribute> GetAttributeValue(params CKA[] types)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -173,6 +173,7 @@ public sealed class Pkcs11Key : IDisposable
     /// still <see cref="Dispose"/> the key to release the wrapper.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The key has already been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call — for example <see cref="CKR.CKR_ACTION_PROHIBITED"/> when the object is not destroyable.</exception>
     public void Delete()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -201,6 +202,8 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="userType">User type to log in as.</param>
     /// <param name="pin">The PIN.</param>
     /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="libraryPath"/>, <paramref name="slotLabel"/>, <paramref name="pin"/>, or <paramref name="keyLabel"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from opening the authenticated workspace (login via <c>C_Login</c>) or from the key lookup (<c>C_FindObjects</c>).</exception>
     public static Pkcs11Key Open(
         string libraryPath,
         string slotLabel,
@@ -239,6 +242,8 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="userType">User type to log in as.</param>
     /// <param name="pin">The PIN.</param>
     /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="library"/>, <paramref name="slotLabel"/>, <paramref name="pin"/>, or <paramref name="keyLabel"/> is <c>null</c>.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from opening the authenticated workspace (login via <c>C_Login</c>) or from the key lookup (<c>C_FindObjects</c>).</exception>
     public static Pkcs11Key Open(
         Pkcs11Library library,
         string slotLabel,
@@ -300,7 +305,10 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="mechanism">The signing mechanism.</param>
     /// <param name="data">The data to sign.</param>
     /// <returns>The signature bytes.</returns>
-    /// <exception cref="Pkcs11Exception">Thrown if the key has no private handle.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Sign</c> call.</exception>
     public byte[] Sign(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -320,7 +328,11 @@ public sealed class Pkcs11Key : IDisposable
     /// exists.
     /// </summary>
     /// <returns><c>true</c> if the signature is valid, <c>false</c> if not.</returns>
-    /// <exception cref="Pkcs11Exception">Thrown if no public material is reachable.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="NotSupportedException">Thrown when the managed verification fallback is taken (no public handle on the token) and <paramref name="mechanism"/> has no managed RSA/ECDSA equivalent.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -356,6 +368,10 @@ public sealed class Pkcs11Key : IDisposable
     /// single handle; asymmetric public-side encryption (RSA-OAEP / RSA-PKCS) uses the
     /// public handle.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public byte[] Encrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -376,6 +392,10 @@ public sealed class Pkcs11Key : IDisposable
     /// Decrypts <paramref name="ciphertext"/> using this key. Symmetric uses the single
     /// handle; asymmetric uses the private handle.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -393,6 +413,7 @@ public sealed class Pkcs11Key : IDisposable
     /// When false, callers should use <see cref="Encrypt"/> / <see cref="Decrypt"/>
     /// with the legacy CK_GCM_PARAMS / CK_CCM_PARAMS / CK_SALSA20_CHACHA20_POLY1305_PARAMS.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     public bool SupportsMessageApi
     {
         get
@@ -412,6 +433,10 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="associatedData">Optional AAD.</param>
     /// <param name="plaintext">Bytes to encrypt.</param>
     /// <returns>Ciphertext (tag is in <paramref name="messageParams"/>).</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="messageParams"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_EncryptMessage</c> call.</exception>
     public byte[] MessageEncrypt(
         Mechanism mechanism,
         MechanismParameters messageParams,
@@ -434,7 +459,10 @@ public sealed class Pkcs11Key : IDisposable
     /// One-shot AEAD decrypt using the v3.0 message-based API. Supply the tag through
     /// <paramref name="messageParams"/> constructed via its <c>ForDecrypt</c> factory.
     /// </summary>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> when authentication fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="messageParams"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DecryptMessage</c> call — notably <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> when authentication fails.</exception>
     public byte[] MessageDecrypt(
         Mechanism mechanism,
         MechanismParameters messageParams,
@@ -459,6 +487,10 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="mechanism">The wrap mechanism (e.g. <see cref="CKM.CKM_AES_KEY_WRAP"/>).</param>
     /// <param name="targetKey">The key being wrapped. Must carry a private/symmetric handle.</param>
     /// <returns>The wrapped key bytes — opaque blob to be transported / stored.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="targetKey"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's wrapping handle or <paramref name="targetKey"/>'s handle is unavailable; otherwise propagated from the underlying <c>C_WrapKey</c> call.</exception>
     public byte[] Wrap(Mechanism mechanism, Pkcs11Key targetKey)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -486,6 +518,10 @@ public sealed class Pkcs11Key : IDisposable
     /// <paramref name="template"/>.
     /// </summary>
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the unwrapped object.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's unwrapping handle is unavailable; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -519,7 +555,10 @@ public sealed class Pkcs11Key : IDisposable
     /// the on-token <see cref="Pkcs11Key"/> wrapping the shared secret. The caller owns the result's
     /// <see cref="EncapsulationResult.SharedSecret"/> — dispose the result (or the key) when done.
     /// </returns>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries, or <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="sharedSecretTemplate"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable, or <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> from the underlying <c>C_EncapsulateKey</c> call on pre-v3.2 libraries.</exception>
     public EncapsulationResult EncapsulateKey(
         Mechanism mechanism,
         ObjectTemplate sharedSecretTemplate,
@@ -543,7 +582,10 @@ public sealed class Pkcs11Key : IDisposable
     /// key's private handle (PKCS#11 v3.2 §5.18.11).
     /// </summary>
     /// <returns>An on-token <see cref="Pkcs11Key"/> wrapping the recovered shared secret.</returns>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries, or <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no private handle is reachable.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="sharedSecretTemplate"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no private handle is reachable, or <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> from the underlying <c>C_DecapsulateKey</c> call on pre-v3.2 libraries.</exception>
     public Pkcs11Key DecapsulateKey(
         Mechanism mechanism,
         ReadOnlySpan<byte> ciphertext,
@@ -567,6 +609,10 @@ public sealed class Pkcs11Key : IDisposable
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
     /// non-sensitive key requires opting in via the workspace's <c>AllowInsecure</c> gate.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key exposes no usable base handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
         => DeriveCore(mechanism, template, enforceSecureDefaults: true);
 

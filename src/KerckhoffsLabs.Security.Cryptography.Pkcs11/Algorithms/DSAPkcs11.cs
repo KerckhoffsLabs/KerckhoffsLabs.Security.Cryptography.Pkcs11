@@ -50,6 +50,9 @@ public sealed class DSAPkcs11 : DSA
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated because FIPS 186-5 disallows DSA signature generation.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] CreateSignature(byte[] rgbHash)
     {
         ArgumentNullException.ThrowIfNull(rgbHash);
@@ -58,6 +61,9 @@ public sealed class DSAPkcs11 : DSA
     }
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> or <paramref name="rgbSignature"/> is <c>null</c>.</exception>
+    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifySignature(byte[] rgbHash, byte[] rgbSignature)
     {
         ArgumentNullException.ThrowIfNull(rgbHash);
@@ -71,6 +77,9 @@ public sealed class DSAPkcs11 : DSA
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data, Span<byte> destination, HashAlgorithmName hashAlgorithm, out int bytesWritten)
     {
@@ -82,6 +91,9 @@ public sealed class DSAPkcs11 : DSA
     }
 
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm)
     {
@@ -129,6 +141,7 @@ public sealed class DSAPkcs11 : DSA
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
+    /// <exception cref="Pkcs11Exception">Thrown when the domain parameters or public value (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) are sensitive or cannot be read.</exception>
     public override DSAParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
