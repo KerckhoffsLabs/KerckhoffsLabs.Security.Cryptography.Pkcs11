@@ -46,6 +46,16 @@
     <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
+  <!-- Spec-version gate shims (Linux/macOS only): tiny C wrappers that restrict which
+       PKCS#11 API version a consumer can negotiate against a real backend. Used by the
+       SoftHsmGate* fixtures to validate v2.40 / v3.0 compatibility end to end. -->
+  <Target Name="BuildPkcs11Gate" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11GateBuild)' != 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <_GateOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_GateOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-pkcs11-gate.sh&quot; &quot;$(_GateOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
   <Target Name="BuildSoftHsmV2" BeforeTargets="PrepareForBuild" Condition="'$(SkipSoftHsmV2Build)' != 'true'">
     <PropertyGroup>
       <_SoftHsmOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_SoftHsmOutputDir>

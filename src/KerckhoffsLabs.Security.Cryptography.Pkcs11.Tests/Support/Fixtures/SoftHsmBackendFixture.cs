@@ -209,7 +209,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     // Path resolution
     // -----------------------------------------------------------------------
 
-    private static string? BuiltLibraryPath()
+    internal static string? BuiltLibraryPath()
     {
         string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
         // macOS uses `.so` too: libsofthsm2 is a libtool `-module` bundle (.so), not a .dylib.
@@ -218,7 +218,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         return File.Exists(candidate) ? candidate : null;
     }
 
-    private static string ResolveUtil(string libPath)
+    internal static string ResolveUtil(string libPath)
     {
         string utilName = OperatingSystem.IsWindows() ? "softhsm2-util.exe" : "softhsm2-util";
         string builtUtil = Path.Combine(Path.GetDirectoryName(libPath)!, utilName);
@@ -230,7 +230,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         return builtUtil;
     }
 
-    private static string GetRid()
+    internal static string GetRid()
     {
         // The native library must match the *process* architecture (the testhost), not the OS:
         // the win-x86 leg runs a 32-bit testhost under WOW64 on a 64-bit OS, so OSArchitecture would
@@ -261,7 +261,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     [LibraryImport("libSystem.dylib", EntryPoint = "setenv", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial int MacSetEnv(string name, string value, int overwrite);
 
-    private static void SetNativeEnv(string name, string value)
+    internal static void SetNativeEnv(string name, string value)
     {
         if (OperatingSystem.IsWindows()) return; // SetEnvironmentVariable already propagates here.
         int rc = OperatingSystem.IsMacOS() ? MacSetEnv(name, value, 1) : LinuxSetEnv(name, value, 1);
@@ -293,6 +293,16 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     }
 }
 
-/// <summary>xUnit collection definition for the SoftHSM2 backend.</summary>
+/// <summary>
+/// xUnit collection definition for the SoftHSM2 backend. Also hosts the spec-version-gate
+/// fixtures (<see cref="SoftHsmGate240Fixture"/>, <see cref="SoftHsmGate30Fixture"/>):
+/// they wrap private copies of the same libsofthsm2 and mutate process-global env vars
+/// (SOFTHSM2_CONF, gate-target paths) during construction, so they must serialize with
+/// every other SoftHSM-touching test.
+/// </summary>
 [CollectionDefinition("SoftHsm")]
-public sealed class SoftHsmBackendCollection : ICollectionFixture<SoftHsmBackendFixture> { }
+public sealed class SoftHsmBackendCollection :
+    ICollectionFixture<SoftHsmBackendFixture>,
+    ICollectionFixture<SoftHsmGate240Fixture>,
+    ICollectionFixture<SoftHsmGate30Fixture>
+{ }

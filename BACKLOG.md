@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (6 resolved)
-- Critical: 0 | High: 7 (4 open, 3 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
+- Total items: 54 (7 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -72,7 +72,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA A
 
-### [BL-006] The promised v2.40-only fallback path (`C_GetFunctionList`, no `C_GetInterface`) is never exercised
+### [BL-006] ✅ RESOLVED — The promised v2.40-only fallback path (`C_GetFunctionList`, no `C_GetInterface`) is never exercised
+- **Status:** Resolved 2026-07-10 in two halves. Hermetic half (with BL-005): `DelegatesLoaderTests` drives the per-symbol fallback and version-header rejection with synthetic tables. Real-module half: new `build/pkcs11-gate.c` spec-version-gate shims wrap the vendored SoftHSM — `pkcs11-gate240.so` exports only `C_GetFunctionList` (a faithful v2.40-only module), `pkcs11-gate30.so` additionally serves a v3.0-truncated, version-rewritten copy of the interface table (a v3.0-but-not-v3.2 module). Each gate dlopens a private file copy of libsofthsm2 (independent `C_Initialize` state); fixtures (`SoftHsmGate240Fixture`/`SoftHsmGate30Fixture`) live in the "SoftHsm" collection to serialize env-var access. `Integration/Compat/SpecVersionGateTests.cs` (11 tests) validates: v2.40 negotiation (`SupportsMessageApi`/`SupportsV32Api` false), clean `CKR_FUNCTION_NOT_SUPPORTED` from `GetInterfaces`/`LoginUser`/`CancelOperations`, AES-GCM through the v2.40 `ct‖tag` concat fallback against real crypto (previously exercised by no real backend), SHA-256 BCL cross-check, RSA-PSS round-trip; and v3.0 negotiation (message API bound, v3.2 absent), interface enumeration, AEAD round-trip. Built by the `BuildPkcs11Gate` MSBuild target (Linux/macOS; Windows gets the hermetic coverage). Full suite green (1667 passed).
 - **Area:** QA
 - **Severity:** High
 - **Effort:** M
