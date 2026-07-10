@@ -1830,6 +1830,12 @@ internal partial class Delegates
     /// Get delegates with C_GetFunctionList function from the dynamically loaded shared PKCS#11 library
     /// </summary>
     /// <param name="resolveExport">Export resolver for the PKCS#11 library</param>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
+        Justification = "Calling the module's C_GetFunctionList export requires an unmanaged function-pointer " +
+        "invocation, which C# only permits in unsafe code. Every outcome is guarded (missing symbol, non-OK CKR, " +
+        "null function-list pointer each throw), the struct read goes through the platform-dispatching " +
+        "UnmanagedMemory.Read, and which native module to trust is the consumer's explicit choice. " +
+        "The path is covered hermetically by DelegatesLoaderTests, including its failure arms.")]
     private unsafe void InitializeWithGetFunctionList(Func<string, IntPtr> resolveExport)
     {
         // Mirrors NativeLibrary.GetExport's contract: a missing bootstrap symbol is fatal.
