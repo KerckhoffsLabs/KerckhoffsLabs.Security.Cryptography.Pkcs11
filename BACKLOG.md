@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (7 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
+- Total items: 54 (8 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (26 open, 4 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -272,7 +272,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA A, QA B
 
-### [BL-025] "v3.2 methods fail cleanly on sub-v3.2 modules" contract is unverified
+### [BL-025] ✅ RESOLVED — "v3.2 methods fail cleanly on sub-v3.2 modules" contract is unverified
+- **Status:** Resolved 2026-07-10. Hermetic: new `Unit/Internal/Pkcs11SessionV32NotSupportedTests.cs` drives every v3.2 session method (`EncapsulateKey`, `DecapsulateKey`, `WrapKeyAuthenticated`, `UnwrapKeyAuthenticated`, `VerifySignature` one-shot + streaming, `GetSessionValidationFlags`) against a fake reporting `IsV32ApiSupported == false` whose low-level entries return `CKR_FUNCTION_NOT_SUPPORTED` (mirroring the real dispatch's null-function-pointer guard), asserting each throws the documented typed `Pkcs11Exception` — never an NRE — plus `SupportsV32Api == false`. Real-module: the spec-version-gate suites (v2.40 and v3.0 tiers over real SoftHSM) each gained an `EncapsulateKey_Throws_FunctionNotSupported` case exercising the actual null-fptr dispatch end to end. All 50 related tests green.
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** S

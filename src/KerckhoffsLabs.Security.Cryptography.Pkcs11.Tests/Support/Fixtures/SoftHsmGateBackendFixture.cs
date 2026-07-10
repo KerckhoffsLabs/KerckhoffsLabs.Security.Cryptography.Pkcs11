@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// vendored SoftHSM2: the gate restricts which PKCS#11 API version the wrapper can negotiate
 /// (v2.40 exports only, or a v3.0-truncated interface table) while every operation in the
 /// function table still lands in real SoftHSM crypto. This is what lets CI validate the
-/// "single managed surface across v2.40 / v3.0 / v3.2 modules" promise end to end (BL-006).
+/// "single managed surface across v2.40 / v3.0 / v3.2 modules" promise end to end.
 /// </summary>
 /// <remarks>
 /// <para>

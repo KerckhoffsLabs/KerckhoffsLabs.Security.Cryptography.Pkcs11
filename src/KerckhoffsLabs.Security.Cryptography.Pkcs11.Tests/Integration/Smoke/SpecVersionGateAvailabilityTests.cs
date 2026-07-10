@@ -4,9 +4,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 
 /// <summary>
 /// CI-health guard: makes missing pkcs11-gate shims fail loudly instead of letting the whole
-/// <c>SpecVersionGateTests</c> suite skip silently while CI stays green (the hazard BL-027
-/// flags for opencryptoki, applied here from day one). The gates are built by the
-/// BuildPkcs11Gate target on every non-Windows CI leg, so availability is enforced there;
+/// <c>SpecVersionGateTests</c> suite skip silently while CI stays green. The gates are built by
+/// the BuildPkcs11Gate target on every non-Windows CI leg, so availability is enforced there;
 /// Windows gets its spec-version coverage from the hermetic <c>DelegatesLoaderTests</c>.
 /// </summary>
 public sealed class SpecVersionGateAvailabilityTests

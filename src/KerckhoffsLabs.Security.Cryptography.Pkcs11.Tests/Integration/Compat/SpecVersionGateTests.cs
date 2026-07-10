@@ -10,7 +10,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 
 /// <summary>
-/// End-to-end spec-version compatibility over the pkcs11-gate shims (BL-006's real-module
+/// End-to-end spec-version compatibility over the pkcs11-gate shims (the real-module
 /// half): the same managed API surface must negotiate correctly against a v2.40-only module
 /// and a v3.0-but-not-v3.2 module, degrade the unavailable functions to clean
 /// <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> failures, and route crypto through the
@@ -108,6 +108,18 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
+    // A v3.2 call on a v2.40 module must surface the documented
+    // CKR through the real null-function-pointer dispatch guard — never an NRE.
+    [ConditionalFact(nameof(Available))]
+    public void EncapsulateKey_Throws_FunctionNotSupported()
+    {
+        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => ws.Session.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
+    }
+
     // The load-bearing crypto case: with the message API absent, AesGcmPkcs11 must take the
     // v2.40 single-part fallback (ciphertext‖tag concatenation) — a path no v3.x CI backend
     // exercises against real crypto.
@@ -148,6 +160,17 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
         // The gate rewrote the interface version to {3,0}: message API bound, v3.2 additions not.
         Assert.True(ws.Session.SupportsMessageApi);
         Assert.False(ws.Session.SupportsV32Api);
+    }
+
+    // The same v3.2 degradation contract holds on the v3.0 tier.
+    [ConditionalFact(nameof(Available))]
+    public void EncapsulateKey_Throws_FunctionNotSupported()
+    {
+        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => ws.Session.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
+        Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [ConditionalFact(nameof(Available))]

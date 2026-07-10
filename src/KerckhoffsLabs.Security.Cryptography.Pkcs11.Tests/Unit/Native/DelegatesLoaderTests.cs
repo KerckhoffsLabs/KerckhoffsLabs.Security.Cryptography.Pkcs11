@@ -9,7 +9,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
-/// Hermetic tests for the real native function-list loader (BL-005): the version dispatch and
+/// Hermetic tests for the real native function-list loader: the version dispatch and
 /// pointer binding in <c>Delegates</c> — the one code path that can corrupt the process — used
 /// to be reachable only through a real PKCS#11 module. These tests drive it with no native
 /// module at all: an export resolver hands the loader <c>[UnmanagedCallersOnly]</c> managed
@@ -240,7 +240,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         Assert.Equal(GetInterfaceStub, Fp(delegates, "C_GetInterface"));
 
         // Base v2.40 slots stay bound from the C_GetFunctionList table (current, documented
-        // behavior — see BL-047: the base surface is not re-sourced from the interface table).
+        // behavior: the base surface is deliberately not re-sourced from the interface table).
         AssertBoundTo(delegates, baseSentinels);
 
         // version {3,0} must NOT trigger the v3.2 re-read.
