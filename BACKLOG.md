@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (5 resolved)
-- Critical: 0 | High: 7 (5 open, 2 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
+- Total items: 54 (6 resolved)
+- Critical: 0 | High: 7 (4 open, 3 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -61,7 +61,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA C
 
-### [BL-005] The native function-list loader — the code most able to corrupt the process — has no hermetic test
+### [BL-005] ✅ RESOLVED — The native function-list loader — the code most able to corrupt the process — has no hermetic test
+- **Status:** Resolved 2026-07-10. `Delegates` gained an export-resolver seam (`internal Delegates(Func<string, IntPtr>)`; the production `Delegates(IntPtr)` ctor now wraps `NativeLibrary.TryGetExport` in the same resolver — behavior unchanged). New `Unit/Native/DelegatesLoaderTests.cs` drives the REAL loader with no native module: `[UnmanagedCallersOnly]` managed stubs serve `C_GetFunctionList`/`C_GetInterface`, synthetic `CK_FUNCTION_LIST`/`_3_0`/`_3_2` tables live in unmanaged memory with a unique sentinel per slot (written via the same packed-struct dispatch the loader reads with, so valid on Windows too), and a reflection sweep asserts every table slot lands in its same-named `FunctionPointers` field (+`_Windows` sibling). 9 tests cover: exhaustive v2.40 slot binding, per-symbol fallback (also the hermetic half of BL-006), v3.0 interface binding without the v3.2 re-read, v3.2 12-addition binding, sub-3.0 version-header rejection → fallback, C_GetInterface error → fallback, all-null v3.2 table guards, missing bootstrap symbol, and a harness self-check. Full suite green (1656 passed).
 - **Area:** QA
 - **Severity:** High
 - **Effort:** M

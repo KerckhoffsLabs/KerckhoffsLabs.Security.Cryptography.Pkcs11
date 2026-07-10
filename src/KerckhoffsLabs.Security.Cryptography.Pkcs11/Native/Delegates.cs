@@ -1488,10 +1488,7 @@ internal partial class Delegates
     {
         if (libraryHandle != IntPtr.Zero)
         {
-            InitializeWithGetFunctionList(libraryHandle);
-            // Best-effort load of v3.0 functions via direct symbol lookup. The full
-            // C_GetInterface-based loader path lives in Pkcs11Library / bucket E.
-            TryLoadV30Symbols(libraryHandle);
+            Load(ResolverFor(libraryHandle));
         }
         else
         {
@@ -1500,19 +1497,50 @@ internal partial class Delegates
             InitializeWithGetFunctionList();
 
             // Then attempt the v3.0/v3.2 surface against the process's own symbol table.
-            // GetMainProgramHandle() resolves statically-linked exports, and TryGetExport
-            // (used inside TryLoadV30Symbols) returns false — no throw, no link-time symbol
+            // GetMainProgramHandle() resolves statically-linked exports, and the resolver
+            // (used inside TryLoadV30Symbols) returns Zero — no throw, no link-time symbol
             // requirement — for functions a v2.40-only module doesn't provide, so we degrade
             // gracefully instead of silently skipping v3.0 as before.
             try
             {
-                TryLoadV30Symbols(NativeLibrary.GetMainProgramHandle());
+                TryLoadV30Symbols(ResolverFor(NativeLibrary.GetMainProgramHandle()));
             }
             catch
             {
                 // Process-global symbol resolution unavailable on this platform; remain v2.40-only.
             }
         }
+    }
+
+    /// <summary>
+    /// Initializes the dispatch table through an export resolver instead of an OS library
+    /// handle. This is the hermetic-test seam: production goes through
+    /// <see cref="Delegates(IntPtr)"/>, whose resolver wraps <see cref="NativeLibrary.TryGetExport"/>;
+    /// tests supply a resolver returning managed <c>[UnmanagedCallersOnly]</c> stubs and
+    /// synthetic function-list tables, so the real bootstrap / version-dispatch / slot-binding
+    /// logic runs without any native module.
+    /// </summary>
+    /// <param name="resolveExport">Maps an export name to its address, or <see cref="IntPtr.Zero"/> when absent.</param>
+    internal Delegates(Func<string, IntPtr> resolveExport) => Load(resolveExport);
+
+    /// <summary>Dynamic-load sequence: v2.40 bootstrap, then best-effort v3.0/v3.2 binding.</summary>
+    private void Load(Func<string, IntPtr> resolveExport)
+    {
+        InitializeWithGetFunctionList(resolveExport);
+        // Best-effort load of v3.0 functions via direct symbol lookup. The full
+        // C_GetInterface-based loader path lives in Pkcs11Library / bucket E.
+        TryLoadV30Symbols(resolveExport);
+    }
+
+    /// <summary>Export resolver over an OS library handle (returns Zero for missing exports).</summary>
+    private static Func<string, IntPtr> ResolverFor(IntPtr libraryHandle)
+        => name => NativeLibrary.TryGetExport(libraryHandle, name, out IntPtr address) ? address : IntPtr.Zero;
+
+    /// <summary>Resolves <paramref name="name"/> and reports whether it is present.</summary>
+    private static bool TryResolve(Func<string, IntPtr> resolveExport, string name, out IntPtr address)
+    {
+        address = resolveExport(name);
+        return address != IntPtr.Zero;
     }
 
     /// <summary>
@@ -1523,114 +1551,114 @@ internal partial class Delegates
     /// <see langword="null"/>) and v3.0 tokens that export individual symbols but
     /// don't publish the interface table.
     /// </summary>
-    private void TryLoadV30Symbols(IntPtr libraryHandle)
+    private void TryLoadV30Symbols(Func<string, IntPtr> resolveExport)
     {
         // Preferred: ask the library for its v3.0 interface table.
-        if (TryLoadFromGetInterface(libraryHandle))
+        if (TryLoadFromGetInterface(resolveExport))
             return;
 
         // Fallback: per-symbol lookup. Works for libraries that export the v3.0
         // functions as plain symbols even though they don't expose C_GetInterface.
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_LoginUser", out IntPtr loginUserPtr) && loginUserPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_LoginUser", out IntPtr loginUserPtr))
             unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)loginUserPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_SessionCancel", out IntPtr sessionCancelPtr) && sessionCancelPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_SessionCancel", out IntPtr sessionCancelPtr))
             unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)sessionCancelPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_GetInterfaceList", out IntPtr getInterfaceListPtr) && getInterfaceListPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_GetInterfaceList", out IntPtr getInterfaceListPtr))
             unsafe
             {
                 _fp.C_GetInterfaceList = (delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong>)getInterfaceListPtr;
                 _fp.C_GetInterfaceList_Windows = (delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong>)getInterfaceListPtr;
             }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageEncryptInit", out IntPtr msgEncInitPtr) && msgEncInitPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageEncryptInit", out IntPtr msgEncInitPtr))
         {
             unsafe { _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgEncInitPtr; }
             unsafe { _fp.C_MessageEncryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgEncInitPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncryptMessage", out IntPtr encMsgPtr) && encMsgPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_EncryptMessage", out IntPtr encMsgPtr))
             unsafe { _fp.C_EncryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)encMsgPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncryptMessageBegin", out IntPtr encMsgBeginPtr) && encMsgBeginPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_EncryptMessageBegin", out IntPtr encMsgBeginPtr))
             unsafe { _fp.C_EncryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)encMsgBeginPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncryptMessageNext", out IntPtr encMsgNextPtr) && encMsgNextPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_EncryptMessageNext", out IntPtr encMsgNextPtr))
             unsafe { _fp.C_EncryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)encMsgNextPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageEncryptFinal", out IntPtr msgEncFinalPtr) && msgEncFinalPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageEncryptFinal", out IntPtr msgEncFinalPtr))
             unsafe { _fp.C_MessageEncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgEncFinalPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageDecryptInit", out IntPtr msgDecInitPtr) && msgDecInitPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageDecryptInit", out IntPtr msgDecInitPtr))
         {
             unsafe { _fp.C_MessageDecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgDecInitPtr; }
             unsafe { _fp.C_MessageDecryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgDecInitPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecryptMessage", out IntPtr decMsgPtr) && decMsgPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_DecryptMessage", out IntPtr decMsgPtr))
             unsafe { _fp.C_DecryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)decMsgPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecryptMessageBegin", out IntPtr decMsgBeginPtr) && decMsgBeginPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_DecryptMessageBegin", out IntPtr decMsgBeginPtr))
             unsafe { _fp.C_DecryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)decMsgBeginPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecryptMessageNext", out IntPtr decMsgNextPtr) && decMsgNextPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_DecryptMessageNext", out IntPtr decMsgNextPtr))
             unsafe { _fp.C_DecryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)decMsgNextPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageDecryptFinal", out IntPtr msgDecFinalPtr) && msgDecFinalPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageDecryptFinal", out IntPtr msgDecFinalPtr))
             unsafe { _fp.C_MessageDecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgDecFinalPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageSignInit", out IntPtr msgSignInitPtr) && msgSignInitPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageSignInit", out IntPtr msgSignInitPtr))
         {
             unsafe { _fp.C_MessageSignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgSignInitPtr; }
             unsafe { _fp.C_MessageSignInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgSignInitPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_SignMessage", out IntPtr signMsgPtr) && signMsgPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_SignMessage", out IntPtr signMsgPtr))
             unsafe { _fp.C_SignMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)signMsgPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_SignMessageBegin", out IntPtr signMsgBeginPtr) && signMsgBeginPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_SignMessageBegin", out IntPtr signMsgBeginPtr))
             unsafe { _fp.C_SignMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)signMsgBeginPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_SignMessageNext", out IntPtr signMsgNextPtr) && signMsgNextPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_SignMessageNext", out IntPtr signMsgNextPtr))
             unsafe { _fp.C_SignMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)signMsgNextPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageSignFinal", out IntPtr msgSignFinalPtr) && msgSignFinalPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageSignFinal", out IntPtr msgSignFinalPtr))
             unsafe { _fp.C_MessageSignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgSignFinalPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageVerifyInit", out IntPtr msgVerifyInitPtr) && msgVerifyInitPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageVerifyInit", out IntPtr msgVerifyInitPtr))
         {
             unsafe { _fp.C_MessageVerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgVerifyInitPtr; }
             unsafe { _fp.C_MessageVerifyInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgVerifyInitPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifyMessage", out IntPtr verMsgPtr) && verMsgPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifyMessage", out IntPtr verMsgPtr))
             unsafe { _fp.C_VerifyMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)verMsgPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifyMessageBegin", out IntPtr verMsgBeginPtr) && verMsgBeginPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifyMessageBegin", out IntPtr verMsgBeginPtr))
             unsafe { _fp.C_VerifyMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)verMsgBeginPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifyMessageNext", out IntPtr verMsgNextPtr) && verMsgNextPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifyMessageNext", out IntPtr verMsgNextPtr))
             unsafe { _fp.C_VerifyMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)verMsgNextPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_MessageVerifyFinal", out IntPtr msgVerifyFinalPtr) && msgVerifyFinalPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_MessageVerifyFinal", out IntPtr msgVerifyFinalPtr))
             unsafe { _fp.C_MessageVerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgVerifyFinalPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_EncapsulateKey", out IntPtr encapPtr) && encapPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_EncapsulateKey", out IntPtr encapPtr))
         {
             unsafe { _fp.C_EncapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)encapPtr; }
             unsafe { _fp.C_EncapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)encapPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_DecapsulateKey", out IntPtr decapPtr) && decapPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_DecapsulateKey", out IntPtr decapPtr))
         {
             unsafe { _fp.C_DecapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)decapPtr; }
             unsafe { _fp.C_DecapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)decapPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignatureInit", out IntPtr vsiPtr) && vsiPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifySignatureInit", out IntPtr vsiPtr))
         {
             unsafe { _fp.C_VerifySignatureInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong>)vsiPtr; }
             unsafe { _fp.C_VerifySignatureInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong>)vsiPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignature", out IntPtr vsPtr) && vsPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifySignature", out IntPtr vsPtr))
             unsafe { _fp.C_VerifySignature = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)vsPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignatureUpdate", out IntPtr vsuPtr) && vsuPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifySignatureUpdate", out IntPtr vsuPtr))
             unsafe { _fp.C_VerifySignatureUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)vsuPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_VerifySignatureFinal", out IntPtr vsfPtr) && vsfPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_VerifySignatureFinal", out IntPtr vsfPtr))
             unsafe { _fp.C_VerifySignatureFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)vsfPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_GetSessionValidationFlags", out IntPtr gsvfPtr) && gsvfPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_GetSessionValidationFlags", out IntPtr gsvfPtr))
             unsafe { _fp.C_GetSessionValidationFlags = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)gsvfPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_AsyncComplete", out IntPtr asyncCompletePtr) && asyncCompletePtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_AsyncComplete", out IntPtr asyncCompletePtr))
         {
             unsafe { _fp.C_AsyncComplete = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong>)asyncCompletePtr; }
             unsafe { _fp.C_AsyncComplete_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong>)asyncCompletePtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_AsyncGetID", out IntPtr asyncGetIdPtr) && asyncGetIdPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_AsyncGetID", out IntPtr asyncGetIdPtr))
             unsafe { _fp.C_AsyncGetID = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)asyncGetIdPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_AsyncJoin", out IntPtr asyncJoinPtr) && asyncJoinPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_AsyncJoin", out IntPtr asyncJoinPtr))
             unsafe { _fp.C_AsyncJoin = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)asyncJoinPtr; }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_WrapKeyAuthenticated", out IntPtr wkaPtr) && wkaPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_WrapKeyAuthenticated", out IntPtr wkaPtr))
         {
             unsafe { _fp.C_WrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)wkaPtr; }
             unsafe { _fp.C_WrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)wkaPtr; }
         }
-        if (NativeLibrary.TryGetExport(libraryHandle, "C_UnwrapKeyAuthenticated", out IntPtr uwkaPtr) && uwkaPtr != IntPtr.Zero)
+        if (TryResolve(resolveExport, "C_UnwrapKeyAuthenticated", out IntPtr uwkaPtr))
         {
             unsafe { _fp.C_UnwrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)uwkaPtr; }
             unsafe { _fp.C_UnwrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)uwkaPtr; }
@@ -1644,9 +1672,9 @@ internal partial class Delegates
     /// C_GetInterface is unavailable / fails / returns a non-3.x version, leaving the
     /// caller to use the per-symbol fallback.
     /// </summary>
-    private bool TryLoadFromGetInterface(IntPtr libraryHandle)
+    private bool TryLoadFromGetInterface(Func<string, IntPtr> resolveExport)
     {
-        if (!NativeLibrary.TryGetExport(libraryHandle, "C_GetInterface", out IntPtr getInterfaceRawPtr) || getInterfaceRawPtr == IntPtr.Zero)
+        if (!TryResolve(resolveExport, "C_GetInterface", out IntPtr getInterfaceRawPtr))
             return false;
         unsafe { _fp.C_GetInterface = (delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)getInterfaceRawPtr; }
 
@@ -1801,10 +1829,13 @@ internal partial class Delegates
     /// <summary>
     /// Get delegates with C_GetFunctionList function from the dynamically loaded shared PKCS#11 library
     /// </summary>
-    /// <param name="libraryHandle">Handle to the PKCS#11 library</param>
-    private unsafe void InitializeWithGetFunctionList(IntPtr libraryHandle)
+    /// <param name="resolveExport">Export resolver for the PKCS#11 library</param>
+    private unsafe void InitializeWithGetFunctionList(Func<string, IntPtr> resolveExport)
     {
-        IntPtr getFunctionListPtr = NativeLibrary.GetExport(libraryHandle, GetFunctionListSymbol);
+        // Mirrors NativeLibrary.GetExport's contract: a missing bootstrap symbol is fatal.
+        if (!TryResolve(resolveExport, GetFunctionListSymbol, out IntPtr getFunctionListPtr))
+            throw new EntryPointNotFoundException(
+                $"Unable to find an entry point named '{GetFunctionListSymbol}' in the PKCS#11 library.");
         var getFunctionList = (delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)getFunctionListPtr;
 
         IntPtr functionList = IntPtr.Zero;
