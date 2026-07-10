@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (8 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (26 open, 4 resolved) | Low: 17
+- Total items: 54 (9 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -293,7 +293,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA A
 
-### [BL-027] No CI-health guard for opencryptoki — the second real backend can silently stop running
+### [BL-027] ✅ RESOLVED — No CI-health guard for opencryptoki — the second real backend can silently stop running
+- **Status:** Resolved 2026-07-10. The ubuntu-latest test step now declares `PKCS11_TEST_EXPECT_OPENCRYPTOKI=1` (set on the step itself, not by the provisioning script, so a provisioning regression that stops exporting the library path is caught rather than masked), and a new `OpenCryptokiAvailabilityTests` guard — mirroring `SoftHsmAvailabilityTests` — fails the job when the marker is set but `OpenCryptokiBackendFixture.OpenCryptokiAvailable` is false. Verified both ways locally: passes with no marker, fails with the marker and no backend.
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** S

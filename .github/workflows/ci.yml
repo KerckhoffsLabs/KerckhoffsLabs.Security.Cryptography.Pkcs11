@@ -309,6 +309,13 @@ jobs:
       # tests run alongside the SoftHSM and mock suites in a single pass.
       - name: Test (incl. opencryptoki)
         if: matrix.os == 'ubuntu-latest'
+        env:
+          # Declares that THIS leg must have a working opencryptoki: the availability guard
+          # test fails the job when the backend is missing, instead of letting every
+          # opencryptoki-gated ConditionalFact skip silently while CI stays green. Set on the
+          # test step (not by the provisioning script) so a provisioning regression that
+          # stops exporting PKCS11_TEST_OPENCRYPTOKI_LIBRARY is caught rather than masked.
+          PKCS11_TEST_EXPECT_OPENCRYPTOKI: '1'
         run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
 
   # Native-AOT smoke test (linux-x64): publishes tests/AotSmoke — a standalone app that
