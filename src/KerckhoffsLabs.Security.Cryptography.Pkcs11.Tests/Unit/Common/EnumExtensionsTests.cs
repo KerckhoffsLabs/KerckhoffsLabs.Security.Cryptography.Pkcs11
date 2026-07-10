@@ -9,8 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Common;
 /// <summary>
 /// Round-trip and validation tests for the per-enum extension methods. One representative
 /// sample per enum keeps the test count reasonable; the extension implementations are
-/// mechanically identical across enums. <c>ToCK*</c> always validates — there is no longer
-/// a loose, non-validating variant.
+/// mechanically identical across enums. <c>ToCK*</c> validates for caller-supplied values —
+/// EXCEPT <c>ToCKR</c> and <c>ToCKM</c>, which convert module-controlled values where
+/// vendor-defined and newer-than-this-enum codes are spec-legal and must round-trip
+/// unvalidated.
 /// </summary>
 public sealed class EnumExtensionsTests
 {
@@ -28,13 +30,24 @@ public sealed class EnumExtensionsTests
     [Fact] public void CKS_RoundTrip() { CKS v = CKS.CKS_RO_PUBLIC_SESSION; Assert.Equal(v, v.ToCULong().ToCKS()); }
     [Fact] public void CKU_RoundTrip() { CKU v = CKU.CKU_USER; Assert.Equal(v, v.ToCULong().ToCKU()); }
 
+    // ToCKR / ToCKM convert module-controlled values: vendor-defined codes (≥ CK*_VENDOR_DEFINED)
+    // and codes newer than the enum are spec-legal, so they round-trip instead of throwing.
+    [Theory]
+    [InlineData(0x80000000u)] // exactly CKR_VENDOR_DEFINED / CKM_VENDOR_DEFINED
+    [InlineData(0x80000123u)] // a typical vendor code
+    [InlineData(0x0000FFFFu)] // unknown non-vendor value (e.g. a future spec code)
+    public void ToCKR_ToCKM_PassUndefinedValuesThrough(uint raw)
+    {
+        NativeCULong value = (NativeCULong)raw;
+        Assert.Equal(raw, (uint)value.ToCKR());
+        Assert.Equal(raw, (uint)value.ToCKM());
+    }
+
     [Fact]
     public void ToCK_ThrowsOnUndefinedValue()
     {
         NativeCULong garbage = (NativeCULong)0xDEADBEEFu;
-        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKR());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKA());
-        Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKM());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKC());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKD());
         Assert.Throws<InvalidEnumValueException>(() => garbage.ToCKG());

@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (4 resolved)
-- Critical: 0 | High: 7 (6 open, 1 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
+- Total items: 54 (5 resolved)
+- Critical: 0 | High: 7 (5 open, 2 resolved) | Medium: 30 (27 open, 3 resolved) | Low: 17
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -39,7 +39,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA A, QA C, .NET Engineer A, .NET Engineer B
 
-### [BL-003] Vendor-defined / unknown return codes throw a bare `InvalidEnumValueException` instead of a typed `Pkcs11Exception`
+### [BL-003] ✅ RESOLVED — Vendor-defined / unknown return codes throw a bare `InvalidEnumValueException` instead of a typed `Pkcs11Exception`
+- **Status:** Resolved 2026-07-10. `ToCKR()` and `ToCKM()` are now non-validating casts (documented as deliberate: return-path values are module-controlled and vendor codes are spec-legal), so unknown codes flow into `ExceptionMapper`'s existing fallback and surface as `Pkcs11UnclassifiedException` with `ReturnValue` preserving the raw code. `Pkcs11Exception` messages render undefined codes as hex ("vendor-defined CKR 0x80000123" / "unrecognized CKR 0x0000FFFF") instead of bare decimal. The other 11 `ToCK*` converters keep validation — they convert caller-supplied values, where fail-fast is the intended design, and have no production read-back call sites. Tests updated/added (vendor pass-through, mapper categorization, ThrowIfError end-to-end); full suite green (1647 passed).
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** S

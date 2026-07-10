@@ -542,14 +542,12 @@ public static class CKRExtensions
     public static NativeCULong ToCULong(this CKR value) => (NativeCULong)(ulong)value;
 
     /// <summary>
-    /// Converts <see cref="NativeCULong"/> to <see cref="CKR"/>, validating that the value
-    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKR"/>. Deliberately a non-validating
+    /// cast, unlike most <c>ToCK*</c> converters: return values come from the module, not the
+    /// caller, and PKCS#11 permits vendor-defined codes (≥ <see cref="CKR.CKR_VENDOR_DEFINED"/>)
+    /// as well as codes newer than this enum. Such values must flow into the typed
+    /// <see cref="Pkcs11Exception"/> hierarchy (where they surface via
+    /// <see cref="Pkcs11Exception.ReturnValue"/>), not crash the conversion.
     /// </summary>
-    public static CKR ToCKR(this NativeCULong value)
-    {
-        CKR result = (CKR)(ulong)value;
-        if (!Enum.IsDefined(result))
-            throw new InvalidEnumValueException(typeof(CKR), (ulong)value);
-        return result;
-    }
+    public static CKR ToCKR(this NativeCULong value) => (CKR)(ulong)value;
 }

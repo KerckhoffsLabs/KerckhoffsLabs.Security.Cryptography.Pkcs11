@@ -40,8 +40,17 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     private static string BuildMessage(string method, CKR returnValue, string? message)
     {
         ArgumentNullException.ThrowIfNull(method);
-        return message ?? $"PKCS#11 method {method} returned {returnValue}";
+        return message ?? $"PKCS#11 method {method} returned {FormatReturnValue(returnValue)}";
     }
+
+    // Vendor-defined and not-yet-known codes have no enum name; render them as hex (the form
+    // vendor documentation uses) instead of Enum.ToString's bare decimal.
+    private static string FormatReturnValue(CKR returnValue)
+        => Enum.IsDefined(returnValue)
+            ? returnValue.ToString()
+            : (uint)returnValue >= (uint)CKR.CKR_VENDOR_DEFINED
+                ? $"vendor-defined CKR 0x{(uint)returnValue:X8}"
+                : $"unrecognized CKR 0x{(uint)returnValue:X8}";
 
     /// <summary>
     /// Throws the appropriate typed <see cref="Pkcs11Exception"/> subclass when

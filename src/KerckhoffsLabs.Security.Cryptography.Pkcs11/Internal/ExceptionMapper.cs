@@ -9,7 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// </summary>
 /// <remarks>
 /// Categories follow PKCS#11 v3.1 §5.3 grouping. A value with no narrower category maps
-/// to <see cref="Pkcs11UnclassifiedException"/>.
+/// to <see cref="Pkcs11UnclassifiedException"/> — including vendor-defined codes
+/// (≥ <c>CKR_VENDOR_DEFINED</c>) and codes newer than the <see cref="CKR"/> enum, which
+/// <c>ToCKR()</c> deliberately passes through unvalidated so the raw code stays reachable
+/// via <see cref="Pkcs11Exception.ReturnValue"/>.
 /// </remarks>
 internal static class ExceptionMapper
 {

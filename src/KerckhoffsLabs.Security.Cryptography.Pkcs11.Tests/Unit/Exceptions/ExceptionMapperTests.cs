@@ -100,4 +100,52 @@ public sealed class ExceptionMapperTests
     [InlineData(CKR.CKR_CRYPTOKI_NOT_INITIALIZED)]
     public void Map_UncategorizedCkr_ReturnsUnclassifiedException(CKR ckr)
         => Assert.IsType<Pkcs11UnclassifiedException>(ExceptionMapper.Map(ckr, "C_Finalize"));
+
+    // Vendor-defined codes (≥ CKR_VENDOR_DEFINED) and codes newer than the CKR enum are
+    // spec-legal on the return path. They must land in the typed hierarchy with the raw
+    // code preserved and rendered as hex — not escape as a bare InvalidEnumValueException.
+    [Theory]
+    [InlineData(0x80000123u)]
+    [InlineData(0xF0001000u)]
+    public void Map_VendorDefinedCkr_ReturnsUnclassifiedWithRawCodeAndHexMessage(uint raw)
+    {
+        var ckr = (CKR)raw;
+
+        var ex = ExceptionMapper.Map(ckr, "C_Sign");
+
+        Assert.IsType<Pkcs11UnclassifiedException>(ex);
+        Assert.Equal(raw, (uint)ex.ReturnValue);
+        Assert.Equal("C_Sign", ex.Method);
+        Assert.Contains($"vendor-defined CKR 0x{raw:X8}", ex.Message);
+    }
+
+    // Exactly CKR_VENDOR_DEFINED is itself a named member (the range sentinel), so it prints
+    // by name like any defined code — only values beyond it fall back to hex.
+    [Fact]
+    public void Map_VendorDefinedSentinel_PrintsEnumName()
+        => Assert.Contains("CKR_VENDOR_DEFINED",
+            ExceptionMapper.Map(CKR.CKR_VENDOR_DEFINED, "C_Sign").Message);
+
+    [Fact]
+    public void Map_UnrecognizedNonVendorCkr_ReturnsUnclassifiedWithRawCodeAndHexMessage()
+    {
+        var ckr = (CKR)0x0000FFFFu; // e.g. a code from a future spec revision
+
+        var ex = ExceptionMapper.Map(ckr, "C_Sign");
+
+        Assert.IsType<Pkcs11UnclassifiedException>(ex);
+        Assert.Equal(0x0000FFFFu, (uint)ex.ReturnValue);
+        Assert.Contains("unrecognized CKR 0x0000FFFF", ex.Message);
+    }
+
+    [Fact]
+    public void ThrowIfError_VendorDefinedCkr_ThrowsTypedPkcs11Exception()
+    {
+        var ckr = (CKR)0x80000042u;
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => Pkcs11Exception.ThrowIfError(ckr, "C_GenerateKeyPair"));
+
+        Assert.Equal(ckr, ex.ReturnValue);
+    }
 }

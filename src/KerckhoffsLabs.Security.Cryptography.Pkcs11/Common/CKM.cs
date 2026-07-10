@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -2402,14 +2401,10 @@ public static class CKMExtensions
     public static NativeCULong ToCULong(this CKM value) => (NativeCULong)(ulong)value;
 
     /// <summary>
-    /// Converts <see cref="NativeCULong"/> to <see cref="CKM"/>, validating that the value
-    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
+    /// Converts <see cref="NativeCULong"/> to <see cref="CKM"/>. Deliberately a non-validating
+    /// cast, unlike most <c>ToCK*</c> converters: mechanism values read back from native
+    /// structures may legally be vendor-defined (≥ <see cref="CKM.CKM_VENDOR_DEFINED"/>) or
+    /// newer than this enum, and must round-trip rather than crash the conversion.
     /// </summary>
-    public static CKM ToCKM(this NativeCULong value)
-    {
-        CKM result = (CKM)(ulong)value;
-        if (!Enum.IsDefined(result))
-            throw new InvalidEnumValueException(typeof(CKM), (ulong)value);
-        return result;
-    }
+    public static CKM ToCKM(this NativeCULong value) => (CKM)(ulong)value;
 }
