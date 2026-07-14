@@ -5,6 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
+// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// behaviour under test), so the compile-time warning is suppressed for this file only.
+#pragma warning disable KLPKCS11010
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>

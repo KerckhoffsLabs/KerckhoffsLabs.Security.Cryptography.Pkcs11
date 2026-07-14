@@ -1,6 +1,11 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
+// This file builds the very mechanisms the secure-by-default policy gates: it sits on the
+// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
+// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+#pragma warning disable KLPKCS11009
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
 /// <summary>

@@ -4,6 +4,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
+// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// behaviour under test), so the compile-time warning is suppressed for this file only.
+#pragma warning disable KLPKCS11010
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 public sealed class Pkcs11MechanismMapTests

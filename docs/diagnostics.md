@@ -84,11 +84,48 @@ gate. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 > exposure. The mechanism guard is direction-agnostic, so gating v1.5 signatures would also break
 > *verifying* third-party signatures.
 
+<a id="KLPKCS11009"></a>
+### KLPKCS11009 — Broken, deprecated, or unauthenticated mechanism
+
+Also an analyzer, for the same reason as KLPKCS11008: the legacy primitives have `[Obsolete]` façade
+types, but the *mechanisms* underneath are reachable as values — `new Mechanism(CKM.CKM_DES3_CBC)`,
+or `aes.Mode = CipherMode.CBC` — where there is no symbol to mark. Covers everything the runtime gate
+rejects apart from the RSA pair above:
+
+- **Unauthenticated AES modes** — ECB, CBC, CBC-PAD, CTR, CTS, OFB, CFB. The common case, and the one
+  with no obsolete type to warn you: AES itself is fine, so `AesPkcs11` is *not* obsolete. These modes
+  provide no integrity protection and are malleable; raw/padded CBC also enables padding oracles.
+  Use `CKM_AES_GCM` or `CKM_AES_CCM`.
+- **Broken hashes** — MD2, MD5, SHA-1, RIPEMD-128/160 (and their HMAC / RSA-signature variants).
+- **Broken or legacy ciphers** — RC2, RC4, DES, 3DES, SEED, CAST/CAST5/CAST128, RC5, Blowfish, Skipjack.
+- **DSA** — every `CKM_DSA*` mechanism (FIPS 186-5 disallows DSA signature generation).
+
+<a id="KLPKCS11010"></a>
+### KLPKCS11010 — Broken hash in a signature or MAC
+
+The standalone digest façades are obsolete (KLPKCS11001/002), but a broken hash also reaches the
+token as a *value*: `rsa.SignData(data, HashAlgorithmName.SHA1, …)`,
+`new HMACPkcs11(key, HashAlgorithmName.MD5)`, `new SP800108HmacCounterKdfPkcs11(key, HashAlgorithmName.SHA1)`.
+`HashAlgorithmName.SHA1` is a BCL value this library cannot obsolete, so an analyzer reports it. Use
+SHA-256 or stronger.
+
+Note that **verifying** an existing SHA-1 signature is gated too — the mechanism guard is
+direction-agnostic, so legacy verification needs `AllowInsecure` as well.
+
 ## Runtime-only gates
 
-Not every insecure operation has a compile-time signal. `Pkcs11Workspace.AllowInsecure` gates
-mechanisms by value at the point of use, so a mechanism chosen dynamically — say, from configuration
-or a `CKM` variable the analyzer cannot trace — is rejected only when the operation runs, with an
-`InsecureOperationException` naming the mechanism. The compile-time diagnostics above are a
-best-effort early warning layered on top of that gate; the gate, not the diagnostic, is the
-enforcement point.
+Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early
+warning layered on top of the gate — **the gate, not the diagnostic, is the enforcement point.**
+
+The analyzers see only what is written literally in the source. A mechanism chosen dynamically — from
+configuration, a `CKM` variable, or a hash name computed at run time — cannot be traced, and is
+rejected only when the operation executes, with an `InsecureOperationException` naming the mechanism.
+
+These policies are inherently runtime-only, because they depend on values rather than symbols:
+
+| Gate | Rejects |
+|------|---------|
+| RSA key strength | Generating an RSA key pair below 2048 bits |
+| EC curve baseline | Generating an EC key on a curve below the 128-bit baseline — including one passed as a value, which the `[Obsolete]` on the named-curve properties cannot catch |
+| Secure key defaults | Creating, deriving, or unwrapping a key explicitly marked extractable or non-sensitive |
+| Key-material extraction | Reading a shared secret or private key off the token (ML-KEM encapsulate/decapsulate, ML-DSA / SLH-DSA private export) |
