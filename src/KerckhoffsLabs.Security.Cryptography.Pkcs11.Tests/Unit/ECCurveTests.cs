@@ -167,7 +167,7 @@ public sealed class ECCurveTests
     [Fact]
     public void IsBelowSecurityBaseline_FlagsSub128BitCurves()
     {
-#pragma warning disable CS0618 // deliberately referencing the obsolete sub-128-bit curves
+#pragma warning disable KLPKCS11007 // deliberately referencing the obsolete sub-128-bit curves
         ECCurve[] weak =
         [
             ECCurve.NamedCurves.NistP192, ECCurve.NamedCurves.NistP224,
@@ -176,7 +176,7 @@ public sealed class ECCurveTests
             ECCurve.NamedCurves.BrainpoolP224r1, ECCurve.NamedCurves.BrainpoolP224t1,
             ECCurve.NamedCurves.Secp192k1, ECCurve.NamedCurves.Secp224k1,
         ];
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11007
         Assert.All(weak, c => Assert.True(c.IsBelowSecurityBaseline, $"{c} should be sub-baseline"));
 
         ECCurve[] strong =
@@ -198,7 +198,7 @@ public sealed class ECCurveTests
         // typo in any catalog OID (e.g. a swapped Brainpool r1/t1 index) fails here. Covers all of
         // the PKCS#11 v3.2 prime-field named curves. The sub-128-bit curves are intentionally
         // [Obsolete]; this catalog test references them on purpose.
-#pragma warning disable CS0618
+#pragma warning disable KLPKCS11007
         (ECCurve curve, string oid, string name)[] catalog =
         [
             (ECCurve.NamedCurves.NistP192, "1.2.840.10045.3.1.1", "nistP192"),
@@ -225,7 +225,7 @@ public sealed class ECCurveTests
             (ECCurve.NamedCurves.BrainpoolP512t1, "1.3.36.3.3.2.8.1.1.14", "brainpoolP512t1"),
             (ECCurve.NamedCurves.Sm2, "1.2.156.10197.1.301", "sm2"),
         ];
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11007
 
         Assert.Equal(23, catalog.Length);
         foreach (var (curve, oid, name) in catalog)

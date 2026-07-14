@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 //   RC2Pkcs11Tests.SoftHsm2.cs   — RC2Pkcs11Tests_SoftHsm  (real SoftHSM token)
 
 // RC2Pkcs11 is [Obsolete] (weak legacy cipher); the secure-defaults gate is the point of the type,
-// so CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// so KLPKCS11005 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11005
 
 /// <summary>Backend-free argument tests for <see cref="RC2Pkcs11"/>.</summary>
 public sealed class RC2Pkcs11ArgumentTests

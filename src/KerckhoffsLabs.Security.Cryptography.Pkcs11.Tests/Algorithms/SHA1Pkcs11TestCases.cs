@@ -9,7 +9,7 @@ using Microsoft.DotNet.XUnitExtensions;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // SHA1Pkcs11 is [Obsolete] (broken crypto); exercising it here is deliberate.
-#pragma warning disable CS0618
+#pragma warning disable KLPKCS11002
 
 /// <summary>
 /// Backend-agnostic SHA1 digest tests. SHA1 is gated by the secure-defaults policy (<c>CKM_SHA_1</c>):
@@ -51,4 +51,4 @@ internal static class SHA1Pkcs11TestCases
         Assert.Equal(SHA1.HashData(data), digest);
     }
 }
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11002

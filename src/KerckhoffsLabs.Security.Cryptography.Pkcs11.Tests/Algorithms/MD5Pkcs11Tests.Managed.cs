@@ -7,9 +7,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
-// MD5Pkcs11 is [Obsolete] (broken crypto); the gate is the point of the type, so CS0618 is
+// MD5Pkcs11 is [Obsolete] (broken crypto); the gate is the point of the type, so KLPKCS11001 is
 // suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+#pragma warning disable KLPKCS11001
 
 /// <summary>
 /// MD5Pkcs11 over the in-process <c>ManagedSoftToken</c> — runs without SoftHSM. The secure-defaults
@@ -172,4 +172,4 @@ public sealed class MD5Pkcs11_Managed
         Assert.Equal("workspace", ex.ParamName);
     }
 }
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11001

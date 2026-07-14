@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 //   DESPkcs11Tests.SoftHsm2.cs   — DESPkcs11Tests_SoftHsm  (real SoftHSM token)
 
 // DESPkcs11 is [Obsolete] (single DES has a 56-bit key); the secure-defaults gate is the point of
-// the type, so CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// the type, so KLPKCS11003 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11003
 
 /// <summary>Backend-free argument tests for <see cref="DESPkcs11"/>.</summary>
 public sealed class DESPkcs11ArgumentTests

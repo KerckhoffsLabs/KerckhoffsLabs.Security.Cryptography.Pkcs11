@@ -25,7 +25,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 [Obsolete("DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern " +
           "deployments. Use ECDsaPkcs11 (ECDSA) or MLDsaPkcs11 (ML-DSA). DSAPkcs11 remains only for interop " +
-          "with existing DSA keys; SHA-1 hashing additionally requires the wrapped key's Pkcs11Workspace.AllowInsecure = true.")]
+          "with existing DSA keys; SHA-1 hashing additionally requires the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+    DiagnosticId = DiagnosticIds.Dsa,
+    UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DSAPkcs11 : DSA
 {
     private readonly Pkcs11Key _key;

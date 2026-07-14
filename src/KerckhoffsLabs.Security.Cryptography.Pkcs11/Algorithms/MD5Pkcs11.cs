@@ -25,7 +25,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("MD5 is a broken hash function with practical collisions. Use SHA256Pkcs11 or stronger. " +
-          "MD5Pkcs11 throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.")]
+          "MD5Pkcs11 throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
+    DiagnosticId = DiagnosticIds.Md5,
+    UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class MD5Pkcs11 : MD5
 {
     private readonly Pkcs11Workspace _workspace;

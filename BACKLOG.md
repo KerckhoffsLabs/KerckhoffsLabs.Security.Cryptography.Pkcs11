@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (10 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17 (16 open, 1 resolved)
+- Total items: 54 (11 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17 (15 open, 2 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -437,7 +437,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** .NET Engineer A
 
-### [BL-041] Legacy-crypto `[Obsolete]` attributes lack `DiagnosticId`, forcing blanket CS0618 suppression
+### [BL-041] ✅ RESOLVED — Legacy-crypto `[Obsolete]` attributes lack `DiagnosticId`, forcing blanket CS0618 suppression
+- **Status:** Resolved 2026-07-14. Every obsoletion now carries a stable `DiagnosticId` + `UrlFormat` (ids centralized in `DiagnosticIds.cs`): KLPKCS11001 MD5, …002 SHA-1, …003 DES, …004 Triple-DES, …005 RC2, …006 DSA, …007 weak EC curves (the 10 sub-128-bit named curves — beyond the finding's 6 façades, same class of problem). New `docs/diagnostics.md` (wired into the TOC) documents each id, shows precise `#pragma`/`NoWarn` suppression, and states that suppressing the compiler diagnostic does *not* disable the runtime `AllowInsecure` gate; the `UrlFormat` resolves to its anchor. All 22 in-repo suppressions migrated from blanket `CS0618` to the specific id. New `ObsoleteDiagnosticIdTests` pins every id to its type (they are a public contract consumers write into their builds) and sweeps the exported surface so a future bare `[Obsolete]` fails the build. Full suite green (1696 passed).
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** S

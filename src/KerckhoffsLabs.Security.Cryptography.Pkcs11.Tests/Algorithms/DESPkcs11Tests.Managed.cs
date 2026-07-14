@@ -7,8 +7,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // DESPkcs11 is [Obsolete] (single DES has a 56-bit key); the secure-defaults gate is the whole point
-// of the type, so CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// of the type, so KLPKCS11003 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11003
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 

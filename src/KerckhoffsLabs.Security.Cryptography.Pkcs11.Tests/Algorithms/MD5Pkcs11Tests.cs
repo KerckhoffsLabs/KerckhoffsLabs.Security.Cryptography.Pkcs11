@@ -7,9 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 //   MD5Pkcs11Tests.cs            — this file: backend-free generic/argument tests (always run)
 //   MD5Pkcs11Tests.SoftHsm2.cs   — MD5Pkcs11Tests_SoftHsm  (real SoftHSM token)
 
-// MD5Pkcs11 is [Obsolete] (broken crypto); the gate is the point of the type, so CS0618 is
+// MD5Pkcs11 is [Obsolete] (broken crypto); the gate is the point of the type, so KLPKCS11001 is
 // suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+#pragma warning disable KLPKCS11001
 
 /// <summary>Backend-free argument tests for <see cref="MD5Pkcs11"/>.</summary>
 public sealed class MD5Pkcs11ArgumentTests
@@ -18,4 +18,4 @@ public sealed class MD5Pkcs11ArgumentTests
     public void Ctor_NullWorkspace_Throws() =>
         Assert.Throws<ArgumentNullException>(() => new MD5Pkcs11(workspace: null!));
 }
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11001

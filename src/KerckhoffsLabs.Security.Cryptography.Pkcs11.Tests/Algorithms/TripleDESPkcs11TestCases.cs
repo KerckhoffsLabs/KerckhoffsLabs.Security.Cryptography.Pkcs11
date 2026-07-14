@@ -10,8 +10,8 @@ using Microsoft.DotNet.XUnitExtensions;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // TripleDESPkcs11 is [Obsolete] (64-bit block / Sweet32, NIST-deprecated); the secure-defaults gate is
-// the point of the type, so CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// the point of the type, so KLPKCS11004 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11004
 
 /// <summary>
 /// Backend-agnostic TripleDESPkcs11 tests: token 3DES-CBC/ECB matches the BCL for the same key, the

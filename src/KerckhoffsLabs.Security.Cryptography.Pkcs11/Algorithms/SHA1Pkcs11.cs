@@ -25,7 +25,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("SHA-1 is broken (SHAttered demonstrated practical collisions). Use SHA256Pkcs11 or stronger. " +
-          "SHA1Pkcs11 throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.")]
+          "SHA1Pkcs11 throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
+    DiagnosticId = DiagnosticIds.Sha1,
+    UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class SHA1Pkcs11 : SHA1
 {
     private readonly Pkcs11Workspace _workspace;

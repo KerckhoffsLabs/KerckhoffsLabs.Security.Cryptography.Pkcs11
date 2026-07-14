@@ -8,8 +8,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // SHA1Pkcs11 is [Obsolete] (broken crypto); the secure-defaults gate is the point of the type, so
-// CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// KLPKCS11002 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11002
 
 /// <summary>
 /// SHA1Pkcs11 over the in-process <c>ManagedSoftToken</c> — runs without SoftHSM. SHA-1 is broken and
@@ -179,4 +179,4 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal("workspace", ex.ParamName);
     }
 }
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11002

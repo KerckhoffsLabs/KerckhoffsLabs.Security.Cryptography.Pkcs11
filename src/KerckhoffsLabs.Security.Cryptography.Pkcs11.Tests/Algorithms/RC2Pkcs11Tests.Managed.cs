@@ -7,9 +7,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // RC2Pkcs11 is [Obsolete] (weak legacy 64-bit cipher with a reduced effective key length); the
-// secure-defaults gate is the whole point of the type, so CS0618 is suppressed deliberately at the
+// secure-defaults gate is the whole point of the type, so KLPKCS11005 is suppressed deliberately at the
 // use sites.
-#pragma warning disable CS0618
+#pragma warning disable KLPKCS11005
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 

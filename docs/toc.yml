@@ -1,4 +1,6 @@
 - name: Home
   href: index.md
+- name: Diagnostics
+  href: diagnostics.md
 - name: API
   href: api/

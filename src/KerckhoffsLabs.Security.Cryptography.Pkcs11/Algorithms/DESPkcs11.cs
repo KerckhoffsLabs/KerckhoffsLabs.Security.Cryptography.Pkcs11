@@ -40,7 +40,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Single DES has a 56-bit key and is exhaustively breakable. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "DESPkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.")]
+          "DESPkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+    DiagnosticId = DiagnosticIds.Des,
+    UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DESPkcs11 : DES
 {
     private readonly Pkcs11Key _key;

@@ -41,7 +41,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("RC2 (RFC 2268) is a weak legacy cipher with a reduced effective key length. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "RC2Pkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.")]
+          "RC2Pkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+    DiagnosticId = DiagnosticIds.Rc2,
+    UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class RC2Pkcs11 : RC2
 {
     private readonly Pkcs11Key _key;

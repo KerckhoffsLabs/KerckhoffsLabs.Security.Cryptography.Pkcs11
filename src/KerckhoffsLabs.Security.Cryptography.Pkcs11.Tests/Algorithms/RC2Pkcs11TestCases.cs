@@ -10,8 +10,8 @@ using Microsoft.DotNet.XUnitExtensions;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // RC2Pkcs11 is [Obsolete] (weak legacy cipher); the secure-defaults gate is the point of the type, so
-// CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// KLPKCS11005 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11005
 
 /// <summary>
 /// Backend-agnostic RC2Pkcs11 tests. The non-RC2-key constructor check only needs an AES key, so it

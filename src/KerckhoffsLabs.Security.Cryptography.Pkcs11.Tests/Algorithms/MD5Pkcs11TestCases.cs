@@ -9,7 +9,7 @@ using Microsoft.DotNet.XUnitExtensions;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // MD5Pkcs11 is [Obsolete] (broken crypto); exercising it here is deliberate.
-#pragma warning disable CS0618
+#pragma warning disable KLPKCS11001
 
 /// <summary>
 /// Backend-agnostic MD5 digest tests. MD5 is gated by the secure-defaults policy (<c>CKM_MD5</c>):
@@ -51,4 +51,4 @@ internal static class MD5Pkcs11TestCases
         Assert.Equal(MD5.HashData(data), digest);
     }
 }
-#pragma warning restore CS0618
+#pragma warning restore KLPKCS11001

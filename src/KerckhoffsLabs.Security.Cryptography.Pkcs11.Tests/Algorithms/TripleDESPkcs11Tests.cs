@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 //   TripleDESPkcs11Tests.SoftHsm2.cs   — TripleDESPkcs11Tests_SoftHsm  (real SoftHSM token)
 
 // TripleDESPkcs11 is [Obsolete] (64-bit block / Sweet32, NIST-deprecated); the secure-defaults gate
-// is the point of the type, so CS0618 is suppressed deliberately at the use sites.
-#pragma warning disable CS0618
+// is the point of the type, so KLPKCS11004 is suppressed deliberately at the use sites.
+#pragma warning disable KLPKCS11004
 
 /// <summary>Backend-free argument tests for <see cref="TripleDESPkcs11"/>.</summary>
 public sealed class TripleDESPkcs11ArgumentTests
