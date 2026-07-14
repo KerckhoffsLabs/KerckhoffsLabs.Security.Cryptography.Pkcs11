@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 
@@ -18,8 +18,7 @@ public static class InsecureMechanismData
     /// <summary>
     /// Mechanisms rejected by the runtime gate, minus the RSA-encryption pair covered by KLPKCS11008.
     /// </summary>
-    public static readonly HashSet<string> GatedMechanisms = new HashSet<string>
-    {
+    public static readonly ImmutableHashSet<string> GatedMechanisms = ImmutableHashSet.Create(
         "CKM_MD5_RSA_PKCS",
         "CKM_SHA1_RSA_PKCS",
         "CKM_SHA1_RSA_PKCS_PSS",
@@ -134,11 +133,10 @@ public static class InsecureMechanismData
         "CKM_SKIPJACK_WRAP",
         "CKM_SKIPJACK_PRIVATE_WRAP",
         "CKM_SKIPJACK_RELAYX"
-    };
+    );
 
     /// <summary>Unauthenticated / malleable AES modes; the authenticated modes are GCM and CCM.</summary>
-    public static readonly HashSet<string> WeakCipherModes = new HashSet<string>
-    {
-        "ECB", "CBC", "CFB", "OFB", "CTS",
-    };
+    public static readonly ImmutableHashSet<string> WeakCipherModes = ImmutableHashSet.Create(
+        "ECB", "CBC", "CFB", "OFB", "CTS"
+    );
 }
