@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (11 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17 (15 open, 2 resolved)
+- Total items: 54 (12 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17 (14 open, 3 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -489,7 +489,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** Cryptographer B
 
-### [BL-046] Intermediate RNG/seed copies are not zeroized
+### [BL-046] ✅ RESOLVED — Intermediate RNG/seed copies are not zeroized
+- **Status:** Resolved 2026-07-14. The interop signatures take `byte[]`, so the span overloads must copy through a transient — `GenerateRandom(Span<byte>)` now zeroes the token's output array after filling the caller's span, and `SeedRandom(ReadOnlySpan<byte>)` zeroes its copy of the caller's entropy, both in a `finally`. (The `Pkcs11Workspace` wrappers pass straight through, so no second leak.) New `Pkcs11SessionRandomZeroizationTests` keeps the transient reachable through the fake to inspect it after the call; both tests were mutation-verified to fail with their respective `ZeroMemory` removed. Full suite green (1701 passed).
 - **Area:** Cryptography
 - **Severity:** Low
 - **Effort:** S

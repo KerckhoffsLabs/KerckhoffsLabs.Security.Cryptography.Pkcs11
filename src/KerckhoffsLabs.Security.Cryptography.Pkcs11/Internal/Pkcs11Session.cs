@@ -2958,8 +2958,18 @@ internal sealed class Pkcs11Session : IDisposable
     public void SeedRandom(ReadOnlySpan<byte> seed)
     {
         using var _ = AcquireExclusive();
+
+        // The interop signature takes byte[], so the caller's entropy has to be copied. Zero the
+        // copy on the way out: seed material is as sensitive as the keys it will help produce.
         byte[] buffer = seed.ToArray();
-        SeedRandom(buffer);
+        try
+        {
+            SeedRandom(buffer);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer);
+        }
     }
 
     /// <summary>
@@ -2989,9 +2999,20 @@ internal sealed class Pkcs11Session : IDisposable
     {
         using var _ = AcquireExclusive();
         if (destination.IsEmpty) return 0;
+
+        // The interop signature takes byte[], so the token's output lands in a transient before it
+        // reaches the caller's span. Zero it: this is freshly generated key material, and leaving a
+        // second copy on the GC heap defeats the point of the caller passing a span it controls.
         byte[] random = GenerateRandom(destination.Length);
-        random.CopyTo(destination);
-        return destination.Length;
+        try
+        {
+            random.CopyTo(destination);
+            return destination.Length;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(random);
+        }
     }
 
     /// <summary>
