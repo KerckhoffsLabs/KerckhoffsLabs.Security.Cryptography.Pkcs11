@@ -29,6 +29,10 @@
     <PackageTags>pkcs11;hsm;cryptography;pkcs11v3;pqc;ml-dsa;ml-kem</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Embedded package icon (PackageIconUrl is deprecated and not rendered by nuget.org).
+         The file must be packed into the .nupkg — see the ItemGroup below. -->
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageProjectUrl>https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -42,6 +46,10 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <!-- Single source of truth for the logo: the same 256x256 icon the docs site uses. Packed at the
+         package root, which is what <PackageIcon> resolves against. Not compiled or copied to output
+         (Visible=false keeps it out of the IDE's project tree). -->
+    <None Include="..\..\docs\images\icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
