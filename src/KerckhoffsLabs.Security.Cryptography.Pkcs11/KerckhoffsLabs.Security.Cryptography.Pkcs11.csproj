@@ -62,4 +62,21 @@
     <InternalsVisibleTo Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests" />
   </ItemGroup>
 
+  <!--
+    Ship the analyzer to consumers. The ProjectReference above runs it while building this library;
+    packing it under analyzers/dotnet/cs is what makes KLPKCS11008 (RSA encryption without OAEP) fire
+    in a consumer's build too — the weak primitives that are types get their compile-time signal from
+    [Obsolete] + DiagnosticId, but a padding *value* has no symbol to mark.
+  -->
+  <Target Name="PackAnalyzer" BeforeTargets="_GetPackageFiles">
+    <MSBuild Projects="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_AnalyzerAssembly" />
+    </MSBuild>
+    <ItemGroup>
+      <None Include="@(_AnalyzerAssembly)" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
 </Project>

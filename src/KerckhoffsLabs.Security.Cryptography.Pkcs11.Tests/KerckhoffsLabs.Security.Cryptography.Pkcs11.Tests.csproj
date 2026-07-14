@@ -19,6 +19,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
+    <!--
+      Run the shipped analyzer against the tests, exactly as a consumer's build would: the tests are
+      the closest thing we have to real consumer code, so the insecure-RSA-padding diagnostic
+      (KLPKCS11008) is proven to fire — and to be suppressible per-site — end to end.
+    -->
+    <ProjectReference
+      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

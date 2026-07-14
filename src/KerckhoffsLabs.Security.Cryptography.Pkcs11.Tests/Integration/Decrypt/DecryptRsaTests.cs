@@ -2,6 +2,11 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+// These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
+// AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
+// for this file only — the per-id suppression the diagnostic exists to enable.
+#pragma warning disable KLPKCS11008
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Decrypt;
 
 /// <summary>

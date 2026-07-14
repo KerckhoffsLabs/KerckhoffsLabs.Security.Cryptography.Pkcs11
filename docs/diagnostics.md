@@ -66,3 +66,29 @@ protocol suites. Use `ECDsaPkcs11`, or `MLDsaPkcs11` for post-quantum signatures
 The named curve provides less than the 128-bit security baseline (NIST SP 800-57) — this covers
 P-192, P-224, secp192k1, secp224k1, and the Brainpool 160/192/224-bit curves. Use `NistP256`,
 `BrainpoolP256r1`, or stronger.
+
+<a id="KLPKCS11008"></a>
+### KLPKCS11008 — RSA encryption without OAEP
+
+Reported by an analyzer rather than `[Obsolete]`, because the insecure choice here is a *value*, not
+a symbol: there is nothing to mark obsolete when a consumer writes
+`rsa.Encrypt(data, RSAEncryptionPadding.Pkcs1)` (a BCL padding singleton passed to a BCL override) or
+`new Mechanism(CKM.CKM_RSA_PKCS)`. Both routes select RSAES-PKCS#1 v1.5 or raw RSA, where the
+Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `AllowInsecure`
+gate. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
+
+> **RSA *signatures* are a different story.** RSASSA-PKCS#1 v1.5 with a strong hash
+> (`CKM_SHA256_RSA_PKCS` and friends) is **allowed by default** and is *not* reported: it is
+> FIPS 186-5-approved and required by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing.
+> Only *encryption* and the raw `CKM_RSA_PKCS` / `CKM_RSA_X_509` mechanisms carry the padding-oracle
+> exposure. The mechanism guard is direction-agnostic, so gating v1.5 signatures would also break
+> *verifying* third-party signatures.
+
+## Runtime-only gates
+
+Not every insecure operation has a compile-time signal. `Pkcs11Workspace.AllowInsecure` gates
+mechanisms by value at the point of use, so a mechanism chosen dynamically — say, from configuration
+or a `CKM` variable the analyzer cannot trace — is rejected only when the operation runs, with an
+`InsecureOperationException` naming the mechanism. The compile-time diagnostics above are a
+best-effort early warning layered on top of that gate; the gate, not the diagnostic, is the
+enforcement point.

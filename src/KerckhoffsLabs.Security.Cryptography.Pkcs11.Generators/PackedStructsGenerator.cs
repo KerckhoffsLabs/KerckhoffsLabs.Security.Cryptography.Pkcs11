@@ -34,6 +34,13 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<INamedTypeSymbol> syms)
     {
+        // Nothing to dispatch: this compilation declares no [PackedForPkcs11] structs. Emitting an
+        // empty PackedDispatch anyway would collide (CS0436) with the real one in any assembly that
+        // references the library and also loads this analyzer — e.g. the test project, which runs
+        // the shipped analyzers against itself.
+        if (syms.IsEmpty)
+            return;
+
         // Map each marked type's fully-qualified name to its Windows-sibling type name
         // ("CK_INFO" -> "CK_INFO_Windows"). Used to substitute field types when emitting.
         var packedNames = syms

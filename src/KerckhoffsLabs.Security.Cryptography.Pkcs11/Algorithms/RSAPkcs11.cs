@@ -260,9 +260,13 @@ public sealed class RSAPkcs11 : RSA
     private static Mechanism EncryptMechanismFor(RSAEncryptionPadding padding)
     {
         // CKM_RSA_PKCS is gated by Session.GuardMechanism — Encrypt/Decrypt will throw
-        // InsecureOperationException unless the caller opts in via AllowInsecure.
+        // InsecureOperationException unless the caller opts in via AllowInsecure. This is the
+        // mapper that hands the mechanism to that gate, so KLPKCS11008 (which exists to warn a
+        // *caller* who selects v1.5 padding) fires on the wrong side of the check here.
+#pragma warning disable KLPKCS11008 // the runtime gate below is the enforcement point
         if (padding == RSAEncryptionPadding.Pkcs1)
             return new Mechanism(CKM.CKM_RSA_PKCS);
+#pragma warning restore KLPKCS11008
         if (padding.Mode == RSAEncryptionPaddingMode.Oaep)
             return Pkcs11MechanismMap.RsaOaep(padding.OaepHashAlgorithm);
         throw new NotSupportedException($"Unsupported RSA encryption padding: {padding}.");
