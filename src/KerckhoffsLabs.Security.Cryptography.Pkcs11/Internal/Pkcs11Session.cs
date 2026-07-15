@@ -1555,6 +1555,28 @@ internal sealed class Pkcs11Session : IDisposable
         {
             encryptedData = new byte[(int)encryptedDataLen];
             rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+
+            // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active so the
+            // caller can retry with the reported length. NSS softoken's classic C_Encrypt path
+            // violates this: it terminates the operation, so the retry above comes back
+            // CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, then use a NULL-buffer length
+            // probe — a fresh NSS operation sizes conservatively (input + one block) and would reject
+            // even an exactly-sized buffer — before the final encrypt. Unreachable on spec-compliant
+            // tokens (their retry already returned CKR_OK), so existing backends keep their exact path
+            // and never see the NULL probe the AEAD heuristic above deliberately avoids.
+            if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
+            {
+                rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+                Pkcs11Exception.ThrowIfError(rv, "C_EncryptInit");
+
+                NativeCULong probeLen = (NativeCULong)0;
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, null, ref probeLen);
+                Pkcs11Exception.ThrowIfError(rv, "C_Encrypt");
+
+                encryptedData = new byte[(int)probeLen];
+                encryptedDataLen = probeLen;
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+            }
         }
 
         Pkcs11Exception.ThrowIfError(rv, "C_Encrypt");
@@ -1813,6 +1835,25 @@ internal sealed class Pkcs11Session : IDisposable
         {
             decryptedData = new byte[(int)decryptedDataLen];
             rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, decryptedData, ref decryptedDataLen);
+
+            // See the matching note in Encrypt: NSS softoken's classic C_Decrypt terminates the
+            // operation on CKR_BUFFER_TOO_SMALL instead of leaving it active (PKCS#11 v3.2 §5.2), so
+            // the retry returns CKR_OPERATION_NOT_INITIALIZED. Re-initialize, probe the required length
+            // with a NULL buffer (a fresh NSS operation sizes conservatively), then decrypt once.
+            // Unreachable on spec-compliant tokens.
+            if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
+            {
+                rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+                Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
+
+                NativeCULong probeLen = (NativeCULong)0;
+                rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, null, ref probeLen);
+                Pkcs11Exception.ThrowIfError(rv, "C_Decrypt");
+
+                decryptedData = new byte[(int)probeLen];
+                decryptedDataLen = probeLen;
+                rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, decryptedData, ref decryptedDataLen);
+            }
         }
 
         Pkcs11Exception.ThrowIfError(rv, "C_Decrypt");

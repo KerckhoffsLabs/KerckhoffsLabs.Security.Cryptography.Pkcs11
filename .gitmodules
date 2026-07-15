@@ -7,3 +7,6 @@
 [submodule "vendor/opencryptoki"]
 	path = vendor/opencryptoki
 	url = https://github.com/opencryptoki/opencryptoki
+[submodule "vendor/nss"]
+	path = vendor/nss
+	url = https://github.com/mozilla/nss.git

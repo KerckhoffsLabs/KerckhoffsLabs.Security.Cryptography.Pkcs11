@@ -43,7 +43,10 @@ public sealed class CkmAesGcmParams : MechanismParameters
             Iv = _iv,
             IvLen = (NativeCULong)iv.Length,
             // Legacy field; PKCS#11 v3.2 §2.5.13 allows 0 and the IV length is taken from IvLen.
-            // Some tokens reject a non-zero value, so leave it 0 for maximum interoperability.
+            // Some tokens reject a non-zero value (SoftHSM's AES-GCM KAT fails when it is set), so
+            // leave it 0 for maximum interoperability. NSS softoken's classic C_EncryptInit GCM path
+            // conversely rejects 0, so GCM against NSS goes through the message-based AesGcmPkcs11
+            // façade (C_MessageEncrypt), not this classic-params path.
             IvBits = (NativeCULong)0,
             AAD = _aad,
             AADLen = (NativeCULong)aad.Length,
