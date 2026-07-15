@@ -95,6 +95,16 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for KDF cases that read the derived key's value back to compare against the BCL.</summary>
     public static bool ExtractableDeriveAvailable => NssAvailable && SupportsExtractableDerive;
 
+    /// <summary>True when <see cref="CKM.CKM_RC2_ECB"/> accepts the spec's <c>CK_RC2_PARAMS</c> (a bare
+    /// effective-bits value). NSS softoken routes RC2-ECB and RC2-CBC through one code path that
+    /// size-checks both against <c>CK_RC2_CBC_PARAMS</c>, so it rejects the spec-correct ECB params the
+    /// wrapper sends with <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/>. RC2-CBC (which legitimately uses
+    /// <c>CK_RC2_CBC_PARAMS</c>) works and is exercised; sending CBC params for ECB would be spec-wrong.</summary>
+    public static bool SupportsRc2Ecb => false;
+
+    /// <summary>Gate for the RC2-ECB round-trip case.</summary>
+    public static bool Rc2EcbAvailable => NssAvailable && SupportsRc2Ecb;
+
     public NssBackendFixture()
     {
         string? libPath = Settings.NssLibraryPath ?? BuiltLibraryPath();

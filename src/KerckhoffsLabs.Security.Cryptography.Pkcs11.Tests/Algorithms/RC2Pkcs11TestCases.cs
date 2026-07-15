@@ -48,7 +48,7 @@ internal static class RC2Pkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"rc2-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
-            .Label(label).Value(Key128).Encrypt().Decrypt().OnToken().Build();
+            .Label(label).Value(Key128).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -71,7 +71,7 @@ internal static class RC2Pkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"nonrc2-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).ValueLen(16).Encrypt().Decrypt().OnToken().Build())
+            .Label(label).ValueLen(16).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
