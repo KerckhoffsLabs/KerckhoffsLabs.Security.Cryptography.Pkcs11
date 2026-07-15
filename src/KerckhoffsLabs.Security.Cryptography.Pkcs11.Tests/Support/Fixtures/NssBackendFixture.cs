@@ -105,6 +105,18 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>Gate for the RC2-ECB round-trip case.</summary>
     public static bool Rc2EcbAvailable => NssAvailable && SupportsRc2Ecb;
 
+    /// <summary>True when RSA PKCS#1 v1.5 <em>encryption</em> works through the buffer-growing path.
+    /// NSS softoken's <c>RSA_EncryptBlock</c> returns a hard failure (mapped to
+    /// <see cref="CKR.CKR_DEVICE_ERROR"/>) when the output buffer is smaller than the modulus, instead
+    /// of <see cref="CKR.CKR_BUFFER_TOO_SMALL"/>, so the wrapper's grow-on-buffer-too-small sizing
+    /// cannot drive it. RSA-OAEP encryption (length-checked differently by softoken) and every RSA
+    /// sign/verify operation work; PKCS#1 v1.5 encryption is insecure (Bleichenbacher) and gated
+    /// behind AllowInsecure anyway.</summary>
+    public static bool SupportsRsaPkcs1Encrypt => false;
+
+    /// <summary>Gate for the RSA PKCS#1 v1.5 encryption round-trip case.</summary>
+    public static bool RsaPkcs1EncryptAvailable => NssAvailable && SupportsRsaPkcs1Encrypt;
+
     public NssBackendFixture()
     {
         string? libPath = Settings.NssLibraryPath ?? BuiltLibraryPath();

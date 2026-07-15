@@ -48,7 +48,7 @@ internal static class TripleDESPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"des3-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_DES3)
-            .Label(label).Value(Key192).Encrypt().Decrypt().OnToken().Build();
+            .Label(label).Value(Key192).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -84,7 +84,7 @@ internal static class TripleDESPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"nondes3-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).ValueLen(32).Sign().OnToken().Build())
+            .Label(label).ValueLen(32).Sign().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }

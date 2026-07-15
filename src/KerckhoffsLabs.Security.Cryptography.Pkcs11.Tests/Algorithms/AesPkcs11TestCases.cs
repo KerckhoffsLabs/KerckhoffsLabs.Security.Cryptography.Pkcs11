@@ -48,7 +48,7 @@ internal static class AesPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"aes-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).Value(Key256).Encrypt().Decrypt().OnToken().Build();
+            .Label(label).Value(Key256).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -70,7 +70,7 @@ internal static class AesPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"nonaes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).ValueLen(32).Sign().OnToken().Build())
+            .Label(label).ValueLen(32).Sign().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
@@ -173,7 +173,7 @@ internal static class AesPkcs11TestCases
         byte[] raw = new byte[keyBytes];
         RandomNumberGenerator.Fill(raw);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).Value(raw).Encrypt().Decrypt().OnToken().Build();
+            .Label(label).Value(raw).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);

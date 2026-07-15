@@ -50,7 +50,7 @@ internal static class AesGcmPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"gcm-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
+            .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
@@ -72,7 +72,7 @@ internal static class AesGcmPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"gcm-kat-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken().Build();
+            .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -89,7 +89,7 @@ internal static class AesGcmPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"gcm-nonaes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).ValueLen(32).Sign().OnToken().Build())
+            .Label(label).ValueLen(32).Sign().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
