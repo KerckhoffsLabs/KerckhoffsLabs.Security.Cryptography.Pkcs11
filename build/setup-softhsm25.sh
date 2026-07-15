@@ -31,7 +31,7 @@ trap 'rm -rf "${WORK}"' EXIT
 #   $2 = filename regex anchoring the version (e.g. softhsm2_2\.5\.0)
 resolve_deb() {
   local subdir="$1" regex="$2" name
-  name="$(curl -fsSL "${POOL}/${subdir}/" \
+  name="$(curl --proto '=https' --tlsv1.2 -fsSL "${POOL}/${subdir}/" \
     | grep -oE "${regex}[^\"']*_amd64\.deb" \
     | sort -V | tail -1)"
   if [[ -z "${name}" ]]; then
@@ -44,7 +44,7 @@ resolve_deb() {
 fetch_extract() {
   local subdir="$1" name="$2"
   echo "fetching ${name}" >&2
-  curl -fsSL -o "${WORK}/${name}" "${POOL}/${subdir}/${name}"
+  curl --proto '=https' --tlsv1.2 -fsSL -o "${WORK}/${name}" "${POOL}/${subdir}/${name}"
   dpkg-deb -x "${WORK}/${name}" "${WORK}/root"
 }
 

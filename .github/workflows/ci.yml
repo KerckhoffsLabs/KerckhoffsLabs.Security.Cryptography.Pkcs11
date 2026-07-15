@@ -433,7 +433,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libnspr4-dev patchelf clang
-          python3 -m pip install --user gyp-next
+          # Pin the pip dependency to a resolved version (unpinned installs are non-reproducible).
+          python3 -m pip install --user 'gyp-next==0.22.2'
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: NSS submodule revision
