@@ -14,13 +14,11 @@ internal struct CK_VERSION
     /// <summary>Minor version number (hundredths portion).</summary>
     public byte Minor;
 
+    // Spec-wise the minor is the "hundredths" portion, so 1-99 are zero-padded (3.05) and 0 is a whole
+    // version (3.0). D2 is a *minimum* width, so a module that exceeds 99 (e.g. NSS softoken's 3.125)
+    // falls through the same format as a plain integer — a loadable module's version still parses.
     public override readonly string ToString()
-    {
-        if (Minor == 0x00) return string.Format("{0}.{1}", Major, Minor);
-        if (Minor <= 0x63) return string.Format("{0}.{1:D2}", Major, Minor);
-        // The spec models Minor as the "hundredths" portion (0-99), but real modules exceed it: NSS
-        // softoken reports its own minor (e.g. 3.125). Render such a value as a plain integer rather
-        // than a sentinel string, so a loadable module's version still parses as "major.minor".
-        return string.Format("{0}.{1}", Major, Minor);
-    }
+        => Minor == 0
+            ? string.Format("{0}.0", Major)
+            : string.Format("{0}.{1:D2}", Major, Minor);
 }
