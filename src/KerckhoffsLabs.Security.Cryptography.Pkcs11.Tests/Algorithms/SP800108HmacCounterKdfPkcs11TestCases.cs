@@ -26,7 +26,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     private static readonly byte[] Context = Encoding.UTF8.GetBytes("kdf-context");
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {

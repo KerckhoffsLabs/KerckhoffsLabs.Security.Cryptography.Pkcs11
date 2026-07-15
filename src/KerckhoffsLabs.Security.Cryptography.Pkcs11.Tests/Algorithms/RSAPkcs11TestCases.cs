@@ -24,7 +24,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 internal static class RSAPkcs11TestCases
 {
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void Require(IPkcs11Backend backend, params CKM[] mechanisms)
     {

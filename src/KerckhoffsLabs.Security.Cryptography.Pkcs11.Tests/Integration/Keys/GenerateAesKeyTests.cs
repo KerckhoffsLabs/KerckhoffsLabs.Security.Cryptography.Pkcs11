@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 internal static class GenerateAesKeyTestCases
 {
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     internal static void Assert_RejectsWrongBitLength(IPkcs11Backend backend)
     {

@@ -28,7 +28,7 @@ internal static class ECDsaPkcs11TestCases
     };
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static Pkcs11Key GenerateEcKey(Pkcs11Workspace workspace, byte[] ecOid)
     {

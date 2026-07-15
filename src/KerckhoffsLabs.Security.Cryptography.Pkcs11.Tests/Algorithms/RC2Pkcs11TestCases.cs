@@ -26,7 +26,7 @@ internal static class RC2Pkcs11TestCases
     private const int EffectiveBits = 128;
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {

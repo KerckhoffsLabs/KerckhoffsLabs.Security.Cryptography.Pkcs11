@@ -19,7 +19,7 @@ internal static class SHA3_256Pkcs11TestCases
         "3A985DA74FE225B2045C172D6BD390BD855F086E3E9D525B46BFE24511431532");
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void Require(IPkcs11Backend backend)
     {

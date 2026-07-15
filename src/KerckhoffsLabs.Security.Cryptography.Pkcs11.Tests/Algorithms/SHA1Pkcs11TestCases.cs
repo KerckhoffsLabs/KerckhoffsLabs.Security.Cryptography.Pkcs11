@@ -23,7 +23,7 @@ internal static class SHA1Pkcs11TestCases
     private static readonly byte[] KnownDigest = Convert.FromHexString("A9993E364706816ABA3E25717850C26C9CD0D89D");
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     internal static void Assert_ComputeHash_GatedByDefault_Throws(IPkcs11Backend backend)
     {

@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 internal static class SpecVersionGateTestSupport
 {
     internal static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     /// <summary>AES-GCM round-trip + tamper rejection through <see cref="AesGcmPkcs11"/>.</summary>
     internal static void AssertAesGcmRoundTrips(Pkcs11Workspace workspace)

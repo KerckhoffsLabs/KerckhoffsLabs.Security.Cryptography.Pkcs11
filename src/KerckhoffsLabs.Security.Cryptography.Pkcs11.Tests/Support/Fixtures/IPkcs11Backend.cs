@@ -35,6 +35,22 @@ public interface IPkcs11Backend
     /// <summary>True if the token advertises <paramref name="mechanism"/>.</summary>
     bool Supports(CKM mechanism);
 
+    /// <summary>True when the fixture's token requires a normal-user <c>C_Login</c> before
+    /// private/session crypto — the usual case. A login-not-required token (NSS softoken's public
+    /// crypto services, whose token has <c>CKF_LOGIN_REQUIRED</c> clear and rejects <c>C_Login</c>
+    /// with <see cref="CKR.CKR_USER_TYPE_INVALID"/>) sets this <see langword="false"/>, so the shared
+    /// helpers open without logging in. Centralizing the toggle here lets backend-agnostic test cases
+    /// run unchanged against both auth models.</summary>
+    bool RequiresUserLogin => true;
+
+    /// <summary>Opens a workspace over the fixture's token using the backend's authentication model:
+    /// a normal-user login when <see cref="RequiresUserLogin"/> is set, otherwise no login. Shared,
+    /// backend-agnostic test cases call this instead of hard-coding the login path.</summary>
+    Pkcs11Workspace OpenWorkspace() =>
+        RequiresUserLogin
+            ? Library.OpenWorkspace(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span))
+            : Library.OpenWorkspaceWithoutLogin(TokenLabel);
+
     /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the
     /// advertised <see cref="CKM.CKM_ML_DSA"/>; SoftHSM overrides this with a build marker because the
     /// real capability depends on the OpenSSL it was built against, not just the mechanism list.</summary>

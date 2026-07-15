@@ -32,7 +32,7 @@ internal static class HMACPkcs11TestCases
     };
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void Require(IPkcs11Backend backend, CKM mechanism)
     {

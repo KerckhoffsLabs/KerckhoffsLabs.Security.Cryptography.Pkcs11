@@ -24,7 +24,7 @@ internal static class AesPkcs11TestCases
         Convert.FromHexString("0F0E0D0C0B0A09080706050403020100");
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void Require(IPkcs11Backend backend, CKM mechanism)
     {

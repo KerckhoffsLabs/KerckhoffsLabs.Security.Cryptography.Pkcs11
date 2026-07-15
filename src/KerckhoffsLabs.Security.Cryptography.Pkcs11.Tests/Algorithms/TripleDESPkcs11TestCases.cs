@@ -28,7 +28,7 @@ internal static class TripleDESPkcs11TestCases
     private static readonly byte[] Iv8 = Convert.FromHexString("1020304050607080");
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.Library.OpenWorkspace(backend.TokenLabel, CKU.CKU_USER, new SecurePin(backend.UserPin.Span));
+        backend.OpenWorkspace();
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {

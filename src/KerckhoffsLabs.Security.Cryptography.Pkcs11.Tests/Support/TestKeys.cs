@@ -128,16 +128,28 @@ internal static class TestKeys
     }
 
     /// <summary>
-    /// Opens a R/W session on the backend's slot, logs in as USER, returns it. Caller disposes.
+    /// Opens a R/W session on the backend's slot, authenticated per the backend's model (a normal-user
+    /// login on most backends; no login on a login-not-required token). Caller disposes.
     /// </summary>
     public static Pkcs11Session OpenLoggedInSession(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
         var session = slot.OpenSession();
-        using var pin = new SecurePin(backend.UserPin.Span);
-        session.Login(CKU.CKU_USER, pin);
-        return session;
+        try
+        {
+            if (backend.RequiresUserLogin)
+            {
+                using var pin = new SecurePin(backend.UserPin.Span);
+                session.Login(CKU.CKU_USER, pin);
+            }
+            return session;
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
