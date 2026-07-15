@@ -41,7 +41,8 @@ public sealed class SlotInfoTests
     [InlineData(3, 0, "3.0")]      // minor 0 -> "M.0"
     [InlineData(3, 7, "3.07")]     // 1..99 -> zero-padded hundredths
     [InlineData(3, 99, "3.99")]    // upper bound of the hundredths range
-    [InlineData(3, 200, "Invalid version")] // > 99 (0x63) -> invalid
+    [InlineData(3, 125, "3.125")]  // > 99: a real module (NSS softoken) exceeds the hundredths range
+    [InlineData(3, 200, "3.200")]  // rendered as a plain minor rather than a sentinel string
     public void Version_RendersPerCkVersionRules(byte major, byte minor, string expected)
     {
         var native = new CK_SLOT_INFO { HardwareVersion = new CK_VERSION { Major = major, Minor = minor } };
