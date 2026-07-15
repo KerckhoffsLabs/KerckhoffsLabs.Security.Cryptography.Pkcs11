@@ -56,6 +56,20 @@ public static class Settings
     public static string OpenCryptokiSoPin =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_OPENCRYPTOKI_SO_PIN") ?? "87654321";
 
+    /// <summary>
+    /// Optional path to a Mozilla NSS softoken PKCS#11 library (<c>libsoftokn3.so</c>) — a third, fully
+    /// independent real backend. Tests skip when this resolves to null. NSS softoken exposes a public
+    /// "NSS Generic Crypto Services" token that needs no config, database, or PIN, so the fixture opens
+    /// it without a login; only session (public) objects are reachable, which suffices for stateless
+    /// crypto and session-lifetime keys.
+    /// </summary>
+    public static string? NssLibraryPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_NSS_LIBRARY");
+
+    /// <summary>Token label of NSS softoken's login-not-required crypto services token.</summary>
+    public static string NssTokenLabel =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_NSS_TOKEN") ?? "NSS Generic Crypto Services";
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;

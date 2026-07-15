@@ -72,7 +72,7 @@ internal static class WrapUnwrapKeyTestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }
@@ -108,7 +108,7 @@ internal static class WrapUnwrapKeyTestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }

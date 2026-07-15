@@ -40,7 +40,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // HMAC-SHA256, RFC 4231 test case 6 (131-byte key, larger than the block size).
@@ -62,7 +62,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // Ed25519, RFC 8032 test 3 (2-byte message 0xaf82). Signature is deterministic, so the KAT
@@ -98,7 +98,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // ChaCha20-Poly1305, RFC 8439 section 2.8.2. SoftHSM does not implement this mechanism, so the
@@ -127,7 +127,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // HMAC-SHA384, RFC 4231 test case 6 (131-byte key, larger than the block size).
@@ -165,7 +165,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // AES Key Wrap, RFC 3394 section 4.6 (256-bit KEK wrapping 256 bits of key data). CKM_AES_KEY_WRAP
@@ -188,7 +188,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(target); session.DestroyObject(wrappingKey); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // RSA-OAEP (SHA-1 / MGF1-SHA1) decrypt KAT: a fixed ciphertext produced for a fixed 2048-bit key
@@ -212,7 +212,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(priv); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // RSA-PSS (SHA-256 / MGF1-SHA256, salt = 32) verify KAT: the token must accept a fixed published
@@ -241,7 +241,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(pub); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // ECDSA P-256 verify KAT over a fixed hash. CKM_ECDSA takes the raw signature as r‖s (P1363, no DER),
@@ -270,7 +270,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(pub); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // ECDH P-256 derive KAT (CKD_NULL → raw shared secret Z). Pins the CK_ECDH1_DERIVE_PARAMS peer-point
@@ -313,7 +313,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(priv); }
         }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.CloseSession(); }
     }
 
     // Fixed 2048-bit RSA key (BCL-generated) shared by the RSA-OAEP and RSA-PSS KATs.

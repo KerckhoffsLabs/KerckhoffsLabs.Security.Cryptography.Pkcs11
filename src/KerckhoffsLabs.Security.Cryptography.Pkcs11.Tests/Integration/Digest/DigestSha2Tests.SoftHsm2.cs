@@ -29,7 +29,7 @@ internal static class DigestSha2TestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }
@@ -45,7 +45,7 @@ internal static class DigestSha2TestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }
@@ -61,7 +61,7 @@ internal static class DigestSha2TestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }

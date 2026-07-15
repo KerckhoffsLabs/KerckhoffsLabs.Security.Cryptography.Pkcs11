@@ -35,7 +35,7 @@ internal static class SignEdDsaTestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }
@@ -65,7 +65,7 @@ internal static class SignEdDsaTestCases
         }
         finally
         {
-            session.Logout();
+            TestKeys.LogoutIfRequired(backend, session);
             session.CloseSession();
         }
     }

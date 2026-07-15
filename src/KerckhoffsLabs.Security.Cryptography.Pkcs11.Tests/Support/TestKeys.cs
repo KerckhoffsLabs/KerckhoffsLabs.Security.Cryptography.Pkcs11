@@ -153,6 +153,18 @@ internal static class TestKeys
     }
 
     /// <summary>
+    /// Logs the session out, but only when the backend authenticates with a login. A
+    /// login-not-required token (NSS softoken's public crypto services) was never logged in, so
+    /// <c>C_Logout</c> would return <c>CKR_USER_NOT_LOGGED_IN</c>; this no-ops there. Lets the shared
+    /// test cases tear down uniformly across both auth models.
+    /// </summary>
+    public static void LogoutIfRequired(IPkcs11Backend backend, Pkcs11Session session)
+    {
+        if (backend.RequiresUserLogin)
+            session.Logout();
+    }
+
+    /// <summary>
     /// Generates an RSA-2048 key pair as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
