@@ -293,6 +293,43 @@ jobs:
             echo "PKCS11_TEST_OPENCRYPTOKI_TOKEN=kl-octk"
           } >> "$GITHUB_ENV"
 
+      # Third independent real backend (ubuntu-latest only): Mozilla NSS softoken, built from the
+      # pinned vendor/nss submodule (NSS_3_125_RTM). NSS is an unrelated crypto stack (freebl, not
+      # OpenSSL) with a login-free generic token — no daemon or PIN — and it uniquely implements
+      # ChaCha20-Poly1305 and the SP800-108 KDF, which neither SoftHSM nor opencryptoki does.
+      - name: NSS submodule revision
+        if: matrix.os == 'ubuntu-latest'
+        id: nssrev
+        run: echo "sha=$(git -C vendor/nss rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache NSS softoken
+        if: matrix.os == 'ubuntu-latest'
+        id: nss-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nss
+          key: nss-${{ steps.nssrev.outputs.sha }}-${{ hashFiles('build/build-nss.sh') }}-v1
+
+      # build.sh drives gyp + ninja against the distro NSPR (--system-nspr); patchelf bakes an
+      # $ORIGIN runpath so the module finds its NSS siblings. The heavy build toolchain is installed
+      # only on a cache miss; the runtime NSPR (libnspr4) is ensured either way so the cached module
+      # still loads.
+      - name: Build NSS softoken
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          set -euxo pipefail
+          sudo apt-get install -y libnspr4
+          NSSDIR="$RUNNER_TEMP/nss/runtimes/linux-x64/native/nss"
+          if [ ! -f "$NSSDIR/libsoftokn3.so" ]; then
+            sudo apt-get install -y ninja-build libnspr4-dev patchelf clang
+            python3 -m pip install --user 'gyp-next==0.22.2'
+            PATH="$HOME/.local/bin:$PATH" bash build/build-nss.sh "$RUNNER_TEMP/nss"
+          fi
+          {
+            echo "PKCS11_TEST_NSS_LIBRARY=$NSSDIR/libsoftokn3.so"
+            echo "PKCS11_TEST_NSS_DIR=$NSSDIR"
+          } >> "$GITHUB_ENV"
+
       # All legs (Linux x64+arm64, macOS, Windows x64+x86+arm64) build both backends (pkcs11-mock +
       # SoftHSM2), so the SoftHSM-gated [ConditionalFact] tests run everywhere and the
       # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
@@ -307,16 +344,20 @@ jobs:
       # STDLL (each built against OpenSSL 3.5) resolve against the system OpenSSL 3.0 and fail to load.
       # PKCS11_TEST_OPENCRYPTOKI_* survive (they are not security-sensitive). The opencryptoki-gated
       # tests run alongside the SoftHSM and mock suites in a single pass.
-      - name: Test (incl. opencryptoki)
+      - name: Test (incl. opencryptoki + NSS)
         if: matrix.os == 'ubuntu-latest'
         env:
-          # Declares that THIS leg must have a working opencryptoki: the availability guard
-          # test fails the job when the backend is missing, instead of letting every
-          # opencryptoki-gated ConditionalFact skip silently while CI stays green. Set on the
-          # test step (not by the provisioning script) so a provisioning regression that
-          # stops exporting PKCS11_TEST_OPENCRYPTOKI_LIBRARY is caught rather than masked.
+          # Declares that THIS leg must have a working opencryptoki / NSS: the availability guard
+          # tests fail the job when a backend is missing, instead of letting every backend-gated
+          # ConditionalFact skip silently while CI stays green. Set on the test step (not by the
+          # provisioning scripts) so a regression that stops exporting a backend library is caught
+          # rather than masked.
           PKCS11_TEST_EXPECT_OPENCRYPTOKI: '1'
-        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64 dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
+          PKCS11_TEST_EXPECT_NSS: '1'
+        # NSS's libsoftokn3 carries an $ORIGIN runpath for its own siblings; its dir is also added to
+        # LD_LIBRARY_PATH (belt-and-suspenders under sg's stripped environment). PKCS11_TEST_NSS_* come
+        # from $GITHUB_ENV set by the NSS build step above.
+        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
 
   # Native-AOT smoke test (linux-x64): publishes tests/AotSmoke — a standalone app that
   # references only the main library (not the test project) — with PublishAot, then runs the
@@ -404,75 +445,3 @@ jobs:
           LD_LIBRARY_PATH: ${{ steps.stage.outputs.native }}
           PKCS11_TEST_EXPECT_SOFTHSM_V240: '1'
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --filter "FullyQualifiedName~SoftHsm" --logger "console;verbosity=normal"
-
-  # Third real backend: Mozilla NSS softoken, built from source from the pinned vendor/nss submodule
-  # (NSS_3_125_RTM) against the distro NSPR. NSS is an unrelated crypto stack (freebl, not OpenSSL),
-  # so it cross-checks the wrapper against a second, independent implementation. Its generic crypto
-  # token needs no login, so the suite runs without a PIN.
-  nss:
-    name: Mozilla NSS softoken
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      # Only vendor/nss is needed; init just that submodule (shallow) instead of pulling them all.
-      - name: Check out vendor/nss
-        run: git submodule update --init --depth 1 vendor/nss
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
-        with:
-          dotnet-version: '10.0.x'
-
-      # build.sh drives gyp + ninja; --system-nspr uses libnspr4-dev; patchelf bakes an $ORIGIN runpath
-      # onto the staged module so it finds its NSS siblings without LD_LIBRARY_PATH.
-      - name: Install NSS build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libnspr4-dev patchelf clang
-          # Pin the pip dependency to a resolved version (unpinned installs are non-reproducible).
-          python3 -m pip install --user 'gyp-next==0.22.2'
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: NSS submodule revision
-        id: nssrev
-        run: echo "sha=$(git -C vendor/nss rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache NSS softoken
-        id: nss-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/nss
-          key: nss-${{ steps.nssrev.outputs.sha }}-${{ hashFiles('build/build-nss.sh') }}-v1
-
-      - name: Build NSS softoken
-        if: steps.nss-cache.outputs.cache-hit != 'true'
-        run: bash build/build-nss.sh "$RUNNER_TEMP/nss"
-
-      - name: Resolve staged NSS library
-        id: nsslib
-        run: echo "native=$RUNNER_TEMP/nss/runtimes/linux-x64/native/nss" >> "$GITHUB_OUTPUT"
-
-      - name: Restore
-        run: dotnet restore src/KerckhoffsLabs.sln
-
-      # The staged softoken is loaded directly, so skip every vendored native build.
-      - name: Build
-        env:
-          SkipPkcs11MockBuild: true
-          SkipSoftHsmV2Build: true
-          SkipPkcs11GateBuild: true
-        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
-
-      # Run the NSS suite plus its availability guard. The mechanism-list gates skip what this NSS
-      # build lacks (e.g. EdDSA on older builds); NssAvailabilityTests fails the leg if the softoken
-      # did not actually build/stage, so a broken build cannot pass as an all-skip green.
-      - name: Test (NSS softoken)
-        env:
-          PKCS11_TEST_NSS_LIBRARY: ${{ steps.nsslib.outputs.native }}/libsoftokn3.so
-          LD_LIBRARY_PATH: ${{ steps.nsslib.outputs.native }}
-          PKCS11_TEST_EXPECT_NSS: '1'
-        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --filter "FullyQualifiedName~_Nss|FullyQualifiedName~NssAvailability" --logger "console;verbosity=normal"
