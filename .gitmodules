@@ -1,13 +1,17 @@
 [submodule "vendor/pkcs11-mock"]
 	path = vendor/pkcs11-mock
 	url = https://github.com/Pkcs11Interop/pkcs11-mock.git
+	ignore = untracked
 [submodule "vendor/softhsmv2"]
 	path = vendor/softhsmv2
 	url = https://github.com/softhsm/SoftHSMv2
+	ignore = untracked
 [submodule "vendor/opencryptoki"]
 	path = vendor/opencryptoki
 	url = https://github.com/opencryptoki/opencryptoki
+	ignore = untracked
 [submodule "vendor/nss"]
 	path = vendor/nss
 	url = https://github.com/mozilla/nss.git
 	shallow = true
+	ignore = untracked

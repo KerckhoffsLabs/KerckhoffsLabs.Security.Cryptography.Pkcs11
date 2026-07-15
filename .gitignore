@@ -44,9 +44,8 @@ appsettings.Development.local.json
 # Build artifacts of pkcs11-mock (added in Phase 0)
 src/**/runtimes/**/native/
 
-# Submodule build trees (kept separate from submodule sources)
-vendor/*/build/
-vendor/*/_cmake_build/
-# NSS's build.sh emits a dist/ tree as a sibling of the submodule (its out/ tree lives inside the
-# submodule and is covered by the submodule's own ignore rules).
+# Build trees created *inside* a submodule (SoftHSM's _at_build/_cmake_build, pkcs11-mock's build/,
+# NSS's out/) are hidden with `ignore = untracked` per-submodule in .gitmodules — a superproject
+# .gitignore cannot reach a submodule's own working tree. Only paths the superproject itself owns
+# belong here: vendor/dist/ is NSS build.sh output emitted as a plain sibling of the submodule.
 vendor/dist/
