@@ -160,7 +160,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
             Pkcs11Key derived = kdf.DeriveKey(Label, Context, template);
             try
             {
-                // The derived sub-key stays on the token: its value must not be readable.
+                // The derived sub-key is sensitive and non-extractable, so its value must not be readable.
                 var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
                 Assert.True(attrs.Count == 0 || attrs[0].CannotBeRead);
             }
