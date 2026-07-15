@@ -404,3 +404,74 @@ jobs:
           LD_LIBRARY_PATH: ${{ steps.stage.outputs.native }}
           PKCS11_TEST_EXPECT_SOFTHSM_V240: '1'
         run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --filter "FullyQualifiedName~SoftHsm" --logger "console;verbosity=normal"
+
+  # Third real backend: Mozilla NSS softoken, built from source from the pinned vendor/nss submodule
+  # (NSS_3_125_RTM) against the distro NSPR. NSS is an unrelated crypto stack (freebl, not OpenSSL),
+  # so it cross-checks the wrapper against a second, independent implementation. Its generic crypto
+  # token needs no login, so the suite runs without a PIN.
+  nss:
+    name: Mozilla NSS softoken
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Only vendor/nss is needed; init just that submodule (shallow) instead of pulling them all.
+      - name: Check out vendor/nss
+        run: git submodule update --init --depth 1 vendor/nss
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # build.sh drives gyp + ninja; --system-nspr uses libnspr4-dev; patchelf bakes an $ORIGIN runpath
+      # onto the staged module so it finds its NSS siblings without LD_LIBRARY_PATH.
+      - name: Install NSS build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libnspr4-dev patchelf clang
+          python3 -m pip install --user gyp-next
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: NSS submodule revision
+        id: nssrev
+        run: echo "sha=$(git -C vendor/nss rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache NSS softoken
+        id: nss-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nss
+          key: nss-${{ steps.nssrev.outputs.sha }}-${{ hashFiles('build/build-nss.sh') }}-v1
+
+      - name: Build NSS softoken
+        if: steps.nss-cache.outputs.cache-hit != 'true'
+        run: bash build/build-nss.sh "$RUNNER_TEMP/nss"
+
+      - name: Resolve staged NSS library
+        id: nsslib
+        run: echo "native=$RUNNER_TEMP/nss/runtimes/linux-x64/native/nss" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore src/KerckhoffsLabs.sln
+
+      # The staged softoken is loaded directly, so skip every vendored native build.
+      - name: Build
+        env:
+          SkipPkcs11MockBuild: true
+          SkipSoftHsmV2Build: true
+          SkipPkcs11GateBuild: true
+        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+
+      # Run the NSS suite plus its availability guard. The mechanism-list gates skip what this NSS
+      # build lacks (e.g. EdDSA on older builds); NssAvailabilityTests fails the leg if the softoken
+      # did not actually build/stage, so a broken build cannot pass as an all-skip green.
+      - name: Test (NSS softoken)
+        env:
+          PKCS11_TEST_NSS_LIBRARY: ${{ steps.nsslib.outputs.native }}/libsoftokn3.so
+          LD_LIBRARY_PATH: ${{ steps.nsslib.outputs.native }}
+          PKCS11_TEST_EXPECT_NSS: '1'
+        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --filter "FullyQualifiedName~_Nss|FullyQualifiedName~NssAvailability" --logger "console;verbosity=normal"

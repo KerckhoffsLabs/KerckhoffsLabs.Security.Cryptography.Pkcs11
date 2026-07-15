@@ -10,3 +10,4 @@
 [submodule "vendor/nss"]
 	path = vendor/nss
 	url = https://github.com/mozilla/nss.git
+	shallow = true
