@@ -75,17 +75,24 @@ fi
 echo "Building NSS softoken for ${RID}..." >&2
 
 # NSS's build.sh drives gyp + ninja. It needs `gyp` on PATH (or GYP set); gyp-next installed via
-# pip provides it. --system-nspr uses the distro NSPR (libnspr4-dev) instead of building NSPR from a
-# sibling ../nspr checkout, and --disable-tests skips the gtest programs we never run.
+# pip provides it. --disable-tests skips the gtest programs we never run.
 export GYP="${GYP:-gyp}"
 if ! command -v "${GYP}" >/dev/null 2>&1; then
   echo "gyp not found (looked for '${GYP}'). Install gyp-next (pip install gyp-next)." >&2
   exit 1
 fi
 
+# NSPR source: by default use the distro NSPR (libnspr4-dev) via --system-nspr. Set NSS_WITH_NSPR to
+# "<include-dir>:<lib-dir>" to build against an NSPR that is not installed system-wide (e.g. headers
+# and libs extracted into a local prefix) without needing root to install the -dev package.
+NSPR_ARGS=(--system-nspr)
+if [[ -n "${NSS_WITH_NSPR:-}" ]]; then
+  NSPR_ARGS=(--with-nspr="${NSS_WITH_NSPR}")
+fi
+
 (
   cd "${SRC_DIR}"
-  ./build.sh --opt --system-nspr --disable-tests
+  ./build.sh --opt "${NSPR_ARGS[@]}" --disable-tests
 ) >&2
 
 # build.sh writes to <nss>/../dist, i.e. vendor/dist.

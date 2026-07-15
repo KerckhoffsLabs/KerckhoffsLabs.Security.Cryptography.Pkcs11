@@ -67,11 +67,21 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// façade, which is covered by the AEAD façade tests.</summary>
     public static bool SupportsClassicAesGcm => false;
 
+    /// <summary>True when EdDSA works the way the shared pure-Ed25519 case drives it (a bare
+    /// <see cref="CKM.CKM_EDDSA"/> with no parameter). NSS 3.125+ advertises <c>CKM_EDDSA</c>, so the
+    /// mechanism-list gate would let the case run, but NSS's softoken requires a <c>CK_EDDSA_PARAMS</c>
+    /// and rejects a bare sign with <see cref="CKR.CKR_ARGUMENTS_BAD"/>; SoftHSM accepts the bare form.
+    /// EdDSA-with-params is a distinct mechanism contract not modelled here, so those cases skip.</summary>
+    public static bool SupportsEdDsa => false;
+
     /// <summary>Gate for cases that need a writable token (persistent keys / token objects).</summary>
     public static bool TokenObjectsAvailable => NssAvailable && SupportsTokenObjects;
 
     /// <summary>Gate for cases that exercise the classic <c>CK_GCM_PARAMS</c> AES-GCM path.</summary>
     public static bool ClassicAesGcmAvailable => NssAvailable && SupportsClassicAesGcm;
+
+    /// <summary>Gate for the shared bare-parameter EdDSA cases.</summary>
+    public static bool EdDsaAvailable => NssAvailable && SupportsEdDsa;
 
     public NssBackendFixture()
     {
