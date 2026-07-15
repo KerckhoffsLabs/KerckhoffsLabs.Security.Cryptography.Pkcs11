@@ -22,7 +22,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 STAGE="$1"
-POOL="http://archive.ubuntu.com/ubuntu/pool"
+POOL="https://archive.ubuntu.com/ubuntu/pool"
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
