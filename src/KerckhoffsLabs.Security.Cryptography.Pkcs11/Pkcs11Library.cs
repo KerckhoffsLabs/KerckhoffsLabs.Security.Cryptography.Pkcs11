@@ -375,11 +375,7 @@ public sealed class Pkcs11Library : IDisposable
         ArgumentNullException.ThrowIfNull(slotLabel);
         ArgumentNullException.ThrowIfNull(pin);
 
-        Pkcs11Slot matched = GetSlotList()
-            .FirstOrDefault(slot => slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
-            ?? throw new ArgumentException(
-                $"No slot found with token label '{slotLabel}'.", nameof(slotLabel));
-
+        Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
         var session = matched.OpenSession();
         try
         {
@@ -392,6 +388,42 @@ public sealed class Pkcs11Library : IDisposable
             throw;
         }
     }
+
+    /// <summary>
+    /// Opens a workspace against the slot whose token label matches <paramref name="slotLabel"/>
+    /// <em>without</em> logging in. For tokens that do not require authentication — the token's
+    /// <c>CKF_LOGIN_REQUIRED</c> flag is clear (e.g. a software token's public crypto services) —
+    /// where a <c>C_Login</c> call would be rejected with <see cref="CKR.CKR_USER_TYPE_INVALID"/>.
+    /// Only public and session objects are reachable, which is sufficient for stateless crypto
+    /// (hashing, and operations on session-lifetime keys).
+    /// </summary>
+    /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing spaces).</param>
+    /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_OpenSession</c> call.</exception>
+    public Pkcs11Workspace OpenWorkspaceWithoutLogin(string slotLabel)
+    {
+        ArgumentNullException.ThrowIfNull(slotLabel);
+
+        Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
+        var session = matched.OpenSession();
+        try
+        {
+            return new Pkcs11Workspace(this, matched, session);
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
+    }
+
+    private Pkcs11Slot MatchSlotByLabel(string slotLabel)
+        => GetSlotList()
+            .FirstOrDefault(slot => slot.GetTokenInfo().Label.TrimEnd() == slotLabel)
+            ?? throw new ArgumentException(
+                $"No slot found with token label '{slotLabel}'.", nameof(slotLabel));
 
     #region IDisposable
 
