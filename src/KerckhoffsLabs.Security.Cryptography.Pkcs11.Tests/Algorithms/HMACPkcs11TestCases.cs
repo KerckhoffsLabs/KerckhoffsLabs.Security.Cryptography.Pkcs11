@@ -57,7 +57,7 @@ internal static class HMACPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"hmac-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).ValueLen(keyLen).Sign().Verify().OnToken().Build())
+            .Label(label).ValueLen(keyLen).Sign().Verify().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
@@ -74,7 +74,7 @@ internal static class HMACPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"hmac-kat-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).Value(rawKey).Sign().Verify().OnToken().Build();
+            .Label(label).Value(rawKey).Sign().Verify().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);

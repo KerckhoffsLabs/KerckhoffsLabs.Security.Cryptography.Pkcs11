@@ -48,7 +48,7 @@ internal static class DESPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"des-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_DES)
-            .Label(label).Value(Key64).Encrypt().Decrypt().OnToken().Build();
+            .Label(label).Value(Key64).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -86,7 +86,7 @@ internal static class DESPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"nondes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).ValueLen(32).Sign().OnToken().Build())
+            .Label(label).ValueLen(32).Sign().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
