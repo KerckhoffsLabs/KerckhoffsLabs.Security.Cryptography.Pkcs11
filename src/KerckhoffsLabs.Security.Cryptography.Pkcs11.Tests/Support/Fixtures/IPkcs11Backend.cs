@@ -35,6 +35,12 @@ public interface IPkcs11Backend
     /// <summary>True if the token advertises <paramref name="mechanism"/>.</summary>
     bool Supports(CKM mechanism);
 
+    /// <summary>True when the backend can persist token objects (<c>CKA_TOKEN = true</c>). Default
+    /// <see langword="true"/>; a write-protected token (NSS softoken's generic crypto services)
+    /// overrides to <see langword="false"/> so shared helpers create session objects, which the same
+    /// crypto exercises identically, instead of hitting <see cref="CKR.CKR_TOKEN_WRITE_PROTECTED"/>.</summary>
+    bool SupportsTokenObjects => true;
+
     /// <summary>True when the fixture's token requires a normal-user <c>C_Login</c> before
     /// private/session crypto — the usual case. A login-not-required token (NSS softoken's public
     /// crypto services, whose token has <c>CKF_LOGIN_REQUIRED</c> clear and rejects <c>C_Login</c>

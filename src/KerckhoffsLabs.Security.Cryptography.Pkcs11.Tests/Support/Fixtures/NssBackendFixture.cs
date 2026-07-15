@@ -54,11 +54,12 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     // wrappers skip the affected cases (ConditionalFact) instead of failing, the same way the
     // mechanism-list gates skip unsupported mechanisms — so the boundary is visible, not hidden.
 
-    /// <summary>True when the backend can persist token objects. NSS's generic crypto token is
-    /// write-protected (<c>C_GenerateKey</c>/<c>C_GenerateKeyPair</c>/<c>C_CreateObject</c> of a token
-    /// object return <see cref="CKR.CKR_TOKEN_WRITE_PROTECTED"/>), so persistent-key and token-object
-    /// cases do not apply — session objects, which every crypto case here uses, still work.</summary>
-    public static bool SupportsTokenObjects => false;
+    /// <summary>NSS's generic crypto token is write-protected (<c>C_GenerateKey</c>/
+    /// <c>C_GenerateKeyPair</c>/<c>C_CreateObject</c> of a token object return
+    /// <see cref="CKR.CKR_TOKEN_WRITE_PROTECTED"/>), so shared helpers create session objects instead;
+    /// the crypto is exercised identically. Cases that specifically require a persistent token object
+    /// skip via <see cref="TokenObjectsAvailable"/>.</summary>
+    public bool SupportsTokenObjects => false;
 
     /// <summary>True when AES-GCM works through the classic <c>C_EncryptInit</c> + <c>CK_GCM_PARAMS</c>
     /// path. NSS softoken rejects that path's spec-legal <c>ulIvBits = 0</c> with
@@ -74,14 +75,25 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// EdDSA-with-params is a distinct mechanism contract not modelled here, so those cases skip.</summary>
     public static bool SupportsEdDsa => false;
 
-    /// <summary>Gate for cases that need a writable token (persistent keys / token objects).</summary>
-    public static bool TokenObjectsAvailable => NssAvailable && SupportsTokenObjects;
+    /// <summary>Gate for cases that specifically need a writable token (persistent keys / token
+    /// objects). Always false: NSS's generic token never persists token objects.</summary>
+    public static bool TokenObjectsAvailable => false;
 
     /// <summary>Gate for cases that exercise the classic <c>CK_GCM_PARAMS</c> AES-GCM path.</summary>
     public static bool ClassicAesGcmAvailable => NssAvailable && SupportsClassicAesGcm;
 
     /// <summary>Gate for the shared bare-parameter EdDSA cases.</summary>
     public static bool EdDsaAvailable => NssAvailable && SupportsEdDsa;
+
+    /// <summary>True when the backend will derive a readable (extractable, non-sensitive) key whose
+    /// value can be read back. NSS softoken refuses with <see cref="CKR.CKR_KEY_FUNCTION_NOT_PERMITTED"/>
+    /// — it only derives non-extractable keys, a deliberate policy against exposing derived key
+    /// material. The byte-returning KDF overloads need a readable derived key and so skip here; the
+    /// on-token non-extractable derive still runs and exercises the KDF operation on NSS.</summary>
+    public static bool SupportsExtractableDerive => false;
+
+    /// <summary>Gate for KDF cases that read the derived key's value back to compare against the BCL.</summary>
+    public static bool ExtractableDeriveAvailable => NssAvailable && SupportsExtractableDerive;
 
     public NssBackendFixture()
     {

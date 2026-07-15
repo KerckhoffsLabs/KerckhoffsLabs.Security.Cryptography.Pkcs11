@@ -50,7 +50,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"kdf-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).Value(KeyBytes).Derive().OnToken().Build();
+            .Label(label).Value(KeyBytes).Derive().Sign().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -66,7 +66,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"kdf-raw-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .Label(label).Value(KeyBytes).Derive().OnToken().Build();
+            .Label(label).Value(KeyBytes).Derive().Sign().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
@@ -82,7 +82,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         byte[] aes = new byte[32];
         RandomNumberGenerator.Fill(aes);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).Value(aes).Derive().OnToken().Build();
+            .Label(label).Value(aes).Derive().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
             using var key = workspace.ImportKey(tpl);
