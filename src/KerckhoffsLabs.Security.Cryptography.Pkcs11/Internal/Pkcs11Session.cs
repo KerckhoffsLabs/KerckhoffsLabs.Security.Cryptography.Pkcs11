@@ -1546,11 +1546,15 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
 
-        // Use input length as the initial output buffer size — avoids a null-probe call
-        // that can cause AEAD tokens to run full tag verification on the probe.
-        // Resize via CKR_BUFFER_TOO_SMALL if the token needs more space (e.g. AEAD tag appended).
-        NativeCULong encryptedDataLen = (NativeCULong)data.Length;
-        byte[] encryptedData = new byte[data.Length];
+        // Size the output for the largest single-block expansion a symmetric mechanism adds — a full
+        // block of PKCS padding (AES block = 16) or a 16-byte AEAD tag — so block and AEAD ciphers
+        // finish in one C_Encrypt without a null-length probe (which makes some AEAD tokens run the
+        // whole operation on the probe). This also sidesteps NSS softoken's broken single-part CBC-PAD
+        // path, whose short-buffer C_Encrypt feeds the input through EncryptUpdate/Final and does not
+        // report the required length. RSA and other output-larger-than-input mechanisms still grow via
+        // the CKR_BUFFER_TOO_SMALL retry below.
+        byte[] encryptedData = new byte[data.Length + 16];
+        NativeCULong encryptedDataLen = (NativeCULong)encryptedData.Length;
         rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
@@ -1558,14 +1562,12 @@ internal sealed class Pkcs11Session : IDisposable
             encryptedData = new byte[(int)encryptedDataLen];
             rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
 
-            // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active so the
-            // caller can retry with the reported length. NSS softoken's classic C_Encrypt path
-            // violates this: it terminates the operation, so the retry above comes back
-            // CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, then use a NULL-buffer length
-            // probe — a fresh NSS operation sizes conservatively (input + one block) and would reject
-            // even an exactly-sized buffer — before the final encrypt. Unreachable on spec-compliant
-            // tokens (their retry already returned CKR_OK), so existing backends keep their exact path
-            // and never see the NULL probe the AEAD heuristic above deliberately avoids.
+            // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
+            // NSS softoken's classic C_Encrypt violates this — it terminates the operation, so the retry
+            // above returns CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, probing the length
+            // with a NULL buffer, then encrypting once. Reachable only for output-larger-than-input
+            // mechanisms (e.g. RSA) that exceed the padded buffer above; unreachable on spec-compliant
+            // tokens, whose retry already returned CKR_OK.
             if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
             {
                 rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
