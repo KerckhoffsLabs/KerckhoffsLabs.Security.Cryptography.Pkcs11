@@ -33,12 +33,3 @@ GitHub supports [markdown](https://docs.github.com/en/get-started/writing-on-git
 ## Contributing code and content
 
 Before submitting a [pull request](https://docs.github.com/en/pull-requests) with a feature or substantial code contribution please discuss it with the project members in the [KerckhoffsLabs.Security.Cryptography.Pkcs11 issue tracker](https://github.com/KerckhoffsLabs/KerckhoffsLabs.Security.Cryptography.Pkcs11/issues). You might also read these two blog posts on contributing code: [Open Source Contribution Etiquette](https://tirania.org/blog/archive/2010/Dec-31.html) by Miguel de Icaza and [Don't "Push" Your Pull Requests](https://www.igvita.com/2011/12/19/dont-push-your-pull-requests/) by Ilya Grigorik. Note that all code submissions will be rigorously reviewed and tested by project members, and only those that maintain the existing coding style and meet both quality and design appropriateness will be merged into the source.
-
-See [Building from source](README.md#building-from-source) for how to clone the repository (it vendors its test backends as git submodules), build, and run the tests. Before opening a pull request, make sure the solution builds warning-free and the tests pass:
-
-```bash
-dotnet build src/KerckhoffsLabs.sln
-dotnet test src/KerckhoffsLabs.sln
-```
-
-Warnings are treated as errors and code style is enforced on build, so a green local build is the same bar CI applies.
