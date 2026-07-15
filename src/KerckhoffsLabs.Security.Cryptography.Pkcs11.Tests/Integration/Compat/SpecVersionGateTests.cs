@@ -1,5 +1,3 @@
-// Licensed under the MIT License
-
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;

@@ -1,5 +1,3 @@
-// Licensed under the MIT License
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 public sealed class SessionIdTests

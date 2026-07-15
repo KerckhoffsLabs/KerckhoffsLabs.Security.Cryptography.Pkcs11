@@ -1,5 +1,3 @@
-// Licensed under the MIT License
-
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;

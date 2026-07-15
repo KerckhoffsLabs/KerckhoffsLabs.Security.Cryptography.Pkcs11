@@ -1,5 +1,3 @@
-// Licensed under the MIT License
-
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using Microsoft.DotNet.XUnitExtensions;
 

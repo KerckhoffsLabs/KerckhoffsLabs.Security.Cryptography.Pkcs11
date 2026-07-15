@@ -1,5 +1,3 @@
-// Licensed under the MIT License
-
 using System.Globalization;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;

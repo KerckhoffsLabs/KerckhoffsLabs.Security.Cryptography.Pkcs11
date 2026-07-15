@@ -1,5 +1,3 @@
-// Licensed under the MIT License
-
 using System.Reflection;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
