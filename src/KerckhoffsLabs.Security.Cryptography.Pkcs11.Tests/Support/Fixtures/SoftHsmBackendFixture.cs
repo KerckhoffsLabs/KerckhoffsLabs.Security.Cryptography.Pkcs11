@@ -46,9 +46,15 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     public bool SupportsSlhDsa => SoftHsmSupportsSlhDsa;
 
     /// <inheritdoc/>
-    // SoftHSM returns CKR_ENCRYPTED_DATA_INVALID for an AEAD tag-verification failure; pin it so the
-    // authenticity tests assert the exact code rather than just "some Pkcs11Exception".
-    public CKR? AeadAuthFailureCode => CKR.CKR_ENCRYPTED_DATA_INVALID;
+    // SoftHSM 2.7 returns CKR_ENCRYPTED_DATA_INVALID for an AEAD tag-verification failure; pin it so
+    // the authenticity tests assert the exact code. SoftHSM 2.5 (the v2.40 leg) instead returns
+    // CKR_GENERAL_ERROR, so there we only assert that the forgery is rejected (some Pkcs11Exception).
+    public CKR? AeadAuthFailureCode => IsV240Leg ? null : CKR.CKR_ENCRYPTED_DATA_INVALID;
+
+    /// <summary>True on the dedicated SoftHSM 2.5 leg (see <c>SoftHsmV240ComplianceTests</c>), which
+    /// loads a v2.40-only module whose exact error codes differ from the modern build's.</summary>
+    private static bool IsV240Leg =>
+        string.Equals(Environment.GetEnvironmentVariable("PKCS11_TEST_EXPECT_SOFTHSM_V240"), "1", StringComparison.Ordinal);
 
     // === SoftHSM 2.7 capability gates ======================================
     // These are static so they can be passed to [ConditionalFact(nameof(...))],

@@ -69,6 +69,7 @@ internal static class KnownAnswerTestCases
     // pins the exact 64 bytes; the round-trip verify also exercises the public-key import path.
     internal static void Assert_Ed25519_Kat(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_EDDSA);
         byte[] seed = H("c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7");
         byte[] point = H("fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025");
         byte[] message = H("af82");

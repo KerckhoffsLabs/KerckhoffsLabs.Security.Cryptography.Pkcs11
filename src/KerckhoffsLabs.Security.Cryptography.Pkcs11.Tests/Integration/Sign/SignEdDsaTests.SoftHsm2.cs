@@ -12,6 +12,7 @@ internal static class SignEdDsaTestCases
 {
     internal static void Assert_Ed25519_RoundTrip(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_EDDSA);
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
@@ -41,6 +42,7 @@ internal static class SignEdDsaTestCases
 
     internal static void Assert_Ed448_RoundTrip(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_EDDSA);
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {

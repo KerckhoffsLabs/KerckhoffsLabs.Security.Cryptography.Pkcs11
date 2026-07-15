@@ -361,3 +361,46 @@ jobs:
           bin="tests/AotSmoke/bin/Release/net10.0/linux-x64/publish/AotSmoke"
           test -x "$bin"
           "$bin" "$RUNNER_TEMP/mock/runtimes/linux-x64/native/pkcs11-mock.so"
+
+  # Real v2.40-only backend: SoftHSM 2.5, which predates the v3.0 C_GetInterface API. This exercises
+  # the wrapper's v2.40 negotiation and single-part fallback paths against a genuine old module — the
+  # authentic counterpart of the synthetic gate-240 shim on the build-and-test legs. 2.5 is staged
+  # from the Ubuntu focal archive (it does not build against modern OpenSSL), so no submodules or
+  # vendored native builds are needed here.
+  softhsm-v240:
+    name: SoftHSM 2.5 (v2.40)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Stage SoftHSM 2.5 (v2.40)
+        id: stage
+        run: echo "native=$(bash build/setup-softhsm25.sh "$RUNNER_TEMP/softhsm25")" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore src/KerckhoffsLabs.sln
+
+      # The staged 2.5 module is used directly, so skip every vendored native build.
+      - name: Build
+        env:
+          SkipPkcs11MockBuild: true
+          SkipSoftHsmV2Build: true
+          SkipPkcs11GateBuild: true
+        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+
+      # Run the SoftHSM suite against the 2.5 module. The mechanism-list gates skip anything 2.5
+      # predates (EdDSA); SoftHsmV240ComplianceTests fails the leg if the module is not actually v2.40.
+      - name: Test (SoftHSM 2.5 / v2.40)
+        env:
+          PKCS11_TEST_SOFTHSM_LIBRARY: ${{ steps.stage.outputs.native }}/libsofthsm2.so
+          LD_LIBRARY_PATH: ${{ steps.stage.outputs.native }}
+          PKCS11_TEST_EXPECT_SOFTHSM_V240: '1'
+        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --filter "FullyQualifiedName~SoftHsm" --logger "console;verbosity=normal"

@@ -8,6 +8,7 @@ internal static class VerifyEdDsaTestCases
 {
     internal static void Assert_Ed25519_RejectsTamperedData(IPkcs11Backend backend)
     {
+        backend.RequireMechanism(CKM.CKM_EDDSA);
         var session = TestKeys.OpenLoggedInSession(backend);
         var (pub, priv) = TestKeys.GenerateEd25519KeyPair(session);
         try
