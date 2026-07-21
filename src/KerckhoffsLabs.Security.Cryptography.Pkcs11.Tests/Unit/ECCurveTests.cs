@@ -25,7 +25,7 @@ public sealed class ECCurveTests
         Assert.Equal("nistP384", curve.FriendlyName);
         Assert.True(curve.IsNamed);
         Assert.False(curve.IsDefault);
-        Assert.Equal(ECCurve.ECCurveType.Named, curve.CurveType);
+        Assert.Equal(BclECCurve.ECCurveType.Named, curve.CurveType);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class ECCurveTests
         ECCurve def = default;
         Assert.True(def.IsDefault);
         Assert.False(def.IsNamed);
-        Assert.Equal(ECCurve.ECCurveType.Implicit, def.CurveType);
+        Assert.Equal(BclECCurve.ECCurveType.Implicit, def.CurveType);
         Assert.Null(def.Oid);
         Assert.Throws<InvalidOperationException>(() => def.GetEcParams());
     }
@@ -232,7 +232,7 @@ public sealed class ECCurveTests
         {
             Assert.Equal(oid, curve.Oid);
             Assert.Equal(name, curve.FriendlyName);
-            Assert.Equal(ECCurve.ECCurveType.Named, curve.CurveType);
+            Assert.Equal(BclECCurve.ECCurveType.Named, curve.CurveType);
             Assert.Equal(curve, ECCurve.CreateFromValue(oid));          // property == factory
             Assert.Equal(curve, ECCurve.FromEcParams(curve.GetEcParams()));  // CKA_EC_PARAMS round-trip
         }

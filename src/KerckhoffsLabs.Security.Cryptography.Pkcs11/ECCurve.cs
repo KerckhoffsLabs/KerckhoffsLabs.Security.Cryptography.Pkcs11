@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Identifies a named elliptic curve by its object identifier (OID), mirroring the shape of the BCL
-/// <see cref="System.Security.Cryptography.ECCurve"/>. A PKCS#11 EC key pair selects its curve through
+/// <see cref="BclECCurve"/>. A PKCS#11 EC key pair selects its curve through
 /// the <c>CKA_EC_PARAMS</c> attribute, which for a named curve is the DER-encoded curve OID — exposed
 /// here via <see cref="GetEcParams"/>.
 /// </summary>
@@ -43,13 +43,13 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
 
     /// <summary>
     /// The category of this curve. Every curve this type can represent is a named curve and reports
-    /// <see cref="ECCurveType.Named"/>; the uninitialized <c>default</c> reports
-    /// <see cref="ECCurveType.Implicit"/>.
+    /// <see cref="BclECCurve.ECCurveType.Named"/>; the uninitialized <c>default</c> reports
+    /// <see cref="BclECCurve.ECCurveType.Implicit"/>.
     /// </summary>
-    public ECCurveType CurveType => Oid is null ? ECCurveType.Implicit : ECCurveType.Named;
+    public BclECCurve.ECCurveType CurveType => Oid is null ? BclECCurve.ECCurveType.Implicit : BclECCurve.ECCurveType.Named;
 
     /// <summary>True when this instance names a curve (the only kind PKCS#11 selects by OID).</summary>
-    public bool IsNamed => CurveType == ECCurveType.Named;
+    public bool IsNamed => CurveType == BclECCurve.ECCurveType.Named;
 
     /// <summary>True for the uninitialized <c>default(ECCurve)</c>, which carries no OID.</summary>
     public bool IsDefault => Oid is null;
@@ -61,7 +61,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
     /// <see cref="Pkcs11Workspace.AllowInsecure"/> is set. An OID outside the catalog reports
     /// <see langword="false"/> — its strength can't be inferred from the OID alone.
     /// </summary>
-    internal bool IsBelowSecurityBaseline => Oid is not null && s_belowBaselineOids.Contains(Oid);
+    internal bool IsBelowSecurityBaseline => Oid is not null && _belowBaselineOids.Contains(Oid);
 
     /// <summary>
     /// Gets the <c>CKA_EC_PARAMS</c> value for this curve: the DER encoding of the curve OID as an
@@ -75,7 +75,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
 
     /// <summary>
     /// Creates a named curve from a dotted-decimal OID value, with an optional friendly name. Mirrors
-    /// <see cref="System.Security.Cryptography.ECCurve.CreateFromValue(string)"/>.
+    /// <see cref="BclECCurve.CreateFromValue(string)"/>.
     /// </summary>
     /// <param name="oidValue">Dotted-decimal OID (e.g. <c>1.3.132.0.10</c>).</param>
     /// <param name="friendlyName">Optional human-readable name; resolved from the known set when omitted.</param>
@@ -89,7 +89,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
 
     /// <summary>
     /// Creates a named curve from an <see cref="System.Security.Cryptography.Oid"/>. Mirrors
-    /// <see cref="System.Security.Cryptography.ECCurve.CreateFromOid(System.Security.Cryptography.Oid)"/>.
+    /// <see cref="BclECCurve.CreateFromOid(System.Security.Cryptography.Oid)"/>.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="curveOid"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="curveOid"/> has no OID value.</exception>
@@ -103,7 +103,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
 
     /// <summary>
     /// Creates a named curve from a friendly name (e.g. <c>nistP256</c>). Mirrors
-    /// <see cref="System.Security.Cryptography.ECCurve.CreateFromFriendlyName(string)"/>; resolves the OID
+    /// <see cref="BclECCurve.CreateFromFriendlyName(string)"/>; resolves the OID
     /// from the known set, falling back to the BCL's name resolution.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="friendlyName"/> is null.</exception>
@@ -111,7 +111,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
     public static ECCurve CreateFromFriendlyName(string friendlyName)
     {
         ArgumentNullException.ThrowIfNull(friendlyName);
-        if (s_oidsByName.TryGetValue(friendlyName, out var oid))
+        if (_oidsByName.TryGetValue(friendlyName, out var oid))
             return new ECCurve(oid, friendlyName);
         return FromECCurve(BclECCurve.CreateFromFriendlyName(friendlyName));
     }
@@ -133,7 +133,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
         }
     }
 
-    /// <summary>Bridges to the BCL <see cref="System.Security.Cryptography.ECCurve"/> (a named curve over the same OID).</summary>
+    /// <summary>Bridges to the BCL <see cref="BclECCurve"/> (a named curve over the same OID).</summary>
     /// <exception cref="InvalidOperationException">The curve is the uninitialized <c>default</c>.</exception>
     public BclECCurve ToECCurve()
     {
@@ -142,7 +142,7 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
         return BclECCurve.CreateFromValue(Oid);
     }
 
-    /// <summary>Creates an <see cref="ECCurve"/> from a named BCL <see cref="System.Security.Cryptography.ECCurve"/>.</summary>
+    /// <summary>Creates an <see cref="ECCurve"/> from a named BCL <see cref="BclECCurve"/>.</summary>
     /// <exception cref="ArgumentException">The curve is not a named curve (has no OID).</exception>
     public static ECCurve FromECCurve(BclECCurve curve)
     {
@@ -165,5 +165,5 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
     /// <inheritdoc/>
     public override string ToString() => FriendlyName is null ? (Oid ?? "<default>") : $"{FriendlyName} ({Oid})";
 
-    private static string? LookupName(string oid) => s_namesByOid.TryGetValue(oid, out var n) ? n : null;
+    private static string? LookupName(string oid) => _namesByOid.TryGetValue(oid, out var n) ? n : null;
 }

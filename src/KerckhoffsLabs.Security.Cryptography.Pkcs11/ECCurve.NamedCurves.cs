@@ -102,7 +102,7 @@ public readonly partial struct ECCurve
         public static ECCurve Sm2 { get; } = CreateFromValue("1.2.156.10197.1.301", "sm2");
     }
 
-    private static readonly Dictionary<string, string> s_namesByOid = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> _namesByOid = new(StringComparer.Ordinal)
     {
         ["1.2.840.10045.3.1.1"] = "nistP192",
         ["1.3.132.0.33"] = "nistP224",
@@ -129,12 +129,12 @@ public readonly partial struct ECCurve
         ["1.2.156.10197.1.301"] = "sm2",
     };
 
-    private static readonly Dictionary<string, string> s_oidsByName =
-        s_namesByOid.ToDictionary(kv => kv.Value, kv => kv.Key, StringComparer.Ordinal);
+    private static readonly Dictionary<string, string> _oidsByName =
+        _namesByOid.ToDictionary(kv => kv.Value, kv => kv.Key, StringComparer.Ordinal);
 
     // Catalog curves providing < 128-bit security (field size < 256-bit): the 160/192/224-bit NIST
     // and Brainpool curves. GenerateEcKeyPair gates these behind AllowInsecure. See IsBelowSecurityBaseline.
-    private static readonly HashSet<string> s_belowBaselineOids = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> _belowBaselineOids = new(StringComparer.Ordinal)
     {
         "1.2.840.10045.3.1.1",   // nistP192        ~96-bit
         "1.3.132.0.33",          // nistP224        ~112-bit
