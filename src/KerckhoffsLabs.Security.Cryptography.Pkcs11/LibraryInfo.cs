@@ -15,7 +15,7 @@ public sealed record LibraryInfo
     public string ManufacturerId { get; }
 
     /// <summary>Bit flags reserved for future versions.</summary>
-    public ulong Flags { get; }
+    public LibraryFlags LibraryFlags { get; }
 
     /// <summary>Description of the library.</summary>
     public string LibraryDescription { get; }
@@ -27,7 +27,7 @@ public sealed record LibraryInfo
     {
         CryptokiVersion = ck_info.CryptokiVersion.ToString();
         ManufacturerId = Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd();
-        Flags = (ulong)ck_info.Flags;
+        LibraryFlags = new LibraryFlags(ck_info.Flags);
         LibraryDescription = Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd();
         LibraryVersion = ck_info.LibraryVersion.ToString();
     }
