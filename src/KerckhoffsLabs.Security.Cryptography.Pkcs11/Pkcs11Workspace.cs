@@ -51,7 +51,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <summary>
     /// When <c>true</c>, operations on this workspace that use mechanisms the library considers
     /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, raw MD5/SHA-1, and the ML-KEM
-    /// extract-and-destroy path) are no longer rejected with <see cref="Exceptions.InsecureOperationException"/>.
+    /// extract-and-destroy path) are no longer rejected with <see cref="InsecureOperationException"/>.
     /// Default is <c>false</c>. Enabling it logs a warning. Prefer <see cref="AllowInsecureScope"/>
     /// to opt in for a single operation rather than latching the flag on for the workspace lifetime.
     /// </summary>
@@ -297,7 +297,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and <see cref="AllowInsecure"/> is false.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
     {
@@ -318,7 +318,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="publicTemplate">Template for the public key half.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="privateTemplate"/>, or <paramref name="publicTemplate"/> is <c>null</c>.</exception>
-    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and <see cref="AllowInsecure"/> is false.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateKey(
         Mechanism mechanism,
@@ -412,7 +412,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The generated RSA key pair.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is not positive.</exception>
-    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and <see cref="AllowInsecure"/> is false.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateRsaKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false)
     {
@@ -455,7 +455,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The generated EC key pair.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="curve"/> is the default (uninitialized) <see cref="ECCurve"/>.</exception>
-    /// <exception cref="Exceptions.InsecureOperationException">The curve provides less than 128-bit
+    /// <exception cref="InsecureOperationException">The curve provides less than 128-bit
     /// security (the 160/192/224-bit NIST and Brainpool curves) and <see cref="AllowInsecure"/> is false.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateEcKeyPair(ECCurve? curve = null, string? label = null, bool persistOnToken = false)
@@ -603,7 +603,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The digest bytes.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="mechanism"/> is a broken digest (e.g. <see cref="CKM.CKM_MD5"/> or <see cref="CKM.CKM_SHA_1"/>) and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is a broken digest (e.g. <see cref="CKM.CKM_MD5"/> or <see cref="CKM.CKM_SHA_1"/>) and <see cref="AllowInsecure"/> is false.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Digest</c> call.</exception>
     public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
