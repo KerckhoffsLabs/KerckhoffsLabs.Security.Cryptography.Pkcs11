@@ -21,7 +21,6 @@ public sealed class Pkcs11Certificate : IDisposable
 {
     private readonly Pkcs11Workspace _workspace;
     private readonly ObjectHandle _handle;
-    private readonly string? _label;
     private readonly byte[] _id;
     private readonly X509Certificate2 _certificate;
     private bool _disposed;
@@ -31,16 +30,16 @@ public sealed class Pkcs11Certificate : IDisposable
     {
         _workspace = workspace;
         _handle = handle;
-        _label = label;
         _id = id ?? [];
         _certificate = certificate;
+        Label = label;
     }
 
     /// <summary>The parsed X.509 certificate (identity + public key). Owned by this instance.</summary>
     public X509Certificate2 Certificate => _certificate;
 
     /// <summary>The object's <c>CKA_LABEL</c>, or <c>null</c> if unset.</summary>
-    public string? Label => _label;
+    public string? Label { get; }
 
     /// <summary>The object's <c>CKA_ID</c> — also the link to the associated key objects. Empty if unset.</summary>
     public ReadOnlySpan<byte> Id => _id;

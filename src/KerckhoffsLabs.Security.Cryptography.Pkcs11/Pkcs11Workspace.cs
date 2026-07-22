@@ -29,23 +29,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </remarks>
 public sealed class Pkcs11Workspace : IDisposable
 {
-    private readonly Pkcs11Library _library;
-    private readonly Pkcs11Slot _slot;
     private readonly Pkcs11Session _session;
     private bool _disposed;
 
     internal Pkcs11Workspace(Pkcs11Library library, Pkcs11Slot slot, Pkcs11Session session)
     {
-        _library = library;
-        _slot = slot;
+        Library = library;
+        Slot = slot;
         _session = session;
     }
 
     /// <summary>The slot this workspace is authenticated against.</summary>
-    public Pkcs11Slot Slot => _slot;
+    public Pkcs11Slot Slot { get; }
 
     /// <summary>The library that hosts this workspace. The workspace does not own the library.</summary>
-    public Pkcs11Library Library => _library;
+    public Pkcs11Library Library { get; }
 
     /// <summary>Internal accessor for the underlying session. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11Session Session => _session;

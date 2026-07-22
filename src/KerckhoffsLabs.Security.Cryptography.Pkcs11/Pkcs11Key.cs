@@ -40,7 +40,6 @@ public sealed class Pkcs11Key : IDisposable
     private readonly ObjectHandle _privateHandle;
     private readonly ObjectHandle _publicHandle;
     private readonly CKK _keyType;
-    private readonly string? _label;
     private readonly byte[] _id;
     private bool _disposed;
 
@@ -64,7 +63,7 @@ public sealed class Pkcs11Key : IDisposable
         _privateHandle = privateHandle;
         _publicHandle = publicHandle;
         _keyType = keyType;
-        _label = label;
+        Label = label;
         _id = id ?? [];
         _ownedLibrary = ownedLibrary;
         _ownsWorkspace = ownsWorkspace;
@@ -74,7 +73,7 @@ public sealed class Pkcs11Key : IDisposable
     public CKK KeyType => _keyType;
 
     /// <summary>The key's CKA_LABEL, or <c>null</c> if not set on the token.</summary>
-    public string? Label => _label;
+    public string? Label { get; }
 
     /// <summary>The key's CKA_ID. Returns an empty span if not set on the token.</summary>
     public ReadOnlySpan<byte> Id => _id;

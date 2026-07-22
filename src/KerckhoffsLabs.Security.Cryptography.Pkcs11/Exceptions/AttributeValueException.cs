@@ -10,12 +10,7 @@ public sealed class AttributeValueException : Exception
     /// <summary>
     /// Attribute whose value could not be read or converted
     /// </summary>
-    private readonly CKA _attribute = CKA.CKA_VENDOR_DEFINED;
-
-    /// <summary>
-    /// Attribute whose value could not be read or converted
-    /// </summary>
-    public CKA Attribute => _attribute;
+    public CKA Attribute { get; } = CKA.CKA_VENDOR_DEFINED;
 
     /// <summary>
     /// Initializes new instance of AttributeValueException class
@@ -24,7 +19,7 @@ public sealed class AttributeValueException : Exception
     public AttributeValueException(CKA attribute)
         : base(string.Format("Value of attribute {0} could not be read", attribute.ToString()))
     {
-        _attribute = attribute;
+        Attribute = attribute;
     }
 
     /// <summary>
@@ -35,7 +30,7 @@ public sealed class AttributeValueException : Exception
     public AttributeValueException(CKA attribute, Exception innerException)
         : base(string.Format("Value of attribute {0} could not be converted", attribute.ToString()), innerException)
     {
-        _attribute = attribute;
+        Attribute = attribute;
     }
 
     /// <summary>

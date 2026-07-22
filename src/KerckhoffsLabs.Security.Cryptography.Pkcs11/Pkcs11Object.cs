@@ -17,8 +17,6 @@ public sealed class Pkcs11Object : IDisposable
 {
     private readonly Pkcs11Workspace _workspace;
     private readonly ObjectHandle _handle;
-    private readonly CKO _objectClass;
-    private readonly string? _label;
     private readonly byte[] _id;
     private bool _disposed;
 
@@ -26,16 +24,16 @@ public sealed class Pkcs11Object : IDisposable
     {
         _workspace = workspace;
         _handle = handle;
-        _objectClass = objectClass;
-        _label = label;
+        ObjectClass = objectClass;
+        Label = label;
         _id = id ?? [];
     }
 
     /// <summary>The object's <c>CKA_CLASS</c> (e.g. <see cref="CKO.CKO_CERTIFICATE"/>, <see cref="CKO.CKO_DATA"/>).</summary>
-    public CKO ObjectClass => _objectClass;
+    public CKO ObjectClass { get; }
 
     /// <summary>The object's <c>CKA_LABEL</c>, or <c>null</c> if unset.</summary>
-    public string? Label => _label;
+    public string? Label { get; }
 
     /// <summary>The object's <c>CKA_ID</c>. Empty if unset.</summary>
     public ReadOnlySpan<byte> Id => _id;
