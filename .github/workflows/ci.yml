@@ -409,7 +409,7 @@ jobs:
   # from the Ubuntu focal archive (it does not build against modern OpenSSL), so no submodules or
   # vendored native builds are needed here.
   softhsm-v240:
-    name: SoftHSM 2.5 (v2.40)
+    name: SoftHSM 2.5 (PKCS11 v2.40)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -439,7 +439,7 @@ jobs:
 
       # Run the SoftHSM suite against the 2.5 module. The mechanism-list gates skip anything 2.5
       # predates (EdDSA); SoftHsmV240ComplianceTests fails the leg if the module is not actually v2.40.
-      - name: Test (SoftHSM 2.5 / v2.40)
+      - name: Test (SoftHSM 2.5 / PKCS11 v2.40)
         env:
           PKCS11_TEST_SOFTHSM_LIBRARY: ${{ steps.stage.outputs.native }}/libsofthsm2.so
           LD_LIBRARY_PATH: ${{ steps.stage.outputs.native }}
