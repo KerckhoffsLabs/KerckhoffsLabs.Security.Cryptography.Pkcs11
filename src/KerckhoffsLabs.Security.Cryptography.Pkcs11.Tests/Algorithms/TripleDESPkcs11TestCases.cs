@@ -25,6 +25,12 @@ internal static class TripleDESPkcs11TestCases
     // rejects keys that degenerate to single/double DES).
     private static readonly byte[] Key192 =
         Convert.FromHexString("0123456789ABCDEF23456789ABCDEF01456789ABCDEF0123");
+
+    // 16-byte two-key (2TDEA) 3DES key: K1 || K2, distinct non-weak subkeys. PKCS#11 models this as
+    // CKK_DES2 (not CKK_DES3 with a short value) — TripleDESPkcs11 accepts either key type.
+    private static readonly byte[] Key128 =
+        Convert.FromHexString("0123456789ABCDEF23456789ABCDEF01");
+
     private static readonly byte[] Iv8 = Convert.FromHexString("1020304050607080");
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
@@ -54,6 +60,41 @@ internal static class TripleDESPkcs11TestCases
             using var key = workspace.ImportKey(tpl);
             using var des3 = new TripleDESPkcs11(key);
             body(workspace, des3);
+        }
+        finally { DestroyByLabel(workspace, label); }
+    }
+
+    // Imports Key128 as a CKK_DES2 (two-key) token key. Some backends advertise CKM_DES3_CBC but
+    // reject the CKK_DES2 key type/length itself — turned into a skip, not a failure, matching
+    // OrSkipIfTokenLacksDes3's tolerance for that class of backend quirk.
+    private static void WithImportedDes2(IPkcs11Backend backend, Action<Pkcs11Workspace, TripleDESPkcs11> body)
+    {
+        if (!backend.Supports(CKM.CKM_DES3_CBC))
+            throw new SkipTestException("Backend does not advertise CKM_DES3_CBC.");
+
+        using var workspace = OpenWorkspace(backend);
+        string label = $"des2-{Guid.NewGuid():N}";
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_DES2)
+            .Label(label).Value(Key128).Encrypt().Decrypt()
+            .OnToken(backend.SupportsTokenObjects).Build();
+        try
+        {
+            Pkcs11Key key;
+            try
+            {
+                key = workspace.ImportKey(tpl);
+            }
+            catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_ATTRIBUTE_VALUE_INVALID
+                or CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_KEY_SIZE_RANGE)
+            {
+                throw new SkipTestException(
+                    "Backend advertises CKM_DES3_CBC but rejects the CKK_DES2 (two-key) key type.");
+            }
+            using (key)
+            {
+                using var des3 = new TripleDESPkcs11(key);
+                body(workspace, des3);
+            }
         }
         finally { DestroyByLabel(workspace, label); }
     }
@@ -181,5 +222,30 @@ internal static class TripleDESPkcs11TestCases
             Assert.Throws<NotSupportedException>(() => des3.CreateDecryptor(new byte[24], new byte[8]));
             Assert.Throws<NotSupportedException>(() => des3.GenerateKey());
             Assert.Throws<NotSupportedException>(() => des3.Key);
+        });
+
+    // === Two-key (CKK_DES2, 128-bit) 3DES ==============================================
+    // No KeySize test here: TripleDESPkcs11.KeySize reads CKA_VALUE_LEN, which a spec-correct token
+    // rejects on C_CreateObject (import) and never derives afterward from CKA_VALUE alone — confirmed
+    // against real SoftHSM2 (CKR_ATTRIBUTE_TYPE_INVALID when supplied, unreadable when omitted). The
+    // 24-byte case's KeySize test only ever passed by coincidence: 192 is also TripleDES's base-class
+    // default.
+
+    // Fixed known-answer vector: two-key (2TDEA) 3DES-CBC, key Key128, plaintext "Now is t" + 8 zero
+    // bytes (two 8-byte blocks, no padding). The BCL's own TripleDES cannot be used as the oracle here —
+    // on OpenSSL-backed .NET, encrypting with a 16-byte (2-key) TripleDES key throws at operation time
+    // ("invalid key length"), even though setting .Key succeeds — so the expected ciphertext is pinned,
+    // computed independently (Python's `cryptography` library, which expands K1||K2 to K1||K2||K1 the
+    // same way PKCS#11 tokens do).
+    internal static void Assert_TwoKeyDes3_EncryptCbc_KnownAnswer_MatchesReferenceVector(IPkcs11Backend backend) =>
+        WithImportedDes2(backend, (workspace, des3) =>
+        {
+            byte[] plaintext = Convert.FromHexString("4E6F7720697320740000000000000000");
+            byte[] expectedCt = Convert.FromHexString("8DC1D44886D99D3004C55BEE813BEC9F");
+            workspace.AllowInsecure = true;
+
+            byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
+            Assert.Equal(expectedCt, ct);
+            Assert.Equal(plaintext, des3.DecryptCbc(expectedCt, Iv8, PaddingMode.None));
         });
 }

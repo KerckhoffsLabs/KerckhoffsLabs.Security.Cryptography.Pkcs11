@@ -41,4 +41,7 @@ public sealed class TripleDESPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void ManagedKeyAndStreamingSurface_NotSupported() => TripleDESPkcs11TestCases.Assert_ManagedKeyAndStreamingSurface_NotSupported(_backend);
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void TwoKeyDes3_EncryptCbc_KnownAnswer_MatchesReferenceVector() => TripleDESPkcs11TestCases.Assert_TwoKeyDes3_EncryptCbc_KnownAnswer_MatchesReferenceVector(_backend);
 }
