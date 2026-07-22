@@ -19,17 +19,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// it against <see cref="Pkcs11Slot.SlotId"/>.
 /// </para>
 /// </remarks>
-public readonly record struct SlotId
+/// <param name="Value">The raw <c>CK_SLOT_ID</c> value as an unsigned 64-bit integer.</param>
+public readonly record struct SlotId(ulong Value)
 {
-    private readonly ulong _value;
-
-    /// <summary>Initializes a slot identifier wrapping the given raw slot number.</summary>
-    /// <param name="value">The raw <c>CK_SLOT_ID</c> value.</param>
-    public SlotId(ulong value) => _value = value;
-
-    /// <summary>The raw <c>CK_SLOT_ID</c> value as an unsigned 64-bit integer.</summary>
-    public ulong Value => _value;
-
     /// <summary>The slot number in decimal, matching how vendor tools display slot ids.</summary>
-    public override string ToString() => _value.ToString(CultureInfo.InvariantCulture);
+    public override string ToString() => Value.ToString(CultureInfo.InvariantCulture);
 }

@@ -25,7 +25,8 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
     public Pkcs11SessionHandle(ILowLevelPkcs11Library library, NativeCULong sessionId)
         : base(IntPtr.Zero, ownsHandle: true)
     {
-        _library = library ?? throw new ArgumentNullException(nameof(library));
+        ArgumentNullException.ThrowIfNull(library);
+        _library = library;
         SetHandle((IntPtr)(ulong)sessionId);
         // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
         // unloads the function table.

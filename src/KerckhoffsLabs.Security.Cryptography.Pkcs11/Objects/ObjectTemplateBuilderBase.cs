@@ -94,7 +94,7 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_built) throw new InvalidOperationException("Builder has already produced an ObjectTemplate. Start a new builder.");
 
-        var list = new List<ObjectAttribute>(_attributes.Values);
+        List<ObjectAttribute> list = [.. _attributes.Values];
         _attributes.Clear(); // ownership transferred to the ObjectTemplate
         _built = true;
         return new ObjectTemplate(list);
