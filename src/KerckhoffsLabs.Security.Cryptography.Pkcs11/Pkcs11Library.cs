@@ -48,13 +48,14 @@ public sealed class Pkcs11Library : IDisposable
         ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
 
     /// <summary>
-    /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>.
-    /// Stays false when another <see cref="Pkcs11Library"/> instance (or a different
-    /// component in the same process) had already initialized the library and we observed
-    /// <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>. <see cref="Dispose()"/> gates
-    /// <c>C_Finalize</c> on this flag so we never tear down another owner's state.
+    /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>, meaning
+    /// this instance owns the matching <c>C_Finalize</c>. Stays false when another
+    /// <see cref="Pkcs11Library"/> instance (or a different component in the same process) had
+    /// already initialized the library and we observed <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>.
+    /// <see cref="Dispose()"/> gates <c>C_Finalize</c> on this flag so we never tear down another
+    /// owner's state.
     /// </summary>
-    private bool _weInitialized = false;
+    private bool _ownsFinalize = false;
 
     /// <summary>
     /// Test seam: access to the underlying low-level wrapper for regression checks on
@@ -170,7 +171,7 @@ public sealed class Pkcs11Library : IDisposable
         CKR rv = LowLevel.C_Initialize(initArgs);
 
         // Another component already initialized the library — treat as success but
-        // leave _weInitialized = false so Dispose doesn't tear down their state.
+        // leave _ownsFinalize = false so Dispose doesn't tear down their state.
         if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
 
         // Token refused OS locking. Retry without — application is single-threaded
@@ -185,7 +186,7 @@ public sealed class Pkcs11Library : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, "C_Initialize");
-        _weInitialized = true;
+        _ownsFinalize = true;
     }
 
     /// <summary>
@@ -257,7 +258,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     /// <returns>The interface descriptors, or an empty list if the module reports none.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">
+    /// <exception cref="Pkcs11Exception">
     /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules, which have no
     /// interface concept.
     /// </exception>
@@ -299,7 +300,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="interfaceName">The interface name to request (e.g. <c>"PKCS 11"</c>), or <c>null</c> for the module's default interface.</param>
     /// <returns>The matching interface descriptor.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">
+    /// <exception cref="Pkcs11Exception">
     /// Thrown with <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 modules (which have no interface
     /// concept), or with the token's error code when the named interface is not available.
     /// </exception>
@@ -431,7 +432,7 @@ public sealed class Pkcs11Library : IDisposable
     /// Releases the library: closes any sessions still tracked against it, calls
     /// <c>C_Finalize</c> (only if this instance drove <c>C_Initialize</c>), and disposes the
     /// underlying low-level wrapper. There is no finalizer — the native module is released by
-    /// <c>Pkcs11ModuleHandle</c>'s critical-finalizer <see cref="System.Runtime.InteropServices.SafeHandle"/>
+    /// <c>Pkcs11ModuleHandle</c>'s critical-finalizer <see cref="SafeHandle"/>
     /// if a caller forgets to dispose.
     /// </summary>
     public void Dispose()
@@ -452,7 +453,7 @@ public sealed class Pkcs11Library : IDisposable
             // Only call C_Finalize if THIS instance drove the C_Initialize to CKR_OK.
             // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
             // responsible for finalization — calling it here would tear down their state.
-            if (_weInitialized)
+            if (_ownsFinalize)
                 _pkcs11Library.C_Finalize(IntPtr.Zero);
 
             Log.UnloadingLibrary(_logger, _libraryPath);

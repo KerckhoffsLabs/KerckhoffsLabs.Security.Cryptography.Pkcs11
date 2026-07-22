@@ -176,10 +176,10 @@ public sealed class ECDsaPkcs11 : ECDsa
         GuardWeakHash(hashAlgorithm);
         return hashAlgorithm.Name switch
         {
-            "SHA1" => System.Security.Cryptography.SHA1.HashData(data),
-            "SHA256" => System.Security.Cryptography.SHA256.HashData(data),
-            "SHA384" => System.Security.Cryptography.SHA384.HashData(data),
-            "SHA512" => System.Security.Cryptography.SHA512.HashData(data),
+            "SHA1" => SHA1.HashData(data),
+            "SHA256" => SHA256.HashData(data),
+            "SHA384" => SHA384.HashData(data),
+            "SHA512" => SHA512.HashData(data),
             _ => throw new NotSupportedException($"ECDSA does not support hash {hashAlgorithm.Name}.")
         };
     }
