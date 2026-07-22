@@ -294,7 +294,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # Third independent real backend (ubuntu-latest only): Mozilla NSS softoken, built from the
-      # pinned vendor/nss submodule (NSS_3_125_RTM). NSS is an unrelated crypto stack (freebl, not
+      # pinned vendor/nss submodule (NSS_3_126_RTM). NSS is an unrelated crypto stack (freebl, not
       # OpenSSL) with a login-free generic token — no daemon or PIN — and it uniquely implements
       # ChaCha20-Poly1305 and the SP800-108 KDF, which neither SoftHSM nor opencryptoki does.
       - name: NSS submodule revision
