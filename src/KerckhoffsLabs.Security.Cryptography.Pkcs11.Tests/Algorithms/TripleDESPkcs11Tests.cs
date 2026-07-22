@@ -4,8 +4,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // Tests for TripleDESPkcs11 are split by backend across sibling files (each a distinct class — they
 // cannot share one partial type because the backends need different xUnit collection fixtures):
-//   TripleDESPkcs11Tests.cs            — this file: backend-free generic/argument tests (always run)
-//   TripleDESPkcs11Tests.SoftHsm2.cs   — TripleDESPkcs11Tests_SoftHsm  (real SoftHSM token)
+//   TripleDESPkcs11Tests.cs             — this file: backend-free generic/argument tests (always run)
+//   TripleDESPkcs11Tests.Managed.cs     — TripleDESPkcs11Tests_Managed     (in-process BCL-backed fake)
+//   TripleDESPkcs11Tests.SoftHsm2.cs    — TripleDESPkcs11Tests_SoftHsm     (real SoftHSM token)
+//   TripleDESPkcs11Tests.OpenCryptoki.cs — TripleDESPkcs11Tests_OpenCryptoki (real opencryptoki token)
+//   TripleDESPkcs11Tests.Nss.cs         — TripleDESPkcs11Tests_Nss         (real NSS softoken)
 
 // TripleDESPkcs11 is [Obsolete] (64-bit block / Sweet32, NIST-deprecated); the secure-defaults gate
 // is the point of the type, so KLPKCS11004 is suppressed deliberately at the use sites.

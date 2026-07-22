@@ -5,8 +5,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // Tests for AesCcmPkcs11 are split by backend across sibling files (each a distinct class — they
 // cannot share one partial type because the backends need different xUnit collection fixtures):
-//   AesCcmPkcs11Tests.cs            — this file: backend-free generic/argument tests (always run)
-//   AesCcmPkcs11Tests.SoftHsm2.cs   — AesCcmPkcs11Tests_SoftHsm  (real SoftHSM token)
+//   AesCcmPkcs11Tests.cs             — this file: backend-free generic/argument tests (always run)
+//   AesCcmPkcs11Tests.Managed.cs     — AesCcmPkcs11Tests_Managed     (in-process BCL-backed fake)
+//   AesCcmPkcs11Tests.SoftHsm2.cs    — AesCcmPkcs11Tests_SoftHsm     (real SoftHSM token)
+//   AesCcmPkcs11Tests.OpenCryptoki.cs — AesCcmPkcs11Tests_OpenCryptoki (real opencryptoki token)
+// (No .Nss.cs — NSS softoken does not implement CKM_AES_CCM.)
 
 /// <summary>
 /// Backend-free tests: argument validation and the static size descriptors, none of which

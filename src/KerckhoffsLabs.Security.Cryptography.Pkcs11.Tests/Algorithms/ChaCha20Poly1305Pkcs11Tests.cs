@@ -4,8 +4,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // Tests for ChaCha20Poly1305Pkcs11 are split by backend across sibling files (each a distinct class —
 // they cannot share one partial type because the backends need different xUnit collection fixtures):
-//   ChaCha20Poly1305Pkcs11Tests.cs            — this file: backend-free generic/argument tests (always run)
-//   ChaCha20Poly1305Pkcs11Tests.SoftHsm2.cs   — ChaCha20Poly1305Pkcs11Tests_SoftHsm  (real SoftHSM token)
+//   ChaCha20Poly1305Pkcs11Tests.cs             — this file: backend-free generic/argument tests (always run)
+//   ChaCha20Poly1305Pkcs11Tests.Managed.cs     — ChaCha20Poly1305Pkcs11Tests_Managed     (in-process BCL-backed fake)
+//   ChaCha20Poly1305Pkcs11Tests.SoftHsm2.cs    — ChaCha20Poly1305Pkcs11Tests_SoftHsm     (real SoftHSM token)
+//   ChaCha20Poly1305Pkcs11Tests.OpenCryptoki.cs — ChaCha20Poly1305Pkcs11Tests_OpenCryptoki (real opencryptoki token)
+//   ChaCha20Poly1305Pkcs11Tests.Nss.cs         — ChaCha20Poly1305Pkcs11Tests_Nss         (real NSS softoken)
 
 /// <summary>
 /// Backend-free tests: ctor null-guard and the static size contracts. The BCL

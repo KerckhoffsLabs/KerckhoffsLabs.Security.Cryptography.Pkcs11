@@ -4,8 +4,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 // Tests for RC2Pkcs11 are split by backend across sibling files (each a distinct class — they
 // cannot share one partial type because the backends need different xUnit collection fixtures):
-//   RC2Pkcs11Tests.cs            — this file: backend-free generic/argument tests (always run)
-//   RC2Pkcs11Tests.SoftHsm2.cs   — RC2Pkcs11Tests_SoftHsm  (real SoftHSM token)
+//   RC2Pkcs11Tests.cs             — this file: backend-free generic/argument tests (always run)
+//   RC2Pkcs11Tests.Managed.cs     — RC2Pkcs11Tests_Managed     (in-process BCL-backed fake)
+//   RC2Pkcs11Tests.SoftHsm2.cs    — RC2Pkcs11Tests_SoftHsm     (real SoftHSM token)
+//   RC2Pkcs11Tests.OpenCryptoki.cs — RC2Pkcs11Tests_OpenCryptoki (real opencryptoki token)
+//   RC2Pkcs11Tests.Nss.cs         — RC2Pkcs11Tests_Nss         (real NSS softoken)
 
 // RC2Pkcs11 is [Obsolete] (weak legacy cipher); the secure-defaults gate is the point of the type,
 // so KLPKCS11005 is suppressed deliberately at the use sites.
