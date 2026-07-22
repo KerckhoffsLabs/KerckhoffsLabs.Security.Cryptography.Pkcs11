@@ -71,7 +71,7 @@ internal static class MLDsaPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         string label = $"mldsa-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
+            .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
             using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
