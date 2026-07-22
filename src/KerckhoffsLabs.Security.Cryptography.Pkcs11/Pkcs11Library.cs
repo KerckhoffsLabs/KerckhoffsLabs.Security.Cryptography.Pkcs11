@@ -20,25 +20,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </remarks>
 public sealed class Pkcs11Library : IDisposable
 {
-    /// <summary>
-    /// Flag indicating whether instance has been disposed
-    /// </summary>
-    private bool _disposed = false;
+    private bool _disposed;
 
-    /// <summary>
-    /// Logger responsible for message logging
-    /// </summary>
     private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Library>();
 
-    /// <summary>
-    /// Library name or path
-    /// </summary>
-    private readonly string? _libraryPath = null;
+    private readonly string? _libraryPath;
 
-    /// <summary>
-    /// Low level PKCS#11 wrapper
-    /// </summary>
-    private ILowLevelPkcs11Library? _pkcs11Library = null;
+    private ILowLevelPkcs11Library? _pkcs11Library;
 
     /// <summary>
     /// The loaded low-level library. Set during construction and released on
@@ -55,7 +43,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <see cref="Dispose()"/> gates <c>C_Finalize</c> on this flag so we never tear down another
     /// owner's state.
     /// </summary>
-    private bool _ownsFinalize = false;
+    private bool _ownsFinalize;
 
     /// <summary>
     /// Test seam: access to the underlying low-level wrapper for regression checks on
@@ -230,25 +218,21 @@ public sealed class Pkcs11Library : IDisposable
         Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
         if (slotCount.Value == 0)
-        {
             return [];
-        }
-        else
-        {
-            NativeCULong[] slotList = new NativeCULong[slotCount.Value];
-            rv = LowLevel.C_GetSlotList(tokenPresent, slotList, ref slotCount);
-            Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
-            // The token may report a different count on the second call; resize to match.
-            if (slotList.Length != (int)slotCount)
-                Array.Resize(ref slotList, (int)slotCount);
+        NativeCULong[] slotList = new NativeCULong[slotCount.Value];
+        rv = LowLevel.C_GetSlotList(tokenPresent, slotList, ref slotCount);
+        Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
 
-            List<Pkcs11Slot> list = [];
-            foreach (NativeCULong slot in slotList)
-                list.Add(new Pkcs11Slot(LowLevel, (ulong)slot));
+        // The token may report a different count on the second call; resize to match.
+        if (slotList.Length != (int)slotCount)
+            Array.Resize(ref slotList, (int)slotCount);
 
-            return list;
-        }
+        List<Pkcs11Slot> list = [];
+        foreach (NativeCULong slot in slotList)
+            list.Add(new Pkcs11Slot(LowLevel, (ulong)slot));
+
+        return list;
     }
 
     /// <summary>
