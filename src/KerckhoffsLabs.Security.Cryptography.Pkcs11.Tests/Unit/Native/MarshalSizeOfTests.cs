@@ -6,29 +6,26 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
-/// Pins the marshalled size of every native interop struct, separately per platform.
-/// Catches struct-layout drift the moment it lands. The Unix expected
-/// values were captured from a probe on Linux x64 at plan-creation time. The Windows
-/// expected values are the OASIS pkcs11.h spec ABI (#pragma pack(push, 1)) and are
-/// added struct-by-struct as types are migrated to [PackedForPkcs11].
+/// Pins the marshalled size of every native interop struct, separately per platform, so struct-layout
+/// drift fails the build the moment it lands. Three sets of expectations, one per ABI:
+/// <list type="bullet">
+///   <item>Unix LP64 — probed on Linux x64.</item>
+///   <item>Windows x64 — the OASIS pkcs11.h ABI (<c>#pragma pack(push, 1)</c>, CK_ULONG 4, pointer 8).</item>
+///   <item>Windows x86 — the same ABI at ILP32 (pointer 4), derived from the x64 values.</item>
+/// </list>
+/// Each set is gated to the platform it describes, so on any given run two of the three are skipped.
 /// </summary>
 public sealed class MarshalSizeOfTests
 {
     public static bool IsUnix => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
 
-    // The Windows sibling sizes below are the OASIS Windows ABI on a 64-bit pointer
-    // (CK_ULONG = 4, pointer = 8, #pragma pack(1)). On 32-bit Windows the pointer-bearing
-    // structs shrink, so the single hard-coded expectation only holds for a 64-bit process.
-    public static bool Is64BitProcess => Environment.Is64BitProcess;
-
-    // The narrow CK_ULONG (uint) runtime asset is resolved only on 64-bit Windows; that is where
-    // the Pack=1 sibling sizes above hold. On 32-bit Windows the pointers shrink; on Unix the
-    // siblings aren't used at all (the unified path handles marshalling), so skip elsewhere.
+    // Windows x64: the narrow CK_ULONG (uint) runtime asset resolves here, which is what the
+    // Pack=1 sibling sizes in WindowsSiblingStructSize assume. On Unix the siblings are never used
+    // at all — the unified path handles marshalling — so that theory is skipped there.
     public static bool IsWindows64 => OperatingSystem.IsWindows() && Environment.Is64BitProcess;
 
-    // The ILP32 leg: pointers shrink to 4 while CK_ULONG stays 4, so the Pack=1 siblings have a
-    // different absolute size than on win-x64. CI runs this leg, and until these pins existed it
-    // had no absolute size expectations at all.
+    // Windows x86 (ILP32): CK_ULONG is still 4, but pointers shrink to 4, so every pointer-bearing
+    // sibling is smaller than on x64 and needs its own expectations.
     public static bool IsWindows32 => OperatingSystem.IsWindows() && !Environment.Is64BitProcess;
 
     [Fact]
@@ -402,8 +399,8 @@ public sealed class MarshalSizeOfTests
     /// pointer field, counted recursively through nested structs.
     /// </summary>
     /// <remarks>
-    /// This runs on every platform, including Linux, where both size theories are skipped — so it is
-    /// the only thing standing between a mistyped x86 literal and a red CI leg on hardware most
+    /// This runs on every platform, including Linux, where both Windows theories are skipped — so it
+    /// is the only thing standing between a mistyped x86 literal and a red CI leg on hardware most
     /// contributors cannot reproduce. Note what it does and does not prove: it verifies the 98 x86
     /// literals are transcribed consistently with the 98 x64 literals under the stated model, not
     /// that the model matches the real ILP32 ABI. The win-x86 CI leg is what confirms the latter.

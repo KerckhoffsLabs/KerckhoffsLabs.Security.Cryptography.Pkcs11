@@ -100,12 +100,21 @@ public sealed class NativeStructLayoutTests
     }
 
     /// <summary>
-    /// Pins every field's LP64 offset for the pointer-bearing param structs. Size pins cannot catch a
-    /// transposition of two same-width fields — swapping a pointer with its length leaves the size
-    /// identical but corrupts every call — so the full name:offset sequence is pinned instead.
-    /// Rows are probed from the built assembly on Linux x64 and spot-checked against the vendored
-    /// OASIS header. The five structs with hand-written Lp64_Offsets_* methods above are excluded.
+    /// Pins every field's LP64 offset. Size pins cannot catch a transposition of two same-width
+    /// fields — swapping a pointer with its length, or two equal-length inline buffers, leaves the
+    /// size identical while corrupting every call — so the full name:offset sequence is pinned
+    /// instead. Covers the pointer-bearing param structs plus the pointer-free ones whose fields are
+    /// interchangeable by width (the CTR/RC2 params, CK_INFO, CK_TOKEN_INFO).
+    /// The five structs with hand-written Lp64_Offsets_* methods above are excluded, as are the
+    /// CK_FUNCTION_LIST variants, which are covered by absolute size pins instead.
     /// </summary>
+    /// <remarks>
+    /// Rows are probed from the built assembly on Linux x64, so they are regression tripwires rather
+    /// than an independent audit: by construction they cannot detect a transposition that was already
+    /// present when they were generated. A sample was cross-checked against the vendored C headers —
+    /// mostly <c>vendor/opencryptoki/…/pkcs11types.h</c>, falling back to
+    /// <c>vendor/pkcs11-mock/…/pkcs11t.h</c> for structs opencryptoki does not declare.
+    /// </remarks>
     [ConditionalTheory(nameof(IsUnix))]
     // BEGIN PROBED offset pins — Linux x64, LP64
     [InlineData(typeof(CK_AES_CBC_ENCRYPT_DATA_PARAMS), "Iv:0,Data:16,Length:24")]
@@ -223,8 +232,9 @@ public sealed class NativeStructLayoutTests
     /// under-allocates a buffer the token then writes into. A managed <c>byte[]</c> field with
     /// <c>[MarshalAs(ByValArray)]</c> is the way this breaks: managed stores a reference where
     /// unmanaged stores the array inline. Use an <c>[InlineArray]</c> buffer instead.
-    /// This is a relative assertion, so it runs on every platform leg including 32-bit Windows,
-    /// where the absolute size pins are all skipped.
+    /// This is a relative assertion — it compares a type against itself rather than against a
+    /// hard-coded number — so unlike the absolute size pins it needs no per-ABI expectations and
+    /// runs unskipped on every platform leg.
     /// </summary>
     [Fact]
     public void EveryCkStruct_ManagedSizeMatchesMarshalledSize()
