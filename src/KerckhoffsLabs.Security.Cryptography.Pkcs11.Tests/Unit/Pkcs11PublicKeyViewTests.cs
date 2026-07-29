@@ -36,7 +36,7 @@ public sealed class Pkcs11PublicKeyViewTests
         ECParameters? parsed = Pkcs11PublicKeyView.TryParseEcPublicKey(ecPoint, ecParams);
 
         Assert.NotNull(parsed);
-        Assert.True(parsed.Value.Curve.IsNamed);
+        Assert.True(parsed!.Value.Curve.IsNamed);
         Assert.Equal(curve.Oid, parsed.Value.Curve.Oid.Value);
         Assert.Equal(coordLen, parsed.Value.Q.X!.Length);
         Assert.Equal(coordLen, parsed.Value.Q.Y!.Length);

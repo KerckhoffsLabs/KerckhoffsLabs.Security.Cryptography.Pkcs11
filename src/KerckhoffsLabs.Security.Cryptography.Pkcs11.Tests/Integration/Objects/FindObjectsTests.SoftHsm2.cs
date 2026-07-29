@@ -128,7 +128,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
                 Assert.NotNull(priv);
                 byte[] sig = priv!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
-                using var pub = cert.Certificate.GetRSAPublicKey();
+                using var pub = cert!.Certificate.GetRSAPublicKey();
                 Assert.True(pub!.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
             }
             finally

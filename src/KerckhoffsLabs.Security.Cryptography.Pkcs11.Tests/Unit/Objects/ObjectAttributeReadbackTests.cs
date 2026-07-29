@@ -79,7 +79,7 @@ public sealed class ObjectAttributeReadbackTests
 
         Assert.NotNull(dt);
         Assert.Equal(new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc), dt!.Value);
-        Assert.Equal(DateTimeKind.Utc, dt.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, dt!.Value.Kind);
     }
 
     [Fact]
