@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -20,7 +21,13 @@ internal static class UnmanagedMemory
     /// net10.0-windows asset, 8 on the neutral net10.0 asset (Unix-LP64). The runtime guard in
     /// <see cref="LowLevelPkcs11Library"/> ensures this matches the host's native CK_ULONG width.
     /// </summary>
-    public static int NativeULongSize { get; } = Marshal.SizeOf<NativeCULong>();
+    /// <remarks>
+    /// Measured with <see cref="Unsafe.SizeOf{T}"/>, not <c>Marshal.SizeOf</c>: CK_ULONG crosses the
+    /// boundary by value through the <c>delegate* unmanaged[Cdecl]</c> signatures, which under
+    /// <c>[assembly: DisableRuntimeMarshalling]</c> use the blittable layout. <see cref="NativeCULong"/>
+    /// wraps a single primitive, so both agree — but the blittable size is the one that governs here.
+    /// </remarks>
+    public static int NativeULongSize { get; } = Unsafe.SizeOf<NativeCULong>();
 
     /// <summary>
     /// Logger responsible for message logging

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
@@ -184,7 +185,11 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     private static void EnsureCkUlongWidthMatchesPlatform()
     {
         int expected = OperatingSystem.IsWindows() ? sizeof(uint) : IntPtr.Size;
-        int actual = Marshal.SizeOf<NativeCULong>();
+        // Unsafe.SizeOf, not Marshal.SizeOf: what can mis-marshal is the by-value CK_ULONG in the
+        // delegate* unmanaged[Cdecl] signatures, and [assembly: DisableRuntimeMarshalling] makes those
+        // use the blittable layout. NativeCULong wraps a single primitive so the two sizes agree, but
+        // this guard should measure the layout that actually crosses the boundary.
+        int actual = Unsafe.SizeOf<NativeCULong>();
         if (actual != expected)
         {
             throw new PlatformNotSupportedException(

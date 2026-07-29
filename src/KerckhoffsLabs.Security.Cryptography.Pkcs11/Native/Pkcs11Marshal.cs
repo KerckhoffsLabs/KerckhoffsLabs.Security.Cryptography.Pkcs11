@@ -17,6 +17,16 @@ internal static class Pkcs11Marshal
     /// Returns the on-wire size of <typeparamref name="T"/>: the Windows-packed sibling
     /// size on Windows, the natural size on Linux/macOS.
     /// </summary>
+    [SuppressMessage("Interoperability", "CA1421:This method uses runtime marshalling even when the 'DisableRuntimeMarshalling' attribute is applied",
+        Justification = "Runtime marshalling is the intended layout source here, not an oversight. " +
+        "[assembly: DisableRuntimeMarshalling] governs P/Invoke *signature* marshalling, and every PKCS#11 entry " +
+        "point takes these structs as an opaque IntPtr rather than by value, so the attribute does not describe the " +
+        "layout the token sees. That layout is the one Marshal.StructureToPtr produces in WriteStructure, so the " +
+        "buffer must be sized by the matching Marshal.SizeOf. The rule's suggested sizeof/Unsafe.SizeOf reports the " +
+        "*managed* layout instead, which is smaller for the structs carrying a [MarshalAs(ByValArray)] byte[] field " +
+        "(CK_AES_CTR_PARAMS: 24 marshalled vs 16 managed, since managed stores a reference where unmanaged stores the " +
+        "inline array) — it would under-allocate a buffer the module then writes into. " +
+        "MarshalSizeOfTests.ByValArrayStruct_MarshalledSizeExceedsManagedSize pins that divergence.")]
     public static int SizeOf<T>() where T : struct
         => IsWindows && IsPackedForPkcs11(typeof(T)) ? PackedDispatch.SizeOfWindows<T>() : Marshal.SizeOf<T>();
 
