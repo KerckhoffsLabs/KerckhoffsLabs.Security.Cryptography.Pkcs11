@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 56 (14 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (25 open, 6 resolved) | Low: 18 (14 open, 4 resolved)
+- Total items: 56 (15 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (24 open, 7 resolved) | Low: 18 (14 open, 4 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -138,7 +138,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Behavioral — decide before 1.0
 - **Raised by:** Cryptographer A
 
-### [BL-012] `Mechanism` does not own its `MechanismParameters`; ordered two-object disposal is easy to misuse
+### [BL-012] ✅ RESOLVED — `Mechanism` does not own its `MechanismParameters`; ordered two-object disposal is easy to misuse
+- **Status:** Resolved 2026-07-29. `Mechanism` now owns the parameters it is constructed with and disposes them in `Dispose(true)`, after releasing the marshalled `CK_MECHANISM` block so the block never outlives the buffers it points at. The parameter object is left alone on the finalizer path, since it is managed and carries a finalizer of its own. The leak this fixes was the common case rather than the exotic one: roughly twelve call sites construct parameters inline (`new Mechanism(ckm, new CkmAesGcmParams(...))`) and keep no reference, so nothing could dispose them and their unmanaged IV/AAD buffers survived until the GC ran. The two sites that do hold a variable use `using var p = …; using var m = new Mechanism(…, p);`, which disposes in reverse order — mechanism first — and stays correct, because disposal is idempotent. What is no longer supported is sharing one parameter instance across two mechanisms; that is now stated on both constructors and on the `MechanismParameters` class doc. `MechanismOwnsParametersTests` pins the behaviour, and two of its four cases were confirmed to fail with the ownership line removed.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** M

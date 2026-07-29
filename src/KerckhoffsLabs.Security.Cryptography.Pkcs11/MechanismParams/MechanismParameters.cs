@@ -7,6 +7,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <c>new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(...))</c>).
 /// </summary>
 /// <remarks>
+/// <para>
+/// <b>Ownership:</b> passing an instance to a <c>Mechanism</c> constructor transfers ownership —
+/// disposing that mechanism disposes this object too. Disposal is idempotent, so disposing it
+/// yourself as well is harmless; sharing one instance across two mechanisms is not, because the
+/// first mechanism disposed frees the buffers the second still points at. Construct one parameter
+/// object per mechanism.
+/// </para>
 /// The marshalling contract (<see cref="ToMarshalableStructure"/>) is <c>internal</c>: callers
 /// select from the library-provided <c>Ckm*Params</c> types and cannot define their own through
 /// this path, which guarantees only blittable <c>[PackedForPkcs11]</c> structs ever reach

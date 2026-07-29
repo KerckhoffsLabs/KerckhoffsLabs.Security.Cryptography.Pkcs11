@@ -102,16 +102,26 @@ public sealed class Mechanism : IDisposable
     }
 
     /// <summary>
-    /// Creates mechanism of given type with object parameter
+    /// Creates mechanism of given type with object parameter. The mechanism takes ownership of
+    /// <paramref name="parameter"/>.
     /// </summary>
+    /// <remarks>
+    /// Disposing the mechanism disposes the parameter object, releasing its unmanaged IV/AAD
+    /// buffers deterministically instead of leaving them to its finalizer. Callers may still
+    /// dispose the parameter themselves — disposal is idempotent, so the common
+    /// <c>using var p = …; using var m = new Mechanism(…, p);</c> shape stays correct (a using
+    /// declaration disposes in reverse order, so the mechanism goes first either way). What is no
+    /// longer supported is sharing one parameter instance across two mechanisms: the first
+    /// mechanism disposed frees the buffers the second still points at.
+    /// </remarks>
     /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
+    /// <param name="parameter">Mechanism parameter. Ownership transfers to the mechanism.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(ulong type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
 
-        // Keep reference to parameter so GC will not free it while mechanism exists
+        // Owned from here: kept alive for the mechanism's lifetime and disposed with it.
         _mechanismParams = parameter;
 
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
@@ -119,16 +129,26 @@ public sealed class Mechanism : IDisposable
     }
 
     /// <summary>
-    /// Creates mechanism of given type with object parameter
+    /// Creates mechanism of given type with object parameter. The mechanism takes ownership of
+    /// <paramref name="parameter"/>.
     /// </summary>
+    /// <remarks>
+    /// Disposing the mechanism disposes the parameter object, releasing its unmanaged IV/AAD
+    /// buffers deterministically instead of leaving them to its finalizer. Callers may still
+    /// dispose the parameter themselves — disposal is idempotent, so the common
+    /// <c>using var p = …; using var m = new Mechanism(…, p);</c> shape stays correct (a using
+    /// declaration disposes in reverse order, so the mechanism goes first either way). What is no
+    /// longer supported is sharing one parameter instance across two mechanisms: the first
+    /// mechanism disposed frees the buffers the second still points at.
+    /// </remarks>
     /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
+    /// <param name="parameter">Mechanism parameter. Ownership transfers to the mechanism.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(CKM type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
 
-        // Keep reference to parameter so GC will not free it while mechanism exists
+        // Owned from here: kept alive for the mechanism's lifetime and disposed with it.
         _mechanismParams = parameter;
 
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
@@ -154,14 +174,19 @@ public sealed class Mechanism : IDisposable
     {
         if (!_disposed)
         {
-            if (disposing)
-            {
-                // Dispose managed objects
-            }
-
-            // Dispose unmanaged objects
+            // Order matters: the marshalled CK_MECHANISM block holds raw pointers into the
+            // parameter object's buffers, so it is released before those buffers are.
             UnmanagedMemory.Free(ref _ckMechanism.Parameter);
             _ckMechanism.ParameterLen = new(0);
+
+            if (disposing)
+            {
+                // The parameters are owned (see the constructor remarks), so their unmanaged IV/AAD
+                // buffers are released here rather than left to the finalizer. Skipped on the
+                // finalizer path: the parameter object is managed and has a finalizer of its own,
+                // which may already have run.
+                _mechanismParams?.Dispose();
+            }
 
             _disposed = true;
         }
