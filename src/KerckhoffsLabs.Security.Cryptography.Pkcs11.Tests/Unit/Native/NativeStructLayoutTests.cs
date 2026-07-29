@@ -109,11 +109,13 @@ public sealed class NativeStructLayoutTests
     [ConditionalTheory(nameof(IsUnix))]
     // BEGIN PROBED offset pins — Linux x64, LP64
     [InlineData(typeof(CK_AES_CBC_ENCRYPT_DATA_PARAMS), "Iv:0,Data:16,Length:24")]
+    [InlineData(typeof(CK_AES_CTR_PARAMS), "CounterBits:0,Cb:8")]
     [InlineData(typeof(CK_ARIA_CBC_ENCRYPT_DATA_PARAMS), "Iv:0,Data:16,Length:24")]
     [InlineData(typeof(CK_ASYNC_DATA), "Version:0,Value:8,ValueLen:16,Object:24,AdditionalObject:32")]
     [InlineData(typeof(CK_ATTRIBUTE), "type:0,value:8,valueLen:16")]
     [InlineData(typeof(CK_C_INITIALIZE_ARGS), "CreateMutex:0,DestroyMutex:8,LockMutex:16,UnlockMutex:24,Flags:32,Reserved:40")]
     [InlineData(typeof(CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS), "Iv:0,Data:16,Length:24")]
+    [InlineData(typeof(CK_CAMELLIA_CTR_PARAMS), "CounterBits:0,Cb:8")]
     [InlineData(typeof(CK_CCM_MESSAGE_PARAMS), "DataLen:0,Nonce:8,NonceLen:16,NonceFixedBits:24,NonceGenerator:32,Mac:40,MacLen:48")]
     [InlineData(typeof(CK_CCM_WRAP_PARAMS), "DataLen:0,Nonce:8,NonceLen:16,NonceFixedBits:24,NonceGenerator:32,Aad:40,AadLen:48,MacLen:56")]
     [InlineData(typeof(CK_CHACHA20_PARAMS), "BlockCounter:0,BlockCounterBits:8,Nonce:16,NonceBits:24")]
@@ -134,6 +136,7 @@ public sealed class NativeStructLayoutTests
     [InlineData(typeof(CK_IKE1_EXTENDED_DERIVE_PARAMS), "PrfMechanism:0,HasKeygxy:8,Keygxy:16,ExtraData:24,ExtraDataLen:32")]
     [InlineData(typeof(CK_IKE1_PRF_DERIVE_PARAMS), "PrfMechanism:0,HasPrevKey:8,Keygxy:16,PrevKey:24,CkyI:32,CkyILen:40,CkyR:48,CkyRLen:56,KeyNumber:64")]
     [InlineData(typeof(CK_IKE2_PRF_PLUS_DERIVE_PARAMS), "PrfMechanism:0,HasSeedKey:8,SeedKey:16,SeedData:24,SeedDataLen:32")]
+    [InlineData(typeof(CK_INFO), "CryptokiVersion:0,ManufacturerId:2,Flags:40,LibraryDescription:48,LibraryVersion:80")]
     [InlineData(typeof(CK_INTERFACE), "InterfaceName:0,FunctionList:8,Flags:16")]
     [InlineData(typeof(CK_KEA_DERIVE_PARAMS), "IsSender:0,RandomLen:8,RandomA:16,RandomB:24,PublicDataLen:32,PublicData:40")]
     [InlineData(typeof(CK_KEY_DERIVATION_STRING_DATA), "Data:0,Len:8")]
@@ -147,6 +150,7 @@ public sealed class NativeStructLayoutTests
     [InlineData(typeof(CK_PKCS5_PBKD2_PARAMS), "SaltSource:0,SaltSourceData:8,SaltSourceDataLen:16,Iterations:24,Prf:32,PrfData:40,PrfDataLen:48,Password:56,PasswordLen:64")]
     [InlineData(typeof(CK_PKCS5_PBKD2_PARAMS2), "SaltSource:0,SaltSourceData:8,SaltSourceDataLen:16,Iterations:24,Prf:32,PrfData:40,PrfDataLen:48,Password:56,PasswordLen:64")]
     [InlineData(typeof(CK_PRF_DATA_PARAM), "Type:0,Value:8,ValueLen:16")]
+    [InlineData(typeof(CK_RC2_CBC_PARAMS), "EffectiveBits:0,Iv:8")]
     [InlineData(typeof(CK_RC5_CBC_PARAMS), "Wordsize:0,Rounds:8,Iv:16,IvLen:24")]
     [InlineData(typeof(CK_RSA_AES_KEY_WRAP_PARAMS), "AESKeyBits:0,OAEPParams:8")]
     [InlineData(typeof(CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS), "Nonce:0,NonceLen:8,Tag:16")]
@@ -167,6 +171,7 @@ public sealed class NativeStructLayoutTests
     [InlineData(typeof(CK_TLS12_EXTENDED_MASTER_KEY_DERIVE_PARAMS), "PrfHashMechanism:0,SessionHash:8,SessionHashLen:16,Version:24")]
     [InlineData(typeof(CK_TLS12_KEY_MAT_PARAMS), "MacSizeInBits:0,KeySizeInBits:8,IVSizeInBits:16,IsExport:24,RandomInfo:32,ReturnedKeyMaterial:64,PrfHashMechanism:72")]
     [InlineData(typeof(CK_TLS12_MASTER_KEY_DERIVE_PARAMS), "RandomInfo:0,Version:32,PrfHashMechanism:40")]
+    [InlineData(typeof(CK_TOKEN_INFO), "Label:0,ManufacturerId:32,Model:64,SerialNumber:80,Flags:96,MaxSessionCount:104,SessionCount:112,MaxRwSessionCount:120,RwSessionCount:128,MaxPinLen:136,MinPinLen:144,TotalPublicMemory:152,FreePublicMemory:160,TotalPrivateMemory:168,FreePrivateMemory:176,HardwareVersion:184,FirmwareVersion:186,UtcTime:188")]
     [InlineData(typeof(CK_WTLS_KEY_MAT_OUT), "MacSecret:0,Key:8,IV:16")]
     [InlineData(typeof(CK_WTLS_KEY_MAT_PARAMS), "DigestMechanism:0,MacSizeInBits:8,KeySizeInBits:16,IVSizeInBits:24,SequenceNumber:32,IsExport:40,RandomInfo:48,ReturnedKeyMaterial:80")]
     [InlineData(typeof(CK_WTLS_MASTER_KEY_DERIVE_PARAMS), "DigestMechanism:0,RandomInfo:8,Version:40")]
@@ -229,8 +234,11 @@ public sealed class NativeStructLayoutTests
                       && m.IsGenericMethodDefinition
                       && m.GetParameters().Length == 0);
 
+        var candidates = CkStructsWithSiblings().ToList();
+        Assert.NotEmpty(candidates); // sanity: the reflection filter actually finds the CK_* set
+
         var failures = new List<string>();
-        foreach (var t in CkStructsWithSiblings())
+        foreach (var t in candidates)
         {
             int marshalled = Marshal.SizeOf(t);
             int managed = (int)unsafeSizeOf.MakeGenericMethod(t).Invoke(null, null)!;
@@ -241,6 +249,33 @@ public sealed class NativeStructLayoutTests
         Assert.True(failures.Count == 0,
             "Managed layout must equal marshalled layout for every native struct. Divergent: "
             + string.Join("; ", failures));
+    }
+
+    /// <summary>
+    /// Production dispatches on the <c>[PackedForPkcs11]</c> attribute (<c>Pkcs11Marshal.SizeOf</c>,
+    /// <c>UnmanagedMemory.cs</c>), while the census above enumerates by namespace + <c>CK_</c> naming
+    /// convention. Those two sets happen to agree today, but nothing forces them to: a struct marked
+    /// <c>[PackedForPkcs11]</c> yet named or namespaced outside the convention would get
+    /// <c>Unsafe.SizeOf</c> dispatch in production while staying invisible to every guard test in this
+    /// file. If that struct still carried a <c>[MarshalAs(ByValArray)]</c> buffer, the managed/marshalled
+    /// sizes would silently diverge and the token would write past the end of an under-allocated
+    /// buffer — the exact failure mode <see cref="EveryCkStruct_ManagedSizeMatchesMarshalledSize"/> exists
+    /// to catch, except this one instance would never reach that test. This guard pins the census to
+    /// what production actually dispatches on, so the two cannot drift apart unnoticed.
+    /// </summary>
+    [Fact]
+    public void EveryPackedStruct_IsCoveredByTheCensus()
+    {
+        var attributed = ProdAssembly.GetTypes().Where(t => t.IsValueType && IsPacked(t)).ToList();
+        Assert.NotEmpty(attributed); // sanity: the reflection filter actually finds the packed set
+
+        var missing = attributed.Except(CkStructsWithSiblings()).ToList();
+        Assert.True(missing.Count == 0,
+            "The following [PackedForPkcs11] types are not enumerated by CkStructsWithSiblings(): "
+            + string.Join(", ", missing.Select(t => t.FullName))
+            + ". Widen the namespace/name filter in CkStructsWithSiblings() to cover them — do not "
+            + "remove [PackedForPkcs11] to make this pass, since that would leave them dispatched by "
+            + "Unsafe.SizeOf in production with no layout guard at all.");
     }
 
     [Fact]
