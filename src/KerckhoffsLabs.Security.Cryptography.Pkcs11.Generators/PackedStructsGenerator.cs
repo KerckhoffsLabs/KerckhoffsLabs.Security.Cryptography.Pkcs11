@@ -92,7 +92,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
             if (ac is null) continue;
             // Skip [PackedForPkcs11] (it's on the type, not fields, but defensive).
             if (ac.ToDisplayString() == AttributeFullName) continue;
-            sb.Append("    [").Append(a.ToString()).AppendLine("]");
+            sb.Append("    [").Append(a).AppendLine("]");
         }
         var typeName = SubstituteFieldType(f.Type, packedNames);
         sb.Append("    public ").Append(typeName).Append(' ').Append(f.Name).AppendLine(";");

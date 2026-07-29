@@ -17,7 +17,7 @@ public sealed class AttributeValueException : Exception
     /// </summary>
     /// <param name="attribute">Attribute whose value could not be read or converted</param>
     public AttributeValueException(CKA attribute)
-        : base(string.Format("Value of attribute {0} could not be read", attribute.ToString()))
+        : base(string.Format("Value of attribute {0} could not be read", attribute))
     {
         Attribute = attribute;
     }
@@ -28,7 +28,7 @@ public sealed class AttributeValueException : Exception
     /// <param name="attribute">Attribute whose value could not be read or converted</param>
     /// <param name="innerException">The exception that is the cause of the current exception</param>
     public AttributeValueException(CKA attribute, Exception innerException)
-        : base(string.Format("Value of attribute {0} could not be converted", attribute.ToString()), innerException)
+        : base(string.Format("Value of attribute {0} could not be converted", attribute), innerException)
     {
         Attribute = attribute;
     }
