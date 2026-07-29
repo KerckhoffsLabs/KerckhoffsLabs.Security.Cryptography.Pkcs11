@@ -473,6 +473,84 @@ public sealed class BuildMarshalableEquivalenceTests
         AssertDistinctBlockWithSameBytes(legacy.InitiatorEphemeral, scoped.InitiatorEphemeral, initiatorEphemeral);
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // The in/out AEAD message types: built ForDecrypt so the tag/MAC field carries caller-supplied,
+    // non-zero bytes — an encrypt fixture's zero-filled output buffer wouldn't distinguish a dropped
+    // scope.Write from a correct one.
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void GcmMessageParams_BothPathsAgree()
+    {
+        byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        byte[] tag = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC];
+        using var p = CkmGcmMessageParams.ForDecrypt(iv, tag);
+        using var scope = new MechanismParameterScope();
+
+        var legacy = (CK_GCM_MESSAGE_PARAMS)p.ToMarshalableStructure();
+        var scoped = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+
+        Assert.Equal((ulong)legacy.IvLen, (ulong)scoped.IvLen);
+        Assert.Equal((ulong)iv.Length, (ulong)scoped.IvLen);
+        // IvFixedBits/IvGenerator are hardcoded (no caller-supplied IV generation yet) in both paths —
+        // a divergence here would mean one path stopped declaring "caller-supplied IV".
+        Assert.Equal((ulong)legacy.IvFixedBits, (ulong)scoped.IvFixedBits);
+        Assert.Equal(0UL, (ulong)scoped.IvFixedBits);
+        Assert.Equal((ulong)legacy.IvGenerator, (ulong)scoped.IvGenerator);
+        Assert.Equal(0UL, (ulong)scoped.IvGenerator);
+        Assert.Equal((ulong)legacy.TagBits, (ulong)scoped.TagBits);
+        Assert.Equal((ulong)(tag.Length * 8), (ulong)scoped.TagBits);
+
+        AssertDistinctBlockWithSameBytes(legacy.Iv, scoped.Iv, iv);
+        AssertDistinctBlockWithSameBytes(legacy.Tag, scoped.Tag, tag);
+    }
+
+    [Fact]
+    public void CcmMessageParams_BothPathsAgree()
+    {
+        byte[] nonce = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99];
+        byte[] mac = [0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB];
+        using var p = CkmCcmMessageParams.ForDecrypt(dataLen: 48, nonce, mac);
+        using var scope = new MechanismParameterScope();
+
+        var legacy = (CK_CCM_MESSAGE_PARAMS)p.ToMarshalableStructure();
+        var scoped = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+
+        Assert.Equal((ulong)legacy.DataLen, (ulong)scoped.DataLen);
+        Assert.Equal(48UL, (ulong)scoped.DataLen);
+        Assert.Equal((ulong)legacy.NonceLen, (ulong)scoped.NonceLen);
+        Assert.Equal((ulong)nonce.Length, (ulong)scoped.NonceLen);
+        // NonceFixedBits/NonceGenerator are hardcoded (no caller-supplied nonce generation yet) in
+        // both paths — a divergence here would mean one path stopped declaring "caller-supplied nonce".
+        Assert.Equal((ulong)legacy.NonceFixedBits, (ulong)scoped.NonceFixedBits);
+        Assert.Equal(0UL, (ulong)scoped.NonceFixedBits);
+        Assert.Equal((ulong)legacy.NonceGenerator, (ulong)scoped.NonceGenerator);
+        Assert.Equal(0UL, (ulong)scoped.NonceGenerator);
+        Assert.Equal((ulong)legacy.MacLen, (ulong)scoped.MacLen);
+        Assert.Equal((ulong)mac.Length, (ulong)scoped.MacLen);
+
+        AssertDistinctBlockWithSameBytes(legacy.Nonce, scoped.Nonce, nonce);
+        AssertDistinctBlockWithSameBytes(legacy.Mac, scoped.Mac, mac);
+    }
+
+    [Fact]
+    public void Salsa20ChaCha20Poly1305MsgParams_BothPathsAgree()
+    {
+        byte[] nonce = [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C];
+        byte[] tag = [0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF];
+        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
+        using var scope = new MechanismParameterScope();
+
+        var legacy = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.ToMarshalableStructure();
+        var scoped = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);
+
+        Assert.Equal((ulong)legacy.NonceLen, (ulong)scoped.NonceLen);
+        Assert.Equal((ulong)nonce.Length, (ulong)scoped.NonceLen);
+
+        AssertDistinctBlockWithSameBytes(legacy.Nonce, scoped.Nonce, nonce);
+        AssertDistinctBlockWithSameBytes(legacy.Tag, scoped.Tag, tag);
+    }
+
     /// <summary>
     /// The SP800-108 graph is the deepest one: the top-level struct points at a
     /// <c>CK_PRF_DATA_PARAM</c> array whose entries point at format sub-structs, and at a
@@ -488,7 +566,7 @@ public sealed class BuildMarshalableEquivalenceTests
         {
             using var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
                 .IterationCounter(widthInBits: 16, littleEndian: true)
-                .OptionalCounter(widthInBits: 8, littleEndian: true)
+                .OptionalCounter(widthInBits: 8, littleEndian: false)
                 .ByteArray(label)
                 .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
                 .KeyHandle(0xABCD)
@@ -506,7 +584,7 @@ public sealed class BuildMarshalableEquivalenceTests
             Assert.Equal((ulong)legacy.AdditionalDerivedKeys, (ulong)scoped.AdditionalDerivedKeys);
             Assert.Equal(1UL, (ulong)scoped.AdditionalDerivedKeys);
 
-            AssertPrfSequenceAgrees(legacy.DataParams, scoped.DataParams, 5, label, spliceKey: 0xABCD);
+            AssertPrfSequenceAgrees(legacy.DataParams, scoped.DataParams, 5, label, spliceKey: 0xABCD, optionalCounterLittleEndian: false);
             AssertDerivedKeyArrayAgrees(legacy.AdditionalDerivedKeysPtr, scoped.AdditionalDerivedKeysPtr, attributeCount: 2);
         }
         finally
@@ -550,10 +628,13 @@ public sealed class BuildMarshalableEquivalenceTests
     /// <summary>
     /// Walks both <c>CK_PRF_DATA_PARAM</c> arrays entry by entry: tags and lengths must match, the
     /// pointed-at blocks must be distinct, and every format sub-struct behind them must decode to the
-    /// same values. The fixture uses <c>littleEndian: true</c> and non-default widths throughout, so a
-    /// dropped assignment cannot pass by coincidence with a zero-initialised field.
+    /// same values. The fixture uses non-default widths throughout, and mixes <c>littleEndian: true</c>
+    /// with one <c>false</c> segment, so a dropped assignment cannot pass by coincidence with a
+    /// zero-initialised field, and a hardcoded <c>true</c> cannot pass either.
     /// </summary>
-    private static void AssertPrfSequenceAgrees(IntPtr legacy, IntPtr scoped, int count, byte[] label, ulong spliceKey)
+    private static void AssertPrfSequenceAgrees(
+        IntPtr legacy, IntPtr scoped, int count, byte[] label, ulong spliceKey,
+        bool iterationCounterLittleEndian = true, bool optionalCounterLittleEndian = true)
     {
         Assert.NotEqual(IntPtr.Zero, scoped);
         Assert.NotEqual(legacy, scoped);
@@ -569,13 +650,16 @@ public sealed class BuildMarshalableEquivalenceTests
             Assert.NotEqual(l.Value, s.Value);
         }
 
-        // [0] iteration counter and [1] optional counter — CK_SP800_108_COUNTER_FORMAT.
-        foreach ((int index, ulong width) in new[] { (0, 16UL), (1, 8UL) })
+        // [0] iteration counter and [1] optional counter — CK_SP800_108_COUNTER_FORMAT. One of the two
+        // is little-endian and the other is not, so a hardcoded `LittleEndian = true` in BuildPrfEntry
+        // would fail here even though it would pass a same-value comparison.
+        foreach ((int index, ulong width, bool littleEndian) in new[]
+            { (0, 16UL, iterationCounterLittleEndian), (1, 8UL, optionalCounterLittleEndian) })
         {
             var l = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(legacy + (index * elem)).Value);
             var s = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(scoped + (index * elem)).Value);
             Assert.Equal(l.LittleEndian, s.LittleEndian);
-            Assert.True(s.LittleEndian);
+            Assert.Equal(littleEndian, s.LittleEndian);
             Assert.Equal((ulong)l.WidthInBits, (ulong)s.WidthInBits);
             Assert.Equal(width, (ulong)s.WidthInBits);
         }
@@ -624,6 +708,11 @@ public sealed class BuildMarshalableEquivalenceTests
         Assert.NotEqual(l.Template, s.Template);
         Assert.NotEqual(IntPtr.Zero, s.Key);
         Assert.NotEqual(l.Key, s.Key);
+
+        // The handle slot itself — not just its address — must start zero-filled (CK_INVALID_HANDLE),
+        // since MechanismParameterScope.Allocate zero-fills and nothing has written to it yet.
+        byte[] keySlot = UnmanagedMemory.Read(s.Key, UnmanagedMemory.NativeULongSize);
+        Assert.All(keySlot, static b => Assert.Equal((byte)0, b));
 
         int attrSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         for (int k = 0; k < attributeCount; k++)

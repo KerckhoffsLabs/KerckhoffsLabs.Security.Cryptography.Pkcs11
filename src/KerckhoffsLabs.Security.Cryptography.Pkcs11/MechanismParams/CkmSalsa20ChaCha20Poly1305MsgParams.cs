@@ -15,6 +15,10 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     private CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS _lowLevelParams;
     private IntPtr _nonce;
     private IntPtr _tag;
+    private readonly byte[] _nonceBytes;
+    // Holds the token's output after AbsorbOutput; the legacy _tag buffer is what CopyTagTo still
+    // reads until the session switches to the scope path (see AbsorbedTag).
+    private readonly byte[] _tagBuffer;
     private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates a 16-byte zero-filled tag buffer.</summary>
@@ -35,12 +39,16 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     {
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
 
+        _nonceBytes = nonce.ToArray();
         _nonce = UnmanagedMemory.Allocate(nonce.Length);
         UnmanagedMemory.Write(_nonce, nonce);
 
         _tag = UnmanagedMemory.Allocate(Poly1305TagLen);
         if (!tagInput.IsEmpty)
             UnmanagedMemory.Write(_tag, tagInput);
+
+        _tagBuffer = new byte[Poly1305TagLen];
+        if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
 
         _lowLevelParams = new()
         {
@@ -61,11 +69,35 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
         UnmanagedMemory.Read(_tag, destination[..Poly1305TagLen]);
     }
 
+    /// <summary>The managed tag buffer that <see cref="AbsorbOutput"/> fills. Used by tests until
+    /// the session switches to the scope path, after which <see cref="CopyTagTo"/> reads it.</summary>
+    internal ReadOnlySpan<byte> AbsorbedTag => _tagBuffer.AsSpan(0, Poly1305TagLen);
+
     /// <inheritdoc/>
     internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
+        {
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            Tag = scope.Write(_tagBuffer),
+        };
+    }
+
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
+    {
+        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)marshalled;
+        if (s.Tag == IntPtr.Zero) return;
+        UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, Poly1305TagLen));
     }
 
     /// <inheritdoc/>

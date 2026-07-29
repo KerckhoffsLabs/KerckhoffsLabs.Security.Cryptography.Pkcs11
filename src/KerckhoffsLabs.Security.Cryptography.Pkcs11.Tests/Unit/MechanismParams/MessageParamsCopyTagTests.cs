@@ -1,4 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -78,5 +80,54 @@ public sealed class MessageParamsCopyTagTests
     {
         using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
         Assert.Throws<ArgumentException>(() => p.CopyTagTo(new byte[15]));
+    }
+
+    [Fact]
+    public void GcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
+    {
+        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        using var scope = new MechanismParameterScope();
+
+        var s = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+
+        // Stand in for the token writing the tag into the block it was handed.
+        byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 1))];
+        UnmanagedMemory.Write(s.Tag, produced);
+
+        p.AbsorbOutput(s);
+
+        Assert.Equal(produced, p.AbsorbedTag.ToArray());
+    }
+
+    [Fact]
+    public void CcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
+    {
+        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
+        using var scope = new MechanismParameterScope();
+
+        var s = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+
+        byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 0x20))];
+        UnmanagedMemory.Write(s.Mac, produced);
+
+        p.AbsorbOutput(s);
+
+        Assert.Equal(produced, p.AbsorbedMac.ToArray());
+    }
+
+    [Fact]
+    public void SalsaChaChaPoly1305MessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
+    {
+        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
+        using var scope = new MechanismParameterScope();
+
+        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);
+
+        byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 0x40))];
+        UnmanagedMemory.Write(s.Tag, produced);
+
+        p.AbsorbOutput(s);
+
+        Assert.Equal(produced, p.AbsorbedTag.ToArray());
     }
 }

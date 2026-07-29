@@ -13,6 +13,10 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     private IntPtr _iv;
     private IntPtr _tag;
     private readonly int _tagLen;
+    private readonly byte[] _ivBytes;
+    // Holds the token's output after AbsorbOutput; the legacy _tag buffer is what CopyTagTo still
+    // reads until the session switches to the scope path (see AbsorbedTag).
+    private readonly byte[] _tagBuffer;
     private bool _disposed;
 
     /// <summary>For encryption — the wrapper allocates a zero-filled tag buffer of
@@ -36,12 +40,16 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         if (tagLen is < 4 or > 16) throw new ArgumentOutOfRangeException(nameof(tagLen), "GCM tag length must be 4..16 bytes.");
 
         _tagLen = tagLen;
+        _ivBytes = iv.ToArray();
         _iv = UnmanagedMemory.Allocate(iv.Length);
         UnmanagedMemory.Write(_iv, iv);
 
         _tag = UnmanagedMemory.Allocate(tagLen);
         if (!tagInput.IsEmpty)
             UnmanagedMemory.Write(_tag, tagInput);
+
+        _tagBuffer = new byte[tagLen];
+        if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
 
         _lowLevelParams = new()
         {
@@ -65,11 +73,38 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         UnmanagedMemory.Read(_tag, destination[.._tagLen]);
     }
 
+    /// <summary>The managed tag buffer that <see cref="AbsorbOutput"/> fills. Used by tests until
+    /// the session switches to the scope path, after which <see cref="CopyTagTo"/> reads it.</summary>
+    internal ReadOnlySpan<byte> AbsorbedTag => _tagBuffer.AsSpan(0, _tagLen);
+
     /// <inheritdoc/>
     internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_GCM_MESSAGE_PARAMS
+        {
+            Iv = scope.Write(_ivBytes),
+            IvLen = (NativeCULong)_ivBytes.Length,
+            IvFixedBits = (NativeCULong)0,
+            IvGenerator = (NativeCULong)0, // CKG_NO_GENERATE
+            Tag = scope.Write(_tagBuffer),
+            TagBits = (NativeCULong)(_tagLen * 8),
+        };
+    }
+
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
+    {
+        var s = (CK_GCM_MESSAGE_PARAMS)marshalled;
+        if (s.Tag == IntPtr.Zero) return;
+        UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, _tagLen));
     }
 
     /// <inheritdoc/>

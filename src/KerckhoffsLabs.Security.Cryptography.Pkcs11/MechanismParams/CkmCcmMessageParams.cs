@@ -14,6 +14,11 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     private IntPtr _nonce;
     private IntPtr _mac;
     private readonly int _macLen;
+    private readonly int _dataLen;
+    private readonly byte[] _nonceBytes;
+    // Holds the token's output after AbsorbOutput; the legacy _mac buffer is what CopyMacTo still
+    // reads until the session switches to the scope path (see AbsorbedMac).
+    private readonly byte[] _macBuffer;
     private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>
@@ -37,12 +42,17 @@ public sealed class CkmCcmMessageParams : MechanismParameters
             throw new ArgumentOutOfRangeException(nameof(macLen), "CCM MAC length must be 4/6/8/10/12/14/16 bytes.");
 
         _macLen = macLen;
+        _dataLen = dataLen;
+        _nonceBytes = nonce.ToArray();
         _nonce = UnmanagedMemory.Allocate(nonce.Length);
         UnmanagedMemory.Write(_nonce, nonce);
 
         _mac = UnmanagedMemory.Allocate(macLen);
         if (!macInput.IsEmpty)
             UnmanagedMemory.Write(_mac, macInput);
+
+        _macBuffer = new byte[macLen];
+        if (!macInput.IsEmpty) macInput.CopyTo(_macBuffer);
 
         _lowLevelParams = new()
         {
@@ -67,11 +77,39 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         UnmanagedMemory.Read(_mac, destination[.._macLen]);
     }
 
+    /// <summary>The managed MAC buffer that <see cref="AbsorbOutput"/> fills. Used by tests until
+    /// the session switches to the scope path, after which <see cref="CopyMacTo"/> reads it.</summary>
+    internal ReadOnlySpan<byte> AbsorbedMac => _macBuffer.AsSpan(0, _macLen);
+
     /// <inheritdoc/>
     internal override object ToMarshalableStructure()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_CCM_MESSAGE_PARAMS
+        {
+            DataLen = (NativeCULong)_dataLen,
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            NonceFixedBits = (NativeCULong)0,
+            NonceGenerator = (NativeCULong)0, // CKG_NO_GENERATE
+            Mac = scope.Write(_macBuffer),
+            MacLen = (NativeCULong)_macLen,
+        };
+    }
+
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
+    {
+        var s = (CK_CCM_MESSAGE_PARAMS)marshalled;
+        if (s.Mac == IntPtr.Zero) return;
+        UnmanagedMemory.Read(s.Mac, _macBuffer.AsSpan(0, _macLen));
     }
 
     /// <inheritdoc/>
