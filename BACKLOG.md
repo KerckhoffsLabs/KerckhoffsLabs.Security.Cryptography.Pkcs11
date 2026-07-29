@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 55 (14 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (24 open, 6 resolved) | Low: 18 (14 open, 4 resolved)
+- Total items: 56 (14 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (25 open, 6 resolved) | Low: 18 (14 open, 4 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -404,6 +404,18 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Adopt MinVer (or NBGV) so every build derives a deterministic version from git, and guard publish on the tag being reachable from `main`.
 - **Breaks public API?** No
 - **Raised by:** QA C
+
+### [BL-056] Ephemeral vs. persistent keys are indistinguishable: destroying a token object is a separate call callers must remember, in the right order
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Object.cs:74-81` (`Delete`/`Dispose`); `Pkcs11Key.cs:38-39,68-69,184-191` (the existing ownership fields); ephemeral call sites `Algorithms/ECDiffieHellmanPkcs11.cs:198-202`, `Algorithms/SP800108HmacCounterKdfPkcs11.cs:168-172`, `Algorithms/MLKemPkcs11.cs:282-292`
+- **Problem:** `Delete()` destroys the object on the token (`C_DestroyObject`); `Dispose()` only marks the managed wrapper dead (and, on `Pkcs11Key`, tears down an owned workspace/library). Nothing in the type system distinguishes a *session-scoped* key that must always be destroyed — a derived secret, an extracted ML-KEM shared secret — from a *persistent* token key that must never be. The distinction lives only in each caller remembering `Delete()` then `Dispose()` in a `finally`, and the order is load-bearing: `Delete()` opens with `ObjectDisposedException.ThrowIf(_disposed, this)`, so a `using` that disposes first turns cleanup into an exception. Forgetting `Delete()` is worse and silent — an extractable copy of a shared secret survives on the token, which is exactly the failure `MLKemPkcs11.DestroyExtractedSecret` exists to shout about. `Dispose` cannot simply be made to delete: most keys are persistent, so that would silently destroy long-lived key material.
+- **Proposed action:** Make the ownership explicit rather than conventional, mirroring what `Pkcs11Key` already does for its workspace and library (`_ownsWorkspace`, `_ownedLibrary`). Either an `ownsTokenObject` flag set by the factory paths that mint ephemeral keys, or a distinct type for them; `Dispose` then performs the destroy-and-teardown and the three production sites collapse to `using var derived = …` with no `finally`. Two decisions to settle first: (a) what a failed destroy does during `Dispose` — throwing from `Dispose` is hostile, but `MLKemPkcs11` deliberately surfaces it today because a lingering extractable shared secret is a security problem, not a cleanup nit; (b) whether the existing `Delete()` stays public for callers who genuinely want to destroy a persistent object.
+- **Constraint worth preserving:** the test suites wrap `Delete()` in `try { } catch { /* best-effort */ }` at 12 sites so a cleanup failure cannot mask the assertion that actually failed. A throwing `Dispose` would regress that; those call sites need a non-throwing path or must keep their explicit form.
+- **Related:** BL-012 is the same class of problem one layer up (`Mechanism` not owning its `MechanismParameters`, with the disposal order documented only in a per-type remark). Worth settling both under one ownership convention rather than separately.
+- **Breaks public API?** Yes (disposal semantics for keys returned by derive/encapsulate paths) — land before 1.0
+- **Raised by:** CodeQL `cs/missed-using-statement` triage
 
 ## Low
 
