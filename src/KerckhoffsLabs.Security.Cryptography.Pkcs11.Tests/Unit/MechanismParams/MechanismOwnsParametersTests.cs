@@ -64,6 +64,40 @@ public sealed class MechanismOwnsParametersTests
         Assert.Throws<ObjectDisposedException>(() => owned!.ToMarshalableStructure());
     }
 
+    /// <summary>
+    /// Sharing one parameter instance across two mechanisms must fail at the second construction.
+    /// Left unguarded it is a silent use-after-free: each mechanism marshals its own copy of the
+    /// parameter struct including the buffer addresses, so disposing the first frees buffers the
+    /// second still points at, and the token is handed released memory with no exception anywhere.
+    /// </summary>
+    [Fact]
+    public void SharingParametersAcrossMechanisms_ThrowsAtTheSecondConstruction()
+    {
+        var parameters = NewParams();
+        using var first = new Mechanism(CKM.CKM_AES_GCM, parameters);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => new Mechanism(CKM.CKM_AES_GCM, parameters));
+
+        Assert.Contains("already belongs to another", ex.Message, StringComparison.Ordinal);
+        // The first mechanism keeps working: the rejected construction must not have disturbed it.
+        Assert.Equal((ulong)CKM.CKM_AES_GCM, first.Type);
+        Assert.NotNull(parameters.ToMarshalableStructure());
+    }
+
+    /// <summary>
+    /// Ownership is claimed once and never released, so a parameter object cannot be handed to a new
+    /// mechanism even after the owning one is disposed — by then its buffers are already freed.
+    /// </summary>
+    [Fact]
+    public void ReusingParametersAfterTheOwningMechanismIsDisposed_AlsoThrows()
+    {
+        var parameters = NewParams();
+        new Mechanism(CKM.CKM_AES_GCM, parameters).Dispose();
+
+        Assert.Throws<InvalidOperationException>(() => new Mechanism(CKM.CKM_AES_GCM, parameters));
+    }
+
     /// <summary>A mechanism built without parameters must still dispose cleanly.</summary>
     [Fact]
     public void MechanismWithoutParameters_DisposesCleanly()

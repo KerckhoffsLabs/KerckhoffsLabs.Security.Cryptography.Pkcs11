@@ -28,6 +28,22 @@ public abstract class MechanismParameters : IDisposable
     /// </summary>
     internal abstract object ToMarshalableStructure();
 
+    /// <summary>0 until some <c>Mechanism</c> has claimed this instance, 1 afterwards.</summary>
+    private int _owned;
+
+    /// <summary>
+    /// Claims this instance for a single <c>Mechanism</c>, returning <see langword="false"/> if
+    /// another one already owns it.
+    /// </summary>
+    /// <remarks>
+    /// Each mechanism marshals its own copy of the parameter struct, pointer fields included, so two
+    /// mechanisms sharing one instance would hold independent copies of the same buffer addresses.
+    /// Disposing either mechanism frees those buffers and leaves the other pointing at released
+    /// memory — which the token would then read. Claiming makes that a loud failure at construction
+    /// rather than a silent one at the boundary.
+    /// </remarks>
+    internal bool TryClaimOwnership() => Interlocked.Exchange(ref _owned, 1) == 0;
+
     /// <summary>
     /// Releases the unmanaged parameter buffers held by this instance, then suppresses finalization.
     /// </summary>

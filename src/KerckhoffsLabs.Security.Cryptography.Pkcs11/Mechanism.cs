@@ -120,6 +120,7 @@ public sealed class Mechanism : IDisposable
     public Mechanism(ulong type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
+        ThrowIfAlreadyOwned(parameter);
 
         // Owned from here: kept alive for the mechanism's lifetime and disposed with it.
         _mechanismParams = parameter;
@@ -147,12 +148,30 @@ public sealed class Mechanism : IDisposable
     public Mechanism(CKM type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
+        ThrowIfAlreadyOwned(parameter);
 
         // Owned from here: kept alive for the mechanism's lifetime and disposed with it.
         _mechanismParams = parameter;
 
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
         _ckMechanism = CK_MECHANISM.CreateMechanism(type, lowLevelParams);
+    }
+
+    /// <summary>
+    /// Rejects a parameter instance that another mechanism already owns. Each mechanism marshals its
+    /// own copy of the parameter struct — pointer fields and all — so sharing one instance would
+    /// leave the second mechanism holding addresses that the first frees on disposal, and the token
+    /// would be handed released memory. Failing here points at the actual mistake.
+    /// </summary>
+    private static void ThrowIfAlreadyOwned(MechanismParameters parameter)
+    {
+        if (!parameter.TryClaimOwnership())
+        {
+            throw new InvalidOperationException(
+                $"This {nameof(MechanismParameters)} instance already belongs to another {nameof(Mechanism)}. " +
+                "A mechanism disposes the parameters it owns, so sharing one instance would leave the other " +
+                "mechanism pointing at freed buffers. Construct a separate parameter object for each mechanism.");
+        }
     }
 
     #region IDisposable
