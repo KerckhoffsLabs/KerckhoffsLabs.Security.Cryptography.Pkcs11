@@ -29,7 +29,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// PKCS#11 handle of slot
     /// </summary>
-    private readonly NativeCULong _slotId = new(0);
+    private readonly NativeCULong _slotId;
 
     /// <summary>
     /// Identifier of this slot (<c>CK_SLOT_ID</c>).

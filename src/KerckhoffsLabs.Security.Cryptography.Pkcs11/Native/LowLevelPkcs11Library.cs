@@ -351,20 +351,18 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong[]? CULongList = mechanismList != null
-            ? new NativeCULong[mechanismList.Length]
-            : null;
+        // NULL_PTR form: the caller is probing for the mechanism count, so there is nothing to copy back.
+        if (mechanismList is null)
+            return _delegates.C_GetMechanismList(slotId, null, ref count).ToCKR();
 
+        NativeCULong[] CULongList = new NativeCULong[mechanismList.Length];
         NativeCULong rv = _delegates.C_GetMechanismList(slotId, CULongList, ref count);
 
-        if (mechanismList != null && CULongList != null)
-        {
-            for (int i = 0; i < mechanismList.Length; i++)
-                // Deliberately an unvalidated cast, not ToCKM(): a token may report vendor-defined
-                // mechanisms (>= CKM_VENDOR_DEFINED) that are not declared CKM members, and the
-                // validating conversion would throw mid-enumeration.
-                mechanismList[i] = (CKM)(ulong)CULongList[i];
-        }
+        for (int i = 0; i < mechanismList.Length; i++)
+            // Deliberately an unvalidated cast, not ToCKM(): a token may report vendor-defined
+            // mechanisms (>= CKM_VENDOR_DEFINED) that are not declared CKM members, and the
+            // validating conversion would throw mid-enumeration.
+            mechanismList[i] = (CKM)(ulong)CULongList[i];
 
         return rv.ToCKR();
     }
@@ -1310,13 +1308,16 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
 
         if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetAttributeValue_Windows)
         {
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+            // Defensive against a null slipping past the non-nullable annotation, as the sibling
+            // attribute paths are. Split into its own branch rather than a null-forgiving local so
+            // that the write-back below needs no null test the compiler considers unreachable.
+            if (template is null)
+                return (CKR)(ulong)_delegates.C_GetAttributeValue_Windows(session, objectId, null!, count);
+
+            var winTpl = System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
             var rv = _delegates.C_GetAttributeValue_Windows(session, objectId, winTpl, count);
-            if (winTpl is not null && template is not null)
-            {
-                for (int i = 0; i < winTpl.Length; i++)
-                    template[i] = winTpl[i].ToUnified();
-            }
+            for (int i = 0; i < winTpl.Length; i++)
+                template[i] = winTpl[i].ToUnified();
             return (CKR)(ulong)rv;
         }
         NativeCULong rv2 = _delegates.C_GetAttributeValue(session, objectId, template, count);
