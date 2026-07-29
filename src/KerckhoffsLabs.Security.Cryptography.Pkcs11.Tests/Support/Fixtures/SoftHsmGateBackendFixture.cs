@@ -71,14 +71,14 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
         // Private copy of libsofthsm2: dlopen of a distinct path/inode yields an independent
         // native instance, so the gate's C_Initialize state and token store never collide with
         // the main SoftHSM fixture's.
-        _gateDir = Path.Combine(Path.GetDirectoryName(gatePath)!, $"gate{level}");
+        _gateDir = Path.Join(Path.GetDirectoryName(gatePath)!, $"gate{level}");
         Directory.CreateDirectory(_gateDir);
-        _targetCopyPath = Path.Combine(_gateDir, Path.GetFileName(softHsmPath));
+        _targetCopyPath = Path.Join(_gateDir, Path.GetFileName(softHsmPath));
         File.Copy(softHsmPath, _targetCopyPath, overwrite: true);
 
-        string tokenStoreDir = Path.Combine(_gateDir, "tokens");
+        string tokenStoreDir = Path.Join(_gateDir, "tokens");
         Directory.CreateDirectory(tokenStoreDir);
-        _configPath = Path.Combine(_gateDir, "softhsm2.conf");
+        _configPath = Path.Join(_gateDir, "softhsm2.conf");
         File.WriteAllText(_configPath,
             $"directories.tokendir = {tokenStoreDir}\n" +
             "objectstore.backend = file\n" +
@@ -129,7 +129,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
     {
         if (OperatingSystem.IsWindows()) return null; // gate shims are Linux/macOS only
         string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-        string candidate = Path.Combine(
+        string candidate = Path.Join(
             asmDir, "runtimes", SoftHsmBackendFixture.GetRid(), "native", $"pkcs11-gate{level}.so");
         return File.Exists(candidate) ? candidate : null;
     }

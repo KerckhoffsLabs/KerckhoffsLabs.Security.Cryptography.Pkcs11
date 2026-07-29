@@ -93,6 +93,6 @@ public static class Settings
             RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "pkcs11-mock.dylib"
             : "pkcs11-mock.so";
 
-        return Path.Combine(baseDir, "runtimes", rid, "native", fileName);
+        return Path.Join(baseDir, "runtimes", rid, "native", fileName);
     }
 }

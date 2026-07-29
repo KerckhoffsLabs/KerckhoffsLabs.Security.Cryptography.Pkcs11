@@ -154,7 +154,7 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     internal static string? BuiltLibraryPath()
     {
         string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-        string candidate = Path.Combine(
+        string candidate = Path.Join(
             asmDir, "runtimes", SoftHsmBackendFixture.GetRid(), "native", "nss", "libsoftokn3.so");
         return File.Exists(candidate) ? candidate : null;
     }

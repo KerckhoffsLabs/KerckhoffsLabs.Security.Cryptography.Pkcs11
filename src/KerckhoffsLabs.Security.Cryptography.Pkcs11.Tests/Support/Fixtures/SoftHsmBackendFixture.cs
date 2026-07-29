@@ -104,7 +104,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         {
             string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
             return lib is not null
-                && File.Exists(Path.Combine(Path.GetDirectoryName(lib)!, "softhsm-mldsa.enabled"));
+                && File.Exists(Path.Join(Path.GetDirectoryName(lib)!, "softhsm-mldsa.enabled"));
         }
     }
 
@@ -118,7 +118,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         {
             string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
             return lib is not null
-                && File.Exists(Path.Combine(Path.GetDirectoryName(lib)!, "softhsm-mlkem.enabled"));
+                && File.Exists(Path.Join(Path.GetDirectoryName(lib)!, "softhsm-mlkem.enabled"));
         }
     }
 
@@ -133,7 +133,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         {
             string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
             return lib is not null
-                && File.Exists(Path.Combine(Path.GetDirectoryName(lib)!, "softhsm-slhdsa.enabled"));
+                && File.Exists(Path.Join(Path.GetDirectoryName(lib)!, "softhsm-slhdsa.enabled"));
         }
     }
 
@@ -163,8 +163,8 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         // Write config next to the library so the baked-in DEFAULT_SOFTHSM2_CONF
         // is satisfied. SoftHSM2 creates UUID subdirs inside _tokenStoreDir.
         string nativeDir = Path.GetDirectoryName(libPath)!;
-        _configPath = Path.Combine(nativeDir, "softhsm2.conf");
-        _tokenStoreDir = Path.Combine(nativeDir, "tokens");
+        _configPath = Path.Join(nativeDir, "softhsm2.conf");
+        _tokenStoreDir = Path.Join(nativeDir, "tokens");
         Directory.CreateDirectory(_tokenStoreDir);
 
         File.WriteAllText(_configPath,
@@ -220,14 +220,14 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         string asmDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
         // macOS uses `.so` too: libsofthsm2 is a libtool `-module` bundle (.so), not a .dylib.
         string ext = OperatingSystem.IsWindows() ? "dll" : "so";
-        string candidate = Path.Combine(asmDir, "runtimes", GetRid(), "native", $"libsofthsm2.{ext}");
+        string candidate = Path.Join(asmDir, "runtimes", GetRid(), "native", $"libsofthsm2.{ext}");
         return File.Exists(candidate) ? candidate : null;
     }
 
     internal static string ResolveUtil(string libPath)
     {
         string utilName = OperatingSystem.IsWindows() ? "softhsm2-util.exe" : "softhsm2-util";
-        string builtUtil = Path.Combine(Path.GetDirectoryName(libPath)!, utilName);
+        string builtUtil = Path.Join(Path.GetDirectoryName(libPath)!, utilName);
         if (!File.Exists(builtUtil))
             throw new FileNotFoundException(
                 $"{utilName} not found next to the built libsofthsm2 at '{builtUtil}'. " +
