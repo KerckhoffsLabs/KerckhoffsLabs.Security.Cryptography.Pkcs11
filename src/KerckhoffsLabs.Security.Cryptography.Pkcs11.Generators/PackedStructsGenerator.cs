@@ -100,7 +100,8 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
 
     private static string SubstituteFieldType(ITypeSymbol t, IReadOnlyDictionary<string, string> packedNames)
     {
-        // Walk arrays / pointers — for now only handle T and T[] (ByValArray flattens to inline).
+        // Walk arrays / pointers. No native struct currently declares an array field — inline
+        // fixed-size buffers use [InlineArray] value types — but the branch is kept for safety.
         if (t is IArrayTypeSymbol arr)
             return SubstituteFieldType(arr.ElementType, packedNames) + "[]";
 
@@ -249,7 +250,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
-            sb.Append("        if (typeof(T) == typeof(").Append(FqUnified(sym)).Append(")) return Marshal.SizeOf<")
+            sb.Append("        if (typeof(T) == typeof(").Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
               .Append(FqWindows(sym)).AppendLine(">();");
         }
         sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.SizeOfWindows<T>: type {typeof(T)} has no Windows sibling.\");");
@@ -304,7 +305,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
-            sb.Append(IfTypeEquals).Append(FqUnified(sym)).Append(")) return Marshal.SizeOf<")
+            sb.Append(IfTypeEquals).Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
               .Append(FqWindows(sym)).AppendLine(">();");
         }
         sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.SizeOfWindows(Type): type {t} has no Windows sibling.\");");
@@ -318,7 +319,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
-            sb.Append(IfTypeEquals).Append(FqUnified(sym)).Append(")) return Marshal.SizeOf<")
+            sb.Append(IfTypeEquals).Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
               .Append(FqUnified(sym)).AppendLine(">();");
         }
         sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.SizeOfUnified(Type): type {t} is not a known [PackedForPkcs11] type.\");");
