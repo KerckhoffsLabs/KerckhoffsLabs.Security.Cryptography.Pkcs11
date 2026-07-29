@@ -101,6 +101,11 @@ jobs:
       # reported as "problems with file encoding in the source code". The repository is UTF-8 by
       # construction — .editorconfig sets charset = utf-8 and the dotnet format gate enforces it — so
       # this only tells the scanner what the files already are.
+      #
+      # docs/images is excluded because the scanner indexes those binary assets and tries to decode
+      # them as text; icon.png in particular reports "Invalid character encountered ... at line 1",
+      # which raises the same project-level encoding warning even when every real source file is
+      # clean. They carry no analyzable content, so indexing them buys nothing.
       - name: Begin analysis
         run: >
           dotnet sonarscanner begin
@@ -110,7 +115,7 @@ jobs:
           /d:sonar.sourceEncoding="UTF-8"
           /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml"
           /d:sonar.coverage.exclusions="**/*.Generators/**/*.cs"
-          /d:sonar.exclusions="vendor/**"
+          /d:sonar.exclusions="vendor/**,docs/images/**"
 
       - name: Build
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
