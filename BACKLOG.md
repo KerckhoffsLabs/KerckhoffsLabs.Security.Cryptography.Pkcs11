@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 55 (13 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 18 (14 open, 4 resolved)
+- Total items: 55 (14 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (24 open, 6 resolved) | Low: 18 (14 open, 4 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -262,7 +262,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** .NET Engineer B
 
-### [BL-024] Native struct-layout pin coverage is missing win-x86 absolute size pins (gaps (a) Unix FUNCTION_LIST and (c) pointer-field offsets closed 2026-07-29)
+### [BL-024] ✅ RESOLVED — Native struct-layout pin coverage is missing win-x86 absolute size pins (gaps (a) Unix FUNCTION_LIST and (c) pointer-field offsets closed 2026-07-29)
+- **Status:** Resolved 2026-07-29. Added `IsWindows32` and a `WindowsSiblingStructSize_OnX86` `ConditionalTheory` pinning all 98 Pack=1 siblings on the ILP32 leg, closing the last gap. The values are derived, not probed — no 32-bit Windows host was available — but the derivation was validated before use: a field-walking model (Pack=1, CK_ULONG=4, pointer=8) reproduced **all 98** existing win-x64 pins exactly, so the same model at pointer=4 rests on something already checked against known-good values. Sanity checks hold: pointer-free structs are byte-identical across the two ABIs (`CK_AES_CTR_PARAMS` 20, `CK_RC2_CBC_PARAMS` 12) and `CK_FUNCTION_LIST_Windows` goes 546 → 274 = 2 + 68×4. Because both Windows theories are skipped on Unix, a further `WindowsX86Pins_AreDerivableFromTheX64Pins` `[Fact]` runs on *every* platform and re-derives each x86 literal from its x64 counterpart minus 4 per recursive pointer field — verified to fail when a single row is corrupted. That guards transcription, not the ABI itself; the win-x86 CI leg remains the confirmation that the model matches real ILP32.
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M

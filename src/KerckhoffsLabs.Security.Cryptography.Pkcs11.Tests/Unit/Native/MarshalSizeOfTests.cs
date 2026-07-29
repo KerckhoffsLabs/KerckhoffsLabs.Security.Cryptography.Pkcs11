@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -24,6 +25,11 @@ public sealed class MarshalSizeOfTests
     // the Pack=1 sibling sizes above hold. On 32-bit Windows the pointers shrink; on Unix the
     // siblings aren't used at all (the unified path handles marshalling), so skip elsewhere.
     public static bool IsWindows64 => OperatingSystem.IsWindows() && Environment.Is64BitProcess;
+
+    // The ILP32 leg: pointers shrink to 4 while CK_ULONG stays 4, so the Pack=1 siblings have a
+    // different absolute size than on win-x64. CI runs this leg, and until these pins existed it
+    // had no absolute size expectations at all.
+    public static bool IsWindows32 => OperatingSystem.IsWindows() && !Environment.Is64BitProcess;
 
     [Fact]
     public void CK_VERSION_SizeIs2() => Assert.Equal(2, Marshal.SizeOf<CK_VERSION>());
@@ -264,5 +270,196 @@ public sealed class MarshalSizeOfTests
             ?? asm.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams." + typeName);
         Assert.NotNull(t);
         Assert.Equal(expectedSize, Marshal.SizeOf(t!));
+    }
+
+    /// <summary>
+    /// The same Pack=1 siblings on 32-bit Windows (ILP32). CK_ULONG stays 4 bytes, but pointers
+    /// shrink from 8 to 4, so every pointer-bearing struct is smaller here than on win-x64 while the
+    /// pointer-free ones are byte-identical. CI runs a win-x86 leg; before these pins it had no
+    /// absolute size expectations, because the win-x64 theory is gated to a 64-bit process.
+    /// </summary>
+    /// <remarks>
+    /// These values are derived, not probed — no 32-bit Windows host was available. Each is the
+    /// win-x64 pin minus 4 bytes per pointer field (counted recursively through nested structs).
+    /// The derivation was validated first by reproducing all 98 win-x64 pins from the same field-walk
+    /// with pointer = 8: it matched every one, so the pointer = 4 variant rests on a model already
+    /// checked against known-good values rather than on arithmetic done by hand.
+    /// </remarks>
+    [ConditionalTheory(nameof(IsWindows32))]
+    // BEGIN Windows x86 InlineData — OASIS Windows ILP32 ABI (CK_ULONG=4, ptr=4, pack=1)
+    [InlineData("CK_AES_CBC_ENCRYPT_DATA_PARAMS_Windows", 24)]
+    [InlineData("CK_AES_CTR_PARAMS_Windows", 20)]
+    [InlineData("CK_ARIA_CBC_ENCRYPT_DATA_PARAMS_Windows", 24)]
+    [InlineData("CK_ASYNC_DATA_Windows", 20)]
+    [InlineData("CK_ATTRIBUTE_Windows", 12)]
+    [InlineData("CK_C_INITIALIZE_ARGS_Windows", 24)]
+    [InlineData("CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS_Windows", 24)]
+    [InlineData("CK_CAMELLIA_CTR_PARAMS_Windows", 20)]
+    [InlineData("CK_CCM_MESSAGE_PARAMS_Windows", 28)]
+    [InlineData("CK_CCM_PARAMS_Windows", 24)]
+    [InlineData("CK_CCM_WRAP_PARAMS_Windows", 32)]
+    [InlineData("CK_CHACHA20_PARAMS_Windows", 16)]
+    [InlineData("CK_CMS_SIG_PARAMS_Windows", 32)]
+    [InlineData("CK_DERIVED_KEY_Windows", 12)]
+    [InlineData("CK_DES_CBC_ENCRYPT_DATA_PARAMS_Windows", 16)]
+    [InlineData("CK_DSA_PARAMETER_GEN_PARAM_Windows", 16)]
+    [InlineData("CK_ECDH_AES_KEY_WRAP_PARAMS_Windows", 16)]
+    [InlineData("CK_ECDH1_DERIVE_PARAMS_Windows", 20)]
+    [InlineData("CK_ECDH2_DERIVE_PARAMS_Windows", 36)]
+    [InlineData("CK_ECMQV_DERIVE_PARAMS_Windows", 40)]
+    [InlineData("CK_EDDSA_PARAMS_Windows", 9)]
+    [InlineData("CK_EXTRACT_PARAMS_Windows", 4)]
+    [InlineData("CK_FUNCTION_LIST_3_0_Windows", 370)]
+    [InlineData("CK_FUNCTION_LIST_3_2_Windows", 418)]
+    [InlineData("CK_FUNCTION_LIST_Windows", 274)]
+    [InlineData("CK_GCM_MESSAGE_PARAMS_Windows", 24)]
+    [InlineData("CK_GCM_PARAMS_Windows", 24)]
+    [InlineData("CK_GCM_WRAP_PARAMS_Windows", 28)]
+    [InlineData("CK_GOSTR3410_DERIVE_PARAMS_Windows", 20)]
+    [InlineData("CK_GOSTR3410_KEY_WRAP_PARAMS_Windows", 20)]
+    [InlineData("CK_HASH_SIGN_ADDITIONAL_CONTEXT_Windows", 16)]
+    [InlineData("CK_HKDF_PARAMS_Windows", 30)]
+    [InlineData("CK_IKE_PRF_DERIVE_PARAMS_Windows", 26)]
+    [InlineData("CK_IKE1_EXTENDED_DERIVE_PARAMS_Windows", 17)]
+    [InlineData("CK_IKE1_PRF_DERIVE_PARAMS_Windows", 30)]
+    [InlineData("CK_IKE2_PRF_PLUS_DERIVE_PARAMS_Windows", 17)]
+    [InlineData("CK_INFO_Windows", 72)]
+    [InlineData("CK_INTERFACE_Windows", 12)]
+    [InlineData("CK_KEA_DERIVE_PARAMS_Windows", 21)]
+    [InlineData("CK_KEY_DERIVATION_STRING_DATA_Windows", 8)]
+    [InlineData("CK_KEY_WRAP_SET_OAEP_PARAMS_Windows", 9)]
+    [InlineData("CK_KIP_PARAMS_Windows", 16)]
+    [InlineData("CK_MAC_GENERAL_PARAMS_Windows", 4)]
+    [InlineData("CK_MECHANISM_INFO_Windows", 12)]
+    [InlineData("CK_MECHANISM_Windows", 12)]
+    [InlineData("CK_OTP_PARAM_Windows", 12)]
+    [InlineData("CK_OTP_PARAMS_Windows", 8)]
+    [InlineData("CK_OTP_SIGNATURE_INFO_Windows", 8)]
+    [InlineData("CK_PBE_PARAMS_Windows", 24)]
+    [InlineData("CK_PKCS5_PBKD2_PARAMS_Windows", 36)]
+    [InlineData("CK_PKCS5_PBKD2_PARAMS2_Windows", 36)]
+    [InlineData("CK_PRF_DATA_PARAM_Windows", 12)]
+    [InlineData("CK_RC2_CBC_PARAMS_Windows", 12)]
+    [InlineData("CK_RC2_MAC_GENERAL_PARAMS_Windows", 8)]
+    [InlineData("CK_RC2_PARAMS_Windows", 4)]
+    [InlineData("CK_RC5_CBC_PARAMS_Windows", 16)]
+    [InlineData("CK_RC5_MAC_GENERAL_PARAMS_Windows", 12)]
+    [InlineData("CK_RC5_PARAMS_Windows", 8)]
+    [InlineData("CK_RSA_AES_KEY_WRAP_PARAMS_Windows", 8)]
+    [InlineData("CK_RSA_PKCS_OAEP_PARAMS_Windows", 20)]
+    [InlineData("CK_RSA_PKCS_PSS_PARAMS_Windows", 12)]
+    [InlineData("CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS_Windows", 12)]
+    [InlineData("CK_SALSA20_CHACHA20_POLY1305_PARAMS_Windows", 16)]
+    [InlineData("CK_SALSA20_PARAMS_Windows", 12)]
+    [InlineData("CK_SEED_CBC_ENCRYPT_DATA_PARAMS_Windows", 24)]
+    [InlineData("CK_SESSION_INFO_Windows", 16)]
+    [InlineData("CK_SIGN_ADDITIONAL_CONTEXT_Windows", 12)]
+    [InlineData("CK_SKIPJACK_PRIVATE_WRAP_PARAMS_Windows", 44)]
+    [InlineData("CK_SKIPJACK_RELAYX_PARAMS_Windows", 56)]
+    [InlineData("CK_SLOT_INFO_Windows", 104)]
+    [InlineData("CK_SP800_108_COUNTER_FORMAT_Windows", 5)]
+    [InlineData("CK_SP800_108_DKM_LENGTH_FORMAT_Windows", 9)]
+    [InlineData("CK_SP800_108_FEEDBACK_KDF_PARAMS_Windows", 28)]
+    [InlineData("CK_SP800_108_KDF_PARAMS_Windows", 20)]
+    [InlineData("CK_SSL3_KEY_MAT_OUT_Windows", 24)]
+    [InlineData("CK_SSL3_KEY_MAT_PARAMS_Windows", 33)]
+    [InlineData("CK_SSL3_MASTER_KEY_DERIVE_PARAMS_Windows", 20)]
+    [InlineData("CK_SSL3_RANDOM_DATA_Windows", 16)]
+    [InlineData("CK_TLS_KDF_PARAMS_Windows", 36)]
+    [InlineData("CK_TLS_MAC_PARAMS_Windows", 12)]
+    [InlineData("CK_TLS_PRF_PARAMS_Windows", 24)]
+    [InlineData("CK_TLS12_EXTENDED_MASTER_KEY_DERIVE_PARAMS_Windows", 16)]
+    [InlineData("CK_TLS12_KEY_MAT_PARAMS_Windows", 37)]
+    [InlineData("CK_TLS12_MASTER_KEY_DERIVE_PARAMS_Windows", 24)]
+    [InlineData("CK_TOKEN_INFO_Windows", 160)]
+    [InlineData("CK_WTLS_KEY_MAT_OUT_Windows", 12)]
+    [InlineData("CK_WTLS_KEY_MAT_PARAMS_Windows", 41)]
+    [InlineData("CK_WTLS_MASTER_KEY_DERIVE_PARAMS_Windows", 24)]
+    [InlineData("CK_WTLS_PRF_PARAMS_Windows", 28)]
+    [InlineData("CK_WTLS_RANDOM_DATA_Windows", 16)]
+    [InlineData("CK_X2RATCHET_INITIALIZE_PARAMS_Windows", 29)]
+    [InlineData("CK_X2RATCHET_RESPOND_PARAMS_Windows", 29)]
+    [InlineData("CK_X3DH_INITIATE_PARAMS_Windows", 28)]
+    [InlineData("CK_X3DH_RESPOND_PARAMS_Windows", 24)]
+    [InlineData("CK_X9_42_DH1_DERIVE_PARAMS_Windows", 20)]
+    [InlineData("CK_X9_42_DH2_DERIVE_PARAMS_Windows", 36)]
+    [InlineData("CK_X9_42_MQV_DERIVE_PARAMS_Windows", 40)]
+    [InlineData("CK_XEDDSA_PARAMS_Windows", 4)]
+    // END Windows x86 InlineData
+    public void WindowsSiblingStructSize_OnX86(string typeName, int expectedSize)
+    {
+        var asm = typeof(CK_INFO).Assembly;
+        var t = asm.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native." + typeName)
+            ?? asm.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams." + typeName);
+        Assert.NotNull(t);
+        Assert.Equal(expectedSize, Marshal.SizeOf(t!));
+    }
+
+    /// <summary>
+    /// Ties the win-x86 pins to the win-x64 pins by the one relationship that produces them: with
+    /// Pack=1 there is no padding and CK_ULONG is 4 bytes on both Windows ABIs, so the only field
+    /// that changes width is the pointer. Every x86 size must therefore be its x64 size minus 4 per
+    /// pointer field, counted recursively through nested structs.
+    /// </summary>
+    /// <remarks>
+    /// This runs on every platform, including Linux, where both size theories are skipped — so it is
+    /// the only thing standing between a mistyped x86 literal and a red CI leg on hardware most
+    /// contributors cannot reproduce. Note what it does and does not prove: it verifies the 98 x86
+    /// literals are transcribed consistently with the 98 x64 literals under the stated model, not
+    /// that the model matches the real ILP32 ABI. The win-x86 CI leg is what confirms the latter.
+    /// </remarks>
+    [Fact]
+    public void WindowsX86Pins_AreDerivableFromTheX64Pins()
+    {
+        var x64 = PinnedSizes(nameof(WindowsSiblingStructSize));
+        var x86 = PinnedSizes(nameof(WindowsSiblingStructSize_OnX86));
+
+        Assert.NotEmpty(x64); // sanity: the attribute reflection actually found the rows
+        Assert.Equal(x64.Count, x86.Count);
+
+        var mismatches = new List<string>();
+        foreach (var (name, x64Size) in x64)
+        {
+            if (!x86.TryGetValue(name, out int x86Size)) { mismatches.Add($"{name}: missing x86 row"); continue; }
+
+            var t = typeof(CK_INFO).Assembly.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native." + name)
+                 ?? typeof(CK_INFO).Assembly.GetType("KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams." + name);
+            Assert.NotNull(t);
+
+            int expected = x64Size - 4 * PointerFieldCount(t!);
+            if (x86Size != expected) mismatches.Add($"{name}: x86 pinned {x86Size}, derived {expected} (x64 {x64Size})");
+        }
+
+        Assert.True(mismatches.Count == 0,
+            "win-x86 pins are inconsistent with the win-x64 pins. Fix the x86 literal, or if the "
+            + "struct genuinely changed shape, update both platforms' rows together: "
+            + string.Join("; ", mismatches));
+    }
+
+    /// <summary>Reads the <c>[InlineData("Name", size)]</c> rows off one of the sibling-size theories.</summary>
+    private static Dictionary<string, int> PinnedSizes(string methodName)
+    {
+        var method = typeof(MarshalSizeOfTests).GetMethod(methodName)!;
+        var pins = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var attr in method.GetCustomAttributesData()
+                     .Where(a => a.AttributeType.Name == "InlineDataAttribute"))
+        {
+            // InlineDataAttribute's ctor is (params object[] data).
+            var args = (IReadOnlyList<CustomAttributeTypedArgument>)attr.ConstructorArguments[0].Value!;
+            pins[(string)args[0].Value!] = (int)args[1].Value!;
+        }
+        return pins;
+    }
+
+    /// <summary>Counts pointer-width fields, recursing into nested structs. Inline buffers are byte
+    /// arrays and <c>NativeCULong</c> is 4 bytes on both Windows ABIs, so neither contributes.</summary>
+    private static int PointerFieldCount(Type t)
+    {
+        if (t == typeof(IntPtr) || t == typeof(UIntPtr)) return 1;
+        if (t.Name == "NativeCULong" || t.IsPrimitive || t.IsEnum) return 0;
+        if (t.GetCustomAttributes().Any(a => a.GetType().Name == "InlineArrayAttribute")) return 0;
+        if (!t.IsValueType) return 0;
+        return t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Sum(f => PointerFieldCount(f.FieldType));
     }
 }
