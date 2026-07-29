@@ -70,11 +70,11 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _tagLen)
             throw new ArgumentException($"Destination must be at least {_tagLen} bytes.", nameof(destination));
-        UnmanagedMemory.Read(_tag, destination[.._tagLen]);
+        _tagBuffer.AsSpan(0, _tagLen).CopyTo(destination);
     }
 
-    /// <summary>The managed tag buffer that <see cref="AbsorbOutput"/> fills. Used by tests until
-    /// the session switches to the scope path, after which <see cref="CopyTagTo"/> reads it.</summary>
+    /// <summary>The managed tag buffer that <see cref="AbsorbOutput"/> fills, and that
+    /// <see cref="CopyTagTo"/> serves callers from.</summary>
     internal ReadOnlySpan<byte> AbsorbedTag => _tagBuffer.AsSpan(0, _tagLen);
 
     /// <inheritdoc/>
@@ -102,6 +102,11 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
+        // Guarded like every other member: the pointers in `marshalled` belong to a call scope, and
+        // absorbing after that scope has gone (or after disposal) would read released memory. Failing
+        // loudly beats silently returning zeros.
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var s = (CK_GCM_MESSAGE_PARAMS)marshalled;
         if (s.Tag == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, _tagLen));

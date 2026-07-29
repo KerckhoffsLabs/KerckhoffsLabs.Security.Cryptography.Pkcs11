@@ -1233,13 +1233,16 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         NativeCULong keyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
+
+        mechanism.AbsorbOutput();
 
         return new ObjectHandle((ulong)keyId);
     }
@@ -1264,7 +1267,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKeyPair");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
         CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
@@ -1273,6 +1277,8 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
+
+        mechanism.AbsorbOutput();
 
         publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
         privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
@@ -1297,11 +1303,17 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
-        return CallWithLengthProbe(
+        byte[] wrappedKey = CallWithLengthProbe(
             (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, ref len),
             OpWrapKey);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput();
+
+        return wrappedKey;
     }
 
     /// <summary>
@@ -1348,7 +1360,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         // Unwrapping decrypts a key blob into a new token object. Without secure defaults a caller
         // could land an extractable, non-sensitive key — silently downgrading the posture the key
@@ -1362,6 +1375,8 @@ internal sealed class Pkcs11Session : IDisposable
             NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
             CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
             Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
+
+            mechanism.AbsorbOutput();
 
             return new ObjectHandle((ulong)unwrappedKey);
         }
@@ -1541,7 +1556,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(data);
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
@@ -1584,6 +1600,10 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
+
+        // Inside the scope's lifetime: the parameter block the token may have written into (an AEAD
+        // IV, say) is still allocated. After `scope` is disposed the bytes are zeroized and freed.
+        mechanism.AbsorbOutput();
 
         if (encryptedData.Length != (int)encryptedDataLen)
             Array.Resize(ref encryptedData, (int)encryptedDataLen);
@@ -1644,7 +1664,8 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
@@ -1684,6 +1705,8 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
             finalized = true;
+
+            mechanism.AbsorbOutput();
 
             if (lastEncryptedPartLen > (NativeCULong)0)
                 outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
@@ -1735,47 +1758,49 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageEncrypt");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        // One scope for the whole operation: it owns the mechanism's parameter block and the
+        // per-message block below, and outlives every native call that reads or writes them.
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
         CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageEncryptInit);
 
+        mechanism.AbsorbOutput();
+
         try
         {
-            object paramsStruct = messageParams.ToMarshalableStructure();
+            object paramsStruct = messageParams.BuildMarshalable(scope);
             int paramsSize = UnmanagedMemory.SizeOf(paramsStruct.GetType());
-            IntPtr paramsPtr = UnmanagedMemory.Allocate(paramsSize);
-            try
-            {
-                UnmanagedMemory.Write(paramsPtr, paramsStruct);
+            IntPtr paramsPtr = scope.Allocate(paramsSize);
+            UnmanagedMemory.Write(paramsPtr, paramsStruct);
 
-                byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
-                byte[] pt = plaintext.ToArray();
+            byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
+            byte[] pt = plaintext.ToArray();
 
-                NativeCULong ctLen = (NativeCULong)0;
-                rv = _pkcs11Library.C_EncryptMessage(
-                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                    aad, (NativeCULong)aad.Length,
-                    pt, (NativeCULong)pt.Length,
-                    null!, ref ctLen);
-                Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
+            NativeCULong ctLen = (NativeCULong)0;
+            rv = _pkcs11Library.C_EncryptMessage(
+                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                aad, (NativeCULong)aad.Length,
+                pt, (NativeCULong)pt.Length,
+                null!, ref ctLen);
+            Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
 
-                byte[] ct = new byte[(int)ctLen];
-                rv = _pkcs11Library.C_EncryptMessage(
-                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                    aad, (NativeCULong)aad.Length,
-                    pt, (NativeCULong)pt.Length,
-                    ct, ref ctLen);
-                Pkcs11Exception.ThrowIfError(rv, OpEncryptMessage);
+            byte[] ct = new byte[(int)ctLen];
+            rv = _pkcs11Library.C_EncryptMessage(
+                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                aad, (NativeCULong)aad.Length,
+                pt, (NativeCULong)pt.Length,
+                ct, ref ctLen);
+            Pkcs11Exception.ThrowIfError(rv, OpEncryptMessage);
 
-                if (ct.Length != (int)ctLen)
-                    Array.Resize(ref ct, (int)ctLen);
+            // The token wrote the authentication tag into the scope-owned block; copy it back into
+            // the wrapper before `scope` is disposed and the bytes are zeroized.
+            messageParams.AbsorbOutput(paramsStruct);
 
-                return ct;
-            }
-            finally
-            {
-                UnmanagedMemory.Free(ref paramsPtr);
-            }
+            if (ct.Length != (int)ctLen)
+                Array.Resize(ref ct, (int)ctLen);
+
+            return ct;
         }
         finally
         {
@@ -1822,7 +1847,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(encryptedData);
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
@@ -1842,6 +1868,8 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+
+        mechanism.AbsorbOutput();
 
         if (decryptedData.Length != (int)decryptedDataLen)
             Array.Resize(ref decryptedData, (int)decryptedDataLen);
@@ -1900,7 +1928,8 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
@@ -1940,6 +1969,8 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
             finalized = true;
+
+            mechanism.AbsorbOutput();
 
             if (lastPartLen > (NativeCULong)0)
                 outputStream.Write(lastPart, 0, (int)(lastPartLen));
@@ -1981,47 +2012,47 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        // One scope for the whole operation: it owns the mechanism's parameter block and the
+        // per-message block below, and outlives every native call that reads or writes them.
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
         CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageDecryptInit);
 
+        mechanism.AbsorbOutput();
+
         try
         {
-            object paramsStruct = messageParams.ToMarshalableStructure();
+            object paramsStruct = messageParams.BuildMarshalable(scope);
             int paramsSize = UnmanagedMemory.SizeOf(paramsStruct.GetType());
-            IntPtr paramsPtr = UnmanagedMemory.Allocate(paramsSize);
-            try
-            {
-                UnmanagedMemory.Write(paramsPtr, paramsStruct);
+            IntPtr paramsPtr = scope.Allocate(paramsSize);
+            UnmanagedMemory.Write(paramsPtr, paramsStruct);
 
-                byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
-                byte[] ct = ciphertext.ToArray();
+            byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
+            byte[] ct = ciphertext.ToArray();
 
-                NativeCULong ptLen = (NativeCULong)0;
-                rv = _pkcs11Library.C_DecryptMessage(
-                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                    aad, (NativeCULong)aad.Length,
-                    ct, (NativeCULong)ct.Length,
-                    null!, ref ptLen);
-                Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
+            NativeCULong ptLen = (NativeCULong)0;
+            rv = _pkcs11Library.C_DecryptMessage(
+                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                aad, (NativeCULong)aad.Length,
+                ct, (NativeCULong)ct.Length,
+                null!, ref ptLen);
+            Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
 
-                byte[] pt = new byte[(int)ptLen];
-                rv = _pkcs11Library.C_DecryptMessage(
-                    _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                    aad, (NativeCULong)aad.Length,
-                    ct, (NativeCULong)ct.Length,
-                    pt, ref ptLen);
-                Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
+            byte[] pt = new byte[(int)ptLen];
+            rv = _pkcs11Library.C_DecryptMessage(
+                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                aad, (NativeCULong)aad.Length,
+                ct, (NativeCULong)ct.Length,
+                pt, ref ptLen);
+            Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
 
-                if (pt.Length != (int)ptLen)
-                    Array.Resize(ref pt, (int)ptLen);
+            messageParams.AbsorbOutput(paramsStruct);
 
-                return pt;
-            }
-            finally
-            {
-                UnmanagedMemory.Free(ref paramsPtr);
-            }
+            if (pt.Length != (int)ptLen)
+                Array.Resize(ref pt, (int)ptLen);
+
+            return pt;
         }
         finally
         {
@@ -2053,14 +2084,20 @@ internal sealed class Pkcs11Session : IDisposable
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
         // P/Invoke when perf profiling proves it matters.
         byte[] buffer = data.ToArray();
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpSignInit);
 
-        return CallWithLengthProbe(
+        byte[] signature = CallWithLengthProbe(
             (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, buffer, (NativeCULong)buffer.Length, buf, ref len),
             OpSign);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput();
+
+        return signature;
     }
 
     /// <summary>
@@ -2106,13 +2143,16 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, (NativeCULong)(data.Length), signature, (NativeCULong)(signature.Length));
         isValid = IsVerified(rv, OpVerify);
+
+        mechanism.AbsorbOutput();
     }
 
     /// <summary>
@@ -2170,7 +2210,8 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
@@ -2192,6 +2233,8 @@ internal sealed class Pkcs11Session : IDisposable
             // the call failed with any other CKR — the verify operation is consumed.
             finalized = true;
             isValid = IsVerified(rv, OpVerifyFinal);
+
+            mechanism.AbsorbOutput();
         }
         finally
         {
@@ -2222,7 +2265,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecoverInit);
@@ -2234,6 +2278,8 @@ internal sealed class Pkcs11Session : IDisposable
         byte[] data = new byte[(int)dataLen];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), data, ref dataLen);
         isValid = IsVerified(rv, OpVerifyRecover);
+
+        mechanism.AbsorbOutput();
 
         if (data.Length != (int)(dataLen))
             Array.Resize(ref data, (int)(dataLen));
@@ -2350,12 +2396,15 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckVerificationMechanism = (CK_MECHANISM)verificationMechanism.ToMarshalableStructure();
+        // Both mechanisms marshal into the same scope: the two operations run interleaved, so both
+        // parameter blocks have to stay alive until the last native call returns.
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckVerificationMechanism = verificationMechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
 
-        CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
+        CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope);
 
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
@@ -2397,6 +2446,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
         isValid = IsVerified(rv, OpVerifyFinal);
+
+        verificationMechanism.AbsorbOutput();
+        decryptionMechanism.AbsorbOutput();
     }
 
     private const string ValueMustBePositive = "Value has to be positive number";
@@ -2419,7 +2471,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
@@ -2434,6 +2487,8 @@ internal sealed class Pkcs11Session : IDisposable
         byte[] digest = new byte[(int)digestLen];
         rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+
+        mechanism.AbsorbOutput();
 
         if (digest.Length != (int)(digestLen))
             Array.Resize(ref digest, (int)(digestLen));
@@ -2478,14 +2533,20 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(data);
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
-        return CallWithLengthProbe(
+        byte[] digest = CallWithLengthProbe(
             (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), buf, ref len),
             OpDigest);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput();
+
+        return digest;
     }
 
     /// <summary>
@@ -2533,7 +2594,8 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
@@ -2558,6 +2620,8 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             finalized = true;
+
+            mechanism.AbsorbOutput();
 
             if (digest.Length != (int)(digestLen))
                 Array.Resize(ref digest, (int)(digestLen));
@@ -2665,7 +2729,10 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
+        // Both mechanisms marshal into the same scope: digest and encrypt run interleaved, so both
+        // parameter blocks have to stay alive until the last native call returns.
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
@@ -2675,7 +2742,7 @@ internal sealed class Pkcs11Session : IDisposable
         bool digestFinalized = false;
         try
         {
-            CK_MECHANISM ckEncryptionMechanism = (CK_MECHANISM)encryptionMechanism.ToMarshalableStructure();
+            CK_MECHANISM ckEncryptionMechanism = encryptionMechanism.Marshal(scope);
 
             rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
             Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
@@ -2725,6 +2792,9 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             digestFinalized = true;
+
+            digestingMechanism.AbsorbOutput();
+            encryptionMechanism.AbsorbOutput();
 
             if (digest.Length != (int)(digestLen))
                 Array.Resize(ref digest, (int)(digestLen));
@@ -2837,7 +2907,10 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        CK_MECHANISM ckDigestingMechanism = (CK_MECHANISM)digestingMechanism.ToMarshalableStructure();
+        // Both mechanisms marshal into the same scope: decrypt and digest run interleaved, so both
+        // parameter blocks have to stay alive until the last native call returns.
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope);
 
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
@@ -2847,7 +2920,7 @@ internal sealed class Pkcs11Session : IDisposable
         bool digestFinalized = false;
         try
         {
-            CK_MECHANISM ckDecryptionMechanism = (CK_MECHANISM)decryptionMechanism.ToMarshalableStructure();
+            CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope);
 
             rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
             Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
@@ -2898,6 +2971,9 @@ internal sealed class Pkcs11Session : IDisposable
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             digestFinalized = true;
 
+            digestingMechanism.AbsorbOutput();
+            decryptionMechanism.AbsorbOutput();
+
             if (digest.Length != (int)(digestLen))
                 Array.Resize(ref digest, (int)(digestLen));
 
@@ -2944,7 +3020,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
@@ -2958,6 +3035,10 @@ internal sealed class Pkcs11Session : IDisposable
             NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
             CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
             Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
+
+            // SP800-108 sibling-key handles live in scope-owned slots the token wrote into; copy them
+            // out before `scope` is disposed.
+            mechanism.AbsorbOutput();
 
             return new ObjectHandle((ulong)derivedKey);
         }
@@ -3103,7 +3184,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
@@ -3158,6 +3240,8 @@ internal sealed class Pkcs11Session : IDisposable
                 Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
             }
 
+            mechanism.AbsorbOutput();
+
             if (ct.Length != (int)ctLen)
                 Array.Resize(ref ct, (int)ctLen);
 
@@ -3192,7 +3276,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
 
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
@@ -3214,6 +3299,8 @@ internal sealed class Pkcs11Session : IDisposable
                 template, (NativeCULong)template.Length,
                 ct, (NativeCULong)ct.Length, ref sharedHandle);
             Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
+
+            mechanism.AbsorbOutput();
 
             return new ObjectHandle((ulong)sharedHandle);
         }
@@ -3246,7 +3333,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
         byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
         NativeCULong wrappedLen = (NativeCULong)0;
@@ -3264,6 +3352,8 @@ internal sealed class Pkcs11Session : IDisposable
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
             aad, (NativeCULong)aad.Length, wrapped, ref wrappedLen);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKeyAuthenticated);
+
+        mechanism.AbsorbOutput();
 
         if (wrapped.Length != (int)wrappedLen)
             Array.Resize(ref wrapped, (int)wrappedLen);
@@ -3292,7 +3382,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
         byte[] wrapped = wrappedKey.ToArray();
         byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
@@ -3316,6 +3407,8 @@ internal sealed class Pkcs11Session : IDisposable
                 template, (NativeCULong)template.Length,
                 aad, (NativeCULong)aad.Length, ref newKey);
             Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
+
+            mechanism.AbsorbOutput();
 
             return new ObjectHandle((ulong)newKey);
         }
@@ -3349,7 +3442,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
         byte[] sig = signature.ToArray();
         byte[] dataBuf = data.ToArray();
 
@@ -3359,7 +3453,12 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
 
         rv = _pkcs11Library.C_VerifySignature(_sessionId, dataBuf, (NativeCULong)dataBuf.Length);
-        return IsVerified(rv, OpVerifySignature);
+        bool verified = IsVerified(rv, OpVerifySignature);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput();
+
+        return verified;
     }
 
     /// <summary>
@@ -3386,7 +3485,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 
-        CK_MECHANISM ckMechanism = (CK_MECHANISM)mechanism.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope);
         byte[] sig = signature.ToArray();
 
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
@@ -3403,7 +3503,12 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
-        return IsVerified(rv, OpVerifySignatureFinal);
+        bool verified = IsVerified(rv, OpVerifySignatureFinal);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput();
+
+        return verified;
     }
 
     // === Validation flags ==================================================

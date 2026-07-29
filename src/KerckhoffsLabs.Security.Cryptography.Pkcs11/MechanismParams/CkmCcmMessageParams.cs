@@ -74,11 +74,11 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _macLen)
             throw new ArgumentException($"Destination must be at least {_macLen} bytes.", nameof(destination));
-        UnmanagedMemory.Read(_mac, destination[.._macLen]);
+        _macBuffer.AsSpan(0, _macLen).CopyTo(destination);
     }
 
-    /// <summary>The managed MAC buffer that <see cref="AbsorbOutput"/> fills. Used by tests until
-    /// the session switches to the scope path, after which <see cref="CopyMacTo"/> reads it.</summary>
+    /// <summary>The managed MAC buffer that <see cref="AbsorbOutput"/> fills, and that
+    /// <see cref="CopyMacTo"/> serves callers from.</summary>
     internal ReadOnlySpan<byte> AbsorbedMac => _macBuffer.AsSpan(0, _macLen);
 
     /// <inheritdoc/>
@@ -107,6 +107,11 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
+        // Guarded like every other member: the pointers in `marshalled` belong to a call scope, and
+        // absorbing after that scope has gone (or after disposal) would read released memory. Failing
+        // loudly beats silently returning zeros.
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var s = (CK_CCM_MESSAGE_PARAMS)marshalled;
         if (s.Mac == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Mac, _macBuffer.AsSpan(0, _macLen));

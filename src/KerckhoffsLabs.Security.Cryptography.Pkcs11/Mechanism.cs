@@ -21,6 +21,19 @@ public sealed class Mechanism : IDisposable
     private CK_MECHANISM _ckMechanism;
 
     /// <summary>
+    /// The mechanism type, kept so <see cref="Marshal"/> can rebuild the <c>CK_MECHANISM</c> without
+    /// reaching into the legacy structure.
+    /// </summary>
+    private readonly NativeCULong _type;
+
+    /// <summary>
+    /// The interop struct handed to the most recent <see cref="Marshal"/> caller. Its pointer fields
+    /// address scope-owned blocks, which is what <see cref="AbsorbOutput"/> reads the token's output
+    /// out of.
+    /// </summary>
+    private object? _lastMarshalled;
+
+    /// <summary>
     /// The type of mechanism
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
@@ -59,6 +72,51 @@ public sealed class Mechanism : IDisposable
     }
 
     /// <summary>
+    /// Builds the <c>CK_MECHANISM</c> for one native call, allocating the parameter block and any
+    /// buffers it points at inside <paramref name="scope"/>.
+    /// </summary>
+    /// <param name="scope">Owns every byte allocated here; released by the caller once the call returns.</param>
+    /// <returns>The structure to hand to the native entry point.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
+    internal CK_MECHANISM Marshal(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // Mechanisms built with no parameter, or with a raw byte[] one, have nothing to rebuild: the
+        // constructor already produced the CK_MECHANISM (null Parameter, or a block it owns), so hand
+        // that value back unchanged.
+        if (_mechanismParams is null)
+            return _ckMechanism;
+
+        object lowLevel = _mechanismParams.BuildMarshalable(scope);
+        _lastMarshalled = lowLevel;
+
+        int size = UnmanagedMemory.SizeOf(lowLevel.GetType());
+        IntPtr block = scope.Allocate(size);
+        UnmanagedMemory.Write(block, lowLevel);
+
+        return new CK_MECHANISM
+        {
+            Mechanism = _type,
+            Parameter = block,
+            ParameterLen = (NativeCULong)size,
+        };
+    }
+
+    /// <summary>
+    /// Copies any token output out of the block built by <see cref="Marshal"/> and back into the
+    /// parameter object's managed state. Must run after the native call returns and before the scope
+    /// passed to <see cref="Marshal"/> is disposed — that scope owns the memory being read.
+    /// </summary>
+    internal void AbsorbOutput()
+    {
+        if (_mechanismParams is null || _lastMarshalled is null)
+            return;
+
+        _mechanismParams.AbsorbOutput(_lastMarshalled);
+    }
+
+    /// <summary>
     /// High level object with mechanism parameters
     /// </summary>
     private readonly MechanismParameters? _mechanismParams = null;
@@ -69,7 +127,8 @@ public sealed class Mechanism : IDisposable
     /// <param name="type">Mechanism type</param>
     public Mechanism(ulong type)
     {
-        _ckMechanism = CK_MECHANISM.CreateMechanism((NativeCULong)type);
+        _type = (NativeCULong)type;
+        _ckMechanism = CK_MECHANISM.CreateMechanism(_type);
     }
 
     /// <summary>
@@ -78,6 +137,7 @@ public sealed class Mechanism : IDisposable
     /// <param name="type">Mechanism type</param>
     public Mechanism(CKM type)
     {
+        _type = type.ToCULong();
         _ckMechanism = CK_MECHANISM.CreateMechanism(type);
     }
 
@@ -88,7 +148,8 @@ public sealed class Mechanism : IDisposable
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(ulong type, byte[] parameter)
     {
-        _ckMechanism = CK_MECHANISM.CreateMechanism((NativeCULong)(type), parameter);
+        _type = (NativeCULong)type;
+        _ckMechanism = CK_MECHANISM.CreateMechanism(_type, parameter);
     }
 
     /// <summary>
@@ -98,6 +159,7 @@ public sealed class Mechanism : IDisposable
     /// <param name="parameter">Mechanism parameter</param>
     public Mechanism(CKM type, byte[] parameter)
     {
+        _type = type.ToCULong();
         _ckMechanism = CK_MECHANISM.CreateMechanism(type, parameter);
     }
 
@@ -125,8 +187,9 @@ public sealed class Mechanism : IDisposable
         // Owned from here: kept alive for the mechanism's lifetime and disposed with it.
         _mechanismParams = parameter;
 
+        _type = (NativeCULong)type;
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
-        _ckMechanism = CK_MECHANISM.CreateMechanism((NativeCULong)(type), lowLevelParams);
+        _ckMechanism = CK_MECHANISM.CreateMechanism(_type, lowLevelParams);
     }
 
     /// <summary>
@@ -153,6 +216,7 @@ public sealed class Mechanism : IDisposable
         // Owned from here: kept alive for the mechanism's lifetime and disposed with it.
         _mechanismParams = parameter;
 
+        _type = type.ToCULong();
         object lowLevelParams = _mechanismParams.ToMarshalableStructure();
         _ckMechanism = CK_MECHANISM.CreateMechanism(type, lowLevelParams);
     }
