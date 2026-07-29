@@ -1,3 +1,5 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
@@ -27,6 +29,23 @@ public abstract class MechanismParameters : IDisposable
     /// unmanaged memory. Internal: the concrete struct type is not part of the public API.
     /// </summary>
     internal abstract object ToMarshalableStructure();
+
+    /// <summary>
+    /// Builds the <c>[PackedForPkcs11]</c> interop struct, allocating any buffers its pointer fields
+    /// need inside <paramref name="scope"/>.
+    /// </summary>
+    /// <remarks>
+    /// The scope outlives this call and is released by the session once the native call returns, so
+    /// implementations own nothing and need no disposal of their own.
+    /// </remarks>
+    internal virtual object BuildMarshalable(MechanismParameterScope scope) => ToMarshalableStructure();
+
+    /// <summary>
+    /// Copies anything the token wrote into <paramref name="marshalled"/> back into managed state,
+    /// while the scope that owns it is still alive. The default does nothing; only the parameter
+    /// types with output fields override it.
+    /// </summary>
+    internal virtual void AbsorbOutput(object marshalled) { }
 
     /// <summary>0 until some <c>Mechanism</c> has claimed this instance, 1 afterwards.</summary>
     private int _owned;
