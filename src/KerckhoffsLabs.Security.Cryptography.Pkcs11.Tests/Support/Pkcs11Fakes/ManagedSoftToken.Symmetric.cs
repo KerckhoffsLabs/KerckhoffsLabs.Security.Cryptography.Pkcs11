@@ -80,7 +80,8 @@ internal sealed partial class ManagedSoftToken
                 {
                     var p = UnmanagedMemory.Read<CK_RC2_CBC_PARAMS>(mech.Parameter);
                     rc2Bits = (int)p.EffectiveBits;
-                    iv = p.Iv; // inline 8-byte IV
+                    // p is a local, so the inline buffer must be copied out rather than aliased.
+                    iv = ((ReadOnlySpan<byte>)p.Iv).ToArray();
                     break;
                 }
             case CKM.CKM_RC2_ECB:

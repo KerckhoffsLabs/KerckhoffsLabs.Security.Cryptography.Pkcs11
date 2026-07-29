@@ -12,8 +12,7 @@ internal partial struct CK_DES_CBC_ENCRYPT_DATA_PARAMS
     /// <summary>
     /// IV value
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-    public byte[] Iv;
+    public CkChar8 Iv;
 
     /// <summary>
     /// Data value part that must be a multiple of 8 bytes long

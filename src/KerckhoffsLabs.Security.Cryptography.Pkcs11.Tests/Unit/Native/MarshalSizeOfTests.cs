@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -28,32 +27,6 @@ public sealed class MarshalSizeOfTests
 
     [Fact]
     public void CK_VERSION_SizeIs2() => Assert.Equal(2, Marshal.SizeOf<CK_VERSION>());
-
-    /// <summary>
-    /// Guards the CA1421 suppression on <c>Pkcs11Marshal.SizeOf</c>. Structs carrying a
-    /// <c>[MarshalAs(ByValArray)] byte[]</c> field marshal to a larger footprint than their managed
-    /// layout — managed stores an object reference where unmanaged stores the array inline. Buffers
-    /// handed to the module are sized from the marshalled value and filled by
-    /// <c>Marshal.StructureToPtr</c>, so swapping in <c>sizeof</c>/<c>Unsafe.SizeOf</c> to satisfy the
-    /// analyzer would under-allocate and let the token write past the end. If these ever converge,
-    /// re-examine the suppression rather than deleting this test.
-    /// </summary>
-    [ConditionalFact(nameof(IsUnix))]
-    public void ByValArrayStruct_MarshalledSizeExceedsManagedSize()
-    {
-        // NativeCULong CounterBits + byte[16] Cb: 8 + 16 inline vs 8 + 8 reference.
-        Assert.Equal(24, Marshal.SizeOf<CK_AES_CTR_PARAMS>());
-        Assert.Equal(16, Unsafe.SizeOf<CK_AES_CTR_PARAMS>());
-
-        // byte[16] Iv + IntPtr Data + NativeCULong Length.
-        Assert.Equal(32, Marshal.SizeOf<CK_AES_CBC_ENCRYPT_DATA_PARAMS>());
-        Assert.Equal(24, Unsafe.SizeOf<CK_AES_CBC_ENCRYPT_DATA_PARAMS>());
-
-        // The live one: CK_RC2_CBC_PARAMS agrees only because its IV is 8 bytes, the same width as
-        // the reference it displaces. Pinned so that coincidence stays visible.
-        Assert.Equal(16, Marshal.SizeOf<CK_RC2_CBC_PARAMS>());
-        Assert.Equal(16, Unsafe.SizeOf<CK_RC2_CBC_PARAMS>());
-    }
 
     [Fact]
     public void CK_INFO_Windows_SiblingIsGenerated()

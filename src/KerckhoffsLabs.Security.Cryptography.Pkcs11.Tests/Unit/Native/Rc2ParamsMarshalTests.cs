@@ -43,7 +43,7 @@ public sealed class Rc2ParamsMarshalTests
             UnmanagedMemory.Write(mem, (object)s);
             var back = UnmanagedMemory.Read<CK_RC2_CBC_PARAMS>(mem);
             Assert.Equal(128UL, (ulong)back.EffectiveBits);
-            Assert.Equal(iv, back.Iv);
+            Assert.True(iv.AsSpan().SequenceEqual(back.Iv), "8-byte inline IV did not round-trip");
         }
         finally { UnmanagedMemory.Free(ref mem); }
     }

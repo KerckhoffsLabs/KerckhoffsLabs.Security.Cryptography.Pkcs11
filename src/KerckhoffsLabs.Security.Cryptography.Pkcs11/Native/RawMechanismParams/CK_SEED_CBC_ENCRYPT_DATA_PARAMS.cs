@@ -12,8 +12,7 @@ internal partial struct CK_SEED_CBC_ENCRYPT_DATA_PARAMS
     /// <summary>
     /// IV value
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] Iv;
+    public CkChar16 Iv;
 
     /// <summary>
     /// Data value part that must be a multiple of 16 bytes long

@@ -12,8 +12,7 @@ internal partial struct CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS
     /// <summary>
     /// 16-octet initialization vector
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] Iv;
+    public CkChar16 Iv;
 
     /// <summary>
     /// Pointer to data to encrypt

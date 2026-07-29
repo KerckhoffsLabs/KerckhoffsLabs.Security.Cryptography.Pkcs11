@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -29,6 +30,15 @@ public sealed class NativeStructLayoutTests
             (t.Namespace == NativeNs || t.Namespace == RawNs) &&
             t.Name.StartsWith("CK_", StringComparison.Ordinal) &&
             !t.Name.EndsWith("_Windows", StringComparison.Ordinal));
+
+    // Same set as CkStructs(), but retaining the generated _Windows siblings: both halves of every
+    // packed pair are marshalled by the dispatcher, so both must satisfy the managed==marshalled
+    // invariant that Pkcs11Marshal.SizeOf relies on.
+    private static IEnumerable<Type> CkStructsWithSiblings() =>
+        ProdAssembly.GetTypes().Where(t =>
+            t.IsValueType && !t.IsEnum &&
+            (t.Namespace == NativeNs || t.Namespace == RawNs) &&
+            t.Name.StartsWith("CK_", StringComparison.Ordinal));
 
     private static bool IsPacked(Type t) =>
         t.GetCustomAttributes().Any(a => a.GetType().Name == "PackedForPkcs11Attribute");
@@ -109,6 +119,38 @@ public sealed class NativeStructLayoutTests
         }
 
         Assert.True(failures.Count == 0, "Non-marshalable CK_* structs: " + string.Join(", ", failures));
+    }
+
+    /// <summary>
+    /// Every native struct must have an identical managed and marshalled layout.
+    /// <c>Pkcs11Marshal.SizeOf</c> sizes buffers with <c>Unsafe.SizeOf</c> (the managed layout) while
+    /// <c>Marshal.StructureToPtr</c> fills them using the marshalled layout, so any divergence
+    /// under-allocates a buffer the token then writes into. A managed <c>byte[]</c> field with
+    /// <c>[MarshalAs(ByValArray)]</c> is the way this breaks: managed stores a reference where
+    /// unmanaged stores the array inline. Use an <c>[InlineArray]</c> buffer instead.
+    /// This is a relative assertion, so it runs on every platform leg including 32-bit Windows,
+    /// where the absolute size pins are all skipped.
+    /// </summary>
+    [Fact]
+    public void EveryCkStruct_ManagedSizeMatchesMarshalledSize()
+    {
+        var unsafeSizeOf = typeof(Unsafe).GetMethods()
+            .Single(m => m.Name == nameof(Unsafe.SizeOf)
+                      && m.IsGenericMethodDefinition
+                      && m.GetParameters().Length == 0);
+
+        var failures = new List<string>();
+        foreach (var t in CkStructsWithSiblings())
+        {
+            int marshalled = Marshal.SizeOf(t);
+            int managed = (int)unsafeSizeOf.MakeGenericMethod(t).Invoke(null, null)!;
+            if (marshalled != managed)
+                failures.Add($"{t.Name}: marshalled={marshalled} managed={managed}");
+        }
+
+        Assert.True(failures.Count == 0,
+            "Managed layout must equal marshalled layout for every native struct. Divergent: "
+            + string.Join("; ", failures));
     }
 
     [Fact]

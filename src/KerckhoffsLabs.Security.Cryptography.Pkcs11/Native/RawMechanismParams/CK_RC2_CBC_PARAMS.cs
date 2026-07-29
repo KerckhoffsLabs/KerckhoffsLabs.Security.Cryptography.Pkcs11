@@ -17,6 +17,5 @@ internal partial struct CK_RC2_CBC_PARAMS
     /// <summary>
     /// The initialization vector (IV) for cipher block chaining mode
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-    public byte[] Iv;
+    public CkChar8 Iv;
 }

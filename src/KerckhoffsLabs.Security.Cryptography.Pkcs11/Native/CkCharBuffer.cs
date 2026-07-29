@@ -2,6 +2,10 @@ using System.Runtime.CompilerServices;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
+/// <summary>Blittable inline 8-byte buffer (replaces <c>[MarshalAs(ByValArray, SizeConst=8)] byte[]</c>).</summary>
+[InlineArray(8)]
+internal struct CkChar8 { private byte _e0; }
+
 /// <summary>Blittable inline 16-byte buffer (replaces <c>[MarshalAs(ByValArray, SizeConst=16)] byte[]</c>).</summary>
 [InlineArray(16)]
 internal struct CkChar16 { private byte _e0; }

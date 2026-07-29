@@ -5,8 +5,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_RC2_CBC_PARAMS"/>. Carries the RC2 effective-key-bits and the
 /// 8-byte IV for the <c>CKM_RC2_CBC</c> and <c>CKM_RC2_CBC_PAD</c> mechanisms (RFC 2268 / PKCS#11).
-/// The IV is an inline <c>[ByValArray]</c> field, so there is no unmanaged memory to own — the
-/// marshaller copies the 8 bytes into the struct.
+/// The IV is an inline fixed-size buffer stored in the struct itself, so there is no unmanaged
+/// memory and no separate heap array to own.
 /// </summary>
 public sealed class CkmRc2CbcParams : MechanismParameters
 {
@@ -24,11 +24,10 @@ public sealed class CkmRc2CbcParams : MechanismParameters
         if (iv.Length != 8)
             throw new ArgumentException("RC2 CBC IV must be exactly 8 bytes.", nameof(iv));
 
-        _lowLevelParams = new()
-        {
-            EffectiveBits = (NativeCULong)effectiveBits,
-            Iv = iv.ToArray(),
-        };
+        // The IV is an inline buffer, which an object initializer cannot assign from a span,
+        // so construct first and copy into the field afterwards.
+        _lowLevelParams = new() { EffectiveBits = (NativeCULong)effectiveBits };
+        iv.CopyTo(_lowLevelParams.Iv);
     }
 
     /// <inheritdoc/>

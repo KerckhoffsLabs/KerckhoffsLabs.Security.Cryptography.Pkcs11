@@ -17,6 +17,5 @@ internal partial struct CK_CAMELLIA_CTR_PARAMS
     /// <summary>
     /// Specifies the counter block
     /// </summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
-    public byte[] Cb;
+    public CkChar16 Cb;
 }
