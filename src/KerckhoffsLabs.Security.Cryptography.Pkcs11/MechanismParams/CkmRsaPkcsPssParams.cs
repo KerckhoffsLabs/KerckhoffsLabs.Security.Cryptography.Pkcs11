@@ -55,6 +55,7 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     /// <summary>Salt length in bytes.</summary>
     public int SaltLength => (int)(ulong)_lowLevelParams.Len;
 
-    /// <summary>No-op finalizer for symmetry with the other params wrappers; this type owns no unmanaged memory.</summary>
-    ~CkmRsaPkcsPssParams() => Dispose(false);
+    // No finalizer: this type owns no unmanaged memory, so one would only put every instance on
+    // the finalization queue and hold it an extra GC generation for a no-op. The sibling types
+    // that allocate keep theirs; CkmRc2Params and CkmRc2CbcParams likewise have none.
 }

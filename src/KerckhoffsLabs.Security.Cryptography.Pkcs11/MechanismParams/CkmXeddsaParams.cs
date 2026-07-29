@@ -34,11 +34,10 @@ public sealed class CkmXeddsaParams : MechanismParameters
     protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
-
-
         _disposed = true;
     }
 
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmXeddsaParams() => Dispose(false);
+    // No finalizer: this type owns no unmanaged memory, so one would only put every instance on
+    // the finalization queue and hold it an extra GC generation for a no-op. The sibling types
+    // that allocate keep theirs; CkmRc2Params and CkmRc2CbcParams likewise have none.
 }

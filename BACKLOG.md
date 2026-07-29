@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 56 (15 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (24 open, 7 resolved) | Low: 18 (14 open, 4 resolved)
+- Total items: 57 (15 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (25 open, 7 resolved) | Low: 18 (14 open, 4 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -395,6 +395,18 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Add the standard CodeQL `csharp` workflow on push/PR/schedule.
 - **Breaks public API?** No
 - **Raised by:** QA C
+
+### [BL-057] `MechanismParameters` owning unmanaged memory is what forces the ownership rules; make them pure descriptors instead
+- **Area:** .NET API Design
+- **Severity:** Medium
+- **Effort:** L
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismParams/` (27 types, 23 of which call `UnmanagedMemory.Allocate`); `MechanismParams/MechanismParameters.cs`; `Mechanism.cs`
+- **Problem:** Each `Ckm*Params` allocates its own unmanaged IV/AAD buffers and hands `Mechanism` a struct with the pointers already populated. That one fact generates everything downstream: a disposal-order contract, ownership transfer from caller to mechanism, the sharing hazard (each mechanism marshals its own copy of the pointer fields, so disposing one leaves the other addressing freed memory), the `TryClaimOwnership` guard added to reject it, and a finalizer on 25 types. Each of those is a correct fix for a symptom of the same root cause.
+- **Proposed action:** Invert the ownership. Parameters keep only managed data — validated in the constructor exactly as today — and `Mechanism` allocates the block *and* the side-buffers at marshal time, patches the pointer fields, and frees all of it in `Dispose`. Sharing then becomes trivially safe because parameters are just data, so the ownership guard, the transfer semantics, the ordering contract and the finalizers all disappear as categories rather than as instances. `MechanismParameters` also drops `IDisposable`, so callers no longer need `using` on them at all.
+- **Decision to settle first:** IV/AAD currently live only in unmanaged memory that `UnmanagedMemory.Free` zeroizes. As descriptors they would sit in the managed heap until marshalled. IVs and AAD are not generally secret, so that is acceptable for most types, but it should be an explicit ruling rather than a side effect — and for any parameter carrying sensitive input, `Internal/SecureBuffer.cs` (pinned and zeroized) is the existing tool.
+- **Related:** subsumes what remains of BL-012, which fixed the disposal ordering and the finalizer leak within the current ownership model. Shares its theme with BL-056: ownership expressed in the type system instead of by convention. Worth settling mechanisms, parameters and keys under one convention rather than three.
+- **Breaks public API?** Yes (`MechanismParameters` stops being `IDisposable`) — land before 1.0
+- **Raised by:** BL-012 follow-up
 
 ### [BL-037] No automated versioning source — the version exists only as a tag stamp
 - **Area:** Release Eng
