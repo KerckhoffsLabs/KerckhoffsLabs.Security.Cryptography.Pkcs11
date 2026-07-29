@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 54 (12 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 17 (14 open, 3 resolved)
+- Total items: 55 (13 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 30 (25 open, 5 resolved) | Low: 18 (14 open, 4 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -266,9 +266,9 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Native/MarshalSizeOfTests.cs:26,42-43,155,160-162`; `Unit/Native/NativeStructLayoutTests.cs:41-90`
-- **Problem:** (a) `CK_FUNCTION_LIST*` — the structs the loader depends on — are size-pinned only via their `_Windows` siblings, excluded from the Unix census; (b) absolute size pins run only on `IsWindows64`, so the win-x86 ILP32 leg (the ABI most different from LP64) has no absolute expectations even though CI runs it; (c) LP64 field-offset pins cover only 5 of ~90 param structs, and the size census cannot catch same-width transpositions (pointer/length swaps) in the many unpinned buffer-carrying structs.
-- **Proposed action:** Add Unix size pins for the three `CK_FUNCTION_LIST*` structs (or sentinel fptr offset pins), a `ConditionalTheory(IsWindows32)` with absolute win-x86 sizes, and extend offset pins to the remaining pointer+length / hash+MGF structs.
+- **Location:** `Tests/Unit/Native/MarshalSizeOfTests.cs:17-27,182`
+- **Problem:** Absolute size pins run only on `IsWindows64`, so the win-x86 ILP32 leg — the ABI most different from LP64, and one CI genuinely runs — has no absolute expectations. (Gaps (a) Unix `CK_FUNCTION_LIST` pins and (c) offset pins for the pointer-bearing structs were closed 2026-07-29.)
+- **Proposed action:** Add a `ConditionalTheory(nameof(IsWindows32))` mirroring `WindowsSiblingStructSize`. The expected values are derivable rather than guessable: with `Pack = 1` and `CK_ULONG` = 4 on both Windows ABIs, win-x86 size = win-x64 size − 4 × (recursive count of pointer fields). Values cannot be verified on a Linux host, so the first CI x86 run is the confirmation step.
 - **Breaks public API?** No
 - **Raised by:** QA A, QA B
 
@@ -581,6 +581,17 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA C
 
+### [BL-055] ✅ RESOLVED — Eight param structs use `[MarshalAs(ByValArray)] byte[]` where the rest of the codebase uses `[InlineArray]`, leaving a latent under-allocation trap
+- **Status:** Resolved 2026-07-29. The eight `byte[]` fields became `[InlineArray]` buffers (`CkChar16`, and a new `CkChar8`), matching the `CkChar32` pattern `CK_INFO` already used. The change is layout-neutral on the unmanaged side — all ~194 absolute size pins passed unchanged — so only the managed layout moved, and managed now equals marshalled for all 198 native types. `Pkcs11Marshal.SizeOf` and the generator's `SizeOfWindows`/`SizeOfUnified` emissions switched to `Unsafe.SizeOf` and the CA1421 suppression was deleted. `NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize` now enforces the invariant on every platform leg, superseding the divergence pin it replaced.
+- **Area:** Interop
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `Native/RawMechanismParams/CK_AES_CTR_PARAMS.cs:20-21`, `CK_CAMELLIA_CTR_PARAMS.cs:20-21`, `CK_AES_CBC_ENCRYPT_DATA_PARAMS.cs:15-16`, `CK_ARIA_CBC_ENCRYPT_DATA_PARAMS.cs:15-16`, `CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS.cs:15-16`, `CK_SEED_CBC_ENCRYPT_DATA_PARAMS.cs:15-16`, `CK_DES_CBC_ENCRYPT_DATA_PARAMS.cs:15-16`, `CK_RC2_CBC_PARAMS.cs:20-21`; `Native/Pkcs11Marshal.cs:20`
+- **Problem:** These eight carry a managed `byte[]` field marshalled `ByValArray`, so the managed layout stores an 8-byte reference where the unmanaged layout stores the array inline. Six diverge in total size (`CK_AES_CTR_PARAMS` is 24 marshalled vs 16 managed; the `*_CBC_ENCRYPT_DATA_PARAMS` family 32 vs 24); `CK_DES_CBC_ENCRYPT_DATA_PARAMS` and `CK_RC2_CBC_PARAMS` agree only because an 8-byte IV happens to match the reference width it displaces. Nothing is wrong today — allocation and `StructureToPtr` both go through `Marshal.SizeOf` consistently — but it makes the CA1421 suggestion (`sizeof`/`Unsafe.SizeOf`) an under-allocation bug rather than a cleanup, which is why `Pkcs11Marshal.SizeOf` carries a suppression instead of a fix. Every other inline buffer in the codebase (`CkChar16/32/64`, `CK_DATE`'s `Char4`/`Char2`) already uses `[InlineArray]`, which marshals to an identical managed and unmanaged layout (see Appendix B).
+- **Proposed action:** Convert the eight `byte[]` fields to `[InlineArray]` buffers matching the existing `CkChar*` pattern, making managed and marshalled layouts identical. That removes the divergence class entirely, lets the `Pkcs11Marshal.SizeOf` suppression be replaced by a real fix, and keeps these structs blittable. Guarded meanwhile by `MarshalSizeOfTests.ByValArrayStruct_MarshalledSizeExceedsManagedSize`, which pins the current divergence; the per-platform size census pins the target sizes across the change.
+- **Breaks public API?** No — all types are `internal`.
+- **Raised by:** SonarCloud CA1421 triage
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 Condensed from PKCS#11 Specialist A, who cross-checked `CK_FUNCTION_LIST_3_0`/`_3_2`, `CK_INTERFACE`, and `CK_ASYNC_DATA` field-by-field against the vendored v3.2 header (`vendor/opencryptoki/usr/include/pkcs11types.h`) — exact match, including the 12 v3.2 additions in declaration order. **No v3.2 `C_*` function is missing at the interop layer.**
@@ -606,7 +617,6 @@ Mechanisms (`CKM`, 480 members): RSA (PSS/OAEP), EC/EdDSA/Montgomery, AES (GCM/C
 ## Appendix A — Unverified / Speculative
 
 - **KEM/authenticated-unwrap secure-defaults application** (Cryptographer B): whether `EncapsulateKey`/`DecapsulateKey` and `UnwrapKeyAuthenticated` call `BuildSecureKeyDefaults` like `UnwrapKey`/`DeriveKey` do — a shared comment claims so, but the reviewer read only the latter two call sites in full. Confirm before 1.0.
-- **`[InlineArray]` structs through `Marshal.SizeOf`/`PtrToStructure`** (.NET Engineer B): currently avoided at runtime (the `CK_*_INFO_Windows` siblings pass by direct blittable pointer), but the interaction should be re-verified if future code routes an InlineArray-bearing struct through `UnmanagedMemory.Read<T>/Write<T>`.
 - **GitHub repository settings** (QA C): branch protections, required status checks, tag protection, Environment approvals, and Private Vulnerability Reporting enablement are not verifiable from the repo — confirm in Settings.
 
 ## Appendix B — Out of Scope Observations
@@ -614,6 +624,7 @@ Mechanisms (`CKM`, 480 members): RSA (PSS/OAEP), EC/EdDSA/Montgomery, AES (GCM/C
 Positive findings worth preserving (multiple specialists, independently):
 
 - **The Windows packing scheme is complete and coherent.** `CK_FUNCTION_LIST` (whose natural alignment would shift every pointer by 6 bytes on Win64) is `[PackedForPkcs11]`; every mechanism/attribute-bearing entry point has unified + `_Windows` function pointers bound from the same slot with matching dispatch branches; every raw param struct carries the attribute; `EnsureCkUlongWidthMatchesPlatform` fails loud on a mis-resolved `NativeCULong` asset instead of corrupting memory. Parameter struct layouts and CKM constants were verified against the vendored v3.2 headers.
+- **`[InlineArray]` structs marshal correctly** (verified 2026-07-29, was Appendix A). Runtime marshalling expands `CkChar16/32/64` and `CK_DATE`'s `Char4`/`Char2` rather than seeing a single field: `Marshal.SizeOf<CK_INFO>()` is 88 on LP64 — matching both the C ABI and `Unsafe.SizeOf` — which is what `MarshalSizeOfTests` already pins (88 / 112 / 208 for `CK_INFO` / `CK_SLOT_INFO` / `CK_TOKEN_INFO`). Production reads still pass these by direct blittable pointer (`C_GetInfo` takes `ref CK_INFO`), but the `Marshal` path is covered too: `Pkcs11MarshalTests` round-trips `CK_INFO` through `WriteStructure`/`ReadStructure`, asserting `ManufacturerId[0]` **and** `[31]` — the latter is what proves all 32 bytes survive rather than just the first element. The remaining risk is durability, not correctness (InlineArray marshalling may be implementation detail rather than contract); the per-platform size census is the standing guard if runtime behavior ever shifts.
 - **Integer overflow at the length boundary is handled by design:** `CheckForOverflowUnderflow` + `NativeCULong`'s `operator checked int` route every length cast through a throwing conversion.
 - **The native interop layer is fully quarantined** — every type under `Native/` is `internal`; no raw `IntPtr`, `delegate*`, or `CK_*` type appears on the public surface.
 - **AOT/trim posture is sound:** `[assembly: DisableRuntimeMarshalling]`, `delegate* unmanaged[Cdecl]` dispatch, generator-emitted `typeof` chains with no reflection, `IsAotCompatible` + analyzers, CI AOT smoke job.
