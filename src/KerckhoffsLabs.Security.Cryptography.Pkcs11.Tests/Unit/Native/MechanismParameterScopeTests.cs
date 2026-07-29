@@ -6,6 +6,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// The scope owns every unmanaged byte for a single native call. Disposal must release all of it,
 /// whatever order it was allocated in, so that no parameter object needs a lifetime of its own.
 /// </summary>
+/// <remarks>
+/// Joins the serialized MemoryLeaks collection: two of these tests assert an exact
+/// <see cref="UnmanagedMemory.OutstandingAllocationCount"/>, which is process-wide, so any test
+/// class allocating concurrently perturbs the count. Every other class that reads that counter is
+/// in this collection for the same reason.
+/// </remarks>
+[Collection("MemoryLeaks")]
 public sealed class MechanismParameterScopeTests
 {
     [Fact]
