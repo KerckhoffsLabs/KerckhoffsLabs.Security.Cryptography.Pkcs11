@@ -12,6 +12,13 @@ public sealed class CkmHkdfParams : MechanismParameters
     private CK_HKDF_PARAMS _lowLevelParams;
     private IntPtr _salt;
     private IntPtr _info;
+    private readonly byte[] _saltBytes;
+    private readonly byte[] _infoBytes;
+    private readonly bool _extract;
+    private readonly bool _expand;
+    private readonly CKM _prfHashMechanism;
+    private readonly ulong _saltType;
+    private readonly ulong _saltKey;
     private bool _disposed;
 
     /// <summary>
@@ -38,6 +45,14 @@ public sealed class CkmHkdfParams : MechanismParameters
             UnmanagedMemory.Write(_info, info);
         }
 
+        _saltBytes = salt.IsEmpty ? [] : salt.ToArray();
+        _infoBytes = info.IsEmpty ? [] : info.ToArray();
+        _extract = extract;
+        _expand = expand;
+        _prfHashMechanism = prfHashMechanism;
+        _saltType = saltType;
+        _saltKey = saltKey;
+
         _lowLevelParams = new()
         {
             Extract = extract,
@@ -57,6 +72,24 @@ public sealed class CkmHkdfParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_HKDF_PARAMS
+        {
+            Extract = _extract,
+            Expand = _expand,
+            PrfHashMechanism = (NativeCULong)(ulong)_prfHashMechanism,
+            SaltType = (NativeCULong)_saltType,
+            Salt = scope.Write(_saltBytes),
+            SaltLen = (NativeCULong)_saltBytes.Length,
+            SaltKey = (NativeCULong)_saltKey,
+            Info = scope.Write(_infoBytes),
+            InfoLen = (NativeCULong)_infoBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

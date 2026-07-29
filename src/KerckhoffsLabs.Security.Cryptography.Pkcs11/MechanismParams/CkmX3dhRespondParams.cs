@@ -13,6 +13,12 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     private IntPtr _prekeyId;
     private IntPtr _onetimeId;
     private IntPtr _initiatorEphemeral;
+    private readonly byte[] _identityIdBytes;
+    private readonly byte[] _prekeyIdBytes;
+    private readonly byte[] _onetimeIdBytes;
+    private readonly byte[] _initiatorEphemeralBytes;
+    private readonly ulong _kdf;
+    private readonly ulong _initiatorIdentity;
     private bool _disposed;
 
     /// <summary>
@@ -50,6 +56,13 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
             UnmanagedMemory.Write(_initiatorEphemeral, initiatorEphemeral);
         }
 
+        _identityIdBytes = identityId.IsEmpty ? [] : identityId.ToArray();
+        _prekeyIdBytes = prekeyId.IsEmpty ? [] : prekeyId.ToArray();
+        _onetimeIdBytes = onetimeId.IsEmpty ? [] : onetimeId.ToArray();
+        _initiatorEphemeralBytes = initiatorEphemeral.IsEmpty ? [] : initiatorEphemeral.ToArray();
+        _kdf = kdf;
+        _initiatorIdentity = initiatorIdentity;
+
         _lowLevelParams = new()
         {
             Kdf = (NativeCULong)kdf,
@@ -66,6 +79,21 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_X3DH_RESPOND_PARAMS
+        {
+            Kdf = (NativeCULong)_kdf,
+            IdentityId = scope.Write(_identityIdBytes),
+            PrekeyId = scope.Write(_prekeyIdBytes),
+            OnetimeId = scope.Write(_onetimeIdBytes),
+            InitiatorIdentity = (NativeCULong)_initiatorIdentity,
+            InitiatorEphemeral = scope.Write(_initiatorEphemeralBytes),
+        };
     }
 
     /// <inheritdoc/>

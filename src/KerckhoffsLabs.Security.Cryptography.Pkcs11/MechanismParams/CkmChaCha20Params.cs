@@ -11,6 +11,10 @@ public sealed class CkmChaCha20Params : MechanismParameters
     private CK_CHACHA20_PARAMS _lowLevelParams;
     private IntPtr _blockCounter;
     private IntPtr _nonce;
+    private readonly byte[] _blockCounterBytes;
+    private readonly byte[] _nonceBytes;
+    private readonly int _blockCounterBits;
+    private readonly int _nonceBits;
     private bool _disposed;
 
     /// <summary>
@@ -31,6 +35,11 @@ public sealed class CkmChaCha20Params : MechanismParameters
         _nonce = UnmanagedMemory.Allocate(nonce.Length);
         UnmanagedMemory.Write(_nonce, nonce);
 
+        _blockCounterBytes = blockCounter.ToArray();
+        _nonceBytes = nonce.ToArray();
+        _blockCounterBits = blockCounterBits;
+        _nonceBits = nonceBits;
+
         _lowLevelParams = new()
         {
             BlockCounter = _blockCounter,
@@ -45,6 +54,19 @@ public sealed class CkmChaCha20Params : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_CHACHA20_PARAMS
+        {
+            BlockCounter = scope.Write(_blockCounterBytes),
+            BlockCounterBits = (NativeCULong)_blockCounterBits,
+            Nonce = scope.Write(_nonceBytes),
+            NonceBits = (NativeCULong)_nonceBits,
+        };
     }
 
     /// <inheritdoc/>

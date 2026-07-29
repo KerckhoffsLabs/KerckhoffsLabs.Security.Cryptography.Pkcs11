@@ -12,6 +12,13 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     private CK_IKE1_PRF_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _ckyI;
     private IntPtr _ckyR;
+    private readonly byte[] _ckyIBytes;
+    private readonly byte[] _ckyRBytes;
+    private readonly CKM _prfMechanism;
+    private readonly bool _hasPrevKey;
+    private readonly ulong _keygxy;
+    private readonly ulong _prevKey;
+    private readonly byte _keyNumber;
     private bool _disposed;
 
     /// <summary>
@@ -38,6 +45,14 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
             UnmanagedMemory.Write(_ckyR, ckyR);
         }
 
+        _ckyIBytes = ckyI.IsEmpty ? [] : ckyI.ToArray();
+        _ckyRBytes = ckyR.IsEmpty ? [] : ckyR.ToArray();
+        _prfMechanism = prfMechanism;
+        _hasPrevKey = hasPrevKey;
+        _keygxy = keygxy;
+        _prevKey = prevKey;
+        _keyNumber = keyNumber;
+
         _lowLevelParams = new()
         {
             PrfMechanism = (NativeCULong)(ulong)prfMechanism,
@@ -57,6 +72,24 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_IKE1_PRF_DERIVE_PARAMS
+        {
+            PrfMechanism = (NativeCULong)(ulong)_prfMechanism,
+            HasPrevKey = _hasPrevKey,
+            Keygxy = (NativeCULong)_keygxy,
+            PrevKey = (NativeCULong)_prevKey,
+            CkyI = scope.Write(_ckyIBytes),
+            CkyILen = (NativeCULong)_ckyIBytes.Length,
+            CkyR = scope.Write(_ckyRBytes),
+            CkyRLen = (NativeCULong)_ckyRBytes.Length,
+            KeyNumber = _keyNumber,
+        };
     }
 
     /// <inheritdoc/>

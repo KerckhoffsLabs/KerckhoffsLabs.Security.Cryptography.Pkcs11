@@ -12,6 +12,10 @@ public sealed class CkmAesCcmParams : MechanismParameters
     private CK_CCM_PARAMS _lowLevelParams;
     private IntPtr _nonce;
     private IntPtr _aad;
+    private readonly byte[] _nonceBytes;
+    private readonly byte[] _aadBytes;
+    private readonly int _dataLen;
+    private readonly int _macLen;
     private bool _disposed;
 
     /// <summary>
@@ -40,6 +44,11 @@ public sealed class CkmAesCcmParams : MechanismParameters
             UnmanagedMemory.Write(_aad, aad);
         }
 
+        _nonceBytes = nonce.ToArray();
+        _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
+        _dataLen = dataLen;
+        _macLen = macLen;
+
         _lowLevelParams = new()
         {
             DataLen = (NativeCULong)dataLen,
@@ -56,6 +65,21 @@ public sealed class CkmAesCcmParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_CCM_PARAMS
+        {
+            DataLen = (NativeCULong)_dataLen,
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            AAD = scope.Write(_aadBytes),
+            AADLen = (NativeCULong)_aadBytes.Length,
+            MACLen = (NativeCULong)_macLen,
+        };
     }
 
     /// <inheritdoc/>

@@ -13,6 +13,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     private CK_SALSA20_CHACHA20_POLY1305_PARAMS _lowLevelParams;
     private IntPtr _nonce;
     private IntPtr _aad;
+    private readonly byte[] _nonceBytes;
+    private readonly byte[] _aadBytes;
     private bool _disposed;
 
     /// <summary>
@@ -34,6 +36,9 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
             UnmanagedMemory.Write(_aad, aad);
         }
 
+        _nonceBytes = nonce.ToArray();
+        _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
+
         _lowLevelParams = new()
         {
             Nonce = _nonce,
@@ -48,6 +53,19 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_SALSA20_CHACHA20_POLY1305_PARAMS
+        {
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            AAD = scope.Write(_aadBytes),
+            AADLen = (NativeCULong)_aadBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

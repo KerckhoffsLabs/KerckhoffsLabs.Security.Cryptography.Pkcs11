@@ -13,6 +13,9 @@ public sealed class CkmAesGcmParams : MechanismParameters
     private CK_GCM_PARAMS _lowLevelParams;
     private IntPtr _iv;
     private IntPtr _aad;
+    private readonly byte[] _ivBytes;
+    private readonly byte[] _aadBytes;
+    private readonly int _tagBits;
     private bool _disposed;
 
     /// <summary>
@@ -38,6 +41,10 @@ public sealed class CkmAesGcmParams : MechanismParameters
             UnmanagedMemory.Write(_aad, aad);
         }
 
+        _ivBytes = iv.ToArray();
+        _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
+        _tagBits = tagBits;
+
         _lowLevelParams = new()
         {
             Iv = _iv,
@@ -59,6 +66,26 @@ public sealed class CkmAesGcmParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_GCM_PARAMS
+        {
+            Iv = scope.Write(_ivBytes),
+            IvLen = (NativeCULong)_ivBytes.Length,
+            // Legacy field; PKCS#11 v3.2 §2.5.13 allows 0 and the IV length is taken from IvLen.
+            // Some tokens reject a non-zero value (SoftHSM's AES-GCM KAT fails when it is set), so
+            // leave it 0 for maximum interoperability. NSS softoken's classic C_EncryptInit GCM path
+            // conversely rejects 0, so GCM against NSS goes through the message-based AesGcmPkcs11
+            // façade (C_MessageEncrypt), not this classic-params path.
+            IvBits = (NativeCULong)0,
+            AAD = scope.Write(_aadBytes),
+            AADLen = (NativeCULong)_aadBytes.Length,
+            TagBits = (NativeCULong)_tagBits,
+        };
     }
 
     /// <inheritdoc/>

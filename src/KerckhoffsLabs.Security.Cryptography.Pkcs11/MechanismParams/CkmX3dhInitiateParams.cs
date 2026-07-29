@@ -11,6 +11,13 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     private CK_X3DH_INITIATE_PARAMS _lowLevelParams;
     private IntPtr _prekeySignature;
     private IntPtr _onetimeKey;
+    private readonly byte[] _prekeySignatureBytes;
+    private readonly byte[] _onetimeKeyBytes;
+    private readonly ulong _kdf;
+    private readonly ulong _peerIdentity;
+    private readonly ulong _peerPrekey;
+    private readonly ulong _ownIdentity;
+    private readonly ulong _ownEphemeral;
     private bool _disposed;
 
     /// <summary>
@@ -37,6 +44,14 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
             UnmanagedMemory.Write(_onetimeKey, onetimeKey);
         }
 
+        _prekeySignatureBytes = prekeySignature.IsEmpty ? [] : prekeySignature.ToArray();
+        _onetimeKeyBytes = onetimeKey.IsEmpty ? [] : onetimeKey.ToArray();
+        _kdf = kdf;
+        _peerIdentity = peerIdentity;
+        _peerPrekey = peerPrekey;
+        _ownIdentity = ownIdentity;
+        _ownEphemeral = ownEphemeral;
+
         _lowLevelParams = new()
         {
             Kdf = (NativeCULong)kdf,
@@ -54,6 +69,22 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_X3DH_INITIATE_PARAMS
+        {
+            Kdf = (NativeCULong)_kdf,
+            PeerIdentity = (NativeCULong)_peerIdentity,
+            PeerPrekey = (NativeCULong)_peerPrekey,
+            PrekeySignature = scope.Write(_prekeySignatureBytes),
+            OnetimeKey = scope.Write(_onetimeKeyBytes),
+            OwnIdentity = (NativeCULong)_ownIdentity,
+            OwnEphemeral = (NativeCULong)_ownEphemeral,
+        };
     }
 
     /// <inheritdoc/>

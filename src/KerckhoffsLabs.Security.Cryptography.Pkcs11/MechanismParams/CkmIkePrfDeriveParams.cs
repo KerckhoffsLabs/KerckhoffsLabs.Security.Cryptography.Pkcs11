@@ -12,6 +12,12 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     private CK_IKE_PRF_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _ni;
     private IntPtr _nr;
+    private readonly byte[] _niBytes;
+    private readonly byte[] _nrBytes;
+    private readonly CKM _prfMechanism;
+    private readonly bool _dataAsKey;
+    private readonly bool _rekey;
+    private readonly ulong _newKey;
     private bool _disposed;
 
     /// <summary>
@@ -37,6 +43,13 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
             UnmanagedMemory.Write(_nr, nr);
         }
 
+        _niBytes = ni.IsEmpty ? [] : ni.ToArray();
+        _nrBytes = nr.IsEmpty ? [] : nr.ToArray();
+        _prfMechanism = prfMechanism;
+        _dataAsKey = dataAsKey;
+        _rekey = rekey;
+        _newKey = newKey;
+
         _lowLevelParams = new()
         {
             PrfMechanism = (NativeCULong)(ulong)prfMechanism,
@@ -55,6 +68,23 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_IKE_PRF_DERIVE_PARAMS
+        {
+            PrfMechanism = (NativeCULong)(ulong)_prfMechanism,
+            DataAsKey = _dataAsKey,
+            Rekey = _rekey,
+            Ni = scope.Write(_niBytes),
+            NiLen = (NativeCULong)_niBytes.Length,
+            Nr = scope.Write(_nrBytes),
+            NrLen = (NativeCULong)_nrBytes.Length,
+            NewKey = (NativeCULong)_newKey,
+        };
     }
 
     /// <inheritdoc/>

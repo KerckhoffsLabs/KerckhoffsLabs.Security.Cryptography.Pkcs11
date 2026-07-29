@@ -15,6 +15,9 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     private CK_ECDH1_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _publicData;
     private IntPtr _sharedData;
+    private readonly byte[] _publicDataBytes;
+    private readonly byte[] _sharedDataBytes;
+    private readonly CKD _kdf;
     private bool _disposed;
 
     /// <summary>
@@ -38,6 +41,10 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
             UnmanagedMemory.Write(_sharedData, sharedData);
         }
 
+        _publicDataBytes = peerPublicPoint.ToArray();
+        _sharedDataBytes = sharedData.IsEmpty ? [] : sharedData.ToArray();
+        _kdf = kdf;
+
         _lowLevelParams = new()
         {
             Kdf = kdf.ToCULong(),
@@ -53,6 +60,20 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_ECDH1_DERIVE_PARAMS
+        {
+            Kdf = _kdf.ToCULong(),
+            SharedData = scope.Write(_sharedDataBytes),
+            SharedDataLen = (NativeCULong)_sharedDataBytes.Length,
+            PublicData = scope.Write(_publicDataBytes),
+            PublicDataLen = (NativeCULong)_publicDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>
