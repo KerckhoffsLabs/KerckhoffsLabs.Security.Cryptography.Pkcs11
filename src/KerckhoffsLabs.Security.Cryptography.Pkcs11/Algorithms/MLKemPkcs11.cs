@@ -98,7 +98,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         // rejection) and the answer is cached on the library — every later call goes straight to the
         // right form, so the probe's exception is one-time discovery, not steady-state control flow.
         Pkcs11Library library = _key.Workspace.Library;
-        Pkcs11Key sharedKey = library.MlKemDecapsulateOmitsValueLen switch
+        using Pkcs11Key sharedKey = library.MlKemDecapsulateOmitsValueLen switch
         {
             bool omit => DecapsulateWith(mech, ciphertext, includeValueLen: !omit),
             null => DecapsulateProbing(mech, ciphertext, library),
@@ -114,10 +114,6 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         {
             CryptographicOperations.ZeroMemory(sharedSecret);
             throw;
-        }
-        finally
-        {
-            sharedKey.Dispose();
         }
     }
 
