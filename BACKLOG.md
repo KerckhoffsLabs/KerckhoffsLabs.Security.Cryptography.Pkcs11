@@ -262,7 +262,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** .NET Engineer B
 
-### [BL-024] Native struct-layout pin coverage has three systematic gaps (FUNCTION_LIST on Unix, win-x86 absolutes, offset pins for pointer+length structs)
+### [BL-024] Native struct-layout pin coverage is missing win-x86 absolute size pins (gaps (a) Unix FUNCTION_LIST and (c) pointer-field offsets closed 2026-07-29)
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M
