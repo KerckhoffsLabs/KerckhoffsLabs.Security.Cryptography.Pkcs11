@@ -160,6 +160,54 @@ public sealed class Sp800108KdfTests
         }
     }
 
+    /// <summary>
+    /// The scope-based path puts the <c>phKey</c> slots in scope-owned memory, so the handles have to
+    /// be copied into managed state before the scope is released. Simulates the token's write and
+    /// checks that <c>AbsorbOutput</c> surfaces both handles through the public accessor, including
+    /// after the scope is disposed.
+    /// </summary>
+    [Fact]
+    public void AbsorbOutput_RecoversTheHandlesTheTokenWroteIntoTheScope()
+    {
+        var templateA = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_AES) };
+        var templateB = new List<ObjectAttribute> { new(CKA.CKA_VALUE_LEN, 16UL) };
+        try
+        {
+            using var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+                .IterationCounter(widthInBits: 16, littleEndian: true)
+                .ByteArray([0x5A])
+                .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
+                .AddDerivedKey(templateA)
+                .AddDerivedKey(templateB)
+                .Build();
+
+            using (var scope = new MechanismParameterScope())
+            {
+                var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+                Assert.Equal(2UL, (ulong)s.AdditionalDerivedKeys);
+                Assert.NotEqual(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
+
+                int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
+                var dk0 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr);
+                var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr + dkSize);
+                Assert.Equal(2UL, (ulong)dk0.AttributeCount);
+                Assert.Equal(1UL, (ulong)dk1.AttributeCount);
+
+                WriteHandle(dk0.Key, 0xDEAD);
+                WriteHandle(dk1.Key, 0xBEEF);
+                p.AbsorbOutput(s);
+            }
+
+            // Read after the scope is gone: the handles must have been copied out, not re-read.
+            Assert.Equal([0xDEAD, 0xBEEF], p.AdditionalDerivedKeys);
+        }
+        finally
+        {
+            foreach (var a in templateA) a.Dispose();
+            foreach (var a in templateB) a.Dispose();
+        }
+    }
+
     [Fact]
     public void AfterDispose_AccessorsThrow()
     {

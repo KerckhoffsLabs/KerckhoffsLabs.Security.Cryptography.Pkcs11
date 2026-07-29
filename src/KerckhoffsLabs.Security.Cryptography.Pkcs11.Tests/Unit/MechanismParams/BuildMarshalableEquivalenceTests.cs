@@ -1,7 +1,9 @@
+using System.Buffers.Binary;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -469,6 +471,170 @@ public sealed class BuildMarshalableEquivalenceTests
         AssertDistinctBlockWithSameBytes(legacy.PrekeyId, scoped.PrekeyId, prekeyId);
         AssertDistinctBlockWithSameBytes(legacy.OnetimeId, scoped.OnetimeId, onetimeId);
         AssertDistinctBlockWithSameBytes(legacy.InitiatorEphemeral, scoped.InitiatorEphemeral, initiatorEphemeral);
+    }
+
+    /// <summary>
+    /// The SP800-108 graph is the deepest one: the top-level struct points at a
+    /// <c>CK_PRF_DATA_PARAM</c> array whose entries point at format sub-structs, and at a
+    /// <c>CK_DERIVED_KEY</c> array whose entries point at attribute templates and handle slots. Every
+    /// level is compared, because a dropped inner allocation shows up nowhere in the scalar fields.
+    /// </summary>
+    [Fact]
+    public void Sp800108CounterKdfParams_BothPathsAgree()
+    {
+        byte[] label = [0x6C, 0x61, 0x62, 0x65, 0x6C];
+        var template = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_AES) };
+        try
+        {
+            using var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
+                .IterationCounter(widthInBits: 16, littleEndian: true)
+                .OptionalCounter(widthInBits: 8, littleEndian: true)
+                .ByteArray(label)
+                .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
+                .KeyHandle(0xABCD)
+                .AddDerivedKey(template)
+                .Build();
+            using var scope = new MechanismParameterScope();
+
+            var legacy = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+            var scoped = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+
+            Assert.Equal((ulong)legacy.PrfType, (ulong)scoped.PrfType);
+            Assert.Equal((ulong)CKM.CKM_AES_CMAC, (ulong)scoped.PrfType);
+            Assert.Equal((ulong)legacy.NumberOfDataParams, (ulong)scoped.NumberOfDataParams);
+            Assert.Equal(5UL, (ulong)scoped.NumberOfDataParams);
+            Assert.Equal((ulong)legacy.AdditionalDerivedKeys, (ulong)scoped.AdditionalDerivedKeys);
+            Assert.Equal(1UL, (ulong)scoped.AdditionalDerivedKeys);
+
+            AssertPrfSequenceAgrees(legacy.DataParams, scoped.DataParams, 5, label, spliceKey: 0xABCD);
+            AssertDerivedKeyArrayAgrees(legacy.AdditionalDerivedKeysPtr, scoped.AdditionalDerivedKeysPtr, attributeCount: 2);
+        }
+        finally
+        {
+            foreach (var a in template) a.Dispose();
+        }
+    }
+
+    [Fact]
+    public void Sp800108FeedbackKdfParams_BothPathsAgree()
+    {
+        byte[] label = [0x66, 0x62, 0x6B];
+        byte[] iv = [0xD1, 0xD2, 0xD3, 0xD4];
+        using var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA384_HMAC)
+            .IterationCounter(widthInBits: 16, littleEndian: true)
+            .OptionalCounter(widthInBits: 8, littleEndian: true)
+            .ByteArray(label)
+            .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
+            .KeyHandle(0xABCD)
+            .WithIV(iv)
+            .Build();
+        using var scope = new MechanismParameterScope();
+
+        var legacy = (CK_SP800_108_FEEDBACK_KDF_PARAMS)p.ToMarshalableStructure();
+        var scoped = (CK_SP800_108_FEEDBACK_KDF_PARAMS)p.BuildMarshalable(scope);
+
+        Assert.Equal((ulong)legacy.PrfType, (ulong)scoped.PrfType);
+        Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)scoped.PrfType);
+        Assert.Equal((ulong)legacy.NumberOfDataParams, (ulong)scoped.NumberOfDataParams);
+        Assert.Equal(5UL, (ulong)scoped.NumberOfDataParams);
+        Assert.Equal((ulong)legacy.IVLen, (ulong)scoped.IVLen);
+        Assert.Equal(4UL, (ulong)scoped.IVLen);
+        Assert.Equal((ulong)legacy.AdditionalDerivedKeys, (ulong)scoped.AdditionalDerivedKeys);
+        Assert.Equal(0UL, (ulong)scoped.AdditionalDerivedKeys);
+        Assert.Equal(IntPtr.Zero, scoped.AdditionalDerivedKeysPtr);
+
+        AssertDistinctBlockWithSameBytes(legacy.IV, scoped.IV, iv);
+        AssertPrfSequenceAgrees(legacy.DataParams, scoped.DataParams, 5, label, spliceKey: 0xABCD);
+    }
+
+    /// <summary>
+    /// Walks both <c>CK_PRF_DATA_PARAM</c> arrays entry by entry: tags and lengths must match, the
+    /// pointed-at blocks must be distinct, and every format sub-struct behind them must decode to the
+    /// same values. The fixture uses <c>littleEndian: true</c> and non-default widths throughout, so a
+    /// dropped assignment cannot pass by coincidence with a zero-initialised field.
+    /// </summary>
+    private static void AssertPrfSequenceAgrees(IntPtr legacy, IntPtr scoped, int count, byte[] label, ulong spliceKey)
+    {
+        Assert.NotEqual(IntPtr.Zero, scoped);
+        Assert.NotEqual(legacy, scoped);
+
+        int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
+        for (int i = 0; i < count; i++)
+        {
+            var l = UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(legacy + (i * elem));
+            var s = UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(scoped + (i * elem));
+            Assert.Equal((ulong)l.Type, (ulong)s.Type);
+            Assert.Equal((ulong)l.ValueLen, (ulong)s.ValueLen);
+            Assert.NotEqual(IntPtr.Zero, s.Value);
+            Assert.NotEqual(l.Value, s.Value);
+        }
+
+        // [0] iteration counter and [1] optional counter — CK_SP800_108_COUNTER_FORMAT.
+        foreach ((int index, ulong width) in new[] { (0, 16UL), (1, 8UL) })
+        {
+            var l = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(legacy + (index * elem)).Value);
+            var s = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(scoped + (index * elem)).Value);
+            Assert.Equal(l.LittleEndian, s.LittleEndian);
+            Assert.True(s.LittleEndian);
+            Assert.Equal((ulong)l.WidthInBits, (ulong)s.WidthInBits);
+            Assert.Equal(width, (ulong)s.WidthInBits);
+        }
+
+        // [2] byte array.
+        AssertDistinctBlockWithSameBytes(
+            UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(legacy + (2 * elem)).Value,
+            UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(scoped + (2 * elem)).Value,
+            label);
+
+        // [3] DKM length — CK_SP800_108_DKM_LENGTH_FORMAT.
+        var legacyDkm = UnmanagedMemory.Read<CK_SP800_108_DKM_LENGTH_FORMAT>(UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(legacy + (3 * elem)).Value);
+        var scopedDkm = UnmanagedMemory.Read<CK_SP800_108_DKM_LENGTH_FORMAT>(UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(scoped + (3 * elem)).Value);
+        Assert.Equal((ulong)legacyDkm.DkmLengthMethod, (ulong)scopedDkm.DkmLengthMethod);
+        Assert.Equal((ulong)Sp800108DkmLengthMethod.SumOfSegments, (ulong)scopedDkm.DkmLengthMethod);
+        Assert.Equal(legacyDkm.LittleEndian, scopedDkm.LittleEndian);
+        Assert.True(scopedDkm.LittleEndian);
+        Assert.Equal((ulong)legacyDkm.WidthInBits, (ulong)scopedDkm.WidthInBits);
+        Assert.Equal(64UL, (ulong)scopedDkm.WidthInBits);
+
+        // [4] key handle — the value block holds the spliced key's CK_OBJECT_HANDLE.
+        byte[] handleBytes = new byte[UnmanagedMemory.NativeULongSize];
+        if (UnmanagedMemory.NativeULongSize == 4) BinaryPrimitives.WriteUInt32LittleEndian(handleBytes, (uint)spliceKey);
+        else BinaryPrimitives.WriteUInt64LittleEndian(handleBytes, spliceKey);
+        AssertDistinctBlockWithSameBytes(
+            UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(legacy + (4 * elem)).Value,
+            UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(scoped + (4 * elem)).Value,
+            handleBytes);
+    }
+
+    /// <summary>
+    /// Compares the <c>CK_DERIVED_KEY</c> arrays: the attribute template and the handle slot must each
+    /// be a fresh scope-owned block, and the templates must carry the same attribute types.
+    /// </summary>
+    private static void AssertDerivedKeyArrayAgrees(IntPtr legacy, IntPtr scoped, int attributeCount)
+    {
+        Assert.NotEqual(IntPtr.Zero, scoped);
+        Assert.NotEqual(legacy, scoped);
+
+        var l = UnmanagedMemory.Read<CK_DERIVED_KEY>(legacy);
+        var s = UnmanagedMemory.Read<CK_DERIVED_KEY>(scoped);
+        Assert.Equal((ulong)l.AttributeCount, (ulong)s.AttributeCount);
+        Assert.Equal((ulong)attributeCount, (ulong)s.AttributeCount);
+
+        Assert.NotEqual(IntPtr.Zero, s.Template);
+        Assert.NotEqual(l.Template, s.Template);
+        Assert.NotEqual(IntPtr.Zero, s.Key);
+        Assert.NotEqual(l.Key, s.Key);
+
+        int attrSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
+        for (int k = 0; k < attributeCount; k++)
+        {
+            var la = UnmanagedMemory.Read<CK_ATTRIBUTE>(l.Template + (k * attrSize));
+            var sa = UnmanagedMemory.Read<CK_ATTRIBUTE>(s.Template + (k * attrSize));
+            Assert.Equal((ulong)la.type, (ulong)sa.type);
+            Assert.Equal((ulong)la.valueLen, (ulong)sa.valueLen);
+            // The value buffers belong to the caller's ObjectAttribute, so both paths point at the same one.
+            Assert.Equal(la.value, sa.value);
+        }
     }
 
     /// <summary>
