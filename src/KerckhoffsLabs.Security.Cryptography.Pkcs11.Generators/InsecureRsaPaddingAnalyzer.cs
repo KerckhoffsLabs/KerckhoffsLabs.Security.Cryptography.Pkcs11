@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -72,6 +73,8 @@ public sealed class InsecureRsaPaddingAnalyzer : DiagnosticAnalyzer
     }
 
     // RSAPkcs11.Encrypt/Decrypt(..., RSAEncryptionPadding.Pkcs1)
+    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified with LINQ expressions",
+        Justification = "These analyzers run an operation action on every object creation / invocation in the compilation, and again on each keystroke in the IDE. foreach over ImmutableArray<IArgumentOperation> uses the struct enumerator and allocates nothing, whereas Select boxes it into IEnumerable and allocates an iterator per call. Roslyn analyzer guidance is to keep LINQ off these paths, and the analyzers here follow it — System.Linq is imported only by the source generator, which runs far less often. The argument lists are one to three elements, so the LINQ form would trade a real allocation for no readability gain.")]
     private static void AnalyzeRsaCall(OperationAnalysisContext context, INamedTypeSymbol rsa, INamedTypeSymbol padding)
     {
         var invocation = (IInvocationOperation)context.Operation;
@@ -95,6 +98,8 @@ public sealed class InsecureRsaPaddingAnalyzer : DiagnosticAnalyzer
     }
 
     // new Mechanism(CKM.CKM_RSA_PKCS) / new Mechanism(CKM.CKM_RSA_X_509)
+    [SuppressMessage("Major Code Smell", "S3267:Loops should be simplified with LINQ expressions",
+        Justification = "These analyzers run an operation action on every object creation / invocation in the compilation, and again on each keystroke in the IDE. foreach over ImmutableArray<IArgumentOperation> uses the struct enumerator and allocates nothing, whereas Select boxes it into IEnumerable and allocates an iterator per call. Roslyn analyzer guidance is to keep LINQ off these paths, and the analyzers here follow it — System.Linq is imported only by the source generator, which runs far less often. The argument lists are one to three elements, so the LINQ form would trade a real allocation for no readability gain.")]
     private static void AnalyzeMechanism(OperationAnalysisContext context, INamedTypeSymbol mechanism, INamedTypeSymbol ckm)
     {
         var creation = (IObjectCreationOperation)context.Operation;
