@@ -16,8 +16,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     private IntPtr _nonce;
     private IntPtr _tag;
     private readonly byte[] _nonceBytes;
-    // Holds the token's output after AbsorbOutput; the legacy _tag buffer is what CopyTagTo still
-    // reads until the session switches to the scope path (see AbsorbedTag).
+    // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
+    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
     private readonly byte[] _tagBuffer;
     private bool _disposed;
 

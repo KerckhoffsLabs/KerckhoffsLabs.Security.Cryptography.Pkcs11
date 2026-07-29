@@ -14,8 +14,8 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     private IntPtr _tag;
     private readonly int _tagLen;
     private readonly byte[] _ivBytes;
-    // Holds the token's output after AbsorbOutput; the legacy _tag buffer is what CopyTagTo still
-    // reads until the session switches to the scope path (see AbsorbedTag).
+    // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
+    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
     private readonly byte[] _tagBuffer;
     private bool _disposed;
 

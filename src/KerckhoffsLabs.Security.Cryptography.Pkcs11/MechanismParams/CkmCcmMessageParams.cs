@@ -16,8 +16,8 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     private readonly int _macLen;
     private readonly int _dataLen;
     private readonly byte[] _nonceBytes;
-    // Holds the token's output after AbsorbOutput; the legacy _mac buffer is what CopyMacTo still
-    // reads until the session switches to the scope path (see AbsorbedMac).
+    // The MAC as managed state, and what CopyMacTo serves. Seeded from the caller's MAC for decrypt;
+    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
     private readonly byte[] _macBuffer;
     private bool _disposed;
 
