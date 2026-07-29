@@ -132,6 +132,7 @@ public sealed class BuildMarshalableEquivalenceTests
         var scoped = (CK_IKE1_EXTENDED_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
         Assert.Equal((ulong)legacy.PrfMechanism, (ulong)scoped.PrfMechanism);
+        Assert.Equal(legacy.HasKeygxy, scoped.HasKeygxy);
         Assert.Equal((ulong)legacy.Keygxy, (ulong)scoped.Keygxy);
         Assert.Equal((ulong)legacy.ExtraDataLen, (ulong)scoped.ExtraDataLen);
         AssertDistinctBlockWithSameBytes(legacy.ExtraData, scoped.ExtraData, [0xE1, 0xE2]);
@@ -141,13 +142,14 @@ public sealed class BuildMarshalableEquivalenceTests
     public void Ike2PrfPlusDeriveParams_BothPathsAgree()
     {
         using var p = new CkmIke2PrfPlusDeriveParams(
-            CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, [0x5E, 0x5D, 0x5C]);
+            CKM.CKM_SHA256_HMAC, hasSeedKey: true, seedKey: 7, [0x5E, 0x5D, 0x5C]);
         using var scope = new MechanismParameterScope();
 
         var legacy = (CK_IKE2_PRF_PLUS_DERIVE_PARAMS)p.ToMarshalableStructure();
         var scoped = (CK_IKE2_PRF_PLUS_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
         Assert.Equal((ulong)legacy.PrfMechanism, (ulong)scoped.PrfMechanism);
+        Assert.Equal(legacy.HasSeedKey, scoped.HasSeedKey);
         Assert.Equal((ulong)legacy.SeedKey, (ulong)scoped.SeedKey);
         Assert.Equal((ulong)legacy.SeedDataLen, (ulong)scoped.SeedDataLen);
         AssertDistinctBlockWithSameBytes(legacy.SeedData, scoped.SeedData, [0x5E, 0x5D, 0x5C]);
