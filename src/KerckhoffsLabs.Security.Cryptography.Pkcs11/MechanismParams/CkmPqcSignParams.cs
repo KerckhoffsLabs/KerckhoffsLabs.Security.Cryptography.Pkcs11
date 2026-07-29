@@ -12,6 +12,7 @@ public sealed class CkmPqcSignParams : MechanismParameters
 {
     private CK_SIGN_ADDITIONAL_CONTEXT _lowLevelParams;
     private IntPtr _context;
+    private readonly byte[] _contextBytes;
     private bool _disposed;
 
     /// <summary>Initializes pure-PQC signing parameters.</summary>
@@ -29,6 +30,8 @@ public sealed class CkmPqcSignParams : MechanismParameters
             UnmanagedMemory.Write(_context, context);
         }
 
+        _contextBytes = context.ToArray();
+
         _lowLevelParams = new()
         {
             HedgeVariant = (NativeCULong)(uint)hedgeVariant,
@@ -42,6 +45,18 @@ public sealed class CkmPqcSignParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_SIGN_ADDITIONAL_CONTEXT
+        {
+            HedgeVariant = _lowLevelParams.HedgeVariant,
+            Context = scope.Write(_contextBytes),
+            ContextLen = (NativeCULong)_contextBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

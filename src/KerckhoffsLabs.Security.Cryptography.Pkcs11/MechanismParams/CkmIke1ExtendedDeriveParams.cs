@@ -11,6 +11,7 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
 {
     private CK_IKE1_EXTENDED_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _extraData;
+    private readonly byte[] _extraDataBytes;
     private bool _disposed;
 
     /// <summary>
@@ -28,6 +29,8 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
             UnmanagedMemory.Write(_extraData, extraData);
         }
 
+        _extraDataBytes = extraData.ToArray();
+
         _lowLevelParams = new()
         {
             PrfMechanism = (NativeCULong)(ulong)prfMechanism,
@@ -43,6 +46,20 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_IKE1_EXTENDED_DERIVE_PARAMS
+        {
+            PrfMechanism = _lowLevelParams.PrfMechanism,
+            HasKeygxy = _lowLevelParams.HasKeygxy,
+            Keygxy = _lowLevelParams.Keygxy,
+            ExtraData = scope.Write(_extraDataBytes),
+            ExtraDataLen = (NativeCULong)_extraDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

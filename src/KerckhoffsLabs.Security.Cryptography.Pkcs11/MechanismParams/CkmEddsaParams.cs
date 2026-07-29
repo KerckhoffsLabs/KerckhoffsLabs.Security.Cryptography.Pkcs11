@@ -10,6 +10,7 @@ public sealed class CkmEddsaParams : MechanismParameters
 {
     private CK_EDDSA_PARAMS _lowLevelParams;
     private IntPtr _contextData;
+    private readonly byte[] _contextDataBytes;
     private bool _disposed;
 
     /// <summary>
@@ -25,6 +26,8 @@ public sealed class CkmEddsaParams : MechanismParameters
             UnmanagedMemory.Write(_contextData, contextData);
         }
 
+        _contextDataBytes = contextData.ToArray();
+
         _lowLevelParams = new()
         {
             PhFlag = phFlag,
@@ -38,6 +41,18 @@ public sealed class CkmEddsaParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_EDDSA_PARAMS
+        {
+            PhFlag = _lowLevelParams.PhFlag,
+            ContextData = scope.Write(_contextDataBytes),
+            ContextDataLen = (NativeCULong)_contextDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

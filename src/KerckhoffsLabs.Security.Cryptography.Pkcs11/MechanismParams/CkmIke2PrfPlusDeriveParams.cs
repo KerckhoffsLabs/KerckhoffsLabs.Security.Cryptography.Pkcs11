@@ -11,6 +11,7 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
 {
     private CK_IKE2_PRF_PLUS_DERIVE_PARAMS _lowLevelParams;
     private IntPtr _seedData;
+    private readonly byte[] _seedDataBytes;
     private bool _disposed;
 
     /// <summary>
@@ -28,6 +29,8 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
             UnmanagedMemory.Write(_seedData, seedData);
         }
 
+        _seedDataBytes = seedData.ToArray();
+
         _lowLevelParams = new()
         {
             PrfMechanism = (NativeCULong)(ulong)prfMechanism,
@@ -43,6 +46,20 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
+        {
+            PrfMechanism = _lowLevelParams.PrfMechanism,
+            HasSeedKey = _lowLevelParams.HasSeedKey,
+            SeedKey = _lowLevelParams.SeedKey,
+            SeedData = scope.Write(_seedDataBytes),
+            SeedDataLen = (NativeCULong)_seedDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

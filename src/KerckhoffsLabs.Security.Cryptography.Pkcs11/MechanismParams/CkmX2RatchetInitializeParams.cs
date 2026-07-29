@@ -11,6 +11,7 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
 {
     private CK_X2RATCHET_INITIALIZE_PARAMS _lowLevelParams;
     private IntPtr _sk;
+    private readonly byte[] _skBytes;
     private bool _disposed;
 
     /// <summary>
@@ -30,6 +31,8 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
         _sk = UnmanagedMemory.Allocate(sk.Length);
         UnmanagedMemory.Write(_sk, sk);
 
+        _skBytes = sk.ToArray();
+
         _lowLevelParams = new()
         {
             Sk = _sk,
@@ -48,6 +51,23 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_X2RATCHET_INITIALIZE_PARAMS
+        {
+            Sk = scope.Write(_skBytes),
+            PeerPublicPrekey = _lowLevelParams.PeerPublicPrekey,
+            PeerPublicIdentity = _lowLevelParams.PeerPublicIdentity,
+            OwnPublicIdentity = _lowLevelParams.OwnPublicIdentity,
+            EncryptedHeader = _lowLevelParams.EncryptedHeader,
+            Curve = _lowLevelParams.Curve,
+            AeadMechanism = _lowLevelParams.AeadMechanism,
+            KdfMechanism = _lowLevelParams.KdfMechanism,
+        };
     }
 
     /// <inheritdoc/>

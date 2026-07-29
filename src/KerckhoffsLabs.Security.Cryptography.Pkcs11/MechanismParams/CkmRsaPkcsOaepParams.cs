@@ -13,6 +13,7 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
 {
     private CK_RSA_PKCS_OAEP_PARAMS _lowLevelParams;
     private IntPtr _sourceData;
+    private readonly byte[] _sourceDataBytes;
     private bool _disposed;
 
     /// <summary>
@@ -29,6 +30,8 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
             UnmanagedMemory.Write(_sourceData, sourceData);
         }
 
+        _sourceDataBytes = sourceData.ToArray();
+
         _lowLevelParams = new()
         {
             HashAlg = hashAlg.ToCULong(),
@@ -44,6 +47,20 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CK_RSA_PKCS_OAEP_PARAMS
+        {
+            HashAlg = _lowLevelParams.HashAlg,
+            Mgf = _lowLevelParams.Mgf,
+            Source = CKZ.CKZ_DATA_SPECIFIED,
+            SourceData = scope.Write(_sourceDataBytes),
+            SourceDataLen = (NativeCULong)_sourceDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>

@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -34,6 +35,13 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
 
     /// <inheritdoc/>
     internal override object ToMarshalableStructure()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _lowLevelParams;
+    }
+
+    /// <inheritdoc/>
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _lowLevelParams;
