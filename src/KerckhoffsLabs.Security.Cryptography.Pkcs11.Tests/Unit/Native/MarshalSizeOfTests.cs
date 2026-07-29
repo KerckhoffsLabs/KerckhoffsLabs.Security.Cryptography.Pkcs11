@@ -39,8 +39,9 @@ public sealed class MarshalSizeOfTests
     /// <summary>
     /// Pins the natural-alignment (Pack default) layout that PKCS#11 produces on
     /// Linux/macOS x64. Any drift here means the unified <c>T</c> type changed shape.
-    /// CK_FUNCTION_LIST variants are intentionally excluded — their size depends on
-    /// platform-specific function pointer counts and is not part of this test's scope.
+    /// CK_FUNCTION_LIST variants are included: each has a fixed function-pointer count, so its
+    /// LP64 size is deterministic (8-byte CK_VERSION slot + N * 8). These are the structs the
+    /// loader binds against, so drift here is the most consequential kind.
     /// </summary>
     [ConditionalTheory(nameof(IsUnix))]
     // BEGIN PROBED InlineData — Linux x64, LP64
@@ -140,6 +141,9 @@ public sealed class MarshalSizeOfTests
     [InlineData(typeof(CK_X9_42_DH2_DERIVE_PARAMS), 72)]
     [InlineData(typeof(CK_X9_42_MQV_DERIVE_PARAMS), 80)]
     [InlineData(typeof(CK_XEDDSA_PARAMS), 8)]
+    [InlineData(typeof(CK_FUNCTION_LIST), 552)]
+    [InlineData(typeof(CK_FUNCTION_LIST_3_0), 744)]
+    [InlineData(typeof(CK_FUNCTION_LIST_3_2), 840)]
     // END PROBED InlineData
     public void UnifiedStructSize_OnUnix(Type t, int expectedSize) => Assert.Equal(expectedSize, Marshal.SizeOf(t));
 
