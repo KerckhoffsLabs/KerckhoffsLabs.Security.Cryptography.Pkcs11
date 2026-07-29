@@ -83,6 +83,16 @@ public sealed class MessageParamsCopyTagTests
     }
 
     [Fact]
+    public void SalsaChaChaPoly1305Message_ForDecrypt_RoundTripsCallerTag()
+    {
+        byte[] tag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(new byte[12], tag);
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(tag, readBack);
+    }
+
+    [Fact]
     public void GcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
     {
         using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
@@ -97,6 +107,12 @@ public sealed class MessageParamsCopyTagTests
         p.AbsorbOutput(s);
 
         Assert.Equal(produced, p.AbsorbedTag.ToArray());
+
+        // The public accessor must serve the absorbed value too, not the buffer the wrapper
+        // allocated for itself — reading the wrong one returns an all-zeros tag on every encrypt.
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(produced, readBack);
     }
 
     [Fact]
@@ -113,6 +129,10 @@ public sealed class MessageParamsCopyTagTests
         p.AbsorbOutput(s);
 
         Assert.Equal(produced, p.AbsorbedMac.ToArray());
+
+        byte[] readBack = new byte[16];
+        p.CopyMacTo(readBack);
+        Assert.Equal(produced, readBack);
     }
 
     [Fact]
@@ -129,5 +149,9 @@ public sealed class MessageParamsCopyTagTests
         p.AbsorbOutput(s);
 
         Assert.Equal(produced, p.AbsorbedTag.ToArray());
+
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(produced, readBack);
     }
 }

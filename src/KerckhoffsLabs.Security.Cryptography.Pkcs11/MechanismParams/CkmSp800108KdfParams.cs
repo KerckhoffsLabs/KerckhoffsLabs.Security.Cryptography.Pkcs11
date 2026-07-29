@@ -193,9 +193,10 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
-        // Guarded like every other member: the pointers in `marshalled` belong to a call scope, and
-        // absorbing after that scope has gone (or after disposal) would read released memory. Failing
-        // loudly beats silently reporting CK_INVALID_HANDLE for every derived key.
+        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
+        // mistake — a scope already released while these params are still live — because nothing here
+        // can observe that; the handle slots in `marshalled` would simply address freed memory.
+        // Keeping the absorb inside the scope's lifetime remains the caller's responsibility.
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_retainedTemplates.Count == 0) return;

@@ -102,9 +102,10 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
-        // Guarded like every other member: the pointers in `marshalled` belong to a call scope, and
-        // absorbing after that scope has gone (or after disposal) would read released memory. Failing
-        // loudly beats silently returning zeros.
+        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
+        // mistake — a scope already released while these params are still live — because nothing here
+        // can observe that; the pointers in `marshalled` would simply address freed memory. Keeping
+        // the absorb inside the scope's lifetime remains the caller's responsibility.
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var s = (CK_GCM_MESSAGE_PARAMS)marshalled;
