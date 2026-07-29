@@ -128,15 +128,15 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     {
         try
         {
-            Pkcs11Key key = DecapsulateWith(mechanism, ciphertext, includeValueLen: true);
+            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: true);
             library.MlKemDecapsulateOmitsValueLen = false;
-            return key;
+            return sharedKey;
         }
         catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
         {
-            Pkcs11Key key = DecapsulateWith(mechanism, ciphertext, includeValueLen: false);
+            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: false);
             library.MlKemDecapsulateOmitsValueLen = true;
-            return key;
+            return sharedKey;
         }
     }
 

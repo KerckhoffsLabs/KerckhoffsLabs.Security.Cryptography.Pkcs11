@@ -116,6 +116,9 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
 
     public void Dispose()
     {
+        // Ahead of the early return below: this type is unsealed, so suppress on behalf of any
+        // derived fixture that introduces a finalizer rather than making it re-implement IDisposable.
+        GC.SuppressFinalize(this);
         try { Library?.Dispose(); } catch { }
         if (_gateDir.Length == 0) return;
         try { RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true); } catch { }
