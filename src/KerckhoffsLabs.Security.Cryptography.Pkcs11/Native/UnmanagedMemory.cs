@@ -156,11 +156,17 @@ internal static class UnmanagedMemory
     /// <summary>
     /// Returns the unmanaged size of the <typeparamref name="T"/> struct in bytes.
     /// For <c>[PackedForPkcs11]</c>-marked types, returns the Windows-packed sibling size on
-    /// Windows and the natural size on Linux/macOS; otherwise delegates to
-    /// <see cref="Marshal.SizeOf{T}()"/>.
+    /// Windows and the natural size on Linux/macOS; otherwise the blittable size.
     /// </summary>
+    /// <remarks>
+    /// Both branches measure the blittable layout, which is the one that governs under
+    /// <c>[assembly: DisableRuntimeMarshalling]</c>. Every native struct is verified to have an
+    /// identical managed and marshalled layout by
+    /// <c>NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize</c>, so this agrees
+    /// with the <c>Marshal.StructureToPtr</c> that fills the buffer.
+    /// </remarks>
     public static int SizeOf<T>() where T : struct
-        => IsPackedForPkcs11(typeof(T)) ? Pkcs11Marshal.SizeOf<T>() : Marshal.SizeOf<T>();
+        => IsPackedForPkcs11(typeof(T)) ? Pkcs11Marshal.SizeOf<T>() : Unsafe.SizeOf<T>();
 
     /// <summary>
     /// Returns the unmanaged size of the structure type <paramref name="structureType"/> in bytes.
