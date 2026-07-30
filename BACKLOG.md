@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 57 (15 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (25 open, 7 resolved) | Low: 18 (14 open, 4 resolved)
+- Total items: 60 (16 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 21 (17 open, 4 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -139,7 +139,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** Cryptographer A
 
 ### [BL-012] ✅ RESOLVED — `Mechanism` does not own its `MechanismParameters`; ordered two-object disposal is easy to misuse
-- **Status:** Resolved 2026-07-29. `Mechanism` now owns the parameters it is constructed with and disposes them in `Dispose(true)`, after releasing the marshalled `CK_MECHANISM` block so the block never outlives the buffers it points at. The parameter object is left alone on the finalizer path, since it is managed and carries a finalizer of its own. The leak this fixes was the common case rather than the exotic one: roughly twelve call sites construct parameters inline (`new Mechanism(ckm, new CkmAesGcmParams(...))`) and keep no reference, so nothing could dispose them and their unmanaged IV/AAD buffers survived until the GC ran. The two sites that do hold a variable use `using var p = …; using var m = new Mechanism(…, p);`, which disposes in reverse order — mechanism first — and stays correct, because disposal is idempotent. What is no longer supported is sharing one parameter instance across two mechanisms; that is now stated on both constructors and on the `MechanismParameters` class doc. Sharing one parameter instance across two mechanisms is now rejected at the second construction with an `InvalidOperationException` rather than left to documentation: each mechanism marshals its own copy of the parameter struct including the buffer addresses, so disposing either would leave the other pointing at freed memory and hand the token released buffers with no exception anywhere. `MechanismOwnsParametersTests` pins all of it, and the ownership cases were confirmed to fail with the disposal line removed.
+- **Status:** Resolved 2026-07-29. `Mechanism` now owns the parameters it is constructed with and disposes them in `Dispose(true)`, after releasing the marshalled `CK_MECHANISM` block so the block never outlives the buffers it points at. The parameter object is left alone on the finalizer path, since it is managed and carries a finalizer of its own. The leak this fixes was the common case rather than the exotic one: roughly twelve call sites construct parameters inline (`new Mechanism(ckm, new CkmAesGcmParams(...))`) and keep no reference, so nothing could dispose them and their unmanaged IV/AAD buffers survived until the GC ran. The two sites that do hold a variable use `using var p = …; using var m = new Mechanism(…, p);`, which disposes in reverse order — mechanism first — and stays correct, because disposal is idempotent. What is no longer supported is sharing one parameter instance across two mechanisms; that is now stated on both constructors and on the `MechanismParameters` class doc. Sharing one parameter instance across two mechanisms is now rejected at the second construction with an `InvalidOperationException` rather than left to documentation: each mechanism marshals its own copy of the parameter struct including the buffer addresses, so disposing either would leave the other pointing at freed memory and hand the token released buffers with no exception anywhere. `MechanismOwnsParametersTests` pinned all of it, and the ownership cases were confirmed to fail with the disposal line removed.
+  - **Superseded by BL-057 (2026-07-29):** the mechanism described above no longer exists. Parameter objects hold no unmanaged memory, so there is nothing to own, nothing to order, and nothing to free — the sharing rejection and its `InvalidOperationException` were deleted along with `MechanismOwnsParametersTests`, and sharing one descriptor across two mechanisms is now legal and tested. The defect this item recorded is still fixed; it was fixed by removing the lifetime rather than by assigning its owner.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** M
@@ -396,7 +397,12 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA C
 
-### [BL-057] Unmanaged parameter memory is scoped to the parameter object rather than to the call that needs it
+### [BL-057] ✅ RESOLVED — Unmanaged parameter memory is scoped to the parameter object rather than to the call that needs it
+- **Status:** Resolved 2026-07-29. `Native/MechanismParameterScope.cs` owns every unmanaged byte for one native call and zeroizes then frees all of it on disposal. All 27 `Ckm*Params` are now managed descriptors: they build their `[PackedForPkcs11]` struct in `BuildMarshalable(scope)`, allocate nothing in their constructors, and have no finalizers. `Mechanism` is a stateless pairing of type and descriptor — `Marshal(scope, out object? marshalledParams)` is a pure function, and `AbsorbOutput(object?)` copies token-written output back into managed state before the scope is released. `Pkcs11Session` opens one scope per operation across 32 call sites and 27 scopes. Deleted: `ToMarshalableStructure` (89 call sites), 26 finalizers, `TryClaimOwnership`/`ThrowIfAlreadyOwned` and its `InvalidOperationException`. Sharing one descriptor across two mechanisms is now legal and asserted (`BuildMarshalableTests.cs:661`). The four in/out types stopped being exceptions to the model: `CopyTagTo`/`CopyMacTo`/`AdditionalDerivedKeys` read managed buffers that `AbsorbOutput` fills. Full suite green (1865 passed / 0 failed / 630 skipped).
+  - **Deviation from the design:** the spec had `Mechanism` cache the struct it built. That was rejected during implementation — the cache made one instance carry per-operation state, so `DecryptVerify(m, k, m, k, …)` overwrote it and silently discarded the first mechanism's output. Single-threaded and deterministic, not a race. Hence the `out` parameter.
+  - **Public behaviour change:** `AdditionalDerivedKeys` returns an empty snapshot before the derive rather than one zero handle per requested key. Pre-seeding zeros was considered and rejected: it makes "the token never wrote this slot" indistinguishable from "not yet absorbed."
+  - **Public behaviour fix found in review:** the raw `Mechanism(type, byte[])` constructors now copy the caller's array. Once `Marshal` read it at call time instead of the constructor copying it to unmanaged memory immediately, a caller zeroizing its own IV buffer afterwards — ordinary hygiene — silently produced an all-zero IV the token accepts without error.
+  - **`IDisposable` deliberately remains** on `MechanismParameters` and `Mechanism` with a no-op `Dispose`, so this change is source-compatible. Removing it is BL-058.
 - **Area:** .NET API Design
 - **Severity:** Medium
 - **Effort:** L
@@ -408,8 +414,41 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Variants considered and rejected:** (a) *hybrid* — convert only the input-only types and let the four in/out ones keep owning: gives one type family two different lifetime semantics, so a caller must know which of 27 siblings needs `using`; an inconsistent API is worse here than a uniformly imperfect one. (b) *uniform `SecureBuffer` in descriptors* — `SecureBuffer` is itself `IDisposable` and pins, so parameters would keep `IDisposable` and would need finalizers more than before, erasing the benefit that motivates the work.
 - **Scheduling note:** larger than it first appears — the marshalling currently happens in the `Mechanism` constructor and the session consumes the finished struct, so the change reaches the session layer rather than staying inside `MechanismParams/`. Not urgent: the current model is safe, since BL-012 fixed the disposal ordering and sharing now fails loudly at construction. Worth its own spec rather than an incremental fix, and worth doing pre-1.0 because lifetime semantics cannot be changed afterwards.
 - **Related:** subsumes what remains of BL-012. Shares its theme with BL-056 — ownership expressed in the type system instead of by convention. Mechanisms, parameters and keys are best settled under one convention rather than three.
-- **Breaks public API?** Yes (`MechanismParameters` stops being `IDisposable`) — land before 1.0
+- **Breaks public API?** No, as landed — `IDisposable` was kept so no caller had to change. The breaking half is BL-058.
 - **Raised by:** BL-012 follow-up; design revised 2026-07-29 after the in/out and zeroization analysis
+
+### [BL-058] `MechanismParameters` and `Mechanism` still advertise `IDisposable` with nothing left to release
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** M (mechanical, but wide)
+- **Location:** `MechanismParams/MechanismParameters.cs`; `Mechanism.cs`; 265 `using` call sites across production and tests
+- **Problem:** BL-057 moved every unmanaged byte into the per-call scope, so `Dispose` on both types is now a no-op. A type that implements `IDisposable` without owning a resource is misleading in the direction that matters: it teaches callers that the object holds something, which is precisely the mental model BL-057 removed. `MechanismParamsFinalizerTests` already asserts no parameter type declares a finalizer, so nothing depends on the disposal machinery.
+- **Proposed action:** Remove `IDisposable` from both types and rewrite the call sites. Measured cost: **265** — 178 `using var … = new Mechanism(…)`, 82 `using var … = new Ckm*Params(…)`, 5 block-form `using (…)`. The compiler flags every one (CS1674), so none can be missed silently.
+- **Why it was split out:** bundling 265 uniform edits with the marshalling rewrite would have buried the risky change in churn and made the diff effectively unreviewable. On its own the diff is mechanical and a reviewer can confirm it by inspection.
+- **Related:** completes BL-057.
+- **Breaks public API?** Yes (`using` on either type stops compiling) — land before 1.0
+- **Raised by:** BL-057 implementation, deliberately deferred
+
+### [BL-059] `CK_MECHANISM.CreateMechanism` is dead production code kept alive only by its own tests
+- **Area:** P/Invoke
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `Native/CK_MECHANISM.cs` (6 overloads); sole caller `Unit/Native/CkMechanismTests.cs`
+- **Problem:** These overloads were the legacy path's allocation primitive — they allocated the parameter block inside the `Mechanism` constructor. BL-057 replaced that with `Mechanism.Marshal(scope, …)`, leaving them unreferenced by any production code path. Their tests still pass, which is what keeps them from showing up as unused. Dead allocation helpers on an interop struct are a trap: the next person needing a `CK_MECHANISM` may reach for one and reintroduce an allocation with no scope to own it.
+- **Proposed action:** Delete the 6 overloads and their tests, or keep one and document it as test-only. Verify nothing outside `Native/` references them first.
+- **Breaks public API?** No (`internal`)
+- **Raised by:** BL-057 implementation (Task 8)
+
+### [BL-060] One parameter descriptor with output fields, used for both halves of a dual-mechanism operation, silently keeps only the last result
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** S
+- **Location:** `Internal/Pkcs11Session.cs` `DecryptVerify` / `DigestEncrypt` / `DecryptDigest`; `MechanismParams/MechanismParameters.cs`
+- **Problem:** Those three operations run two mechanisms in one scope. Each now marshals into its own block, so the blocks no longer collide — but if the *same descriptor instance* is passed for both halves and it has output fields (a tag, a MAC, derived handles), both `AbsorbOutput` calls write the same managed buffer and the first result is lost with no error. BL-057 made sharing a descriptor across mechanisms legal, which is correct for the common input-only case and makes this narrow case reachable. The old `TryClaimOwnership` guard never covered it either: it rejected two *mechanisms* sharing one descriptor, not one descriptor used for two operations.
+- **Proposed action:** Cheapest honest option is to document it on the three methods. A stronger option is to reject it — for the four descriptor types that have output fields, throw if the same instance is supplied for both halves of one call. Decide with BL-056, which is settling ownership conventions across mechanisms, parameters and keys.
+- **Related:** the residual of BL-057's sharing relaxation; same theme as BL-056.
+- **Breaks public API?** No (documentation), or yes if the guard is added — settle before 1.0
+- **Raised by:** BL-057 implementation (Task 7), found while verifying the `_lastMarshalled` finding
 
 ### [BL-037] No automated versioning source — the version exists only as a tag stamp
 - **Area:** Release Eng
