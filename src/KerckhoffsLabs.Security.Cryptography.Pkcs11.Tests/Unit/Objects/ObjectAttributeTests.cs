@@ -125,7 +125,7 @@ public sealed class ObjectAttributeTests
         Assert.NotNull(roundtripped);
         // CK_DATE encodes date only; time component is dropped.
         Assert.Equal(source.Date, roundtripped!.Value.Date);
-        Assert.Equal(DateTimeKind.Utc, roundtripped.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, roundtripped!.Value.Kind);
     }
 
     [Fact]

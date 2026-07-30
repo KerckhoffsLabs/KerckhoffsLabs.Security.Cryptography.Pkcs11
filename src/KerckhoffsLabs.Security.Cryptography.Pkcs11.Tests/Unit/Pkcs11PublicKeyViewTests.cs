@@ -37,9 +37,9 @@ public sealed class Pkcs11PublicKeyViewTests
 
         Assert.NotNull(parsed);
         Assert.True(parsed!.Value.Curve.IsNamed);
-        Assert.Equal(curve.Oid, parsed.Value.Curve.Oid.Value);
-        Assert.Equal(coordLen, parsed.Value.Q.X!.Length);
-        Assert.Equal(coordLen, parsed.Value.Q.Y!.Length);
+        Assert.Equal(curve.Oid, parsed!.Value.Curve.Oid.Value);
+        Assert.Equal(coordLen, parsed!.Value.Q.X!.Length);
+        Assert.Equal(coordLen, parsed!.Value.Q.Y!.Length);
     }
 
     [Fact]
