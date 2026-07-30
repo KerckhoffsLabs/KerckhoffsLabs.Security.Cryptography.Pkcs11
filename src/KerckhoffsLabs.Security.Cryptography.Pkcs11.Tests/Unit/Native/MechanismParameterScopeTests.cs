@@ -66,12 +66,24 @@ public sealed class MechanismParameterScopeTests
         Assert.Equal(3, UnmanagedMemory.Read<CK_VERSION>(p + size).Major);
     }
 
+    // Sessions dispose the scope in a `finally` while some paths also dispose it on the way out, so a
+    // second release has to be inert. It relied on not throwing, which asserted nothing explicitly:
+    // the count assertions below are what distinguish "inert" from "freed the same block twice".
     [Fact]
     public void Dispose_IsIdempotent()
     {
+        int before = UnmanagedMemory.OutstandingAllocationCount;
         var scope = new MechanismParameterScope();
         scope.Write([1]);
+        Assert.True(UnmanagedMemory.OutstandingAllocationCount > before);
+
         scope.Dispose();
-        scope.Dispose();
+        int afterFirst = UnmanagedMemory.OutstandingAllocationCount;
+        Assert.Equal(before, afterFirst);
+
+        // UnmanagedMemory.Free throws on a pointer it no longer tracks, so a repeated release would
+        // surface here rather than silently corrupting the heap.
+        Assert.Null(Record.Exception(scope.Dispose));
+        Assert.Equal(afterFirst, UnmanagedMemory.OutstandingAllocationCount);
     }
 }
