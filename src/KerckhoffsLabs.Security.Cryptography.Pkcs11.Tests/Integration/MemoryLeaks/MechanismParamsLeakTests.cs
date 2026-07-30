@@ -35,7 +35,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
                 iv: new byte[12],
                 aad: new byte[16],
                 tagBits: 128);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -50,7 +51,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
                 hashAlg: CKM.CKM_SHA256,
                 mgf: CKG.CKG_MGF1_SHA256,
                 sourceData: new byte[16]);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -65,7 +67,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
                 hashAlg: CKM.CKM_SHA256,
                 mgf: CKG.CKG_MGF1_SHA256,
                 saltLength: 32);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -79,7 +82,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
             using var p = new CkmSalsa20ChaCha20Poly1305Params(
                 nonce: new byte[12],
                 aad: new byte[16]);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -94,7 +98,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
                 prfType: CKM.CKM_SHA256_HMAC,
                 label: new byte[9],
                 context: new byte[11]);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -109,7 +114,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
                 prfType: CKM.CKM_SHA256_HMAC,
                 label: default,
                 context: default);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -127,7 +133,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
                 kdf: CKD.CKD_SHA256_KDF,
                 peerPublicPoint: peerPublicPoint,
                 sharedData: new byte[16]);
-            _ = p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = p.BuildMarshalable(scope);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }

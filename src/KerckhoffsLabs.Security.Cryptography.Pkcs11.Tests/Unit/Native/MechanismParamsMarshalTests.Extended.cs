@@ -7,8 +7,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// Shared round-trip helper for the mechanism-parameter marshal tests: writes the boxed low-level
-/// <c>CK_*</c> struct through the platform marshaller and reads it back. Pointers in the result still
-/// reference the wrapper's unmanaged buffers, so callers keep the wrapper alive while dereferencing.
+/// <c>CK_*</c> struct through the platform marshaller and reads it back. Pointers in the result
+/// reference the scope the struct was built into, so callers keep that scope alive while
+/// dereferencing them.
 /// </summary>
 internal static class ParamMarshal
 {
@@ -34,7 +35,8 @@ public sealed class MechanismAeadMessageParamsTests
     {
         byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         using var p = CkmGcmMessageParams.ForEncrypt(iv, tagBytes: 16);
-        var s = ParamMarshal.RoundTrip<CK_GCM_MESSAGE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_GCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)iv.Length, (ulong)s.IvLen);
         Assert.Equal(iv, UnmanagedMemory.Read(s.Iv, iv.Length));
@@ -48,7 +50,8 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] iv = [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9];
         byte[] tag = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         using var p = CkmGcmMessageParams.ForDecrypt(iv, tag);
-        var s = ParamMarshal.RoundTrip<CK_GCM_MESSAGE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_GCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(tag, UnmanagedMemory.Read(s.Tag, tag.Length));
     }
@@ -68,7 +71,8 @@ public sealed class MechanismAeadMessageParamsTests
     {
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7]; // 7..13
         using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, nonce, macBytes: 16);
-        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(64UL, (ulong)s.DataLen);
         Assert.Equal((ulong)nonce.Length, (ulong)s.NonceLen);
@@ -83,7 +87,8 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8];
         byte[] mac = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7];
         using var p = CkmCcmMessageParams.ForDecrypt(dataLen: 32, nonce, mac);
-        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)mac.Length, (ulong)s.MacLen);
         Assert.Equal(mac, UnmanagedMemory.Read(s.Mac, mac.Length));
@@ -106,7 +111,8 @@ public sealed class MechanismAeadMessageParamsTests
     {
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(nonce);
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)nonce.Length, (ulong)s.NonceLen);
         Assert.Equal(nonce, UnmanagedMemory.Read(s.Nonce, nonce.Length));
@@ -119,7 +125,8 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         byte[] tag = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(tag, UnmanagedMemory.Read(s.Tag, tag.Length));
     }
@@ -139,7 +146,8 @@ public sealed class MechanismStreamParamsTests
         byte[] blockCounter = [0, 0, 0, 0, 0, 0, 0, 1];
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8];
         using var p = new CkmSalsa20Params(blockCounter, nonce, nonceBits: 64);
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SALSA20_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(blockCounter, UnmanagedMemory.Read(s.BlockCounter, blockCounter.Length));
         Assert.Equal(nonce, UnmanagedMemory.Read(s.Nonce, nonce.Length));
@@ -160,7 +168,8 @@ public sealed class MechanismStreamParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         byte[] aad = [0xAA, 0xBB];
         using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)nonce.Length, (ulong)s.NonceLen);
         Assert.Equal(nonce, UnmanagedMemory.Read(s.Nonce, nonce.Length));
@@ -173,7 +182,8 @@ public sealed class MechanismStreamParamsTests
     {
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, default);
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(0UL, (ulong)s.AADLen);
         Assert.Equal(IntPtr.Zero, s.AAD);
@@ -195,7 +205,8 @@ public sealed class MechanismKdfParamsTests
         byte[] info = [9, 8, 7];
         using var p = new CkmHkdfParams(extract: true, expand: true, CKM.CKM_SHA256_HMAC,
             saltType: 1, salt, saltKey: 0, info);
-        var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.True(s.Extract);
         Assert.True(s.Expand);
@@ -212,7 +223,8 @@ public sealed class MechanismKdfParamsTests
     {
         using var p = new CkmHkdfParams(extract: false, expand: false, CKM.CKM_SHA256_HMAC,
             saltType: 0, default, saltKey: 0, default);
-        var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.False(s.Extract);
         Assert.False(s.Expand);
@@ -228,7 +240,8 @@ public sealed class MechanismKdfParamsTests
         using var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([1, 2, 3]).ByteArray([0x00]).ByteArray([4, 5])
             .DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
-        var s = ParamMarshal.RoundTrip<CK_SP800_108_KDF_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SP800_108_KDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
@@ -241,7 +254,8 @@ public sealed class MechanismKdfParamsTests
         using var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([9]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
             .WithIV(iv).Build();
-        var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(3UL, (ulong)s.NumberOfDataParams);
@@ -254,7 +268,8 @@ public sealed class MechanismKdfParamsTests
     {
         using var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([9]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
-        var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(0UL, (ulong)s.IVLen);
         Assert.Equal(IntPtr.Zero, s.IV);
@@ -270,7 +285,8 @@ public sealed class MechanismPqcSignParamsTests
     {
         byte[] context = [0x01, 0x02, 0x03];
         using var p = new CkmPqcSignParams(CkhHedge.CKH_HEDGE_REQUIRED, context);
-        var s = ParamMarshal.RoundTrip<CK_SIGN_ADDITIONAL_CONTEXT>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SIGN_ADDITIONAL_CONTEXT>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_REQUIRED, (ulong)s.HedgeVariant);
         Assert.Equal((ulong)context.Length, (ulong)s.ContextLen);
@@ -281,7 +297,8 @@ public sealed class MechanismPqcSignParamsTests
     public void PqcSign_DefaultHedge_EmptyContext_NullPointer()
     {
         using var p = new CkmPqcSignParams();
-        var s = ParamMarshal.RoundTrip<CK_SIGN_ADDITIONAL_CONTEXT>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_SIGN_ADDITIONAL_CONTEXT>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_PREFERRED, (ulong)s.HedgeVariant);
         Assert.Equal(0UL, (ulong)s.ContextLen);
@@ -297,7 +314,8 @@ public sealed class MechanismPqcSignParamsTests
     {
         byte[] context = [0xAA];
         using var p = new CkmHashPqcSignParams(CKM.CKM_SHA256, CkhHedge.CKH_HEDGE_REQUIRED, context);
-        var s = ParamMarshal.RoundTrip<CK_HASH_SIGN_ADDITIONAL_CONTEXT>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_HASH_SIGN_ADDITIONAL_CONTEXT>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CKM.CKM_SHA256, (ulong)s.Hash);
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_REQUIRED, (ulong)s.HedgeVariant);
@@ -313,7 +331,8 @@ public sealed class MechanismPqcSignParamsTests
     public void Xeddsa_MarshalsHashType()
     {
         using var p = new CkmXeddsaParams(hashType: (ulong)CKM.CKM_SHA512);
-        var s = ParamMarshal.RoundTrip<CK_XEDDSA_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_XEDDSA_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CKM.CKM_SHA512, (ulong)s.Hash);
     }
@@ -329,7 +348,8 @@ public sealed class MechanismIkeDeriveParamsTests
         byte[] ni = [1, 2, 3];
         byte[] nr = [4, 5];
         using var p = new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: false, ni, nr, newKey: 7);
-        var s = ParamMarshal.RoundTrip<CK_IKE_PRF_DERIVE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_IKE_PRF_DERIVE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.True(s.DataAsKey);
@@ -346,7 +366,8 @@ public sealed class MechanismIkeDeriveParamsTests
         byte[] ckyR = [0x33];
         using var p = new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: true,
             keygxy: 1, prevKey: 2, ckyI, ckyR, keyNumber: 9);
-        var s = ParamMarshal.RoundTrip<CK_IKE1_PRF_DERIVE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_IKE1_PRF_DERIVE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.True(s.HasPrevKey);
@@ -360,7 +381,8 @@ public sealed class MechanismIkeDeriveParamsTests
     {
         byte[] extra = [0xDE, 0xAD];
         using var p = new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: true, keygxy: 5, extra);
-        var s = ParamMarshal.RoundTrip<CK_IKE1_EXTENDED_DERIVE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_IKE1_EXTENDED_DERIVE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.True(s.HasKeygxy);
         Assert.Equal(5UL, (ulong)s.Keygxy);
@@ -373,7 +395,8 @@ public sealed class MechanismIkeDeriveParamsTests
     {
         byte[] seed = [0xBE, 0xEF, 0x01];
         using var p = new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, seed);
-        var s = ParamMarshal.RoundTrip<CK_IKE2_PRF_PLUS_DERIVE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_IKE2_PRF_PLUS_DERIVE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.False(s.HasSeedKey);
         Assert.Equal((ulong)seed.Length, (ulong)s.SeedDataLen);
@@ -394,11 +417,12 @@ public sealed class MechanismParamsLifecycleTests
     }
 
     [Fact]
-    public void ToMarshalableStructure_AfterDispose_Throws()
+    public void BuildMarshalable_AfterDispose_Throws()
     {
         var p = new CkmAesGcmParams([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], default, 128);
         p.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        Assert.Throws<ObjectDisposedException>(() => p.BuildMarshalable(scope));
     }
 }
 
@@ -412,7 +436,8 @@ public sealed class MechanismSignalParamsTests
         byte[] sig = [1, 2, 3];
         byte[] otk = [4, 5];
         using var p = new CkmX3dhInitiateParams(kdf: 1, peerIdentity: 2, peerPrekey: 3, sig, otk, ownIdentity: 4, ownEphemeral: 5);
-        var s = ParamMarshal.RoundTrip<CK_X3DH_INITIATE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_X3DH_INITIATE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(1UL, (ulong)s.Kdf);
         Assert.Equal(2UL, (ulong)s.PeerIdentity);
@@ -431,7 +456,8 @@ public sealed class MechanismSignalParamsTests
         byte[] otp = [0x33];
         byte[] eph = [0x44, 0x45, 0x46];
         using var p = new CkmX3dhRespondParams(kdf: 7, id, pre, otp, initiatorIdentity: 8, eph);
-        var s = ParamMarshal.RoundTrip<CK_X3DH_RESPOND_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_X3DH_RESPOND_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(7UL, (ulong)s.Kdf);
         Assert.Equal(8UL, (ulong)s.InitiatorIdentity);
@@ -447,7 +473,8 @@ public sealed class MechanismSignalParamsTests
         byte[] sk = [1, 2, 3, 4, 5, 6, 7, 8];
         using var p = new CkmX2RatchetInitializeParams(sk, peerPublicPrekey: 1, peerPublicIdentity: 2,
             ownPublicIdentity: 3, encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 5);
-        var s = ParamMarshal.RoundTrip<CK_X2RATCHET_INITIALIZE_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_X2RATCHET_INITIALIZE_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(sk, UnmanagedMemory.Read(s.Sk, sk.Length));
         Assert.Equal(1UL, (ulong)s.PeerPublicPrekey);
@@ -469,7 +496,8 @@ public sealed class MechanismSignalParamsTests
         byte[] sk = [9, 8, 7, 6];
         using var p = new CkmX2RatchetRespondParams(sk, ownPrekey: 1, initiatorIdentity: 2,
             ownPublicIdentity: 3, encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 6);
-        var s = ParamMarshal.RoundTrip<CK_X2RATCHET_RESPOND_PARAMS>(p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_X2RATCHET_RESPOND_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.Equal(sk, UnmanagedMemory.Read(s.Sk, sk.Length));
         Assert.Equal(1UL, (ulong)s.OwnPrekey);

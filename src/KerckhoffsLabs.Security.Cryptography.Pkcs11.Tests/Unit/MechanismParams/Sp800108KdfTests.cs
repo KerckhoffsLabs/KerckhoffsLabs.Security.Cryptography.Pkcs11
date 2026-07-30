@@ -49,7 +49,8 @@ public sealed class Sp800108KdfTests
             .KeyHandle(spliceKey)
             .Build();
 
-        var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal((ulong)CKM.CKM_AES_CMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
         Assert.NotEqual(IntPtr.Zero, s.DataParams);
@@ -94,7 +95,8 @@ public sealed class Sp800108KdfTests
         using var p = CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([1, 2]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
 
-        var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(3UL, (ulong)s.NumberOfDataParams);
     }
@@ -115,7 +117,8 @@ public sealed class Sp800108KdfTests
     {
         using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, [1], [2]);
         Assert.Empty(p.AdditionalDerivedKeys);
-        var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal(0UL, (ulong)s.AdditionalDerivedKeys);
         Assert.Equal(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
     }
@@ -133,7 +136,8 @@ public sealed class Sp800108KdfTests
                 .AddDerivedKey(templateB)
                 .Build();
 
-            var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
             Assert.Equal(2UL, (ulong)s.AdditionalDerivedKeys);
             Assert.NotEqual(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
 
@@ -145,12 +149,15 @@ public sealed class Sp800108KdfTests
             Assert.NotEqual(IntPtr.Zero, dk0.Template);
             Assert.NotEqual(IntPtr.Zero, dk1.Template);
 
-            // Slots start at CK_INVALID_HANDLE (0) until the token populates them.
+            // Slots start zero-filled, so absorbing before the token has written reports
+            // CK_INVALID_HANDLE rather than garbage.
+            p.AbsorbOutput(s);
             Assert.Equal([0, 0], p.AdditionalDerivedKeys);
 
             // Simulate the token writing the derived handles into the phKey slots.
             WriteHandle(dk0.Key, 0x111);
             WriteHandle(dk1.Key, 0x222);
+            p.AbsorbOutput(s);
             Assert.Equal([0x111, 0x222], p.AdditionalDerivedKeys);
         }
         finally
@@ -213,7 +220,8 @@ public sealed class Sp800108KdfTests
     {
         var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, default, default);
         p.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        Assert.Throws<ObjectDisposedException>(() => p.BuildMarshalable(scope));
         Assert.Throws<ObjectDisposedException>(() => _ = p.AdditionalDerivedKeys);
         Assert.Null(Record.Exception(p.Dispose)); // idempotent
     }

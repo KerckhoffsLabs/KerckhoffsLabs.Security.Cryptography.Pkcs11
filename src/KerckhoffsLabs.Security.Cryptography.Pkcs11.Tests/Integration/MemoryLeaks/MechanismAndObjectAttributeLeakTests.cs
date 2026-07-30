@@ -31,7 +31,8 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
         for (int i = 0; i < 20; i++)
         {
             using var m = new Mechanism(CKM.CKM_AES_KEY_GEN);
-            _ = m.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = m.Marshal(scope, out _);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -44,7 +45,8 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
         {
             using var p = new CkmAesGcmParams(iv: new byte[12], aad: [], tagBits: 128);
             using var m = new Mechanism(CKM.CKM_AES_GCM, p);
-            _ = m.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            _ = m.Marshal(scope, out _);
         }
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }

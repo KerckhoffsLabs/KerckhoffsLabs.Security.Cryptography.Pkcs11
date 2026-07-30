@@ -16,7 +16,8 @@ public sealed class Rc2ParamsMarshalTests
     public void CkmRc2Params_MarshalsEffectiveBits()
     {
         using var p = new CkmRc2Params(64);
-        var s = (CK_RC2_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_RC2_PARAMS)p.BuildMarshalable(scope);
 
         int size = UnmanagedMemory.SizeOf<CK_RC2_PARAMS>();
         IntPtr mem = UnmanagedMemory.Allocate(size);
@@ -34,7 +35,8 @@ public sealed class Rc2ParamsMarshalTests
     {
         byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80];
         using var p = new CkmRc2CbcParams(128, iv);
-        var s = (CK_RC2_CBC_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_RC2_CBC_PARAMS)p.BuildMarshalable(scope);
 
         int size = UnmanagedMemory.SizeOf<CK_RC2_CBC_PARAMS>();
         IntPtr mem = UnmanagedMemory.Allocate(size);
