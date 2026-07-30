@@ -144,22 +144,22 @@ public sealed class Mechanism : IDisposable
     /// Creates mechanism of given type with byte array parameter
     /// </summary>
     /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
+    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
     public Mechanism(ulong type, byte[] parameter)
     {
         _type = (NativeCULong)type;
-        _rawParameter = parameter;
+        _rawParameter = [.. parameter];
     }
 
     /// <summary>
     /// Creates mechanism of given type with byte array parameter
     /// </summary>
     /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
+    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
     public Mechanism(CKM type, byte[] parameter)
     {
         _type = type.ToCULong();
-        _rawParameter = parameter;
+        _rawParameter = [.. parameter];
     }
 
     /// <summary>

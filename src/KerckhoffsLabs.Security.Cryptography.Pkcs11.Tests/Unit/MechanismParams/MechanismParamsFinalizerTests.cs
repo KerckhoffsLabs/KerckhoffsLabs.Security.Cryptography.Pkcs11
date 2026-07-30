@@ -1,3 +1,4 @@
+using System.Reflection;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -5,13 +6,50 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
 /// <summary>
-/// Census over every mechanism-parameter wrapper, asserting none of them owns unmanaged memory.
-/// This replaces the finalizer census: the finalizers existed to release buffers the constructors
-/// allocated, and both are gone — the per-call scope owns everything now. A type that regains a
-/// constructor allocation shows up here as a leak, since nothing would ever free it.
+/// Census over every mechanism-parameter wrapper, asserting none of them declares a finalizer or owns
+/// unmanaged memory. This replaces the old census, which asserted that the finalizers ran: they
+/// existed to release buffers the constructors allocated, and both are gone — the per-call scope owns
+/// everything now.
 /// </summary>
 public sealed class MechanismParamsFinalizerTests
 {
+    /// <summary>
+    /// Every concrete <see cref="MechanismParameters"/> subclass, found by reflection rather than
+    /// listed, so a newly added type is covered without anyone remembering to add it.
+    /// </summary>
+    private static Type[] ConcreteParameterTypes =>
+        [.. typeof(MechanismParameters).Assembly
+            .GetTypes()
+            .Where(t => !t.IsAbstract && typeof(MechanismParameters).IsAssignableFrom(t))
+            .OrderBy(t => t.Name, StringComparer.Ordinal)];
+
+    /// <summary>
+    /// No parameter type declares a finalizer. Each one existed solely to free a constructor-allocated
+    /// buffer, so a type that regains one is either leaking managed-only work onto the finalizer queue
+    /// or has quietly started owning unmanaged memory again.
+    /// </summary>
+    /// <remarks>
+    /// This is the assertion the sibling allocation census cannot make: a finalizer with nothing to
+    /// free allocates nothing, so it would pass there unnoticed.
+    /// </remarks>
+    [Fact]
+    public void NoParameterType_DeclaresAFinalizer()
+    {
+        Type[] all = ConcreteParameterTypes;
+
+        // Guard against a reflection filter that silently matches nothing and passes vacuously.
+        Assert.Contains(nameof(CkmAesGcmParams), all.Select(t => t.Name));
+        Assert.True(all.Length >= 27, $"expected the full parameter surface, found {all.Length}");
+
+        string[] withFinalizers =
+            [.. all.Where(static t => t.GetMethod(
+                    "Finalize",
+                    BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) is not null)
+                .Select(static t => t.Name)];
+
+        Assert.Empty(withFinalizers);
+    }
+
     /// <summary>
     /// No parameter type owns unmanaged memory any more, so constructing one must not allocate.
     /// </summary>
