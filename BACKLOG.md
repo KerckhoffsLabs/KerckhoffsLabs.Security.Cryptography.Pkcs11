@@ -425,6 +425,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Problem:** BL-057 moved every unmanaged byte into the per-call scope, so `Dispose` on both types is now a no-op. A type that implements `IDisposable` without owning a resource is misleading in the direction that matters: it teaches callers that the object holds something, which is precisely the mental model BL-057 removed. `MechanismParamsFinalizerTests` already asserts no parameter type declares a finalizer, so nothing depends on the disposal machinery.
 - **Proposed action:** Remove `IDisposable` from both types and rewrite the call sites. Measured cost: **265** — 178 `using var … = new Mechanism(…)`, 82 `using var … = new Ckm*Params(…)`, 5 block-form `using (…)`. The compiler flags every one (CS1674), so none can be missed silently.
 - **Why it was split out:** bundling 265 uniform edits with the marshalling rewrite would have buried the risky change in churn and made the diff effectively unreviewable. On its own the diff is mechanical and a reviewer can confirm it by inspection.
+- **Also in scope:** the `GC.SuppressFinalize` calls at `Mechanism.cs:219` and `MechanismParams/MechanismParameters.cs:52` are dead — neither type has a finalizer any more.
 - **Related:** completes BL-057.
 - **Breaks public API?** Yes (`using` on either type stops compiling) — land before 1.0
 - **Raised by:** BL-057 implementation, deliberately deferred
@@ -436,6 +437,7 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Location:** `Native/CK_MECHANISM.cs` (6 overloads); sole caller `Unit/Native/CkMechanismTests.cs`
 - **Problem:** These overloads were the legacy path's allocation primitive — they allocated the parameter block inside the `Mechanism` constructor. BL-057 replaced that with `Mechanism.Marshal(scope, …)`, leaving them unreferenced by any production code path. Their tests still pass, which is what keeps them from showing up as unused. Dead allocation helpers on an interop struct are a trap: the next person needing a `CK_MECHANISM` may reach for one and reintroduce an allocation with no scope to own it.
 - **Proposed action:** Delete the 6 overloads and their tests, or keep one and document it as test-only. Verify nothing outside `Native/` references them first.
+- **Why it is worth more than its size:** these two `UnmanagedMemory.Allocate` calls (`Native/CK_MECHANISM.cs:80,119`) are the only place in the parameter or mechanism layer where unmanaged memory is owned by nothing at all, so they are the sole reason BL-057's central claim — that only the per-call scope owns parameter memory — is not literally true. Deleting them makes the invariant checkable by grep.
 - **Breaks public API?** No (`internal`)
 - **Raised by:** BL-057 implementation (Task 8)
 
