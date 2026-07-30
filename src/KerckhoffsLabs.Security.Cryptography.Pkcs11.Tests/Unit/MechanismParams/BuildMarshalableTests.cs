@@ -632,7 +632,7 @@ public sealed class BuildMarshalableTests
     /// attributes, and the handle slot must be a distinct zero-filled block for the token to write
     /// into.
     /// </summary>
-    private static void AssertDerivedKeyArray(IntPtr array, IReadOnlyList<ObjectAttribute> template)
+    private static void AssertDerivedKeyArray(IntPtr array, List<ObjectAttribute> template)
     {
         Assert.NotEqual(IntPtr.Zero, array);
 
