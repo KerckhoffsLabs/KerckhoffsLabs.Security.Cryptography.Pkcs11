@@ -10,10 +10,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmCcmMessageParams : MechanismParameters
 {
-    private CK_CCM_MESSAGE_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _mac;
     private readonly int _macLen;
+    private readonly int _dataLen;
+    private readonly byte[] _nonceBytes;
+    // The MAC as managed state, and what CopyMacTo serves. Seeded from the caller's MAC for decrypt;
+    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
+    private readonly byte[] _macBuffer;
     private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>
@@ -37,23 +39,11 @@ public sealed class CkmCcmMessageParams : MechanismParameters
             throw new ArgumentOutOfRangeException(nameof(macLen), "CCM MAC length must be 4/6/8/10/12/14/16 bytes.");
 
         _macLen = macLen;
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
+        _dataLen = dataLen;
+        _nonceBytes = nonce.ToArray();
 
-        _mac = UnmanagedMemory.Allocate(macLen);
-        if (!macInput.IsEmpty)
-            UnmanagedMemory.Write(_mac, macInput);
-
-        _lowLevelParams = new()
-        {
-            DataLen = (NativeCULong)dataLen,
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            NonceFixedBits = (NativeCULong)0,
-            NonceGenerator = (NativeCULong)0, // CKG_NO_GENERATE
-            Mac = _mac,
-            MacLen = (NativeCULong)macLen,
-        };
+        _macBuffer = new byte[macLen];
+        if (!macInput.IsEmpty) macInput.CopyTo(_macBuffer);
     }
 
     /// <summary>Copies the MAC bytes (output of encrypt) into the caller's buffer.</summary>
@@ -64,27 +54,42 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _macLen)
             throw new ArgumentException($"Destination must be at least {_macLen} bytes.", nameof(destination));
-        UnmanagedMemory.Read(_mac, destination[.._macLen]);
+        _macBuffer.AsSpan(0, _macLen).CopyTo(destination);
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_CCM_MESSAGE_PARAMS
+        {
+            DataLen = (NativeCULong)_dataLen,
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            NonceFixedBits = (NativeCULong)0,
+            NonceGenerator = (NativeCULong)0, // CKG_NO_GENERATE
+            Mac = scope.Write(_macBuffer),
+            MacLen = (NativeCULong)_macLen,
+        };
+    }
+
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
+    {
+        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
+        // mistake — a scope already released while these params are still live — because nothing here
+        // can observe that; the pointers in `marshalled` would simply address freed memory. Keeping
+        // the absorb inside the scope's lifetime remains the caller's responsibility.
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var s = (CK_CCM_MESSAGE_PARAMS)marshalled;
+        if (s.Mac == IntPtr.Zero) return;
+        UnmanagedMemory.Read(s.Mac, _macBuffer.AsSpan(0, _macLen));
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _mac);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.Mac = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmCcmMessageParams() => Dispose(false);
 }

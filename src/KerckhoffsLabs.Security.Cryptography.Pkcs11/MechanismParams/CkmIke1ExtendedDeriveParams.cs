@@ -9,8 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
 {
-    private CK_IKE1_EXTENDED_DERIVE_PARAMS _lowLevelParams;
-    private IntPtr _extraData;
+    private readonly byte[] _extraDataBytes;
+    private readonly CKM _prfMechanism;
+    private readonly bool _hasKeygxy;
+    private readonly ulong _keygxy;
     private bool _disposed;
 
     /// <summary>
@@ -22,38 +24,29 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     /// <param name="extraData">Additional input data.</param>
     public CkmIke1ExtendedDeriveParams(CKM prfMechanism, bool hasKeygxy, ulong keygxy, ReadOnlySpan<byte> extraData)
     {
-        if (!extraData.IsEmpty)
-        {
-            _extraData = UnmanagedMemory.Allocate(extraData.Length);
-            UnmanagedMemory.Write(_extraData, extraData);
-        }
-
-        _lowLevelParams = new()
-        {
-            PrfMechanism = (NativeCULong)(ulong)prfMechanism,
-            HasKeygxy = hasKeygxy,
-            Keygxy = (NativeCULong)keygxy,
-            ExtraData = _extraData,
-            ExtraDataLen = (NativeCULong)extraData.Length,
-        };
+        _extraDataBytes = extraData.ToArray();
+        _prfMechanism = prfMechanism;
+        _hasKeygxy = hasKeygxy;
+        _keygxy = keygxy;
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_IKE1_EXTENDED_DERIVE_PARAMS
+        {
+            PrfMechanism = _prfMechanism.ToCULong(),
+            HasKeygxy = _hasKeygxy,
+            Keygxy = (NativeCULong)_keygxy,
+            ExtraData = scope.Write(_extraDataBytes),
+            ExtraDataLen = (NativeCULong)_extraDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _extraData);
-        _lowLevelParams.ExtraData = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmIke1ExtendedDeriveParams() => Dispose(false);
 }

@@ -15,11 +15,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// mechanism type.
 /// </summary>
 /// <remarks>
-/// Owns every unmanaged buffer it allocates (the PRF data-param array and each segment's value,
-/// the feedback IV, and the additional-derived-key array with its per-key templates and handle
-/// slots). Per the <see cref="Mechanism"/> contract, dispose this <b>after</b> the mechanism that
-/// references it. When additional derived keys were requested, read
-/// <see cref="AdditionalDerivedKeys"/> after the <c>C_DeriveKey</c> call but before disposing.
+/// A managed descriptor: the whole parameter graph (the PRF data-param array and each segment's
+/// value, the feedback IV, and the additional-derived-key array with its per-key templates and
+/// handle slots) is rebuilt into the call's own scope on each use, and owns nothing beyond it. When
+/// additional derived keys were requested, read <see cref="AdditionalDerivedKeys"/> after the
+/// <c>C_DeriveKey</c> call — the session copies the handles out of the scope before releasing it.
 /// </remarks>
 public sealed class CkmSp800108KdfParams : MechanismParameters
 {
@@ -31,14 +31,18 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     private const ulong CK_SP800_108_KEY_HANDLE = 5UL;
 
     private readonly bool _feedback;
-    private CK_SP800_108_KDF_PARAMS _counterParams;
-    private CK_SP800_108_FEEDBACK_KDF_PARAMS _feedbackParams;
 
-    private readonly List<IntPtr> _owned = [];
     // Keeps the caller's derived-key attribute objects rooted so their unmanaged value buffers
     // (referenced by the marshalled CK_ATTRIBUTE pointers) are not finalized before the derive call.
     private readonly List<IReadOnlyList<ObjectAttribute>> _retainedTemplates;
-    private readonly IntPtr[] _derivedKeyHandleSlots;
+
+    // Managed description of the parameter graph, kept so it can be rebuilt inside a call scope.
+    private readonly CKM _prfType;
+    private readonly Sp800108Segment[] _segments;
+    private readonly byte[] _iv;
+    // Handles copied out of the scope-owned CK_DERIVED_KEY array by AbsorbOutput, before the scope
+    // that holds the slots is released.
+    private readonly List<ulong> _derivedHandles = [];
     private bool _disposed;
 
     /// <summary>Begins a counter-mode (<c>CKM_SP800_108_COUNTER_KDF</c>) parameter build.</summary>
@@ -68,188 +72,203 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     {
         _feedback = builder.Mode == Sp800108KdfMode.Feedback;
         _retainedTemplates = [.. builder.DerivedKeys];
-
-        IntPtr dataParams = MarshalDataParams(builder.Segments, out NativeCULong dataParamCount);
-        IntPtr derivedKeys = MarshalDerivedKeys(builder.DerivedKeys, out NativeCULong derivedKeyCount, out _derivedKeyHandleSlots);
-
-        if (_feedback)
-        {
-            IntPtr iv = AllocateBytes(builder.Iv);
-            _feedbackParams = new CK_SP800_108_FEEDBACK_KDF_PARAMS
-            {
-                PrfType = builder.PrfType.ToCULong(),
-                NumberOfDataParams = dataParamCount,
-                DataParams = dataParams,
-                IVLen = (NativeCULong)builder.Iv.Length,
-                IV = iv,
-                AdditionalDerivedKeys = derivedKeyCount,
-                AdditionalDerivedKeysPtr = derivedKeys,
-            };
-        }
-        else
-        {
-            _counterParams = new CK_SP800_108_KDF_PARAMS
-            {
-                PrfType = builder.PrfType.ToCULong(),
-                NumberOfDataParams = dataParamCount,
-                DataParams = dataParams,
-                AdditionalDerivedKeys = derivedKeyCount,
-                AdditionalDerivedKeysPtr = derivedKeys,
-            };
-        }
+        _prfType = builder.PrfType;
+        _segments = [.. builder.Segments];
+        _iv = builder.Iv.IsEmpty ? [] : builder.Iv.ToArray();
     }
 
     /// <summary>
     /// Raw <c>CK_OBJECT_HANDLE</c> values of the additional sibling keys derived in the same call, in
     /// the order added via <see cref="Sp800108KdfBuilder.AddDerivedKey"/>. Read after the
-    /// <c>C_DeriveKey</c> call; values are <c>CK_INVALID_HANDLE</c> (0) until the token populates them.
-    /// Empty when none were requested.
+    /// <c>C_DeriveKey</c> call. Empty when none were requested, and also before the call: the handles
+    /// live in the call scope's memory until the derive absorbs them out of it. A slot the token left
+    /// unwritten reads as <c>CK_INVALID_HANDLE</c> (0).
     /// </summary>
+    /// <remarks>
+    /// A snapshot, not a view: the returned list does not change when a later call absorbs again.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
     public IReadOnlyList<ulong> AdditionalDerivedKeys
     {
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            ulong[] handles = new ulong[_derivedKeyHandleSlots.Length];
-            for (int i = 0; i < _derivedKeyHandleSlots.Length; i++)
-                handles[i] = ReadHandle(_derivedKeyHandleSlots[i]);
-            return handles;
+            ulong[] snapshot = [.. _derivedHandles];
+            return snapshot;
         }
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _feedback ? _feedbackParams : _counterParams;
-    }
 
-    // ---- marshalling helpers ----
+        // Inner blocks first: every CK_PRF_DATA_PARAM stores the address of its format struct or
+        // byte array, and every CK_DERIVED_KEY stores the addresses of its attribute template and
+        // its handle slot. Those blocks have to exist before the array that records their addresses
+        // is written, so the arrays are built last.
+        var prfEntries = new CK_PRF_DATA_PARAM[_segments.Length];
+        for (int i = 0; i < _segments.Length; i++)
+            prfEntries[i] = BuildPrfEntry(_segments[i], scope);
+        IntPtr dataParams = scope.WriteStructArray<CK_PRF_DATA_PARAM>(prfEntries);
 
-    private IntPtr Track(int size)
-    {
-        IntPtr p = UnmanagedMemory.Allocate(size);
-        _owned.Add(p);
-        return p;
-    }
-
-    private IntPtr AllocateBytes(ReadOnlySpan<byte> data)
-    {
-        if (data.IsEmpty) return IntPtr.Zero;
-        IntPtr p = Track(data.Length);
-        UnmanagedMemory.Write(p, data);
-        return p;
-    }
-
-    private IntPtr MarshalDataParams(IReadOnlyList<Sp800108Segment> segments, out NativeCULong count)
-    {
-        int prfSize = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-        IntPtr array = Track(prfSize * segments.Count);
-
-        for (int i = 0; i < segments.Count; i++)
+        IntPtr derivedKeys = IntPtr.Zero;
+        if (_retainedTemplates.Count > 0)
         {
-            (ulong type, IntPtr value, int valueLen) = MarshalSegment(segments[i]);
-            var entry = new CK_PRF_DATA_PARAM
-            {
-                Type = (NativeCULong)type,
-                Value = value,
-                ValueLen = (NativeCULong)(ulong)valueLen,
-            };
-            UnmanagedMemory.Write(array + (i * prfSize), in entry);
+            var entries = new CK_DERIVED_KEY[_retainedTemplates.Count];
+            for (int j = 0; j < _retainedTemplates.Count; j++)
+                entries[j] = BuildDerivedKey(_retainedTemplates[j], scope);
+            derivedKeys = scope.WriteStructArray<CK_DERIVED_KEY>(entries);
         }
 
-        count = (NativeCULong)(ulong)segments.Count;
-        return array;
+        var dataParamCount = (NativeCULong)(ulong)_segments.Length;
+        var derivedKeyCount = (NativeCULong)(ulong)_retainedTemplates.Count;
+
+        // Feedback mode has its own top-level struct; counter and double-pipeline share one.
+        if (_feedback)
+        {
+            return new CK_SP800_108_FEEDBACK_KDF_PARAMS
+            {
+                PrfType = _prfType.ToCULong(),
+                NumberOfDataParams = dataParamCount,
+                DataParams = dataParams,
+                IVLen = (NativeCULong)_iv.Length,
+                IV = scope.Write(_iv),
+                AdditionalDerivedKeys = derivedKeyCount,
+                AdditionalDerivedKeysPtr = derivedKeys,
+            };
+        }
+
+        return new CK_SP800_108_KDF_PARAMS
+        {
+            PrfType = _prfType.ToCULong(),
+            NumberOfDataParams = dataParamCount,
+            DataParams = dataParams,
+            AdditionalDerivedKeys = derivedKeyCount,
+            AdditionalDerivedKeysPtr = derivedKeys,
+        };
     }
 
-    private (ulong Type, IntPtr Value, int ValueLen) MarshalSegment(Sp800108Segment seg)
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
     {
+        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
+        // mistake — a scope already released while these params are still live — because nothing here
+        // can observe that; the handle slots in `marshalled` would simply address freed memory.
+        // Keeping the absorb inside the scope's lifetime remains the caller's responsibility.
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_retainedTemplates.Count == 0) return;
+
+        IntPtr array = ExtractAdditionalDerivedKeysPointer(marshalled);
+        if (array == IntPtr.Zero) return;
+
+        int size = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
+        _derivedHandles.Clear();
+        for (int j = 0; j < _retainedTemplates.Count; j++)
+        {
+            var entry = UnmanagedMemory.Read<CK_DERIVED_KEY>(array + (j * size));
+            // Key is a CK_OBJECT_HANDLE_PTR — the handle the token wrote lives in the slot it
+            // addresses, not in the field itself.
+            _derivedHandles.Add(entry.Key == IntPtr.Zero ? 0UL : ReadHandle(entry.Key));
+        }
+    }
+
+    /// <summary>
+    /// Reads the <c>CK_DERIVED_KEY</c> array pointer out of whichever top-level struct the mode used.
+    /// Counter and double-pipeline mode both marshal <see cref="CK_SP800_108_KDF_PARAMS"/>.
+    /// </summary>
+    private static IntPtr ExtractAdditionalDerivedKeysPointer(object marshalled) => marshalled switch
+    {
+        CK_SP800_108_KDF_PARAMS p => p.AdditionalDerivedKeysPtr,
+        CK_SP800_108_FEEDBACK_KDF_PARAMS f => f.AdditionalDerivedKeysPtr,
+        _ => IntPtr.Zero,
+    };
+
+    private static CK_PRF_DATA_PARAM BuildPrfEntry(Sp800108Segment seg, MechanismParameterScope scope)
+    {
+        ulong type;
+        IntPtr value;
+        int valueLen;
+
         switch (seg.Kind)
         {
             case Sp800108SegmentKind.IterationCounter:
             case Sp800108SegmentKind.OptionalCounter:
                 {
-                    int size = UnmanagedMemory.SizeOf<CK_SP800_108_COUNTER_FORMAT>();
-                    IntPtr p = Track(size);
-                    UnmanagedMemory.Write(p, (object)new CK_SP800_108_COUNTER_FORMAT
+                    valueLen = UnmanagedMemory.SizeOf<CK_SP800_108_COUNTER_FORMAT>();
+                    value = scope.WriteStruct(new CK_SP800_108_COUNTER_FORMAT
                     {
                         LittleEndian = seg.LittleEndian,
                         WidthInBits = (NativeCULong)seg.WidthInBits,
                     });
-                    ulong tag = seg.Kind == Sp800108SegmentKind.IterationCounter
+                    type = seg.Kind == Sp800108SegmentKind.IterationCounter
                         ? CK_SP800_108_ITERATION_VARIABLE
                         : CK_SP800_108_OPTIONAL_COUNTER;
-                    return (tag, p, size);
+                    break;
                 }
 
             case Sp800108SegmentKind.DkmLength:
                 {
-                    int size = UnmanagedMemory.SizeOf<CK_SP800_108_DKM_LENGTH_FORMAT>();
-                    IntPtr p = Track(size);
-                    UnmanagedMemory.Write(p, (object)new CK_SP800_108_DKM_LENGTH_FORMAT
+                    valueLen = UnmanagedMemory.SizeOf<CK_SP800_108_DKM_LENGTH_FORMAT>();
+                    value = scope.WriteStruct(new CK_SP800_108_DKM_LENGTH_FORMAT
                     {
                         DkmLengthMethod = (NativeCULong)(ulong)seg.DkmMethod,
                         LittleEndian = seg.LittleEndian,
                         WidthInBits = (NativeCULong)seg.WidthInBits,
                     });
-                    return (CK_SP800_108_DKM_LENGTH, p, size);
+                    type = CK_SP800_108_DKM_LENGTH;
+                    break;
                 }
 
             case Sp800108SegmentKind.KeyHandle:
                 {
-                    IntPtr p = Track(UnmanagedMemory.NativeULongSize);
-                    WriteHandle(p, seg.KeyHandle);
-                    return (CK_SP800_108_KEY_HANDLE, p, UnmanagedMemory.NativeULongSize);
+                    valueLen = UnmanagedMemory.NativeULongSize;
+                    value = scope.Allocate(valueLen);
+                    WriteHandle(value, seg.KeyHandle);
+                    type = CK_SP800_108_KEY_HANDLE;
+                    break;
                 }
 
             case Sp800108SegmentKind.ByteArray:
             default:
                 {
                     byte[] bytes = seg.Bytes ?? [];
-                    return (CK_SP800_108_BYTE_ARRAY, AllocateBytes(bytes), bytes.Length);
+                    valueLen = bytes.Length;
+                    value = scope.Write(bytes);
+                    type = CK_SP800_108_BYTE_ARRAY;
+                    break;
                 }
         }
+
+        return new CK_PRF_DATA_PARAM
+        {
+            Type = (NativeCULong)type,
+            Value = value,
+            ValueLen = (NativeCULong)(ulong)valueLen,
+        };
     }
 
-    private IntPtr MarshalDerivedKeys(IReadOnlyList<IReadOnlyList<ObjectAttribute>> derivedKeys, out NativeCULong count, out IntPtr[] handleSlots)
+    private static CK_DERIVED_KEY BuildDerivedKey(IReadOnlyList<ObjectAttribute> template, MechanismParameterScope scope)
     {
-        count = (NativeCULong)(ulong)derivedKeys.Count;
-        if (derivedKeys.Count == 0)
+        IntPtr templatePtr = IntPtr.Zero;
+        if (template.Count > 0)
         {
-            handleSlots = [];
-            return IntPtr.Zero;
-        }
-
-        int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
-        int attrSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
-        IntPtr array = Track(dkSize * derivedKeys.Count);
-        handleSlots = new IntPtr[derivedKeys.Count];
-
-        for (int j = 0; j < derivedKeys.Count; j++)
-        {
-            IReadOnlyList<ObjectAttribute> template = derivedKeys[j];
-            IntPtr templatePtr = template.Count > 0 ? Track(attrSize * template.Count) : IntPtr.Zero;
+            var attributes = new CK_ATTRIBUTE[template.Count];
             for (int k = 0; k < template.Count; k++)
-            {
-                CK_ATTRIBUTE attr = template[k].CkAttribute;
-                UnmanagedMemory.Write(templatePtr + (k * attrSize), in attr);
-            }
-
-            IntPtr keySlot = Track(UnmanagedMemory.NativeULongSize); // zero-filled = CK_INVALID_HANDLE
-            handleSlots[j] = keySlot;
-
-            var derived = new CK_DERIVED_KEY
-            {
-                Template = templatePtr,
-                AttributeCount = (NativeCULong)(ulong)template.Count,
-                Key = keySlot,
-            };
-            UnmanagedMemory.Write(array + (j * dkSize), in derived);
+                attributes[k] = template[k].CkAttribute;
+            templatePtr = scope.WriteStructArray<CK_ATTRIBUTE>(attributes);
         }
 
-        return array;
+        return new CK_DERIVED_KEY
+        {
+            Template = templatePtr,
+            AttributeCount = (NativeCULong)(ulong)template.Count,
+            Key = scope.Allocate(UnmanagedMemory.NativeULongSize), // zero-filled = CK_INVALID_HANDLE
+        };
     }
+
+    // ---- handle marshalling at the platform's CK_ULONG width ----
 
     private static void WriteHandle(IntPtr destination, ulong handle)
     {
@@ -272,23 +291,6 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-
-        for (int i = 0; i < _owned.Count; i++)
-        {
-            IntPtr p = _owned[i];
-            UnmanagedMemory.Free(ref p);
-        }
-        _owned.Clear();
-
-        _counterParams.DataParams = IntPtr.Zero;
-        _counterParams.AdditionalDerivedKeysPtr = IntPtr.Zero;
-        _feedbackParams.DataParams = IntPtr.Zero;
-        _feedbackParams.IV = IntPtr.Zero;
-        _feedbackParams.AdditionalDerivedKeysPtr = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSp800108KdfParams() => Dispose(false);
 }

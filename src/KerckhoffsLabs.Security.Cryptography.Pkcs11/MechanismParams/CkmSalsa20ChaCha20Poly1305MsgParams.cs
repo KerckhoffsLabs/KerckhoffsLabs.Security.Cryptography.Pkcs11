@@ -12,9 +12,10 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
 {
     private const int Poly1305TagLen = 16;
 
-    private CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _tag;
+    private readonly byte[] _nonceBytes;
+    // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
+    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
+    private readonly byte[] _tagBuffer;
     private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates a 16-byte zero-filled tag buffer.</summary>
@@ -35,19 +36,10 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     {
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
 
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
+        _nonceBytes = nonce.ToArray();
 
-        _tag = UnmanagedMemory.Allocate(Poly1305TagLen);
-        if (!tagInput.IsEmpty)
-            UnmanagedMemory.Write(_tag, tagInput);
-
-        _lowLevelParams = new()
-        {
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            Tag = _tag,
-        };
+        _tagBuffer = new byte[Poly1305TagLen];
+        if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
     }
 
     /// <summary>Copies the 16-byte tag (output of encrypt) into the caller's buffer.</summary>
@@ -58,27 +50,38 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < Poly1305TagLen)
             throw new ArgumentException($"Destination must be at least {Poly1305TagLen} bytes.", nameof(destination));
-        UnmanagedMemory.Read(_tag, destination[..Poly1305TagLen]);
+        _tagBuffer.AsSpan(0, Poly1305TagLen).CopyTo(destination);
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
+        {
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            Tag = scope.Write(_tagBuffer),
+        };
+    }
+
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
+    {
+        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
+        // mistake — a scope already released while these params are still live — because nothing here
+        // can observe that; the pointers in `marshalled` would simply address freed memory. Keeping
+        // the absorb inside the scope's lifetime remains the caller's responsibility.
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)marshalled;
+        if (s.Tag == IntPtr.Zero) return;
+        UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, Poly1305TagLen));
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _tag);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.Tag = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20ChaCha20Poly1305MsgParams() => Dispose(false);
 }

@@ -4,14 +4,16 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_CCM_PARAMS"/>. Owns the unmanaged buffers for
-/// the nonce and AAD. Dispose AFTER the Mechanism holding it has been disposed.
+/// High-level wrapper for <see cref="CK_CCM_PARAMS"/>. A managed descriptor: it holds the nonce and
+/// AAD as managed arrays and is rebuilt into each call's own scope, so disposal order relative to
+/// the <see cref="Mechanism"/> does not matter and one instance may back several mechanisms.
 /// </summary>
 public sealed class CkmAesCcmParams : MechanismParameters
 {
-    private CK_CCM_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _aad;
+    private readonly byte[] _nonceBytes;
+    private readonly byte[] _aadBytes;
+    private readonly int _dataLen;
+    private readonly int _macLen;
     private bool _disposed;
 
     /// <summary>
@@ -31,44 +33,30 @@ public sealed class CkmAesCcmParams : MechanismParameters
             throw new ArgumentOutOfRangeException(nameof(macLen),
                 "CCM MAC length must be one of {4, 6, 8, 10, 12, 14, 16} bytes.");
 
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        if (!aad.IsEmpty)
-        {
-            _aad = UnmanagedMemory.Allocate(aad.Length);
-            UnmanagedMemory.Write(_aad, aad);
-        }
-
-        _lowLevelParams = new()
-        {
-            DataLen = (NativeCULong)dataLen,
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            AAD = _aad,
-            AADLen = (NativeCULong)aad.Length,
-            MACLen = (NativeCULong)macLen,
-        };
+        _nonceBytes = nonce.ToArray();
+        _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
+        _dataLen = dataLen;
+        _macLen = macLen;
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_CCM_PARAMS
+        {
+            DataLen = (NativeCULong)_dataLen,
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            AAD = scope.Write(_aadBytes),
+            AADLen = (NativeCULong)_aadBytes.Length,
+            MACLen = (NativeCULong)_macLen,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _aad);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.AAD = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmAesCcmParams() => Dispose(false);
 }

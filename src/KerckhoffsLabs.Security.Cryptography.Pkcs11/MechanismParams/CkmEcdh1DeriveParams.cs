@@ -5,16 +5,16 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_ECDH1_DERIVE_PARAMS"/>. Owns the unmanaged
-/// buffers for the peer's public point and the optional shared data.
-/// Dispose this instance AFTER the <see cref="Mechanism"/> that holds a reference
-/// to it has been disposed.
+/// High-level wrapper for <see cref="CK_ECDH1_DERIVE_PARAMS"/>. A managed descriptor: it holds the
+/// peer's public point and the optional shared data as managed arrays and is rebuilt into each
+/// call's own scope, so disposal order relative to the <see cref="Mechanism"/> does not matter and
+/// one instance may back several mechanisms.
 /// </summary>
 public sealed class CkmEcdh1DeriveParams : MechanismParameters
 {
-    private CK_ECDH1_DERIVE_PARAMS _lowLevelParams;
-    private IntPtr _publicData;
-    private IntPtr _sharedData;
+    private readonly byte[] _publicDataBytes;
+    private readonly byte[] _sharedDataBytes;
+    private readonly CKD _kdf;
     private bool _disposed;
 
     /// <summary>
@@ -29,43 +29,28 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
         if (peerPublicPoint.IsEmpty)
             throw new ArgumentException("Peer public point must not be empty.", nameof(peerPublicPoint));
 
-        _publicData = UnmanagedMemory.Allocate(peerPublicPoint.Length);
-        UnmanagedMemory.Write(_publicData, peerPublicPoint);
-
-        if (!sharedData.IsEmpty)
-        {
-            _sharedData = UnmanagedMemory.Allocate(sharedData.Length);
-            UnmanagedMemory.Write(_sharedData, sharedData);
-        }
-
-        _lowLevelParams = new()
-        {
-            Kdf = kdf.ToCULong(),
-            SharedData = _sharedData,
-            SharedDataLen = (NativeCULong)sharedData.Length,
-            PublicData = _publicData,
-            PublicDataLen = (NativeCULong)peerPublicPoint.Length,
-        };
+        _publicDataBytes = peerPublicPoint.ToArray();
+        _sharedDataBytes = sharedData.IsEmpty ? [] : sharedData.ToArray();
+        _kdf = kdf;
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_ECDH1_DERIVE_PARAMS
+        {
+            Kdf = _kdf.ToCULong(),
+            SharedData = scope.Write(_sharedDataBytes),
+            SharedDataLen = (NativeCULong)_sharedDataBytes.Length,
+            PublicData = scope.Write(_publicDataBytes),
+            PublicDataLen = (NativeCULong)_publicDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _publicData);
-        UnmanagedMemory.Free(ref _sharedData);
-        _lowLevelParams.PublicData = IntPtr.Zero;
-        _lowLevelParams.SharedData = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmEcdh1DeriveParams() => Dispose(false);
 }

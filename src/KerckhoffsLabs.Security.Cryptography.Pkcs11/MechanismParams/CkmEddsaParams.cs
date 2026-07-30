@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmEddsaParams : MechanismParameters
 {
-    private CK_EDDSA_PARAMS _lowLevelParams;
-    private IntPtr _contextData;
+    private readonly byte[] _contextDataBytes;
+    private readonly bool _phFlag;
     private bool _disposed;
 
     /// <summary>
@@ -19,36 +19,25 @@ public sealed class CkmEddsaParams : MechanismParameters
     /// <param name="contextData">Optional context bytes; pass <c>default</c> for the unsalted vanilla signature.</param>
     public CkmEddsaParams(bool phFlag, ReadOnlySpan<byte> contextData = default)
     {
-        if (!contextData.IsEmpty)
-        {
-            _contextData = UnmanagedMemory.Allocate(contextData.Length);
-            UnmanagedMemory.Write(_contextData, contextData);
-        }
-
-        _lowLevelParams = new()
-        {
-            PhFlag = phFlag,
-            ContextDataLen = (NativeCULong)contextData.Length,
-            ContextData = _contextData,
-        };
+        _contextDataBytes = contextData.ToArray();
+        _phFlag = phFlag;
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_EDDSA_PARAMS
+        {
+            PhFlag = _phFlag,
+            ContextData = scope.Write(_contextDataBytes),
+            ContextDataLen = (NativeCULong)_contextDataBytes.Length,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _contextData);
-        _lowLevelParams.ContextData = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmEddsaParams() => Dispose(false);
 }

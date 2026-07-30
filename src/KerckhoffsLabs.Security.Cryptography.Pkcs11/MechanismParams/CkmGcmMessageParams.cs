@@ -9,10 +9,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmGcmMessageParams : MechanismParameters
 {
-    private CK_GCM_MESSAGE_PARAMS _lowLevelParams;
-    private IntPtr _iv;
-    private IntPtr _tag;
     private readonly int _tagLen;
+    private readonly byte[] _ivBytes;
+    // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
+    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
+    private readonly byte[] _tagBuffer;
     private bool _disposed;
 
     /// <summary>For encryption — the wrapper allocates a zero-filled tag buffer of
@@ -36,22 +37,10 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         if (tagLen is < 4 or > 16) throw new ArgumentOutOfRangeException(nameof(tagLen), "GCM tag length must be 4..16 bytes.");
 
         _tagLen = tagLen;
-        _iv = UnmanagedMemory.Allocate(iv.Length);
-        UnmanagedMemory.Write(_iv, iv);
+        _ivBytes = iv.ToArray();
 
-        _tag = UnmanagedMemory.Allocate(tagLen);
-        if (!tagInput.IsEmpty)
-            UnmanagedMemory.Write(_tag, tagInput);
-
-        _lowLevelParams = new()
-        {
-            Iv = _iv,
-            IvLen = (NativeCULong)iv.Length,
-            IvFixedBits = (NativeCULong)0,
-            IvGenerator = (NativeCULong)0, // CKG_NO_GENERATE
-            Tag = _tag,
-            TagBits = (NativeCULong)(tagLen * 8),
-        };
+        _tagBuffer = new byte[tagLen];
+        if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
     }
 
     /// <summary>Copies the tag bytes (output of encrypt) into the caller's buffer.</summary>
@@ -62,27 +51,41 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _tagLen)
             throw new ArgumentException($"Destination must be at least {_tagLen} bytes.", nameof(destination));
-        UnmanagedMemory.Read(_tag, destination[.._tagLen]);
+        _tagBuffer.AsSpan(0, _tagLen).CopyTo(destination);
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_GCM_MESSAGE_PARAMS
+        {
+            Iv = scope.Write(_ivBytes),
+            IvLen = (NativeCULong)_ivBytes.Length,
+            IvFixedBits = (NativeCULong)0,
+            IvGenerator = (NativeCULong)0, // CKG_NO_GENERATE
+            Tag = scope.Write(_tagBuffer),
+            TagBits = (NativeCULong)(_tagLen * 8),
+        };
+    }
+
+    /// <inheritdoc/>
+    internal override void AbsorbOutput(object marshalled)
+    {
+        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
+        // mistake — a scope already released while these params are still live — because nothing here
+        // can observe that; the pointers in `marshalled` would simply address freed memory. Keeping
+        // the absorb inside the scope's lifetime remains the caller's responsibility.
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var s = (CK_GCM_MESSAGE_PARAMS)marshalled;
+        if (s.Tag == IntPtr.Zero) return;
+        UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, _tagLen));
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _iv);
-        UnmanagedMemory.Free(ref _tag);
-        _lowLevelParams.Iv = IntPtr.Zero;
-        _lowLevelParams.Tag = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmGcmMessageParams() => Dispose(false);
 }

@@ -1,4 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -78,5 +80,96 @@ public sealed class MessageParamsCopyTagTests
     {
         using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
         Assert.Throws<ArgumentException>(() => p.CopyTagTo(new byte[15]));
+    }
+
+    [Fact]
+    public void SalsaChaChaPoly1305Message_ForDecrypt_RoundTripsCallerTag()
+    {
+        byte[] tag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(new byte[12], tag);
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(tag, readBack);
+    }
+
+    // AbsorbOutput carries a disposal guard of its own. It is only a partial one — it cannot see a
+    // released scope, so absorbing after the scope is gone still reads zeroized memory silently —
+    // but the half it does cover has to stay covered, or a later refactor can drop the guard with
+    // the whole suite green.
+    [Theory]
+    [MemberData(nameof(DisposedAbsorbCases))]
+    public void AbsorbOutput_AfterDispose_Throws(Func<MechanismParameters> factory)
+    {
+        MechanismParameters p = factory();
+        using var scope = new MechanismParameterScope();
+        object marshalled = p.BuildMarshalable(scope);
+
+        p.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => p.AbsorbOutput(marshalled));
+    }
+
+    public static TheoryData<Func<MechanismParameters>> DisposedAbsorbCases => new()
+    {
+        () => CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16),
+        () => CkmCcmMessageParams.ForEncrypt(dataLen: 32, new byte[13], macBytes: 16),
+        () => CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]),
+    };
+
+    [Fact]
+    public void GcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
+    {
+        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        using var scope = new MechanismParameterScope();
+
+        var s = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+
+        // Stand in for the token writing the tag into the block it was handed.
+        byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 1))];
+        UnmanagedMemory.Write(s.Tag, produced);
+
+        p.AbsorbOutput(s);
+
+        // The public accessor must serve what was absorbed, not the buffer the wrapper started
+        // with — reading the wrong one returns an all-zeros tag on every encrypt.
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(produced, readBack);
+    }
+
+    [Fact]
+    public void CcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
+    {
+        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
+        using var scope = new MechanismParameterScope();
+
+        var s = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+
+        byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 0x20))];
+        UnmanagedMemory.Write(s.Mac, produced);
+
+        p.AbsorbOutput(s);
+
+        byte[] readBack = new byte[16];
+        p.CopyMacTo(readBack);
+        Assert.Equal(produced, readBack);
+    }
+
+    [Fact]
+    public void SalsaChaChaPoly1305MessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
+    {
+        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
+        using var scope = new MechanismParameterScope();
+
+        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);
+
+        byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 0x40))];
+        UnmanagedMemory.Write(s.Tag, produced);
+
+        p.AbsorbOutput(s);
+
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(produced, readBack);
     }
 }

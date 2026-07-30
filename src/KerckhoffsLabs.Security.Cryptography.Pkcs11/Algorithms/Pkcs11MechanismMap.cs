@@ -96,8 +96,8 @@ public static class Pkcs11MechanismMap
 
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for pure ML-DSA signing (CKM_ML_DSA, PKCS#11 v3.2)
-    /// with the supplied context bytes and hedge mode. The mechanism takes ownership of the
-    /// underlying parameter struct — dispose the returned <see cref="Mechanism"/> when done.
+    /// with the supplied context bytes and hedge mode. The returned mechanism holds only managed
+    /// state; its parameters are marshalled into each call's own scope.
     /// </summary>
     /// <param name="hedgeVariant">Hedge mode. Default is <see cref="CkhHedge.CKH_HEDGE_PREFERRED"/> (per FIPS 204).</param>
     /// <param name="context">Optional context bytes (max 255 per FIPS 204 §5.2.1).</param>
@@ -125,8 +125,8 @@ public static class Pkcs11MechanismMap
 
     /// <summary>
     /// Returns a <see cref="Mechanism"/> for pure SLH-DSA signing (CKM_SLH_DSA, PKCS#11 v3.2)
-    /// with the supplied context bytes and hedge mode. The mechanism takes ownership of the
-    /// underlying parameter struct — dispose the returned <see cref="Mechanism"/> when done.
+    /// with the supplied context bytes and hedge mode. The returned mechanism holds only managed
+    /// state; its parameters are marshalled into each call's own scope.
     /// </summary>
     /// <param name="hedgeVariant">Hedge mode. Default is <see cref="CkhHedge.CKH_HEDGE_PREFERRED"/> (per FIPS 205).</param>
     /// <param name="context">Optional context bytes (max 255 per FIPS 205 §10.2).</param>

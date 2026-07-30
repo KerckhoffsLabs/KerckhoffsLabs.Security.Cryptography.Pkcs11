@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
@@ -29,6 +30,14 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public int EncryptFinalCalls { get; private set; }
         public int DecryptFinalCalls { get; private set; }
 
+        // Stands in for the token's own access to the per-message parameter block, which a real
+        // module reads (nonce, tag on decrypt) and writes (tag on encrypt) through its pointer
+        // fields. Invoked with the block address during the real call only, never the length probe,
+        // because that is when a token touches it. Left null by the tests that only care about
+        // ciphertext plumbing.
+        public Action<IntPtr>? OnEncryptMessageParams;
+        public Action<IntPtr>? OnDecryptMessageParams;
+
         public override CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         public override CKR C_MessageEncryptFinal(NativeCULong session) { EncryptFinalCalls++; return CKR.CKR_OK; }
         public override CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
@@ -37,6 +46,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen)
         {
             if (ciphertext is null) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
+            OnEncryptMessageParams?.Invoke(parameter);
             Array.Copy(Ciphertext, ciphertext, Ciphertext.Length);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
             return EncMsgRv;
@@ -45,6 +55,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen)
         {
             if (plaintext is null) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
+            OnDecryptMessageParams?.Invoke(parameter);
             Array.Copy(Plaintext, plaintext, Plaintext.Length);
             plaintextLen = (NativeCULong)Plaintext.Length;
             return DecMsgRv;
@@ -105,6 +116,105 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.MessageDecrypt(mech, new ObjectHandle(1), p, associatedData: [], ciphertext: [1, 2, 3]));
         Assert.Equal(1, fake.DecryptFinalCalls);
+    }
+
+    // === Tag / MAC round-trip through the parameter block ====================
+    //
+    // The tests above pin the ciphertext and finalize plumbing but never look at the parameter
+    // block, so they pass whether or not the AEAD tag survives the trip. These three close that
+    // gap from both ends: the token's tag must reach the caller through CopyTagTo/CopyMacTo, and
+    // the caller's tag must reach the token for verification. Both directions cross scope-owned
+    // memory, so a lifetime or absorb-ordering mistake shows up here as a wrong tag rather than
+    // as a crash.
+
+    [Fact]
+    public void MessageEncrypt_TagWrittenByToken_ReachesCopyTagTo()
+    {
+        byte[] tokenTag = new byte[16];
+        tokenTag.AsSpan().Fill(0xA7);
+
+        var fake = new MessageFake
+        {
+            Ciphertext = [1, 2, 3],
+            // What a real module does on encrypt: locate the tag buffer via the block and fill it.
+            OnEncryptMessageParams = block =>
+            {
+                var gcm = UnmanagedMemory.Read<CK_GCM_MESSAGE_PARAMS>(block);
+                Assert.NotEqual(IntPtr.Zero, gcm.Tag);
+                Assert.Equal(16 * 8, (int)(ulong)gcm.TagBits);
+                UnmanagedMemory.Write(gcm.Tag, tokenTag);
+            },
+        };
+
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+
+        s.MessageEncrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], plaintext: [9, 9, 9]);
+
+        byte[] readBack = new byte[16];
+        p.CopyTagTo(readBack);
+        Assert.Equal(tokenTag, readBack);
+    }
+
+    [Fact]
+    public void MessageDecrypt_CallerSuppliedTag_ReachesTheToken()
+    {
+        byte[] callerTag = [0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                            0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
+
+        byte[]? observed = null;
+        var fake = new MessageFake
+        {
+            Plaintext = [7, 7, 7],
+            // What a real module does on decrypt: read the tag out of the block to verify against.
+            OnDecryptMessageParams = block =>
+            {
+                var gcm = UnmanagedMemory.Read<CK_GCM_MESSAGE_PARAMS>(block);
+                Assert.NotEqual(IntPtr.Zero, gcm.Tag);
+                observed = UnmanagedMemory.Read(gcm.Tag, (int)(ulong)gcm.TagBits / 8);
+            },
+        };
+
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        using var p = CkmGcmMessageParams.ForDecrypt(new byte[12], callerTag);
+
+        s.MessageDecrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], ciphertext: [1, 2, 3]);
+
+        // Non-null proves the hook ran at all: a block the token never sees would leave this null
+        // and pass the equality check below by vacuous omission.
+        Assert.NotNull(observed);
+        Assert.Equal(callerTag, observed);
+    }
+
+    [Fact]
+    public void MessageEncrypt_MacWrittenByToken_ReachesCopyMacTo()
+    {
+        byte[] tokenMac = new byte[16];
+        tokenMac.AsSpan().Fill(0x5C);
+
+        var fake = new MessageFake
+        {
+            Ciphertext = [4, 5, 6],
+            OnEncryptMessageParams = block =>
+            {
+                var ccm = UnmanagedMemory.Read<CK_CCM_MESSAGE_PARAMS>(block);
+                Assert.NotEqual(IntPtr.Zero, ccm.Mac);
+                Assert.Equal(16, (int)(ulong)ccm.MacLen);
+                UnmanagedMemory.Write(ccm.Mac, tokenMac);
+            },
+        };
+
+        var s = NewSession(fake);
+        using var mech = new Mechanism(CKM.CKM_AES_CCM);
+        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 3, new byte[12], macBytes: 16);
+
+        s.MessageEncrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], plaintext: [9, 9, 9]);
+
+        byte[] readBack = new byte[16];
+        p.CopyMacTo(readBack);
+        Assert.Equal(tokenMac, readBack);
     }
 
     // === SupportsMechanism (lazy cache) =====================================

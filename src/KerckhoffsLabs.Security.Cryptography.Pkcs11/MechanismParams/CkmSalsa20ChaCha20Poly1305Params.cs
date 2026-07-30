@@ -4,15 +4,15 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_SALSA20_CHACHA20_POLY1305_PARAMS"/>. Owns
-/// the unmanaged buffers for the nonce and AAD. Dispose this instance AFTER the
-/// <see cref="Mechanism"/> that holds a reference to it has been disposed.
+/// High-level wrapper for <see cref="CK_SALSA20_CHACHA20_POLY1305_PARAMS"/>. A managed descriptor:
+/// it holds the nonce and AAD as managed arrays and is rebuilt into each call's own scope, so
+/// disposal order relative to the <see cref="Mechanism"/> does not matter and one instance may back
+/// several mechanisms.
 /// </summary>
 public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
 {
-    private CK_SALSA20_CHACHA20_POLY1305_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _aad;
+    private readonly byte[] _nonceBytes;
+    private readonly byte[] _aadBytes;
     private bool _disposed;
 
     /// <summary>
@@ -25,42 +25,26 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     {
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
 
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        if (!aad.IsEmpty)
-        {
-            _aad = UnmanagedMemory.Allocate(aad.Length);
-            UnmanagedMemory.Write(_aad, aad);
-        }
-
-        _lowLevelParams = new()
-        {
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            AAD = _aad,
-            AADLen = (NativeCULong)aad.Length,
-        };
+        _nonceBytes = nonce.ToArray();
+        _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_SALSA20_CHACHA20_POLY1305_PARAMS
+        {
+            Nonce = scope.Write(_nonceBytes),
+            NonceLen = (NativeCULong)_nonceBytes.Length,
+            AAD = scope.Write(_aadBytes),
+            AADLen = (NativeCULong)_aadBytes.Length,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _aad);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.AAD = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20ChaCha20Poly1305Params() => Dispose(false);
 }

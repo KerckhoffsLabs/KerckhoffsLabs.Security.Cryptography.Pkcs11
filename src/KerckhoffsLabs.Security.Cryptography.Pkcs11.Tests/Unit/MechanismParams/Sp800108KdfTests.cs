@@ -49,7 +49,8 @@ public sealed class Sp800108KdfTests
             .KeyHandle(spliceKey)
             .Build();
 
-        var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal((ulong)CKM.CKM_AES_CMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
         Assert.NotEqual(IntPtr.Zero, s.DataParams);
@@ -94,7 +95,8 @@ public sealed class Sp800108KdfTests
         using var p = CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([1, 2]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
 
-        var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(3UL, (ulong)s.NumberOfDataParams);
     }
@@ -115,7 +117,8 @@ public sealed class Sp800108KdfTests
     {
         using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, [1], [2]);
         Assert.Empty(p.AdditionalDerivedKeys);
-        var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+        using var scope = new MechanismParameterScope();
+        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal(0UL, (ulong)s.AdditionalDerivedKeys);
         Assert.Equal(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
     }
@@ -133,7 +136,8 @@ public sealed class Sp800108KdfTests
                 .AddDerivedKey(templateB)
                 .Build();
 
-            var s = (CK_SP800_108_KDF_PARAMS)p.ToMarshalableStructure();
+            using var scope = new MechanismParameterScope();
+            var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
             Assert.Equal(2UL, (ulong)s.AdditionalDerivedKeys);
             Assert.NotEqual(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
 
@@ -145,13 +149,64 @@ public sealed class Sp800108KdfTests
             Assert.NotEqual(IntPtr.Zero, dk0.Template);
             Assert.NotEqual(IntPtr.Zero, dk1.Template);
 
-            // Slots start at CK_INVALID_HANDLE (0) until the token populates them.
+            // Slots start zero-filled, so absorbing before the token has written reports
+            // CK_INVALID_HANDLE rather than garbage.
+            p.AbsorbOutput(s);
             Assert.Equal([0, 0], p.AdditionalDerivedKeys);
 
             // Simulate the token writing the derived handles into the phKey slots.
             WriteHandle(dk0.Key, 0x111);
             WriteHandle(dk1.Key, 0x222);
+            p.AbsorbOutput(s);
             Assert.Equal([0x111, 0x222], p.AdditionalDerivedKeys);
+        }
+        finally
+        {
+            foreach (var a in templateA) a.Dispose();
+            foreach (var a in templateB) a.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The scope-based path puts the <c>phKey</c> slots in scope-owned memory, so the handles have to
+    /// be copied into managed state before the scope is released. Simulates the token's write and
+    /// checks that <c>AbsorbOutput</c> surfaces both handles through the public accessor, including
+    /// after the scope is disposed.
+    /// </summary>
+    [Fact]
+    public void AbsorbOutput_RecoversTheHandlesTheTokenWroteIntoTheScope()
+    {
+        var templateA = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_AES) };
+        var templateB = new List<ObjectAttribute> { new(CKA.CKA_VALUE_LEN, 16UL) };
+        try
+        {
+            using var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+                .IterationCounter(widthInBits: 16, littleEndian: true)
+                .ByteArray([0x5A])
+                .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
+                .AddDerivedKey(templateA)
+                .AddDerivedKey(templateB)
+                .Build();
+
+            using (var scope = new MechanismParameterScope())
+            {
+                var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+                Assert.Equal(2UL, (ulong)s.AdditionalDerivedKeys);
+                Assert.NotEqual(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
+
+                int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
+                var dk0 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr);
+                var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr + dkSize);
+                Assert.Equal(2UL, (ulong)dk0.AttributeCount);
+                Assert.Equal(1UL, (ulong)dk1.AttributeCount);
+
+                WriteHandle(dk0.Key, 0xDEAD);
+                WriteHandle(dk1.Key, 0xBEEF);
+                p.AbsorbOutput(s);
+            }
+
+            // Read after the scope is gone: the handles must have been copied out, not re-read.
+            Assert.Equal([0xDEAD, 0xBEEF], p.AdditionalDerivedKeys);
         }
         finally
         {
@@ -165,8 +220,24 @@ public sealed class Sp800108KdfTests
     {
         var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, default, default);
         p.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => p.ToMarshalableStructure());
+        using var scope = new MechanismParameterScope();
+        Assert.Throws<ObjectDisposedException>(() => p.BuildMarshalable(scope));
         Assert.Throws<ObjectDisposedException>(() => _ = p.AdditionalDerivedKeys);
         Assert.Null(Record.Exception(p.Dispose)); // idempotent
+    }
+
+    // AbsorbOutput's own disposal guard. Partial by design — it cannot see a released scope, so
+    // absorbing after the scope is gone still reads zeroized memory silently — but the half it does
+    // cover has to stay covered, or a later refactor drops the guard with the suite still green.
+    [Fact]
+    public void AbsorbOutput_AfterDispose_Throws()
+    {
+        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, default, default);
+        using var scope = new MechanismParameterScope();
+        object marshalled = p.BuildMarshalable(scope);
+
+        p.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => p.AbsorbOutput(marshalled));
     }
 }

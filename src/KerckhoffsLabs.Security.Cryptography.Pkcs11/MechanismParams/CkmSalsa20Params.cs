@@ -8,9 +8,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmSalsa20Params : MechanismParameters
 {
-    private CK_SALSA20_PARAMS _lowLevelParams;
-    private IntPtr _blockCounter;
-    private IntPtr _nonce;
+    private readonly byte[] _blockCounterBytes;
+    private readonly byte[] _nonceBytes;
+    private readonly int _nonceBits;
     private bool _disposed;
 
     /// <summary>
@@ -25,37 +25,26 @@ public sealed class CkmSalsa20Params : MechanismParameters
         if (blockCounter.IsEmpty) throw new ArgumentException("Block counter must not be empty.", nameof(blockCounter));
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
 
-        _blockCounter = UnmanagedMemory.Allocate(blockCounter.Length);
-        UnmanagedMemory.Write(_blockCounter, blockCounter);
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        _lowLevelParams = new()
-        {
-            BlockCounter = _blockCounter,
-            Nonce = _nonce,
-            NonceBits = (NativeCULong)nonceBits,
-        };
+        _blockCounterBytes = blockCounter.ToArray();
+        _nonceBytes = nonce.ToArray();
+        _nonceBits = nonceBits;
     }
 
     /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
+    internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_SALSA20_PARAMS
+        {
+            BlockCounter = scope.Write(_blockCounterBytes),
+            Nonce = scope.Write(_nonceBytes),
+            NonceBits = (NativeCULong)_nonceBits,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _blockCounter);
-        UnmanagedMemory.Free(ref _nonce);
-        _lowLevelParams.BlockCounter = IntPtr.Zero;
-        _lowLevelParams.Nonce = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20Params() => Dispose(false);
 }
