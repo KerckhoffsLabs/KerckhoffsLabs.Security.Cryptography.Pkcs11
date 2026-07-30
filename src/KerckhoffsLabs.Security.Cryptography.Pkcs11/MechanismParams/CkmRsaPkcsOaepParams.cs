@@ -5,9 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_RSA_PKCS_OAEP_PARAMS"/>. Owns the unmanaged
-/// buffer for the optional source data. Dispose this instance AFTER the
-/// <see cref="Mechanism"/> that holds a reference to it has been disposed.
+/// High-level wrapper for <see cref="CK_RSA_PKCS_OAEP_PARAMS"/>. A managed descriptor: it holds the
+/// optional source data as a managed array and is rebuilt into each call's own scope, so disposal
+/// order relative to the <see cref="Mechanism"/> does not matter and one instance may back several
+/// mechanisms.
 /// </summary>
 public sealed class CkmRsaPkcsOaepParams : MechanismParameters
 {

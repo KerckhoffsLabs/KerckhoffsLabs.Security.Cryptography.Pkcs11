@@ -5,9 +5,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_RSA_PKCS_PSS_PARAMS"/>. Owns no unmanaged
-/// buffers — PSS params are three integers — but follows the MechanismParams
-/// contract so the secure helpers can construct a Mechanism uniformly.
+/// High-level wrapper for <see cref="CK_RSA_PKCS_PSS_PARAMS"/>. A managed descriptor of three
+/// integers, rebuilt into each call's own scope like every other parameter type.
 /// </summary>
 public sealed class CkmRsaPkcsPssParams : MechanismParameters
 {

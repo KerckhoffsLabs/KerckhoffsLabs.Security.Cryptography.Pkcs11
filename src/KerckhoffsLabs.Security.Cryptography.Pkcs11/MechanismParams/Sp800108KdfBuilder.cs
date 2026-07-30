@@ -41,7 +41,7 @@ internal readonly struct Sp800108Segment
 /// Fluent builder for the PKCS#11 v3.0 SP800-108 KDFs. Assembles the PRF data sequence
 /// (iteration/optional counters, byte arrays, DKM-length encoding, and key-handle splices),
 /// the feedback IV, and any additional sibling keys to derive in the same call, then produces a
-/// <see cref="CkmSp800108KdfParams"/> that owns all the unmanaged buffers.
+/// <see cref="CkmSp800108KdfParams"/> — a managed descriptor, rebuilt into each call's own scope.
 /// </summary>
 /// <remarks>
 /// Obtain an instance via <see cref="CkmSp800108KdfParams.Counter"/>,
@@ -133,7 +133,7 @@ public sealed class Sp800108KdfBuilder
         return this;
     }
 
-    /// <summary>Marshals the configured parameters into a <see cref="CkmSp800108KdfParams"/> that owns the unmanaged buffers.</summary>
+    /// <summary>Builds the configured parameters into a <see cref="CkmSp800108KdfParams"/> descriptor. Nothing is marshalled here — the parameter graph is rebuilt into each call's own scope.</summary>
     /// <exception cref="InvalidOperationException">Thrown if no data segment was added.</exception>
     public CkmSp800108KdfParams Build()
     {

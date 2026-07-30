@@ -134,6 +134,36 @@ public sealed class MechanismTests
         Assert.Equal(0UL, (ulong)marshalled.ParameterLen);
     }
 
+    // Disposing a mechanism must NOT dispose the descriptor it was built with — the inversion of the
+    // old ownership rule. The descriptor is shareable managed state, so the common loop shape
+    // (one descriptor, a fresh `using var` mechanism per iteration) has to leave it usable. Before
+    // this branch the first mechanism disposed took the parameters with it.
+    [Fact]
+    public void DisposingMechanism_LeavesTheParametersUsable()
+    {
+        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+
+        new Mechanism(CKM.CKM_AES_GCM, p).Dispose();
+
+        using var second = new Mechanism(CKM.CKM_AES_GCM, p);
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM marshalled = second.Marshal(scope, out object? mechParams);
+        Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)marshalled.Mechanism);
+        Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);
+        Assert.NotNull(mechParams);
+    }
+
+    [Fact]
+    public void Marshal_AfterMechanismDisposed_Throws()
+    {
+        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        var mech = new Mechanism(CKM.CKM_AES_GCM, p);
+        mech.Dispose();
+        using var scope = new MechanismParameterScope();
+
+        Assert.Throws<ObjectDisposedException>(() => mech.Marshal(scope, out _));
+    }
+
     [Fact]
     public void AbsorbOutput_NullMarshalledParams_IsNoOp()
     {

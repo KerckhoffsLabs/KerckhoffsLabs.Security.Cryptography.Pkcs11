@@ -11,6 +11,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// existed to release buffers the constructors allocated, and both are gone — the per-call scope owns
 /// everything now.
 /// </summary>
+/// <remarks>
+/// Joins the serialized MemoryLeaks collection because
+/// <see cref="ConstructingParameters_AllocatesNoUnmanagedMemory"/> asserts an exact
+/// <see cref="UnmanagedMemory.OutstandingAllocationCount"/>, which is process-wide: a concurrent
+/// test holding an allocation across the window would make the count differ on a correct build.
+/// Every other class that reads that counter is in this collection for the same reason.
+/// </remarks>
+[Collection("MemoryLeaks")]
 public sealed class MechanismParamsFinalizerTests
 {
     /// <summary>

@@ -4,9 +4,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_SALSA20_CHACHA20_POLY1305_PARAMS"/>. Owns
-/// the unmanaged buffers for the nonce and AAD. Dispose this instance AFTER the
-/// <see cref="Mechanism"/> that holds a reference to it has been disposed.
+/// High-level wrapper for <see cref="CK_SALSA20_CHACHA20_POLY1305_PARAMS"/>. A managed descriptor:
+/// it holds the nonce and AAD as managed arrays and is rebuilt into each call's own scope, so
+/// disposal order relative to the <see cref="Mechanism"/> does not matter and one instance may back
+/// several mechanisms.
 /// </summary>
 public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
 {

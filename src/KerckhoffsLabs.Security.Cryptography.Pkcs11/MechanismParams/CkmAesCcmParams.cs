@@ -4,8 +4,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_CCM_PARAMS"/>. Owns the unmanaged buffers for
-/// the nonce and AAD. Dispose AFTER the Mechanism holding it has been disposed.
+/// High-level wrapper for <see cref="CK_CCM_PARAMS"/>. A managed descriptor: it holds the nonce and
+/// AAD as managed arrays and is rebuilt into each call's own scope, so disposal order relative to
+/// the <see cref="Mechanism"/> does not matter and one instance may back several mechanisms.
 /// </summary>
 public sealed class CkmAesCcmParams : MechanismParameters
 {
