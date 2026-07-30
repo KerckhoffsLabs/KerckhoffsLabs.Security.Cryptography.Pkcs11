@@ -158,7 +158,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         _derivedHandles.Clear();
         for (int j = 0; j < _retainedTemplates.Count; j++)
         {
-            var entry = UnmanagedMemory.Read<CK_DERIVED_KEY>(array + (j * size));
+            var entry = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(array, j * size));
             // Key is a CK_OBJECT_HANDLE_PTR — the handle the token wrote lives in the slot it
             // addresses, not in the field itself.
             _derivedHandles.Add(entry.Key == IntPtr.Zero ? 0UL : ReadHandle(entry.Key));

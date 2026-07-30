@@ -584,7 +584,7 @@ public sealed class BuildMarshalableTests
         Assert.NotEqual(IntPtr.Zero, array);
 
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-        CK_PRF_DATA_PARAM Entry(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(array + (i * elem));
+        CK_PRF_DATA_PARAM Entry(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(array, i * elem));
 
         int counterSize = UnmanagedMemory.SizeOf<CK_SP800_108_COUNTER_FORMAT>();
 
@@ -648,7 +648,7 @@ public sealed class BuildMarshalableTests
         int attrSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         for (int k = 0; k < template.Count; k++)
         {
-            var marshalled = UnmanagedMemory.Read<CK_ATTRIBUTE>(entry.Template + (k * attrSize));
+            var marshalled = UnmanagedMemory.Read<CK_ATTRIBUTE>(IntPtr.Add(entry.Template, k * attrSize));
             CK_ATTRIBUTE expected = template[k].CkAttribute;
             Assert.Equal((ulong)expected.type, (ulong)marshalled.type);
             Assert.Equal((ulong)expected.valueLen, (ulong)marshalled.valueLen);

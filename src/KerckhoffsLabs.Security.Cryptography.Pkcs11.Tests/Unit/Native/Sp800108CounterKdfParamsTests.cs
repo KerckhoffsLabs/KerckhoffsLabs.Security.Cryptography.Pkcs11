@@ -37,7 +37,7 @@ public sealed class Sp800108CounterKdfParamsTests
         Assert.Equal(IntPtr.Zero, kdf.AdditionalDerivedKeysPtr);
 
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(kdf.DataParams + (i * elem));
+        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(kdf.DataParams, i * elem));
 
         // [0] iteration variable -> 32-bit big-endian counter format.
         var iter = Param(0);
@@ -82,7 +82,7 @@ public sealed class Sp800108CounterKdfParamsTests
         Assert.Equal(5UL, (ulong)kdf.NumberOfDataParams);
 
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(kdf.DataParams + (i * elem));
+        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(kdf.DataParams, i * elem));
 
         // Empty label / context: zero length, NULL value; the 0x00 separator is still present.
         Assert.Equal(0UL, (ulong)Param(1).ValueLen);

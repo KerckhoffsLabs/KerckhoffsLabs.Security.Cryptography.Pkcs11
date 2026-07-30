@@ -19,7 +19,7 @@ public sealed class Sp800108KdfTests
     private const ulong IterationVariable = 1, OptionalCounter = 2, DkmLengthTag = 3, ByteArrayTag = 4, KeyHandleTag = 5;
 
     private static int Elem => UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-    private static CK_PRF_DATA_PARAM Param(IntPtr array, int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(array + (i * Elem));
+    private static CK_PRF_DATA_PARAM Param(IntPtr array, int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(array, i * Elem));
 
     private static ulong ReadHandle(IntPtr slot)
     {
@@ -143,7 +143,7 @@ public sealed class Sp800108KdfTests
 
             int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
             var dk0 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr);
-            var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr + dkSize);
+            var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(s.AdditionalDerivedKeysPtr, dkSize));
             Assert.Equal(2UL, (ulong)dk0.AttributeCount);
             Assert.Equal(1UL, (ulong)dk1.AttributeCount);
             Assert.NotEqual(IntPtr.Zero, dk0.Template);
@@ -196,7 +196,7 @@ public sealed class Sp800108KdfTests
 
                 int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
                 var dk0 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr);
-                var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr + dkSize);
+                var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(s.AdditionalDerivedKeysPtr, dkSize));
                 Assert.Equal(2UL, (ulong)dk0.AttributeCount);
                 Assert.Equal(1UL, (ulong)dk1.AttributeCount);
 

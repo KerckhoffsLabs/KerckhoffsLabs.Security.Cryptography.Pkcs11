@@ -57,7 +57,7 @@ internal sealed class MechanismParameterScope : IDisposable
         int size = UnmanagedMemory.SizeOf<T>();
         IntPtr p = Allocate(size * values.Length);
         for (int i = 0; i < values.Length; i++)
-            UnmanagedMemory.Write(p + (i * size), in values[i]);
+            UnmanagedMemory.Write(IntPtr.Add(p, i * size), in values[i]);
         return p;
     }
 

@@ -65,7 +65,7 @@ internal sealed partial class ManagedSoftToken
         var p = UnmanagedMemory.Read<CK_SP800_108_KDF_PARAMS>(mech.Parameter);
         int n = (int)p.NumberOfDataParams;
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();
-        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(p.DataParams + (i * elem));
+        CK_PRF_DATA_PARAM Param(int i) => UnmanagedMemory.Read<CK_PRF_DATA_PARAM>(IntPtr.Add(p.DataParams, i * elem));
 
         byte[] label = n > 1 ? PrfBytes(Param(1)) : [];
         byte[] context = n > 3 ? PrfBytes(Param(3)) : [];

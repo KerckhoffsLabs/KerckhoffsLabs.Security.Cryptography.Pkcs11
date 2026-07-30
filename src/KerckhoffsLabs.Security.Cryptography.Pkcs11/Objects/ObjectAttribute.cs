@@ -161,7 +161,7 @@ public sealed class ObjectAttribute : IDisposable
             try
             {
                 for (int i = 0; i < value.Count; i++)
-                    UnmanagedMemory.Write(scratch + (i * stride), in value[i]._ckAttribute);
+                    UnmanagedMemory.Write(IntPtr.Add(scratch, i * stride), in value[i]._ckAttribute);
                 UnmanagedMemory.Read(scratch, flat);
             }
             finally

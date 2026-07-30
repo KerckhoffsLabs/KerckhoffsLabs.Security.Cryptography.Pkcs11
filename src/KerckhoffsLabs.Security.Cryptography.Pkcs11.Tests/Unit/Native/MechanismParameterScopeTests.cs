@@ -63,7 +63,7 @@ public sealed class MechanismParameterScopeTests
 
         int size = UnmanagedMemory.SizeOf<CK_VERSION>();
         Assert.Equal(1, UnmanagedMemory.Read<CK_VERSION>(p).Major);
-        Assert.Equal(3, UnmanagedMemory.Read<CK_VERSION>(p + size).Major);
+        Assert.Equal(3, UnmanagedMemory.Read<CK_VERSION>(IntPtr.Add(p, size)).Major);
     }
 
     // Sessions dispose the scope in a `finally` while some paths also dispose it on the way out, so a
