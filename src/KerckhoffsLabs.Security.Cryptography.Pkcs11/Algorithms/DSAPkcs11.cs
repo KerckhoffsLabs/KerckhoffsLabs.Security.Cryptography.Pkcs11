@@ -63,7 +63,7 @@ public sealed class DSAPkcs11 : DSA
     public override byte[] CreateSignature(byte[] rgbHash)
     {
         ArgumentNullException.ThrowIfNull(rgbHash);
-        using var mech = new Mechanism(CKM.CKM_DSA);
+        var mech = new Mechanism(CKM.CKM_DSA);
         return _key.Sign(mech, rgbHash);
     }
 
@@ -75,7 +75,7 @@ public sealed class DSAPkcs11 : DSA
     {
         ArgumentNullException.ThrowIfNull(rgbHash);
         ArgumentNullException.ThrowIfNull(rgbSignature);
-        using var mech = new Mechanism(CKM.CKM_DSA);
+        var mech = new Mechanism(CKM.CKM_DSA);
         return _key.Verify(mech, rgbHash, rgbSignature);
     }
 
@@ -108,9 +108,8 @@ public sealed class DSAPkcs11 : DSA
         if (_key.SupportsMechanism((CKM)combined.Type))
             return _key.Verify(combined, data, signature);
 
-        combined.Dispose();
         byte[] hash = HashData(hashAlgorithm, data);
-        using var raw = new Mechanism(CKM.CKM_DSA);
+        var raw = new Mechanism(CKM.CKM_DSA);
         return _key.Verify(raw, hash, signature);
     }
 
@@ -120,9 +119,8 @@ public sealed class DSAPkcs11 : DSA
         if (_key.SupportsMechanism((CKM)combined.Type))
             return _key.Sign(combined, data);
 
-        combined.Dispose();
         byte[] hash = HashData(hashAlgorithm, data);
-        using var raw = new Mechanism(CKM.CKM_DSA);
+        var raw = new Mechanism(CKM.CKM_DSA);
         return _key.Sign(raw, hash);
     }
 

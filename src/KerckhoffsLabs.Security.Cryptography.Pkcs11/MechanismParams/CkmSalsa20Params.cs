@@ -11,7 +11,6 @@ public sealed class CkmSalsa20Params : MechanismParameters
     private readonly byte[] _blockCounterBytes;
     private readonly byte[] _nonceBytes;
     private readonly int _nonceBits;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes Salsa20 raw-mode parameters.
@@ -33,18 +32,11 @@ public sealed class CkmSalsa20Params : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_SALSA20_PARAMS
         {
             BlockCounter = scope.Write(_blockCounterBytes),
             Nonce = scope.Write(_nonceBytes),
             NonceBits = (NativeCULong)_nonceBits,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

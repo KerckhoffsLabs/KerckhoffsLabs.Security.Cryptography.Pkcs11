@@ -74,7 +74,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
             try
             {
                 // Build the Mechanism and attempt a realistic create+encrypt+destroy cycle.
-                using var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
+                var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
 
                 // The mock may reject C_CreateObject outright; if it does, nothing was created and
                 // there is nothing to clean up for this cycle.

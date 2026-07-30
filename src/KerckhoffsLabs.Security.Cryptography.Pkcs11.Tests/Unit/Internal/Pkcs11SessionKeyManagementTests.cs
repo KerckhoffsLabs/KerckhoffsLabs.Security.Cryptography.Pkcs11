@@ -52,7 +52,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void GenerateKeyPair_Ok_ReturnsBothHandles()
     {
         var s = NewSession(new KeyFake { PublicId = 0x11, PrivateId = 0x22 });
-        using var mech = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
         s.GenerateKeyPair(mech, [], [], out ObjectHandle pub, out ObjectHandle priv);
 
@@ -64,7 +64,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void GenerateKeyPair_Error_Throws()
     {
         var s = NewSession(new KeyFake { GenPairRv = CKR.CKR_TEMPLATE_INCONSISTENT });
-        using var mech = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.GenerateKeyPair(mech, [], [], out _, out _));
     }
@@ -75,7 +75,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void WrapKey_Ok_ReturnsProbedBytes()
     {
         var s = NewSession(new KeyFake { Wrapped = [1, 2, 3, 4] });
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, s.WrapKey(mech, new ObjectHandle(1), new ObjectHandle(2)));
     }
 
@@ -84,7 +84,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     {
         // Probe says 4 bytes; the real call only fills 2 -> the result must be trimmed to 2.
         var s = NewSession(new KeyFake { Wrapped = [9, 8, 7, 6], WrapSecondLen = 2 });
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
         Assert.Equal(new byte[] { 9, 8 }, s.WrapKey(mech, new ObjectHandle(1), new ObjectHandle(2)));
     }
 
@@ -92,7 +92,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void WrapKey_Error_Throws()
     {
         var s = NewSession(new KeyFake { WrapRv = CKR.CKR_KEY_UNEXTRACTABLE });
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.WrapKey(mech, new ObjectHandle(1), new ObjectHandle(2)));
     }
 
@@ -102,7 +102,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void UnwrapKey_Ok_ReturnsHandle()
     {
         var s = NewSession(new KeyFake { UnwrappedId = 0x77 });
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
         Assert.Equal(0x77UL, s.UnwrapKey(mech, new ObjectHandle(1), [1, 2, 3], []).ObjectId);
     }
 
@@ -110,7 +110,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void UnwrapKey_Error_Throws()
     {
         var s = NewSession(new KeyFake { UnwrapRv = CKR.CKR_WRAPPED_KEY_INVALID });
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.UnwrapKey(mech, new ObjectHandle(1), [1, 2, 3], []));
     }
 
@@ -120,7 +120,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void DeriveKey_Ok_ReturnsHandle()
     {
         var s = NewSession(new KeyFake { DerivedId = 0x55 });
-        using var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
+        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
         Assert.Equal(0x55UL, s.DeriveKey(mech, new ObjectHandle(1), []).ObjectId);
     }
 
@@ -128,7 +128,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void DeriveKey_Error_Throws()
     {
         var s = NewSession(new KeyFake { DeriveRv = CKR.CKR_MECHANISM_INVALID });
-        using var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
+        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DeriveKey(mech, new ObjectHandle(1), []));
     }
 }

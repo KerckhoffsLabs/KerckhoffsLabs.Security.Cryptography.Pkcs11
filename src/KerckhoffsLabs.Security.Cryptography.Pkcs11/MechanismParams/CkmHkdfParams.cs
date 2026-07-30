@@ -16,7 +16,6 @@ public sealed class CkmHkdfParams : MechanismParameters
     private readonly CKM _prfHashMechanism;
     private readonly ulong _saltType;
     private readonly ulong _saltKey;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes the HKDF parameters.
@@ -42,7 +41,6 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_HKDF_PARAMS
         {
             Extract = _extract,
@@ -55,11 +53,5 @@ public sealed class CkmHkdfParams : MechanismParameters
             Info = scope.Write(_infoBytes),
             InfoLen = (NativeCULong)_infoBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

@@ -94,7 +94,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     {
         var fake = new CombinedFake { DigestOutput = [1, 2, 3, 4] };
         var s = NewSession(fake);
-        using Mechanism digestMech = Sha256(), encMech = AesGcm();
+        Mechanism digestMech = Sha256(), encMech = AesGcm();
         byte[] data = [10, 20, 30];
 
         s.DigestEncrypt(digestMech, encMech, new ObjectHandle(1), data, out byte[] digest, out byte[] encrypted);
@@ -108,7 +108,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     {
         var fake = new CombinedFake { FirstUpdateBufferTooSmall = true };
         var s = NewSession(fake);
-        using Mechanism digestMech = Sha256(), encMech = AesGcm();
+        Mechanism digestMech = Sha256(), encMech = AesGcm();
         byte[] data = [9, 8, 7, 6, 5];
 
         s.DigestEncrypt(digestMech, encMech, new ObjectHandle(1), data, out _, out byte[] encrypted);
@@ -123,7 +123,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     {
         var fake = new CombinedFake { DigestOutput = [0xAA] };
         var s = NewSession(fake);
-        using Mechanism digestMech = Sha256(), decMech = AesGcm();
+        Mechanism digestMech = Sha256(), decMech = AesGcm();
         byte[] data = [42, 43];
 
         s.DecryptDigest(digestMech, decMech, new ObjectHandle(1), data, out byte[] digest, out byte[] decrypted);
@@ -138,7 +138,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     public void DecryptVerify_Ok_SetsValidTrue()
     {
         var s = NewSession(new CombinedFake { VerifyFinalRv = CKR.CKR_OK });
-        using Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
+        Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
         byte[] data = [1, 2, 3];
 
         s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
@@ -152,7 +152,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     public void DecryptVerify_SignatureInvalid_SetsValidFalse()
     {
         var s = NewSession(new CombinedFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID });
-        using Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
+        Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
         s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
             data: [1, 2, 3], signature: [9, 9], out _, out bool isValid);
@@ -164,7 +164,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     public void DecryptVerify_VerifyFinalOtherError_Throws()
     {
         var s = NewSession(new CombinedFake { VerifyFinalRv = CKR.CKR_DEVICE_ERROR });
-        using Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
+        Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
@@ -175,7 +175,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     public void DecryptVerify_VerifyInitError_Throws()
     {
         var s = NewSession(new CombinedFake { VerifyInitRv = CKR.CKR_KEY_HANDLE_INVALID });
-        using Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
+        Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
@@ -188,7 +188,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     public void DigestEncrypt_InsecureEncryptionMechanism_IsRejected()
     {
         var s = NewSession(new CombinedFake());
-        using Mechanism digestMech = Sha256(), insecure = new(CKM.CKM_AES_ECB);
+        Mechanism digestMech = Sha256(), insecure = new(CKM.CKM_AES_ECB);
 
         Assert.Throws<InsecureOperationException>(() =>
             s.DigestEncrypt(digestMech, insecure, new ObjectHandle(1), [1], out _, out _));

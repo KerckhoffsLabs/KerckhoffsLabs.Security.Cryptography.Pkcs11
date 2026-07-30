@@ -22,7 +22,7 @@ internal static class VerifyRsaPkcsTestCases
         try
         {
             var fakeKey = new ObjectHandle(0);
-            using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Verify(mech, fakeKey, Array.Empty<byte>(), Array.Empty<byte>(), out _));
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);

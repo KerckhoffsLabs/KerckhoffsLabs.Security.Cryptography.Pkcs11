@@ -15,7 +15,6 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     private readonly ulong _peerPrekey;
     private readonly ulong _ownIdentity;
     private readonly ulong _ownEphemeral;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes X3DH initiator parameters.
@@ -41,7 +40,6 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_X3DH_INITIATE_PARAMS
         {
             Kdf = (NativeCULong)_kdf,
@@ -52,11 +50,5 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
             OwnIdentity = (NativeCULong)_ownIdentity,
             OwnEphemeral = (NativeCULong)_ownEphemeral,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

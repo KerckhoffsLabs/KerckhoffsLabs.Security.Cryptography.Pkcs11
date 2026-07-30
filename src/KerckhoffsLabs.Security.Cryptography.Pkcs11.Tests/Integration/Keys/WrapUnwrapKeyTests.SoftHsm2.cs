@@ -28,7 +28,7 @@ internal static class WrapUnwrapKeyTestCases
             using var dkEncrypt = new ObjectAttribute(CKA.CKA_ENCRYPT, true);
             using var dkDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
             var dkTemplate = new List<ObjectAttribute> { dkClass, dkKeyType, dkValueLen, dkToken, dkSensitive, dkExtract, dkEncrypt, dkDecrypt };
-            using var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+            var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
             ObjectHandle dataKey = session.GenerateKey(keyGenMech, dkTemplate);
 
             try
@@ -38,7 +38,7 @@ internal static class WrapUnwrapKeyTestCases
                 byte[] plaintext = Encoding.UTF8.GetBytes("phase-4a wrap round-trip plaintext");
                 byte[] ciphertext = TestAesGcm.Encrypt(session, dataKey, iv, plaintext);
 
-                using var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
                 Assert.NotEmpty(wrapped);
 
@@ -92,11 +92,11 @@ internal static class WrapUnwrapKeyTestCases
             using var dkSensitive = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
             using var dkExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
             var dkTemplate = new List<ObjectAttribute> { dkClass, dkKeyType, dkValueLen, dkToken, dkSensitive, dkExtract };
-            using var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+            var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
             ObjectHandle dataKey = session.GenerateKey(keyGenMech, dkTemplate);
             try
             {
-                using var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
                 body(session, kek, wrapped);
             }
@@ -124,7 +124,7 @@ internal static class WrapUnwrapKeyTestCases
             using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
             // Deliberately omit CKA_SENSITIVE / CKA_EXTRACTABLE — the library must supply them.
             var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrToken };
-            using var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+            var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
 
             ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
             try
@@ -149,7 +149,7 @@ internal static class WrapUnwrapKeyTestCases
     {
         WithWrappedAesKey(backend, (session, kek, wrapped) =>
         {
-            using var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+            var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
 
             using (var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY))
             using (var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES))

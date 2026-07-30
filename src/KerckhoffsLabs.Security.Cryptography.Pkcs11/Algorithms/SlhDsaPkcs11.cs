@@ -56,7 +56,7 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
         if (context.Length > 255)
             throw new ArgumentException("SLH-DSA context must be at most 255 bytes.", nameof(context));
 
-        using var mech = Pkcs11MechanismMap.SlhDsaSign(context: context);
+        var mech = Pkcs11MechanismMap.SlhDsaSign(context: context);
         byte[] sig = _key.Sign(mech, data);
         CopyExact(sig, destination, Algorithm.SignatureSizeInBytes);
     }
@@ -70,7 +70,7 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
         if (context.Length > 255)
             throw new ArgumentException("SLH-DSA context must be at most 255 bytes.", nameof(context));
 
-        using var mech = Pkcs11MechanismMap.SlhDsaSign(context: context);
+        var mech = Pkcs11MechanismMap.SlhDsaSign(context: context);
         return _key.Verify(mech, data, signature);
     }
 

@@ -19,7 +19,7 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA512", (ulong)CKM.CKM_SHA512_RSA_PKCS)]
     public void RsaPkcs1_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
     {
-        using var mech = Pkcs11MechanismMap.RsaPkcs1Sign(new HashAlgorithmName(hashName));
+        var mech = Pkcs11MechanismMap.RsaPkcs1Sign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
     }
 
@@ -30,7 +30,7 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA512", (ulong)CKM.CKM_SHA512_RSA_PKCS_PSS)]
     public void RsaPss_HashToCkm_ReturnsExpectedWithParams(string hashName, ulong expectedCkm)
     {
-        using var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
+        var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
         Assert.Equal(expectedCkm, mech.Type);
     }
 
@@ -42,7 +42,7 @@ public sealed class Pkcs11MechanismMapTests
     public void RsaPss_DefaultSalt_PssParamsAreCorrect(
         string hashName, CKM expectedInnerHash, CKG expectedMgf, int expectedSalt)
     {
-        using var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
+        var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
         var pssParams = Assert.IsType<CkmRsaPkcsPssParams>(mech.Parameters);
         Assert.Equal(expectedInnerHash, pssParams.HashAlg);
         Assert.Equal(expectedMgf, pssParams.Mgf);
@@ -57,7 +57,7 @@ public sealed class Pkcs11MechanismMapTests
     public void RsaOaep_HashToCkm_ReturnsExpectedWithParams(
         string hashName, CKM expectedInnerHash, CKG expectedMgf)
     {
-        using var mech = Pkcs11MechanismMap.RsaOaep(new HashAlgorithmName(hashName));
+        var mech = Pkcs11MechanismMap.RsaOaep(new HashAlgorithmName(hashName));
         Assert.Equal((ulong)CKM.CKM_RSA_PKCS_OAEP, mech.Type);
         var oaepParams = Assert.IsType<CkmRsaPkcsOaepParams>(mech.Parameters);
         Assert.Equal(expectedInnerHash, oaepParams.HashAlg);
@@ -71,7 +71,7 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA512", (ulong)CKM.CKM_ECDSA_SHA512)]
     public void EcdsaSign_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
     {
-        using var mech = Pkcs11MechanismMap.EcdsaSign(new HashAlgorithmName(hashName));
+        var mech = Pkcs11MechanismMap.EcdsaSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
     }
 
@@ -83,7 +83,7 @@ public sealed class Pkcs11MechanismMapTests
     [InlineData("SHA512", (ulong)CKM.CKM_DSA_SHA512)]
     public void DsaSign_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
     {
-        using var mech = Pkcs11MechanismMap.DsaSign(new HashAlgorithmName(hashName));
+        var mech = Pkcs11MechanismMap.DsaSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
     }
 
@@ -104,7 +104,7 @@ public sealed class Pkcs11MechanismMapTests
     [Fact]
     public void HmacHash_HashToCkm_ReturnsExpected()
     {
-        using var mech = Pkcs11MechanismMap.Hmac(HashAlgorithmName.SHA256);
+        var mech = Pkcs11MechanismMap.Hmac(HashAlgorithmName.SHA256);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, mech.Type);
     }
 
@@ -120,7 +120,7 @@ public sealed class Pkcs11MechanismMapTests
     public void MlDsaHashSign_HashToCkm_ReturnsExpectedWithParams(
         string hashName, ulong expectedCkm, CKM expectedInnerHash)
     {
-        using var mech = Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName));
+        var mech = Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
         Assert.IsType<CkmHashPqcSignParams>(mech.Parameters);
         _ = expectedInnerHash; // documented mapping — verified by the absence of NotSupportedException above
@@ -139,7 +139,7 @@ public sealed class Pkcs11MechanismMapTests
     [Fact]
     public void MlDsaSign_ReturnsMlDsaMechanismWithPqcParams()
     {
-        using var mech = Pkcs11MechanismMap.MlDsaSign();
+        var mech = Pkcs11MechanismMap.MlDsaSign();
         Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
         Assert.IsType<CkmPqcSignParams>(mech.Parameters);
     }
@@ -147,7 +147,7 @@ public sealed class Pkcs11MechanismMapTests
     [Fact]
     public void MlDsaSign_WithContext_ReturnsMlDsaMechanism()
     {
-        using var mech = Pkcs11MechanismMap.MlDsaSign(context: [0x01, 0x02, 0x03]);
+        var mech = Pkcs11MechanismMap.MlDsaSign(context: [0x01, 0x02, 0x03]);
         Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
         Assert.IsType<CkmPqcSignParams>(mech.Parameters);
     }

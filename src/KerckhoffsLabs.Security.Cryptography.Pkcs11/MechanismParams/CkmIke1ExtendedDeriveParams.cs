@@ -13,7 +13,6 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     private readonly CKM _prfMechanism;
     private readonly bool _hasKeygxy;
     private readonly ulong _keygxy;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes IKEv1 extended-derive parameters.
@@ -33,7 +32,6 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_IKE1_EXTENDED_DERIVE_PARAMS
         {
             PrfMechanism = _prfMechanism.ToCULong(),
@@ -42,11 +40,5 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
             ExtraData = scope.Write(_extraDataBytes),
             ExtraDataLen = (NativeCULong)_extraDataBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

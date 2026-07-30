@@ -14,7 +14,7 @@ public sealed class MessageParamsCopyTagTests
     [Fact]
     public void GcmMessage_CopyTagTo_FillsDestination()
     {
-        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
         byte[] tag = new byte[16];
         Assert.Null(Record.Exception(() => p.CopyTagTo(tag))); // tag buffer is allocated; readable
     }
@@ -22,23 +22,15 @@ public sealed class MessageParamsCopyTagTests
     [Fact]
     public void GcmMessage_CopyTagTo_TooSmall_Throws()
     {
-        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
-        Assert.Throws<ArgumentException>(() => p.CopyTagTo(new byte[15]));
-    }
-
-    [Fact]
-    public void GcmMessage_CopyTagTo_AfterDispose_Throws()
-    {
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
-        p.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => p.CopyTagTo(new byte[16]));
+        Assert.Throws<ArgumentException>(() => p.CopyTagTo(new byte[15]));
     }
 
     [Fact]
     public void GcmMessage_ForDecrypt_RoundTripsCallerTag()
     {
         byte[] tag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-        using var p = CkmGcmMessageParams.ForDecrypt(new byte[12], tag);
+        var p = CkmGcmMessageParams.ForDecrypt(new byte[12], tag);
         byte[] readBack = new byte[16];
         p.CopyTagTo(readBack);
         Assert.Equal(tag, readBack);
@@ -47,14 +39,14 @@ public sealed class MessageParamsCopyTagTests
     [Fact]
     public void CcmMessage_CopyMacTo_FillsDestination()
     {
-        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
+        var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
         Assert.Null(Record.Exception(() => p.CopyMacTo(new byte[16])));
     }
 
     [Fact]
     public void CcmMessage_CopyMacTo_TooSmall_Throws()
     {
-        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
+        var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
         Assert.Throws<ArgumentException>(() => p.CopyMacTo(new byte[15]));
     }
 
@@ -62,7 +54,7 @@ public sealed class MessageParamsCopyTagTests
     public void CcmMessage_ForDecrypt_RoundTripsCallerMac()
     {
         byte[] mac = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-        using var p = CkmCcmMessageParams.ForDecrypt(dataLen: 32, new byte[13], mac);
+        var p = CkmCcmMessageParams.ForDecrypt(dataLen: 32, new byte[13], mac);
         byte[] readBack = new byte[16];
         p.CopyMacTo(readBack);
         Assert.Equal(mac, readBack);
@@ -71,14 +63,14 @@ public sealed class MessageParamsCopyTagTests
     [Fact]
     public void SalsaChaChaPoly1305Message_CopyTagTo_FillsDestination()
     {
-        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
+        var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
         Assert.Null(Record.Exception(() => p.CopyTagTo(new byte[16])));
     }
 
     [Fact]
     public void SalsaChaChaPoly1305Message_CopyTagTo_TooSmall_Throws()
     {
-        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
+        var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
         Assert.Throws<ArgumentException>(() => p.CopyTagTo(new byte[15]));
     }
 
@@ -86,40 +78,16 @@ public sealed class MessageParamsCopyTagTests
     public void SalsaChaChaPoly1305Message_ForDecrypt_RoundTripsCallerTag()
     {
         byte[] tag = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(new byte[12], tag);
+        var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(new byte[12], tag);
         byte[] readBack = new byte[16];
         p.CopyTagTo(readBack);
         Assert.Equal(tag, readBack);
     }
 
-    // AbsorbOutput carries a disposal guard of its own. It is only a partial one — it cannot see a
-    // released scope, so absorbing after the scope is gone still reads zeroized memory silently —
-    // but the half it does cover has to stay covered, or a later refactor can drop the guard with
-    // the whole suite green.
-    [Theory]
-    [MemberData(nameof(DisposedAbsorbCases))]
-    public void AbsorbOutput_AfterDispose_Throws(Func<MechanismParameters> factory)
-    {
-        MechanismParameters p = factory();
-        using var scope = new MechanismParameterScope();
-        object marshalled = p.BuildMarshalable(scope);
-
-        p.Dispose();
-
-        Assert.Throws<ObjectDisposedException>(() => p.AbsorbOutput(marshalled));
-    }
-
-    public static TheoryData<Func<MechanismParameters>> DisposedAbsorbCases => new()
-    {
-        () => CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16),
-        () => CkmCcmMessageParams.ForEncrypt(dataLen: 32, new byte[13], macBytes: 16),
-        () => CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]),
-    };
-
     [Fact]
     public void GcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
     {
-        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
@@ -140,7 +108,7 @@ public sealed class MessageParamsCopyTagTests
     [Fact]
     public void CcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
     {
-        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
+        var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
@@ -158,7 +126,7 @@ public sealed class MessageParamsCopyTagTests
     [Fact]
     public void SalsaChaChaPoly1305MessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
     {
-        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
+        var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);

@@ -115,37 +115,34 @@ public sealed class RC2Pkcs11 : RC2
 
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
-        using (mechanism)
+        // Empty input is a no-op (0 bytes in → 0 bytes out): skip the token (some reject an empty
+        // buffer) — but ONLY when AllowInsecure is set. With AllowInsecure off we fall through so
+        // GuardMechanism throws InsecureOperationException as documented (the gate runs before the
+        // empty buffer reaches the token). Padded encryption (CKM_RC2_CBC_PAD) must emit a full
+        // padding block, so that path always goes to the token.
+        if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
         {
-            // Empty input is a no-op (0 bytes in → 0 bytes out): skip the token (some reject an empty
-            // buffer) — but ONLY when AllowInsecure is set. With AllowInsecure off we fall through so
-            // GuardMechanism throws InsecureOperationException as documented (the gate runs before the
-            // empty buffer reaches the token). Padded encryption (CKM_RC2_CBC_PAD) must emit a full
-            // padding block, so that path always goes to the token.
-            if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
+            bytesWritten = 0;
+            return true;
+        }
+
+        byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
+        try
+        {
+            if (output.Length > destination.Length)
             {
                 bytesWritten = 0;
-                return true;
+                return false;
             }
-
-            byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
-            try
-            {
-                if (output.Length > destination.Length)
-                {
-                    bytesWritten = 0;
-                    return false;
-                }
-                output.CopyTo(destination);
-                bytesWritten = output.Length;
-                return true;
-            }
-            finally
-            {
-                // On decrypt, `output` is plaintext — zero this intermediate copy.
-                if (!encrypt)
-                    CryptographicOperations.ZeroMemory(output);
-            }
+            output.CopyTo(destination);
+            bytesWritten = output.Length;
+            return true;
+        }
+        finally
+        {
+            // On decrypt, `output` is plaintext — zero this intermediate copy.
+            if (!encrypt)
+                CryptographicOperations.ZeroMemory(output);
         }
     }
 

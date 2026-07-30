@@ -15,7 +15,6 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     private readonly bool _dataAsKey;
     private readonly bool _rekey;
     private readonly ulong _newKey;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes IKE PRF derive parameters.
@@ -39,7 +38,6 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_IKE_PRF_DERIVE_PARAMS
         {
             PrfMechanism = (NativeCULong)(ulong)_prfMechanism,
@@ -51,11 +49,5 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
             NrLen = (NativeCULong)_nrBytes.Length,
             NewKey = (NativeCULong)_newKey,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

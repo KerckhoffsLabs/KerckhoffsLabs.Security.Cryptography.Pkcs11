@@ -27,7 +27,7 @@ internal static class SignRsaPkcsTestCases
         try
         {
             var fakeKey = new ObjectHandle(0);
-            using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+            var mech = new Mechanism(CKM.CKM_RSA_PKCS);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Sign(mech, fakeKey, []));
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
@@ -54,7 +54,7 @@ internal static class SignRsaPkcsTestCases
             var fakeKey = new ObjectHandle(0);
             try
             {
-                using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+                var mech = new Mechanism(CKM.CKM_RSA_PKCS);
                 session.Sign(mech, fakeKey, []);
             }
             catch (InsecureOperationException)

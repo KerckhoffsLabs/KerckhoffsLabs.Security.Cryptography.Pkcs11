@@ -94,9 +94,8 @@ public sealed class ECDsaPkcs11 : ECDsa
         {
             return _key.Verify(combined, data, signature);
         }
-        combined.Dispose();
         byte[] hash = HashData(hashAlgorithm, data);
-        using var raw = new Mechanism(CKM.CKM_ECDSA);
+        var raw = new Mechanism(CKM.CKM_ECDSA);
         return _key.Verify(raw, hash, signature);
     }
 
@@ -116,7 +115,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     public override byte[] SignHash(byte[] hash)
     {
         ArgumentNullException.ThrowIfNull(hash);
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         return _key.Sign(mech, hash);
     }
 
@@ -127,7 +126,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     {
         ArgumentNullException.ThrowIfNull(hash);
         ArgumentNullException.ThrowIfNull(signature);
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         return _key.Verify(mech, hash, signature);
     }
 
@@ -136,9 +135,8 @@ public sealed class ECDsaPkcs11 : ECDsa
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
         if (_key.SupportsMechanism((CKM)combined.Type))
             return _key.Sign(combined, data);
-        combined.Dispose();
         byte[] hash = HashData(hashAlgorithm, data);
-        using var raw = new Mechanism(CKM.CKM_ECDSA);
+        var raw = new Mechanism(CKM.CKM_ECDSA);
         return _key.Sign(raw, hash);
     }
 

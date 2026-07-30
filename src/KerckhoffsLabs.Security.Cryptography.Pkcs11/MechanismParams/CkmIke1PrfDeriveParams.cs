@@ -16,7 +16,6 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     private readonly ulong _keygxy;
     private readonly ulong _prevKey;
     private readonly byte _keyNumber;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes IKEv1 PRF derive parameters.
@@ -42,7 +41,6 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_IKE1_PRF_DERIVE_PARAMS
         {
             PrfMechanism = (NativeCULong)(ulong)_prfMechanism,
@@ -55,11 +53,5 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
             CkyRLen = (NativeCULong)_ckyRBytes.Length,
             KeyNumber = _keyNumber,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

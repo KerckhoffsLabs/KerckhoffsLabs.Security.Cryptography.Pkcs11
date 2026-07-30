@@ -92,8 +92,8 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            using var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(nonce);
-            using var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
+            var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(nonce);
+            var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
             byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
             if (ct.Length != plaintext.Length)
                 throw new InvalidOperationException(
@@ -104,7 +104,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         }
 
         // v2.40 fallback: ciphertext || tag concatenated.
-        using var legacyMech = new Mechanism(CKM.CKM_CHACHA20_POLY1305,
+        var legacyMech = new Mechanism(CKM.CKM_CHACHA20_POLY1305,
             new CkmSalsa20ChaCha20Poly1305Params(nonce, associatedData));
         byte[] result = _key.Encrypt(legacyMech, plaintext);
         if (result.Length != plaintext.Length + tag.Length)
@@ -135,8 +135,8 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            using var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
-            using var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
+            var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
+            var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
             byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
             try
             {
@@ -153,7 +153,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         }
 
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
-        using var legacyMech = new Mechanism(CKM.CKM_CHACHA20_POLY1305,
+        var legacyMech = new Mechanism(CKM.CKM_CHACHA20_POLY1305,
             new CkmSalsa20ChaCha20Poly1305Params(nonce, associatedData));
         byte[] combined = new byte[ciphertext.Length + tag.Length];
         ciphertext.CopyTo(combined);

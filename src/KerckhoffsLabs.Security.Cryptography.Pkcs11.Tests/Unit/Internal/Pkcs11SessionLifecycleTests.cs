@@ -281,21 +281,21 @@ public sealed class Pkcs11SessionLifecycleTests
         var s = NewSession(fake);
 
         // Gated by default.
-        using (var mech = new Mechanism(CKM.CKM_DES_KEY_GEN))
-            Assert.Throws<InsecureOperationException>(() => s.GenerateKey(mech, []));
+        var gated = new Mechanism(CKM.CKM_DES_KEY_GEN);
+        Assert.Throws<InsecureOperationException>(() => s.GenerateKey(gated, []));
 
         // Permitted inside the scope.
         using (s.AllowInsecureScope())
         {
             Assert.True(s.AllowInsecure);
-            using var mech = new Mechanism(CKM.CKM_DES_KEY_GEN);
+            var mech = new Mechanism(CKM.CKM_DES_KEY_GEN);
             Assert.Equal(7UL, s.GenerateKey(mech, []).ObjectId);
         }
 
         // Restored to gated after the scope.
         Assert.False(s.AllowInsecure);
-        using (var mech = new Mechanism(CKM.CKM_DES_KEY_GEN))
-            Assert.Throws<InsecureOperationException>(() => s.GenerateKey(mech, []));
+        var gatedAgain = new Mechanism(CKM.CKM_DES_KEY_GEN);
+        Assert.Throws<InsecureOperationException>(() => s.GenerateKey(gatedAgain, []));
     }
 
     [Fact]

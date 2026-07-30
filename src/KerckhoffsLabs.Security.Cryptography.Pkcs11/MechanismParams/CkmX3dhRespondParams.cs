@@ -14,7 +14,6 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     private readonly byte[] _initiatorEphemeralBytes;
     private readonly ulong _kdf;
     private readonly ulong _initiatorIdentity;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes X3DH responder parameters.
@@ -38,7 +37,6 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_X3DH_RESPOND_PARAMS
         {
             Kdf = (NativeCULong)_kdf,
@@ -48,11 +46,5 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
             InitiatorIdentity = (NativeCULong)_initiatorIdentity,
             InitiatorEphemeral = scope.Write(_initiatorEphemeralBytes),
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

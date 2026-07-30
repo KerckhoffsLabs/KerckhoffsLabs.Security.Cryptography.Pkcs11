@@ -44,7 +44,7 @@ internal static class TestKeys
 
         var template = new List<ObjectAttribute>
             { attrClass, attrKeyType, attrValueLen, attrToken, attrWrap, attrUnwrap };
-        using var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
         return session.GenerateKey(mechanism, template);
     }
 
@@ -170,7 +170,7 @@ internal static class TestKeys
     /// </summary>
     public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048KeyPair(Pkcs11Session session)
     {
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
@@ -202,7 +202,7 @@ internal static class TestKeys
     /// </summary>
     public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048SigningKeyPair(Pkcs11Session session)
     {
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
@@ -252,7 +252,7 @@ internal static class TestKeys
     /// </summary>
     public static (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(Pkcs11Session session, byte[] ecParams)
     {
-        using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
 
         using var pubClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var pubKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
@@ -279,7 +279,7 @@ internal static class TestKeys
     /// </summary>
     public static (ObjectHandle pub, ObjectHandle priv) GenerateEd25519KeyPair(Pkcs11Session session)
     {
-        using var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
 
         // DER-encoded ASN.1 OID for id-Ed25519 (1.3.101.112):
         // 06 03 2B 65 70
@@ -310,7 +310,7 @@ internal static class TestKeys
     /// </summary>
     public static (ObjectHandle pub, ObjectHandle priv) GenerateEd448KeyPair(Pkcs11Session session)
     {
-        using var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
 
         // DER-encoded ASN.1 OID for id-Ed448 (1.3.101.113):
         // 06 03 2B 65 71

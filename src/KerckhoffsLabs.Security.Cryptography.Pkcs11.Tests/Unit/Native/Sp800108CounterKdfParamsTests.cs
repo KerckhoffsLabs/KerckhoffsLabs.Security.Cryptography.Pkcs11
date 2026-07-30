@@ -26,7 +26,7 @@ public sealed class Sp800108CounterKdfParamsTests
         byte[] label = Encoding.UTF8.GetBytes("lbl");
         byte[] context = Encoding.UTF8.GetBytes("ctx-xyz");
 
-        using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, label, context);
+        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, label, context);
         using var scope = new MechanismParameterScope();
         var kdf = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
 
@@ -76,7 +76,7 @@ public sealed class Sp800108CounterKdfParamsTests
     [Fact]
     public void EmptyLabelAndContext_StillEmitsFiveParamsWithSeparator()
     {
-        using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA384_HMAC, label: default, context: default);
+        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA384_HMAC, label: default, context: default);
         using var scope = new MechanismParameterScope();
         var kdf = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal(5UL, (ulong)kdf.NumberOfDataParams);

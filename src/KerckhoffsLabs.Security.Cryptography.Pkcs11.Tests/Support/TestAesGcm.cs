@@ -16,16 +16,16 @@ internal static class TestAesGcm
     public static byte[] Encrypt(Pkcs11Session session, ObjectHandle key,
         ReadOnlySpan<byte> iv, ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> aad = default)
     {
-        using var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM, p);
+        var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
+        var mech = new Mechanism(CKM.CKM_AES_GCM, p);
         return session.Encrypt(mech, key, plaintext);
     }
 
     public static byte[] Decrypt(Pkcs11Session session, ObjectHandle key,
         ReadOnlySpan<byte> iv, ReadOnlySpan<byte> ciphertextAndTag, ReadOnlySpan<byte> aad = default)
     {
-        using var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM, p);
+        var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
+        var mech = new Mechanism(CKM.CKM_AES_GCM, p);
         return session.Decrypt(mech, key, ciphertextAndTag);
     }
 }

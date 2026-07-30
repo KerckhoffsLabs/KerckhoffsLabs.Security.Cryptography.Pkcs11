@@ -34,7 +34,7 @@ public sealed class RsaKeyGenStrengthGateTests
 
     private static void GenerateRsa(Pkcs11Session session, int modulusBits)
     {
-        using var mech = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .ModulusBits(modulusBits).PublicExponent([0x01, 0x00, 0x01]).Verify().Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA).Sign().Build();

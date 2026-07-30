@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 60 (17 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 21 (16 open, 5 resolved)
+- Total items: 60 (18 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 21 (15 open, 6 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -417,7 +417,13 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No, as landed — `IDisposable` was kept so no caller had to change. The breaking half is BL-058.
 - **Raised by:** BL-012 follow-up; design revised 2026-07-29 after the in/out and zeroization analysis
 
-### [BL-058] `MechanismParameters` and `Mechanism` still advertise `IDisposable` with nothing left to release
+### [BL-058] ✅ RESOLVED — `MechanismParameters` and `Mechanism` still advertise `IDisposable` with nothing left to release
+- **Status:** Resolved 2026-07-30. `IDisposable` removed from both types, along with `Dispose()`, the `protected abstract Dispose(bool)` contract, all 27 `Dispose(bool)` overrides, the 28 `_disposed` fields, and the 38 now-unreachable `ObjectDisposedException.ThrowIf` guards. Neither type has any lifecycle left: they are values.
+  - **Actual scope was larger than the estimate.** 339 `using var` conversions plus 6 block-form `using` statements plus 12 explicit `.Dispose()` calls, across 95 files — not the 265 sites this entry predicted. The compiler enumerated every one (CS1674 / CS1061), so none could be missed silently; three passes were needed because the test project only compiles once the library does.
+  - **Consequence the entry did not state:** with nothing able to set `_disposed`, every disposal guard became dead code and the 10 tests asserting `ObjectDisposedException` after disposal were asserting a contract that no longer exists. They were deleted, not weakened. The properties worth keeping survive elsewhere — sharing one descriptor across two mechanisms is still pinned by `BuildMarshalableTests.OneDescriptor_CanBackTwoMechanisms`.
+  - **Verified no leak was introduced.** `CkmSp800108KdfParams` retains `IReadOnlyList<ObjectAttribute>` templates, and `ObjectAttribute` does own unmanaged memory — but the params object never disposed them: `Sp800108KdfBuilder.AddDerivedKey` documents that the caller retains ownership and must keep them undisposed until after the derive. All 27 `Dispose(bool)` bodies were confirmed to flip a flag and nothing more before removal.
+  - Four `RunBlock` methods in the AES/DES/3DES/RC2 façades wrapped their whole body in `using (mechanism)`; those are unwrapped and dedented rather than left as bare block scopes.
+  - Full suite: 0 failed, 1860 passed, 630 skipped (1870 minus the 10 deleted disposal tests).
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** M (mechanical, but wide)

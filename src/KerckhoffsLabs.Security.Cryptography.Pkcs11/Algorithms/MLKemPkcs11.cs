@@ -56,7 +56,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     {
         GuardExtraction(encapsulating: true);
 
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
         // The ML-KEM ciphertext length is fixed by the parameter set, so hand the token a pre-sized
         // buffer in one call rather than a NULL-buffer length probe (which SoftHSM does not honour).
@@ -88,7 +88,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     {
         GuardExtraction(encapsulating: false);
 
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
 
         // Token quirk: the decapsulated shared-secret key is created via unwrap semantics, and tokens
         // disagree on CKA_VALUE_LEN there. opencryptoki *requires* it (CKR_TEMPLATE_INCONSISTENT

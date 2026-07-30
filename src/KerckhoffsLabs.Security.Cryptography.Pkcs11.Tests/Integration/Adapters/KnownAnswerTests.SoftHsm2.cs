@@ -57,7 +57,7 @@ internal static class KnownAnswerTestCases
             ObjectHandle k = TestKeys.CreateGenericSecretKey(session, key);
             try
             {
-                using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+                var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
                 Assert.Equal(expected, session.Sign(mech, k, data));
             }
             finally { session.DestroyObject(k); }
@@ -84,7 +84,7 @@ internal static class KnownAnswerTestCases
             ObjectHandle pub = TestKeys.CreateEd25519PublicKey(session, point);
             try
             {
-                using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                var eddsa = new Mechanism(CKM.CKM_EDDSA);
                 byte[] sig = session.Sign(eddsa, priv, message);
                 Assert.Equal(expectedSig, sig);
 
@@ -160,7 +160,7 @@ internal static class KnownAnswerTestCases
             ObjectHandle k = TestKeys.CreateGenericSecretKey(session, key);
             try
             {
-                using var mech = new Mechanism(mechanism);
+                var mech = new Mechanism(mechanism);
                 Assert.Equal(expected, session.Sign(mech, k, data));
             }
             finally { session.DestroyObject(k); }
@@ -183,7 +183,7 @@ internal static class KnownAnswerTestCases
             ObjectHandle target = TestKeys.ImportExtractableAesKey(session, keyData);
             try
             {
-                using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
+                var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP);
                 Assert.Equal(expected, session.WrapKey(mech, wrappingKey, target));
             }
             finally { session.DestroyObject(target); session.DestroyObject(wrappingKey); }
@@ -206,8 +206,8 @@ internal static class KnownAnswerTestCases
             ObjectHandle priv = ImportRsaPrivateKey(session);
             try
             {
-                using var oaep = new CkmRsaPkcsOaepParams(CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1);
-                using var mech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, oaep);
+                var oaep = new CkmRsaPkcsOaepParams(CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1);
+                var mech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, oaep);
                 Assert.Equal(expectedPt, session.Decrypt(mech, priv, ct));
             }
             finally { session.DestroyObject(priv); }
@@ -229,8 +229,8 @@ internal static class KnownAnswerTestCases
             ObjectHandle pub = TestKeys.ImportRsaPublicKey(session, RsaModulus, RsaPublicExponent);
             try
             {
-                using var pss = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32);
-                using var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, pss);
+                var pss = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32);
+                var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, pss);
                 session.Verify(mech, pub, msg, sig, out bool ok);
                 Assert.True(ok, "RFC 8017 RSA-PSS signature should verify under the imported public key.");
 
@@ -259,7 +259,7 @@ internal static class KnownAnswerTestCases
             ObjectHandle pub = TestKeys.ImportEcP256PublicKey(session, qx, qy);
             try
             {
-                using var mech = new Mechanism(CKM.CKM_ECDSA);
+                var mech = new Mechanism(CKM.CKM_ECDSA);
                 session.Verify(mech, pub, hash, sig, out bool ok);
                 Assert.True(ok, "ECDSA P-256 signature should verify under the imported public key.");
 
@@ -289,8 +289,8 @@ internal static class KnownAnswerTestCases
             ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, privScalar);
             try
             {
-                using var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, TestKeys.DerEcPoint(peerX, peerY));
-                using var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
+                var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, TestKeys.DerEcPoint(peerX, peerY));
+                var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
 
                 using var dc = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
                 using var dt = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);

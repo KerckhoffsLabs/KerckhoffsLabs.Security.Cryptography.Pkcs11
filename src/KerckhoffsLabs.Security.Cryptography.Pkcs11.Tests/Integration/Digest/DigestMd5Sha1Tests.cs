@@ -20,7 +20,7 @@ internal static class DigestMd5Sha1TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism(CKM.CKM_MD5);
+            var mech = new Mechanism(CKM.CKM_MD5);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Digest(mech, []));
             Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
@@ -37,7 +37,7 @@ internal static class DigestMd5Sha1TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism(CKM.CKM_SHA_1);
+            var mech = new Mechanism(CKM.CKM_SHA_1);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Digest(mech, []));
             Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
@@ -57,7 +57,7 @@ internal static class DigestMd5Sha1TestCases
         {
             try
             {
-                using var mech = new Mechanism(CKM.CKM_MD5);
+                var mech = new Mechanism(CKM.CKM_MD5);
                 session.Digest(mech, []);
             }
             catch (InsecureOperationException)

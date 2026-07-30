@@ -397,7 +397,7 @@ public sealed class Pkcs11Workspace : IDisposable
             builder = builder.Label(label);
 
         using var template = builder.Build();
-        using var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        var mechanism = new Mechanism(CKM.CKM_AES_KEY_GEN);
         return GenerateKey(mechanism, template);
     }
 
@@ -440,7 +440,7 @@ public sealed class Pkcs11Workspace : IDisposable
 
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
-        using var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
         return GenerateKey(mechanism, privTemplate, pubTemplate);
     }
 
@@ -489,7 +489,7 @@ public sealed class Pkcs11Workspace : IDisposable
 
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
-        using var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+        var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
         return GenerateKey(mechanism, privTemplate, pubTemplate);
     }
 
@@ -520,8 +520,8 @@ public sealed class Pkcs11Workspace : IDisposable
         if (aesBitLength is not 128 and not 192 and not 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
 
-        using var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
-        using var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
+        var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .ValueLen(aesBitLength / 8)
             .Sensitive().NonExtractable()

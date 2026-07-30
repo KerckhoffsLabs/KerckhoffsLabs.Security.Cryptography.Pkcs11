@@ -88,8 +88,8 @@ public sealed class AesCcmPkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            using var msgParams = CkmCcmMessageParams.ForEncrypt(plaintext.Length, nonce, tag.Length);
-            using var mech = new Mechanism(CKM.CKM_AES_CCM);
+            var msgParams = CkmCcmMessageParams.ForEncrypt(plaintext.Length, nonce, tag.Length);
+            var mech = new Mechanism(CKM.CKM_AES_CCM);
             byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
             if (ct.Length != plaintext.Length)
                 throw new InvalidOperationException(
@@ -100,7 +100,7 @@ public sealed class AesCcmPkcs11 : IDisposable
         }
 
         // v2.40 fallback: ciphertext || tag concatenated.
-        using var legacyMech = new Mechanism(CKM.CKM_AES_CCM,
+        var legacyMech = new Mechanism(CKM.CKM_AES_CCM,
             new CkmAesCcmParams(plaintext.Length, nonce, associatedData, macLen: tag.Length));
         byte[] result = _key.Encrypt(legacyMech, plaintext);
         if (result.Length != plaintext.Length + tag.Length)
@@ -131,8 +131,8 @@ public sealed class AesCcmPkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            using var msgParams = CkmCcmMessageParams.ForDecrypt(plaintext.Length, nonce, tag);
-            using var mech = new Mechanism(CKM.CKM_AES_CCM);
+            var msgParams = CkmCcmMessageParams.ForDecrypt(plaintext.Length, nonce, tag);
+            var mech = new Mechanism(CKM.CKM_AES_CCM);
             byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
             try
             {
@@ -149,7 +149,7 @@ public sealed class AesCcmPkcs11 : IDisposable
         }
 
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
-        using var legacyMech = new Mechanism(CKM.CKM_AES_CCM,
+        var legacyMech = new Mechanism(CKM.CKM_AES_CCM,
             new CkmAesCcmParams(ciphertext.Length, nonce, associatedData, macLen: tag.Length));
         byte[] combined = new byte[ciphertext.Length + tag.Length];
         ciphertext.CopyTo(combined);

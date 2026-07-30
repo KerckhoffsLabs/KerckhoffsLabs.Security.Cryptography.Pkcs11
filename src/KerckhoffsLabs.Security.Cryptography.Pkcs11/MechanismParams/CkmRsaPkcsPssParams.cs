@@ -13,7 +13,6 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     private readonly CKM _hashAlg;
     private readonly CKG _mgf;
     private readonly int _saltLength;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes RSA-PSS parameters.
@@ -34,19 +33,12 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_RSA_PKCS_PSS_PARAMS
         {
             HashAlg = _hashAlg.ToCULong(),
             Mgf = _mgf.ToCULong(),
             Len = (NativeCULong)_saltLength,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 
     /// <summary>Hash algorithm used in the PSS encoding.</summary>

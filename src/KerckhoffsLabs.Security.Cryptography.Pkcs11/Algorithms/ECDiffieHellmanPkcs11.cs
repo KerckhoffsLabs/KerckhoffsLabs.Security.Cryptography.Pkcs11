@@ -168,8 +168,8 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         int fieldSize = x.Length;
 
         byte[] peerPoint = EncodeEcPointAsDerOctetString(x, y);
-        using var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peerPoint);
-        using var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
+        var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peerPoint);
+        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
         // Raw secret read-back: derive an extractable, non-sensitive session generic secret of the
         // field size. The private key itself remains non-extractable.
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)

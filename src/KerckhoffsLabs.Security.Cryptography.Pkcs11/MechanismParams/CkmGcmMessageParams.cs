@@ -14,7 +14,6 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
     // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
     private readonly byte[] _tagBuffer;
-    private bool _disposed;
 
     /// <summary>For encryption — the wrapper allocates a zero-filled tag buffer of
     /// <paramref name="tagBytes"/>; the library writes into it during C_EncryptMessage.
@@ -44,11 +43,9 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     }
 
     /// <summary>Copies the tag bytes (output of encrypt) into the caller's buffer.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than the tag length.</exception>
     public void CopyTagTo(Span<byte> destination)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _tagLen)
             throw new ArgumentException($"Destination must be at least {_tagLen} bytes.", nameof(destination));
         _tagBuffer.AsSpan(0, _tagLen).CopyTo(destination);
@@ -57,7 +54,6 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_GCM_MESSAGE_PARAMS
         {
             Iv = scope.Write(_ivBytes),
@@ -72,20 +68,9 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
-        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
-        // mistake — a scope already released while these params are still live — because nothing here
-        // can observe that; the pointers in `marshalled` would simply address freed memory. Keeping
-        // the absorb inside the scope's lifetime remains the caller's responsibility.
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         var s = (CK_GCM_MESSAGE_PARAMS)marshalled;
         if (s.Tag == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, _tagLen));
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

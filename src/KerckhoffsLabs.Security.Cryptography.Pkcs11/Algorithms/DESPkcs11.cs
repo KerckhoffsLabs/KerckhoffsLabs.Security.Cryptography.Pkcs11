@@ -92,39 +92,36 @@ public sealed class DESPkcs11 : DES
 
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
-        using (mechanism)
+        // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens reject an empty
+        // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when AllowInsecure is set
+        // (i.e. once the secure-defaults gate would pass). With AllowInsecure off we fall through
+        // so GuardMechanism throws InsecureOperationException as documented (the empty buffer
+        // never reaches the token — the gate runs first). Padded encryption (CKM_DES_CBC_PAD)
+        // must emit a full padding block, so that path always goes to the token.
+        if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES_CBC_PAD))
         {
-            // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens reject an empty
-            // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when AllowInsecure is set
-            // (i.e. once the secure-defaults gate would pass). With AllowInsecure off we fall through
-            // so GuardMechanism throws InsecureOperationException as documented (the empty buffer
-            // never reaches the token — the gate runs first). Padded encryption (CKM_DES_CBC_PAD)
-            // must emit a full padding block, so that path always goes to the token.
-            if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES_CBC_PAD))
+            bytesWritten = 0;
+            return true;
+        }
+
+        byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
+        try
+        {
+            if (output.Length > destination.Length)
             {
                 bytesWritten = 0;
-                return true;
+                return false;
             }
-
-            byte[] output = encrypt ? _key.Encrypt(mechanism, input) : _key.Decrypt(mechanism, input);
-            try
-            {
-                if (output.Length > destination.Length)
-                {
-                    bytesWritten = 0;
-                    return false;
-                }
-                output.CopyTo(destination);
-                bytesWritten = output.Length;
-                return true;
-            }
-            finally
-            {
-                // On decrypt, `output` is plaintext — zero this intermediate copy (the caller still
-                // receives the plaintext via `destination`). Ciphertext on encrypt is not sensitive.
-                if (!encrypt)
-                    CryptographicOperations.ZeroMemory(output);
-            }
+            output.CopyTo(destination);
+            bytesWritten = output.Length;
+            return true;
+        }
+        finally
+        {
+            // On decrypt, `output` is plaintext — zero this intermediate copy (the caller still
+            // receives the plaintext via `destination`). Ciphertext on encrypt is not sensitive.
+            if (!encrypt)
+                CryptographicOperations.ZeroMemory(output);
         }
     }
 

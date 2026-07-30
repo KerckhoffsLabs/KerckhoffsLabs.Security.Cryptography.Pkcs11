@@ -66,7 +66,7 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
         var s = NewSession();
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         AssertNotSupported(() => s.EncapsulateKey(mech, new ObjectHandle(1), []));
     }
 
@@ -74,7 +74,7 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     public void DecapsulateKey_Throws_FunctionNotSupported()
     {
         var s = NewSession();
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         AssertNotSupported(() => s.DecapsulateKey(mech, new ObjectHandle(1), [1, 2, 3], []));
     }
 
@@ -82,7 +82,7 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     public void WrapKeyAuthenticated_Throws_FunctionNotSupported()
     {
         var s = NewSession();
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         AssertNotSupported(() => s.WrapKeyAuthenticated(mech, new ObjectHandle(1), new ObjectHandle(2), [0xAA]));
     }
 
@@ -90,7 +90,7 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     public void UnwrapKeyAuthenticated_Throws_FunctionNotSupported()
     {
         var s = NewSession();
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         AssertNotSupported(() => s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1), [1, 2, 3], [0xCC], []));
     }
 
@@ -98,7 +98,7 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     public void VerifySignature_OneShot_Throws_FunctionNotSupported()
     {
         var s = NewSession();
-        using var mech = new Mechanism(CKM.CKM_ML_DSA);
+        var mech = new Mechanism(CKM.CKM_ML_DSA);
         AssertNotSupported(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
 
@@ -106,7 +106,7 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     public void VerifySignature_Streaming_Throws_FunctionNotSupported()
     {
         var s = NewSession();
-        using var mech = new Mechanism(CKM.CKM_ML_DSA);
+        var mech = new Mechanism(CKM.CKM_ML_DSA);
         using var input = new MemoryStream([1, 2, 3, 4]);
         AssertNotSupported(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input, bufferLength: 2));
     }

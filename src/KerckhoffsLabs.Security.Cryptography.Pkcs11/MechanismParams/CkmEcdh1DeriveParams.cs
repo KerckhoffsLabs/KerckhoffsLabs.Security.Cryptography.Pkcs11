@@ -7,15 +7,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_ECDH1_DERIVE_PARAMS"/>. A managed descriptor: it holds the
 /// peer's public point and the optional shared data as managed arrays and is rebuilt into each
-/// call's own scope, so disposal order relative to the <see cref="Mechanism"/> does not matter and
-/// one instance may back several mechanisms.
+/// call's own scope, so one instance may safely back several mechanisms.
 /// </summary>
 public sealed class CkmEcdh1DeriveParams : MechanismParameters
 {
     private readonly byte[] _publicDataBytes;
     private readonly byte[] _sharedDataBytes;
     private readonly CKD _kdf;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes ECDH1-derive parameters.
@@ -37,7 +35,6 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_ECDH1_DERIVE_PARAMS
         {
             Kdf = _kdf.ToCULong(),
@@ -46,11 +43,5 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
             PublicData = scope.Write(_publicDataBytes),
             PublicDataLen = (NativeCULong)_publicDataBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

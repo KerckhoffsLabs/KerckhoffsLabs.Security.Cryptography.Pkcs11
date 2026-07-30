@@ -38,7 +38,7 @@ internal static class DecryptAesTestCases
             {
                 // Block-aligned ciphertext placeholder; gate fires before it is ever consumed.
                 byte[] ciphertext = new byte[16];
-                using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
                 var ex = Assert.Throws<InsecureOperationException>(() =>
                     session.Decrypt(mechanism, keyHandle, ciphertext));
@@ -70,7 +70,7 @@ internal static class DecryptAesTestCases
             try
             {
                 byte[] ciphertext = new byte[16];
-                using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
                 var ex = Record.Exception(() =>
                     session.Decrypt(mechanism, keyHandle, ciphertext));

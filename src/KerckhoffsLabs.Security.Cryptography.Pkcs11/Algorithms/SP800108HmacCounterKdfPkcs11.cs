@@ -140,15 +140,15 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(template);
 
-        using var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
-        using var mech = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p);
+        var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
+        var mech = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p);
         return _key.Derive(mech, template);
     }
 
     private byte[] DeriveExtractable(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int length)
     {
-        using var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
-        using var mech = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p);
+        var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
+        var mech = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p);
         // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .ValueLen(length)

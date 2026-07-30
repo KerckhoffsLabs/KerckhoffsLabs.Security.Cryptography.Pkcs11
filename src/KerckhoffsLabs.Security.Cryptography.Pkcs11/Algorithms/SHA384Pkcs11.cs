@@ -40,7 +40,7 @@ public sealed class SHA384Pkcs11 : SHA384
     /// <inheritdoc/>
     protected override byte[] HashFinal()
     {
-        using var mech = new Mechanism(CKM.CKM_SHA384);
+        var mech = new Mechanism(CKM.CKM_SHA384);
         byte[] data = _buffer.ToArray();
         _buffer.SetLength(0);
         return _workspace.Digest(mech, data);
