@@ -17,7 +17,6 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
     private readonly ulong _curve;
     private readonly CKM _aeadMechanism;
     private readonly ulong _kdfMechanism;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes X2 Ratchet initiator parameters.
@@ -47,7 +46,6 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_X2RATCHET_INITIALIZE_PARAMS
         {
             Sk = scope.Write(_skBytes),
@@ -59,11 +57,5 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
             AeadMechanism = _aeadMechanism.ToCULong(),
             KdfMechanism = (NativeCULong)_kdfMechanism,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

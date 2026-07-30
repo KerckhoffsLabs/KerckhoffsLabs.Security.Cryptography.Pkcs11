@@ -81,7 +81,7 @@ public sealed class Pkcs11SessionV32Tests
     public void EncapsulateKey_Ok_ReturnsCiphertextAndHandle()
     {
         var s = NewSession(new V32Fake { Ciphertext = [1, 2, 3, 4], SharedId = 0x77 });
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
 
         var (ciphertext, shared) = s.EncapsulateKey(mech, new ObjectHandle(1), []);
 
@@ -93,7 +93,7 @@ public sealed class Pkcs11SessionV32Tests
     public void EncapsulateKey_ProbeBufferTooSmall_StillSucceeds()
     {
         var s = NewSession(new V32Fake { EncapsProbeBufferTooSmall = true, Ciphertext = [5, 6] });
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
 
         var (ciphertext, _) = s.EncapsulateKey(mech, new ObjectHandle(1), []);
 
@@ -104,7 +104,7 @@ public sealed class Pkcs11SessionV32Tests
     public void EncapsulateKey_Error_Throws()
     {
         var s = NewSession(new V32Fake { EncapsRv = CKR.CKR_KEY_HANDLE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.EncapsulateKey(mech, new ObjectHandle(1), []));
     }
 
@@ -114,7 +114,7 @@ public sealed class Pkcs11SessionV32Tests
     public void DecapsulateKey_Ok_ReturnsHandle()
     {
         var s = NewSession(new V32Fake { SharedId = 0x88 });
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         Assert.Equal(0x88UL, s.DecapsulateKey(mech, new ObjectHandle(1), [1, 2, 3], []).ObjectId);
     }
 
@@ -122,7 +122,7 @@ public sealed class Pkcs11SessionV32Tests
     public void DecapsulateKey_Error_Throws()
     {
         var s = NewSession(new V32Fake { DecapsRv = CKR.CKR_MECHANISM_PARAM_INVALID });
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DecapsulateKey(mech, new ObjectHandle(1), [1, 2, 3], []));
     }
 
@@ -133,7 +133,7 @@ public sealed class Pkcs11SessionV32Tests
     {
         var fake = new V32Fake { Wrapped = [9, 8, 7] };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
 
         byte[] wrapped = s.WrapKeyAuthenticated(mech, new ObjectHandle(1), new ObjectHandle(2), [0xAA, 0xBB]);
 
@@ -145,7 +145,7 @@ public sealed class Pkcs11SessionV32Tests
     public void WrapKeyAuthenticated_SecondCallShorter_ResizesDown()
     {
         var s = NewSession(new V32Fake { Wrapped = [1, 2, 3, 4], WrapSecondLen = 2 });
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         Assert.Equal(new byte[] { 1, 2 }, s.WrapKeyAuthenticated(mech, new ObjectHandle(1), new ObjectHandle(2), []));
     }
 
@@ -153,7 +153,7 @@ public sealed class Pkcs11SessionV32Tests
     public void WrapKeyAuthenticated_Error_Throws()
     {
         var s = NewSession(new V32Fake { WrapAuthRv = CKR.CKR_KEY_UNEXTRACTABLE });
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.WrapKeyAuthenticated(mech, new ObjectHandle(1), new ObjectHandle(2), []));
     }
 
@@ -164,7 +164,7 @@ public sealed class Pkcs11SessionV32Tests
     {
         var fake = new V32Fake { UnwrappedId = 0x99 };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
 
         ObjectHandle h = s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1), [1, 2, 3], [0xCC], []);
 
@@ -176,7 +176,7 @@ public sealed class Pkcs11SessionV32Tests
     public void UnwrapKeyAuthenticated_Error_Throws()
     {
         var s = NewSession(new V32Fake { UnwrapAuthRv = CKR.CKR_AEAD_DECRYPT_FAILED });
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1), [1, 2, 3], [0xCC], []));
     }
@@ -187,7 +187,7 @@ public sealed class Pkcs11SessionV32Tests
     public void VerifySignature_OneShot_Ok_ReturnsTrue()
     {
         var s = NewSession(new V32Fake { VerifySigRv = CKR.CKR_OK });
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         Assert.True(s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
 
@@ -195,7 +195,7 @@ public sealed class Pkcs11SessionV32Tests
     public void VerifySignature_OneShot_SignatureInvalid_ReturnsFalse()
     {
         var s = NewSession(new V32Fake { VerifySigRv = CKR.CKR_SIGNATURE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         Assert.False(s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
 
@@ -203,7 +203,7 @@ public sealed class Pkcs11SessionV32Tests
     public void VerifySignature_OneShot_OtherError_Throws()
     {
         var s = NewSession(new V32Fake { VerifySigRv = CKR.CKR_DEVICE_ERROR });
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
 
@@ -211,7 +211,7 @@ public sealed class Pkcs11SessionV32Tests
     public void VerifySignature_OneShot_InitError_Throws()
     {
         var s = NewSession(new V32Fake { VerifySigInitRv = CKR.CKR_KEY_HANDLE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
 
@@ -222,7 +222,7 @@ public sealed class Pkcs11SessionV32Tests
     {
         var fake = new V32Fake { VerifySigFinalRv = CKR.CKR_OK };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
         bool ok = s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input, bufferLength: 2);
@@ -235,7 +235,7 @@ public sealed class Pkcs11SessionV32Tests
     public void VerifySignature_Stream_SignatureInvalid_ReturnsFalse()
     {
         var s = NewSession(new V32Fake { VerifySigFinalRv = CKR.CKR_SIGNATURE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.False(s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input));
@@ -245,7 +245,7 @@ public sealed class Pkcs11SessionV32Tests
     public void VerifySignature_Stream_OtherError_Throws()
     {
         var s = NewSession(new V32Fake { VerifySigFinalRv = CKR.CKR_DEVICE_ERROR });
-        using var mech = new Mechanism(CKM.CKM_ECDSA);
+        var mech = new Mechanism(CKM.CKM_ECDSA);
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input));

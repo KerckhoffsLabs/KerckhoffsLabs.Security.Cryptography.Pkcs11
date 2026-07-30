@@ -30,7 +30,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mechanism = new Mechanism((CKM)mechanismId);
+            var mechanism = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Assert.Throws<InsecureOperationException>(() =>
@@ -55,7 +55,7 @@ internal static class InsecureOperationGateTestCases
         session.AllowInsecure = true;
         try
         {
-            using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Record.Exception(() =>
@@ -84,7 +84,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mechanism = new Mechanism((CKM)mechanismId);
+            var mechanism = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Assert.Throws<InsecureOperationException>(() =>
@@ -109,7 +109,7 @@ internal static class InsecureOperationGateTestCases
         session.AllowInsecure = true;
         try
         {
-            using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+            var mechanism = new Mechanism(CKM.CKM_AES_ECB);
             var fakeHandle = new ObjectHandle(0);
 
             var ex = Record.Exception(() =>
@@ -139,7 +139,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Sign(mech, fakeHandle, []));
@@ -167,7 +167,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>(), out _));
@@ -197,7 +197,7 @@ internal static class InsecureOperationGateTestCases
         // standard scheme and must not require an insecure opt-in.
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Record.Exception(() => session.Sign(mech, fakeHandle, []));
             Assert.False(ex is InsecureOperationException,
@@ -219,7 +219,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var fakeHandle = new ObjectHandle(0);
             var ex = Record.Exception(() =>
                 session.Verify(mech, fakeHandle, Array.Empty<byte>(), Array.Empty<byte>(), out _));
@@ -248,7 +248,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.Digest(mech, []));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
@@ -275,7 +275,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.GenerateKey(mech, []));
             Assert.Equal((CKM)mechanismId, ex.Mechanism);
@@ -302,7 +302,7 @@ internal static class InsecureOperationGateTestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism((CKM)mechanismId);
+            var mech = new Mechanism((CKM)mechanismId);
             var fakeBase = new ObjectHandle(0);
             var ex = Assert.Throws<InsecureOperationException>(() =>
                 session.DeriveKey(mech, fakeBase, []));

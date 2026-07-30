@@ -15,7 +15,7 @@ public sealed class Rc2ParamsMarshalTests
     [Fact]
     public void CkmRc2Params_MarshalsEffectiveBits()
     {
-        using var p = new CkmRc2Params(64);
+        var p = new CkmRc2Params(64);
         using var scope = new MechanismParameterScope();
         var s = (CK_RC2_PARAMS)p.BuildMarshalable(scope);
 
@@ -34,7 +34,7 @@ public sealed class Rc2ParamsMarshalTests
     public void CkmRc2CbcParams_MarshalsEffectiveBitsAndInlineIv()
     {
         byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80];
-        using var p = new CkmRc2CbcParams(128, iv);
+        var p = new CkmRc2CbcParams(128, iv);
         using var scope = new MechanismParameterScope();
         var s = (CK_RC2_CBC_PARAMS)p.BuildMarshalable(scope);
 

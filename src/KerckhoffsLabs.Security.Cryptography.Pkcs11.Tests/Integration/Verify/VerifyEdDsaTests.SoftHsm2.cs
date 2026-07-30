@@ -14,7 +14,7 @@ internal static class VerifyEdDsaTestCases
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("Ed25519 tamper");
-            using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+            var eddsa = new Mechanism(CKM.CKM_EDDSA);
             byte[] sig = session.Sign(eddsa, priv, data);
             byte[] tampered = (byte[])data.Clone();
             tampered[0] ^= 0xFF;

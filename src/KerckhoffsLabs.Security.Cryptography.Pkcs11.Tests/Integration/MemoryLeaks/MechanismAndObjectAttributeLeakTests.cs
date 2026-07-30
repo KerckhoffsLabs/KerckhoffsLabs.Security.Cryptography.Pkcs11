@@ -34,7 +34,7 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < 20; i++)
         {
-            using var m = new Mechanism(CKM.CKM_AES_KEY_GEN);
+            var m = new Mechanism(CKM.CKM_AES_KEY_GEN);
             using (var scope = new MechanismParameterScope())
             {
                 CK_MECHANISM marshalled = m.Marshal(scope, out object? mechParams);
@@ -52,8 +52,8 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < 20; i++)
         {
-            using var p = new CkmAesGcmParams(iv: new byte[12], aad: [], tagBits: 128);
-            using var m = new Mechanism(CKM.CKM_AES_GCM, p);
+            var p = new CkmAesGcmParams(iv: new byte[12], aad: [], tagBits: 128);
+            var m = new Mechanism(CKM.CKM_AES_GCM, p);
 
             // Neither object owns unmanaged memory of its own any more.
             Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);

@@ -69,8 +69,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     {
         var fake = new MessageFake { Ciphertext = [1, 2, 3, 4] };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         byte[] ct = s.MessageEncrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], plaintext: [9, 9, 9]);
 
@@ -83,8 +83,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     {
         var fake = new MessageFake { EncMsgRv = CKR.CKR_DEVICE_ERROR };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.MessageEncrypt(mech, new ObjectHandle(1), p, associatedData: [], plaintext: [1]));
@@ -96,8 +96,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     {
         var fake = new MessageFake { Plaintext = [7, 7, 7] };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        using var p = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var p = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
 
         byte[] pt = s.MessageDecrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], ciphertext: [1, 2, 3]);
 
@@ -110,8 +110,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     {
         var fake = new MessageFake { DecMsgRv = CKR.CKR_AEAD_DECRYPT_FAILED };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        using var p = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var p = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.MessageDecrypt(mech, new ObjectHandle(1), p, associatedData: [], ciphertext: [1, 2, 3]));
@@ -147,8 +147,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         };
 
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        using var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         s.MessageEncrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], plaintext: [9, 9, 9]);
 
@@ -177,8 +177,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         };
 
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
-        using var p = CkmGcmMessageParams.ForDecrypt(new byte[12], callerTag);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var p = CkmGcmMessageParams.ForDecrypt(new byte[12], callerTag);
 
         s.MessageDecrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], ciphertext: [1, 2, 3]);
 
@@ -207,8 +207,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         };
 
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_CCM);
-        using var p = CkmCcmMessageParams.ForEncrypt(dataLen: 3, new byte[12], macBytes: 16);
+        var mech = new Mechanism(CKM.CKM_AES_CCM);
+        var p = CkmCcmMessageParams.ForEncrypt(dataLen: 3, new byte[12], macBytes: 16);
 
         s.MessageEncrypt(mech, new ObjectHandle(1), p, associatedData: [0xAA], plaintext: [9, 9, 9]);
 
@@ -303,7 +303,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     public void DigestKey_Ok_ReturnsDigest()
     {
         var s = NewSession(new DigestKeyFake { DigestOutput = [1, 2, 3] });
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.Equal(new byte[] { 1, 2, 3 }, s.DigestKey(mech, new ObjectHandle(1)));
     }
 
@@ -311,7 +311,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     public void DigestKey_DigestKeyError_Throws()
     {
         var s = NewSession(new DigestKeyFake { KeyRv = CKR.CKR_KEY_INDIGESTIBLE });
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DigestKey(mech, new ObjectHandle(1)));
     }
 
@@ -319,7 +319,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     public void DigestKey_InitError_Throws()
     {
         var s = NewSession(new DigestKeyFake { InitRv = CKR.CKR_MECHANISM_INVALID });
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DigestKey(mech, new ObjectHandle(1)));
     }
 }

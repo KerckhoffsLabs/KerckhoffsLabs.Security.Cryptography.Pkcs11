@@ -14,7 +14,6 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
     private readonly byte[] _contextBytes;
     private readonly CKM _hash;
     private readonly CkhHedge _hedgeVariant;
-    private bool _disposed;
 
     /// <summary>Initializes prehash-PQC signing parameters.</summary>
     /// <param name="hash">Hash mechanism applied to the data before signing (CKM_SHA256, CKM_SHA3_256, CKM_SHAKE_*, etc.).</param>
@@ -37,7 +36,6 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_HASH_SIGN_ADDITIONAL_CONTEXT
         {
             HedgeVariant = (NativeCULong)(uint)_hedgeVariant,
@@ -45,11 +43,5 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
             ContextLen = (NativeCULong)_contextBytes.Length,
             Hash = (NativeCULong)(ulong)_hash,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

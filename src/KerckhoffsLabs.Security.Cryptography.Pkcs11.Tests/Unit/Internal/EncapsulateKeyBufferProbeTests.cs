@@ -53,7 +53,7 @@ public sealed class EncapsulateKeyBufferProbeTests
         var session = new Pkcs11Session(fake, sessionId: 1);
         try
         {
-            using var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
             var (ciphertext, sharedKey) = session.EncapsulateKey(
                 mechanism, new ObjectHandle(2), []);
@@ -108,7 +108,7 @@ public sealed class EncapsulateKeyBufferProbeTests
         var session = new Pkcs11Session(fake, sessionId: 1);
         try
         {
-            using var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
             var (ciphertext, sharedKey) = session.EncapsulateKey(
                 mechanism, new ObjectHandle(2), [], SoftHsmLikeFake.CiphertextSize);
@@ -133,7 +133,7 @@ public sealed class EncapsulateKeyBufferProbeTests
         var session = new Pkcs11Session(fake, sessionId: 1);
         try
         {
-            using var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
             Assert.ThrowsAny<Pkcs11Exception>(() =>
                 session.EncapsulateKey(mechanism, new ObjectHandle(2), []));

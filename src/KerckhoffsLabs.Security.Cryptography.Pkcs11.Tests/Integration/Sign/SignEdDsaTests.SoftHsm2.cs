@@ -20,7 +20,7 @@ internal static class SignEdDsaTestCases
             try
             {
                 byte[] data = Encoding.UTF8.GetBytes("phase-2 Ed25519 round-trip");
-                using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                var eddsa = new Mechanism(CKM.CKM_EDDSA);
                 byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(64, sig.Length);
 
@@ -50,7 +50,7 @@ internal static class SignEdDsaTestCases
             try
             {
                 byte[] data = Encoding.UTF8.GetBytes("phase-2 Ed448 round-trip");
-                using var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                var eddsa = new Mechanism(CKM.CKM_EDDSA);
                 byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(114, sig.Length);
 

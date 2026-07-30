@@ -50,7 +50,7 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
         if (context.Length > 255)
             throw new ArgumentException("ML-DSA context must be at most 255 bytes.", nameof(context));
 
-        using var mech = Pkcs11MechanismMap.MlDsaSign(context: context);
+        var mech = Pkcs11MechanismMap.MlDsaSign(context: context);
         byte[] sig = _key.Sign(mech, data);
         CopyExact(sig, destination, Algorithm.SignatureSizeInBytes);
     }
@@ -64,7 +64,7 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
         if (context.Length > 255)
             throw new ArgumentException("ML-DSA context must be at most 255 bytes.", nameof(context));
 
-        using var mech = Pkcs11MechanismMap.MlDsaSign(context: context);
+        var mech = Pkcs11MechanismMap.MlDsaSign(context: context);
         return _key.Verify(mech, data, signature);
     }
 

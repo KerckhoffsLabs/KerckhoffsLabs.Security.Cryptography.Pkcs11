@@ -42,7 +42,7 @@ internal static class EncryptAesTestCases
                 byte[] plaintext = Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
 
                 session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
-                using var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
+                var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] ciphertext = session.Encrypt(mechanism, keyHandle, plaintext);
 
                 Assert.NotNull(ciphertext);
@@ -70,13 +70,13 @@ internal static class EncryptAesTestCases
                 byte[] plaintext = Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
 
                 session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
-                using var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
+                var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] ciphertext = session.Encrypt(encMechanism, keyHandle, plaintext);
 
                 Assert.NotNull(ciphertext);
                 Assert.True(ciphertext.Length > 0);
 
-                using var decMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
+                var decMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] recovered = session.Decrypt(decMechanism, keyHandle, ciphertext);
 
                 Assert.Equal(plaintext, recovered);
@@ -103,7 +103,7 @@ internal static class EncryptAesTestCases
             try
             {
                 byte[] plaintext = new byte[16]; // must be block-aligned for ECB
-                using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
                 var ex = Assert.Throws<InsecureOperationException>(() =>
                     session.Encrypt(mechanism, keyHandle, plaintext));
@@ -131,7 +131,7 @@ internal static class EncryptAesTestCases
             try
             {
                 byte[] plaintext = new byte[16];
-                using var mechanism = new Mechanism(CKM.CKM_AES_ECB);
+                var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
                 // Must not throw InsecureOperationException.
                 var ex = Record.Exception(() =>

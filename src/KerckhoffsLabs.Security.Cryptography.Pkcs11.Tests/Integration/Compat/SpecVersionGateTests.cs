@@ -112,7 +112,7 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
             () => ws.Session.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
@@ -165,7 +165,7 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
-        using var mech = new Mechanism(CKM.CKM_ML_KEM);
+        var mech = new Mechanism(CKM.CKM_ML_KEM);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
             () => ws.Session.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);

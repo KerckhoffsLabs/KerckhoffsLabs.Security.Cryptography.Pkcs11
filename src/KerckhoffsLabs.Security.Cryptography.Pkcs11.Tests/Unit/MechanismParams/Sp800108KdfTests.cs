@@ -41,7 +41,7 @@ public sealed class Sp800108KdfTests
         const ulong spliceKey = 0xABCD;
         byte[] label = [0x6C, 0x62, 0x6C];
 
-        using var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
+        var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
             .IterationCounter(widthInBits: 16, littleEndian: true)
             .OptionalCounter(widthInBits: 8, littleEndian: false)
             .ByteArray(label)
@@ -92,7 +92,7 @@ public sealed class Sp800108KdfTests
     [Fact]
     public void DoublePipeline_MarshalsCounterParamsStruct()
     {
-        using var p = CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC)
+        var p = CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([1, 2]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
 
         using var scope = new MechanismParameterScope();
@@ -115,7 +115,7 @@ public sealed class Sp800108KdfTests
     [Fact]
     public void CounterModeHmac_Preset_HasNoAdditionalDerivedKeys()
     {
-        using var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, [1], [2]);
+        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, [1], [2]);
         Assert.Empty(p.AdditionalDerivedKeys);
         using var scope = new MechanismParameterScope();
         var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
@@ -130,7 +130,7 @@ public sealed class Sp800108KdfTests
         var templateB = new List<ObjectAttribute> { new(CKA.CKA_VALUE_LEN, 16UL) };
         try
         {
-            using var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
                 .IterationCounter().ByteArray([1]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
                 .AddDerivedKey(templateA)
                 .AddDerivedKey(templateB)
@@ -180,7 +180,7 @@ public sealed class Sp800108KdfTests
         var templateB = new List<ObjectAttribute> { new(CKA.CKA_VALUE_LEN, 16UL) };
         try
         {
-            using var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
+            var p = CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC)
                 .IterationCounter(widthInBits: 16, littleEndian: true)
                 .ByteArray([0x5A])
                 .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
@@ -213,31 +213,5 @@ public sealed class Sp800108KdfTests
             foreach (var a in templateA) a.Dispose();
             foreach (var a in templateB) a.Dispose();
         }
-    }
-
-    [Fact]
-    public void AfterDispose_AccessorsThrow()
-    {
-        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, default, default);
-        p.Dispose();
-        using var scope = new MechanismParameterScope();
-        Assert.Throws<ObjectDisposedException>(() => p.BuildMarshalable(scope));
-        Assert.Throws<ObjectDisposedException>(() => _ = p.AdditionalDerivedKeys);
-        Assert.Null(Record.Exception(p.Dispose)); // idempotent
-    }
-
-    // AbsorbOutput's own disposal guard. Partial by design — it cannot see a released scope, so
-    // absorbing after the scope is gone still reads zeroized memory silently — but the half it does
-    // cover has to stay covered, or a later refactor drops the guard with the suite still green.
-    [Fact]
-    public void AbsorbOutput_AfterDispose_Throws()
-    {
-        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, default, default);
-        using var scope = new MechanismParameterScope();
-        object marshalled = p.BuildMarshalable(scope);
-
-        p.Dispose();
-
-        Assert.Throws<ObjectDisposedException>(() => p.AbsorbOutput(marshalled));
     }
 }

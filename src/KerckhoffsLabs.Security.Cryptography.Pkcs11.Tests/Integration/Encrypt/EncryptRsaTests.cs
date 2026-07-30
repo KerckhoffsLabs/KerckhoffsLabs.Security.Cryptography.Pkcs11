@@ -32,7 +32,7 @@ internal static class EncryptRsaTestCases
 
                 // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by Session.GuardMechanism; the same gate the
                 // RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.
-                using var mech = new Mechanism(CKM.CKM_RSA_PKCS);
+                var mech = new Mechanism(CKM.CKM_RSA_PKCS);
                 var ex = Assert.Throws<InsecureOperationException>(() =>
                     session.Encrypt(mech, pub, plaintext));
                 Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);

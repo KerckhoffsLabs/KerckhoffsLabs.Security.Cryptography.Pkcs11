@@ -13,7 +13,6 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     private readonly CKM _prfMechanism;
     private readonly bool _hasSeedKey;
     private readonly ulong _seedKey;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes IKEv2 PRF+ derive parameters.
@@ -33,7 +32,6 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
         {
             PrfMechanism = _prfMechanism.ToCULong(),
@@ -42,11 +40,5 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
             SeedData = scope.Write(_seedDataBytes),
             SeedDataLen = (NativeCULong)_seedDataBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

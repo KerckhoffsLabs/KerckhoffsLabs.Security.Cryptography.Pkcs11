@@ -36,7 +36,7 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
     [Fact]
     public void Unwrap_ExplicitExtractableTrue_ThrowsByDefault() => WithSession(session =>
     {
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
@@ -49,7 +49,7 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
     [Fact]
     public void Unwrap_ExplicitSensitiveFalse_ThrowsByDefault() => WithSession(session =>
     {
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_SENSITIVE, false));
         try
         {
@@ -62,7 +62,7 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
     [Fact]
     public void Unwrap_InsecureTemplate_AllowInsecureScope_BypassesGate() => WithSession(session =>
     {
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {

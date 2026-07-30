@@ -18,7 +18,7 @@ internal static class DigestSha2TestCases
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("abc");
-            using var mech = new Mechanism(CKM.CKM_SHA256);
+            var mech = new Mechanism(CKM.CKM_SHA256);
             byte[] digest = session.Digest(mech, data);
             Assert.Equal(32, digest.Length);
 
@@ -39,7 +39,7 @@ internal static class DigestSha2TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism(CKM.CKM_SHA384);
+            var mech = new Mechanism(CKM.CKM_SHA384);
             byte[] digest = session.Digest(mech, Encoding.UTF8.GetBytes("phase-3"));
             Assert.Equal(48, digest.Length);
         }
@@ -55,7 +55,7 @@ internal static class DigestSha2TestCases
         var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
-            using var mech = new Mechanism(CKM.CKM_SHA512);
+            var mech = new Mechanism(CKM.CKM_SHA512);
             byte[] digest = session.Digest(mech, Encoding.UTF8.GetBytes("phase-3"));
             Assert.Equal(64, digest.Length);
         }

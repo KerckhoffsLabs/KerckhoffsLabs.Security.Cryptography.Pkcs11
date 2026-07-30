@@ -5,8 +5,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_CCM_PARAMS"/>. A managed descriptor: it holds the nonce and
-/// AAD as managed arrays and is rebuilt into each call's own scope, so disposal order relative to
-/// the <see cref="Mechanism"/> does not matter and one instance may back several mechanisms.
+/// AAD as managed arrays and is rebuilt into each call's own scope, so one instance may safely back
+/// several mechanisms.
 /// </summary>
 public sealed class CkmAesCcmParams : MechanismParameters
 {
@@ -14,7 +14,6 @@ public sealed class CkmAesCcmParams : MechanismParameters
     private readonly byte[] _aadBytes;
     private readonly int _dataLen;
     private readonly int _macLen;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes the CCM parameters.
@@ -42,7 +41,6 @@ public sealed class CkmAesCcmParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_CCM_PARAMS
         {
             DataLen = (NativeCULong)_dataLen,
@@ -52,11 +50,5 @@ public sealed class CkmAesCcmParams : MechanismParameters
             AADLen = (NativeCULong)_aadBytes.Length,
             MACLen = (NativeCULong)_macLen,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

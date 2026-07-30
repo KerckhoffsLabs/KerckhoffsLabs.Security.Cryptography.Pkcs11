@@ -43,7 +43,6 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     // Handles copied out of the scope-owned CK_DERIVED_KEY array by AbsorbOutput, before the scope
     // that holds the slots is released.
     private readonly List<ulong> _derivedHandles = [];
-    private bool _disposed;
 
     /// <summary>Begins a counter-mode (<c>CKM_SP800_108_COUNTER_KDF</c>) parameter build.</summary>
     public static Sp800108KdfBuilder Counter(CKM prfType) => new(prfType, Sp800108KdfMode.Counter);
@@ -87,12 +86,10 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <remarks>
     /// A snapshot, not a view: the returned list does not change when a later call absorbs again.
     /// </remarks>
-    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
     public IReadOnlyList<ulong> AdditionalDerivedKeys
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
             ulong[] snapshot = [.. _derivedHandles];
             return snapshot;
         }
@@ -101,7 +98,6 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         // Inner blocks first: every CK_PRF_DATA_PARAM stores the address of its format struct or
         // byte array, and every CK_DERIVED_KEY stores the addresses of its attribute template and
@@ -152,11 +148,6 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
-        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
-        // mistake — a scope already released while these params are still live — because nothing here
-        // can observe that; the handle slots in `marshalled` would simply address freed memory.
-        // Keeping the absorb inside the scope's lifetime remains the caller's responsibility.
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_retainedTemplates.Count == 0) return;
 
@@ -286,11 +277,5 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         return UnmanagedMemory.NativeULongSize == 4
             ? BinaryPrimitives.ReadUInt32LittleEndian(buffer)
             : BinaryPrimitives.ReadUInt64LittleEndian(buffer);
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

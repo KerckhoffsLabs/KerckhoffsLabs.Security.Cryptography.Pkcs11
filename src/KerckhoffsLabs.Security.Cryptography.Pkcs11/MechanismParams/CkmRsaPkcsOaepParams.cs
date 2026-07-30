@@ -6,16 +6,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_RSA_PKCS_OAEP_PARAMS"/>. A managed descriptor: it holds the
-/// optional source data as a managed array and is rebuilt into each call's own scope, so disposal
-/// order relative to the <see cref="Mechanism"/> does not matter and one instance may back several
-/// mechanisms.
+/// optional source data as a managed array and is rebuilt into each call's own scope, so one instance may safely back
+/// several mechanisms.
 /// </summary>
 public sealed class CkmRsaPkcsOaepParams : MechanismParameters
 {
     private readonly byte[] _sourceDataBytes;
     private readonly CKM _hashAlg;
     private readonly CKG _mgf;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes OAEP parameters. Defaults to <c>CKZ_DATA_SPECIFIED</c> with empty source.
@@ -33,7 +31,6 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_RSA_PKCS_OAEP_PARAMS
         {
             HashAlg = _hashAlg.ToCULong(),
@@ -42,12 +39,6 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
             SourceData = scope.Write(_sourceDataBytes),
             SourceDataLen = (NativeCULong)_sourceDataBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 
     /// <summary>Hash algorithm used in the OAEP encoding.</summary>

@@ -65,7 +65,7 @@ public sealed class RSAPkcs11 : RSA
         out int bytesWritten)
     {
         ArgumentNullException.ThrowIfNull(padding);
-        using var mech = SignMechanismFor(hashAlgorithm, padding);
+        var mech = SignMechanismFor(hashAlgorithm, padding);
         byte[] sig = _key.Sign(mech, data);
         if (sig.Length > destination.Length)
         {
@@ -101,7 +101,7 @@ public sealed class RSAPkcs11 : RSA
         if (offset < 0 || count < 0 || offset > data.Length - count)
             throw new ArgumentOutOfRangeException(nameof(offset));
 
-        using var mech = SignMechanismFor(hashAlgorithm, padding);
+        var mech = SignMechanismFor(hashAlgorithm, padding);
         return _key.Sign(mech, data.AsSpan(offset, count));
     }
 
@@ -124,7 +124,7 @@ public sealed class RSAPkcs11 : RSA
         RSASignaturePadding padding)
     {
         ArgumentNullException.ThrowIfNull(padding);
-        using var mech = SignMechanismFor(hashAlgorithm, padding);
+        var mech = SignMechanismFor(hashAlgorithm, padding);
         return _key.Verify(mech, data, signature);
     }
 
@@ -152,7 +152,7 @@ public sealed class RSAPkcs11 : RSA
         if (offset < 0 || count < 0 || offset > data.Length - count)
             throw new ArgumentOutOfRangeException(nameof(offset));
 
-        using var mech = SignMechanismFor(hashAlgorithm, padding);
+        var mech = SignMechanismFor(hashAlgorithm, padding);
         return _key.Verify(mech, data.AsSpan(offset, count), signature);
     }
 
@@ -169,7 +169,7 @@ public sealed class RSAPkcs11 : RSA
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(padding);
-        using var mech = EncryptMechanismFor(padding);
+        var mech = EncryptMechanismFor(padding);
         return _key.Encrypt(mech, data);
     }
 
@@ -182,7 +182,7 @@ public sealed class RSAPkcs11 : RSA
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(padding);
-        using var mech = EncryptMechanismFor(padding);
+        var mech = EncryptMechanismFor(padding);
         return _key.Decrypt(mech, data);
     }
 

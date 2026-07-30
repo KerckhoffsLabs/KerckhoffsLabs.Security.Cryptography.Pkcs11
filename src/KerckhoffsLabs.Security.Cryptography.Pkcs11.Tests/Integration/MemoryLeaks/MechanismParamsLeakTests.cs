@@ -50,8 +50,8 @@ public sealed class MechanismParamsLeakTests : IDisposable
 
         for (int i = 0; i < 10; i++)
         {
-            using MechanismParameters p = create();
-            using var mech = new Mechanism(type, p);
+            MechanismParameters p = create();
+            var mech = new Mechanism(type, p);
 
             // Pure managed descriptors: constructing either must not reach unmanaged memory.
             Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
@@ -139,11 +139,11 @@ public sealed class MechanismParamsLeakTests : IDisposable
     {
         int baseline = UnmanagedMemory.OutstandingAllocationCount;
 
-        using var gcm = new CkmAesGcmParams(new byte[12], new byte[16], 128);
-        using var oaep = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, new byte[16]);
-        using var pss = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32);
-        using var kdf = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, new byte[9], new byte[11]);
-        using var ecdh = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, new byte[65], new byte[16]);
+        var gcm = new CkmAesGcmParams(new byte[12], new byte[16], 128);
+        var oaep = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, new byte[16]);
+        var pss = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32);
+        var kdf = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, new byte[9], new byte[11]);
+        var ecdh = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, new byte[65], new byte[16]);
 
         Assert.Equal(baseline, UnmanagedMemory.OutstandingAllocationCount);
     }

@@ -143,7 +143,7 @@ public sealed class Pkcs11SessionTests
     public void Operations_NullData_Throw()
     {
         var s = NewSession();
-        using var mech = AesGen();
+        var mech = AesGen();
         ObjectHandle h = ObjectHandle.Invalid;
         Assert.Throws<ArgumentNullException>(() => s.Encrypt(mech, h, (byte[])null!));
         Assert.Throws<ArgumentNullException>(() => s.Decrypt(mech, h, (byte[])null!));
@@ -224,7 +224,7 @@ public sealed class Pkcs11SessionTests
     public void InsecureMechanism_IsRejected(CKM insecure)
     {
         var s = NewSession();
-        using var mech = new Mechanism(insecure);
+        var mech = new Mechanism(insecure);
         Assert.Throws<InsecureOperationException>(() => s.Digest(mech, new byte[1]));
     }
 
@@ -283,7 +283,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake();
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.Equal(fake.Output, s.Digest(mech, [1, 2, 3]));
     }
 
@@ -292,7 +292,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake();
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         Assert.Equal(fake.Output, s.Sign(mech, ObjectHandle.Invalid, [1, 2, 3]));
     }
 
@@ -301,7 +301,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake();
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         Assert.Equal(fake.Output, s.Encrypt(mech, ObjectHandle.Invalid, [1, 2, 3]));
     }
 
@@ -310,7 +310,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake();
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_GCM);
+        var mech = new Mechanism(CKM.CKM_AES_GCM);
         Assert.Equal(fake.Output, s.Decrypt(mech, ObjectHandle.Invalid, [1, 2, 3]));
     }
 
@@ -319,7 +319,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake { SecondLen = 2 }; // probe says 4, data call fills 2
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.Equal(new byte[] { 0xAA, 0xBB }, s.Digest(mech, [1]));
     }
 
@@ -336,7 +336,7 @@ public sealed class Pkcs11SessionTests
             FinalRv = failingCall == "final" ? CKR.CKR_DEVICE_ERROR : CKR.CKR_OK,
         };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.Digest(mech, [1]));
     }
 
@@ -345,7 +345,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake { GeneratedKeyId = 0x1234 };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
         Assert.Equal(0x1234UL, s.GenerateKey(mech, []).ObjectId);
     }
 
@@ -354,7 +354,7 @@ public sealed class Pkcs11SessionTests
     {
         var fake = new CryptoFake { GenerateKeyRv = CKR.CKR_TEMPLATE_INCONSISTENT };
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.GenerateKey(mech, []));
     }
 
@@ -372,7 +372,7 @@ public sealed class Pkcs11SessionTests
     public void Verify_Ok_SetsValidTrue()
     {
         var s = NewSession(new CryptoFake { VerifyRv = CKR.CKR_OK });
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }, out bool valid);
         Assert.True(valid);
     }
@@ -381,7 +381,7 @@ public sealed class Pkcs11SessionTests
     public void Verify_SignatureInvalid_SetsValidFalse()
     {
         var s = NewSession(new CryptoFake { VerifyRv = CKR.CKR_SIGNATURE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }, out bool valid);
         Assert.False(valid);
     }
@@ -390,7 +390,7 @@ public sealed class Pkcs11SessionTests
     public void Verify_OtherError_Throws()
     {
         var s = NewSession(new CryptoFake { VerifyRv = CKR.CKR_DEVICE_ERROR });
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.Verify(mech, ObjectHandle.Invalid, new byte[] { 1 }, new byte[] { 2 }, out _));
     }

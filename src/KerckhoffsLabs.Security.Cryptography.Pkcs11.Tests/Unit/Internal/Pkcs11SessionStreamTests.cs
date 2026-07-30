@@ -108,7 +108,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Encrypt_Stream_Ok_WritesTransformedOutput()
     {
         var s = NewSession(new StreamFake());
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([1, 2, 3]);
         using var output = new MemoryStream();
 
@@ -122,7 +122,7 @@ public sealed class Pkcs11SessionStreamTests
     {
         var fake = new StreamFake();
         var s = NewSession(fake);
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
         using var output = new MemoryStream();
 
@@ -136,7 +136,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Encrypt_Stream_BufferTooSmall_RetriesAndSucceeds()
     {
         var s = NewSession(new StreamFake { FirstUpdateBufferTooSmall = true });
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([7, 8, 9, 10]);
         using var output = new MemoryStream();
 
@@ -149,7 +149,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Encrypt_Stream_FinalEmitsTrailingBlock()
     {
         var s = NewSession(new StreamFake { LastBlock = [0xFF] });
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([1, 2]);
         using var output = new MemoryStream();
 
@@ -163,7 +163,7 @@ public sealed class Pkcs11SessionStreamTests
     {
         var fake = new StreamFake { UpdateRv = CKR.CKR_DEVICE_ERROR };
         var s = NewSession(fake);
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([1, 2, 3]);
         using var output = new MemoryStream();
 
@@ -175,7 +175,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Encrypt_Stream_InitError_Throws()
     {
         var s = NewSession(new StreamFake { InitRv = CKR.CKR_KEY_HANDLE_INVALID });
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([1]);
         using var output = new MemoryStream();
         Assert.ThrowsAny<Pkcs11Exception>(() => s.Encrypt(mech, new ObjectHandle(1), input, output));
@@ -187,7 +187,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Decrypt_Stream_Ok_WritesTransformedOutput()
     {
         var s = NewSession(new StreamFake());
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([4, 5, 6]);
         using var output = new MemoryStream();
 
@@ -200,7 +200,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Decrypt_Stream_BufferTooSmall_RetriesAndSucceeds()
     {
         var s = NewSession(new StreamFake { FirstUpdateBufferTooSmall = true });
-        using var mech = AesGcm();
+        var mech = AesGcm();
         using var input = new MemoryStream([9, 8, 7]);
         using var output = new MemoryStream();
 
@@ -215,7 +215,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Digest_Stream_Ok_ReturnsDigest()
     {
         var s = NewSession(new StreamFake { DigestOutput = [0xAA, 0xBB] });
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.Equal(new byte[] { 0xAA, 0xBB }, s.Digest(mech, input));
@@ -226,7 +226,7 @@ public sealed class Pkcs11SessionStreamTests
     {
         var fake = new StreamFake();
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
         s.Digest(mech, input, bufferLength: 2);
@@ -238,7 +238,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Digest_Stream_InitError_Throws()
     {
         var s = NewSession(new StreamFake { InitRv = CKR.CKR_MECHANISM_INVALID });
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         using var input = new MemoryStream([1]);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.Digest(mech, input));
     }
@@ -249,7 +249,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Verify_Stream_Ok_SetsValidTrue()
     {
         var s = NewSession(new StreamFake { VerifyFinalRv = CKR.CKR_OK });
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
         s.Verify(mech, new ObjectHandle(1), input, [9, 9], out bool isValid);
@@ -261,7 +261,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Verify_Stream_SignatureInvalid_SetsValidFalse()
     {
         var s = NewSession(new StreamFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
         s.Verify(mech, new ObjectHandle(1), input, [9, 9], out bool isValid);
@@ -273,7 +273,7 @@ public sealed class Pkcs11SessionStreamTests
     public void Verify_Stream_OtherError_Throws()
     {
         var s = NewSession(new StreamFake { VerifyFinalRv = CKR.CKR_DEVICE_ERROR });
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
@@ -285,7 +285,7 @@ public sealed class Pkcs11SessionStreamTests
     {
         var fake = new StreamFake();
         var s = NewSession(fake);
-        using var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
+        var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
         s.Verify(mech, new ObjectHandle(1), input, [9, 9], out bool isValid, bufferLength: 2);
@@ -300,7 +300,7 @@ public sealed class Pkcs11SessionStreamTests
     public void VerifyRecover_Ok_ReturnsDataAndValidTrue()
     {
         var s = NewSession(new StreamFake { RecoveredData = [1, 2, 3], VerifyRecoverRv = CKR.CKR_OK });
-        using var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
 
         byte[] recovered = s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
 
@@ -312,7 +312,7 @@ public sealed class Pkcs11SessionStreamTests
     public void VerifyRecover_SignatureInvalid_SetsValidFalse()
     {
         var s = NewSession(new StreamFake { VerifyRecoverRv = CKR.CKR_SIGNATURE_INVALID });
-        using var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
 
         s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
 
@@ -323,7 +323,7 @@ public sealed class Pkcs11SessionStreamTests
     public void VerifyRecover_OtherError_Throws()
     {
         var s = NewSession(new StreamFake { VerifyRecoverRv = CKR.CKR_DEVICE_ERROR });
-        using var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
+        var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out _));

@@ -54,7 +54,7 @@ public sealed class SHA256Pkcs11 : SHA256
     /// <inheritdoc/>
     protected override byte[] HashFinal()
     {
-        using var mech = new Mechanism(CKM.CKM_SHA256);
+        var mech = new Mechanism(CKM.CKM_SHA256);
         byte[] data = _buffer.ToArray();
         _buffer.SetLength(0);
         return _workspace.Digest(mech, data);

@@ -8,13 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// The strongly-typed managed counterpart of <c>CK_MECHANISM</c>, pairing a mechanism type with its
 /// parameters.
 /// </summary>
-public sealed class Mechanism : IDisposable
+public sealed class Mechanism
 {
-    /// <summary>
-    /// Flag indicating whether instance has been disposed
-    /// </summary>
-    private bool _disposed = false;
-
     /// <summary>
     /// The mechanism type, from which <see cref="Marshal"/> builds the <c>CK_MECHANISM</c>.
     /// </summary>
@@ -29,15 +24,9 @@ public sealed class Mechanism : IDisposable
     /// <summary>
     /// The type of mechanism
     /// </summary>
-    /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
     public ulong Type
     {
-        get
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            return (ulong)_type;
-        }
+        get => (ulong)_type;
     }
 
     /// <summary>
@@ -46,11 +35,7 @@ public sealed class Mechanism : IDisposable
     /// </summary>
     internal MechanismParameters? Parameters
     {
-        get
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _mechanismParams;
-        }
+        get => _mechanismParams;
     }
 
     /// <summary>
@@ -64,7 +49,6 @@ public sealed class Mechanism : IDisposable
     /// mechanism with no high-level parameters.
     /// </param>
     /// <returns>The structure to hand to the native entry point.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
     /// <remarks>
     /// Deliberately stateless: the marshalled struct is returned to the caller rather than cached on
     /// this instance. One <c>Mechanism</c> may be used by two operations at once — different sessions,
@@ -74,8 +58,6 @@ public sealed class Mechanism : IDisposable
     /// </remarks>
     internal CK_MECHANISM Marshal(MechanismParameterScope scope, out object? marshalledParams)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         // No high-level parameters: either no parameter at all, or a raw byte[] one. Both are a
         // straight copy into the scope, and neither has output to absorb. `scope.Write` yields
         // IntPtr.Zero for an empty span, which is what PKCS#11 expects for an absent parameter.
@@ -168,8 +150,7 @@ public sealed class Mechanism : IDisposable
     /// <remarks>
     /// The parameter object is a managed descriptor holding nothing unmanaged, so the mechanism only
     /// keeps a reference to it: each native call marshals it into that call's own scope. Sharing one
-    /// parameter instance across several mechanisms is therefore safe, and disposal order between the
-    /// two does not matter.
+    /// parameter instance across several mechanisms is therefore safe.
     /// </remarks>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
@@ -188,8 +169,7 @@ public sealed class Mechanism : IDisposable
     /// <remarks>
     /// The parameter object is a managed descriptor holding nothing unmanaged, so the mechanism only
     /// keeps a reference to it: each native call marshals it into that call's own scope. Sharing one
-    /// parameter instance across several mechanisms is therefore safe, and disposal order between the
-    /// two does not matter.
+    /// parameter instance across several mechanisms is therefore safe.
     /// </remarks>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter</param>
@@ -201,22 +181,4 @@ public sealed class Mechanism : IDisposable
         _mechanismParams = parameter;
         _type = type.ToCULong();
     }
-
-    #region IDisposable
-
-    // Nothing unmanaged is owned any more — the session's per-call scope holds it all. The
-    // interface is retained for source compatibility and is removed in a separate change.
-
-    /// <summary>
-    /// Marks this instance disposed, after which <see cref="Marshal"/> throws. Idempotent.
-    /// </summary>
-    public void Dispose()
-    {
-        // The parameter object is not disposed with the mechanism: it is a shareable managed
-        // descriptor, and disposing it here would break the mechanism it is shared with.
-        _disposed = true;
-        GC.SuppressFinalize(this);
-    }
-
-    #endregion
 }

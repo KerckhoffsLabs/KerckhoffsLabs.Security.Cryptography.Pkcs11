@@ -13,7 +13,6 @@ public sealed class CkmRc2CbcParams : MechanismParameters
 {
     private readonly ulong _effectiveBits;
     private readonly byte[] _iv;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes RC2 CBC parameters.
@@ -33,18 +32,11 @@ public sealed class CkmRc2CbcParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         // The IV is an inline buffer, which an object initializer cannot assign from a span,
         // so construct first and copy into the field afterwards.
         var lowLevel = new CK_RC2_CBC_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
         _iv.CopyTo(lowLevel.Iv);
         return lowLevel;
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

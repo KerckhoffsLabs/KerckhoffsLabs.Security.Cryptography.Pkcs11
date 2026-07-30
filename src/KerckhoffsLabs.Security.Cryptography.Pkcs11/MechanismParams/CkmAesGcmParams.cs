@@ -5,15 +5,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
 /// High-level wrapper for <see cref="CK_GCM_PARAMS"/>. A managed descriptor: it holds the IV and
-/// AAD as managed arrays and is rebuilt into each call's own scope, so disposal order relative to
-/// the <see cref="Mechanism"/> does not matter and one instance may back several mechanisms.
+/// AAD as managed arrays and is rebuilt into each call's own scope, so one instance may safely back
+/// several mechanisms.
 /// </summary>
 public sealed class CkmAesGcmParams : MechanismParameters
 {
     private readonly byte[] _ivBytes;
     private readonly byte[] _aadBytes;
     private readonly int _tagBits;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes the GCM parameters.
@@ -37,7 +36,6 @@ public sealed class CkmAesGcmParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_GCM_PARAMS
         {
             Iv = scope.Write(_ivBytes),
@@ -52,11 +50,5 @@ public sealed class CkmAesGcmParams : MechanismParameters
             AADLen = (NativeCULong)_aadBytes.Length,
             TagBits = (NativeCULong)_tagBits,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

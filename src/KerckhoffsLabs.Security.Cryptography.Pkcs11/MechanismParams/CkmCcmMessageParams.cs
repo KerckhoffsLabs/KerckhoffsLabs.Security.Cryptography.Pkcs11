@@ -16,7 +16,6 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     // The MAC as managed state, and what CopyMacTo serves. Seeded from the caller's MAC for decrypt;
     // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
     private readonly byte[] _macBuffer;
-    private bool _disposed;
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>
     /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is not 7 to 13 bytes long.</exception>
@@ -47,11 +46,9 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     }
 
     /// <summary>Copies the MAC bytes (output of encrypt) into the caller's buffer.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown if the parameters have been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than the MAC length.</exception>
     public void CopyMacTo(Span<byte> destination)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         if (destination.Length < _macLen)
             throw new ArgumentException($"Destination must be at least {_macLen} bytes.", nameof(destination));
         _macBuffer.AsSpan(0, _macLen).CopyTo(destination);
@@ -60,7 +57,6 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_CCM_MESSAGE_PARAMS
         {
             DataLen = (NativeCULong)_dataLen,
@@ -76,20 +72,9 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     internal override void AbsorbOutput(object marshalled)
     {
-        // Catches absorbing after this object has been disposed. It cannot catch the other ordering
-        // mistake — a scope already released while these params are still live — because nothing here
-        // can observe that; the pointers in `marshalled` would simply address freed memory. Keeping
-        // the absorb inside the scope's lifetime remains the caller's responsibility.
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         var s = (CK_CCM_MESSAGE_PARAMS)marshalled;
         if (s.Mac == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Mac, _macBuffer.AsSpan(0, _macLen));
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

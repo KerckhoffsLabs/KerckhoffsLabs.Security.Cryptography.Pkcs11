@@ -74,7 +74,7 @@ public sealed class HMACPkcs11 : HMAC
     /// <inheritdoc/>
     protected override byte[] HashFinal()
     {
-        using var mech = Pkcs11MechanismMap.Hmac(_hashAlgorithm);
+        var mech = Pkcs11MechanismMap.Hmac(_hashAlgorithm);
         byte[] data = _buffer.ToArray();
         _buffer.SetLength(0);
         return _key.Sign(mech, data);

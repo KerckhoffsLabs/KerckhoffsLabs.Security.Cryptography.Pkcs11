@@ -40,7 +40,7 @@ public sealed class SHA512Pkcs11 : SHA512
     /// <inheritdoc/>
     protected override byte[] HashFinal()
     {
-        using var mech = new Mechanism(CKM.CKM_SHA512);
+        var mech = new Mechanism(CKM.CKM_SHA512);
         byte[] data = _buffer.ToArray();
         _buffer.SetLength(0);
         return _workspace.Digest(mech, data);

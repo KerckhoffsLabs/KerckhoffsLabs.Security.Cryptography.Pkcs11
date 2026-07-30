@@ -12,7 +12,6 @@ public sealed class CkmChaCha20Params : MechanismParameters
     private readonly byte[] _nonceBytes;
     private readonly int _blockCounterBits;
     private readonly int _nonceBits;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes ChaCha20 raw-mode parameters.
@@ -36,7 +35,6 @@ public sealed class CkmChaCha20Params : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_CHACHA20_PARAMS
         {
             BlockCounter = scope.Write(_blockCounterBytes),
@@ -44,11 +42,5 @@ public sealed class CkmChaCha20Params : MechanismParameters
             Nonce = scope.Write(_nonceBytes),
             NonceBits = (NativeCULong)_nonceBits,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

@@ -11,7 +11,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 public sealed class CkmRc2Params : MechanismParameters
 {
     private readonly ulong _effectiveBits;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes RC2 ECB/MAC parameters.
@@ -22,13 +21,6 @@ public sealed class CkmRc2Params : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_RC2_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

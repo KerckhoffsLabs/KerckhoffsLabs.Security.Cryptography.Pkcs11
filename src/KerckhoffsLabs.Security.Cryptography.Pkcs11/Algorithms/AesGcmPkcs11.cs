@@ -92,8 +92,8 @@ public sealed class AesGcmPkcs11 : IDisposable
             try
             {
                 // PKCS#11 v3.0 message-mode path — tag is returned via params, not appended.
-                using var msgParams = CkmGcmMessageParams.ForEncrypt(nonce, tag.Length);
-                using var mech = new Mechanism(CKM.CKM_AES_GCM);
+                var msgParams = CkmGcmMessageParams.ForEncrypt(nonce, tag.Length);
+                var mech = new Mechanism(CKM.CKM_AES_GCM);
                 byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
                 if (ct.Length != plaintext.Length)
                     throw new InvalidOperationException(
@@ -111,7 +111,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         }
 
         // v2.40 fallback: ciphertext || tag concatenated.
-        using var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
+        var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
             new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
         byte[] result = _key.Encrypt(legacyMech, plaintext);
         if (result.Length != plaintext.Length + tag.Length)
@@ -144,8 +144,8 @@ public sealed class AesGcmPkcs11 : IDisposable
         {
             try
             {
-                using var msgParams = CkmGcmMessageParams.ForDecrypt(nonce, tag);
-                using var mech = new Mechanism(CKM.CKM_AES_GCM);
+                var msgParams = CkmGcmMessageParams.ForDecrypt(nonce, tag);
+                var mech = new Mechanism(CKM.CKM_AES_GCM);
                 byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
                 try
                 {
@@ -169,7 +169,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         }
 
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
-        using var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
+        var legacyMech = new Mechanism(CKM.CKM_AES_GCM,
             new CkmAesGcmParams(nonce, associatedData, tagBits: tag.Length * 8));
         byte[] combined = new byte[ciphertext.Length + tag.Length];
         ciphertext.CopyTo(combined);

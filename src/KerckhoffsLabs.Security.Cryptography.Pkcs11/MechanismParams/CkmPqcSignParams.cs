@@ -12,7 +12,6 @@ public sealed class CkmPqcSignParams : MechanismParameters
 {
     private readonly byte[] _contextBytes;
     private readonly CkhHedge _hedgeVariant;
-    private bool _disposed;
 
     /// <summary>Initializes pure-PQC signing parameters.</summary>
     /// <param name="hedgeVariant">Hedge mode (default <see cref="CkhHedge.CKH_HEDGE_PREFERRED"/>).</param>
@@ -30,18 +29,11 @@ public sealed class CkmPqcSignParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_SIGN_ADDITIONAL_CONTEXT
         {
             HedgeVariant = (NativeCULong)(uint)_hedgeVariant,
             Context = scope.Write(_contextBytes),
             ContextLen = (NativeCULong)_contextBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }

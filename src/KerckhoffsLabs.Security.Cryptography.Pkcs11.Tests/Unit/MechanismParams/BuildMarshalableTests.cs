@@ -21,7 +21,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void EddsaParams_MarshalsItsFields()
     {
-        using var p = new CkmEddsaParams(phFlag: true, [0xAA, 0xBB, 0xCC]);
+        var p = new CkmEddsaParams(phFlag: true, [0xAA, 0xBB, 0xCC]);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_EDDSA_PARAMS)p.BuildMarshalable(scope);
@@ -34,7 +34,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void Rc2Params_MarshalsItsFields()
     {
-        using var p = new CkmRc2Params(128);
+        var p = new CkmRc2Params(128);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_RC2_PARAMS)p.BuildMarshalable(scope);
@@ -45,7 +45,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void EmptyBuffer_MarshalsAsNullPointer()
     {
-        using var p = new CkmEddsaParams(phFlag: false, default);
+        var p = new CkmEddsaParams(phFlag: false, default);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_EDDSA_PARAMS)p.BuildMarshalable(scope);
@@ -63,7 +63,7 @@ public sealed class BuildMarshalableTests
     public void Rc2CbcParams_MarshalsItsFields()
     {
         byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80];
-        using var p = new CkmRc2CbcParams(128, iv);
+        var p = new CkmRc2CbcParams(128, iv);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_RC2_CBC_PARAMS)p.BuildMarshalable(scope);
@@ -76,7 +76,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void RsaPkcsPssParams_MarshalsItsFields()
     {
-        using var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
+        var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_RSA_PKCS_PSS_PARAMS)p.BuildMarshalable(scope);
@@ -89,7 +89,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void XeddsaParams_MarshalsItsFields()
     {
-        using var p = new CkmXeddsaParams(hashType: 1);
+        var p = new CkmXeddsaParams(hashType: 1);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_XEDDSA_PARAMS)p.BuildMarshalable(scope);
@@ -105,7 +105,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void HashPqcSignParams_MarshalsItsFields()
     {
-        using var p = new CkmHashPqcSignParams(CKM.CKM_SHA256, CkhHedge.CKH_HEDGE_REQUIRED, [0x01, 0x02]);
+        var p = new CkmHashPqcSignParams(CKM.CKM_SHA256, CkhHedge.CKH_HEDGE_REQUIRED, [0x01, 0x02]);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_HASH_SIGN_ADDITIONAL_CONTEXT)p.BuildMarshalable(scope);
@@ -119,7 +119,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void Ike1ExtendedDeriveParams_MarshalsItsFields()
     {
-        using var p = new CkmIke1ExtendedDeriveParams(
+        var p = new CkmIke1ExtendedDeriveParams(
             CKM.CKM_SHA256_HMAC, hasKeygxy: true, keygxy: 5, [0xE1, 0xE2]);
         using var scope = new MechanismParameterScope();
 
@@ -135,7 +135,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void Ike2PrfPlusDeriveParams_MarshalsItsFields()
     {
-        using var p = new CkmIke2PrfPlusDeriveParams(
+        var p = new CkmIke2PrfPlusDeriveParams(
             CKM.CKM_SHA256_HMAC, hasSeedKey: true, seedKey: 7, [0x5E, 0x5D, 0x5C]);
         using var scope = new MechanismParameterScope();
 
@@ -151,7 +151,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void PqcSignParams_MarshalsItsFields()
     {
-        using var p = new CkmPqcSignParams(CkhHedge.CKH_HEDGE_REQUIRED, [0xC0, 0xC1, 0xC2]);
+        var p = new CkmPqcSignParams(CkhHedge.CKH_HEDGE_REQUIRED, [0xC0, 0xC1, 0xC2]);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_SIGN_ADDITIONAL_CONTEXT)p.BuildMarshalable(scope);
@@ -164,7 +164,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void RsaPkcsOaepParams_MarshalsItsFields()
     {
-        using var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, [0x0A, 0x0B]);
+        var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, [0x0A, 0x0B]);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_RSA_PKCS_OAEP_PARAMS)p.BuildMarshalable(scope);
@@ -182,7 +182,7 @@ public sealed class BuildMarshalableTests
     public void X2RatchetInitializeParams_MarshalsItsFields()
     {
         byte[] sk = [0x51, 0x52, 0x53, 0x54];
-        using var p = new CkmX2RatchetInitializeParams(
+        var p = new CkmX2RatchetInitializeParams(
             sk, peerPublicPrekey: 1, peerPublicIdentity: 2, ownPublicIdentity: 3,
             encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 5);
         using var scope = new MechanismParameterScope();
@@ -203,7 +203,7 @@ public sealed class BuildMarshalableTests
     public void X2RatchetRespondParams_MarshalsItsFields()
     {
         byte[] sk = [0x61, 0x62, 0x63, 0x64];
-        using var p = new CkmX2RatchetRespondParams(
+        var p = new CkmX2RatchetRespondParams(
             sk, ownPrekey: 1, initiatorIdentity: 2, ownPublicIdentity: 3,
             encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 6);
         using var scope = new MechanismParameterScope();
@@ -230,7 +230,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         byte[] aad = [0xA0, 0xA1];
-        using var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
+        var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_GCM_PARAMS)p.BuildMarshalable(scope);
@@ -247,7 +247,7 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void AesGcmParams_EmptyAad_MarshalsAsNullPointer()
     {
-        using var p = new CkmAesGcmParams(new byte[12], default, tagBits: 128);
+        var p = new CkmAesGcmParams(new byte[12], default, tagBits: 128);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_GCM_PARAMS)p.BuildMarshalable(scope);
@@ -261,7 +261,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] nonce = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
         byte[] aad = [0xAA, 0xBB, 0xCC];
-        using var p = new CkmAesCcmParams(dataLen: 64, nonce, aad, macLen: 16);
+        var p = new CkmAesCcmParams(dataLen: 64, nonce, aad, macLen: 16);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_CCM_PARAMS)p.BuildMarshalable(scope);
@@ -279,7 +279,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] blockCounter = [0x01, 0x00, 0x00, 0x00];
         byte[] nonce = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C];
-        using var p = new CkmChaCha20Params(blockCounter, blockCounterBits: 32, nonce, nonceBits: 96);
+        var p = new CkmChaCha20Params(blockCounter, blockCounterBits: 32, nonce, nonceBits: 96);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_CHACHA20_PARAMS)p.BuildMarshalable(scope);
@@ -295,7 +295,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] peerPublicPoint = [0x04, 0x01, 0x02, 0x03, 0x04, 0x05];
         byte[] sharedData = [0x77, 0x78, 0x79];
-        using var p = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, peerPublicPoint, sharedData);
+        var p = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, peerPublicPoint, sharedData);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_ECDH1_DERIVE_PARAMS)p.BuildMarshalable(scope);
@@ -312,7 +312,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] salt = [0x01, 0x02, 0x03];
         byte[] info = [0xF0, 0xF1, 0xF2, 0xF3];
-        using var p = new CkmHkdfParams(
+        var p = new CkmHkdfParams(
             extract: true, expand: true, CKM.CKM_SHA256_HMAC, saltType: 2, salt, saltKey: 9, info);
         using var scope = new MechanismParameterScope();
 
@@ -334,7 +334,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] ckyI = [0x01, 0x02, 0x03, 0x04];
         byte[] ckyR = [0x05, 0x06, 0x07, 0x08];
-        using var p = new CkmIke1PrfDeriveParams(
+        var p = new CkmIke1PrfDeriveParams(
             CKM.CKM_SHA256_HMAC, hasPrevKey: true, keygxy: 11, prevKey: 22, ckyI, ckyR, keyNumber: 3);
         using var scope = new MechanismParameterScope();
 
@@ -356,7 +356,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] ni = [0x21, 0x22, 0x23];
         byte[] nr = [0x31, 0x32, 0x33, 0x34];
-        using var p = new CkmIkePrfDeriveParams(
+        var p = new CkmIkePrfDeriveParams(
             CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: true, ni, nr, newKey: 42);
         using var scope = new MechanismParameterScope();
 
@@ -377,7 +377,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] blockCounter = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         byte[] nonce = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18];
-        using var p = new CkmSalsa20Params(blockCounter, nonce, nonceBits: 64);
+        var p = new CkmSalsa20Params(blockCounter, nonce, nonceBits: 64);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_SALSA20_PARAMS)p.BuildMarshalable(scope);
@@ -392,7 +392,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] nonce = [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C];
         byte[] aad = [0x91, 0x92];
-        using var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
+        var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_SALSA20_CHACHA20_POLY1305_PARAMS)p.BuildMarshalable(scope);
@@ -408,7 +408,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] prekeySignature = [0x51, 0x52, 0x53, 0x54, 0x55];
         byte[] onetimeKey = [0x61, 0x62, 0x63];
-        using var p = new CkmX3dhInitiateParams(
+        var p = new CkmX3dhInitiateParams(
             kdf: 1, peerIdentity: 2, peerPrekey: 3, prekeySignature, onetimeKey, ownIdentity: 4, ownEphemeral: 5);
         using var scope = new MechanismParameterScope();
 
@@ -430,7 +430,7 @@ public sealed class BuildMarshalableTests
         byte[] prekeyId = [0x81, 0x82, 0x83];
         byte[] onetimeId = [0x91, 0x92, 0x93, 0x94];
         byte[] initiatorEphemeral = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5];
-        using var p = new CkmX3dhRespondParams(
+        var p = new CkmX3dhRespondParams(
             kdf: 6, identityId, prekeyId, onetimeId, initiatorIdentity: 7, initiatorEphemeral);
         using var scope = new MechanismParameterScope();
 
@@ -455,7 +455,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         byte[] tag = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC];
-        using var p = CkmGcmMessageParams.ForDecrypt(iv, tag);
+        var p = CkmGcmMessageParams.ForDecrypt(iv, tag);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
@@ -475,7 +475,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] nonce = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99];
         byte[] mac = [0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB];
-        using var p = CkmCcmMessageParams.ForDecrypt(dataLen: 48, nonce, mac);
+        var p = CkmCcmMessageParams.ForDecrypt(dataLen: 48, nonce, mac);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
@@ -496,7 +496,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] nonce = [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C];
         byte[] tag = [0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF];
-        using var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
+        var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);
@@ -519,7 +519,7 @@ public sealed class BuildMarshalableTests
         var template = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_AES) };
         try
         {
-            using var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
+            var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
                 .IterationCounter(widthInBits: 16, littleEndian: true)
                 .OptionalCounter(widthInBits: 8, littleEndian: false)
                 .ByteArray(label)
@@ -549,7 +549,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] label = [0x66, 0x62, 0x6B];
         byte[] iv = [0xD1, 0xD2, 0xD3, 0xD4];
-        using var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA384_HMAC)
+        var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA384_HMAC)
             .IterationCounter(widthInBits: 16, littleEndian: true)
             .OptionalCounter(widthInBits: 8, littleEndian: true)
             .ByteArray(label)
@@ -665,9 +665,9 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void OneDescriptor_CanBackTwoMechanisms()
     {
-        using var p = new CkmAesGcmParams(new byte[12], [0xA0], tagBits: 128);
-        using var first = new Mechanism(CKM.CKM_AES_GCM, p);
-        using var second = new Mechanism(CKM.CKM_AES_GCM, p);
+        var p = new CkmAesGcmParams(new byte[12], [0xA0], tagBits: 128);
+        var first = new Mechanism(CKM.CKM_AES_GCM, p);
+        var second = new Mechanism(CKM.CKM_AES_GCM, p);
 
         using var scopeA = new MechanismParameterScope();
         using var scopeB = new MechanismParameterScope();

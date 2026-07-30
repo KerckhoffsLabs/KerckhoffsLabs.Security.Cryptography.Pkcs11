@@ -10,7 +10,6 @@ public sealed class CkmEddsaParams : MechanismParameters
 {
     private readonly byte[] _contextDataBytes;
     private readonly bool _phFlag;
-    private bool _disposed;
 
     /// <summary>
     /// Initializes EdDSA parameters.
@@ -26,18 +25,11 @@ public sealed class CkmEddsaParams : MechanismParameters
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_EDDSA_PARAMS
         {
             PhFlag = _phFlag,
             ContextData = scope.Write(_contextDataBytes),
             ContextDataLen = (NativeCULong)_contextDataBytes.Length,
         };
-    }
-
-    /// <inheritdoc/>
-    protected override void Dispose(bool disposing)
-    {
-        _disposed = true;
     }
 }
