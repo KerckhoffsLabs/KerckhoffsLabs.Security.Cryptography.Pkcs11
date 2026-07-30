@@ -27,13 +27,6 @@ public sealed class Mechanism : IDisposable
     private readonly NativeCULong _type;
 
     /// <summary>
-    /// The interop struct handed to the most recent <see cref="Marshal"/> caller. Its pointer fields
-    /// address scope-owned blocks, which is what <see cref="AbsorbOutput"/> reads the token's output
-    /// out of.
-    /// </summary>
-    private object? _lastMarshalled;
-
-    /// <summary>
     /// The type of mechanism
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
@@ -76,9 +69,21 @@ public sealed class Mechanism : IDisposable
     /// buffers it points at inside <paramref name="scope"/>.
     /// </summary>
     /// <param name="scope">Owns every byte allocated here; released by the caller once the call returns.</param>
+    /// <param name="marshalledParams">
+    /// Receives the interop struct written into <paramref name="scope"/>, to be handed back to
+    /// <see cref="AbsorbOutput"/> once the native call returns, or <see langword="null"/> for a
+    /// mechanism with no high-level parameters.
+    /// </param>
     /// <returns>The structure to hand to the native entry point.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the mechanism has been disposed.</exception>
-    internal CK_MECHANISM Marshal(MechanismParameterScope scope)
+    /// <remarks>
+    /// Deliberately stateless: the marshalled struct is returned to the caller rather than cached on
+    /// this instance. One <c>Mechanism</c> may be used by two operations at once — different sessions,
+    /// or the same instance passed as both arguments of <c>DecryptVerify</c> — and a cache would let
+    /// the second marshal overwrite the first, so both absorbs would read the second block and the
+    /// first operation's output would be silently lost.
+    /// </remarks>
+    internal CK_MECHANISM Marshal(MechanismParameterScope scope, out object? marshalledParams)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -86,10 +91,13 @@ public sealed class Mechanism : IDisposable
         // constructor already produced the CK_MECHANISM (null Parameter, or a block it owns), so hand
         // that value back unchanged.
         if (_mechanismParams is null)
+        {
+            marshalledParams = null;
             return _ckMechanism;
+        }
 
         object lowLevel = _mechanismParams.BuildMarshalable(scope);
-        _lastMarshalled = lowLevel;
+        marshalledParams = lowLevel;
 
         int size = UnmanagedMemory.SizeOf(lowLevel.GetType());
         IntPtr block = scope.Allocate(size);
@@ -108,12 +116,16 @@ public sealed class Mechanism : IDisposable
     /// parameter object's managed state. Must run after the native call returns and before the scope
     /// passed to <see cref="Marshal"/> is disposed — that scope owns the memory being read.
     /// </summary>
-    internal void AbsorbOutput()
+    /// <param name="marshalledParams">
+    /// The value <see cref="Marshal"/> produced for this operation. <see langword="null"/> is a no-op,
+    /// which is what parameterless and <c>byte[]</c> mechanisms pass.
+    /// </param>
+    internal void AbsorbOutput(object? marshalledParams)
     {
-        if (_mechanismParams is null || _lastMarshalled is null)
+        if (_mechanismParams is null || marshalledParams is null)
             return;
 
-        _mechanismParams.AbsorbOutput(_lastMarshalled);
+        _mechanismParams.AbsorbOutput(marshalledParams);
     }
 
     /// <summary>
