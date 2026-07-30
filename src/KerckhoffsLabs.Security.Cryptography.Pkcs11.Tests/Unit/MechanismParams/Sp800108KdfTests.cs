@@ -225,4 +225,19 @@ public sealed class Sp800108KdfTests
         Assert.Throws<ObjectDisposedException>(() => _ = p.AdditionalDerivedKeys);
         Assert.Null(Record.Exception(p.Dispose)); // idempotent
     }
+
+    // AbsorbOutput's own disposal guard. Partial by design — it cannot see a released scope, so
+    // absorbing after the scope is gone still reads zeroized memory silently — but the half it does
+    // cover has to stay covered, or a later refactor drops the guard with the suite still green.
+    [Fact]
+    public void AbsorbOutput_AfterDispose_Throws()
+    {
+        var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, default, default);
+        using var scope = new MechanismParameterScope();
+        object marshalled = p.BuildMarshalable(scope);
+
+        p.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => p.AbsorbOutput(marshalled));
+    }
 }

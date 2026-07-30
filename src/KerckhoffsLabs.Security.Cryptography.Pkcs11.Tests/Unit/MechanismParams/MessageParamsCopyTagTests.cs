@@ -92,6 +92,30 @@ public sealed class MessageParamsCopyTagTests
         Assert.Equal(tag, readBack);
     }
 
+    // AbsorbOutput carries a disposal guard of its own. It is only a partial one — it cannot see a
+    // released scope, so absorbing after the scope is gone still reads zeroized memory silently —
+    // but the half it does cover has to stay covered, or a later refactor can drop the guard with
+    // the whole suite green.
+    [Theory]
+    [MemberData(nameof(DisposedAbsorbCases))]
+    public void AbsorbOutput_AfterDispose_Throws(Func<MechanismParameters> factory)
+    {
+        MechanismParameters p = factory();
+        using var scope = new MechanismParameterScope();
+        object marshalled = p.BuildMarshalable(scope);
+
+        p.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => p.AbsorbOutput(marshalled));
+    }
+
+    public static TheoryData<Func<MechanismParameters>> DisposedAbsorbCases => new()
+    {
+        () => CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16),
+        () => CkmCcmMessageParams.ForEncrypt(dataLen: 32, new byte[13], macBytes: 16),
+        () => CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]),
+    };
+
     [Fact]
     public void GcmMessageParams_AbsorbOutput_ReadsWhatTheTokenWrote()
     {
