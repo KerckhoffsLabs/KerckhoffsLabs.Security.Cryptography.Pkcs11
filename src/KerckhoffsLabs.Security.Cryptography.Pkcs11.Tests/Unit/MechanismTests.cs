@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -86,6 +87,24 @@ public sealed class MechanismTests
 
         // A raw block has no output fields, so there is nothing to absorb.
         Assert.Null(mechParams);
+    }
+
+    // The constructor copies the array, so the caller keeps ownership of theirs. Zeroizing an IV
+    // buffer after handing it over is good hygiene, and while the block was allocated in the
+    // constructor it was also harmless; once Marshal reads the array at call time, aliasing it would
+    // turn that hygiene into an all-zero IV silently accepted by the token.
+    [Fact]
+    public void Marshal_ByteArrayParameter_IgnoresLaterChangesToTheCallersArray()
+    {
+        byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0];
+        byte[] expected = [.. iv];
+        using var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
+        using var scope = new MechanismParameterScope();
+
+        CryptographicOperations.ZeroMemory(iv);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out _);
+
+        Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
     }
 
     // Reaches the byte[] constructor with nothing in it — a mechanism that takes no parameter is the
