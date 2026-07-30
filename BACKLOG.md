@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 60 (16 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 21 (17 open, 4 resolved)
+- Total items: 60 (17 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 21 (16 open, 5 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -430,7 +430,10 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Yes (`using` on either type stops compiling) — land before 1.0
 - **Raised by:** BL-057 implementation, deliberately deferred
 
-### [BL-059] `CK_MECHANISM.CreateMechanism` is dead production code kept alive only by its own tests
+### [BL-059] ✅ RESOLVED — `CK_MECHANISM.CreateMechanism` is dead production code kept alive only by its own tests
+- **Status:** Resolved 2026-07-30. All 8 overloads deleted (the count was 8, not 6 — each of the four parameter shapes had a `CKM` and a `NativeCULong` form), together with `Unit/Native/CkMechanismTests.cs`, whose single test existed only to compare two of them. `CK_MECHANISM` is now a plain three-field interop struct with no behaviour. The build is the proof of completeness: 0 warnings with `TreatWarningsAsErrors` and `EnforceCodeStyleInBuild`, so no caller and no stranded `using` remained.
+  - **The invariant this unblocks is now checkable by grep.** Every `UnmanagedMemory.Allocate` / `AllocHGlobal` in the library is one of: `Native/MechanismParameterScope.cs:25` (the scope itself), `Native/UnmanagedMemory.cs:89` (the allocator), `Native/LowLevelPkcs11Library.cs:219` (`C_Initialize` args), `Objects/ObjectAttribute.cs:160,405` and `Internal/Pkcs11Session.cs:989,1033` (CKA attribute values, explicitly outside BL-057's scope). Zero in `MechanismParams/`, zero in `Mechanism.cs` — no unmanaged parameter memory is owned by anything but the per-call scope.
+  - **Coverage:** the deleted test asserted that the span and `byte[]` overloads produce identical buffers. The surviving equivalent of that property is `Mechanism.Marshal` writing a raw parameter into the scope, covered by `MechanismTests.Marshal_ByteArrayParameter_CopiesTheBytesIntoTheScope` and `…_IgnoresLaterChangesToTheCallersArray`.
 - **Area:** P/Invoke
 - **Severity:** Low
 - **Effort:** S
