@@ -20,7 +20,5 @@ public sealed class CkmRc2Params : MechanismParameters
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
-    {
-        return new CK_RC2_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
-    }
+        => new CK_RC2_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
 }

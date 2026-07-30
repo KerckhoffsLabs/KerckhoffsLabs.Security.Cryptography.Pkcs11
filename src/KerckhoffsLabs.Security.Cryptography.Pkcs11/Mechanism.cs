@@ -24,19 +24,13 @@ public sealed class Mechanism
     /// <summary>
     /// The type of mechanism
     /// </summary>
-    public ulong Type
-    {
-        get => (ulong)_type;
-    }
+    public ulong Type => (ulong)_type;
 
     /// <summary>
     /// Exposes the high-level mechanism parameters for test inspection (visible to the test assembly via InternalsVisibleTo).
     /// Returns <c>null</c> when the mechanism was constructed without parameters.
     /// </summary>
-    internal MechanismParameters? Parameters
-    {
-        get => _mechanismParams;
-    }
+    internal MechanismParameters? Parameters => _mechanismParams;
 
     /// <summary>
     /// Builds the <c>CK_MECHANISM</c> for one native call, allocating the parameter block and any
