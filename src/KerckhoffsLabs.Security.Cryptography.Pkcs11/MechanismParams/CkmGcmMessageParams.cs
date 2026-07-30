@@ -9,9 +9,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmGcmMessageParams : MechanismParameters
 {
-    private CK_GCM_MESSAGE_PARAMS _lowLevelParams;
-    private IntPtr _iv;
-    private IntPtr _tag;
     private readonly int _tagLen;
     private readonly byte[] _ivBytes;
     // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
@@ -41,25 +38,9 @@ public sealed class CkmGcmMessageParams : MechanismParameters
 
         _tagLen = tagLen;
         _ivBytes = iv.ToArray();
-        _iv = UnmanagedMemory.Allocate(iv.Length);
-        UnmanagedMemory.Write(_iv, iv);
-
-        _tag = UnmanagedMemory.Allocate(tagLen);
-        if (!tagInput.IsEmpty)
-            UnmanagedMemory.Write(_tag, tagInput);
 
         _tagBuffer = new byte[tagLen];
         if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
-
-        _lowLevelParams = new()
-        {
-            Iv = _iv,
-            IvLen = (NativeCULong)iv.Length,
-            IvFixedBits = (NativeCULong)0,
-            IvGenerator = (NativeCULong)0, // CKG_NO_GENERATE
-            Tag = _tag,
-            TagBits = (NativeCULong)(tagLen * 8),
-        };
     }
 
     /// <summary>Copies the tag bytes (output of encrypt) into the caller's buffer.</summary>
@@ -71,17 +52,6 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         if (destination.Length < _tagLen)
             throw new ArgumentException($"Destination must be at least {_tagLen} bytes.", nameof(destination));
         _tagBuffer.AsSpan(0, _tagLen).CopyTo(destination);
-    }
-
-    /// <summary>The managed tag buffer that <see cref="AbsorbOutput"/> fills, and that
-    /// <see cref="CopyTagTo"/> serves callers from.</summary>
-    internal ReadOnlySpan<byte> AbsorbedTag => _tagBuffer.AsSpan(0, _tagLen);
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -116,14 +86,6 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _iv);
-        UnmanagedMemory.Free(ref _tag);
-        _lowLevelParams.Iv = IntPtr.Zero;
-        _lowLevelParams.Tag = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmGcmMessageParams() => Dispose(false);
 }

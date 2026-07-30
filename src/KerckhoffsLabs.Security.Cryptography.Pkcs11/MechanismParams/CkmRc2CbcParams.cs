@@ -11,7 +11,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmRc2CbcParams : MechanismParameters
 {
-    private CK_RC2_CBC_PARAMS _lowLevelParams;
+    private readonly ulong _effectiveBits;
+    private readonly byte[] _iv;
     private bool _disposed;
 
     /// <summary>
@@ -25,30 +26,25 @@ public sealed class CkmRc2CbcParams : MechanismParameters
         if (iv.Length != 8)
             throw new ArgumentException("RC2 CBC IV must be exactly 8 bytes.", nameof(iv));
 
-        // The IV is an inline buffer, which an object initializer cannot assign from a span,
-        // so construct first and copy into the field afterwards.
-        _lowLevelParams = new() { EffectiveBits = (NativeCULong)effectiveBits };
-        iv.CopyTo(_lowLevelParams.Iv);
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _effectiveBits = effectiveBits;
+        _iv = iv.ToArray();
     }
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+
+        // The IV is an inline buffer, which an object initializer cannot assign from a span,
+        // so construct first and copy into the field afterwards.
+        var lowLevel = new CK_RC2_CBC_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
+        _iv.CopyTo(lowLevel.Iv);
+        return lowLevel;
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
         _disposed = true;
     }
 }

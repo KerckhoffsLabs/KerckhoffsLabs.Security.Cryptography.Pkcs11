@@ -11,9 +11,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmHashPqcSignParams : MechanismParameters
 {
-    private CK_HASH_SIGN_ADDITIONAL_CONTEXT _lowLevelParams;
-    private IntPtr _context;
     private readonly byte[] _contextBytes;
+    private readonly CKM _hash;
+    private readonly CkhHedge _hedgeVariant;
     private bool _disposed;
 
     /// <summary>Initializes prehash-PQC signing parameters.</summary>
@@ -29,28 +29,9 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
         if (context.Length > 255)
             throw new ArgumentException("PQC signing context must be at most 255 bytes.", nameof(context));
 
-        if (!context.IsEmpty)
-        {
-            _context = UnmanagedMemory.Allocate(context.Length);
-            UnmanagedMemory.Write(_context, context);
-        }
-
         _contextBytes = context.ToArray();
-
-        _lowLevelParams = new()
-        {
-            HedgeVariant = (NativeCULong)(uint)hedgeVariant,
-            Context = _context,
-            ContextLen = (NativeCULong)context.Length,
-            Hash = (NativeCULong)(ulong)hash,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _hash = hash;
+        _hedgeVariant = hedgeVariant;
     }
 
     /// <inheritdoc/>
@@ -59,22 +40,16 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_HASH_SIGN_ADDITIONAL_CONTEXT
         {
-            HedgeVariant = _lowLevelParams.HedgeVariant,
+            HedgeVariant = (NativeCULong)(uint)_hedgeVariant,
             Context = scope.Write(_contextBytes),
             ContextLen = (NativeCULong)_contextBytes.Length,
-            Hash = _lowLevelParams.Hash,
+            Hash = (NativeCULong)(ulong)_hash,
         };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _context);
-        _lowLevelParams.Context = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer.</summary>
-    ~CkmHashPqcSignParams() => Dispose(false);
 }

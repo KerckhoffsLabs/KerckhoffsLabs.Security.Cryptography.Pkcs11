@@ -10,36 +10,25 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmRc2Params : MechanismParameters
 {
-    private CK_RC2_PARAMS _lowLevelParams;
+    private readonly ulong _effectiveBits;
     private bool _disposed;
 
     /// <summary>
     /// Initializes RC2 ECB/MAC parameters.
     /// </summary>
     /// <param name="effectiveBits">Effective number of bits in the RC2 search space (RFC 2268, 1–1024).</param>
-    public CkmRc2Params(ulong effectiveBits)
-    {
-        _lowLevelParams = new() { EffectiveBits = (NativeCULong)effectiveBits };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
-    }
+    public CkmRc2Params(ulong effectiveBits) => _effectiveBits = effectiveBits;
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_RC2_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
         _disposed = true;
     }
 }

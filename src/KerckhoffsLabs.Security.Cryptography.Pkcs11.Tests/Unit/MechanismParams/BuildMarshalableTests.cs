@@ -658,6 +658,30 @@ public sealed class BuildMarshalableTests
     }
 
     /// <summary>
+    /// Sharing one descriptor across two mechanisms is now legal: each marshals into its own scope,
+    /// so neither can free buffers the other addresses. This is the hazard that previously required
+    /// a runtime guard.
+    /// </summary>
+    [Fact]
+    public void OneDescriptor_CanBackTwoMechanisms()
+    {
+        using var p = new CkmAesGcmParams(new byte[12], [0xA0], tagBits: 128);
+        using var first = new Mechanism(CKM.CKM_AES_GCM, p);
+        using var second = new Mechanism(CKM.CKM_AES_GCM, p);
+
+        using var scopeA = new MechanismParameterScope();
+        using var scopeB = new MechanismParameterScope();
+
+        var a = (CK_GCM_PARAMS)p.BuildMarshalable(scopeA);
+        var b = (CK_GCM_PARAMS)p.BuildMarshalable(scopeB);
+
+        Assert.NotEqual(a.Iv, b.Iv);   // independent buffers
+        Assert.Equal((ulong)a.IvLen, (ulong)b.IvLen);
+        Assert.Equal((ulong)CKM.CKM_AES_GCM, first.Type);
+        Assert.Equal((ulong)CKM.CKM_AES_GCM, second.Type);
+    }
+
+    /// <summary>
     /// Asserts a pointer field addresses a live block holding exactly the expected bytes. A correct
     /// length beside an unwritten or wrongly sized buffer is the failure this catches.
     /// </summary>

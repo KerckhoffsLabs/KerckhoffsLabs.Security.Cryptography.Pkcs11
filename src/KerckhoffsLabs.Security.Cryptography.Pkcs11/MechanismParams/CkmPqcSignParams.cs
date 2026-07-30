@@ -10,9 +10,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmPqcSignParams : MechanismParameters
 {
-    private CK_SIGN_ADDITIONAL_CONTEXT _lowLevelParams;
-    private IntPtr _context;
     private readonly byte[] _contextBytes;
+    private readonly CkhHedge _hedgeVariant;
     private bool _disposed;
 
     /// <summary>Initializes pure-PQC signing parameters.</summary>
@@ -24,27 +23,8 @@ public sealed class CkmPqcSignParams : MechanismParameters
         if (context.Length > 255)
             throw new ArgumentException("PQC signing context must be at most 255 bytes.", nameof(context));
 
-        if (!context.IsEmpty)
-        {
-            _context = UnmanagedMemory.Allocate(context.Length);
-            UnmanagedMemory.Write(_context, context);
-        }
-
         _contextBytes = context.ToArray();
-
-        _lowLevelParams = new()
-        {
-            HedgeVariant = (NativeCULong)(uint)hedgeVariant,
-            Context = _context,
-            ContextLen = (NativeCULong)context.Length,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _hedgeVariant = hedgeVariant;
     }
 
     /// <inheritdoc/>
@@ -53,7 +33,7 @@ public sealed class CkmPqcSignParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_SIGN_ADDITIONAL_CONTEXT
         {
-            HedgeVariant = _lowLevelParams.HedgeVariant,
+            HedgeVariant = (NativeCULong)(uint)_hedgeVariant,
             Context = scope.Write(_contextBytes),
             ContextLen = (NativeCULong)_contextBytes.Length,
         };
@@ -62,12 +42,6 @@ public sealed class CkmPqcSignParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _context);
-        _lowLevelParams.Context = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer.</summary>
-    ~CkmPqcSignParams() => Dispose(false);
 }

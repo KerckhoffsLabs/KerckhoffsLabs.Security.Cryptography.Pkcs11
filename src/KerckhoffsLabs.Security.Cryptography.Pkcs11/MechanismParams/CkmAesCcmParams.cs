@@ -9,9 +9,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmAesCcmParams : MechanismParameters
 {
-    private CK_CCM_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _aad;
     private readonly byte[] _nonceBytes;
     private readonly byte[] _aadBytes;
     private readonly int _dataLen;
@@ -35,36 +32,10 @@ public sealed class CkmAesCcmParams : MechanismParameters
             throw new ArgumentOutOfRangeException(nameof(macLen),
                 "CCM MAC length must be one of {4, 6, 8, 10, 12, 14, 16} bytes.");
 
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        if (!aad.IsEmpty)
-        {
-            _aad = UnmanagedMemory.Allocate(aad.Length);
-            UnmanagedMemory.Write(_aad, aad);
-        }
-
         _nonceBytes = nonce.ToArray();
         _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
         _dataLen = dataLen;
         _macLen = macLen;
-
-        _lowLevelParams = new()
-        {
-            DataLen = (NativeCULong)dataLen,
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            AAD = _aad,
-            AADLen = (NativeCULong)aad.Length,
-            MACLen = (NativeCULong)macLen,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -85,14 +56,6 @@ public sealed class CkmAesCcmParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _aad);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.AAD = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmAesCcmParams() => Dispose(false);
 }

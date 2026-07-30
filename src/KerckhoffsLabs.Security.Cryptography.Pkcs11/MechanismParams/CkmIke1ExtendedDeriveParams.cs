@@ -9,9 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
 {
-    private CK_IKE1_EXTENDED_DERIVE_PARAMS _lowLevelParams;
-    private IntPtr _extraData;
     private readonly byte[] _extraDataBytes;
+    private readonly CKM _prfMechanism;
+    private readonly bool _hasKeygxy;
+    private readonly ulong _keygxy;
     private bool _disposed;
 
     /// <summary>
@@ -23,29 +24,10 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     /// <param name="extraData">Additional input data.</param>
     public CkmIke1ExtendedDeriveParams(CKM prfMechanism, bool hasKeygxy, ulong keygxy, ReadOnlySpan<byte> extraData)
     {
-        if (!extraData.IsEmpty)
-        {
-            _extraData = UnmanagedMemory.Allocate(extraData.Length);
-            UnmanagedMemory.Write(_extraData, extraData);
-        }
-
         _extraDataBytes = extraData.ToArray();
-
-        _lowLevelParams = new()
-        {
-            PrfMechanism = (NativeCULong)(ulong)prfMechanism,
-            HasKeygxy = hasKeygxy,
-            Keygxy = (NativeCULong)keygxy,
-            ExtraData = _extraData,
-            ExtraDataLen = (NativeCULong)extraData.Length,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _prfMechanism = prfMechanism;
+        _hasKeygxy = hasKeygxy;
+        _keygxy = keygxy;
     }
 
     /// <inheritdoc/>
@@ -54,9 +36,9 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_IKE1_EXTENDED_DERIVE_PARAMS
         {
-            PrfMechanism = _lowLevelParams.PrfMechanism,
-            HasKeygxy = _lowLevelParams.HasKeygxy,
-            Keygxy = _lowLevelParams.Keygxy,
+            PrfMechanism = _prfMechanism.ToCULong(),
+            HasKeygxy = _hasKeygxy,
+            Keygxy = (NativeCULong)_keygxy,
             ExtraData = scope.Write(_extraDataBytes),
             ExtraDataLen = (NativeCULong)_extraDataBytes.Length,
         };
@@ -65,12 +47,6 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _extraData);
-        _lowLevelParams.ExtraData = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmIke1ExtendedDeriveParams() => Dispose(false);
 }

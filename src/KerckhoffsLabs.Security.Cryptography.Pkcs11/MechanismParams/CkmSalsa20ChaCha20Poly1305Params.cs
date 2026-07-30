@@ -10,9 +10,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
 {
-    private CK_SALSA20_CHACHA20_POLY1305_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _aad;
     private readonly byte[] _nonceBytes;
     private readonly byte[] _aadBytes;
     private bool _disposed;
@@ -27,32 +24,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     {
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
 
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        if (!aad.IsEmpty)
-        {
-            _aad = UnmanagedMemory.Allocate(aad.Length);
-            UnmanagedMemory.Write(_aad, aad);
-        }
-
         _nonceBytes = nonce.ToArray();
         _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
-
-        _lowLevelParams = new()
-        {
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            AAD = _aad,
-            AADLen = (NativeCULong)aad.Length,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -71,14 +44,6 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _aad);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.AAD = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20ChaCha20Poly1305Params() => Dispose(false);
 }

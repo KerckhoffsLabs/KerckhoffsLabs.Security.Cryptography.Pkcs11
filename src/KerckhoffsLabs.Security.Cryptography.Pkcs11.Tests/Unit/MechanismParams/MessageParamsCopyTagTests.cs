@@ -106,10 +106,8 @@ public sealed class MessageParamsCopyTagTests
 
         p.AbsorbOutput(s);
 
-        Assert.Equal(produced, p.AbsorbedTag.ToArray());
-
-        // The public accessor must serve the absorbed value too, not the buffer the wrapper
-        // allocated for itself — reading the wrong one returns an all-zeros tag on every encrypt.
+        // The public accessor must serve what was absorbed, not the buffer the wrapper started
+        // with — reading the wrong one returns an all-zeros tag on every encrypt.
         byte[] readBack = new byte[16];
         p.CopyTagTo(readBack);
         Assert.Equal(produced, readBack);
@@ -128,8 +126,6 @@ public sealed class MessageParamsCopyTagTests
 
         p.AbsorbOutput(s);
 
-        Assert.Equal(produced, p.AbsorbedMac.ToArray());
-
         byte[] readBack = new byte[16];
         p.CopyMacTo(readBack);
         Assert.Equal(produced, readBack);
@@ -147,8 +143,6 @@ public sealed class MessageParamsCopyTagTests
         UnmanagedMemory.Write(s.Tag, produced);
 
         p.AbsorbOutput(s);
-
-        Assert.Equal(produced, p.AbsorbedTag.ToArray());
 
         byte[] readBack = new byte[16];
         p.CopyTagTo(readBack);

@@ -9,9 +9,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmHkdfParams : MechanismParameters
 {
-    private CK_HKDF_PARAMS _lowLevelParams;
-    private IntPtr _salt;
-    private IntPtr _info;
     private readonly byte[] _saltBytes;
     private readonly byte[] _infoBytes;
     private readonly bool _extract;
@@ -33,18 +30,6 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// <param name="info">Application-specific context bytes.</param>
     public CkmHkdfParams(bool extract, bool expand, CKM prfHashMechanism, ulong saltType, ReadOnlySpan<byte> salt, ulong saltKey, ReadOnlySpan<byte> info)
     {
-        if (!salt.IsEmpty)
-        {
-            _salt = UnmanagedMemory.Allocate(salt.Length);
-            UnmanagedMemory.Write(_salt, salt);
-        }
-
-        if (!info.IsEmpty)
-        {
-            _info = UnmanagedMemory.Allocate(info.Length);
-            UnmanagedMemory.Write(_info, info);
-        }
-
         _saltBytes = salt.IsEmpty ? [] : salt.ToArray();
         _infoBytes = info.IsEmpty ? [] : info.ToArray();
         _extract = extract;
@@ -52,26 +37,6 @@ public sealed class CkmHkdfParams : MechanismParameters
         _prfHashMechanism = prfHashMechanism;
         _saltType = saltType;
         _saltKey = saltKey;
-
-        _lowLevelParams = new()
-        {
-            Extract = extract,
-            Expand = expand,
-            PrfHashMechanism = (NativeCULong)(ulong)prfHashMechanism,
-            SaltType = (NativeCULong)saltType,
-            Salt = _salt,
-            SaltLen = (NativeCULong)salt.Length,
-            SaltKey = (NativeCULong)saltKey,
-            Info = _info,
-            InfoLen = (NativeCULong)info.Length,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -95,14 +60,6 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _salt);
-        UnmanagedMemory.Free(ref _info);
-        _lowLevelParams.Salt = IntPtr.Zero;
-        _lowLevelParams.Info = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmHkdfParams() => Dispose(false);
 }

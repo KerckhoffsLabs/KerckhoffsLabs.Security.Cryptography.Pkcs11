@@ -9,9 +9,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmIke1PrfDeriveParams : MechanismParameters
 {
-    private CK_IKE1_PRF_DERIVE_PARAMS _lowLevelParams;
-    private IntPtr _ckyI;
-    private IntPtr _ckyR;
     private readonly byte[] _ckyIBytes;
     private readonly byte[] _ckyRBytes;
     private readonly CKM _prfMechanism;
@@ -33,18 +30,6 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     /// <param name="keyNumber">KEYMAT_INDEX byte.</param>
     public CkmIke1PrfDeriveParams(CKM prfMechanism, bool hasPrevKey, ulong keygxy, ulong prevKey, ReadOnlySpan<byte> ckyI, ReadOnlySpan<byte> ckyR, byte keyNumber)
     {
-        if (!ckyI.IsEmpty)
-        {
-            _ckyI = UnmanagedMemory.Allocate(ckyI.Length);
-            UnmanagedMemory.Write(_ckyI, ckyI);
-        }
-
-        if (!ckyR.IsEmpty)
-        {
-            _ckyR = UnmanagedMemory.Allocate(ckyR.Length);
-            UnmanagedMemory.Write(_ckyR, ckyR);
-        }
-
         _ckyIBytes = ckyI.IsEmpty ? [] : ckyI.ToArray();
         _ckyRBytes = ckyR.IsEmpty ? [] : ckyR.ToArray();
         _prfMechanism = prfMechanism;
@@ -52,26 +37,6 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
         _keygxy = keygxy;
         _prevKey = prevKey;
         _keyNumber = keyNumber;
-
-        _lowLevelParams = new()
-        {
-            PrfMechanism = (NativeCULong)(ulong)prfMechanism,
-            HasPrevKey = hasPrevKey,
-            Keygxy = (NativeCULong)keygxy,
-            PrevKey = (NativeCULong)prevKey,
-            CkyI = _ckyI,
-            CkyILen = (NativeCULong)ckyI.Length,
-            CkyR = _ckyR,
-            CkyRLen = (NativeCULong)ckyR.Length,
-            KeyNumber = keyNumber,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -95,14 +60,6 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _ckyI);
-        UnmanagedMemory.Free(ref _ckyR);
-        _lowLevelParams.CkyI = IntPtr.Zero;
-        _lowLevelParams.CkyR = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmIke1PrfDeriveParams() => Dispose(false);
 }

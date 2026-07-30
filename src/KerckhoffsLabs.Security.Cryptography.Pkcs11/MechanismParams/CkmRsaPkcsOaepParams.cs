@@ -11,9 +11,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmRsaPkcsOaepParams : MechanismParameters
 {
-    private CK_RSA_PKCS_OAEP_PARAMS _lowLevelParams;
-    private IntPtr _sourceData;
     private readonly byte[] _sourceDataBytes;
+    private readonly CKM _hashAlg;
+    private readonly CKG _mgf;
     private bool _disposed;
 
     /// <summary>
@@ -24,29 +24,9 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     /// <param name="sourceData">Optional encoding-parameter source data; pass <c>default</c> for none.</param>
     public CkmRsaPkcsOaepParams(CKM hashAlg, CKG mgf, ReadOnlySpan<byte> sourceData = default)
     {
-        if (!sourceData.IsEmpty)
-        {
-            _sourceData = UnmanagedMemory.Allocate(sourceData.Length);
-            UnmanagedMemory.Write(_sourceData, sourceData);
-        }
-
         _sourceDataBytes = sourceData.ToArray();
-
-        _lowLevelParams = new()
-        {
-            HashAlg = hashAlg.ToCULong(),
-            Mgf = mgf.ToCULong(),
-            Source = CKZ.CKZ_DATA_SPECIFIED,
-            SourceData = _sourceData,
-            SourceDataLen = (NativeCULong)sourceData.Length,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _hashAlg = hashAlg;
+        _mgf = mgf;
     }
 
     /// <inheritdoc/>
@@ -55,8 +35,8 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_RSA_PKCS_OAEP_PARAMS
         {
-            HashAlg = _lowLevelParams.HashAlg,
-            Mgf = _lowLevelParams.Mgf,
+            HashAlg = _hashAlg.ToCULong(),
+            Mgf = _mgf.ToCULong(),
             Source = CKZ.CKZ_DATA_SPECIFIED,
             SourceData = scope.Write(_sourceDataBytes),
             SourceDataLen = (NativeCULong)_sourceDataBytes.Length,
@@ -66,18 +46,12 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _sourceData);
-        _lowLevelParams.SourceData = IntPtr.Zero;
         _disposed = true;
     }
 
     /// <summary>Hash algorithm used in the OAEP encoding.</summary>
-    public CKM HashAlg => _lowLevelParams.HashAlg.ToCKM();
+    public CKM HashAlg => _hashAlg;
 
     /// <summary>Mask generation function.</summary>
-    public CKG Mgf => _lowLevelParams.Mgf.ToCKG();
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmRsaPkcsOaepParams() => Dispose(false);
+    public CKG Mgf => _mgf;
 }

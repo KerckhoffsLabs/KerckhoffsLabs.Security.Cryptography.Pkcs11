@@ -10,9 +10,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmCcmMessageParams : MechanismParameters
 {
-    private CK_CCM_MESSAGE_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _mac;
     private readonly int _macLen;
     private readonly int _dataLen;
     private readonly byte[] _nonceBytes;
@@ -44,26 +41,9 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         _macLen = macLen;
         _dataLen = dataLen;
         _nonceBytes = nonce.ToArray();
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        _mac = UnmanagedMemory.Allocate(macLen);
-        if (!macInput.IsEmpty)
-            UnmanagedMemory.Write(_mac, macInput);
 
         _macBuffer = new byte[macLen];
         if (!macInput.IsEmpty) macInput.CopyTo(_macBuffer);
-
-        _lowLevelParams = new()
-        {
-            DataLen = (NativeCULong)dataLen,
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            NonceFixedBits = (NativeCULong)0,
-            NonceGenerator = (NativeCULong)0, // CKG_NO_GENERATE
-            Mac = _mac,
-            MacLen = (NativeCULong)macLen,
-        };
     }
 
     /// <summary>Copies the MAC bytes (output of encrypt) into the caller's buffer.</summary>
@@ -75,17 +55,6 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         if (destination.Length < _macLen)
             throw new ArgumentException($"Destination must be at least {_macLen} bytes.", nameof(destination));
         _macBuffer.AsSpan(0, _macLen).CopyTo(destination);
-    }
-
-    /// <summary>The managed MAC buffer that <see cref="AbsorbOutput"/> fills, and that
-    /// <see cref="CopyMacTo"/> serves callers from.</summary>
-    internal ReadOnlySpan<byte> AbsorbedMac => _macBuffer.AsSpan(0, _macLen);
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -121,14 +90,6 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _mac);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.Mac = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmCcmMessageParams() => Dispose(false);
 }

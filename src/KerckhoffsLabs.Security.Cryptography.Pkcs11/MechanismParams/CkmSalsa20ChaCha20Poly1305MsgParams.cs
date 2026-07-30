@@ -12,9 +12,6 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
 {
     private const int Poly1305TagLen = 16;
 
-    private CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS _lowLevelParams;
-    private IntPtr _nonce;
-    private IntPtr _tag;
     private readonly byte[] _nonceBytes;
     // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
     // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
@@ -40,22 +37,9 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
         if (nonce.IsEmpty) throw new ArgumentException("Nonce must not be empty.", nameof(nonce));
 
         _nonceBytes = nonce.ToArray();
-        _nonce = UnmanagedMemory.Allocate(nonce.Length);
-        UnmanagedMemory.Write(_nonce, nonce);
-
-        _tag = UnmanagedMemory.Allocate(Poly1305TagLen);
-        if (!tagInput.IsEmpty)
-            UnmanagedMemory.Write(_tag, tagInput);
 
         _tagBuffer = new byte[Poly1305TagLen];
         if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
-
-        _lowLevelParams = new()
-        {
-            Nonce = _nonce,
-            NonceLen = (NativeCULong)nonce.Length,
-            Tag = _tag,
-        };
     }
 
     /// <summary>Copies the 16-byte tag (output of encrypt) into the caller's buffer.</summary>
@@ -67,17 +51,6 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
         if (destination.Length < Poly1305TagLen)
             throw new ArgumentException($"Destination must be at least {Poly1305TagLen} bytes.", nameof(destination));
         _tagBuffer.AsSpan(0, Poly1305TagLen).CopyTo(destination);
-    }
-
-    /// <summary>The managed tag buffer that <see cref="AbsorbOutput"/> fills, and that
-    /// <see cref="CopyTagTo"/> serves callers from.</summary>
-    internal ReadOnlySpan<byte> AbsorbedTag => _tagBuffer.AsSpan(0, Poly1305TagLen);
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -109,14 +82,6 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _nonce);
-        UnmanagedMemory.Free(ref _tag);
-        _lowLevelParams.Nonce = IntPtr.Zero;
-        _lowLevelParams.Tag = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmSalsa20ChaCha20Poly1305MsgParams() => Dispose(false);
 }

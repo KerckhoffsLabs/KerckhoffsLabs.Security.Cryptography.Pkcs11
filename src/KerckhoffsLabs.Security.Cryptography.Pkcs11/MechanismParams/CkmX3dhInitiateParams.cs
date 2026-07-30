@@ -8,9 +8,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmX3dhInitiateParams : MechanismParameters
 {
-    private CK_X3DH_INITIATE_PARAMS _lowLevelParams;
-    private IntPtr _prekeySignature;
-    private IntPtr _onetimeKey;
     private readonly byte[] _prekeySignatureBytes;
     private readonly byte[] _onetimeKeyBytes;
     private readonly ulong _kdf;
@@ -32,18 +29,6 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     /// <param name="ownEphemeral">Our own ephemeral-key handle.</param>
     public CkmX3dhInitiateParams(ulong kdf, ulong peerIdentity, ulong peerPrekey, ReadOnlySpan<byte> prekeySignature, ReadOnlySpan<byte> onetimeKey, ulong ownIdentity, ulong ownEphemeral)
     {
-        if (!prekeySignature.IsEmpty)
-        {
-            _prekeySignature = UnmanagedMemory.Allocate(prekeySignature.Length);
-            UnmanagedMemory.Write(_prekeySignature, prekeySignature);
-        }
-
-        if (!onetimeKey.IsEmpty)
-        {
-            _onetimeKey = UnmanagedMemory.Allocate(onetimeKey.Length);
-            UnmanagedMemory.Write(_onetimeKey, onetimeKey);
-        }
-
         _prekeySignatureBytes = prekeySignature.IsEmpty ? [] : prekeySignature.ToArray();
         _onetimeKeyBytes = onetimeKey.IsEmpty ? [] : onetimeKey.ToArray();
         _kdf = kdf;
@@ -51,24 +36,6 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
         _peerPrekey = peerPrekey;
         _ownIdentity = ownIdentity;
         _ownEphemeral = ownEphemeral;
-
-        _lowLevelParams = new()
-        {
-            Kdf = (NativeCULong)kdf,
-            PeerIdentity = (NativeCULong)peerIdentity,
-            PeerPrekey = (NativeCULong)peerPrekey,
-            PrekeySignature = _prekeySignature,
-            OnetimeKey = _onetimeKey,
-            OwnIdentity = (NativeCULong)ownIdentity,
-            OwnEphemeral = (NativeCULong)ownEphemeral,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -90,14 +57,6 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _prekeySignature);
-        UnmanagedMemory.Free(ref _onetimeKey);
-        _lowLevelParams.PrekeySignature = IntPtr.Zero;
-        _lowLevelParams.OnetimeKey = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmX3dhInitiateParams() => Dispose(false);
 }

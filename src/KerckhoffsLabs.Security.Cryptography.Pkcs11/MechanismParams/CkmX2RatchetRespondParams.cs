@@ -9,9 +9,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmX2RatchetRespondParams : MechanismParameters
 {
-    private CK_X2RATCHET_RESPOND_PARAMS _lowLevelParams;
-    private IntPtr _sk;
     private readonly byte[] _skBytes;
+    private readonly ulong _ownPrekey;
+    private readonly ulong _initiatorIdentity;
+    private readonly ulong _ownPublicIdentity;
+    private readonly bool _encryptedHeader;
+    private readonly ulong _curve;
+    private readonly CKM _aeadMechanism;
+    private readonly ulong _kdfMechanism;
     private bool _disposed;
 
     /// <summary>
@@ -28,29 +33,15 @@ public sealed class CkmX2RatchetRespondParams : MechanismParameters
     public CkmX2RatchetRespondParams(ReadOnlySpan<byte> sk, ulong ownPrekey, ulong initiatorIdentity, ulong ownPublicIdentity, bool encryptedHeader, ulong curve, CKM aeadMechanism, ulong kdfMechanism)
     {
         if (sk.IsEmpty) throw new ArgumentException("Shared-secret bytes must not be empty.", nameof(sk));
-        _sk = UnmanagedMemory.Allocate(sk.Length);
-        UnmanagedMemory.Write(_sk, sk);
 
         _skBytes = sk.ToArray();
-
-        _lowLevelParams = new()
-        {
-            Sk = _sk,
-            OwnPrekey = (NativeCULong)ownPrekey,
-            InitiatorIdentity = (NativeCULong)initiatorIdentity,
-            OwnPublicIdentity = (NativeCULong)ownPublicIdentity,
-            EncryptedHeader = encryptedHeader,
-            Curve = (NativeCULong)curve,
-            AeadMechanism = (NativeCULong)(ulong)aeadMechanism,
-            KdfMechanism = (NativeCULong)kdfMechanism,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _ownPrekey = ownPrekey;
+        _initiatorIdentity = initiatorIdentity;
+        _ownPublicIdentity = ownPublicIdentity;
+        _encryptedHeader = encryptedHeader;
+        _curve = curve;
+        _aeadMechanism = aeadMechanism;
+        _kdfMechanism = kdfMechanism;
     }
 
     /// <inheritdoc/>
@@ -60,25 +51,19 @@ public sealed class CkmX2RatchetRespondParams : MechanismParameters
         return new CK_X2RATCHET_RESPOND_PARAMS
         {
             Sk = scope.Write(_skBytes),
-            OwnPrekey = _lowLevelParams.OwnPrekey,
-            InitiatorIdentity = _lowLevelParams.InitiatorIdentity,
-            OwnPublicIdentity = _lowLevelParams.OwnPublicIdentity,
-            EncryptedHeader = _lowLevelParams.EncryptedHeader,
-            Curve = _lowLevelParams.Curve,
-            AeadMechanism = _lowLevelParams.AeadMechanism,
-            KdfMechanism = _lowLevelParams.KdfMechanism,
+            OwnPrekey = (NativeCULong)_ownPrekey,
+            InitiatorIdentity = (NativeCULong)_initiatorIdentity,
+            OwnPublicIdentity = (NativeCULong)_ownPublicIdentity,
+            EncryptedHeader = _encryptedHeader,
+            Curve = (NativeCULong)_curve,
+            AeadMechanism = _aeadMechanism.ToCULong(),
+            KdfMechanism = (NativeCULong)_kdfMechanism,
         };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _sk);
-        _lowLevelParams.Sk = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmX2RatchetRespondParams() => Dispose(false);
 }

@@ -8,11 +8,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmX3dhRespondParams : MechanismParameters
 {
-    private CK_X3DH_RESPOND_PARAMS _lowLevelParams;
-    private IntPtr _identityId;
-    private IntPtr _prekeyId;
-    private IntPtr _onetimeId;
-    private IntPtr _initiatorEphemeral;
     private readonly byte[] _identityIdBytes;
     private readonly byte[] _prekeyIdBytes;
     private readonly byte[] _onetimeIdBytes;
@@ -32,53 +27,12 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     /// <param name="initiatorEphemeral">Initiator's ephemeral public-key bytes.</param>
     public CkmX3dhRespondParams(ulong kdf, ReadOnlySpan<byte> identityId, ReadOnlySpan<byte> prekeyId, ReadOnlySpan<byte> onetimeId, ulong initiatorIdentity, ReadOnlySpan<byte> initiatorEphemeral)
     {
-        if (!identityId.IsEmpty)
-        {
-            _identityId = UnmanagedMemory.Allocate(identityId.Length);
-            UnmanagedMemory.Write(_identityId, identityId);
-        }
-
-        if (!prekeyId.IsEmpty)
-        {
-            _prekeyId = UnmanagedMemory.Allocate(prekeyId.Length);
-            UnmanagedMemory.Write(_prekeyId, prekeyId);
-        }
-
-        if (!onetimeId.IsEmpty)
-        {
-            _onetimeId = UnmanagedMemory.Allocate(onetimeId.Length);
-            UnmanagedMemory.Write(_onetimeId, onetimeId);
-        }
-
-        if (!initiatorEphemeral.IsEmpty)
-        {
-            _initiatorEphemeral = UnmanagedMemory.Allocate(initiatorEphemeral.Length);
-            UnmanagedMemory.Write(_initiatorEphemeral, initiatorEphemeral);
-        }
-
         _identityIdBytes = identityId.IsEmpty ? [] : identityId.ToArray();
         _prekeyIdBytes = prekeyId.IsEmpty ? [] : prekeyId.ToArray();
         _onetimeIdBytes = onetimeId.IsEmpty ? [] : onetimeId.ToArray();
         _initiatorEphemeralBytes = initiatorEphemeral.IsEmpty ? [] : initiatorEphemeral.ToArray();
         _kdf = kdf;
         _initiatorIdentity = initiatorIdentity;
-
-        _lowLevelParams = new()
-        {
-            Kdf = (NativeCULong)kdf,
-            IdentityId = _identityId,
-            PrekeyId = _prekeyId,
-            OnetimeId = _onetimeId,
-            InitiatorIdentity = (NativeCULong)initiatorIdentity,
-            InitiatorEphemeral = _initiatorEphemeral,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
     }
 
     /// <inheritdoc/>
@@ -99,18 +53,6 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _identityId);
-        UnmanagedMemory.Free(ref _prekeyId);
-        UnmanagedMemory.Free(ref _onetimeId);
-        UnmanagedMemory.Free(ref _initiatorEphemeral);
-        _lowLevelParams.IdentityId = IntPtr.Zero;
-        _lowLevelParams.PrekeyId = IntPtr.Zero;
-        _lowLevelParams.OnetimeId = IntPtr.Zero;
-        _lowLevelParams.InitiatorEphemeral = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmX3dhRespondParams() => Dispose(false);
 }

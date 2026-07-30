@@ -9,9 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
 {
-    private CK_IKE2_PRF_PLUS_DERIVE_PARAMS _lowLevelParams;
-    private IntPtr _seedData;
     private readonly byte[] _seedDataBytes;
+    private readonly CKM _prfMechanism;
+    private readonly bool _hasSeedKey;
+    private readonly ulong _seedKey;
     private bool _disposed;
 
     /// <summary>
@@ -23,29 +24,10 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     /// <param name="seedData">Additional seed data bytes.</param>
     public CkmIke2PrfPlusDeriveParams(CKM prfMechanism, bool hasSeedKey, ulong seedKey, ReadOnlySpan<byte> seedData)
     {
-        if (!seedData.IsEmpty)
-        {
-            _seedData = UnmanagedMemory.Allocate(seedData.Length);
-            UnmanagedMemory.Write(_seedData, seedData);
-        }
-
         _seedDataBytes = seedData.ToArray();
-
-        _lowLevelParams = new()
-        {
-            PrfMechanism = (NativeCULong)(ulong)prfMechanism,
-            HasSeedKey = hasSeedKey,
-            SeedKey = (NativeCULong)seedKey,
-            SeedData = _seedData,
-            SeedDataLen = (NativeCULong)seedData.Length,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _prfMechanism = prfMechanism;
+        _hasSeedKey = hasSeedKey;
+        _seedKey = seedKey;
     }
 
     /// <inheritdoc/>
@@ -54,9 +36,9 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
         ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
         {
-            PrfMechanism = _lowLevelParams.PrfMechanism,
-            HasSeedKey = _lowLevelParams.HasSeedKey,
-            SeedKey = _lowLevelParams.SeedKey,
+            PrfMechanism = _prfMechanism.ToCULong(),
+            HasSeedKey = _hasSeedKey,
+            SeedKey = (NativeCULong)_seedKey,
             SeedData = scope.Write(_seedDataBytes),
             SeedDataLen = (NativeCULong)_seedDataBytes.Length,
         };
@@ -65,12 +47,6 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        UnmanagedMemory.Free(ref _seedData);
-        _lowLevelParams.SeedData = IntPtr.Zero;
         _disposed = true;
     }
-
-    /// <summary>Finalizer to release unmanaged memory if Dispose was not called.</summary>
-    ~CkmIke2PrfPlusDeriveParams() => Dispose(false);
 }

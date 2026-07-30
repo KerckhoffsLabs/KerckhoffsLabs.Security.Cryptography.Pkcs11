@@ -11,7 +11,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmRsaPkcsPssParams : MechanismParameters
 {
-    private CK_RSA_PKCS_PSS_PARAMS _lowLevelParams;
+    private readonly CKM _hashAlg;
+    private readonly CKG _mgf;
+    private readonly int _saltLength;
     private bool _disposed;
 
     /// <summary>
@@ -25,45 +27,35 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     {
         ArgumentOutOfRangeException.ThrowIfNegative(saltLength);
 
-        _lowLevelParams = new()
-        {
-            HashAlg = hashAlg.ToCULong(),
-            Mgf = mgf.ToCULong(),
-            Len = (NativeCULong)saltLength,
-        };
-    }
-
-    /// <inheritdoc/>
-    internal override object ToMarshalableStructure()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        _hashAlg = hashAlg;
+        _mgf = mgf;
+        _saltLength = saltLength;
     }
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _lowLevelParams;
+        return new CK_RSA_PKCS_PSS_PARAMS
+        {
+            HashAlg = _hashAlg.ToCULong(),
+            Mgf = _mgf.ToCULong(),
+            Len = (NativeCULong)_saltLength,
+        };
     }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
         _disposed = true;
     }
 
     /// <summary>Hash algorithm used in the PSS encoding.</summary>
-    public CKM HashAlg => _lowLevelParams.HashAlg.ToCKM();
+    public CKM HashAlg => _hashAlg;
 
     /// <summary>Mask generation function.</summary>
-    public CKG Mgf => _lowLevelParams.Mgf.ToCKG();
+    public CKG Mgf => _mgf;
 
     /// <summary>Salt length in bytes.</summary>
-    public int SaltLength => (int)(ulong)_lowLevelParams.Len;
-
-    // No finalizer: this type owns no unmanaged memory, so one would only put every instance on
-    // the finalization queue and hold it an extra GC generation for a no-op. The sibling types
-    // that allocate keep theirs; CkmRc2Params and CkmRc2CbcParams likewise have none.
+    public int SaltLength => _saltLength;
 }
