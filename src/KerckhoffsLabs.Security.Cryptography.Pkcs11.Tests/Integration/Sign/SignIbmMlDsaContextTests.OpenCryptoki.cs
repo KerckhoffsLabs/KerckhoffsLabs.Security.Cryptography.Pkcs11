@@ -116,7 +116,7 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
         }
         finally
         {
-            try { key.Delete(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch { /* best-effort cleanup */ }
             key.Dispose();
         }
     }

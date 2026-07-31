@@ -33,7 +33,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            k.Delete();
+            k.Destroy();
             k.Dispose();
         }
     }
@@ -166,7 +166,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
             }
             finally
             {
-                derived.Delete();
+                derived.Destroy();
                 derived.Dispose();
             }
         });

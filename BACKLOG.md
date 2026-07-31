@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 61 (19 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 22 (15 open, 7 resolved)
+- Total items: 61 (20 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (23 open, 8 resolved) | Low: 23 (15 open, 8 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -486,20 +486,25 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA C
 
-### [BL-056] Ephemeral vs. persistent keys are indistinguishable: destroying a token object is a separate call callers must remember, in the right order
+### [BL-056] ✅ RESOLVED — Ephemeral vs. persistent keys are indistinguishable: destroying a token object is a separate call callers must remember, in the right order
+- **Status:** Resolved 2026-07-31, after the original framing was found to be wrong. See "Correction" below — the entry claimed a risk the code does not have, and missed two real defects that were sitting in the same methods.
+- **Correction to the original problem statement:** it asserted that forgetting `Delete()` leaves "an extractable copy of a shared secret on the token". All three ephemeral paths create **session objects**, not token objects: `MLKemPkcs11` sets `.OnToken(false)` explicitly, and `ECDiffieHellmanPkcs11`/`SP800108HmacCounterKdfPkcs11` omit `CKA_TOKEN` entirely, whose PKCS#11 default is `CK_FALSE`. PKCS#11 destroys session objects at `C_CloseSession`, which this library wires to `SafeHandle.ReleaseHandle`. So the exposure is bounded by the session's lifetime, not permanent — real, but a different and smaller risk than stated.
+- **Why the proposed fix was rejected:** the entry proposed an `ownsTokenObject` flag (or a distinct type) so `Dispose` could destroy. Both are unworkable, because ownership here is **runtime data, not static structure**: `CKA_TOKEN` is set from a caller-supplied template, or from the `persistOnToken` argument of `Pkcs11Workspace.GenerateAesKey`/`GenerateRsaKeyPair`. A flag would make `Dispose` destroy or not according to an argument invisible at the call site — the very "ownership by convention" complaint this entry opens with, moved one layer down. A distinct return type cannot be chosen at all when the deciding attribute is inside a runtime template.
+- **The decision, and the asymmetry behind it:** destroying wrongly is irreversible loss of key material; failing to destroy a session object costs nothing, because the token collects it at session close. Given that, **disposal is inert and destruction is explicit**, permanently and on every wrapper type:
+  - `Dispose()` releases the managed wrapper (and, on `Pkcs11Key`, any workspace/library it owns). It never calls `C_DestroyObject`.
+  - `Destroy()` is the only member that destroys. Renamed from `Delete()` on `Pkcs11Key`, `Pkcs11Object` and `Pkcs11Certificate` — `Delete` read as "release the wrapper" and invited exactly this confusion. No forwarder: pre-1.0, no released consumers.
+  - The invariant is stated in the class remarks of all three types, with the reasoning, so the next contributor does not re-litigate it.
+- **Two real defects found in the same methods, both fixed:**
+  1. **Cleanup masked real failures.** `ECDiffieHellmanPkcs11` and `SP800108HmacCounterKdfPkcs11` destroyed the derived key inside `finally`. A throw from `finally` *replaces* an exception already in flight, so a failed `C_DestroyObject` reached the caller instead of the actual error — and both methods have a throw right above it. Now routed through `DestroyEphemeral(derived, operationFailed)`, which suppresses the destroy failure only when something else already went wrong, and lets it surface when it is the only news. `MLKemPkcs11` already had this shape; the other two had diverged from it.
+  2. **Derived key material leaked in cleartext.** `SP800108HmacCounterKdfPkcs11` never disposed the `ObjectAttribute` list returned by `GetAttributeValue`. Those own unmanaged buffers holding the derived secret, and disposing them is what zeroizes them (`UnmanagedMemory.Free` wipes before releasing), so every `DeriveKey` call left the secret in unmanaged memory for the life of the process. Its `ECDiffieHellmanPkcs11` sibling disposed them correctly, which is how the divergence was spotted.
+- **Verification:** `DisposeDoesNotDestroyTests` asserts the observable outcome — the object is still on the token after `Dispose`, gone after `Destroy` — including the persistent-key case an auto-destroying `Dispose` would ruin. Mutation-verified: making `Dispose` destroy reddens both inertness tests and leaves the `Destroy` tests green. `DerivedKeyMaterialLeakTests` pins both derive paths against the allocation counter; restoring the missing `attrs` disposal reddens the SP800-108 case and leaves ECDH green.
 - **Area:** .NET API Design
-- **Severity:** Medium
+- **Severity:** Low
 - **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Object.cs:74-81` (`Delete`/`Dispose`); `Pkcs11Key.cs:38-39,68-69,184-191` (the existing ownership fields); ephemeral call sites `Algorithms/ECDiffieHellmanPkcs11.cs:198-202`, `Algorithms/SP800108HmacCounterKdfPkcs11.cs:168-172`, `Algorithms/MLKemPkcs11.cs:282-292`
-- **Problem:** `Delete()` destroys the object on the token (`C_DestroyObject`); `Dispose()` only marks the managed wrapper dead (and, on `Pkcs11Key`, tears down an owned workspace/library). Nothing in the type system distinguishes a *session-scoped* key that must always be destroyed — a derived secret, an extracted ML-KEM shared secret — from a *persistent* token key that must never be. The distinction lives only in each caller remembering `Delete()` then `Dispose()` in a `finally`, and the order is load-bearing: `Delete()` opens with `ObjectDisposedException.ThrowIf(_disposed, this)`, so a `using` that disposes first turns cleanup into an exception. Forgetting `Delete()` is worse and silent — an extractable copy of a shared secret survives on the token, which is exactly the failure `MLKemPkcs11.DestroyExtractedSecret` exists to shout about. `Dispose` cannot simply be made to delete: most keys are persistent, so that would silently destroy long-lived key material.
-- **Proposed action:** Make the ownership explicit rather than conventional, mirroring what `Pkcs11Key` already does for its workspace and library (`_ownsWorkspace`, `_ownedLibrary`). Either an `ownsTokenObject` flag set by the factory paths that mint ephemeral keys, or a distinct type for them; `Dispose` then performs the destroy-and-teardown and the three production sites collapse to `using var derived = …` with no `finally`. Two decisions to settle first: (a) what a failed destroy does during `Dispose` — throwing from `Dispose` is hostile, but `MLKemPkcs11` deliberately surfaces it today because a lingering extractable shared secret is a security problem, not a cleanup nit; (b) whether the existing `Delete()` stays public for callers who genuinely want to destroy a persistent object.
-- **Constraint worth preserving:** the test suites wrap `Delete()` in `try { } catch { /* best-effort */ }` at 12 sites so a cleanup failure cannot mask the assertion that actually failed. A throwing `Dispose` would regress that; those call sites need a non-throwing path or must keep their explicit form.
-- **Related:** BL-012 is the same class of problem one layer up (`Mechanism` not owning its `MechanismParameters`, with the disposal order documented only in a per-type remark). Worth settling both under one ownership convention rather than separately.
-- **Breaks public API?** Yes (disposal semantics for keys returned by derive/encapsulate paths) — land before 1.0
-- **Raised by:** CodeQL `cs/missed-using-statement` triage
-
-## Low
-
+- **Location:** `Pkcs11Object.cs`; `Pkcs11Key.cs`; `Pkcs11Certificate.cs`; `Algorithms/ECDiffieHellmanPkcs11.cs`; `Algorithms/SP800108HmacCounterKdfPkcs11.cs`; `Algorithms/MLKemPkcs11.cs`
+- **Related:** completes the ownership family with BL-012/BL-057/BL-060. The pattern is the same one those settled: remove the ambiguity rather than document it — here by making disposal mean one thing everywhere, instead of adding a mode that decides what it means.
+- **Breaks public API?** Yes (`Delete()` renamed to `Destroy()` on three types) — pre-1.0, no released consumers
+- **Raised by:** CodeQL `cs/missed-using-statement` triage; rewritten 2026-07-31 after analysis showed the original premise was incorrect
 ### [BL-038] `WaitForSlotEvent` uses `void` + two `out` params instead of a Try/result shape, with a raw `ulong` slot id
 - **Area:** .NET API Design
 - **Severity:** Low

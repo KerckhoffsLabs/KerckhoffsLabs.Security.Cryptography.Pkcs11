@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// The caller owns <see cref="SharedSecret"/> and must dispose it — dispose this result (typically
 /// with a <c>using</c> statement), or dispose the key directly after deconstructing. Disposing
 /// releases the managed handle only; as with every <see cref="Pkcs11Key"/>, the token object itself
-/// is removed by <see cref="Pkcs11Key.Delete"/> or by the token's session-object lifetime rules.
+/// is removed by <see cref="Pkcs11Key.Destroy"/> or by the token's session-object lifetime rules.
 /// </para>
 /// <para>
 /// Instances are produced exclusively by <see cref="Pkcs11Key.EncapsulateKey"/>; the constructor is

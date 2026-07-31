@@ -56,7 +56,7 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
             var objs = workspace.FindObjects(filter);
-            objs[0].Delete();
+            objs[0].Destroy();
             foreach (var o in objs) o.Dispose();
         }
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
@@ -121,8 +121,8 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         finally
         {
             using (var cleanup = ObjectTemplate.Empty().Label(certLabel).Build())
-                foreach (var o in workspace.FindObjects(cleanup)) { o.Delete(); o.Dispose(); }
-            keypair.Delete();
+                foreach (var o in workspace.FindObjects(cleanup)) { o.Destroy(); o.Dispose(); }
+            keypair.Destroy();
         }
     }
 }

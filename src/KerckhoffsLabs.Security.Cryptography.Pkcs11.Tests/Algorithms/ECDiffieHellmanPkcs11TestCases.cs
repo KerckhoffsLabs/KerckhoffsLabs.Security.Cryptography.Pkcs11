@@ -27,7 +27,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            k.Delete();
+            k.Destroy();
             k.Dispose();
         }
     }
@@ -56,7 +56,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         }
         finally
         {
-            try { key.Delete(); } catch { /* best-effort */ }
+            try { key.Destroy(); } catch { /* best-effort */ }
             key.Dispose();
         }
     }

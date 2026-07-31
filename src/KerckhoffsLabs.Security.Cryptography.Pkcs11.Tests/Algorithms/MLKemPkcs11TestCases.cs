@@ -29,7 +29,7 @@ internal static class MLKemPkcs11TestCases
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            k.Delete();
+            k.Destroy();
             k.Dispose();
         }
     }
@@ -61,7 +61,7 @@ internal static class MLKemPkcs11TestCases
         }
         finally
         {
-            try { key.Delete(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch { /* best-effort cleanup */ }
             key.Dispose();
         }
     }

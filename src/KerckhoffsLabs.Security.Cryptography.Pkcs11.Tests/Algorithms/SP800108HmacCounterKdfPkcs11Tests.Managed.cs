@@ -182,7 +182,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         }
         finally
         {
-            derived.Delete();
+            derived.Destroy();
             derived.Dispose();
         }
     });

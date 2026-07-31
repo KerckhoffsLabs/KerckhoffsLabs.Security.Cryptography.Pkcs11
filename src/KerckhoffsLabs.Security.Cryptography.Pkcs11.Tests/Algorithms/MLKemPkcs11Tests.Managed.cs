@@ -56,7 +56,7 @@ public sealed class MLKemPkcs11Tests_Managed
         }
         finally
         {
-            try { key.Delete(); }
+            try { key.Destroy(); }
             catch { /* best-effort cleanup */ }
             key.Dispose();
         }
@@ -191,7 +191,7 @@ public sealed class MLKemPkcs11Tests_Managed
         {
             // Lift the override so the key can actually be cleaned up.
             token.DestroyObjectResultOverride = null;
-            try { key.Delete(); }
+            try { key.Destroy(); }
             catch { /* best-effort cleanup */ }
             key.Dispose();
         }

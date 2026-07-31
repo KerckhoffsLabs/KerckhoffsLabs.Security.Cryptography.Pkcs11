@@ -55,7 +55,7 @@ public sealed class MLDsaPkcs11Tests_Managed
         }
         finally
         {
-            try { key.Delete(); }
+            try { key.Destroy(); }
             catch { /* best-effort cleanup */ }
             key.Dispose();
         }

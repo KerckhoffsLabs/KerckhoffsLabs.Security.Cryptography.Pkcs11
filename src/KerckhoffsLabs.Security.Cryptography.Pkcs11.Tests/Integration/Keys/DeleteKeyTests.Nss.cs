@@ -32,7 +32,7 @@ public sealed class DeleteKeyTests_Nss(NssBackendFixture backend)
         }
 
         using (var key = workspace.OpenKey(label))
-            key.Delete();
+            key.Destroy();
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
             Assert.Empty(workspace.FindKeys(filter));
