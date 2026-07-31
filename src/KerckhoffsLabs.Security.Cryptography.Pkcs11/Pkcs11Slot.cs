@@ -87,10 +87,13 @@ public sealed class Pkcs11Slot
     /// Obtains a list of mechanism types supported by a token.
     /// </summary>
     /// <remarks>
-    /// Vendor-defined mechanisms (values <c>≥ CKM_VENDOR_DEFINED = 0x80000000</c>) that
-    /// don't have a <see cref="CKM"/> enum member are dropped from the result — they can't
-    /// be represented as <see cref="CKM"/> values. A future overload returning raw
-    /// <see cref="ulong"/> values may surface them.
+    /// Every mechanism the token reports is returned, including vendor-defined ones
+    /// (<c>≥ CKM_VENDOR_DEFINED = 0x80000000</c>) and any standard mechanism newer than this enum.
+    /// Nothing is filtered: the interop layer casts each value without validating it, precisely so
+    /// those survive. Such an entry is a <see cref="CKM"/> value with no declared member, so it
+    /// compares and round-trips correctly but has no name — <c>ToString()</c> renders the number, and
+    /// <c>Enum.IsDefined</c> is what distinguishes it. Pass one to <see cref="Mechanism"/>'s
+    /// <c>ulong</c> constructors to use it.
     /// </remarks>
     /// <returns>Read-only list of mechanism types supported by a token.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetMechanismList</c> call.</exception>

@@ -132,6 +132,43 @@ public sealed class Mechanism
     public ulong Type => (ulong)_type;
 
     /// <summary>
+    /// Whether the mechanism type is vendor-defined (<c>≥ CKM_VENDOR_DEFINED</c>, <c>0x80000000</c>).
+    /// </summary>
+    /// <remarks>
+    /// This is the question that decides whether a <see cref="CKM"/> view of <see cref="Type"/> means
+    /// anything: a vendor value is outside the range the enum names, so it can be cast but not
+    /// meaningfully switched on. It answers what the mechanism <i>is</i>, not merely whether this
+    /// library happens to have heard of it — a standard mechanism newer than this enum is not vendor
+    /// defined, and <see cref="TryGetMechanism"/> is the check for that case.
+    /// </remarks>
+    public bool IsVendorDefined => Type >= (ulong)CKM.CKM_VENDOR_DEFINED;
+
+    /// <summary>
+    /// Gets the mechanism as a <see cref="CKM"/> value, reporting whether the enum actually names it.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not a plain <c>CKM</c> property. A mechanism may be vendor-defined or simply newer
+    /// than this enum, and a property would hand back a value that names nothing while looking
+    /// authoritative — the same unchecked cast callers write today, with the warning removed.
+    /// </remarks>
+    /// <param name="mechanism">
+    /// Receives the mechanism value <b>whether or not the method returns <see langword="true"/></b>.
+    /// This departs from the usual <c>Try</c> convention on purpose: <c>default(CKM)</c> is
+    /// <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c>, a real mechanism, so defaulting on failure would hand a
+    /// caller who ignored the result a plausible but entirely different mechanism. Returning the true
+    /// value costs nothing and cannot mislead.
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/> if <see cref="CKM"/> declares a member with this value; otherwise
+    /// <see langword="false"/>.
+    /// </returns>
+    public bool TryGetMechanism(out CKM mechanism)
+    {
+        mechanism = _type.ToCKM();
+        return Enum.IsDefined(mechanism);
+    }
+
+    /// <summary>
     /// Exposes the high-level mechanism parameters for test inspection (visible to the test assembly via InternalsVisibleTo).
     /// Returns <c>null</c> when the mechanism was constructed without parameters.
     /// </summary>

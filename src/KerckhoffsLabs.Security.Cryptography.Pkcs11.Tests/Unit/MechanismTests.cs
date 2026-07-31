@@ -227,6 +227,42 @@ public sealed class MechanismTests
         Assert.Null(mechParams);
     }
 
+    // The CKM/ulong boundary. Both members exist because casting Type to CKM is lossy for exactly the
+    // mechanisms the ulong constructors serve, and nothing in the type system says so.
+    [Fact]
+    public void IsVendorDefined_SeparatesVendorTypesFromStandardOnes()
+    {
+        Assert.True(new Mechanism(CkmIbmEthDerive).IsVendorDefined);
+        Assert.True(new Mechanism((ulong)CKM.CKM_VENDOR_DEFINED).IsVendorDefined);  // the boundary itself
+        Assert.False(new Mechanism(CKM.CKM_AES_KEY_GEN).IsVendorDefined);
+
+        // One below the boundary is still standard, so the comparison cannot be >.
+        Assert.False(new Mechanism((ulong)CKM.CKM_VENDOR_DEFINED - 1).IsVendorDefined);
+    }
+
+    [Fact]
+    public void TryGetMechanism_ReportsWhetherTheEnumNamesTheValue()
+    {
+        Assert.True(new Mechanism(CKM.CKM_AES_GCM).TryGetMechanism(out CKM known));
+        Assert.Equal(CKM.CKM_AES_GCM, known);
+
+        Assert.False(new Mechanism(CkmIbmEthDerive).TryGetMechanism(out _));
+    }
+
+    // The out parameter carries the true value even when the method returns false. Defaulting would
+    // hand a caller who ignored the result CKM_RSA_PKCS_KEY_PAIR_GEN — value 0, a real mechanism and
+    // an entirely different one — so this is the difference between an unnamed value and a wrong one.
+    [Fact]
+    public void TryGetMechanism_OnFailure_StillYieldsTheActualValue()
+    {
+        var mech = new Mechanism(CkmIbmEthDerive);
+
+        Assert.False(mech.TryGetMechanism(out CKM unnamed));
+
+        Assert.Equal(CkmIbmEthDerive, (ulong)unnamed);
+        Assert.NotEqual(default, unnamed);
+    }
+
     [Fact]
     public void Marshal_NoParameter_IsNullPointerAndZeroLength()
     {

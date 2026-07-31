@@ -153,6 +153,25 @@ public sealed class Pkcs11SlotTests
         Assert.Equal(expected, list);
     }
 
+    // This method's documentation claimed for a long time that vendor-defined mechanisms without a CKM
+    // member were "dropped from the result". They never were — the interop layer casts each value
+    // without validating it, deliberately, so they arrive as CKM values the enum does not name. The
+    // claim mattered: it told callers a mechanism was unreachable when it was sitting in the list, and
+    // documentation is not the kind of thing a compiler disagrees with. Hence a test.
+    [Fact]
+    public void GetMechanismList_VendorDefinedMechanisms_SurviveUnnamed()
+    {
+        const ulong ckmIbmEthDerive = 0x80070002UL;  // no CKM member
+        var fake = new SlotFake { Mechs = [CKM.CKM_AES_GCM, (CKM)ckmIbmEthDerive] };
+
+        var list = NewSlot(fake).GetMechanismList();
+
+        Assert.Equal(2, list.Count);
+        Assert.Equal(ckmIbmEthDerive, (ulong)list[1]);
+        Assert.False(Enum.IsDefined(list[1]));            // present, but unnamed
+        Assert.True(new Mechanism((ulong)list[1]).IsVendorDefined);  // and usable from here
+    }
+
     [Fact]
     public void GetMechanismList_TokenReportsFewerOnSecondCall_ResizesDown()
     {
