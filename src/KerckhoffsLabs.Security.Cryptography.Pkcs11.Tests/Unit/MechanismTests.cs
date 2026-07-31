@@ -23,11 +23,51 @@ public sealed class MechanismTests
         Assert.Null(mech.Parameters);
     }
 
+    // A vendor mechanism the CKM enum has no member for. Passing the type as a raw ulong rather than
+    // casting an invented enum value is the point of the ulong constructors: the cast would assert the
+    // value is a known CKM, which it is not.
+    private const ulong CkmIbmEthDerive = 0x80070002UL;  // CKM_VENDOR_DEFINED + 0x70002
+
+    // The ulong+byte[] pairing is the escape hatch for a vendor mechanism whose parameter this library
+    // cannot describe — an opaque or nested block the caller lays out themselves. Every other test of
+    // the raw path goes through the CKM-typed constructor, so nothing covered the one thing this
+    // overload does differently: carry a mechanism value from outside the enum. Asserting the type
+    // alone would not have caught a block that never reached the scope, which is the failure a caller
+    // would see as the token rejecting a well-formed parameter.
     [Fact]
-    public void Ctor_RawUlong_ByteArrayParameter_SetsType()
+    public void Marshal_VendorTypeWithByteArrayParameter_CarriesBothTheTypeAndTheBlock()
     {
-        var mech = new Mechanism((ulong)CKM.CKM_AES_GCM, [0x01, 0x02, 0x03]);
-        Assert.Equal((ulong)CKM.CKM_AES_GCM, mech.Type);
+        byte[] block = [.. Enumerable.Range(0, 24).Select(i => (byte)(0xD0 + i))];
+        var mech = new Mechanism(CkmIbmEthDerive, block);
+        using var scope = new MechanismParameterScope();
+
+        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+
+        Assert.Equal(CkmIbmEthDerive, mech.Type);
+        Assert.Equal(CkmIbmEthDerive, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)block.Length, (ulong)marshalled.ParameterLen);
+        Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);
+        Assert.Equal(block, UnmanagedMemory.Read(marshalled.Parameter, block.Length));
+
+        // An opaque block has no output fields, so there is nothing to absorb.
+        Assert.Null(mechParams);
+    }
+
+    // The defensive copy is a separate line of code in each byte[] constructor, so the CKM-typed
+    // sibling's coverage does not extend here: aliasing the caller's array in this one alone would go
+    // unnoticed until a caller zeroized their block and the token silently received all zeroes.
+    [Fact]
+    public void Marshal_VendorTypeWithByteArrayParameter_IgnoresLaterChangesToTheCallersArray()
+    {
+        byte[] block = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        byte[] expected = [.. block];
+        var mech = new Mechanism(CkmIbmEthDerive, block);
+        using var scope = new MechanismParameterScope();
+
+        CryptographicOperations.ZeroMemory(block);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out _);
+
+        Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
     }
 
     [Fact]
