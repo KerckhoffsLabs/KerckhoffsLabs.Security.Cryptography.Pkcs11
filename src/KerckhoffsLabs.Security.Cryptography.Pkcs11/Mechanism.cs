@@ -77,7 +77,10 @@ public sealed class Mechanism
     /// </para>
     /// </remarks>
     /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied into the mechanism</param>
+    /// <param name="parameter">
+    /// Mechanism parameter, copied into the mechanism, so later changes to the caller's buffer are
+    /// ignored. An empty parameter marshals as a null <c>pParameter</c> with zero length.
+    /// </param>
     public Mechanism(CKM type, ReadOnlySpan<byte> parameter)
     {
         _type = type.ToCULong();
@@ -85,8 +88,6 @@ public sealed class Mechanism
     }
 
     /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(CKM type, byte[] parameter)
     {
@@ -99,13 +100,9 @@ public sealed class Mechanism
     // knows, and for a vendor mechanism it is not.
 
     /// <inheritdoc cref="Mechanism(CKM)"/>
-    /// <param name="type">Mechanism type</param>
     public Mechanism(ulong type) => _type = (NativeCULong)type;
 
     /// <inheritdoc cref="Mechanism(CKM, MechanismParameters)"/>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(ulong type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
@@ -115,8 +112,6 @@ public sealed class Mechanism
     }
 
     /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied into the mechanism</param>
     public Mechanism(ulong type, ReadOnlySpan<byte> parameter)
     {
         _type = (NativeCULong)type;
@@ -124,8 +119,6 @@ public sealed class Mechanism
     }
 
     /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
     public Mechanism(ulong type, byte[] parameter)
     {
