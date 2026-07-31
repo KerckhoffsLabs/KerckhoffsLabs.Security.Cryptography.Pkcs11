@@ -1582,17 +1582,8 @@ internal sealed class Pkcs11Session : IDisposable
     {
         GuardInsecureKeyAttributes(attributes);
 
-        bool hasSensitive = false;
-        bool hasExtractable = false;
-
-        if (attributes != null)
-        {
-            foreach (ObjectAttribute a in attributes)
-            {
-                if (a.Type == (ulong)CKA.CKA_SENSITIVE) hasSensitive = true;
-                else if (a.Type == (ulong)CKA.CKA_EXTRACTABLE) hasExtractable = true;
-            }
-        }
+        bool hasSensitive = attributes?.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE) ?? false;
+        bool hasExtractable = attributes?.Any(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE) ?? false;
 
         List<ObjectAttribute> added = [];
         if (!hasSensitive)
