@@ -23,9 +23,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// </para>
 /// <para>
 /// These tests drive that behaviour through the <c>ILowLevelPkcs11Library</c> seam, since no real
-/// module will misbehave on request. They assert the refusal, and — separately — that refusing does
-/// not leak the buffers already handed out, which is what makes the guard safe to add to a path that
-/// had no cleanup before it.
+/// module will misbehave on request. That refusing does not leak the buffers already handed out — the
+/// property that makes this guard safe to add to a path which had no cleanup before it — is asserted
+/// by <c>AttributeLengthClampLeakTests</c>, which has to be serialized and so lives apart.
 /// </para>
 /// </remarks>
 public sealed class AttributeLengthClampTests
@@ -79,25 +79,6 @@ public sealed class AttributeLengthClampTests
         // "could not be read" would send them looking at their own template instead.
         Assert.Contains("4096", ex.Message, StringComparison.Ordinal);
         Assert.Contains("8-byte", ex.Message, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// The refusal happens after buffers have been handed to the module, on a path that previously had
-    /// no cleanup at all — so a guard that threw and leaked would trade an out-of-bounds read for an
-    /// unbounded leak of buffers that may hold key material.
-    /// </summary>
-    [Fact]
-    public void RefusingAnInflatedLength_FreesTheBuffersItAllocated()
-    {
-        // Warm up: the first pass through this path allocates one-time state that would read as a leak.
-        Assert.Throws<AttributeValueException>(() => Read(new LyingLengthFake(8, 4096)));
-
-        int before = UnmanagedMemory.OutstandingAllocationCount;
-
-        for (int i = 0; i < 8; i++)
-            Assert.Throws<AttributeValueException>(() => Read(new LyingLengthFake(8, 4096)));
-
-        Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
     }
 
     /// <summary>
