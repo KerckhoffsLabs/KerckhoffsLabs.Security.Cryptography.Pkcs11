@@ -600,6 +600,31 @@ internal sealed class Pkcs11Session : IDisposable
     /// Mirrored in <c>RSAPkcs11.SignMechanismFor</c> and the README "Security model" section.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Rejects one descriptor driving both halves of a dual-mechanism operation when the token writes
+    /// into it.
+    /// </summary>
+    /// <remarks>
+    /// Sharing a descriptor is legal and safe in general: each mechanism marshals into its own block.
+    /// The exception is a descriptor with output fields used for both halves of the same call — both
+    /// absorb into the same managed buffer, so whichever runs last wins and the other result is lost
+    /// with no error anywhere. Rejecting it up front costs nothing and the alternative is a wrong
+    /// answer.
+    /// </remarks>
+    private static void ThrowIfOneDescriptorDrivesBothHalves(Mechanism first, Mechanism second, string secondParamName)
+    {
+        MechanismParameters? shared = first.Parameters;
+        if (shared is null || !ReferenceEquals(shared, second.Parameters) || !shared.AbsorbsTokenOutput)
+            return;
+
+        throw new ArgumentException(
+            $"The same {shared.GetType().Name} instance drives both mechanisms of this operation. The "
+            + "token writes into it, and both halves would absorb into the same managed buffer, so one "
+            + "of the two results would be silently discarded. Use a separate parameter object for "
+            + "each mechanism.",
+            secondParamName);
+    }
+
     private void GuardMechanism(CKM mechanism)
     {
         if (AllowInsecure) return;
@@ -2348,6 +2373,8 @@ internal sealed class Pkcs11Session : IDisposable
         GuardMechanism((CKM)verificationMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
 
+        ThrowIfOneDescriptorDrivesBothHalves(verificationMechanism, decryptionMechanism, nameof(decryptionMechanism));
+
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify2");
 
         ArgumentNullException.ThrowIfNull(inputStream);
@@ -2720,6 +2747,8 @@ internal sealed class Pkcs11Session : IDisposable
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)encryptionMechanism.Type);
 
+        ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, encryptionMechanism, nameof(encryptionMechanism));
+
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt3");
 
         ArgumentNullException.ThrowIfNull(inputStream);
@@ -2897,6 +2926,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         GuardMechanism((CKM)digestingMechanism.Type);
         GuardMechanism((CKM)decryptionMechanism.Type);
+
+        ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, decryptionMechanism, nameof(decryptionMechanism));
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest3");
 

@@ -62,6 +62,9 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     }
 
     /// <inheritdoc/>
+    /// <inheritdoc/>
+    internal override bool AbsorbsTokenOutput => true;
+
     internal override void AbsorbOutput(object marshalled)
     {
 
