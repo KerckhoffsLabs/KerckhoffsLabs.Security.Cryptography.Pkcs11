@@ -54,7 +54,7 @@ internal static class RSAPkcs11TestCases
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            k.Delete();
+            k.Destroy();
             k.Dispose();
         }
     }
@@ -106,7 +106,7 @@ internal static class RSAPkcs11TestCases
         }
         finally
         {
-            try { key.Delete(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch { /* best-effort cleanup */ }
             key.Dispose();
         }
     }
@@ -174,7 +174,7 @@ internal static class RSAPkcs11TestCases
         }
         finally
         {
-            try { key.Delete(); } catch { /* best-effort cleanup */ }
+            try { key.Destroy(); } catch { /* best-effort cleanup */ }
             key.Dispose();
         }
     }
@@ -373,7 +373,7 @@ internal static class RSAPkcs11TestCases
             }
             finally
             {
-                try { other.Delete(); } catch { /* best-effort cleanup of the second key */ }
+                try { other.Destroy(); } catch { /* best-effort cleanup of the second key */ }
                 other.Dispose();
             }
         });

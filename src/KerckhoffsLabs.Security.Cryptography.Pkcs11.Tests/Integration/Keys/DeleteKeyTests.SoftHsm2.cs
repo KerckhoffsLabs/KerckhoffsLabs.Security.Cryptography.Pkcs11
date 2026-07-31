@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// SoftHSM-only: <see cref="Pkcs11Key.Delete"/> removes the token object via C_DestroyObject.
+/// SoftHSM-only: <see cref="Pkcs11Key.Destroy"/> removes the token object via C_DestroyObject.
 /// Requires a real token to verify the object is actually gone after deletion.
 /// </summary>
 [Collection("SoftHsm")]
@@ -34,7 +34,7 @@ public sealed class DeleteKeyTests_SoftHsm(SoftHsmBackendFixture f)
         }
 
         using (var key = workspace.OpenKey(label))
-            key.Delete();
+            key.Destroy();
 
         // Gone after deletion.
         using (var filter = ObjectTemplate.Empty().Label(label).Build())

@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <summary>
 /// A certificate object on a PKCS#11 token, returned by <see cref="Pkcs11Workspace.FindCertificates"/>.
 /// Exposes the parsed <see cref="X509Certificate2"/> (identity + public key), retains the token
-/// handle for <see cref="Delete"/>, and bridges to the associated on-token private key — located by
+/// handle for <see cref="Destroy"/>, and bridges to the associated on-token private key — located by
 /// the certificate's <c>CKA_ID</c> — as a <see cref="Pkcs11Key"/>.
 /// </summary>
 /// <remarks>
@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// on the OpenSSL backend). Operations on a key returned by <see cref="TryOpenPrivateKey"/> run on
 /// the token and are valid only while the owning <see cref="Pkcs11Workspace"/> is open. Disposing
 /// this instance disposes the wrapped <see cref="X509Certificate2"/> but does not destroy the token
-/// object — use <see cref="Delete"/>.
+/// object — use <see cref="Destroy"/>.
 /// </remarks>
 public sealed class Pkcs11Certificate : IDisposable
 {
@@ -67,12 +67,12 @@ public sealed class Pkcs11Certificate : IDisposable
 
     /// <summary>
     /// Permanently removes the certificate object from the token via <c>C_DestroyObject</c>.
-    /// Distinct from <see cref="Dispose"/> (which only releases this wrapper), and subject to the
+    /// The only member that destroys token state; <see cref="Dispose"/> never does. Subject to the
     /// token's <c>CKA_DESTROYABLE</c>/read-only permissions. Does not remove the associated key.
     /// </summary>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
-    public void Delete()
+    public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _workspace.Session.DestroyObject(_handle);

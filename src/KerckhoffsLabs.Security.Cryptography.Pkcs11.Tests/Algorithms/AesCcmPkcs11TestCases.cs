@@ -39,7 +39,7 @@ internal static class AesCcmPkcs11TestCases
         using var filter = ObjectTemplate.Empty().Label(label).Build();
         foreach (var k in workspace.FindKeys(filter))
         {
-            k.Delete();
+            k.Destroy();
             k.Dispose();
         }
     }

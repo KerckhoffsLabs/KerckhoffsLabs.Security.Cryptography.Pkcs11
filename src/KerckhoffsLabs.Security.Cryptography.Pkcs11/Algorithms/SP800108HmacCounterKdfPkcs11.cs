@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
@@ -157,17 +158,55 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
             .Build();
 
         Pkcs11Key derived = _key.DeriveExtractable(mech, template);
+        bool operationFailed = true;
         try
         {
             var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                throw new InvalidOperationException(
-                    "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
-            return attrs[0].GetValueAsByteArray();
+            try
+            {
+                if (attrs.Count == 0 || attrs[0].CannotBeRead)
+                    throw new InvalidOperationException(
+                        "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
+                byte[] derivedKey = attrs[0].GetValueAsByteArray();
+                operationFailed = false;
+                return derivedKey;
+            }
+            finally
+            {
+                // ObjectAttribute owns an unmanaged buffer holding the derived key material, and
+                // freeing it is what zeroizes it. Without this the secret stays in unmanaged memory
+                // for the life of the process.
+                foreach (var a in attrs) a.Dispose();
+            }
         }
         finally
         {
-            derived.Delete();
+            DestroyEphemeral(derived, operationFailed);
+        }
+    }
+
+    /// <summary>
+    /// Destroys an ephemeral derived key without letting a cleanup failure hide a real one.
+    /// </summary>
+    /// <remarks>
+    /// A throw from <c>finally</c> <i>replaces</i> an exception already in flight, so a failed
+    /// <c>C_DestroyObject</c> would reach the caller in place of whatever actually went wrong. This
+    /// suppresses the destroy failure only on that path: when the operation succeeded, the destroy
+    /// failure is the only news and is allowed to surface. The key is a session object either way, so
+    /// the token collects it at <c>C_CloseSession</c> even when the eager destroy fails.
+    /// </remarks>
+    private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
+    {
+        try
+        {
+            derived.Destroy();
+        }
+        catch (Pkcs11Exception) when (operationFailed)
+        {
+            // Deliberately swallowed: see the remarks. The primary exception is the useful one.
+        }
+        finally
+        {
             derived.Dispose();
         }
     }

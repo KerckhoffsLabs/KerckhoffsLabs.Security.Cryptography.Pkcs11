@@ -10,9 +10,22 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// the object class, label/id, and the raw <c>CKA_VALUE</c> payload. For key-specific operations
 /// (sign/verify/encrypt/wrap/…) use <see cref="Pkcs11Key"/> via the key-oriented workspace methods.
 /// </summary>
-/// <remarks>The view holds a non-owning handle into the workspace's session; the workspace must
-/// outlive it. <see cref="Dispose"/> only releases the wrapper — use <see cref="Delete"/> to
-/// destroy the object on the token.</remarks>
+/// <remarks>
+/// <para>
+/// The view holds a non-owning handle into the workspace's session; the workspace must outlive it.
+/// </para>
+/// <para>
+/// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper (and any
+/// workspace or library this instance owns); <c>Destroy</c> is the only member that calls
+/// <c>C_DestroyObject</c>. The two are kept apart deliberately: whether a handle refers to a
+/// short-lived session object or to a persistent key is decided at creation by <c>CKA_TOKEN</c> —
+/// a runtime template attribute, or the <c>persistOnToken</c> argument of the workspace factories —
+/// so the wrapper cannot tell the two apart. Destroying when it should not is irreversible loss of
+/// key material; failing to destroy a session object costs nothing, because PKCS#11 collects those
+/// at <c>C_CloseSession</c>. Given that asymmetry, disposal stays inert and destruction stays
+/// explicit.
+/// </para>
+/// </remarks>
 public sealed class Pkcs11Object : IDisposable
 {
     private readonly Pkcs11Workspace _workspace;
@@ -65,18 +78,28 @@ public sealed class Pkcs11Object : IDisposable
     }
 
     /// <summary>
-    /// Permanently removes the object from the token via <c>C_DestroyObject</c>. As with
-    /// <see cref="Pkcs11Key.Delete"/>, this is distinct from <see cref="Dispose"/> and is subject
-    /// to the token's <c>CKA_DESTROYABLE</c>/read-only permissions.
+    /// Permanently removes the object from the token via <c>C_DestroyObject</c>. Subject to the
+    /// token's <c>CKA_DESTROYABLE</c> and read-only permissions.
     /// </summary>
+    /// <remarks>
+    /// This is the only method that destroys anything on the token. <see cref="Dispose"/> never
+    /// does — see the class remarks for why the two are kept apart.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">The view has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call.</exception>
-    public void Delete()
+    public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _workspace.Session.DestroyObject(_handle);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Releases the managed wrapper. <b>Never destroys the token object</b> — call
+    /// <see cref="Destroy"/> for that.
+    /// </summary>
+    /// <remarks>
+    /// See the class remarks: disposal cannot know whether this handle refers to a session object
+    /// the token will collect anyway or to a persistent key that must outlive the process.
+    /// </remarks>
     public void Dispose() => _disposed = true;
 }

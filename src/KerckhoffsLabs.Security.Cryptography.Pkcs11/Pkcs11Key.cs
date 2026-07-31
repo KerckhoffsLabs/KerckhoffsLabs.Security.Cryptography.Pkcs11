@@ -31,6 +31,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// key on a token without a stored <c>CKO_PUBLIC_KEY</c> companion has
 /// <c>publicHandle == ObjectHandle.Invalid</c>.
 /// </para>
+/// <para>
+/// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper (and any
+/// workspace or library this instance owns); <c>Destroy</c> is the only member that calls
+/// <c>C_DestroyObject</c>. The two are kept apart deliberately: whether a handle refers to a
+/// short-lived session object or to a persistent key is decided at creation by <c>CKA_TOKEN</c> —
+/// a runtime template attribute, or the <c>persistOnToken</c> argument of the workspace factories —
+/// so the wrapper cannot tell the two apart. Destroying when it should not is irreversible loss of
+/// key material; failing to destroy a session object costs nothing, because PKCS#11 collects those
+/// at <c>C_CloseSession</c>. Given that asymmetry, disposal stays inert and destruction stays
+/// explicit.
+/// </para>
 /// </remarks>
 public sealed class Pkcs11Key : IDisposable
 {
@@ -165,15 +176,15 @@ public sealed class Pkcs11Key : IDisposable
     /// <remarks>
     /// This is distinct from <see cref="Dispose"/>: <c>Dispose</c> only releases this wrapper
     /// (and any workspace/library it owns) and leaves the token object intact, whereas
-    /// <c>Delete</c> erases the key material from the token. The token enforces its own
+    /// <c>Destroy</c> erases the key material from the token. The token enforces its own
     /// permissions — destroying a read-only object, or one created with
     /// <c>CKA_DESTROYABLE = false</c>, fails with a <see cref="Exceptions.Pkcs11Exception"/>
-    /// (typically <c>CKR_ACTION_PROHIBITED</c>). After a successful delete the handles are stale;
+    /// (typically <c>CKR_ACTION_PROHIBITED</c>). After a successful destroy the handles are stale;
     /// still <see cref="Dispose"/> the key to release the wrapper.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The key has already been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DestroyObject</c> call — for example <see cref="CKR.CKR_ACTION_PROHIBITED"/> when the object is not destroyable.</exception>
-    public void Delete()
+    public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!_privateHandle.IsInvalid) _workspace.Session.DestroyObject(_privateHandle);

@@ -283,7 +283,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     {
         try
         {
-            sharedKey.Delete();
+            sharedKey.Destroy();
         }
         catch (Pkcs11Exception ex)
         {
