@@ -1275,12 +1275,12 @@ internal sealed class Pkcs11Session : IDisposable
                 attributes.AddRange(generatedDefaults);
             }
 
-        using var scope = new MechanismParameterScope();
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+            CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
-        NativeCULong keyId = CK.CK_INVALID_HANDLE;
+            NativeCULong keyId = CK.CK_INVALID_HANDLE;
             CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
             Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
 
@@ -1325,14 +1325,14 @@ internal sealed class Pkcs11Session : IDisposable
                 privateKeyAttributes.AddRange(privateDefaults);
             }
 
-        using var scope = new MechanismParameterScope();
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+            using var scope = new MechanismParameterScope();
+            CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
-        CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
+            CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
+            CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
 
-        NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
-        NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
+            NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
+            NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
             CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
             Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
 
