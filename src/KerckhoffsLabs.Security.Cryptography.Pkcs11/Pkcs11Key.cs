@@ -20,11 +20,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// the test assembly via <c>InternalsVisibleTo</c>.
 /// </para>
 /// <para>
-/// Disposing a key releases owned resources (workspace and/or library, depending on how
-/// the key was constructed). It does NOT destroy the underlying PKCS#11 object on the
-/// token; handles refer to token-side state that may legitimately outlive the wrapper.
-/// </para>
-/// <para>
 /// Asymmetric keys may carry both a private and a public handle (paired automatically
 /// via <c>CKA_ID</c> by <c>Pkcs11Workspace.OpenKey</c>) or only one. A
 /// public-only key has <c>privateHandle == ObjectHandle.Invalid</c>; a private-only

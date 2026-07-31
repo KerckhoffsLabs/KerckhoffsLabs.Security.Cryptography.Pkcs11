@@ -56,7 +56,8 @@ public readonly partial struct ECCurve : IEquatable<ECCurve>
 
     /// <summary>
     /// True when this is a known catalog curve providing less than 128-bit security (field size
-    /// &lt; 256-bit): the 160/192/224-bit NIST and Brainpool curves.
+    /// &lt; 256-bit): the 160/192/224-bit NIST, Brainpool and SEC 2 Koblitz curves — ten in all,
+    /// listed in <c>ECCurve.NamedCurves._belowBaselineOids</c>.
     /// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/> refuses these unless
     /// <see cref="Pkcs11Workspace.AllowInsecure"/> is set. An OID outside the catalog reports
     /// <see langword="false"/> — its strength can't be inferred from the OID alone.
