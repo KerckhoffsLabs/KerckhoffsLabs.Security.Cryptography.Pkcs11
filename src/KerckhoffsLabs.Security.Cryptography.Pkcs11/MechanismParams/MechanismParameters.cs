@@ -39,4 +39,16 @@ public abstract class MechanismParameters
     /// types with output fields override it.
     /// </summary>
     internal virtual void AbsorbOutput(object marshalled) { }
+
+    /// <summary>
+    /// Whether the token writes into this descriptor's block and <see cref="AbsorbOutput"/> copies the
+    /// result back into managed state. <see langword="false"/> for input-only parameters.
+    /// </summary>
+    /// <remarks>
+    /// Sharing one descriptor across mechanisms is safe in general — each marshals into its own block.
+    /// It stops being safe when the descriptor carries output and drives both halves of a
+    /// dual-mechanism operation, because both halves absorb into the same managed buffer and the first
+    /// result is lost. The session rejects that pairing, and this is how it recognises it.
+    /// </remarks>
+    internal virtual bool AbsorbsTokenOutput => false;
 }

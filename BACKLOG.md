@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 61 (18 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 22 (16 open, 6 resolved)
+- Total items: 61 (19 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 22 (15 open, 7 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -462,7 +462,10 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No (`internal`)
 - **Raised by:** BL-057 implementation (Task 8)
 
-### [BL-060] One parameter descriptor with output fields, used for both halves of a dual-mechanism operation, silently keeps only the last result
+### [BL-060] ✅ RESOLVED — One parameter descriptor with output fields, used for both halves of a dual-mechanism operation, silently keeps only the last result
+- **Status:** Resolved 2026-07-31 by rejecting the pairing rather than documenting it. `MechanismParameters.AbsorbsTokenOutput` (false by default, overridden by the four types the token writes into) lets the session recognise the case; `Pkcs11Session.ThrowIfOneDescriptorDrivesBothHalves` throws `ArgumentException` naming the second mechanism's parameter. Wired into the three inner methods that own the call scope — `DecryptVerify`, `DigestEncrypt`, `DecryptDigest` — which every one of the eight public overloads funnels through, so the byte[] forms are covered by the same check.
+  - **The guard is deliberately narrow.** Sharing a descriptor stays legal, because each mechanism marshals into its own block; only an output-bearing descriptor driving *both halves of one call* is refused. Tests pin both directions — the rejection, and that an input-only descriptor shared across both halves still runs.
+  - Mutation-verified: commenting out the three guard calls (against a clean build) reddens the four rejection tests and leaves the three permissive ones green.
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** S
