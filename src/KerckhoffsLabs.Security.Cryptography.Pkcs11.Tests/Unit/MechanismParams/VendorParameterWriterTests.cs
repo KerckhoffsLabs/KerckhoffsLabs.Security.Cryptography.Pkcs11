@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
@@ -174,8 +175,10 @@ public sealed class VendorParameterWriterTests
         byte[] bytes = new byte[block.Length];
         UnmanagedMemory.Read(block.Pointer, bytes);
 
-        // The pointer field sits after the CK_ULONG length.
-        IntPtr target = (IntPtr)BitConverter.ToInt64(bytes, UnmanagedMemory.NativeULongSize);
+        // The pointer field sits after the CK_ULONG length, and is pointer-wide — reading a fixed 64
+        // bits here overruns the whole block on a 32-bit runtime, where CK_ULONG and the pointer are
+        // four bytes each.
+        IntPtr target = MemoryMarshal.Read<IntPtr>(bytes.AsSpan(UnmanagedMemory.NativeULongSize));
         Assert.NotEqual(IntPtr.Zero, target);
 
         byte[] pointee = new byte[payload.Length];
