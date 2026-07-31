@@ -34,6 +34,21 @@ public sealed class AttributeValueException : Exception
     }
 
     /// <summary>
+    /// Initializes new instance of AttributeValueException class with a caller-supplied explanation.
+    /// </summary>
+    /// <remarks>
+    /// For refusals that need to say more than "could not be read" — chiefly a module reporting a
+    /// value length the library will not act on, where the reason matters more than the attribute.
+    /// </remarks>
+    /// <param name="attribute">Attribute whose value could not be read or converted</param>
+    /// <param name="message">Explanation of why the value was not read</param>
+    public AttributeValueException(ulong attribute, string message)
+        : base(message)
+    {
+        Attribute = (CKA)attribute;
+    }
+
+    /// <summary>
     /// Initializes new instance of AttributeValueException class
     /// </summary>
     /// <param name="attribute">Attribute whose value could not be read or converted</param>

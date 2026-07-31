@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 62 (23 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (22 open, 10 resolved) | Low: 23 (14 open, 9 resolved)
+- Total items: 62 (24 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (21 open, 11 resolved) | Low: 23 (14 open, 9 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -169,14 +169,18 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Yes (ownership semantics) — land before 1.0
 - **Raised by:** .NET Engineer B
 
-### [BL-013] `C_GetAttributeValue` read-back trusts the module's post-call `valueLen` without clamping to the allocated buffer
+### [BL-013] ✅ RESOLVED — `C_GetAttributeValue` read-back trusts the module's post-call `valueLen` without clamping to the allocated buffer
 - **Area:** P/Invoke
 - **Severity:** Medium
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:986-1052`; `Objects/ObjectAttribute.cs:257-282`
+- **Location:** `Internal/Pkcs11Session.cs` (`GetAttributeValue`, `GuardReportedLength`); `Objects/ObjectAttribute.cs` (every `GetValueAs*` / `CopyValueTo`)
 - **Problem:** Buffers are sized from the first call's `valueLen`, but after the second call the wrapper reads back using whatever `valueLen` the module last wrote, unchecked. A buggy or hostile module that inflates `valueLen` on the second call causes an out-of-bounds read of adjacent unmanaged heap into the returned array (info disclosure / AV). The overflow-to-write variant is already blocked by `NativeCULong` checked casts; this is the in-range-but-oversized case.
-- **Proposed action:** Record the allocated size per attribute and reject `valueLen > allocated` on read-back with a typed exception. Cheap defense-in-depth squarely within the "expect vendor quirks" mandate.
-- **Breaks public API?** No
+- **Resolution (2026-07-31):** `GetAttributeValue` records the size allocated per attribute and `GuardReportedLength` rejects any post-call length exceeding it, throwing `AttributeValueException` with a message naming both figures — the caller's next step is to identify the offending module, which a bare "could not be read" would not support. Applied after the second call and, for nested array attributes, after the third.
+  - **A leak had to be fixed to make the guard safe.** Ownership of the allocated blocks passed to the `ObjectAttribute`s only at the very end of the method, so every earlier exit leaked them — the two fatal-return paths and the malformed-nested-template throw already did, before this change added a fourth. A guard that threw and leaked would have traded an out-of-bounds read for an unbounded leak of buffers that can hold key material. The allocations are now tracked and freed on any failure, with the `ObjectAttribute` construction deliberately outside the `try` so the two owners cannot double-free.
+  - **A message-carrying `AttributeValueException(ulong, string)` overload was added.** The existing constructors all produce "could not be read"/"could not be converted", and the `Pkcs11Exception` hierarchy is keyed on CKR codes, which do not apply here: the module returns `CKR_OK` throughout and simply answers inconsistently.
+- **Verification:** `AttributeLengthClampTests` drives a fake module that reports one length then a larger one. Three mutations, each killing only what it should — the guard disabled (the pre-fix behaviour), `<=` narrowed to `<` (which would reject the legal exact-length answer), and the free-loop deleted (caught by the allocation-count assertion, not by the refusal assertion). A shrinking second answer is legal and is covered as an accepted case.
+- **Breaks public API?** No (additive)
+- **Related:** BL-029 proposes fuzzing this same read-back path with adversarial `ulValueLen`; this guard is what such a harness would now be testing against.
 - **Raised by:** Cryptographer B
 
 ### [BL-014] Fixed-length token strings NUL-padded by real tokens are not trimmed, breaking label matching
