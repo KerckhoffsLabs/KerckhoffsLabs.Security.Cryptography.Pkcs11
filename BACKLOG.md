@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 60 (18 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 21 (15 open, 6 resolved)
+- Total items: 61 (18 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (24 open, 8 resolved) | Low: 22 (16 open, 6 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -435,6 +435,18 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Related:** completes BL-057.
 - **Breaks public API?** Yes (`using` on either type stops compiling) — land before 1.0
 - **Raised by:** BL-057 implementation, deliberately deferred
+
+### [BL-061] Vendor parameter writer covers input-only, flat structs — not read-back or nested layouts
+- **Area:** .NET API Design
+- **Severity:** Low
+- **Effort:** M
+- **Location:** `MechanismParams/Pkcs11ParameterWriter.cs`; `MechanismParams/VendorMechanismParameters.cs`
+- **Problem:** `VendorMechanismParameters` lets a caller use a `CKM_VENDOR_DEFINED` mechanism without hand-serializing a struct, but it models only the field kinds the built-in types needed: `CK_ULONG`, pointer, `CK_BBOOL`, raw byte, and inline fixed arrays. Two shapes are unsupported. (a) **Read-back**: a vendor parameter the token writes into — the equivalent of `CopyTagTo` — has no route home, because `AbsorbOutput` is `internal` and the writer hands back no field handles. A caller needing an output field must fall back to the raw `byte[]` constructor and lose the layout help exactly where it is hardest to get right. (b) **Nested structs and arrays of structs**, as in `CK_SSL3_KEY_MAT_PARAMS` (`CK_SSL3_RANDOM_DATA`) or the `CK_DERIVED_KEY[]` of SP800-108: the writer can only append scalars, so a nested layout has to be flattened by hand, reintroducing the alignment reasoning the type exists to remove.
+- **Proposed action:** For (a), return a field handle from the writer that the caller can read after the call while the scope is alive — `var tag = writer.OutBuffer(16);` plus a protected `Absorb(handle, span)` hook. For (b), a nested scope: `writer.Struct(inner => inner.CkULong(...)...)` applying the same alignment rules recursively, with the struct's own alignment being that of its widest member.
+- **Verification:** the existing oracle extends directly — assert the writer reproduces `CK_SSL3_KEY_MAT_PARAMS` and `CK_DERIVED_KEY` byte for byte, as `VendorParameterWriterTests` already does for the flat cases.
+- **Related:** completes the extension point opened for BL-057's successor work; the raw `Mechanism(type, byte[])` constructor remains the escape hatch meanwhile.
+- **Breaks public API?** No (additive)
+- **Raised by:** vendor-parameter-writer implementation
 
 ### [BL-059] ✅ RESOLVED — `CK_MECHANISM.CreateMechanism` is dead production code kept alive only by its own tests
 - **Status:** Resolved 2026-07-30. All 8 overloads deleted (the count was 8, not 6 — each of the four parameter shapes had a `CKM` and a `NativeCULong` form), together with `Unit/Native/CkMechanismTests.cs`, whose single test existed only to compare two of them. `CK_MECHANISM` is now a plain three-field interop struct with no behaviour. The build is the proof of completeness: 0 warnings with `TreatWarningsAsErrors` and `EnforceCodeStyleInBuild`, so no caller and no stranded `using` remained.

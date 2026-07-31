@@ -70,6 +70,18 @@ public sealed class Mechanism
         object lowLevel = _mechanismParams.BuildMarshalable(scope);
         marshalledParams = lowLevel;
 
+        // A vendor block arrives already laid out: it has no [PackedForPkcs11] struct for
+        // UnmanagedMemory to marshal, because the generator never saw the vendor's type.
+        if (lowLevel is Pkcs11ParameterBlock prebuilt)
+        {
+            return new CK_MECHANISM
+            {
+                Mechanism = _type,
+                Parameter = prebuilt.Pointer,
+                ParameterLen = (NativeCULong)prebuilt.Length,
+            };
+        }
+
         int size = UnmanagedMemory.SizeOf(lowLevel.GetType());
         IntPtr block = scope.Allocate(size);
         UnmanagedMemory.Write(block, lowLevel);
