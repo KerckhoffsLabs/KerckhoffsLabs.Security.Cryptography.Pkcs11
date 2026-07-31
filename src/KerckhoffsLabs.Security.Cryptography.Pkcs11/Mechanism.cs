@@ -16,10 +16,122 @@ public sealed class Mechanism
     private readonly NativeCULong _type;
 
     /// <summary>
-    /// The raw parameter block for the <c>byte[]</c> constructors, copied into the call scope by
-    /// <see cref="Marshal"/>. <see langword="null"/> for every other constructor.
+    /// The raw parameter block for the <c>byte[]</c> and <c>ReadOnlySpan&lt;byte&gt;</c> constructors,
+    /// copied into the call scope by <see cref="Marshal"/>. <see langword="null"/> for every other
+    /// constructor.
     /// </summary>
     private readonly byte[]? _rawParameter;
+
+    /// <summary>
+    /// High level object with mechanism parameters
+    /// </summary>
+    private readonly MechanismParameters? _mechanismParams = null;
+
+    // The constructors form two blocks. The CKM-typed block below is the ordinary API and carries the
+    // documentation; the ulong-typed block after it is the vendor escape hatch and inherits it. Within
+    // each block they run from least to most raw — no parameter, then a typed descriptor, then a block
+    // of bytes the caller laid out — which is also the order of preference for reaching for them.
+
+    /// <summary>
+    /// Creates mechanism of given type with no parameter
+    /// </summary>
+    /// <param name="type">Mechanism type</param>
+    public Mechanism(CKM type) => _type = type.ToCULong();
+
+    /// <summary>
+    /// Creates mechanism of given type with object parameter.
+    /// </summary>
+    /// <remarks>
+    /// The parameter object is a managed descriptor holding nothing unmanaged, so the mechanism only
+    /// keeps a reference to it: each native call marshals it into that call's own scope. Sharing one
+    /// parameter instance across several mechanisms is therefore safe.
+    /// </remarks>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
+    public Mechanism(CKM type, MechanismParameters parameter)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+
+        _mechanismParams = parameter;
+        _type = type.ToCULong();
+    }
+
+    /// <summary>
+    /// Creates mechanism of given type whose parameter is a raw block of bytes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <paramref name="parameter"/> becomes <c>pParameter</c> verbatim, so it must be the mechanism's
+    /// <i>entire</i> parameter as the token expects to receive it. That is the right shape only where
+    /// PKCS#11 defines the parameter as a bare block — an IV for the CBC and CFB modes — or where a
+    /// vendor mechanism's block is one this library cannot describe. A mechanism whose parameter is a
+    /// <c>CK_*_PARAMS</c> struct takes a <see cref="MechanismParameters"/> descriptor instead; passing
+    /// the struct's leading field here produces a block the token rejects as malformed.
+    /// </para>
+    /// <para>
+    /// The span overloads exist for callers that already hold the block as a span — the CBC and CFB
+    /// modes do, on every operation. Taking an array there forced a <c>ToArray()</c> at the call site
+    /// purely to satisfy the signature, and the constructor's own defensive copy then made that first
+    /// array garbage; one copy is enough.
+    /// </para>
+    /// </remarks>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter, copied into the mechanism</param>
+    public Mechanism(CKM type, ReadOnlySpan<byte> parameter)
+    {
+        _type = type.ToCULong();
+        _rawParameter = parameter.ToArray();
+    }
+
+    /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
+    public Mechanism(CKM type, byte[] parameter)
+    {
+        _type = type.ToCULong();
+        _rawParameter = [.. parameter];
+    }
+
+    // The ulong-typed block: mechanisms outside CKM. Taking the type as a raw value rather than an
+    // invented enum member is the point — casting to CKM would assert the value is one this library
+    // knows, and for a vendor mechanism it is not.
+
+    /// <inheritdoc cref="Mechanism(CKM)"/>
+    /// <param name="type">Mechanism type</param>
+    public Mechanism(ulong type) => _type = (NativeCULong)type;
+
+    /// <inheritdoc cref="Mechanism(CKM, MechanismParameters)"/>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
+    public Mechanism(ulong type, MechanismParameters parameter)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+
+        _mechanismParams = parameter;
+        _type = (NativeCULong)type;
+    }
+
+    /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter, copied into the mechanism</param>
+    public Mechanism(ulong type, ReadOnlySpan<byte> parameter)
+    {
+        _type = (NativeCULong)type;
+        _rawParameter = parameter.ToArray();
+    }
+
+    /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
+    public Mechanism(ulong type, byte[] parameter)
+    {
+        _type = (NativeCULong)type;
+        _rawParameter = [.. parameter];
+    }
 
     /// <summary>
     /// The type of mechanism
@@ -109,103 +221,5 @@ public sealed class Mechanism
             return;
 
         _mechanismParams.AbsorbOutput(marshalledParams);
-    }
-
-    /// <summary>
-    /// High level object with mechanism parameters
-    /// </summary>
-    private readonly MechanismParameters? _mechanismParams = null;
-
-    /// <summary>
-    /// Creates mechanism of given type with no parameter
-    /// </summary>
-    /// <param name="type">Mechanism type</param>
-    public Mechanism(ulong type) => _type = (NativeCULong)type;
-
-    /// <summary>
-    /// Creates mechanism of given type with no parameter
-    /// </summary>
-    /// <param name="type">Mechanism type</param>
-    public Mechanism(CKM type) => _type = type.ToCULong();
-
-    /// <summary>
-    /// Creates mechanism of given type whose parameter is a raw block of bytes.
-    /// </summary>
-    /// <remarks>
-    /// <paramref name="parameter"/> becomes <c>pParameter</c> verbatim, so it must be the mechanism's
-    /// <i>entire</i> parameter as the token expects to receive it. That is the right shape only where
-    /// PKCS#11 defines the parameter as a bare block — an IV for the CBC and CFB modes — or where a
-    /// vendor mechanism's block is one this library cannot describe. A mechanism whose parameter is a
-    /// <c>CK_*_PARAMS</c> struct takes a <see cref="MechanismParameters"/> descriptor instead; passing
-    /// the struct's leading field here produces a block the token rejects as malformed.
-    /// </remarks>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
-    public Mechanism(ulong type, byte[] parameter)
-    {
-        _type = (NativeCULong)type;
-        _rawParameter = [.. parameter];
-    }
-
-    /// <inheritdoc cref="Mechanism(ulong, byte[])"/>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
-    public Mechanism(CKM type, byte[] parameter)
-    {
-        _type = type.ToCULong();
-        _rawParameter = [.. parameter];
-    }
-
-    /// <inheritdoc cref="Mechanism(ulong, byte[])"/>
-    /// <remarks>
-    /// The span overload exists for the CBC and CFB modes, which reach this constructor holding the IV
-    /// as a span: taking an array there forced a <c>ToArray()</c> at the call site purely to satisfy
-    /// the signature, and the constructor's own defensive copy then made that first array garbage. Both
-    /// symmetric block ciphers do this on every operation, so the copy is worth not making twice.
-    /// </remarks>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter, copied into the mechanism</param>
-    public Mechanism(CKM type, ReadOnlySpan<byte> parameter)
-    {
-        _type = type.ToCULong();
-        _rawParameter = parameter.ToArray();
-    }
-
-    /// <summary>
-    /// Creates mechanism of given type with object parameter.
-    /// </summary>
-    /// <remarks>
-    /// The parameter object is a managed descriptor holding nothing unmanaged, so the mechanism only
-    /// keeps a reference to it: each native call marshals it into that call's own scope. Sharing one
-    /// parameter instance across several mechanisms is therefore safe.
-    /// </remarks>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
-    public Mechanism(ulong type, MechanismParameters parameter)
-    {
-        ArgumentNullException.ThrowIfNull(parameter);
-
-        _mechanismParams = parameter;
-        _type = (NativeCULong)type;
-    }
-
-    /// <summary>
-    /// Creates mechanism of given type with object parameter.
-    /// </summary>
-    /// <remarks>
-    /// The parameter object is a managed descriptor holding nothing unmanaged, so the mechanism only
-    /// keeps a reference to it: each native call marshals it into that call's own scope. Sharing one
-    /// parameter instance across several mechanisms is therefore safe.
-    /// </remarks>
-    /// <param name="type">Mechanism type</param>
-    /// <param name="parameter">Mechanism parameter</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
-    public Mechanism(CKM type, MechanismParameters parameter)
-    {
-        ArgumentNullException.ThrowIfNull(parameter);
-
-        _mechanismParams = parameter;
-        _type = type.ToCULong();
     }
 }

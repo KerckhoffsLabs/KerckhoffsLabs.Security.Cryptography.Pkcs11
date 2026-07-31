@@ -206,6 +206,27 @@ public sealed class MechanismTests
         Assert.Equal(0UL, (ulong)marshalled.ParameterLen);
     }
 
+    // The vendor half of the span pair. It shares Marshal with its CKM sibling but not its own two
+    // lines — the mechanism value and the copy — and those are exactly what a vendor caller depends
+    // on: a type the enum cannot name, and a block that outlives the buffer it was read from.
+    [Fact]
+    public void Marshal_VendorTypeWithSpanParameter_CarriesBothTheTypeAndTheBlock()
+    {
+        byte[] source = [.. Enumerable.Range(0, 20).Select(i => (byte)(0x5A + i))];
+        byte[] expected = [.. source];
+        var mech = new Mechanism(CkmIbmEthDerive, new ReadOnlySpan<byte>(source));
+        using var scope = new MechanismParameterScope();
+
+        CryptographicOperations.ZeroMemory(source);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+
+        Assert.Equal(CkmIbmEthDerive, mech.Type);
+        Assert.Equal(CkmIbmEthDerive, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)expected.Length, (ulong)marshalled.ParameterLen);
+        Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
+        Assert.Null(mechParams);
+    }
+
     [Fact]
     public void Marshal_NoParameter_IsNullPointerAndZeroLength()
     {
