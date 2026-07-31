@@ -194,7 +194,10 @@ public sealed class MechanismTests
     [Fact]
     public void Marshal_EmptySpanParameter_IsNullPointerAndZeroLength()
     {
-        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN, ReadOnlySpan<byte>.Empty);
+        // Typed local rather than an inline `[]`: the constructor has a byte[] sibling, and naming the
+        // type is what keeps this test on the overload it is written for.
+        ReadOnlySpan<byte> empty = [];
+        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN, empty);
         using var scope = new MechanismParameterScope();
 
         CK_MECHANISM marshalled = mech.Marshal(scope, out _);

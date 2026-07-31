@@ -81,7 +81,10 @@ public sealed class UnmanagedMemoryTests
         IntPtr p = UnmanagedMemory.Allocate(4);
         try
         {
-            UnmanagedMemory.Write(p, new byte[] { 1, 2, 3, 4 });
+            // Typed local rather than an inline `[1, 2, 3, 4]`: Write has a ReadOnlySpan<byte> sibling
+            // that an untyped collection expression would bind to, silently retargeting this test.
+            byte[] content = [1, 2, 3, 4];
+            UnmanagedMemory.Write(p, content);
             Assert.Equal([1, 2, 3, 4], UnmanagedMemory.Read(p, 4));
 
             byte[] into = new byte[4];
