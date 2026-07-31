@@ -281,6 +281,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CreateObject</c> call.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when the template sets <c>CKA_SENSITIVE=false</c> and <see cref="AllowInsecure"/> is <c>false</c>.</exception>
     public Pkcs11Key ImportKey(ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

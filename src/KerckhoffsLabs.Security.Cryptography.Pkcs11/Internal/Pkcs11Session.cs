@@ -1451,16 +1451,6 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Returns the secure-default attributes (<c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c>)
-    /// to append to a key-creation template for any the caller omitted. Shared by every operation that
-    /// produces a key object from a template — unwrap, derive, KEM encapsulate/decapsulate, and
-    /// authenticated unwrap — so they all establish the same secure posture. If the caller supplied an
-    /// explicit insecure value (<c>CKA_SENSITIVE=false</c> or <c>CKA_EXTRACTABLE=true</c>), it is
-    /// permitted only when <see cref="AllowInsecure"/> is set; otherwise
-    /// <see cref="InsecureOperationException"/> is thrown. The returned attributes own unmanaged buffers
-    /// and must be disposed by the caller.
-    /// </summary>
-    /// <summary>
     /// Refuses a template that would make key material readable in plaintext, unless the caller has
     /// opted in.
     /// </summary>
@@ -1497,6 +1487,17 @@ internal sealed class Pkcs11Session : IDisposable
         }
     }
 
+    /// <summary>
+    /// Runs <see cref="GuardInsecureKeyAttributes"/>, then returns the secure-default attributes to
+    /// append for any the caller omitted — <c>CKA_SENSITIVE=true</c> and <c>CKA_EXTRACTABLE=false</c>.
+    /// </summary>
+    /// <remarks>
+    /// Used by the paths that create a secret or private key from a template, so they all start from
+    /// the same posture. The returned attributes own unmanaged buffers and must be disposed by the
+    /// caller. Note the asymmetry with the refusal: <c>CKA_EXTRACTABLE=false</c> is supplied as a
+    /// default here, but an explicit <c>CKA_EXTRACTABLE=true</c> is not refused — only
+    /// <c>CKA_SENSITIVE=false</c> is.
+    /// </remarks>
     private List<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes)
     {
         GuardInsecureKeyAttributes(attributes);

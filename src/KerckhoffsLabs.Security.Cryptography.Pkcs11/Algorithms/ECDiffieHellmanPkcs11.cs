@@ -77,6 +77,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyMaterial(ECDiffieHellmanPublicKey otherPartyPublicKey)
         => DeriveKeyFromHash(otherPartyPublicKey, HashAlgorithmName.SHA256, null, null);
 
@@ -134,6 +135,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyFromHmac(
         ECDiffieHellmanPublicKey otherPartyPublicKey,
         HashAlgorithmName hashAlgorithm,

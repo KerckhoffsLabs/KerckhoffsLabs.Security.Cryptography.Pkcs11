@@ -84,6 +84,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(byte[] label, byte[] context, int derivedKeyLengthInBytes)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -98,6 +99,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -114,6 +116,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
