@@ -34,12 +34,29 @@ internal static class ECDiffieHellmanPkcs11TestCases
 
     // Generates a P-256 key pair on the token (private half CKA_DERIVE) and hands the adapter to the
     // body. Skips where the backend lacks EC key-pair generation or ECDH derivation.
-    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body)
+    /// <summary>
+    /// Runs <paramref name="body"/> against an on-token EC key with the workspace opted in.
+    /// </summary>
+    /// <remarks>
+    /// Every <c>ECDiffieHellman</c> method returns <c>byte[]</c>, so this adapter reads the agreement
+    /// off the token in all of them — it cannot be implemented without extraction. The single gate in
+    /// <c>Pkcs11Session.BuildSecureKeyDefaults</c> therefore refuses the whole adapter unless the
+    /// caller opts in, which is what these tests do. <c>WithEcdhStrict</c> keeps the default posture
+    /// so the refusal itself stays covered.
+    /// </remarks>
+    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(backend, body, allowExtraction: true);
+
+    private static void WithEcdhStrict(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(backend, body, allowExtraction: false);
+
+    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDH1_DERIVE))
             throw new SkipTestException("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
 
         using var workspace = OpenWorkspace(backend);
+        if (allowExtraction) workspace.AllowInsecure = true;
         string label = $"ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 

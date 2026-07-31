@@ -34,6 +34,10 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        // Every byte-returning DeriveKey overload reads the derived value off the token, so the gate
+        // in BuildSecureKeyDefaults refuses them under the default posture. Opt in here; the refusal
+        // itself is covered by its own test.
+        workspace.AllowInsecure = true;
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf").Value(KeyBytes).Derive().Build();
         using var key = workspace.ImportKey(tpl);

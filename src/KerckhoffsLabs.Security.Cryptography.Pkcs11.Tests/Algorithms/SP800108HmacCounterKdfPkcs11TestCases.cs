@@ -48,6 +48,9 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     private static void WithImportedKdf(IPkcs11Backend backend, Action<Pkcs11Workspace, SP800108HmacCounterKdfPkcs11> body)
     {
         using var workspace = OpenWorkspace(backend);
+        // The byte-returning DeriveKey overloads read the derived value off the token, so the gate in
+        // BuildSecureKeyDefaults refuses them under the default posture. Opt in here.
+        workspace.AllowInsecure = true;
         string label = $"kdf-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(KeyBytes).Derive().Sign().OnToken(backend.SupportsTokenObjects).Build();

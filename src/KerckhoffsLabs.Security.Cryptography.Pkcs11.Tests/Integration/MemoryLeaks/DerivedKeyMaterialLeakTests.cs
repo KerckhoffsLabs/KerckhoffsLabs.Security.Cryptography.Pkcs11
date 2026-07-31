@@ -35,6 +35,7 @@ public sealed class DerivedKeyMaterialLeakTests
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        workspace.AllowInsecure = true; // reading derived bytes back is gated
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf-leak").Value(KeyBytes).Derive().Build();
         using var key = workspace.ImportKey(tpl);
@@ -61,6 +62,7 @@ public sealed class DerivedKeyMaterialLeakTests
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        workspace.AllowInsecure = true; // DeriveRawSecretAgreement hands Z to the caller and is gated
         using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         using var peer = ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);

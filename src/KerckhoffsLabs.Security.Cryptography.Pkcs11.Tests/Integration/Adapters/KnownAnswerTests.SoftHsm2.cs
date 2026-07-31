@@ -299,10 +299,11 @@ internal static class KnownAnswerTestCases
                 using var dext = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
                 using var dsens = new ObjectAttribute(CKA.CKA_SENSITIVE, false);
 
-                // enforceSecureDefaults: false — deliberately derive an ephemeral extractable secret to
-                // read CKA_VALUE for the KAT, then destroy it (the library's own ECDH helper does the same).
-                ObjectHandle derived = session.DeriveKey(
-                    mech, priv, [dc, dt, dvl, dtok, dext, dsens], enforceSecureDefaults: false);
+                // Deliberately derives an ephemeral extractable secret to read CKA_VALUE for the KAT,
+                // then destroys it — the same thing the library's ECDH helper does. Extraction is
+                // opted into here rather than bypassed: there is no longer a way to skip the gate.
+                using var insecure = session.AllowInsecureScope();
+                ObjectHandle derived = session.DeriveKey(mech, priv, [dc, dt, dvl, dtok, dext, dsens]);
                 try
                 {
                     var attrs = session.GetAttributeValue(derived, [CKA.CKA_VALUE]);

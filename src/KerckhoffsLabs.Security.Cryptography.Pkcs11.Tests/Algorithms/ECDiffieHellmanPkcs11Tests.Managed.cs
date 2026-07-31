@@ -53,10 +53,22 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     };
 
     // Generates an EC key pair on the token (private half CKA_DERIVE) and hands the adapter to the body.
-    private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body)
+    /// <summary>
+    /// Opts the workspace in: every method on this adapter returns bytes read off the token, so the
+    /// single gate in <c>BuildSecureKeyDefaults</c> refuses all of them by default.
+    /// <c>WithEcdhStrict</c> keeps the default posture for the tests that assert the refusal.
+    /// </summary>
+    private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(curve, body, allowExtraction: true);
+
+    private static void WithEcdhStrict(string curve, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(curve, body, allowExtraction: false);
+
+    private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        if (allowExtraction) workspace.AllowInsecure = true;
         using var key = workspace.GenerateEcKeyPair(Curves(curve).token);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         body(ecdh);
@@ -130,12 +142,53 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobZ, aliceZ);
     });
 
+    // === The AllowInsecure gate ============================================================
+
+    /// <summary>
+    /// Every method on this adapter returns key bytes read off the token, so all of them are refused
+    /// under the default posture — not just the raw-secret one.
+    /// </summary>
+    /// <remarks>
+    /// The refusal comes from <c>Pkcs11Session.BuildSecureKeyDefaults</c>, the single place that
+    /// decides whether extractable key material may be created. The adapter carries no guard of its
+    /// own, which is the point: there is nothing here that can drift out of step with the policy, and
+    /// a new adapter cannot forget to apply it.
+    /// </remarks>
+    [ConditionalTheory(nameof(Supported))]
+    [InlineData("raw")]
+    [InlineData("hash")]
+    [InlineData("hmac")]
+    [InlineData("material")]
+    public void WithoutAllowInsecure_EveryDerivationIsRefused(string method) => WithEcdhStrict("P-256", alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+
+        Assert.Throws<InsecureOperationException>(() => _ = method switch
+        {
+            "raw" => alice.DeriveRawSecretAgreement(bob.PublicKey),
+            "hash" => alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null),
+            "hmac" => alice.DeriveKeyFromHmac(bob.PublicKey, HashAlgorithmName.SHA256, null, null, null),
+            _ => alice.DeriveKeyMaterial(bob.PublicKey),
+        });
+    });
+
+    /// <summary>With the opt-in, the same calls work — the gate refuses, it does not disable.</summary>
+    [ConditionalFact(nameof(Supported))]
+    public void WithAllowInsecure_DerivationWorks() => WithEcdh("P-256", alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+
+        Assert.NotEmpty(alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null));
+        Assert.NotEmpty(alice.DeriveRawSecretAgreement(bob.PublicKey));
+    });
+
     // Two on-token key pairs agree with each other, and each agrees with the BCL in both directions.
     [ConditionalFact(nameof(Supported))]
     public void DeriveRawSecret_BothOnTokenParties_Match_AndMatchBcl()
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        workspace.AllowInsecure = true; // reads Z back on both sides
 
         using var aliceKey = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bobKey = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);

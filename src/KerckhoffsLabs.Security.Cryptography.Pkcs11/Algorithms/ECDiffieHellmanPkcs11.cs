@@ -27,6 +27,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// TLS-PRF primitive). Private-parameter export is refused; <see cref="ExportParameters(bool)"/> with
 /// <c>false</c> reads the public point from the token.
 /// </para>
+/// <para>
+/// <b>Requires <c>Pkcs11Workspace.AllowInsecure</c>.</b> Every method here returns <c>byte[]</c>, so
+/// the derived value must be read off the token — this adapter cannot be implemented without
+/// extracting key material. The refusal comes from the library's single secure-defaults gate, which
+/// declines to create the extractable, non-sensitive key the read-back needs. Use
+/// <c>AllowInsecureScope()</c> to opt in for one operation, or stay on the on-token
+/// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
+/// </para>
 /// </remarks>
 public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 {
@@ -73,15 +81,19 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         => DeriveKeyFromHash(otherPartyPublicKey, HashAlgorithmName.SHA256, null, null);
 
     /// <inheritdoc/>
-    /// <remarks>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</remarks>
+    /// <remarks>
+    /// <para>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</para>
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
         ArgumentNullException.ThrowIfNull(otherPartyPublicKey);
         return DeriveRawSecret(otherPartyPublicKey);
     }
+
 
     /// <inheritdoc/>
     /// <remarks>Computes <c>Hash(secretPrepend ‖ Z ‖ secretAppend)</c> over the raw agreement Z.</remarks>
@@ -178,7 +190,11 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             .Sensitive(false)
             .Build();
 
-        Pkcs11Key derived = _key.DeriveExtractable(mech, template);
+        // Public, gated path — the same one an external caller would use. The template asks for an
+        // extractable, non-sensitive key, so Pkcs11Session.BuildSecureKeyDefaults refuses unless the
+        // workspace has opted in. That single check is the whole policy; there is no adapter-local
+        // guard to keep in step with it.
+        Pkcs11Key derived = _key.Derive(mech, template);
         bool operationFailed = true;
         try
         {
