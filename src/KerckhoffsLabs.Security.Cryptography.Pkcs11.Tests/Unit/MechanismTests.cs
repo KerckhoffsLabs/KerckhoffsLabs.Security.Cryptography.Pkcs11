@@ -148,11 +148,53 @@ public sealed class MechanismTests
     }
 
     // Reaches the byte[] constructor with nothing in it — a mechanism that takes no parameter is the
-    // only way to do that without tripping the weak-mechanism gate.
+    // only way to do that without tripping the weak-mechanism gate. The cast is load-bearing: an
+    // untyped collection expression binds to the ReadOnlySpan<byte> sibling, so without it this would
+    // silently stop covering the constructor it is named for.
     [Fact]
     public void Marshal_EmptyByteArrayParameter_IsNullPointerAndZeroLength()
     {
-        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN, []);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN, (byte[])[]);
+        using var scope = new MechanismParameterScope();
+
+        CK_MECHANISM marshalled = mech.Marshal(scope, out _);
+
+        Assert.Equal(IntPtr.Zero, marshalled.Parameter);
+        Assert.Equal(0UL, (ulong)marshalled.ParameterLen);
+    }
+
+    // The span constructor is the one every CBC and CFB operation goes through: those paths hold the
+    // IV as a span, and taking an array there made each call copy it twice.
+    //
+    // Unlike its byte[] siblings, this one cannot alias the caller's buffer even in principle — a span
+    // does not fit in the byte[] field, so the copy is the type system's doing rather than a line that
+    // could regress. What is not guaranteed, and is what the zeroize below pins, is that the copy
+    // happens at construction: a design that captured the source and read it during Marshal would
+    // compile just as well and would hand the token whatever the buffer held by then. For a stack
+    // span that is not merely stale data but memory the frame no longer owns.
+    [Fact]
+    public void Marshal_SpanParameter_CopiesTheBytesAtConstruction()
+    {
+        byte[] source = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0];
+        byte[] expected = [.. source];
+        var mech = new Mechanism(CKM.CKM_AES_CBC, new ReadOnlySpan<byte>(source));
+        using var scope = new MechanismParameterScope();
+
+        CryptographicOperations.ZeroMemory(source);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+
+        Assert.Equal((ulong)CKM.CKM_AES_CBC, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)expected.Length, (ulong)marshalled.ParameterLen);
+        Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
+        Assert.Null(mechParams);
+    }
+
+    // An empty span is an absent parameter, not a pointer to nothing — the same distinction the byte[]
+    // sibling makes, asserted here because the two constructors build _rawParameter separately.
+    [Fact]
+    public void Marshal_EmptySpanParameter_IsNullPointerAndZeroLength()
+    {
+        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN, ReadOnlySpan<byte>.Empty);
         using var scope = new MechanismParameterScope();
 
         CK_MECHANISM marshalled = mech.Marshal(scope, out _);

@@ -158,8 +158,8 @@ public sealed class AesPkcs11 : Aes
 
     private static Mechanism CbcMechanism(ReadOnlySpan<byte> iv, PaddingMode paddingMode) => paddingMode switch
     {
-        PaddingMode.PKCS7 => new Mechanism(CKM.CKM_AES_CBC_PAD, iv.ToArray()),
-        PaddingMode.None => new Mechanism(CKM.CKM_AES_CBC, iv.ToArray()),
+        PaddingMode.PKCS7 => new Mechanism(CKM.CKM_AES_CBC_PAD, iv),
+        PaddingMode.None => new Mechanism(CKM.CKM_AES_CBC, iv),
         _ => throw new NotSupportedException(
             $"AesPkcs11 supports PKCS7 or None padding for CBC (CKM_AES_CBC_PAD / CKM_AES_CBC); got {paddingMode}."),
     };
@@ -178,8 +178,8 @@ public sealed class AesPkcs11 : Aes
             throw new NotSupportedException("AesPkcs11 CFB is a stream mode and supports only PaddingMode.None.");
         return feedbackSizeInBits switch
         {
-            128 => new Mechanism(CKM.CKM_AES_CFB128, iv.ToArray()),
-            8 => new Mechanism(CKM.CKM_AES_CFB8, iv.ToArray()),
+            128 => new Mechanism(CKM.CKM_AES_CFB128, iv),
+            8 => new Mechanism(CKM.CKM_AES_CFB8, iv),
             _ => throw new NotSupportedException(
                 $"AesPkcs11 CFB supports feedback size 128 (CKM_AES_CFB128) or 8 (CKM_AES_CFB8); got {feedbackSizeInBits} bits."),
         };

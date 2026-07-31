@@ -155,8 +155,8 @@ public sealed class TripleDESPkcs11 : TripleDES
 
     private static Mechanism CbcMechanism(ReadOnlySpan<byte> iv, PaddingMode paddingMode) => paddingMode switch
     {
-        PaddingMode.PKCS7 => new Mechanism(CKM.CKM_DES3_CBC_PAD, iv.ToArray()),
-        PaddingMode.None => new Mechanism(CKM.CKM_DES3_CBC, iv.ToArray()),
+        PaddingMode.PKCS7 => new Mechanism(CKM.CKM_DES3_CBC_PAD, iv),
+        PaddingMode.None => new Mechanism(CKM.CKM_DES3_CBC, iv),
         _ => throw new NotSupportedException(
             $"TripleDESPkcs11 supports PKCS7 or None padding for CBC (CKM_DES3_CBC_PAD / CKM_DES3_CBC); got {paddingMode}."),
     };

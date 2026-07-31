@@ -129,8 +129,16 @@ public sealed class Mechanism
     public Mechanism(CKM type) => _type = type.ToCULong();
 
     /// <summary>
-    /// Creates mechanism of given type with byte array parameter
+    /// Creates mechanism of given type whose parameter is a raw block of bytes.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="parameter"/> becomes <c>pParameter</c> verbatim, so it must be the mechanism's
+    /// <i>entire</i> parameter as the token expects to receive it. That is the right shape only where
+    /// PKCS#11 defines the parameter as a bare block — an IV for the CBC and CFB modes — or where a
+    /// vendor mechanism's block is one this library cannot describe. A mechanism whose parameter is a
+    /// <c>CK_*_PARAMS</c> struct takes a <see cref="MechanismParameters"/> descriptor instead; passing
+    /// the struct's leading field here produces a block the token rejects as malformed.
+    /// </remarks>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
     public Mechanism(ulong type, byte[] parameter)
@@ -139,15 +147,28 @@ public sealed class Mechanism
         _rawParameter = [.. parameter];
     }
 
-    /// <summary>
-    /// Creates mechanism of given type with byte array parameter
-    /// </summary>
+    /// <inheritdoc cref="Mechanism(ulong, byte[])"/>
     /// <param name="type">Mechanism type</param>
     /// <param name="parameter">Mechanism parameter, copied so later changes to the array are ignored</param>
     public Mechanism(CKM type, byte[] parameter)
     {
         _type = type.ToCULong();
         _rawParameter = [.. parameter];
+    }
+
+    /// <inheritdoc cref="Mechanism(ulong, byte[])"/>
+    /// <remarks>
+    /// The span overload exists for the CBC and CFB modes, which reach this constructor holding the IV
+    /// as a span: taking an array there forced a <c>ToArray()</c> at the call site purely to satisfy
+    /// the signature, and the constructor's own defensive copy then made that first array garbage. Both
+    /// symmetric block ciphers do this on every operation, so the copy is worth not making twice.
+    /// </remarks>
+    /// <param name="type">Mechanism type</param>
+    /// <param name="parameter">Mechanism parameter, copied into the mechanism</param>
+    public Mechanism(CKM type, ReadOnlySpan<byte> parameter)
+    {
+        _type = type.ToCULong();
+        _rawParameter = parameter.ToArray();
     }
 
     /// <summary>
