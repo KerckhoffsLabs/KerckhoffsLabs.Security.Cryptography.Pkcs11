@@ -53,16 +53,16 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     };
 
     // Generates an EC key pair on the token (private half CKA_DERIVE) and hands the adapter to the body.
-    private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body) =>
-        WithEcdh(curve, body, allowExtraction: false);
-
     /// <summary>
-    /// As <c>WithEcdh</c>, for the cases that read the raw agreement Z back. That path is gated
-    /// behind <c>AllowInsecure</c> — it is the only one that hands secret material to the caller —
-    /// so those tests opt in explicitly rather than the helper relaxing the posture for everyone.
+    /// Opts the workspace in: every method on this adapter returns bytes read off the token, so the
+    /// single gate in <c>BuildSecureKeyDefaults</c> refuses all of them by default.
+    /// <c>WithEcdhStrict</c> keeps the default posture for the tests that assert the refusal.
     /// </summary>
-    private static void WithEcdhExtracting(string curve, Action<ECDiffieHellmanPkcs11> body) =>
+    private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body) =>
         WithEcdh(curve, body, allowExtraction: true);
+
+    private static void WithEcdhStrict(string curve, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(curve, body, allowExtraction: false);
 
     private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
     {
@@ -131,7 +131,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     [ConditionalTheory(nameof(Supported))]
     [InlineData("P-256")]
     [InlineData("P-384")]
-    public void DeriveRawSecretAgreement_MatchesBcl(string curve) => WithEcdhExtracting(curve, alice =>
+    public void DeriveRawSecretAgreement_MatchesBcl(string curve) => WithEcdh(curve, alice =>
     {
         using var bob = ECDiffieHellman.Create(Curves(curve).bcl);
 
@@ -142,36 +142,44 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobZ, aliceZ);
     });
 
-    // === The AllowInsecure gate on raw-secret extraction ==================================
+    // === The AllowInsecure gate ============================================================
 
     /// <summary>
-    /// <c>DeriveRawSecretAgreement</c> hands the raw agreement Z to the caller, so it is refused
-    /// unless the workspace opts in — the same posture ML-KEM's shared-secret extraction enforces.
+    /// Every method on this adapter returns key bytes read off the token, so all of them are refused
+    /// under the default posture — not just the raw-secret one.
     /// </summary>
-    [ConditionalFact(nameof(Supported))]
-    public void DeriveRawSecretAgreement_WithoutAllowInsecure_Throws() => WithEcdh("P-256", alice =>
+    /// <remarks>
+    /// The refusal comes from <c>Pkcs11Session.BuildSecureKeyDefaults</c>, the single place that
+    /// decides whether extractable key material may be created. The adapter carries no guard of its
+    /// own, which is the point: there is nothing here that can drift out of step with the policy, and
+    /// a new adapter cannot forget to apply it.
+    /// </remarks>
+    [ConditionalTheory(nameof(Supported))]
+    [InlineData("raw")]
+    [InlineData("hash")]
+    [InlineData("hmac")]
+    [InlineData("material")]
+    public void WithoutAllowInsecure_EveryDerivationIsRefused(string method) => WithEcdhStrict("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
-        var ex = Assert.Throws<InsecureOperationException>(
-            () => alice.DeriveRawSecretAgreement(bob.PublicKey));
-
-        Assert.Contains("AllowInsecure", ex.Message, StringComparison.Ordinal);
+        Assert.Throws<InsecureOperationException>(() => _ = method switch
+        {
+            "raw" => alice.DeriveRawSecretAgreement(bob.PublicKey),
+            "hash" => alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null),
+            "hmac" => alice.DeriveKeyFromHmac(bob.PublicKey, HashAlgorithmName.SHA256, null, null, null),
+            _ => alice.DeriveKeyMaterial(bob.PublicKey),
+        });
     });
 
-    /// <summary>
-    /// The gate must be narrow. The KDF paths derive from the same Z but consume and zeroize it
-    /// inside the library, so nothing secret reaches the caller and they stay open by default —
-    /// gating them would make the adapter unusable without weakening the whole workspace.
-    /// </summary>
+    /// <summary>With the opt-in, the same calls work — the gate refuses, it does not disable.</summary>
     [ConditionalFact(nameof(Supported))]
-    public void KdfPaths_AreNotGated() => WithEcdh("P-256", alice =>
+    public void WithAllowInsecure_DerivationWorks() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
         Assert.NotEmpty(alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null));
-        Assert.NotEmpty(alice.DeriveKeyFromHmac(bob.PublicKey, HashAlgorithmName.SHA256, null, null, null));
-        Assert.NotEmpty(alice.DeriveKeyMaterial(bob.PublicKey));
+        Assert.NotEmpty(alice.DeriveRawSecretAgreement(bob.PublicKey));
     });
 
     // Two on-token key pairs agree with each other, and each agrees with the BCL in both directions.
@@ -211,7 +219,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     // reproduce on both sides. The token key is fresh each run, so the KAT pins the token<->BCL
     // agreement to the BCL's own computation for the same inputs (round-trip identity in both directions).
     [ConditionalFact(nameof(Supported))]
-    public void DeriveKeyFromHash_KnownVectorPeer_RoundTripsBothDirections() => WithEcdhExtracting("P-256", alice =>
+    public void DeriveKeyFromHash_KnownVectorPeer_RoundTripsBothDirections() => WithEcdh("P-256", alice =>
     {
         // RFC 5114 / SP 800-56A P-256 sample static key pair "dA" (a fixed, well-formed P-256 key).
         ECParameters fixedPeer = new()
@@ -250,7 +258,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
     // The exported public point must be a valid P-256 point the BCL can agree against.
     [ConditionalFact(nameof(Supported))]
-    public void ExportedPublicKey_IsUsableByBcl() => WithEcdhExtracting("P-256", alice =>
+    public void ExportedPublicKey_IsUsableByBcl() => WithEcdh("P-256", alice =>
     {
         ECParameters pub = alice.ExportParameters(includePrivateParameters: false);
         using var bobFromExport = ECDiffieHellman.Create(pub);

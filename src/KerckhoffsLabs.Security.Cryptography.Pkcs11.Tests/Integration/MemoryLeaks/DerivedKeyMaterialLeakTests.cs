@@ -35,6 +35,7 @@ public sealed class DerivedKeyMaterialLeakTests
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        workspace.AllowInsecure = true; // reading derived bytes back is gated
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf-leak").Value(KeyBytes).Derive().Build();
         using var key = workspace.ImportKey(tpl);

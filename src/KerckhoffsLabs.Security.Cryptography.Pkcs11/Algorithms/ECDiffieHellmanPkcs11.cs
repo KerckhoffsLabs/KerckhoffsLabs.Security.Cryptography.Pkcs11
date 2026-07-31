@@ -27,6 +27,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// TLS-PRF primitive). Private-parameter export is refused; <see cref="ExportParameters(bool)"/> with
 /// <c>false</c> reads the public point from the token.
 /// </para>
+/// <para>
+/// <b>Requires <c>Pkcs11Workspace.AllowInsecure</c>.</b> Every method here returns <c>byte[]</c>, so
+/// the derived value must be read off the token — this adapter cannot be implemented without
+/// extracting key material. The refusal comes from the library's single secure-defaults gate, which
+/// declines to create the extractable, non-sensitive key the read-back needs. Use
+/// <c>AllowInsecureScope()</c> to opt in for one operation, or stay on the on-token
+/// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
+/// </para>
 /// </remarks>
 public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 {
@@ -75,11 +83,6 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <inheritdoc/>
     /// <remarks>
     /// <para>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</para>
-    /// <para>
-    /// Gated: this is the one ECDH path that hands raw secret material to the caller, so it requires
-    /// <see cref="Pkcs11Workspace.AllowInsecure"/>. The KDF paths are not gated — they consume Z
-    /// inside the library and zeroize it, so nothing secret reaches the caller.
-    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
@@ -88,38 +91,9 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
         ArgumentNullException.ThrowIfNull(otherPartyPublicKey);
-        GuardRawSecretExtraction();
         return DeriveRawSecret(otherPartyPublicKey);
     }
 
-    /// <summary>
-    /// Refuses to hand the raw agreement Z to the caller unless the workspace has opted in.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// This mirrors <c>MLKemPkcs11.GuardExtraction</c>, and the line between them is the same one:
-    /// <b>does secret material reach the caller?</b> It does here, and there is no way to wipe it
-    /// afterwards — the caller owns the array. In <see cref="DeriveKeyFromHash"/> and
-    /// <see cref="DeriveKeyFromHmac"/> the same Z crosses the boundary, but the library consumes it
-    /// and zeroizes it, so those stay ungated.
-    /// </para>
-    /// <para>
-    /// Gating only this method is therefore not cosmetic: it is the only ECDH entry point after which
-    /// the shared secret exists in memory the library does not control.
-    /// </para>
-    /// </remarks>
-    private void GuardRawSecretExtraction()
-    {
-        if (_key.AllowInsecure) return;
-
-        throw new InsecureOperationException(
-            "ECDiffieHellmanPkcs11.DeriveRawSecretAgreement returns the raw shared secret Z to the "
-            + "caller, which leaves it in memory the library cannot wipe. This violates the "
-            + "non-extractable-by-default posture. Use DeriveKeyFromHash / DeriveKeyFromHmac / "
-            + "DeriveKeyMaterial, which derive from Z and zeroize it, or set "
-            + "Pkcs11Workspace.AllowInsecure = true (or use Pkcs11Workspace.AllowInsecureScope()) "
-            + "to opt in.");
-    }
 
     /// <inheritdoc/>
     /// <remarks>Computes <c>Hash(secretPrepend ‖ Z ‖ secretAppend)</c> over the raw agreement Z.</remarks>
@@ -216,7 +190,11 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             .Sensitive(false)
             .Build();
 
-        Pkcs11Key derived = _key.DeriveExtractable(mech, template);
+        // Public, gated path — the same one an external caller would use. The template asks for an
+        // extractable, non-sensitive key, so Pkcs11Session.BuildSecureKeyDefaults refuses unless the
+        // workspace has opted in. That single check is the whole policy; there is no adapter-local
+        // guard to keep in step with it.
+        Pkcs11Key derived = _key.Derive(mech, template);
         bool operationFailed = true;
         try
         {

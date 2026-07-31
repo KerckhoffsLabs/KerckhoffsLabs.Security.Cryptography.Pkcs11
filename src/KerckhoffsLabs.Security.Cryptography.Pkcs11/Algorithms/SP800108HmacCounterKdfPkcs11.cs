@@ -31,6 +31,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// Does not take ownership of the base key — disposing this provider does not dispose it.
 /// </para>
+/// <para>
+/// <b>Requires <c>Pkcs11Workspace.AllowInsecure</c>.</b> Every method here returns <c>byte[]</c>, so
+/// the derived value must be read off the token — this adapter cannot be implemented without
+/// extracting key material. The refusal comes from the library's single secure-defaults gate, which
+/// declines to create the extractable, non-sensitive key the read-back needs. Use
+/// <c>AllowInsecureScope()</c> to opt in for one operation, or stay on the on-token
+/// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
+/// </para>
 /// </remarks>
 public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 {
@@ -157,7 +165,11 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
             .Sensitive(false)
             .Build();
 
-        Pkcs11Key derived = _key.DeriveExtractable(mech, template);
+        // Public, gated path — the same one an external caller would use. The template asks for an
+        // extractable, non-sensitive key, so Pkcs11Session.BuildSecureKeyDefaults refuses unless the
+        // workspace has opted in. That single check is the whole policy; there is no adapter-local
+        // guard to keep in step with it.
+        Pkcs11Key derived = _key.Derive(mech, template);
         bool operationFailed = true;
         try
         {

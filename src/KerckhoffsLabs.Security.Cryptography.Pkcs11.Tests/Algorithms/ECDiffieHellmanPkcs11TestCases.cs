@@ -35,18 +35,19 @@ internal static class ECDiffieHellmanPkcs11TestCases
     // Generates a P-256 key pair on the token (private half CKA_DERIVE) and hands the adapter to the
     // body. Skips where the backend lacks EC key-pair generation or ECDH derivation.
     /// <summary>
-    /// As <c>WithEcdh</c>, but with the workspace opted in to insecure operations.
+    /// Runs <paramref name="body"/> against an on-token EC key with the workspace opted in.
     /// </summary>
     /// <remarks>
-    /// <c>DeriveRawSecretAgreement</c> hands the raw agreement Z to the caller, so it is gated behind
-    /// <c>AllowInsecure</c> exactly as ML-KEM's shared-secret extraction is. Tests that genuinely
-    /// need Z opt in here; everything else keeps running against the default posture, which is what
-    /// keeps the gate honest.
+    /// Every <c>ECDiffieHellman</c> method returns <c>byte[]</c>, so this adapter reads the agreement
+    /// off the token in all of them — it cannot be implemented without extraction. The single gate in
+    /// <c>Pkcs11Session.BuildSecureKeyDefaults</c> therefore refuses the whole adapter unless the
+    /// caller opts in, which is what these tests do. <c>WithEcdhStrict</c> keeps the default posture
+    /// so the refusal itself stays covered.
     /// </remarks>
-    private static void WithEcdhExtracting(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
+    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
         WithEcdh(backend, body, allowExtraction: true);
 
-    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
+    private static void WithEcdhStrict(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
         WithEcdh(backend, body, allowExtraction: false);
 
     private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
@@ -133,7 +134,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         });
 
     internal static void Assert_DeriveKeyFromHmac_NullKey_UsesSecret_AgreesWithBcl(IPkcs11Backend backend) =>
-        WithEcdhExtracting(backend, alice =>
+        WithEcdh(backend, alice =>
         {
             using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
@@ -144,7 +145,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         });
 
     internal static void Assert_DeriveRawSecretAgreement_MatchesBcl(IPkcs11Backend backend) =>
-        WithEcdhExtracting(backend, alice =>
+        WithEcdh(backend, alice =>
         {
             using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
