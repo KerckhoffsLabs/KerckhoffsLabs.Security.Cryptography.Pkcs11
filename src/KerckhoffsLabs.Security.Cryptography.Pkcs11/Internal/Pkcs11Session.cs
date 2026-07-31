@@ -625,23 +625,29 @@ internal sealed class Pkcs11Session : IDisposable
             secondParamName);
     }
 
-    private void GuardMechanism(CKM mechanism)
+    // Takes the Mechanism rather than a CKM so the conversion happens once, here, instead of at all
+    // ~50 call sites. The cast is meaningful only for mechanisms this enum names: a vendor-defined
+    // value lands in `default` and is not gated, which is correct — the policy encodes verdicts about
+    // known-weak algorithms, and it has none to offer about a mechanism it has never heard of.
+    private void GuardMechanism(Mechanism mechanism)
     {
         if (AllowInsecure) return;
 
-        switch (mechanism)
+        CKM mechanismType = (CKM)mechanism.Type;
+
+        switch (mechanismType)
         {
             case CKM.CKM_RSA_PKCS:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks and fault attacks; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
             case CKM.CKM_MD5_RSA_PKCS:
             case CKM.CKM_SHA1_RSA_PKCS:
             case CKM.CKM_SHA1_RSA_PKCS_PSS:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "MD5/SHA-1 in RSA signature contexts is broken (SHAttered breaks PSS-SHA-1 too); use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256 instead.");
             case CKM.CKM_MD5:
             case CKM.CKM_SHA_1:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "MD5 and SHA-1 are broken hash functions; use CKM_SHA256 or stronger.");
             case CKM.CKM_DES_ECB:
             case CKM.CKM_DES_CBC:
@@ -649,25 +655,25 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_DES3_ECB:
             case CKM.CKM_DES3_CBC:
             case CKM.CKM_DES3_CBC_PAD:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CCM) instead.");
             case CKM.CKM_DES_MAC:
             case CKM.CKM_DES_MAC_GENERAL:
             case CKM.CKM_DES3_MAC:
             case CKM.CKM_DES3_MAC_GENERAL:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "DES/3DES MAC is weak; use CKM_AES_CMAC or CKM_SHA256_HMAC instead.");
             case CKM.CKM_DES_KEY_GEN:
             case CKM.CKM_DES2_KEY_GEN:
             case CKM.CKM_DES3_KEY_GEN:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "DES and 3DES key generation produces deprecated keys; use CKM_AES_KEY_GEN instead.");
             case CKM.CKM_DES3_ECB_ENCRYPT_DATA:
             case CKM.CKM_DES3_CBC_ENCRYPT_DATA:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "DES3 key-derive mechanisms are weak; use CKM_SP800_108-family KDFs or CKM_AES_CBC_ENCRYPT_DATA on a strong base key instead.");
             case CKM.CKM_AES_ECB:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CCM instead.");
             case CKM.CKM_AES_CBC:
             case CKM.CKM_AES_CBC_PAD:
@@ -678,11 +684,11 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_AES_CFB8:
             case CKM.CKM_AES_CFB64:
             case CKM.CKM_AES_CFB128:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. To use these for legacy interop, set Pkcs11Workspace.AllowInsecure = true.");
             case CKM.CKM_RC4:
             case CKM.CKM_RC4_KEY_GEN:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "RC4 is a broken stream cipher with a biased keystream (prohibited in TLS by RFC 7465); use CKM_AES_GCM.");
             case CKM.CKM_RC2_ECB:
             case CKM.CKM_RC2_CBC:
@@ -690,7 +696,7 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_RC2_MAC:
             case CKM.CKM_RC2_MAC_GENERAL:
             case CKM.CKM_RC2_KEY_GEN:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "RC2 is a deprecated 40/64-bit-key cipher with known weaknesses; use CKM_AES_GCM.");
             case CKM.CKM_SEED_ECB:
             case CKM.CKM_SEED_CBC:
@@ -700,14 +706,14 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_SEED_KEY_GEN:
             case CKM.CKM_SEED_CBC_ENCRYPT_DATA:
             case CKM.CKM_SEED_ECB_ENCRYPT_DATA:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "SEED is a legacy regional cipher retained only for Korean-standard interop; use CKM_AES_GCM.");
             case CKM.CKM_MD2:
             case CKM.CKM_MD2_HMAC:
             case CKM.CKM_MD2_HMAC_GENERAL:
             case CKM.CKM_MD2_KEY_DERIVATION:
             case CKM.CKM_MD2_RSA_PKCS:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "MD2 is a broken hash function; use CKM_SHA256 or stronger.");
             case CKM.CKM_RIPEMD128:
             case CKM.CKM_RIPEMD128_HMAC:
@@ -717,15 +723,15 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_RIPEMD160_HMAC:
             case CKM.CKM_RIPEMD160_HMAC_GENERAL:
             case CKM.CKM_RIPEMD160_RSA_PKCS:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "RIPEMD-128/160 are deprecated hash functions; use CKM_SHA256 or stronger.");
             case CKM.CKM_SHA_1_HMAC:
             case CKM.CKM_SHA_1_HMAC_GENERAL:
             case CKM.CKM_ECDSA_SHA1:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "SHA-1 is collision-broken and deprecated in signature/MAC contexts; use CKM_SHA256_HMAC or CKM_ECDSA_SHA256.");
             case CKM.CKM_RSA_X_509:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "Raw RSA (X.509, no padding) is malleable and forgeable; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
             case CKM.CKM_DSA:
             case CKM.CKM_DSA_SHA1:
@@ -733,7 +739,7 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_DSA_SHA256:
             case CKM.CKM_DSA_SHA384:
             case CKM.CKM_DSA_SHA512:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys; use CKM_ECDSA_SHA256 or CKM_ML_DSA.");
             case CKM.CKM_CAST_ECB:
             case CKM.CKM_CAST_CBC:
@@ -755,7 +761,7 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_CAST128_MAC:
             case CKM.CKM_CAST128_MAC_GENERAL:
             case CKM.CKM_CAST128_KEY_GEN:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
             case CKM.CKM_RC5_ECB:
             case CKM.CKM_RC5_CBC:
@@ -763,12 +769,12 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_RC5_MAC:
             case CKM.CKM_RC5_MAC_GENERAL:
             case CKM.CKM_RC5_KEY_GEN:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
             case CKM.CKM_BLOWFISH_CBC:
             case CKM.CKM_BLOWFISH_CBC_PAD:
             case CKM.CKM_BLOWFISH_KEY_GEN:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "Blowfish is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
             case CKM.CKM_SKIPJACK_KEY_GEN:
             case CKM.CKM_SKIPJACK_ECB64:
@@ -781,7 +787,7 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_SKIPJACK_WRAP:
             case CKM.CKM_SKIPJACK_PRIVATE_WRAP:
             case CKM.CKM_SKIPJACK_RELAYX:
-                throw new InsecureOperationException(mechanism,
+                throw new InsecureOperationException(mechanismType,
                     "SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses; use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping).");
             default:
                 return;
@@ -1260,7 +1266,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKey");
 
@@ -1309,7 +1315,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
         GuardKeyPairStrength((CKM)mechanism.Type, publicKeyAttributes);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKeyPair");
@@ -1362,7 +1368,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
@@ -1419,7 +1425,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(wrappedKey);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
@@ -1639,7 +1645,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
 
@@ -1715,7 +1721,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt2");
 
@@ -1742,7 +1748,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt3");
 
@@ -1843,7 +1849,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageEncrypt");
 
@@ -1930,7 +1936,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 
@@ -1980,7 +1986,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt2");
 
@@ -2006,7 +2012,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt3");
 
@@ -2097,7 +2103,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
 
@@ -2166,7 +2172,7 @@ internal sealed class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
@@ -2224,7 +2230,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
 
@@ -2260,7 +2266,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify2");
 
@@ -2288,7 +2294,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify3");
 
@@ -2348,7 +2354,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifyRecover");
 
@@ -2398,8 +2404,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism((CKM)verificationMechanism.Type);
-        GuardMechanism((CKM)decryptionMechanism.Type);
+        GuardMechanism(verificationMechanism);
+        GuardMechanism(decryptionMechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify1");
 
@@ -2434,8 +2440,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism((CKM)verificationMechanism.Type);
-        GuardMechanism((CKM)decryptionMechanism.Type);
+        GuardMechanism(verificationMechanism);
+        GuardMechanism(decryptionMechanism);
 
         ThrowIfOneDescriptorDrivesBothHalves(verificationMechanism, decryptionMechanism, nameof(decryptionMechanism));
 
@@ -2473,8 +2479,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism((CKM)verificationMechanism.Type);
-        GuardMechanism((CKM)decryptionMechanism.Type);
+        GuardMechanism(verificationMechanism);
+        GuardMechanism(decryptionMechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify3");
 
@@ -2558,7 +2564,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
@@ -2618,7 +2624,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
 
@@ -2653,7 +2659,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest2");
 
@@ -2676,7 +2682,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest3");
 
@@ -2745,8 +2751,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
 
-        GuardMechanism((CKM)digestingMechanism.Type);
-        GuardMechanism((CKM)encryptionMechanism.Type);
+        GuardMechanism(digestingMechanism);
+        GuardMechanism(encryptionMechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt1");
 
@@ -2776,8 +2782,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
 
-        GuardMechanism((CKM)digestingMechanism.Type);
-        GuardMechanism((CKM)encryptionMechanism.Type);
+        GuardMechanism(digestingMechanism);
+        GuardMechanism(encryptionMechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt2");
 
@@ -2808,8 +2814,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
 
-        GuardMechanism((CKM)digestingMechanism.Type);
-        GuardMechanism((CKM)encryptionMechanism.Type);
+        GuardMechanism(digestingMechanism);
+        GuardMechanism(encryptionMechanism);
 
         ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, encryptionMechanism, nameof(encryptionMechanism));
 
@@ -2925,8 +2931,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism((CKM)digestingMechanism.Type);
-        GuardMechanism((CKM)decryptionMechanism.Type);
+        GuardMechanism(digestingMechanism);
+        GuardMechanism(decryptionMechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest1");
 
@@ -2956,8 +2962,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism((CKM)digestingMechanism.Type);
-        GuardMechanism((CKM)decryptionMechanism.Type);
+        GuardMechanism(digestingMechanism);
+        GuardMechanism(decryptionMechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest2");
 
@@ -2988,8 +2994,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism((CKM)digestingMechanism.Type);
-        GuardMechanism((CKM)decryptionMechanism.Type);
+        GuardMechanism(digestingMechanism);
+        GuardMechanism(decryptionMechanism);
 
         ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, decryptionMechanism, nameof(decryptionMechanism));
 
@@ -3101,7 +3107,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
@@ -3264,7 +3270,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
@@ -3356,7 +3362,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
 
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
@@ -3413,7 +3419,7 @@ internal sealed class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
@@ -3462,7 +3468,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
@@ -3522,7 +3528,7 @@ internal sealed class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
@@ -3565,7 +3571,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(inputStream);
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be a positive number.", nameof(bufferLength));
-        GuardMechanism((CKM)mechanism.Type);
+        GuardMechanism(mechanism);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 

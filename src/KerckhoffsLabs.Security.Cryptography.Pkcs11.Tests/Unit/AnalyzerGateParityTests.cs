@@ -49,7 +49,10 @@ public sealed class AnalyzerGateParityTests
         {
             try
             {
-                guard.Invoke(session, [mechanism]);
+                // The gate takes a Mechanism, not a CKM, so that it converts once rather than at every
+                // call site; wrap the value here rather than reaching for the enum overload that no
+                // longer exists.
+                guard.Invoke(session, [new Mechanism(mechanism)]);
             }
             catch (TargetInvocationException ex) when (ex.InnerException is InsecureOperationException)
             {

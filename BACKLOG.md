@@ -545,15 +545,20 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Yes if changed — decide before 1.0
 - **Raised by:** .NET Engineer A
 
-### [BL-040] `Mechanism.Type` exposes only a raw `ulong`; no `CKM`-typed accessor
+### [BL-040] The `CKM`/`ulong` boundary is unsettled: no typed accessor on `Mechanism`, and `GetMechanismList` silently drops vendor mechanisms
 - **Area:** .NET API Design
 - **Severity:** Low
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Mechanism.cs:25`; cast sites `Pkcs11Key.cs:624,632,652`
-- **Problem:** Consumers (and the library itself) must write `(CKM)mechanism.Type`; there is a `CKM` constructor but no typed getter.
-- **Proposed action:** Add `public CKM MechanismType` (or `TryGetMechanism(out CKM)`), keeping `ulong` for vendor mechanisms. Additive.
-- **Breaks public API?** No
-- **Raised by:** .NET Engineer A
+- **Location:** `Mechanism.cs` (`Type`); `Pkcs11Slot.cs:97` (`GetMechanismList`); remaining cast sites `Pkcs11Key.cs:671,679,699`, `Algorithms/ECDsaPkcs11.cs:93,136`, `Algorithms/DSAPkcs11.cs:108,119`, `Internal/Pkcs11Session.cs:1319`
+- **Problem:** `Mechanism.Type` is a raw `ulong`, so callers write `(CKM)mechanism.Type`. The original entry counted three cast sites; the real count was 57, of which 49 were `GuardMechanism((CKM)mechanism.Type)` inside `Pkcs11Session`.
+  - **The internal half is resolved (2026-07-31).** `GuardMechanism` now takes the `Mechanism` and converts once, so those 49 casts became one. That was never an argument for a public accessor: a guard should take the object, not a projection of it, and `GuardMechanism(mechanism.MechanismType)` would still have been 49 call sites performing a conversion the callee should own. Eight casts remain, spread over four files, which is ordinary.
+  - **What is left is a design decision, not a missing convenience.** A bare `public CKM MechanismType` would be lossy in the direction the library has been widening: there are now four `ulong` constructors for vendor mechanisms, and a value such as `0x80070002` has no `CKM` member, so the property would hand back an enum value that names nothing while looking authoritative. `NativeCULongExtensions.ToCKM` already documents this as a deliberate choice — it is non-validating "unlike most `ToCK*` converters" precisely because mechanism values may be vendor-defined or newer than the enum. A typed property is that same unchecked cast with the warning label removed.
+  - **The same boundary is broken in the other direction, and worse.** `Pkcs11Slot.GetMechanismList()` returns `IReadOnlyList<CKM>` and drops vendor-defined mechanisms that have no enum member; its own remarks admit this and anticipate "a future overload returning raw `ulong` values." So a caller cannot *discover* a vendor mechanism through the public API while the library offers four constructors for *using* one.
+- **Proposed action:** Settle both directions under one convention rather than adding a getter. `IsVendorDefined` (`Type >= (ulong)CKM.CKM_VENDOR_DEFINED`) answers the question that decides whether a `CKM` view means anything, and is more useful than a typed accessor; add `TryGetMechanism(out CKM)` rather than a bare property if a typed read is wanted; add the raw `ulong` overload of `GetMechanismList` its own docs promise. Do **not** add `public CKM MechanismType`.
+- **Scheduling note:** sequence after BL-002. This is the most consequential public-surface decision left, and with an API baseline in place the change arrives as a reviewable surface diff instead of on trust.
+- **Breaks public API?** No (additive)
+- **Related:** BL-002 (the gate that should front this change); the vendor constructor set on `Mechanism` that makes the lossiness concrete.
+- **Raised by:** .NET Engineer A; scope corrected 2026-07-31 after measuring the cast sites
 
 ### [BL-041] ✅ RESOLVED — Legacy-crypto `[Obsolete]` attributes lack `DiagnosticId`, forcing blanket CS0618 suppression
 - **Status:** Resolved 2026-07-14. Every obsoletion now carries a stable `DiagnosticId` + `UrlFormat` (ids centralized in `DiagnosticIds.cs`): KLPKCS11001 MD5, …002 SHA-1, …003 DES, …004 Triple-DES, …005 RC2, …006 DSA, …007 weak EC curves (the 10 sub-128-bit named curves — beyond the finding's 6 façades, same class of problem). New `docs/diagnostics.md` (wired into the TOC) documents each id, shows precise `#pragma`/`NoWarn` suppression, and states that suppressing the compiler diagnostic does *not* disable the runtime `AllowInsecure` gate; the `UrlFormat` resolves to its anchor. All 22 in-repo suppressions migrated from blanket `CS0618` to the specific id. New `ObsoleteDiagnosticIdTests` pins every id to its type (they are a public contract consumers write into their builds) and sweeps the exported surface so a future bare `[Obsolete]` fails the build. Full suite green (1696 passed).
