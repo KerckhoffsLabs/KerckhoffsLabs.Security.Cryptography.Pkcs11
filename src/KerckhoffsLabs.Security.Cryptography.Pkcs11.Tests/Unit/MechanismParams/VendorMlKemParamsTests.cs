@@ -65,14 +65,22 @@ public sealed class VendorMlKemParamsTests
             .CkObjectHandle(secretHandle);
     }
 
-    /// <summary>Sizes and offsets a C compiler produces for the header above, per platform.</summary>
+    /// <summary>
+    /// Sizes and offsets a C compiler produces for the header above, per platform.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on <c>CK_ULONG</c> width and pointer width <i>separately</i>, because on 64-bit Windows
+    /// they differ: <c>CK_ULONG</c> is <c>unsigned long</c> — four bytes — while pointers are eight.
+    /// Deriving one from the other gives 65 where the answer is 41, which is exactly the mistake the
+    /// Windows CI legs caught in an earlier revision of this test.
+    /// </remarks>
     private static (int Total, int PrependOffset, int CipherOffset) Expected =>
-        (IntPtr.Size, Pkcs11Marshal.IsWindows) switch
+        (Word, IntPtr.Size, Pkcs11Marshal.IsWindows) switch
         {
-            (8, false) => (72, 24, 32),
-            (8, true) => (65, 24, 25),
-            (4, false) => (36, 12, 16),
-            _ => (33, 12, 13),
+            (8, 8, false) => (72, 24, 32),   // Linux / macOS 64-bit, naturally aligned
+            (4, 8, true) => (41, 12, 13),    // Windows x64 and arm64, packed
+            (4, 4, true) => (33, 12, 13),    // Windows x86, packed
+            _ => (36, 12, 16),               // 32-bit, naturally aligned
         };
 
     private static int Word => UnmanagedMemory.NativeULongSize;
