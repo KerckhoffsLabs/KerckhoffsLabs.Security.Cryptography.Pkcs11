@@ -873,6 +873,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "CreateObject");
 
+        // Any object class may arrive here, so the refusal applies but key defaults do not.
+        GuardInsecureKeyAttributes(attributes);
+
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
@@ -895,6 +898,9 @@ internal sealed class Pkcs11Session : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "CopyObject");
+
+        // A copy can weaken the original's protection, so the same refusal applies.
+        GuardInsecureKeyAttributes(attributes);
 
 
         NativeCULong objectId = CK.CK_INVALID_HANDLE;
@@ -1258,18 +1264,34 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKey");
 
+        // A secret key: refuse a deliberately weakened template, and supply the secure defaults when
+        // the caller stated nothing — the same treatment DeriveKey and UnwrapKey already gave.
+        List<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes);
+        try
+        {
+            if (generatedDefaults.Count > 0)
+            {
+                attributes = attributes is null ? [] : [.. attributes];
+                attributes.AddRange(generatedDefaults);
+            }
+
         using var scope = new MechanismParameterScope();
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         NativeCULong keyId = CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
-        Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
+            CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
+            Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
 
-        mechanism.AbsorbOutput(mechParams);
+            mechanism.AbsorbOutput(mechParams);
 
-        return new ObjectHandle((ulong)keyId);
+            return new ObjectHandle((ulong)keyId);
+        }
+        finally
+        {
+            foreach (ObjectAttribute d in generatedDefaults) d.Dispose();
+        }
     }
 
     /// <summary>
@@ -1292,6 +1314,17 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKeyPair");
 
+        // The private half only. CKA_SENSITIVE / CKA_EXTRACTABLE do not belong on a public key, so
+        // seeding them there would be rejected by the token; the refusal alone is enough.
+        List<ObjectAttribute> privateDefaults = BuildSecureKeyDefaults(privateKeyAttributes);
+        try
+        {
+            if (privateDefaults.Count > 0)
+            {
+                privateKeyAttributes = [.. privateKeyAttributes];
+                privateKeyAttributes.AddRange(privateDefaults);
+            }
+
         using var scope = new MechanismParameterScope();
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
@@ -1300,13 +1333,18 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
         NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
-        Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
+            CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
+            Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
 
-        mechanism.AbsorbOutput(mechParams);
+            mechanism.AbsorbOutput(mechParams);
 
-        publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
-        privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
+            publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
+            privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
+        }
+        finally
+        {
+            foreach (ObjectAttribute d in privateDefaults) d.Dispose();
+        }
     }
 
     /// <summary>
@@ -1422,8 +1460,47 @@ internal sealed class Pkcs11Session : IDisposable
     /// <see cref="InsecureOperationException"/> is thrown. The returned attributes own unmanaged buffers
     /// and must be disposed by the caller.
     /// </summary>
+    /// <summary>
+    /// Refuses a template that would make key material readable in plaintext, unless the caller has
+    /// opted in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Only <c>CKA_SENSITIVE=false</c> is refused. <c>CKA_EXTRACTABLE=true</c> is not: an extractable
+    /// key can be <i>wrapped</i> — exported encrypted under a KEK — which is the standard way to back
+    /// up and transport keys, and PKCS#11 requires the attribute for it. Demanding an "insecure"
+    /// opt-in to use key wrapping at all would misdescribe a safe operation. The value still never
+    /// leaves in the clear, which is what <c>CKA_SENSITIVE</c> governs and what this refuses.
+    /// </para>
+    /// <para>
+    /// Non-extractable remains the <i>default</i> — <see cref="BuildSecureKeyDefaults"/> still supplies
+    /// <c>CKA_EXTRACTABLE=false</c> when the caller says nothing. Asking for extractable is allowed;
+    /// getting it by omission is not.
+    /// </para>
+    /// Check only — it adds nothing — so it is safe on any object class, including public keys and
+    /// non-key objects where <c>CKA_SENSITIVE</c>/<c>CKA_EXTRACTABLE</c> defaults would be wrong or
+    /// rejected outright. Every path that creates a token object runs this; the ones that create a
+    /// secret or private key additionally run <see cref="BuildSecureKeyDefaults"/> to supply the
+    /// defaults when the caller stated nothing.
+    /// </remarks>
+    private void GuardInsecureKeyAttributes(List<ObjectAttribute>? attributes)
+    {
+        if (attributes is null) return;
+
+        foreach (ObjectAttribute a in attributes)
+        {
+            if (a.Type == (ulong)CKA.CKA_SENSITIVE && !a.GetValueAsBool() && !AllowInsecure)
+                throw new InsecureOperationException(
+                    "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
+                    "Pass AllowInsecure (or use AllowInsecureScope) to override.");
+
+        }
+    }
+
     private List<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes)
     {
+        GuardInsecureKeyAttributes(attributes);
+
         bool hasSensitive = false;
         bool hasExtractable = false;
 
@@ -1431,22 +1508,8 @@ internal sealed class Pkcs11Session : IDisposable
         {
             foreach (ObjectAttribute a in attributes)
             {
-                if (a.Type == (ulong)CKA.CKA_SENSITIVE)
-                {
-                    hasSensitive = true;
-                    if (!a.GetValueAsBool() && !AllowInsecure)
-                        throw new InsecureOperationException(
-                            "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
-                            "Pass AllowInsecure (or use AllowInsecureScope) to override.");
-                }
-                else if (a.Type == (ulong)CKA.CKA_EXTRACTABLE)
-                {
-                    hasExtractable = true;
-                    if (a.GetValueAsBool() && !AllowInsecure)
-                        throw new InsecureOperationException(
-                            "Creating a key with CKA_EXTRACTABLE=true would create an extractable key. " +
-                            "Pass AllowInsecure (or use AllowInsecureScope) to override.");
-                }
+                if (a.Type == (ulong)CKA.CKA_SENSITIVE) hasSensitive = true;
+                else if (a.Type == (ulong)CKA.CKA_EXTRACTABLE) hasExtractable = true;
             }
         }
 
