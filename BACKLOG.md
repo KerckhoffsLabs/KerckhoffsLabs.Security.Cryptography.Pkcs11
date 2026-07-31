@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 61 (20 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (23 open, 8 resolved) | Low: 23 (15 open, 8 resolved)
+- Total items: 61 (21 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (22 open, 9 resolved) | Low: 23 (15 open, 8 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -128,16 +128,19 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** Yes if changed later — decide before 1.0
 - **Raised by:** .NET Engineer B
 
-### [BL-011] ECDH raw shared-secret extraction bypasses the `AllowInsecure` gate that the analogous ML-KEM path enforces
+### [BL-011] ✅ RESOLVED — ECDH raw shared-secret extraction bypasses the `AllowInsecure` gate that the analogous ML-KEM path enforces
+- **Status:** Resolved 2026-07-31 by gating, not by documenting an exception. `ECDiffieHellmanPkcs11.DeriveRawSecretAgreement` now calls `GuardRawSecretExtraction`, which throws `InsecureOperationException` unless `Pkcs11Workspace.AllowInsecure` is set — the same posture, and very nearly the same message, as `MLKemPkcs11.GuardExtraction`.
+- **The line, and why it is not cosmetic:** the ECDH adapter reads Z back off the token in *every* derivation path, so "does the secret leave the token" cannot be the criterion — gating on that would make the whole adapter unusable. The criterion that does hold is **does secret material reach the caller**: `DeriveKeyFromHash` and `DeriveKeyFromHmac` consume Z and `CryptographicOperations.ZeroMemory` it (`ECDiffieHellmanPkcs11.cs:112,148`), so the caller never sees it; `DeriveRawSecretAgreement` returns Z itself, after which it lives in memory the library cannot wipe. That is exactly ML-KEM's line — `MLKemPkcs11.Encapsulate`/`Decapsulate` return the shared secret and are gated, while the on-token `Pkcs11Key.EncapsulateKey` is not.
+- **Why gating is legitimate against the BCL contract:** `ECDiffieHellman.DeriveRawSecretAgreement` is virtual with a throwing default, not abstract — it was added to an existing hierarchy, so implementations are expected to be able to refuse. A provider declining to hand out raw Z is within the contract.
+- **Not gated, deliberately:** `DeriveKeyMaterial`, `DeriveKeyFromHash`, `DeriveKeyFromHmac`. A test asserts they still work under the default posture, so a later "tighten everything" change cannot quietly make the adapter unusable.
+- **Verification:** `DeriveRawSecretAgreement_WithoutAllowInsecure_Throws` and `KdfPaths_AreNotGated`, both mutation-verified — removing the guard call reddens the first and leaves the second green. Every existing test that genuinely needs Z now opts in through a `WithEcdhExtracting` helper rather than the shared helper relaxing the posture for all ECDH tests, which is what keeps the gate meaningful.
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** M
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/ECDiffieHellmanPkcs11.cs:150-190` (contrast `Algorithms/MLKemPkcs11.cs:197-207`, `Pkcs11Key.cs:569-591`)
-- **Problem:** `DeriveRawSecret` derives Z into an extractable, non-sensitive session object via `DeriveExtractable` (`enforceSecureDefaults: false`) and reads `CKA_VALUE` back with no `AllowInsecure` check, while the structurally identical ML-KEM shared-secret extraction is gated behind `GuardExtraction`. The two extract-and-read-back paths apply inconsistent security policy.
-- **Proposed action:** Settle it now: either gate `DeriveRawSecretAgreement` like ML-KEM, or document why ECDH extraction is inherent to the `ECDiffeHellman` contract while ML-KEM is gated. Adding a throwing gate after release is a behavioral break.
-- **Breaks public API?** Behavioral — decide before 1.0
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/ECDiffieHellmanPkcs11.cs`
+- **Related:** same `AllowInsecure` gate pattern as the weak-mechanism refusals and `MLKemPkcs11.GuardExtraction`.
+- **Breaks public API?** Behavioural — `DeriveRawSecretAgreement` now throws by default. Landed pre-1.0, as the entry required.
 - **Raised by:** Cryptographer A
-
 ### [BL-012] ✅ RESOLVED — `Mechanism` does not own its `MechanismParameters`; ordered two-object disposal is easy to misuse
 - **Status:** Resolved 2026-07-29. `Mechanism` now owns the parameters it is constructed with and disposes them in `Dispose(true)`, after releasing the marshalled `CK_MECHANISM` block so the block never outlives the buffers it points at. The parameter object is left alone on the finalizer path, since it is managed and carries a finalizer of its own. The leak this fixes was the common case rather than the exotic one: roughly twelve call sites construct parameters inline (`new Mechanism(ckm, new CkmAesGcmParams(...))`) and keep no reference, so nothing could dispose them and their unmanaged IV/AAD buffers survived until the GC ran. The two sites that do hold a variable use `using var p = …; using var m = new Mechanism(…, p);`, which disposes in reverse order — mechanism first — and stays correct, because disposal is idempotent. What is no longer supported is sharing one parameter instance across two mechanisms; that is now stated on both constructors and on the `MechanismParameters` class doc. Sharing one parameter instance across two mechanisms is now rejected at the second construction with an `InvalidOperationException` rather than left to documentation: each mechanism marshals its own copy of the parameter struct including the buffer addresses, so disposing either would leave the other pointing at freed memory and hand the token released buffers with no exception anywhere. `MechanismOwnsParametersTests` pinned all of it, and the ownership cases were confirmed to fail with the disposal line removed.
   - **Superseded by BL-057 (2026-07-29):** the mechanism described above no longer exists. Parameter objects hold no unmanaged memory, so there is nothing to own, nothing to order, and nothing to free — the sharing rejection and its `InvalidOperationException` were deleted along with `MechanismOwnsParametersTests`, and sharing one descriptor across two mechanisms is now legal and tested. The defect this item recorded is still fixed; it was fixed by removing the lifetime rather than by assigning its owner.

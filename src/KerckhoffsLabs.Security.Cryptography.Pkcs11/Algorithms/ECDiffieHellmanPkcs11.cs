@@ -73,14 +73,52 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         => DeriveKeyFromHash(otherPartyPublicKey, HashAlgorithmName.SHA256, null, null);
 
     /// <inheritdoc/>
-    /// <remarks>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</remarks>
+    /// <remarks>
+    /// <para>Returns the raw shared secret Z (the x-coordinate), as the BCL does.</para>
+    /// <para>
+    /// Gated: this is the one ECDH path that hands raw secret material to the caller, so it requires
+    /// <see cref="Pkcs11Workspace.AllowInsecure"/>. The KDF paths are not gated — they consume Z
+    /// inside the library and zeroize it, so nothing secret reaches the caller.
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
         ArgumentNullException.ThrowIfNull(otherPartyPublicKey);
+        GuardRawSecretExtraction();
         return DeriveRawSecret(otherPartyPublicKey);
+    }
+
+    /// <summary>
+    /// Refuses to hand the raw agreement Z to the caller unless the workspace has opted in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This mirrors <c>MLKemPkcs11.GuardExtraction</c>, and the line between them is the same one:
+    /// <b>does secret material reach the caller?</b> It does here, and there is no way to wipe it
+    /// afterwards — the caller owns the array. In <see cref="DeriveKeyFromHash"/> and
+    /// <see cref="DeriveKeyFromHmac"/> the same Z crosses the boundary, but the library consumes it
+    /// and zeroizes it, so those stay ungated.
+    /// </para>
+    /// <para>
+    /// Gating only this method is therefore not cosmetic: it is the only ECDH entry point after which
+    /// the shared secret exists in memory the library does not control.
+    /// </para>
+    /// </remarks>
+    private void GuardRawSecretExtraction()
+    {
+        if (_key.AllowInsecure) return;
+
+        throw new InsecureOperationException(
+            "ECDiffieHellmanPkcs11.DeriveRawSecretAgreement returns the raw shared secret Z to the "
+            + "caller, which leaves it in memory the library cannot wipe. This violates the "
+            + "non-extractable-by-default posture. Use DeriveKeyFromHash / DeriveKeyFromHmac / "
+            + "DeriveKeyMaterial, which derive from Z and zeroize it, or set "
+            + "Pkcs11Workspace.AllowInsecure = true (or use Pkcs11Workspace.AllowInsecureScope()) "
+            + "to opt in.");
     }
 
     /// <inheritdoc/>

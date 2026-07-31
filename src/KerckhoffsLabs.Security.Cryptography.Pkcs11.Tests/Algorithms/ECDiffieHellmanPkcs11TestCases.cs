@@ -34,12 +34,28 @@ internal static class ECDiffieHellmanPkcs11TestCases
 
     // Generates a P-256 key pair on the token (private half CKA_DERIVE) and hands the adapter to the
     // body. Skips where the backend lacks EC key-pair generation or ECDH derivation.
-    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body)
+    /// <summary>
+    /// As <c>WithEcdh</c>, but with the workspace opted in to insecure operations.
+    /// </summary>
+    /// <remarks>
+    /// <c>DeriveRawSecretAgreement</c> hands the raw agreement Z to the caller, so it is gated behind
+    /// <c>AllowInsecure</c> exactly as ML-KEM's shared-secret extraction is. Tests that genuinely
+    /// need Z opt in here; everything else keeps running against the default posture, which is what
+    /// keeps the gate honest.
+    /// </remarks>
+    private static void WithEcdhExtracting(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(backend, body, allowExtraction: true);
+
+    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body) =>
+        WithEcdh(backend, body, allowExtraction: false);
+
+    private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDH1_DERIVE))
             throw new SkipTestException("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
 
         using var workspace = OpenWorkspace(backend);
+        if (allowExtraction) workspace.AllowInsecure = true;
         string label = $"ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -117,7 +133,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         });
 
     internal static void Assert_DeriveKeyFromHmac_NullKey_UsesSecret_AgreesWithBcl(IPkcs11Backend backend) =>
-        WithEcdh(backend, alice =>
+        WithEcdhExtracting(backend, alice =>
         {
             using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
@@ -128,7 +144,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         });
 
     internal static void Assert_DeriveRawSecretAgreement_MatchesBcl(IPkcs11Backend backend) =>
-        WithEcdh(backend, alice =>
+        WithEcdhExtracting(backend, alice =>
         {
             using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 

@@ -61,6 +61,7 @@ public sealed class DerivedKeyMaterialLeakTests
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
+        workspace.AllowInsecure = true; // DeriveRawSecretAgreement hands Z to the caller and is gated
         using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         using var peer = ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
