@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 61 (21 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 31 (22 open, 9 resolved) | Low: 23 (15 open, 8 resolved)
+- Total items: 62 (22 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (22 open, 10 resolved) | Low: 23 (15 open, 8 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -127,6 +127,21 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Proposed action:** Decide (the OSS norm is to strong-name with a checked-in key, treating it as identity not security) and document the decision either way.
 - **Breaks public API?** Yes if changed later — decide before 1.0
 - **Raised by:** .NET Engineer B
+
+### [BL-062] ✅ RESOLVED — The secure-defaults gate ran on only five of nine object-creating paths, and conflated two different risks
+- **Status:** Resolved 2026-07-31, found while auditing BL-011 for other bypasses of the same shape.
+- **Problem (a) — coverage.** `DeriveKey`, `UnwrapKey`, `EncapsulateKey`, `DecapsulateKey` and `UnwrapKeyAuthenticated` ran `BuildSecureKeyDefaults`; `GenerateKey`, `GenerateKeyPair`, `CreateObject` and `CopyObject` did not. So a template refused through a derive was accepted through a generate — the more direct route to defeating the non-extractable posture. Confirmed by probe before fixing, not inferred.
+- **Problem (b) — the test list mirrored the gap.** `KeyCreationSecureDefaultsTests.Operations` enumerated operations by hand, and the four it omitted were exactly the four that were ungated. The coverage was self-fulfilling: it could only ever assert what someone had remembered to add.
+- **Problem (c) — two risks treated as one.** The gate refused `CKA_SENSITIVE=false` *and* `CKA_EXTRACTABLE=true`. These are not equivalent: `CKA_SENSITIVE=false` makes the value readable in plaintext off the token, while `CKA_EXTRACTABLE=true` merely permits wrapping — export encrypted under a KEK, the standard way to back up and transport keys, and required by PKCS#11 for it. The conflation was survivable only while `GenerateKey` was ungated; closing (a) made it bite, turning key wrapping into an operation that demanded an "insecure" opt-in.
+- **Fix:** the refusal is split out as `GuardInsecureKeyAttributes` — check-only, so it is safe on public-key and non-key templates where seeding `CKA_SENSITIVE`/`CKA_EXTRACTABLE` defaults would be wrong or rejected — and now runs on all nine paths. `GenerateKey` and the private half of `GenerateKeyPair` additionally get the defaults; `CreateObject`/`CopyObject` get the check only, since any object class may arrive there. Only `CKA_SENSITIVE=false` is refused. Non-extractable remains the default when the caller says nothing: asking for extractable is allowed, getting it by omission is not.
+- **Verification:** `KeyCreationSecureDefaultsTests.Operations` extended from four entries to nine, with a comment recording why the short list was itself the bug. `SecureDefaultsGateCoverageTests` adds the two properties that list cannot express — that the gate refuses rather than disables, and that it does not push secret-key defaults onto a public-key template. Mutation-verified: reverting the four newly-gated paths reddens six of eight cases.
+- **Area:** Cryptography
+- **Severity:** Medium
+- **Effort:** M
+- **Location:** `Internal/Pkcs11Session.cs`
+- **Related:** BL-011, whose audit surfaced it.
+- **Breaks public API?** Behavioural, both ways — `GenerateKey`/`ImportKey` now refuse `CKA_SENSITIVE=false` without opt-in; every path now permits `CKA_EXTRACTABLE=true` without one. Pre-1.0.
+- **Raised by:** BL-011 follow-up audit
 
 ### [BL-011] ✅ RESOLVED — ECDH raw shared-secret extraction bypasses the `AllowInsecure` gate that the analogous ML-KEM path enforces
 - **Status:** Resolved 2026-07-31 by **removing the bypass**, not by adding a second gate. The first attempt added a guard inside `ECDiffieHellmanPkcs11`; that was the wrong shape — it treated a symptom and left the mechanism that caused it in place.

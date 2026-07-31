@@ -25,8 +25,13 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     // (non-insecure) Pkcs11Exception.
     // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
 #pragma warning disable CA1825
+    // Every session method that can create a token object belongs here. This list was previously
+    // four entries, and the four it omitted — GenerateKey, GenerateKeyPair, CreateObject, CopyObject
+    // — were precisely the four that did not run the gate. The list mirrored the gap rather than
+    // catching it, so adding a creation path without adding it here is the failure mode to avoid.
     public static TheoryData<string> Operations() =>
-        ["DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated"];
+        ["DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated",
+         "UnwrapKey", "GenerateKey", "GenerateKeyPair", "CreateObject", "CopyObject"];
 #pragma warning restore CA1825
 
     private static void Invoke(string operation, Pkcs11Session s, List<ObjectAttribute> template)
@@ -57,6 +62,31 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
                     s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1UL), new byte[16], [], template);
                     break;
                 }
+            case "UnwrapKey":
+                {
+                    var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+                    s.UnwrapKey(mech, new ObjectHandle(1UL), new byte[24], template);
+                    break;
+                }
+            case "GenerateKey":
+                {
+                    var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+                    s.GenerateKey(mech, template);
+                    break;
+                }
+            case "GenerateKeyPair":
+                {
+                    var mech = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
+                    // The weakened attributes go on the private half; the public template is separate.
+                    s.GenerateKeyPair(mech, [], template, out _, out _);
+                    break;
+                }
+            case "CreateObject":
+                s.CreateObject(template);
+                break;
+            case "CopyObject":
+                s.CopyObject(new ObjectHandle(1UL), template);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unknown operation.");
         }
@@ -78,14 +108,21 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
         insecure,
     ];
 
+    /// <summary>
+    /// <c>CKA_EXTRACTABLE=true</c> is permitted without opting in: an extractable key can be wrapped
+    /// — exported encrypted under a KEK — which is the standard way to back up and transport keys,
+    /// and PKCS#11 requires the attribute for it. Only <c>CKA_SENSITIVE=false</c>, which exposes the
+    /// value in the clear, needs consent.
+    /// </summary>
     [Theory]
     [MemberData(nameof(Operations))]
-    public void ExplicitExtractableTrue_ThrowsByDefault(string operation) => WithSession(session =>
+    public void ExplicitExtractableTrue_IsAllowed(string operation) => WithSession(session =>
     {
         var template = SecretKeyTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
-            Assert.Throws<InsecureOperationException>(() => Invoke(operation, session, template));
+            Assert.IsNotType<InsecureOperationException>(
+                Record.Exception(() => Invoke(operation, session, template)));
         }
         finally { foreach (var a in template) a.Dispose(); }
     });

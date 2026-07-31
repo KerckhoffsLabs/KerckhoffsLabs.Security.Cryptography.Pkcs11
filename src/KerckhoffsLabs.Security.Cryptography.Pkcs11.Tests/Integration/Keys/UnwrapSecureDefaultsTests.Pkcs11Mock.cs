@@ -33,15 +33,17 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
         insecure,
     ];
 
+    /// <summary>Unwrapping to an extractable key is permitted — see the note on wrapping in
+    /// <c>KeyCreationSecureDefaultsTests.ExplicitExtractableTrue_IsAllowed</c>.</summary>
     [Fact]
-    public void Unwrap_ExplicitExtractableTrue_ThrowsByDefault() => WithSession(session =>
+    public void Unwrap_ExplicitExtractableTrue_IsAllowed() => WithSession(session =>
     {
         var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
-            Assert.Throws<InsecureOperationException>(
-                () => session.UnwrapKey(mech, new ObjectHandle(1UL), new byte[16], template));
+            Assert.IsNotType<InsecureOperationException>(Record.Exception(
+                () => session.UnwrapKey(mech, new ObjectHandle(1UL), new byte[16], template)));
         }
         finally { foreach (var a in template) a.Dispose(); }
     });

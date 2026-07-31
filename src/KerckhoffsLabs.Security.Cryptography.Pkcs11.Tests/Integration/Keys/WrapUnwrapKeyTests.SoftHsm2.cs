@@ -1,6 +1,5 @@
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -29,7 +28,12 @@ internal static class WrapUnwrapKeyTestCases
             using var dkDecrypt = new ObjectAttribute(CKA.CKA_DECRYPT, true);
             var dkTemplate = new List<ObjectAttribute> { dkClass, dkKeyType, dkValueLen, dkToken, dkSensitive, dkExtract, dkEncrypt, dkDecrypt };
             var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
-            ObjectHandle dataKey = session.GenerateKey(keyGenMech, dkTemplate);
+            // The weakened template needs the opt-in, but only for this call: a helper-wide scope
+            // would still be open inside the test body and would mask an assertion that the gate
+            // fires there.
+            ObjectHandle dataKey;
+            using (session.AllowInsecureScope())
+                dataKey = session.GenerateKey(keyGenMech, dkTemplate);
 
             try
             {
@@ -93,7 +97,12 @@ internal static class WrapUnwrapKeyTestCases
             using var dkExtract = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
             var dkTemplate = new List<ObjectAttribute> { dkClass, dkKeyType, dkValueLen, dkToken, dkSensitive, dkExtract };
             var keyGenMech = new Mechanism(CKM.CKM_AES_KEY_GEN);
-            ObjectHandle dataKey = session.GenerateKey(keyGenMech, dkTemplate);
+            // The weakened template needs the opt-in, but only for this call: a helper-wide scope
+            // would still be open inside the test body and would mask an assertion that the gate
+            // fires there.
+            ObjectHandle dataKey;
+            using (session.AllowInsecureScope())
+                dataKey = session.GenerateKey(keyGenMech, dkTemplate);
             try
             {
                 var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
@@ -143,32 +152,28 @@ internal static class WrapUnwrapKeyTestCases
         });
     }
 
-    /// <summary>an explicit CKA_EXTRACTABLE=true is rejected by default and permitted under
-    /// AllowInsecureScope (the resulting key really is extractable).</summary>
-    internal static void Assert_Unwrap_ExplicitExtractable_RequiresAllowInsecure(IPkcs11Backend backend)
+    /// <summary>
+    /// An explicit <c>CKA_EXTRACTABLE=true</c> is permitted without opting in, and the resulting key
+    /// really is extractable.
+    /// </summary>
+    /// <remarks>
+    /// It used to be refused. Requiring an "insecure" opt-in to unwrap into a wrappable key described
+    /// a safe operation as a dangerous one — the value never leaves the token in the clear, which is
+    /// what <c>CKA_SENSITIVE</c> governs and what the gate still refuses.
+    /// </remarks>
+    internal static void Assert_Unwrap_ExplicitExtractable_IsAllowed(IPkcs11Backend backend)
     {
         WithWrappedAesKey(backend, (session, kek, wrapped) =>
         {
             var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
 
-            using (var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY))
-            using (var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES))
-            using (var t = new ObjectAttribute(CKA.CKA_TOKEN, false))
-            using (var ex = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true))
+            using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+            using var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
+            using var t = new ObjectAttribute(CKA.CKA_TOKEN, false);
+            using var ex = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
             {
                 var template = new List<ObjectAttribute> { c, k, t, ex };
-                Assert.Throws<InsecureOperationException>(() => session.UnwrapKey(wrapMech, kek, wrapped, template));
-            }
-
-            using (var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY))
-            using (var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES))
-            using (var t = new ObjectAttribute(CKA.CKA_TOKEN, false))
-            using (var ex = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true))
-            {
-                var template = new List<ObjectAttribute> { c, k, t, ex };
-                ObjectHandle unwrapped;
-                using (session.AllowInsecureScope())
-                    unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
+                ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
                 try
                 {
                     var read = session.GetAttributeValue(unwrapped, [CKA.CKA_EXTRACTABLE]);
@@ -194,5 +199,5 @@ public sealed class WrapUnwrapKeyTests_SoftHsm(SoftHsmBackendFixture f)
     public void Unwrap_AppliesSecureDefaults() => WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend);
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
-    public void Unwrap_ExplicitExtractable_RequiresAllowInsecure() => WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_RequiresAllowInsecure(_backend);
+    public void Unwrap_ExplicitExtractable_IsAllowed() => WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend);
 }
