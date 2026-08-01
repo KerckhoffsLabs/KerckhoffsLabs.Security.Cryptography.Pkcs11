@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -1129,11 +1130,12 @@ internal sealed class Pkcs11Session : IDisposable
         }
         catch
         {
-            foreach (IntPtr allocated in allocatedBlocks)
-            {
-                IntPtr block = allocated;
-                UnmanagedMemory.Free(ref block);
-            }
+            // Freed through a span so that Free's write-back lands in the list. Free nulls the pointer
+            // it is given and returns early on a null one — that pair is its double-free guard, and
+            // handing it a copy of each entry threw the guard away while looking like it was using it.
+            Span<IntPtr> blocks = CollectionsMarshal.AsSpan(allocatedBlocks);
+            for (int i = 0; i < blocks.Length; i++)
+                UnmanagedMemory.Free(ref blocks[i]);
             throw;
         }
 
