@@ -163,11 +163,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
 
     private static void AssertAllZero(Delegates delegates, IEnumerable<string> names, params string[] skip)
     {
-        foreach (string name in names)
-        {
-            if (skip.Contains(name) || !FpFieldExists(name)) continue;
+        foreach (string name in names.Where(n => !skip.Contains(n) && FpFieldExists(n)))
             Assert.True(Fp(delegates, name) == IntPtr.Zero, $"Slot '{name}' should be unbound but is 0x{Fp(delegates, name):X}.");
-        }
     }
 
     // ---------------------------------------------------------------------------

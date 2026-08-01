@@ -28,11 +28,9 @@ internal static class RSAPkcs11TestCases
 
     private static void Require(IPkcs11Backend backend, params CKM[] mechanisms)
     {
-        foreach (var m in mechanisms)
-        {
-            if (!backend.Supports(m))
-                throw new SkipTestException($"Backend does not advertise {m}.");
-        }
+        CKM[] missing = [.. mechanisms.Where(m => !backend.Supports(m))];
+        if (missing.Length > 0)
+            throw new SkipTestException($"Backend does not advertise {string.Join(", ", missing)}.");
     }
 
     private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace, int modulusBits = 2048)

@@ -19,17 +19,23 @@ public sealed class Pkcs11ModuleHandleTests
     private static readonly string? LoadableLib = FindLoadableLib();
     public static bool NativeLibAvailable => LoadableLib is not null;
 
-    private static string? FindLoadableLib()
+    private static string? FindLoadableLib() => Candidates.FirstOrDefault(CanLoad);
+
+    /// <summary>
+    /// Whether this library can be loaded, leaving the process as it found it.
+    /// </summary>
+    /// <remarks>
+    /// The release is why this is a named method and not a lambda in the query above: probing with
+    /// <c>TryLoad(name, out _)</c> would load each candidate and drop its handle on the floor, so the
+    /// tidier-looking version would leak a native module reference per probe.
+    /// </remarks>
+    private static bool CanLoad(string name)
     {
-        foreach (string name in Candidates)
-        {
-            if (NativeLibrary.TryLoad(name, out IntPtr h))
-            {
-                NativeLibrary.Free(h); // release the probe; the test re-loads to get its own ref
-                return name;
-            }
-        }
-        return null;
+        if (!NativeLibrary.TryLoad(name, out IntPtr handle))
+            return false;
+
+        NativeLibrary.Free(handle); // release the probe; the test re-loads to get its own ref
+        return true;
     }
 
     [Fact]

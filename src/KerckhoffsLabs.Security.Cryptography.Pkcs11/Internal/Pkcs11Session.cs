@@ -808,18 +808,18 @@ internal sealed class Pkcs11Session : IDisposable
         if (mechanism is not (CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or CKM.CKM_RSA_X9_31_KEY_PAIR_GEN))
             return;
 
-        foreach (ObjectAttribute attr in publicKeyAttributes)
-        {
-            if ((CKA)attr.Type != CKA.CKA_MODULUS_BITS)
-                continue;
-
-            ulong bits = attr.GetValueAsUlong();
-            if (bits < 2048)
-                throw new InsecureOperationException(
-                    $"RSA-{bits} is below the NIST SP 800-131A 2048-bit minimum. Set Pkcs11Workspace.AllowInsecure " +
-                    "to opt in (e.g. legacy interop), or generate a key of at least 2048 bits.");
+        // Only the first CKA_MODULUS_BITS is consulted, as before: a template carrying two is
+        // malformed, and which one the token would honour is not ours to decide.
+        ObjectAttribute? modulusBits =
+            publicKeyAttributes.FirstOrDefault(a => (CKA)a.Type == CKA.CKA_MODULUS_BITS);
+        if (modulusBits is null)
             return;
-        }
+
+        ulong bits = modulusBits.GetValueAsUlong();
+        if (bits < 2048)
+            throw new InsecureOperationException(
+                $"RSA-{bits} is below the NIST SP 800-131A 2048-bit minimum. Set Pkcs11Workspace.AllowInsecure " +
+                "to opt in (e.g. legacy interop), or generate a key of at least 2048 bits.");
     }
 
     #region IDisposable
@@ -1573,14 +1573,16 @@ internal sealed class Pkcs11Session : IDisposable
     {
         if (attributes is null) return;
 
-        foreach (ObjectAttribute a in attributes)
-        {
-            if (a.Type == (ulong)CKA.CKA_SENSITIVE && !a.GetValueAsBool() && !AllowInsecure)
-                throw new InsecureOperationException(
-                    "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
-                    "Pass AllowInsecure (or use AllowInsecureScope) to override.");
+        // The opt-in is checked up front rather than per-attribute, matching GuardMechanism and
+        // GuardKeyPairStrength. It also stops the guard from reading a value it has already decided not
+        // to police: with AllowInsecure set there is no verdict to reach, so there is no reason to
+        // parse a caller's CKA_SENSITIVE and risk throwing over its encoding instead.
+        if (AllowInsecure) return;
 
-        }
+        if (attributes.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE && !a.GetValueAsBool()))
+            throw new InsecureOperationException(
+                "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
+                "Pass AllowInsecure (or use AllowInsecureScope) to override.");
     }
 
     /// <summary>
