@@ -105,9 +105,7 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
             var certs = workspace.FindCertificates();
             try
             {
-                Pkcs11Certificate? cert = null;
-                foreach (var c in certs)
-                    if (c.Label == certLabel) cert = c;
+                Pkcs11Certificate? cert = certs.FirstOrDefault(c => c.Label == certLabel);
                 Assert.NotNull(cert);
 
                 byte[] data = Encoding.UTF8.GetBytes("sign via FindCertificates bridge");
