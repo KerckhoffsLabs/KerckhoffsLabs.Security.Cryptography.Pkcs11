@@ -111,8 +111,8 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         finally
         {
             using (var cleanup = ObjectTemplate.Empty().Label(certLabel).Build())
-                using (var found = workspace.FindObjects(cleanup))
-                    foreach (var o in found) o.Destroy();
+            using (var found = workspace.FindObjects(cleanup))
+                foreach (var o in found) o.Destroy();
             keypair.Destroy();
         }
     }
