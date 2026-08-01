@@ -42,11 +42,11 @@ public sealed class ReadOnlyDisposableListTests
         Spy last = new();
         var list = new ReadOnlyDisposableList<Spy>([first, bad, last]);
 
-        var ex = Assert.Throws<AggregateException>(list.Dispose);
+        list.Dispose();
 
         Assert.Equal(1, first.Disposals);
         Assert.Equal(1, last.Disposals);   // reached despite the failure in between
-        Assert.Single(ex.InnerExceptions);
+        Assert.Single(list.DisposalFailures);
     }
 
     [Fact]
@@ -55,9 +55,9 @@ public sealed class ReadOnlyDisposableListTests
         var list = new ReadOnlyDisposableList<Spy>(
             [new() { ThrowOnDispose = true }, new(), new() { ThrowOnDispose = true }]);
 
-        var ex = Assert.Throws<AggregateException>(list.Dispose);
+        list.Dispose();
 
-        Assert.Equal(2, ex.InnerExceptions.Count);
+        Assert.Equal(2, list.DisposalFailures.Count);
     }
 
     [Fact]
@@ -72,15 +72,31 @@ public sealed class ReadOnlyDisposableListTests
         Assert.Equal(1, spy.Disposals);
     }
 
-    /// <summary>A second dispose must not re-throw the first one's failure either.</summary>
+    /// <summary>
+    /// Disposal never throws, however badly it goes. A <c>using</c> is usually unwinding when this
+    /// runs, and a throw here would replace the exception that started the unwind — hiding the
+    /// failure the caller actually needs to see behind one about releasing memory.
+    /// </summary>
     [Fact]
-    public void Dispose_AfterAFailure_IsStillIdempotent()
+    public void Dispose_NeverThrows_EvenWhenEveryElementFails()
     {
-        var list = new ReadOnlyDisposableList<Spy>([new() { ThrowOnDispose = true }]);
-
-        Assert.Throws<AggregateException>(list.Dispose);
+        var list = new ReadOnlyDisposableList<Spy>(
+            [new() { ThrowOnDispose = true }, new() { ThrowOnDispose = true }]);
 
         Assert.Null(Record.Exception(list.Dispose));
+        Assert.Null(Record.Exception(list.Dispose));   // and still not on a second pass
+
+        Assert.Equal(2, list.DisposalFailures.Count);
+    }
+
+    [Fact]
+    public void DisposalFailures_IsEmptyWhenNothingWentWrong()
+    {
+        var list = new ReadOnlyDisposableList<Spy>([new(), new()]);
+
+        list.Dispose();
+
+        Assert.Empty(list.DisposalFailures);
     }
 
     [Fact]

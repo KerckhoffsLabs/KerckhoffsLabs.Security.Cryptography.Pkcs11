@@ -180,11 +180,10 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         {
             byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
                 KeyBytes, HashAlgorithmName.SHA256, Label, Context, length);
-            IReadOnlyList<ObjectAttribute> attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
+            // Disposing the list is what zeroizes the unmanaged buffer holding the derived key bytes.
+            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
             Assert.NotEmpty(attrs);
-            // Disposing is what zeroizes the unmanaged buffer holding the derived key bytes.
-            using ObjectAttribute value = attrs[0];
-            Assert.Equal(expected, value.GetValueAsByteArray());
+            Assert.Equal(expected, attrs[0].GetValueAsByteArray());
         }
         finally
         {

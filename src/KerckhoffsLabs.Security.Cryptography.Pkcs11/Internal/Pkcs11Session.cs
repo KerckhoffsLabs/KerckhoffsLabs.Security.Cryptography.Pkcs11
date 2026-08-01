@@ -1620,7 +1620,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// appended <paramref name="secureDefaults"/>. Returns <c>null</c> (length 0) only when both are
     /// empty, matching the "null template = no attributes" convention.
     /// </summary>
-    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, IReadOnlyList<ObjectAttribute> secureDefaults, out NativeCULong length)
+    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, ReadOnlyDisposableList<ObjectAttribute> secureDefaults, out NativeCULong length)
     {
         int attrCount = attributes?.Count ?? 0;
         int total = attrCount + secureDefaults.Count;
