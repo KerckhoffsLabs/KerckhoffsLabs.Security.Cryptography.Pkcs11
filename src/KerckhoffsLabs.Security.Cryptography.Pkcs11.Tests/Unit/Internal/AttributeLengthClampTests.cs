@@ -62,7 +62,7 @@ public sealed class AttributeLengthClampTests
         }
     }
 
-    private static List<ObjectAttribute> Read(FakeLowLevelPkcs11Library fake)
+    private static ReadOnlyDisposableList<ObjectAttribute> Read(FakeLowLevelPkcs11Library fake)
     {
         using var session = new Pkcs11Session(fake, 1);
         return session.GetAttributeValue(new ObjectHandle(ObjectId), [(ulong)CKA.CKA_VALUE]);

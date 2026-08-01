@@ -217,22 +217,15 @@ public sealed class Pkcs11Workspace : IDisposable
 
     private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)
     {
-        var attrs = _session.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID]);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "FindCertificates (CKA_VALUE unreadable)");
+        using var attrs = _session.GetAttributeValue(handle, [CKA.CKA_VALUE, CKA.CKA_LABEL, CKA.CKA_ID]);
+        if (attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "FindCertificates (CKA_VALUE unreadable)");
 
-            var certificate = X509CertificateLoader.LoadCertificate(attrs[0].GetValueAsByteArray());
-            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
-            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-            return new Pkcs11Certificate(this, handle, label, id, certificate);
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        var certificate = X509CertificateLoader.LoadCertificate(attrs[0].GetValueAsByteArray());
+        string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+        byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
+        return new Pkcs11Certificate(this, handle, label, id, certificate);
     }
 
     /// <summary>
@@ -256,18 +249,11 @@ public sealed class Pkcs11Workspace : IDisposable
 
     private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
     {
-        var attrs = _session.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);
-        try
-        {
-            var objectClass = (CKO)attrs[0].GetValueAsUlong();
-            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
-            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-            return new Pkcs11Object(this, handle, objectClass, label, id);
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        using var attrs = _session.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);
+        var objectClass = (CKO)attrs[0].GetValueAsUlong();
+        string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+        byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
+        return new Pkcs11Object(this, handle, objectClass, label, id);
     }
 
     /// <summary>
@@ -340,33 +326,25 @@ public sealed class Pkcs11Workspace : IDisposable
 
         // Read identifying metadata off the private side — we already have both
         // handles in hand so we bypass the companion-discovery lookup.
-        var attrs = _session.GetAttributeValue(privateHandle,
+        using var attrs = _session.GetAttributeValue(privateHandle,
         [
             CKA.CKA_KEY_TYPE,
             CKA.CKA_LABEL,
             CKA.CKA_ID,
         ]);
+        var keyType = (CKK)attrs[0].GetValueAsUlong();
+        string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
+        byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
 
-        try
-        {
-            var keyType = (CKK)attrs[0].GetValueAsUlong();
-            string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
-            byte[] id = attrs[2].CannotBeRead ? [] : attrs[2].GetValueAsByteArray();
-
-            return new Pkcs11Key(
-                workspace: this,
-                privateHandle: privateHandle,
-                publicHandle: publicHandle,
-                keyType: keyType,
-                label: label,
-                id: id,
-                ownedLibrary: null,
-                ownsWorkspace: false);
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        return new Pkcs11Key(
+            workspace: this,
+            privateHandle: privateHandle,
+            publicHandle: publicHandle,
+            keyType: keyType,
+            label: label,
+            id: id,
+            ownedLibrary: null,
+            ownsWorkspace: false);
     }
 
     // === Secure-default key-generation helpers =============================
@@ -647,58 +625,50 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     private Pkcs11Key HydrateKeyFromHandle(ObjectHandle handle)
     {
-        var attrs = _session.GetAttributeValue(handle,
+        using var attrs = _session.GetAttributeValue(handle,
         [
             CKA.CKA_CLASS,
             CKA.CKA_KEY_TYPE,
             CKA.CKA_LABEL,
             CKA.CKA_ID,
         ]);
+        var objectClass = (CKO)attrs[0].GetValueAsUlong();
+        var keyType = (CKK)attrs[1].GetValueAsUlong();
+        string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
+        byte[] id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
 
-        try
+        ObjectHandle privateHandle = ObjectHandle.Invalid;
+        ObjectHandle publicHandle = ObjectHandle.Invalid;
+
+        if (objectClass == CKO.CKO_PRIVATE_KEY)
         {
-            var objectClass = (CKO)attrs[0].GetValueAsUlong();
-            var keyType = (CKK)attrs[1].GetValueAsUlong();
-            string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
-            byte[] id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
-
-            ObjectHandle privateHandle = ObjectHandle.Invalid;
-            ObjectHandle publicHandle = ObjectHandle.Invalid;
-
-            if (objectClass == CKO.CKO_PRIVATE_KEY)
-            {
-                privateHandle = handle;
-                // Search for public companion by CKA_ID. Empty ID disables the lookup.
-                if (id.Length > 0)
-                    publicHandle = FindCompanion(CKO.CKO_PUBLIC_KEY, id);
-            }
-            else if (objectClass == CKO.CKO_PUBLIC_KEY)
-            {
-                publicHandle = handle;
-                // Mirror the private-side lookup. FindAllObjects orders pub/priv arbitrarily
-                // — if the public came back first, we must still hydrate the private half so
-                // Sign/Decrypt work. Empty ID disables the lookup (no reliable way to match).
-                if (id.Length > 0)
-                    privateHandle = FindCompanion(CKO.CKO_PRIVATE_KEY, id);
-            }
-            else // CKO_SECRET_KEY or other
-            {
-                privateHandle = handle;
-            }
-
-            return new Pkcs11Key(
-                workspace: this,
-                privateHandle: privateHandle,
-                publicHandle: publicHandle,
-                keyType: keyType,
-                label: label,
-                id: id,
-                ownedLibrary: null,
-                ownsWorkspace: false);
+            privateHandle = handle;
+            // Search for public companion by CKA_ID. Empty ID disables the lookup.
+            if (id.Length > 0)
+                publicHandle = FindCompanion(CKO.CKO_PUBLIC_KEY, id);
         }
-        finally
+        else if (objectClass == CKO.CKO_PUBLIC_KEY)
         {
-            foreach (var a in attrs) a.Dispose();
+            publicHandle = handle;
+            // Mirror the private-side lookup. FindAllObjects orders pub/priv arbitrarily
+            // — if the public came back first, we must still hydrate the private half so
+            // Sign/Decrypt work. Empty ID disables the lookup (no reliable way to match).
+            if (id.Length > 0)
+                privateHandle = FindCompanion(CKO.CKO_PRIVATE_KEY, id);
         }
+        else // CKO_SECRET_KEY or other
+        {
+            privateHandle = handle;
+        }
+
+        return new Pkcs11Key(
+            workspace: this,
+            privateHandle: privateHandle,
+            publicHandle: publicHandle,
+            keyType: keyType,
+            label: label,
+            id: id,
+            ownedLibrary: null,
+            ownsWorkspace: false);
     }
 }

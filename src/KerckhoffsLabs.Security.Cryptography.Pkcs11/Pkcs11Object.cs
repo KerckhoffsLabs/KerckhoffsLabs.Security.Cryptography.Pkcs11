@@ -63,18 +63,11 @@ public sealed class Pkcs11Object : IDisposable
     public byte[] GetValue()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var attrs = _workspace.Session.GetAttributeValue(_handle, [CKA.CKA_VALUE]);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "Pkcs11Object.GetValue (CKA_VALUE unreadable)");
-            return attrs[0].GetValueAsByteArray();
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        using var attrs = _workspace.Session.GetAttributeValue(_handle, [CKA.CKA_VALUE]);
+        if (attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "Pkcs11Object.GetValue (CKA_VALUE unreadable)");
+        return attrs[0].GetValueAsByteArray();
     }
 
     /// <summary>

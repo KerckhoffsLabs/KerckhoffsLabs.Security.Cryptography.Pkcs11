@@ -962,7 +962,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="objectHandle">Handle of object whose attributes should be read</param>
     /// <param name="attributes">List of attributes that should be read</param>
     /// <returns>Object attributes</returns>
-    public List<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<CKA> attributes)
+    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<CKA> attributes)
     {
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -988,7 +988,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="objectHandle">Handle of object whose attributes should be read</param>
     /// <param name="attributes">List of attributes that should be read</param>
     /// <returns>Object attributes</returns>
-    public List<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<ulong> attributes)
+    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<ulong> attributes)
     {
         using var _ = AcquireExclusive();
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -1145,7 +1145,8 @@ internal sealed class Pkcs11Session : IDisposable
         for (int i = 0; i < template.Length; i++)
             outAttributes.Add(new ObjectAttribute(template[i]));
 
-        return outAttributes;
+        // The blocks belong to the caller from here; the returned list is what releases them.
+        return new ReadOnlyDisposableList<ObjectAttribute>(outAttributes);
     }
 
     /// <summary>
@@ -1362,32 +1363,25 @@ internal sealed class Pkcs11Session : IDisposable
 
         // A secret key: refuse a deliberately weakened template, and supply the secure defaults when
         // the caller stated nothing — the same treatment DeriveKey and UnwrapKey already gave.
-        List<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes);
-        try
+        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes);
+        if (generatedDefaults.Count > 0)
         {
-            if (generatedDefaults.Count > 0)
-            {
-                attributes = attributes is null ? [] : [.. attributes];
-                attributes.AddRange(generatedDefaults);
-            }
-
-            using var scope = new MechanismParameterScope();
-            CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-
-            CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
-
-            NativeCULong keyId = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
-            Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
-
-            mechanism.AbsorbOutput(mechParams);
-
-            return new ObjectHandle((ulong)keyId);
+            attributes = attributes is null ? [] : [.. attributes];
+            attributes.AddRange(generatedDefaults);
         }
-        finally
-        {
-            foreach (ObjectAttribute d in generatedDefaults) d.Dispose();
-        }
+
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+
+        NativeCULong keyId = CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
+        Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
+
+        mechanism.AbsorbOutput(mechParams);
+
+        return new ObjectHandle((ulong)keyId);
     }
 
     /// <summary>
@@ -1412,35 +1406,28 @@ internal sealed class Pkcs11Session : IDisposable
 
         // The private half only. CKA_SENSITIVE / CKA_EXTRACTABLE do not belong on a public key, so
         // seeding them there would be rejected by the token; the refusal alone is enough.
-        List<ObjectAttribute> privateDefaults = BuildSecureKeyDefaults(privateKeyAttributes);
-        try
+        using ReadOnlyDisposableList<ObjectAttribute> privateDefaults = BuildSecureKeyDefaults(privateKeyAttributes);
+        if (privateDefaults.Count > 0)
         {
-            if (privateDefaults.Count > 0)
-            {
-                privateKeyAttributes = [.. privateKeyAttributes];
-                privateKeyAttributes.AddRange(privateDefaults);
-            }
-
-            using var scope = new MechanismParameterScope();
-            CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-
-            CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
-            CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
-
-            NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
-            NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
-            Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
-
-            mechanism.AbsorbOutput(mechParams);
-
-            publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
-            privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
+            privateKeyAttributes = [.. privateKeyAttributes];
+            privateKeyAttributes.AddRange(privateDefaults);
         }
-        finally
-        {
-            foreach (ObjectAttribute d in privateDefaults) d.Dispose();
-        }
+
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+
+        CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
+        CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
+
+        NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
+        NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
+        Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
+
+        mechanism.AbsorbOutput(mechParams);
+
+        publicKeyHandle = new ObjectHandle((ulong)publicKeyId);
+        privateKeyHandle = new ObjectHandle((ulong)privateKeyId);
     }
 
     /// <summary>
@@ -1526,24 +1513,16 @@ internal sealed class Pkcs11Session : IDisposable
         // could land an extractable, non-sensitive key — silently downgrading the posture the key
         // template builders establish. Append CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the
         // caller omitted them; an explicit insecure value requires AllowInsecure (throws otherwise).
-        List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
-        try
-        {
-            CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
+        CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
-            NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
-            Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
+        NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
+        Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
 
-            mechanism.AbsorbOutput(mechParams);
+        mechanism.AbsorbOutput(mechParams);
 
-            return new ObjectHandle((ulong)unwrappedKey);
-        }
-        finally
-        {
-            foreach (ObjectAttribute d in secureDefaults)
-                d.Dispose();
-        }
+        return new ObjectHandle((ulong)unwrappedKey);
     }
 
     /// <summary>
@@ -1596,7 +1575,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// default here, but an explicit <c>CKA_EXTRACTABLE=true</c> is not refused — only
     /// <c>CKA_SENSITIVE=false</c> is.
     /// </remarks>
-    private List<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes)
+    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes)
     {
         GuardInsecureKeyAttributes(attributes);
 
@@ -1608,7 +1587,10 @@ internal sealed class Pkcs11Session : IDisposable
             added.Add(new ObjectAttribute(CKA.CKA_SENSITIVE, true));
         if (!hasExtractable)
             added.Add(new ObjectAttribute(CKA.CKA_EXTRACTABLE, false));
-        return added;
+
+        // The caller owns what comes back — these are attributes this method created, not the
+        // caller's own — so hand back something that says so and can be released with a `using`.
+        return new ReadOnlyDisposableList<ObjectAttribute>(added);
     }
 
     // ---- Marshalling helpers (shared by the wrapper methods) ----
@@ -1638,7 +1620,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// appended <paramref name="secureDefaults"/>. Returns <c>null</c> (length 0) only when both are
     /// empty, matching the "null template = no attributes" convention.
     /// </summary>
-    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, List<ObjectAttribute> secureDefaults, out NativeCULong length)
+    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, IReadOnlyList<ObjectAttribute> secureDefaults, out NativeCULong length)
     {
         int attrCount = attributes?.Count ?? 0;
         int total = attrCount + secureDefaults.Count;
@@ -3200,26 +3182,18 @@ internal sealed class Pkcs11Session : IDisposable
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
         // value requires AllowInsecure (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
-        List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
-        try
-        {
-            CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
+        CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
-            NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
-            Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
+        NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
+        Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
 
-            // SP800-108 sibling-key handles live in scope-owned slots the token wrote into; copy them
-            // out before `scope` is disposed.
-            mechanism.AbsorbOutput(mechParams);
+        // SP800-108 sibling-key handles live in scope-owned slots the token wrote into; copy them
+        // out before `scope` is disposed.
+        mechanism.AbsorbOutput(mechParams);
 
-            return new ObjectHandle((ulong)derivedKey);
-        }
-        finally
-        {
-            foreach (ObjectAttribute d in secureDefaults)
-                d.Dispose();
-        }
+        return new ObjectHandle((ulong)derivedKey);
     }
 
     /// <summary>
@@ -3363,68 +3337,60 @@ internal sealed class Pkcs11Session : IDisposable
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires AllowInsecure. See BuildSecureKeyDefaults.
-        List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate);
-        try
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate);
+        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
+        int idx = 0;
+        for (int i = 0; i < sharedKeyTemplate.Count; i++)
+            template[idx++] = sharedKeyTemplate[i].CkAttribute;
+        foreach (ObjectAttribute d in secureDefaults)
+            template[idx++] = d.CkAttribute;
+
+        NativeCULong ctLen = (NativeCULong)0;
+        NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
+        CKR rv;
+        byte[] ct;
+
+        if (expectedCiphertextLen > 0)
         {
-            CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
-            int idx = 0;
-            for (int i = 0; i < sharedKeyTemplate.Count; i++)
-                template[idx++] = sharedKeyTemplate[i].CkAttribute;
-            foreach (ObjectAttribute d in secureDefaults)
-                template[idx++] = d.CkAttribute;
-
-            NativeCULong ctLen = (NativeCULong)0;
-            NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
-            CKR rv;
-            byte[] ct;
-
-            if (expectedCiphertextLen > 0)
-            {
-                // Single-call: the exact ciphertext size is known, so hand the token a correctly-sized
-                // buffer and let it fill it in one shot. This is the spec-correct path on every token
-                // and the only correct path on SoftHSM, whose C_EncapsulateKey ignores a NULL buffer
-                // (no length probe) and performs a side-effectful encapsulation on each call.
-                ct = new byte[expectedCiphertextLen];
-                ctLen = (NativeCULong)expectedCiphertextLen;
-                rv = _pkcs11Library.C_EncapsulateKey(
-                    _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                    template, (NativeCULong)template.Length,
-                    ct, ref ctLen, ref sharedHandle);
-                Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
-            }
-            else
-            {
-                // Two-call: query size first, then real encaps (size unknown to the caller).
-                rv = _pkcs11Library.C_EncapsulateKey(
-                    _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                    template, (NativeCULong)template.Length,
-                    null!, ref ctLen, ref sharedHandle);
-                // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
-                // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
-                // Only a genuine error aborts the probe.
-                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                    Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
-
-                ct = new byte[(int)ctLen];
-                rv = _pkcs11Library.C_EncapsulateKey(
-                    _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                    template, (NativeCULong)template.Length,
-                    ct, ref ctLen, ref sharedHandle);
-                Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
-            }
-
-            mechanism.AbsorbOutput(mechParams);
-
-            if (ct.Length != (int)ctLen)
-                Array.Resize(ref ct, (int)ctLen);
-
-            return (ct, new ObjectHandle((ulong)sharedHandle));
+            // Single-call: the exact ciphertext size is known, so hand the token a correctly-sized
+            // buffer and let it fill it in one shot. This is the spec-correct path on every token
+            // and the only correct path on SoftHSM, whose C_EncapsulateKey ignores a NULL buffer
+            // (no length probe) and performs a side-effectful encapsulation on each call.
+            ct = new byte[expectedCiphertextLen];
+            ctLen = (NativeCULong)expectedCiphertextLen;
+            rv = _pkcs11Library.C_EncapsulateKey(
+                _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
+                template, (NativeCULong)template.Length,
+                ct, ref ctLen, ref sharedHandle);
+            Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
         }
-        finally
+        else
         {
-            foreach (ObjectAttribute d in secureDefaults)
-                d.Dispose();
+            // Two-call: query size first, then real encaps (size unknown to the caller).
+            rv = _pkcs11Library.C_EncapsulateKey(
+                _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
+                template, (NativeCULong)template.Length,
+                null!, ref ctLen, ref sharedHandle);
+            // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
+            // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
+            // Only a genuine error aborts the probe.
+            if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
+                Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
+
+            ct = new byte[(int)ctLen];
+            rv = _pkcs11Library.C_EncapsulateKey(
+                _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
+                template, (NativeCULong)template.Length,
+                ct, ref ctLen, ref sharedHandle);
+            Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
         }
+
+        mechanism.AbsorbOutput(mechParams);
+
+        if (ct.Length != (int)ctLen)
+            Array.Resize(ref ct, (int)ctLen);
+
+        return (ct, new ObjectHandle((ulong)sharedHandle));
     }
 
     /// <summary>
@@ -3455,33 +3421,25 @@ internal sealed class Pkcs11Session : IDisposable
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires AllowInsecure. See BuildSecureKeyDefaults.
-        List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate);
-        try
-        {
-            CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
-            int idx = 0;
-            for (int i = 0; i < sharedKeyTemplate.Count; i++)
-                template[idx++] = sharedKeyTemplate[i].CkAttribute;
-            foreach (ObjectAttribute d in secureDefaults)
-                template[idx++] = d.CkAttribute;
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate);
+        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
+        int idx = 0;
+        for (int i = 0; i < sharedKeyTemplate.Count; i++)
+            template[idx++] = sharedKeyTemplate[i].CkAttribute;
+        foreach (ObjectAttribute d in secureDefaults)
+            template[idx++] = d.CkAttribute;
 
-            byte[] ct = ciphertext.ToArray();
-            NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_DecapsulateKey(
-                _sessionId, ref ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
-                template, (NativeCULong)template.Length,
-                ct, (NativeCULong)ct.Length, ref sharedHandle);
-            Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
+        byte[] ct = ciphertext.ToArray();
+        NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_DecapsulateKey(
+            _sessionId, ref ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
+            template, (NativeCULong)template.Length,
+            ct, (NativeCULong)ct.Length, ref sharedHandle);
+        Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
 
-            mechanism.AbsorbOutput(mechParams);
+        mechanism.AbsorbOutput(mechParams);
 
-            return new ObjectHandle((ulong)sharedHandle);
-        }
-        finally
-        {
-            foreach (ObjectAttribute d in secureDefaults)
-                d.Dispose();
-        }
+        return new ObjectHandle((ulong)sharedHandle);
     }
 
     // === Authenticated wrap ================================================
@@ -3563,33 +3521,25 @@ internal sealed class Pkcs11Session : IDisposable
         // Authenticated unwrap lands a new key object on the token, exactly as UnwrapKey does. Apply the
         // same secure defaults (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires AllowInsecure. See BuildSecureKeyDefaults.
-        List<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(unwrappedKeyTemplate);
-        try
-        {
-            CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[unwrappedKeyTemplate.Count + secureDefaults.Count];
-            int idx = 0;
-            for (int i = 0; i < unwrappedKeyTemplate.Count; i++)
-                template[idx++] = unwrappedKeyTemplate[i].CkAttribute;
-            foreach (ObjectAttribute d in secureDefaults)
-                template[idx++] = d.CkAttribute;
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(unwrappedKeyTemplate);
+        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[unwrappedKeyTemplate.Count + secureDefaults.Count];
+        int idx = 0;
+        for (int i = 0; i < unwrappedKeyTemplate.Count; i++)
+            template[idx++] = unwrappedKeyTemplate[i].CkAttribute;
+        foreach (ObjectAttribute d in secureDefaults)
+            template[idx++] = d.CkAttribute;
 
-            NativeCULong newKey = CK.CK_INVALID_HANDLE;
-            CKR rv = _pkcs11Library.C_UnwrapKeyAuthenticated(
-                _sessionId, ref ckMechanism, (NativeCULong)unwrappingKey.ObjectId,
-                wrapped, (NativeCULong)wrapped.Length,
-                template, (NativeCULong)template.Length,
-                aad, (NativeCULong)aad.Length, ref newKey);
-            Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
+        NativeCULong newKey = CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_UnwrapKeyAuthenticated(
+            _sessionId, ref ckMechanism, (NativeCULong)unwrappingKey.ObjectId,
+            wrapped, (NativeCULong)wrapped.Length,
+            template, (NativeCULong)template.Length,
+            aad, (NativeCULong)aad.Length, ref newKey);
+        Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
 
-            mechanism.AbsorbOutput(mechParams);
+        mechanism.AbsorbOutput(mechParams);
 
-            return new ObjectHandle((ulong)newKey);
-        }
-        finally
-        {
-            foreach (ObjectAttribute d in secureDefaults)
-                d.Dispose();
-        }
+        return new ObjectHandle((ulong)newKey);
     }
 
     // === Signature-only verify (init binds the signature, data feeds in) ====

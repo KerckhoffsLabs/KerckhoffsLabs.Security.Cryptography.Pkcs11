@@ -192,7 +192,7 @@ public sealed class Pkcs11SessionObjectsTests
         // rather than throwing.
         var s = NewSession(new AttrFake { Rv = CKR.CKR_ATTRIBUTE_SENSITIVE, MarkSensitive = true });
 
-        List<ObjectAttribute> result = s.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE]);
+        using ReadOnlyDisposableList<ObjectAttribute> result = s.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE]);
 
         Assert.Single(result);
         Assert.True(result[0].CannotBeRead);

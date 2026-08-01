@@ -21,27 +21,19 @@ internal static class Pkcs11PublicKeyView
     /// </summary>
     internal static RSAParameters? TrySynthesizeRsa(Pkcs11Session session, ObjectHandle privateHandle)
     {
-        var attrs = session.GetAttributeValue(privateHandle,
+        using var attrs = session.GetAttributeValue(privateHandle,
         [
             CKA.CKA_MODULUS,
             CKA.CKA_PUBLIC_EXPONENT,
         ]);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            return null;
 
-        try
+        return new RSAParameters
         {
-            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-                return null;
-
-            return new RSAParameters
-            {
-                Modulus = attrs[0].GetValueAsByteArray(),
-                Exponent = attrs[1].GetValueAsByteArray(),
-            };
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+            Modulus = attrs[0].GetValueAsByteArray(),
+            Exponent = attrs[1].GetValueAsByteArray(),
+        };
     }
 
     /// <summary>
@@ -81,22 +73,14 @@ internal static class Pkcs11PublicKeyView
     /// </summary>
     internal static ECParameters? TrySynthesizeEc(Pkcs11Session session, ObjectHandle privateHandle)
     {
-        var attrs = session.GetAttributeValue(privateHandle,
+        using var attrs = session.GetAttributeValue(privateHandle,
         [
             CKA.CKA_EC_POINT,
             CKA.CKA_EC_PARAMS,
         ]);
-
-        try
-        {
-            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-                return null;
-            return TryParseEcPublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            return null;
+        return TryParseEcPublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
     }
 
     private static ReadOnlySpan<byte> StripDerOctetString(byte[] der)
