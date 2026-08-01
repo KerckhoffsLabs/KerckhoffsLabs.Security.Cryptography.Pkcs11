@@ -18,9 +18,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// transposed field in the struct or a mis-wired binding line fails by name.
 /// </summary>
 /// <remarks>
-/// Static fields feed the <c>[UnmanagedCallersOnly]</c> stubs (which cannot capture state).
-/// xUnit serializes tests within a class, so the statics are race-free. Sentinels are never
-/// invoked — the loader only calls the two bootstrap functions, which are real managed stubs.
+/// Static fields feed the <c>[UnmanagedCallersOnly]</c> stubs (which cannot capture state), and
+/// are written only through <c>InstallModule</c>. xUnit serializes tests within a class, so the
+/// statics are race-free. Sentinels are never invoked — the loader only calls the two bootstrap
+/// functions, which are real managed stubs.
 /// </remarks>
 public sealed unsafe class DelegatesLoaderTests : IDisposable
 {
@@ -38,9 +39,29 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     {
         foreach (IntPtr p in _allocations) Marshal.FreeHGlobal(p);
         _allocations.Clear();
-        s_functionListPtr = IntPtr.Zero;
-        s_interfacePtr = IntPtr.Zero;
-        s_getInterfaceRv = 0;
+        InstallModule(IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Publishes the module state that <see cref="FakeGetFunctionList"/> and
+    /// <see cref="FakeGetInterface"/> will hand back, and resets what is not given.
+    /// </summary>
+    /// <remarks>
+    /// Static, and the only writer of these fields. The stubs are
+    /// <c>[UnmanagedCallersOnly]</c> and so cannot capture instance state — reaching statics is the
+    /// only channel available to them — which makes the coupling unavoidable rather than incidental.
+    /// Routing every write through one named method keeps it stated in a single place instead of
+    /// scattered field-by-field across each test, and keeps the tests reading as "install this
+    /// module, then load it".
+    /// </remarks>
+    /// <param name="functionList">Table <c>C_GetFunctionList</c> hands out.</param>
+    /// <param name="interfaceTable">Table <c>C_GetInterface</c> hands out; none by default.</param>
+    /// <param name="getInterfaceRv">CKR <c>C_GetInterface</c> returns; <c>CKR_OK</c> by default.</param>
+    private static void InstallModule(IntPtr functionList, IntPtr interfaceTable = default, uint getInterfaceRv = 0)
+    {
+        s_functionListPtr = functionList;
+        s_interfacePtr = interfaceTable;
+        s_getInterfaceRv = getInterfaceRv;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -175,7 +196,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     public void V240Module_BindsEveryBaseSlot_AndLeavesV3SurfaceNull()
     {
         var (table, sentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        s_functionListPtr = table;
+        InstallModule(table);
 
         var delegates = new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub }));
 
@@ -190,7 +211,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     public void V240Module_PerSymbolExports_BindV30SurfaceWithoutGetInterface()
     {
         var (table, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        s_functionListPtr = table;
+        InstallModule(table);
         IntPtr loginUser = (IntPtr)0x0BAD_0010;
         IntPtr encapsulate = (IntPtr)0x0BAD_0020;
 
@@ -215,9 +236,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     {
         var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         var (v30Table, v30Sentinels) = BuildTable<CK_FUNCTION_LIST_3_0>(3, 0, 0x0B00_0000);
-        s_functionListPtr = baseTable;
-        s_interfacePtr = BuildInterface(v30Table);
-        s_getInterfaceRv = 0; // CKR_OK
+        InstallModule(baseTable, BuildInterface(v30Table));  // getInterfaceRv defaults to CKR_OK
 
         var delegates = new Delegates(Resolver(new()
         {
@@ -247,9 +266,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     {
         var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
-        s_functionListPtr = baseTable;
-        s_interfacePtr = BuildInterface(v32Table);
-        s_getInterfaceRv = 0;
+        InstallModule(baseTable, BuildInterface(v32Table));
 
         var delegates = new Delegates(Resolver(new()
         {
@@ -270,9 +287,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     {
         var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         var (v30Table, _) = BuildTable<CK_FUNCTION_LIST_3_0>(2, 40, 0x0B00_0000); // header says 2.40
-        s_functionListPtr = baseTable;
-        s_interfacePtr = BuildInterface(v30Table);
-        s_getInterfaceRv = 0;
+        InstallModule(baseTable, BuildInterface(v30Table));
         IntPtr sessionCancel = (IntPtr)0x0BAD_0030;
 
         var delegates = new Delegates(Resolver(new()
@@ -292,9 +307,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     public void Interface_ReturningError_FallsBackToPerSymbolLookup()
     {
         var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        s_functionListPtr = baseTable;
-        s_interfacePtr = IntPtr.Zero;
-        s_getInterfaceRv = 0x00000006; // CKR_FUNCTION_FAILED
+        InstallModule(baseTable, getInterfaceRv: 0x00000006);  // CKR_FUNCTION_FAILED
         IntPtr loginUser = (IntPtr)0x0BAD_0040;
 
         var delegates = new Delegates(Resolver(new()
@@ -317,9 +330,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var empty = new CK_FUNCTION_LIST_3_2 { version = new CK_VERSION { Major = 3, Minor = 2 } };
         IntPtr v32Table = Alloc(Marshal.SizeOf<CK_FUNCTION_LIST_3_2>() + 64);
         WriteTable(v32Table, in empty);
-        s_functionListPtr = baseTable;
-        s_interfacePtr = BuildInterface(v32Table);
-        s_getInterfaceRv = 0;
+        InstallModule(baseTable, BuildInterface(v32Table));
 
         var delegates = new Delegates(Resolver(new()
         {
