@@ -1000,10 +1000,24 @@ internal sealed class Pkcs11Session : IDisposable
         if (attributes.Count < 1)
             throw new ArgumentException("No attributes specified", nameof(attributes));
 
-        // Prepare array of CK_ATTRIBUTEs
+        // Prepare array of CK_ATTRIBUTEs. These are type-only: the first call asks the module how long
+        // each value is, so the template carries no values and needs no buffers.
+        //
+        // Built directly rather than through ObjectAttribute, which is IDisposable and was being
+        // constructed here only to have its struct copied out and the wrapper dropped. Adding a `using`
+        // would have been the wrong repair: the copy in the template shares the wrapper's pointer, so
+        // disposing would leave the template pointing at freed memory the moment a type-only attribute
+        // ever allocated one. Not creating the disposable avoids the question.
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
         for (int i = 0; i < attributes.Count; i++)
-            template[i] = new ObjectAttribute(attributes[i]).CkAttribute;
+        {
+            template[i] = new CK_ATTRIBUTE
+            {
+                type = (NativeCULong)attributes[i],
+                value = IntPtr.Zero,
+                valueLen = (NativeCULong)0,
+            };
+        }
 
         // The size actually allocated for each attribute, kept so the post-call length can be checked
         // against it rather than trusted — see GuardReportedLength.

@@ -44,11 +44,21 @@ public sealed class SecureDefaultsAreAddedTests
         }
     }
 
+    // The session disposes only the defaults it generates itself; an attribute the caller supplied
+    // stays the caller's to free, and each one owns an unmanaged buffer.
     private static List<(ulong Type, byte[] Value)> GenerateWith(params ObjectAttribute[] attributes)
     {
         var fake = new TemplateCapturingFake();
-        using (var session = new Pkcs11Session(fake, 1))
+        try
+        {
+            using var session = new Pkcs11Session(fake, 1);
             session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. attributes]);
+        }
+        finally
+        {
+            foreach (ObjectAttribute attribute in attributes)
+                attribute.Dispose();
+        }
         return fake.Captured;
     }
 
