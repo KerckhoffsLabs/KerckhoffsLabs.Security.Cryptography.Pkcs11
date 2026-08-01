@@ -96,7 +96,7 @@ internal static class RSAPkcs11TestCases
     {
         Require(backend, CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
         using var workspace = OpenWorkspace(backend);
-        var key = GenerateRsaKey(workspace);
+        using var key = GenerateRsaKey(workspace);
         try
         {
             using var rsa = new RSAPkcs11(key);
@@ -104,8 +104,9 @@ internal static class RSAPkcs11TestCases
         }
         finally
         {
+            // Destroy only: the using disposes the wrapper as the scope unwinds, which is after this
+            // block either way, so the destroy-then-dispose order is the same as when it was explicit.
             try { key.Destroy(); } catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 
@@ -146,7 +147,7 @@ internal static class RSAPkcs11TestCases
         Require(backend, CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var workspace = OpenWorkspace(backend);
         using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
-        var key = GenerateRsaKey(workspace, modulusBits);
+        using var key = GenerateRsaKey(workspace, modulusBits);
         try
         {
             using var rsa = new RSAPkcs11(key);
@@ -173,7 +174,6 @@ internal static class RSAPkcs11TestCases
         finally
         {
             try { key.Destroy(); } catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 
@@ -361,7 +361,7 @@ internal static class RSAPkcs11TestCases
         Require(backend, CKM.CKM_RSA_PKCS_OAEP);
         WithRsa(backend, (workspace, rsa) =>
         {
-            Pkcs11Key other = GenerateRsaKey(workspace);
+            using Pkcs11Key other = GenerateRsaKey(workspace);
             try
             {
                 using var otherRsa = new RSAPkcs11(other);
@@ -372,7 +372,6 @@ internal static class RSAPkcs11TestCases
             finally
             {
                 try { other.Destroy(); } catch { /* best-effort cleanup of the second key */ }
-                other.Dispose();
             }
         });
     }

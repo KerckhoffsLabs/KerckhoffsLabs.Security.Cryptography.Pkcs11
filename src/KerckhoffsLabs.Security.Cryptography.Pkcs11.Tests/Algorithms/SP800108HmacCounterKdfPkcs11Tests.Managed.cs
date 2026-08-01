@@ -175,19 +175,20 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .ValueLen(length).Derive().Build();
 
-        Pkcs11Key derived = kdf.DeriveKey(Label, Context, template);
+        using Pkcs11Key derived = kdf.DeriveKey(Label, Context, template);
         try
         {
             byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
                 KeyBytes, HashAlgorithmName.SHA256, Label, Context, length);
-            var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
+            IReadOnlyList<ObjectAttribute> attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
             Assert.NotEmpty(attrs);
-            Assert.Equal(expected, attrs[0].GetValueAsByteArray());
+            // Disposing is what zeroizes the unmanaged buffer holding the derived key bytes.
+            using ObjectAttribute value = attrs[0];
+            Assert.Equal(expected, value.GetValueAsByteArray());
         }
         finally
         {
             derived.Destroy();
-            derived.Dispose();
         }
     });
 

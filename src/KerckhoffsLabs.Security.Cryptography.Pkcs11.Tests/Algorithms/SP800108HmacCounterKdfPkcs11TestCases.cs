@@ -160,17 +160,16 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
             using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
                 .ValueLen(32).Derive().NonExtractable().Sensitive().Build();
 
-            Pkcs11Key derived = kdf.DeriveKey(Label, Context, template);
+            using Pkcs11Key derived = kdf.DeriveKey(Label, Context, template);
             try
             {
                 // The derived sub-key is sensitive and non-extractable, so its value must not be readable.
-                var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-                Assert.True(attrs.Count == 0 || attrs[0].CannotBeRead);
+                using ObjectAttribute? value = derived.GetAttributeValue(CKA.CKA_VALUE).FirstOrDefault();
+                Assert.True(value is null || value.CannotBeRead);
             }
             finally
             {
                 derived.Destroy();
-                derived.Dispose();
             }
         });
 }
