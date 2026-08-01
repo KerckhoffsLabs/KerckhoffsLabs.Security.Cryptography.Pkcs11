@@ -60,25 +60,25 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
         // The ML-KEM ciphertext length is fixed by the parameter set, so hand the token a pre-sized
         // buffer in one call rather than a NULL-buffer length probe (which SoftHSM does not honour).
-        var (ct, sharedKey) = _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
+        // Held as the result rather than deconstructed into (ct, key): EncapsulationResult is
+        // IDisposable precisely so the shared-secret key has an owner, and splitting it up discards
+        // that owner and leaves the key to be released by hand.
+        using EncapsulationResult encapsulated =
+            _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
 
         try
         {
-            ReadAndCopySecret(sharedKey, sharedSecret);
-            CopyExact(ct, ciphertext, Algorithm.CiphertextSizeInBytes);
+            ReadAndCopySecret(encapsulated.SharedSecret, sharedSecret);
+            CopyExact(encapsulated.Ciphertext, ciphertext, Algorithm.CiphertextSizeInBytes);
             // Destroy the extracted, extractable shared-secret object now that we hold its bytes.
             // Surfaced (not swallowed): a failure here would leave the secret lingering on-token.
-            DestroyExtractedSecret(sharedKey);
+            DestroyExtractedSecret(encapsulated.SharedSecret);
         }
         catch
         {
             // Never hand back a shared secret alongside a failure (copy or cleanup).
             CryptographicOperations.ZeroMemory(sharedSecret);
             throw;
-        }
-        finally
-        {
-            sharedKey.Dispose();
         }
     }
 

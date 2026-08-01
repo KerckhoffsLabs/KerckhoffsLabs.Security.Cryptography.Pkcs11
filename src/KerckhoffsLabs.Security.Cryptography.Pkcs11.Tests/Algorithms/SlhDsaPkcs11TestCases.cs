@@ -51,7 +51,7 @@ internal static class SlhDsaPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_SLH_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_SLH_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_SLH_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
         try
         {
             using var slhdsa = new SlhDsaPkcs11(key);
@@ -60,7 +60,6 @@ internal static class SlhDsaPkcs11TestCases
         finally
         {
             try { key.Destroy(); } catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 

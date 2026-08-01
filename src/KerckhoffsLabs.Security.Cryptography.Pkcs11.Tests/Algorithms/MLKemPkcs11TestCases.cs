@@ -53,7 +53,7 @@ internal static class MLKemPkcs11TestCases
             .Label(label).Id(id)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
 
-        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), privTpl, pubTpl);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
@@ -62,7 +62,6 @@ internal static class MLKemPkcs11TestCases
         finally
         {
             try { key.Destroy(); } catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 

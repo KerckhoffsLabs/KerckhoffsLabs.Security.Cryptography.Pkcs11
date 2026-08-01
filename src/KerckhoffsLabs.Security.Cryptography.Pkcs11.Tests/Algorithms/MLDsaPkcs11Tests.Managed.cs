@@ -46,7 +46,7 @@ public sealed class MLDsaPkcs11Tests_Managed
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Sign().Build();
 
-        var key = workspace.GenerateKey(
+        using var key = workspace.GenerateKey(
             new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
         try
         {
@@ -57,7 +57,6 @@ public sealed class MLDsaPkcs11Tests_Managed
         {
             try { key.Destroy(); }
             catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 

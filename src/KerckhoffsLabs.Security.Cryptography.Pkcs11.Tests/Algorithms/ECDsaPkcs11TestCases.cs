@@ -65,7 +65,7 @@ internal static class ECDsaPkcs11TestCases
 
         var (oid, _, _) = Spec(curve);
         using var workspace = OpenWorkspace(backend);
-        var key = GenerateEcKey(workspace, oid);
+        using var key = GenerateEcKey(workspace, oid);
         try
         {
             using var ec = new ECDsaPkcs11(key);
@@ -74,7 +74,6 @@ internal static class ECDsaPkcs11TestCases
         finally
         {
             try { key.Destroy(); } catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 

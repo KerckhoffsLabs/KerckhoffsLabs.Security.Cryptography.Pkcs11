@@ -81,7 +81,7 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("vendor parameter block, built by the library");
@@ -117,7 +117,6 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
         finally
         {
             try { key.Destroy(); } catch { /* best-effort cleanup */ }
-            key.Dispose();
         }
     }
 }

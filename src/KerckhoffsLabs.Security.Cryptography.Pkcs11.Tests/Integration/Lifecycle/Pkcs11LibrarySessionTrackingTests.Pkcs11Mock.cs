@@ -21,47 +21,29 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     [Fact]
     public void OpeningSession_RegistersWithLibraryTracker()
     {
-        Pkcs11Library library = new(_backend.LibraryPath);
-        try
-        {
-            int before = library.LowLevelLibrary!.TrackedSessionCount;
+        using Pkcs11Library library = new(_backend.LibraryPath);
+        int before = library.LowLevelLibrary!.TrackedSessionCount;
 
-            var slot = library.GetSlotList()[0];
-            var session = slot.OpenSession();
-            try
-            {
-                Assert.Equal(before + 1, library.LowLevelLibrary.TrackedSessionCount);
-            }
-            finally
-            {
-                session.Dispose();
-            }
-        }
-        finally
-        {
-            library.Dispose();
-        }
+        var slot = library.GetSlotList()[0];
+        // Declared after the library so it is released first, as the nested finally did.
+        using var session = slot.OpenSession();
+
+        Assert.Equal(before + 1, library.LowLevelLibrary.TrackedSessionCount);
     }
 
     [Fact]
     public void DisposingSession_RemovesItFromLibraryTracker()
     {
-        Pkcs11Library library = new(_backend.LibraryPath);
-        try
-        {
-            int before = library.LowLevelLibrary!.TrackedSessionCount;
-            var slot = library.GetSlotList()[0];
+        using Pkcs11Library library = new(_backend.LibraryPath);
+        int before = library.LowLevelLibrary!.TrackedSessionCount;
+        var slot = library.GetSlotList()[0];
 
-            var session = slot.OpenSession();
-            Assert.Equal(before + 1, library.LowLevelLibrary.TrackedSessionCount);
+        var session = slot.OpenSession();
+        Assert.Equal(before + 1, library.LowLevelLibrary.TrackedSessionCount);
 
-            session.Dispose();
-            Assert.Equal(before, library.LowLevelLibrary.TrackedSessionCount);
-        }
-        finally
-        {
-            library.Dispose();
-        }
+        // Not a `using`: disposing the session at a chosen moment is what this test measures.
+        session.Dispose();
+        Assert.Equal(before, library.LowLevelLibrary.TrackedSessionCount);
     }
 
     [Fact]
