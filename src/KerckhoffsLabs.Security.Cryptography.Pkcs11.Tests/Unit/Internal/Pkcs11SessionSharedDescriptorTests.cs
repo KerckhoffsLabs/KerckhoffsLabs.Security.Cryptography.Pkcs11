@@ -43,8 +43,11 @@ public sealed class Pkcs11SessionSharedDescriptorTests
         var verify = new Mechanism(CKM.CKM_AES_GCM, shared);
         var decrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
 
+        using var input = new MemoryStream([1, 2, 3]);
+        using var output = new MemoryStream();
+
         var ex = Assert.Throws<ArgumentException>(() => session.DecryptVerify(
-            verify, Key, decrypt, Key, new MemoryStream([1, 2, 3]), new MemoryStream(), [4, 5], out _));
+            verify, Key, decrypt, Key, input, output, [4, 5], out _));
 
         Assert.Equal("decryptionMechanism", ex.ParamName);
         Assert.Contains("silently discarded", ex.Message, StringComparison.Ordinal);
@@ -58,8 +61,11 @@ public sealed class Pkcs11SessionSharedDescriptorTests
         var digest = new Mechanism(CKM.CKM_AES_GCM, shared);
         var encrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
 
+        using var input = new MemoryStream([1, 2, 3]);
+        using var output = new MemoryStream();
+
         var ex = Assert.Throws<ArgumentException>(() => session.DigestEncrypt(
-            digest, encrypt, Key, new MemoryStream([1, 2, 3]), new MemoryStream()));
+            digest, encrypt, Key, input, output));
 
         Assert.Equal("encryptionMechanism", ex.ParamName);
     }
@@ -72,8 +78,11 @@ public sealed class Pkcs11SessionSharedDescriptorTests
         var digest = new Mechanism(CKM.CKM_AES_GCM, shared);
         var decrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
 
+        using var input = new MemoryStream([1, 2, 3]);
+        using var output = new MemoryStream();
+
         var ex = Assert.Throws<ArgumentException>(() => session.DecryptDigest(
-            digest, decrypt, Key, new MemoryStream([1, 2, 3]), new MemoryStream()));
+            digest, decrypt, Key, input, output));
 
         Assert.Equal("decryptionMechanism", ex.ParamName);
     }
@@ -110,8 +119,11 @@ public sealed class Pkcs11SessionSharedDescriptorTests
 
         // Reaches the fake and fails there instead — the point is that it is not rejected as an
         // argument error before the operation starts.
+        using var input = new MemoryStream([1, 2, 3]);
+        using var output = new MemoryStream();
+
         Exception? ex = Record.Exception(() => session.DigestEncrypt(
-            digest, encrypt, Key, new MemoryStream([1, 2, 3]), new MemoryStream()));
+            digest, encrypt, Key, input, output));
 
         Assert.IsNotType<ArgumentException>(ex);
     }
@@ -124,8 +136,11 @@ public sealed class Pkcs11SessionSharedDescriptorTests
         var digest = new Mechanism(CKM.CKM_AES_GCM, OutputBearing());
         var encrypt = new Mechanism(CKM.CKM_AES_GCM, OutputBearing());
 
+        using var input = new MemoryStream([1, 2, 3]);
+        using var output = new MemoryStream();
+
         Exception? ex = Record.Exception(() => session.DigestEncrypt(
-            digest, encrypt, Key, new MemoryStream([1, 2, 3]), new MemoryStream()));
+            digest, encrypt, Key, input, output));
 
         Assert.IsNotType<ArgumentException>(ex);
     }
@@ -138,8 +153,11 @@ public sealed class Pkcs11SessionSharedDescriptorTests
         var digest = new Mechanism(CKM.CKM_SHA256);
         var encrypt = new Mechanism(CKM.CKM_AES_GCM);
 
+        using var input = new MemoryStream([1, 2, 3]);
+        using var output = new MemoryStream();
+
         Exception? ex = Record.Exception(() => session.DigestEncrypt(
-            digest, encrypt, Key, new MemoryStream([1, 2, 3]), new MemoryStream()));
+            digest, encrypt, Key, input, output));
 
         Assert.IsNotType<ArgumentException>(ex);
     }
