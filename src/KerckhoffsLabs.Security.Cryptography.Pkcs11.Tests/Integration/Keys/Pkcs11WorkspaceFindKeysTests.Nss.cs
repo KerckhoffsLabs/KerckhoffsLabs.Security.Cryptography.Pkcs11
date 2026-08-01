@@ -42,11 +42,11 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Nss(NssBackendFixture backend)
         finally
         {
             using var filter = ObjectTemplate.Empty().Label(label).Build();
-            foreach (var k in workspace.FindKeys(filter))
+            using var keys = workspace.FindKeys(filter);
+            foreach (var k in keys)
             {
                 var h = k.PrivateHandle.IsInvalid ? k.PublicHandle : k.PrivateHandle;
                 workspace.Session.DestroyObject(h);
-                k.Dispose();
             }
         }
     }

@@ -65,7 +65,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Derive().Build();
 
-        var key = workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl);
         try
         {
             using var ecdh = new ECDiffieHellmanPkcs11(key);
@@ -74,7 +74,6 @@ internal static class ECDiffieHellmanPkcs11TestCases
         finally
         {
             try { key.Destroy(); } catch { /* best-effort */ }
-            key.Dispose();
         }
     }
 

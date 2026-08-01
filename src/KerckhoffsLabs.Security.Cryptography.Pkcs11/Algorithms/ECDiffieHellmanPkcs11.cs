@@ -228,17 +228,16 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// </remarks>
     private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
     {
-        try
+        using (derived)
         {
-            derived.Destroy();
-        }
-        catch (Pkcs11Exception) when (operationFailed)
-        {
-            // Deliberately swallowed: see the remarks. The primary exception is the useful one.
-        }
-        finally
-        {
-            derived.Dispose();
+            try
+            {
+                derived.Destroy();
+            }
+            catch (Pkcs11Exception) when (operationFailed)
+            {
+                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
+            }
         }
     }
 

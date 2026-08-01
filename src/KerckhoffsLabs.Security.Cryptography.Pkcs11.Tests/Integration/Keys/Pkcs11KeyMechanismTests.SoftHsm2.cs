@@ -39,11 +39,11 @@ internal static class Pkcs11KeyMechanismCases
         finally
         {
             using var filter = ObjectTemplate.Empty().Label(label).Build();
-            foreach (var k in workspace.FindKeys(filter))
+            using var keys = workspace.FindKeys(filter);
+            foreach (var k in keys)
             {
                 var handle = k.PrivateHandle.IsInvalid ? k.PublicHandle : k.PrivateHandle;
                 workspace.Session.DestroyObject(handle);
-                k.Dispose();
             }
         }
     }

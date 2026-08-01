@@ -172,9 +172,8 @@ internal static class WrapUnwrapKeyTestCases
                 ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
                 try
                 {
-                    var read = session.GetAttributeValue(unwrapped, [CKA.CKA_EXTRACTABLE]);
-                    try { Assert.True(read.First(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool()); }
-                    finally { foreach (var a in read) a.Dispose(); }
+                    using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_EXTRACTABLE]);
+                    Assert.True(read.First(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool());
                 }
                 finally { session.DestroyObject(unwrapped); }
             }

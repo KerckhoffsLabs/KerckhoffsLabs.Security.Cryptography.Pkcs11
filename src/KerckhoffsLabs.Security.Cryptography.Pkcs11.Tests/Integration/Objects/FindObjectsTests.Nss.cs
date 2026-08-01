@@ -113,7 +113,8 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
         finally
         {
             using (var cleanup = ObjectTemplate.Empty().Label(certLabel).Build())
-                foreach (var o in workspace.FindObjects(cleanup)) { o.Destroy(); o.Dispose(); }
+                using (var found = workspace.FindObjects(cleanup))
+                    foreach (var o in found) o.Destroy();
             keypair.Destroy();
         }
     }

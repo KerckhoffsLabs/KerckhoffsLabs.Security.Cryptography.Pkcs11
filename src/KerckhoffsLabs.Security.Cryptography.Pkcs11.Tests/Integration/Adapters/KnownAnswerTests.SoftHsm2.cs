@@ -306,9 +306,8 @@ internal static class KnownAnswerTestCases
                 ObjectHandle derived = session.DeriveKey(mech, priv, [dc, dt, dvl, dtok, dext, dsens]);
                 try
                 {
-                    var attrs = session.GetAttributeValue(derived, [CKA.CKA_VALUE]);
-                    try { Assert.Equal(expectedZ, attrs[0].GetValueAsByteArray()); }
-                    finally { foreach (var a in attrs) a.Dispose(); }
+                    using var attrs = session.GetAttributeValue(derived, [CKA.CKA_VALUE]);
+                    Assert.Equal(expectedZ, attrs[0].GetValueAsByteArray());
                 }
                 finally { session.DestroyObject(derived); }
             }
