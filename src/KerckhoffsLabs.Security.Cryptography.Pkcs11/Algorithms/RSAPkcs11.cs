@@ -206,23 +206,16 @@ public sealed class RSAPkcs11 : RSA
         // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one
         // exists, falling back to the private-key handle otherwise — covering both real key-pair
         // companions and private-only objects whose CKA_MODULUS / CKA_PUBLIC_EXPONENT are readable.
-        var attrs = _key.GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
-        try
-        {
-            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "RSAPkcs11.ExportParameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT)");
+        using var attrs = _key.GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "RSAPkcs11.ExportParameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT)");
 
-            return new RSAParameters
-            {
-                Modulus = attrs[0].GetValueAsByteArray(),
-                Exponent = attrs[1].GetValueAsByteArray(),
-            };
-        }
-        finally
+        return new RSAParameters
         {
-            foreach (var a in attrs) a.Dispose();
-        }
+            Modulus = attrs[0].GetValueAsByteArray(),
+            Exponent = attrs[1].GetValueAsByteArray(),
+        };
     }
 
     /// <inheritdoc/>

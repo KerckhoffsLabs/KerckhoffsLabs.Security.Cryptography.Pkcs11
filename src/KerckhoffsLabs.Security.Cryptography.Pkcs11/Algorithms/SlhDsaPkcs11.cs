@@ -123,20 +123,13 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
     /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
     protected override void ExportSlhDsaPublicKeyCore(Span<byte> destination)
     {
-        var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "SlhDsaPkcs11.ExportSlhDsaPublicKey (CKA_VALUE unreadable)");
+        using var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
+        if (attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "SlhDsaPkcs11.ExportSlhDsaPublicKey (CKA_VALUE unreadable)");
 
-            byte[] value = attrs[0].GetValueAsByteArray();
-            CopyExact(value, destination, Algorithm.PublicKeySizeInBytes);
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        byte[] value = attrs[0].GetValueAsByteArray();
+        CopyExact(value, destination, Algorithm.PublicKeySizeInBytes);
     }
 
     /// <inheritdoc/>
@@ -162,35 +155,28 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
             throw new ArgumentException(
                 $"Expected an SLH-DSA key, got {key.KeyType}.", nameof(key));
 
-        var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw new ArgumentException(
-                    "SLH-DSA key's CKA_PARAMETER_SET is not readable.", nameof(key));
+        using var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
+        if (attrs[0].CannotBeRead)
+            throw new ArgumentException(
+                "SLH-DSA key's CKA_PARAMETER_SET is not readable.", nameof(key));
 
-            return (CkpSlhDsa)attrs[0].GetValueAsUlong() switch
-            {
-                CkpSlhDsa.CKP_SLH_DSA_SHA2_128S => SlhDsaAlgorithm.SlhDsaSha2_128s,
-                CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S => SlhDsaAlgorithm.SlhDsaShake128s,
-                CkpSlhDsa.CKP_SLH_DSA_SHA2_128F => SlhDsaAlgorithm.SlhDsaSha2_128f,
-                CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F => SlhDsaAlgorithm.SlhDsaShake128f,
-                CkpSlhDsa.CKP_SLH_DSA_SHA2_192S => SlhDsaAlgorithm.SlhDsaSha2_192s,
-                CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S => SlhDsaAlgorithm.SlhDsaShake192s,
-                CkpSlhDsa.CKP_SLH_DSA_SHA2_192F => SlhDsaAlgorithm.SlhDsaSha2_192f,
-                CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F => SlhDsaAlgorithm.SlhDsaShake192f,
-                CkpSlhDsa.CKP_SLH_DSA_SHA2_256S => SlhDsaAlgorithm.SlhDsaSha2_256s,
-                CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S => SlhDsaAlgorithm.SlhDsaShake256s,
-                CkpSlhDsa.CKP_SLH_DSA_SHA2_256F => SlhDsaAlgorithm.SlhDsaSha2_256f,
-                CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F => SlhDsaAlgorithm.SlhDsaShake256f,
-                var unknown => throw new ArgumentException(
-                    $"Unrecognized SLH-DSA parameter set 0x{(ulong)unknown:X}.", nameof(key)),
-            };
-        }
-        finally
+        return (CkpSlhDsa)attrs[0].GetValueAsUlong() switch
         {
-            foreach (var a in attrs) a.Dispose();
-        }
+            CkpSlhDsa.CKP_SLH_DSA_SHA2_128S => SlhDsaAlgorithm.SlhDsaSha2_128s,
+            CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S => SlhDsaAlgorithm.SlhDsaShake128s,
+            CkpSlhDsa.CKP_SLH_DSA_SHA2_128F => SlhDsaAlgorithm.SlhDsaSha2_128f,
+            CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F => SlhDsaAlgorithm.SlhDsaShake128f,
+            CkpSlhDsa.CKP_SLH_DSA_SHA2_192S => SlhDsaAlgorithm.SlhDsaSha2_192s,
+            CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S => SlhDsaAlgorithm.SlhDsaShake192s,
+            CkpSlhDsa.CKP_SLH_DSA_SHA2_192F => SlhDsaAlgorithm.SlhDsaSha2_192f,
+            CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F => SlhDsaAlgorithm.SlhDsaShake192f,
+            CkpSlhDsa.CKP_SLH_DSA_SHA2_256S => SlhDsaAlgorithm.SlhDsaSha2_256s,
+            CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S => SlhDsaAlgorithm.SlhDsaShake256s,
+            CkpSlhDsa.CKP_SLH_DSA_SHA2_256F => SlhDsaAlgorithm.SlhDsaSha2_256f,
+            CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F => SlhDsaAlgorithm.SlhDsaShake256f,
+            var unknown => throw new ArgumentException(
+                $"Unrecognized SLH-DSA parameter set 0x{(ulong)unknown:X}.", nameof(key)),
+        };
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)

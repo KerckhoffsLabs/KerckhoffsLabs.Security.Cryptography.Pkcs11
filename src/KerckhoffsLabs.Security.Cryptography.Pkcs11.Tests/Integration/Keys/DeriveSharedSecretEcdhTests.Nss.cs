@@ -21,13 +21,9 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
 
     private static byte[] ReadEcPoint(Pkcs11Workspace workspace, ObjectHandle publicHandle)
     {
-        var attrs = workspace.Session.GetAttributeValue(publicHandle, [CKA.CKA_EC_POINT]);
-        try
-        {
-            Assert.False(attrs[0].CannotBeRead);
-            return attrs[0].GetValueAsByteArray();
-        }
-        finally { foreach (var a in attrs) a.Dispose(); }
+        using var attrs = workspace.Session.GetAttributeValue(publicHandle, [CKA.CKA_EC_POINT]);
+        Assert.False(attrs[0].CannotBeRead);
+        return attrs[0].GetValueAsByteArray();
     }
 
     [ConditionalFact(nameof(ClassicGcm))]

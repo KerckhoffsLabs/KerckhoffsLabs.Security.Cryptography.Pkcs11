@@ -138,15 +138,11 @@ internal static class WrapUnwrapKeyTestCases
             ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
             try
             {
-                var read = session.GetAttributeValue(unwrapped, [CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE]);
-                try
-                {
-                    Assert.True(read.First(a => a.Type == (ulong)CKA.CKA_SENSITIVE).GetValueAsBool(),
-                        "unwrapped key should default to CKA_SENSITIVE=true");
-                    Assert.False(read.First(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool(),
-                        "unwrapped key should default to CKA_EXTRACTABLE=false");
-                }
-                finally { foreach (var a in read) a.Dispose(); }
+                using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE]);
+                Assert.True(read.First(a => a.Type == (ulong)CKA.CKA_SENSITIVE).GetValueAsBool(),
+                    "unwrapped key should default to CKA_SENSITIVE=true");
+                Assert.False(read.First(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool(),
+                    "unwrapped key should default to CKA_EXTRACTABLE=false");
             }
             finally { session.DestroyObject(unwrapped); }
         });

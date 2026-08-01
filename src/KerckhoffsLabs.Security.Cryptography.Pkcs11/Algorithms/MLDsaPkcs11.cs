@@ -144,20 +144,13 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
     /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
     protected override void ExportMLDsaPublicKeyCore(Span<byte> destination)
     {
-        var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "MLDsaPkcs11.ExportMLDsaPublicKey (CKA_VALUE unreadable)");
+        using var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
+        if (attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "MLDsaPkcs11.ExportMLDsaPublicKey (CKA_VALUE unreadable)");
 
-            byte[] value = attrs[0].GetValueAsByteArray();
-            CopyExact(value, destination, Algorithm.PublicKeySizeInBytes);
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        byte[] value = attrs[0].GetValueAsByteArray();
+        CopyExact(value, destination, Algorithm.PublicKeySizeInBytes);
     }
 
     /// <inheritdoc/>
@@ -189,26 +182,19 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
             throw new ArgumentException(
                 $"Expected an ML-DSA key, got {key.KeyType}.", nameof(key));
 
-        var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw new ArgumentException(
-                    "ML-DSA key's CKA_PARAMETER_SET is not readable.", nameof(key));
+        using var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
+        if (attrs[0].CannotBeRead)
+            throw new ArgumentException(
+                "ML-DSA key's CKA_PARAMETER_SET is not readable.", nameof(key));
 
-            return (CkpMlDsa)attrs[0].GetValueAsUlong() switch
-            {
-                CkpMlDsa.CKP_ML_DSA_44 => MLDsaAlgorithm.MLDsa44,
-                CkpMlDsa.CKP_ML_DSA_65 => MLDsaAlgorithm.MLDsa65,
-                CkpMlDsa.CKP_ML_DSA_87 => MLDsaAlgorithm.MLDsa87,
-                var unknown => throw new ArgumentException(
-                    $"Unrecognized ML-DSA parameter set 0x{(ulong)unknown:X}.", nameof(key)),
-            };
-        }
-        finally
+        return (CkpMlDsa)attrs[0].GetValueAsUlong() switch
         {
-            foreach (var a in attrs) a.Dispose();
-        }
+            CkpMlDsa.CKP_ML_DSA_44 => MLDsaAlgorithm.MLDsa44,
+            CkpMlDsa.CKP_ML_DSA_65 => MLDsaAlgorithm.MLDsa65,
+            CkpMlDsa.CKP_ML_DSA_87 => MLDsaAlgorithm.MLDsa87,
+            var unknown => throw new ArgumentException(
+                $"Unrecognized ML-DSA parameter set 0x{(ulong)unknown:X}.", nameof(key)),
+        };
     }
 
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)

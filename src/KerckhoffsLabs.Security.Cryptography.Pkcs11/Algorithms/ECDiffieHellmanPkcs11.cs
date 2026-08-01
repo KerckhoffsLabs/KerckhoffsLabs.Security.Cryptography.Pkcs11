@@ -200,21 +200,15 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         bool operationFailed = true;
         try
         {
-            var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            try
-            {
-                if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                    throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                        "ECDiffieHellmanPkcs11.DeriveRawSecret (derived CKA_VALUE not readable)");
-                byte[] secret = attrs[0].GetValueAsByteArray();
-                operationFailed = false;
-                return secret;
-            }
-            finally
-            {
-                // ObjectAttribute owns an unmanaged buffer holding the shared secret Z; free it.
-                foreach (var a in attrs) a.Dispose();
-            }
+            // ObjectAttribute owns an unmanaged buffer holding the shared secret Z; disposing the
+            // list is what frees and zeroizes it.
+            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
+            if (attrs.Count == 0 || attrs[0].CannotBeRead)
+                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                    "ECDiffieHellmanPkcs11.DeriveRawSecret (derived CKA_VALUE not readable)");
+            byte[] secret = attrs[0].GetValueAsByteArray();
+            operationFailed = false;
+            return secret;
         }
         finally
         {
@@ -296,22 +290,15 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             throw new InsecureOperationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
-        try
-        {
-            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "ECDiffieHellmanPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS not readable)");
+        using var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "ECDiffieHellmanPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS not readable)");
 
-            var ec = Pkcs11PublicKeyView.TryParseEcPublicKey(
-                attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
-            return ec ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
-                "ECDiffieHellmanPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be parsed as a named-curve uncompressed point)");
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        var ec = Pkcs11PublicKeyView.TryParseEcPublicKey(
+            attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
+        return ec ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
+            "ECDiffieHellmanPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be parsed as a named-curve uncompressed point)");
     }
 
     /// <inheritdoc/>

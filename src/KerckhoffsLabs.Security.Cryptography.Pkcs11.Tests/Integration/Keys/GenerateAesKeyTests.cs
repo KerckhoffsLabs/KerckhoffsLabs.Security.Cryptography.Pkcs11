@@ -27,15 +27,8 @@ internal static class GenerateAesKeyTestCases
 
         Assert.False(key.PrivateHandle.IsInvalid);
 
-        var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
-        try
-        {
-            Assert.Single(attrs);
-            Assert.Equal(32UL, attrs[0].GetValueAsUlong());
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        using var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
+        Assert.Single(attrs);
+        Assert.Equal(32UL, attrs[0].GetValueAsUlong());
     }
 }

@@ -17,16 +17,9 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
 
     private static byte[] ReadEcPoint(Pkcs11Workspace workspace, ObjectHandle publicHandle)
     {
-        var attrs = workspace.Session.GetAttributeValue(publicHandle, [CKA.CKA_EC_POINT]);
-        try
-        {
-            Assert.False(attrs[0].CannotBeRead);
-            return attrs[0].GetValueAsByteArray();
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        using var attrs = workspace.Session.GetAttributeValue(publicHandle, [CKA.CKA_EC_POINT]);
+        Assert.False(attrs[0].CannotBeRead);
+        return attrs[0].GetValueAsByteArray();
     }
 
     // Two parties run ECDH1 (CKD_NULL) over P-256; the derived on-token AES keys must be identical,

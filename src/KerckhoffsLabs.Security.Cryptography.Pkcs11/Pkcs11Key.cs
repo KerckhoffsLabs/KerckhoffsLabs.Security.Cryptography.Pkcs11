@@ -105,11 +105,12 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <param name="types">CKA types to read.</param>
     /// <returns>The attribute values, in the same order as <paramref name="types"/>. Attributes the
-    /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set.</returns>
+    /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set. The list
+    /// owns the values: dispose it (a <c>using</c> will do) to release and zeroize their buffers.</returns>
     /// <exception cref="ObjectDisposedException">Thrown when the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="types"/> is null.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key exposes no readable handle; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
-    public IReadOnlyList<ObjectAttribute> GetAttributeValue(params CKA[] types)
+    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(params CKA[] types)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(types);

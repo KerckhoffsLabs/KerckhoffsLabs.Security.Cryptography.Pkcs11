@@ -150,11 +150,12 @@ public sealed class Pkcs11Workspace : IDisposable
     /// Finds all keys matching the given template.
     /// </summary>
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder.</param>
-    /// <returns>A list of <see cref="Pkcs11Key"/>. May be empty. Caller disposes each.</returns>
+    /// <returns>A list of <see cref="Pkcs11Key"/>. May be empty. The list owns the keys: dispose it
+    /// (a <c>using</c> will do) to release them all.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
-    public IReadOnlyList<Pkcs11Key> FindKeys(ObjectTemplate filter)
+    public ReadOnlyDisposableList<Pkcs11Key> FindKeys(ObjectTemplate filter)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
@@ -163,7 +164,7 @@ public sealed class Pkcs11Workspace : IDisposable
         var result = new List<Pkcs11Key>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateKeyFromHandle(handle));
-        return result;
+        return new ReadOnlyDisposableList<Pkcs11Key>(result);
     }
 
     /// <summary>
@@ -174,11 +175,12 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder
     /// (e.g. filter on <c>CKA_CLASS = CKO_CERTIFICATE</c>).</param>
-    /// <returns>A list of <see cref="Pkcs11Object"/>. May be empty. Caller disposes each.</returns>
+    /// <returns>A list of <see cref="Pkcs11Object"/>. May be empty. The list owns the objects: dispose
+    /// it (a <c>using</c> will do) to release them all. Disposal does not destroy anything on the token.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="filter"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call.</exception>
-    public IReadOnlyList<Pkcs11Object> FindObjects(ObjectTemplate filter)
+    public ReadOnlyDisposableList<Pkcs11Object> FindObjects(ObjectTemplate filter)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(filter);
@@ -187,7 +189,7 @@ public sealed class Pkcs11Workspace : IDisposable
         var result = new List<Pkcs11Object>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateObjectFromHandle(handle));
-        return result;
+        return new ReadOnlyDisposableList<Pkcs11Object>(result);
     }
 
     /// <summary>
@@ -196,11 +198,12 @@ public sealed class Pkcs11Workspace : IDisposable
     /// parsed <see cref="X509Certificate2"/> and bridges to its on-token private key by
     /// <c>CKA_ID</c>.
     /// </summary>
-    /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. Caller disposes each.</returns>
+    /// <returns>A list of <see cref="Pkcs11Certificate"/>. May be empty. The list owns the certificates:
+    /// dispose it (a <c>using</c> will do) to release them all.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Thrown (<see cref="CKR.CKR_ATTRIBUTE_SENSITIVE"/>) if a certificate's
     /// <c>CKA_VALUE</c> cannot be read; also propagated from the underlying <c>C_FindObjects</c> call.</exception>
-    public IReadOnlyList<Pkcs11Certificate> FindCertificates()
+    public ReadOnlyDisposableList<Pkcs11Certificate> FindCertificates()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -212,7 +215,7 @@ public sealed class Pkcs11Workspace : IDisposable
         var result = new List<Pkcs11Certificate>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateCertificateFromHandle(handle));
-        return result;
+        return new ReadOnlyDisposableList<Pkcs11Certificate>(result);
     }
 
     private Pkcs11Certificate HydrateCertificateFromHandle(ObjectHandle handle)

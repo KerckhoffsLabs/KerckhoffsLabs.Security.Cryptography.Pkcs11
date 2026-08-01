@@ -33,16 +33,9 @@ internal static class ObjectLifecycleTestCases
                 Assert.Single(found);
 
                 // GetAttributeValue retrieves the value.
-                var attrs = session.GetAttributeValue(found[0], [CKA.CKA_VALUE]);
-                try
-                {
-                    Assert.Single(attrs);
-                    Assert.Equal(value, attrs[0].GetValueAsByteArray());
-                }
-                finally
-                {
-                    foreach (var a in attrs) a.Dispose();
-                }
+                using var attrs = session.GetAttributeValue(found[0], [CKA.CKA_VALUE]);
+                Assert.Single(attrs);
+                Assert.Equal(value, attrs[0].GetValueAsByteArray());
             }
             finally
             {

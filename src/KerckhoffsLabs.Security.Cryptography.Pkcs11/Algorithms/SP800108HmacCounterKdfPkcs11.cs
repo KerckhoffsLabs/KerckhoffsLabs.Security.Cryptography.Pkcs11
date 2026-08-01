@@ -176,23 +176,16 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
         bool operationFailed = true;
         try
         {
-            var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            try
-            {
-                if (attrs.Count == 0 || attrs[0].CannotBeRead)
-                    throw new InvalidOperationException(
-                        "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
-                byte[] derivedKey = attrs[0].GetValueAsByteArray();
-                operationFailed = false;
-                return derivedKey;
-            }
-            finally
-            {
-                // ObjectAttribute owns an unmanaged buffer holding the derived key material, and
-                // freeing it is what zeroizes it. Without this the secret stays in unmanaged memory
-                // for the life of the process.
-                foreach (var a in attrs) a.Dispose();
-            }
+            // ObjectAttribute owns an unmanaged buffer holding the derived key material, and
+            // freeing it is what zeroizes it. Without this the secret stays in unmanaged memory
+            // for the life of the process.
+            using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
+            if (attrs.Count == 0 || attrs[0].CannotBeRead)
+                throw new InvalidOperationException(
+                    "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
+            byte[] derivedKey = attrs[0].GetValueAsByteArray();
+            operationFailed = false;
+            return derivedKey;
         }
         finally
         {

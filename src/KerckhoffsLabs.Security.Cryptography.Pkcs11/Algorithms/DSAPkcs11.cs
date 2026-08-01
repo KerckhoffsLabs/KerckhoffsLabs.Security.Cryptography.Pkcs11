@@ -156,28 +156,21 @@ public sealed class DSAPkcs11 : DSA
 
         // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one exists,
         // so CKA_VALUE resolves to the public value Y (not the private value X).
-        var attrs = _key.GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE, CKA.CKA_VALUE);
-        try
-        {
-            if (attrs[0].CannotBeRead || attrs[1].CannotBeRead || attrs[2].CannotBeRead || attrs[3].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "DSAPkcs11.ExportParameters (CKA_PRIME / CKA_SUBPRIME / CKA_BASE / CKA_VALUE)");
+        using var attrs = _key.GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE, CKA.CKA_VALUE);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead || attrs[2].CannotBeRead || attrs[3].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "DSAPkcs11.ExportParameters (CKA_PRIME / CKA_SUBPRIME / CKA_BASE / CKA_VALUE)");
 
-            byte[] p = TrimLeadingZeros(attrs[0].GetValueAsByteArray());
-            byte[] q = TrimLeadingZeros(attrs[1].GetValueAsByteArray());
-            return new DSAParameters
-            {
-                P = p,
-                Q = q,
-                // DSAParameters requires G and Y to share the prime length; left-pad to P.
-                G = LeftPad(attrs[2].GetValueAsByteArray(), p.Length),
-                Y = LeftPad(attrs[3].GetValueAsByteArray(), p.Length),
-            };
-        }
-        finally
+        byte[] p = TrimLeadingZeros(attrs[0].GetValueAsByteArray());
+        byte[] q = TrimLeadingZeros(attrs[1].GetValueAsByteArray());
+        return new DSAParameters
         {
-            foreach (var a in attrs) a.Dispose();
-        }
+            P = p,
+            Q = q,
+            // DSAParameters requires G and Y to share the prime length; left-pad to P.
+            G = LeftPad(attrs[2].GetValueAsByteArray(), p.Length),
+            Y = LeftPad(attrs[3].GetValueAsByteArray(), p.Length),
+        };
     }
 
     /// <inheritdoc/>

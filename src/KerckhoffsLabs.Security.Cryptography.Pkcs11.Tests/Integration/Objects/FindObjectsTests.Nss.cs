@@ -45,14 +45,10 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            var objs = workspace.FindObjects(filter);
-            try
-            {
-                Assert.Single(objs);
-                Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
-                Assert.Equal(der, objs[0].GetValue());
-            }
-            finally { foreach (var o in objs) o.Dispose(); }
+            using var objs = workspace.FindObjects(filter);
+            Assert.Single(objs);
+            Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
+            Assert.Equal(der, objs[0].GetValue());
         }
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
@@ -102,21 +98,17 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
 
         try
         {
-            var certs = workspace.FindCertificates();
-            try
-            {
-                Pkcs11Certificate? cert = certs.FirstOrDefault(c => c.Label == certLabel);
-                Assert.NotNull(cert);
+            using var certs = workspace.FindCertificates();
+            Pkcs11Certificate? cert = certs.FirstOrDefault(c => c.Label == certLabel);
+            Assert.NotNull(cert);
 
-                byte[] data = Encoding.UTF8.GetBytes("sign via FindCertificates bridge");
-                using var priv = cert!.GetRSAPrivateKey();
-                Assert.NotNull(priv);
-                byte[] sig = priv!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            byte[] data = Encoding.UTF8.GetBytes("sign via FindCertificates bridge");
+            using var priv = cert!.GetRSAPrivateKey();
+            Assert.NotNull(priv);
+            byte[] sig = priv!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
-                using var pub = cert!.Certificate.GetRSAPublicKey();
-                Assert.True(pub!.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
-            }
-            finally { foreach (var c in certs) c.Dispose(); }
+            using var pub = cert!.Certificate.GetRSAPublicKey();
+            Assert.True(pub!.VerifyData(data, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
         }
         finally
         {

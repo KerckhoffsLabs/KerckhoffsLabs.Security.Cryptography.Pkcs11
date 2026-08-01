@@ -152,20 +152,13 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
     protected override void ExportEncapsulationKeyCore(Span<byte> destination)
     {
-        var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "MLKemPkcs11.ExportEncapsulationKey (CKA_VALUE unreadable)");
+        using var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
+        if (attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                "MLKemPkcs11.ExportEncapsulationKey (CKA_VALUE unreadable)");
 
-            byte[] value = attrs[0].GetValueAsByteArray();
-            CopyExact(value, destination, Algorithm.EncapsulationKeySizeInBytes);
-        }
-        finally
-        {
-            foreach (var a in attrs) a.Dispose();
-        }
+        byte[] value = attrs[0].GetValueAsByteArray();
+        CopyExact(value, destination, Algorithm.EncapsulationKeySizeInBytes);
     }
 
     /// <inheritdoc/>
@@ -209,26 +202,19 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
             throw new ArgumentException(
                 $"Expected an ML-KEM key, got {key.KeyType}.", nameof(key));
 
-        var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw new ArgumentException(
-                    "ML-KEM key's CKA_PARAMETER_SET is not readable.", nameof(key));
+        using var attrs = key.GetAttributeValue(CKA.CKA_PARAMETER_SET);
+        if (attrs[0].CannotBeRead)
+            throw new ArgumentException(
+                "ML-KEM key's CKA_PARAMETER_SET is not readable.", nameof(key));
 
-            return (CkpMlKem)attrs[0].GetValueAsUlong() switch
-            {
-                CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
-                CkpMlKem.CKP_ML_KEM_768 => MLKemAlgorithm.MLKem768,
-                CkpMlKem.CKP_ML_KEM_1024 => MLKemAlgorithm.MLKem1024,
-                var unknown => throw new ArgumentException(
-                    $"Unrecognized ML-KEM parameter set 0x{(ulong)unknown:X}.", nameof(key)),
-            };
-        }
-        finally
+        return (CkpMlKem)attrs[0].GetValueAsUlong() switch
         {
-            foreach (var a in attrs) a.Dispose();
-        }
+            CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
+            CkpMlKem.CKP_ML_KEM_768 => MLKemAlgorithm.MLKem768,
+            CkpMlKem.CKP_ML_KEM_1024 => MLKemAlgorithm.MLKem1024,
+            var unknown => throw new ArgumentException(
+                $"Unrecognized ML-KEM parameter set 0x{(ulong)unknown:X}.", nameof(key)),
+        };
     }
 
     // includeValueLen: encapsulate creates the shared secret via C_DeriveKey-style semantics
@@ -249,7 +235,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
     private static void ReadAndCopySecret(Pkcs11Key sharedKey, Span<byte> destination)
     {
-        var attrs = sharedKey.GetAttributeValue(CKA.CKA_VALUE);
+        using var attrs = sharedKey.GetAttributeValue(CKA.CKA_VALUE);
         byte[]? value = null;
         try
         {
@@ -267,8 +253,9 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         }
         finally
         {
+            // `value` is a managed copy of the secret; the attribute's unmanaged buffer behind it is
+            // released by the using on `attrs`.
             if (value is not null) CryptographicOperations.ZeroMemory(value);
-            foreach (var a in attrs) a.Dispose();
         }
     }
 
