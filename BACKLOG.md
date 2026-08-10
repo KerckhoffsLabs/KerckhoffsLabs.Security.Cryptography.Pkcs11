@@ -194,7 +194,10 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Raised by:** .NET Engineer B
 - **Spec / References:** PKCS#11 v3.1 §3.2 (blank-padded fields)
 
-### [BL-015] `Pkcs11Session.Dispose` bypasses the busy-lock every operation acquires — close can race an in-flight native call
+### [BL-015] ✅ RESOLVED — `Pkcs11Session.Dispose` bypasses the busy-lock every operation acquires — close can race an in-flight native call
+- **Status:** Resolved 2026-08-10. `Dispose(bool)` now runs its whole body under `_busyLock`, so the `C_CloseSession` issued by releasing the handle can no longer overlap a native call in flight on another thread. `_disposed` became `volatile` — it is written under the lock but read outside it by the property guards.
+  - **It waits for the lock rather than calling `AcquireExclusive()`, which is what this entry proposed.** `AcquireExclusive` throws on cross-thread contention, and disposal usually runs from a `using` that is already unwinding, where that throw would replace the exception that started the unwind — the same objection that moved `ReadOnlyDisposableList.Dispose` off throwing (S3877). So `Dispose` uses a blocking `Monitor.Enter`. Waiting is bounded in practice: the lock is only ever held for the length of one native call, and the sole nesting is `_busyLock` → the library's session tracker, never the reverse, so there is no ordering cycle. `Monitor` is reentrant, so disposing from inside an operation on the same thread still closes.
+- **Verification:** `Pkcs11SessionDisposeRaceTests` parks a worker inside `C_GenerateRandom` on a fake module and disposes from a second thread. Three mutations, each killed by a different assertion — the lock removed (the pre-fix behaviour: the fake records a close entered while the call was on the stack), `AcquireExclusive()` substituted for `Monitor.Enter` (throws out of `Dispose`, *and* leaves the session unclosed), and a non-reentrant lock (the same-thread self-disposal test deadlocks). Full suite green: 1947 passed, 0 failed.
 - **Area:** P/Invoke
 - **Severity:** Medium
 - **Effort:** S

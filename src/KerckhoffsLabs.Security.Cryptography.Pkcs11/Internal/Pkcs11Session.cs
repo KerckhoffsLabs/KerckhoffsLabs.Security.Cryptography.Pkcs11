@@ -20,9 +20,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 internal sealed class Pkcs11Session : IDisposable
 {
     /// <summary>
-    /// Flag indicating whether instance has been disposed
+    /// Flag indicating whether instance has been disposed. Written under <see cref="_busyLock"/>,
+    /// but read outside it by the property guards, so it is <c>volatile</c>: a disposal on one
+    /// thread has to be visible to the next caller on another without the reader taking the lock.
     /// </summary>
-    private bool _disposed = false;
+    private volatile bool _disposed = false;
 
     /// <summary>
     /// Logger responsible for message logging
@@ -60,6 +62,11 @@ internal sealed class Pkcs11Session : IDisposable
     /// internally call the public <c>GenerateKey</c>. Re-entry from the same thread succeeds;
     /// a different thread calling while the lock is held fails immediately and
     /// <see cref="AcquireExclusive"/> throws.
+    /// <para>
+    /// <see cref="Dispose(bool)"/> is the one exception: it waits for the lock instead of throwing,
+    /// because it cannot report contention by throwing and it must not close the session under an
+    /// in-flight native call. See the comment there.
+    /// </para>
     /// </remarks>
     private readonly object _busyLock = new();
 
@@ -843,8 +850,28 @@ internal sealed class Pkcs11Session : IDisposable
     {
         Log.SessionTrace(_logger, (ulong)_sessionId, "Dispose2");
 
-        if (!_disposed)
+        // Releasing the handle issues C_CloseSession, so disposal has to hold the same lock every
+        // native-touching method holds: session ids cross the P/Invoke boundary by value, and the
+        // SafeHandle's ref-counting protects the handle object, not the session behind it. Without
+        // this, a Dispose on one thread closes the session out from under a C_Sign in flight on
+        // another — undefined behaviour at the boundary.
+        //
+        // It waits for the lock rather than going through AcquireExclusive, which throws on
+        // cross-thread contention. Dispose usually runs from a `using` that is already unwinding,
+        // where a throw would replace the exception that started the unwind with one about closing
+        // a session — the same reason ReadOnlyDisposableList records its release failures instead
+        // of throwing them. Waiting is bounded in practice: the lock is only ever held for the
+        // length of one native call, and the sole nesting is _busyLock -> the library's session
+        // tracker, never the reverse, so there is no ordering cycle to deadlock on. Monitor is
+        // reentrant, so disposing from inside an operation on this thread still closes.
+        bool lockTaken = false;
+        try
         {
+            Monitor.Enter(_busyLock, ref lockTaken);
+
+            if (_disposed)
+                return;
+
             // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
             // Honour _closeWhenDisposed: only close if the caller wants automatic close on dispose.
             if (disposing && _closeWhenDisposed)
@@ -857,6 +884,11 @@ internal sealed class Pkcs11Session : IDisposable
             // session ID, and Pkcs11ModuleHandle (held transitively via _pkcs11Library) owns the
             // library module. Both are SafeHandles and run their own critical finalizers.
             _disposed = true;
+        }
+        finally
+        {
+            if (lockTaken)
+                Monitor.Exit(_busyLock);
         }
     }
 
