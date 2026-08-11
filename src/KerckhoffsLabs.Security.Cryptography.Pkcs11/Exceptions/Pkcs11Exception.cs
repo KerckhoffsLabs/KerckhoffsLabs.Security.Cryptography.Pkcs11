@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -12,6 +13,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// Carries the PKCS#11 method name that failed and the underlying CKR. Typed subclasses
 /// (<c>Pkcs11AuthenticationException</c>, <c>Pkcs11SessionException</c>, etc.) categorize
 /// related CKR values so callers can catch by category.
+///
+/// Derives from <see cref="CryptographicException"/> because the BCL-shaped façades
+/// (<c>RSAPkcs11</c>, <c>ECDsaPkcs11</c>, <c>MLDsaPkcs11</c>, <c>HMACPkcs11</c>) are documented as
+/// drop-in substitutes for their BCL base types, and code written against those bases — including
+/// generic wrappers that have never heard of PKCS#11 — funnels failures through
+/// <c>catch (CryptographicException)</c>. An exception escaping <c>rsa.SignData(...)</c> that sat
+/// outside that hierarchy would bypass the caller's error handling entirely.
+/// Catching <see cref="Pkcs11Exception"/> remains available for callers that want the CKR.
 ///
 /// Use the appropriate static at each call site:
 /// <list type="bullet">
@@ -29,7 +38,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// <param name="method">Name of the failing PKCS#11 method.</param>
 /// <param name="message">Optional explanatory message. When null, a default message
 /// of the form <c>"PKCS#11 method &lt;method&gt; returned &lt;returnValue&gt;"</c> is used.</param>
-public abstract class Pkcs11Exception(CKR returnValue, string method, string? message) : Exception(BuildMessage(method, returnValue, message))
+public abstract class Pkcs11Exception(CKR returnValue, string method, string? message)
+    : CryptographicException(BuildMessage(method, returnValue, message))
 {
     /// <summary>PKCS#11 return value that triggered this exception.</summary>
     public CKR ReturnValue { get; } = returnValue;

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
@@ -8,7 +9,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// encryption and signature), MD5 and SHA-1 (raw and in RSA signature contexts), DES/3DES
 /// (encryption and MAC), and AES-ECB.
 /// </summary>
-public sealed class InsecureOperationException : Exception
+/// <remarks>
+/// Derives from <see cref="CryptographicException"/> so a caller handling failures from the
+/// BCL-shaped façades in the usual way still catches it — the refusal reaches them through the
+/// same call as any other crypto failure. The message names the opt-in, so a broad catch that
+/// logs still says what to do.
+/// </remarks>
+public sealed class InsecureOperationException : CryptographicException
 {
     /// <summary>The mechanism that triggered the gate.</summary>
     public CKM Mechanism { get; }

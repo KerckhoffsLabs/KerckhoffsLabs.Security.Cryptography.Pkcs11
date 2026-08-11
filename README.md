@@ -76,6 +76,22 @@ Reach for an existing key by label instead of generating one with `workspace.Ope
 and see the [documentation](#documentation) for encryption, wrapping, key derivation, and the
 post-quantum mechanisms.
 
+### Error handling
+
+Every exception this library raises derives from `System.Security.Cryptography.CryptographicException`,
+so code written against the BCL shapes above — including generic wrappers that have never heard of
+PKCS#11 — catches token failures where it already catches everything else:
+
+```csharp
+try { rsa.SignData(message, HashAlgorithmName.SHA256, RSASignaturePadding.Pss); }
+catch (Pkcs11Exception ex) { logger.LogError("{Method} returned {Ckr}", ex.Method, ex.ReturnValue); }
+catch (CryptographicException ex) { /* everything else, including a plain BCL failure */ }
+```
+
+Narrow to `Pkcs11Exception` when you want the raw `CKR` and the failing PKCS#11 method, or to one of
+its typed subclasses (`Pkcs11AuthenticationException`, `Pkcs11SessionException`, …) to catch by
+category.
+
 ## Security model
 
 The high-level API is **secure by default**. A cryptographic operation whose mechanism is considered

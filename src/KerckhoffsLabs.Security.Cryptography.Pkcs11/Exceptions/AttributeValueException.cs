@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -5,7 +6,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// <summary>
 /// Exception with the name of PKCS#11 attribute whose value could not be read or converted
 /// </summary>
-public sealed class AttributeValueException : Exception
+/// <remarks>
+/// Derives from <see cref="CryptographicException"/>: attribute reads happen underneath the
+/// BCL-shaped façades (resolving a key's type or parameters before an operation), so this can
+/// surface from a plain <c>SignData</c> call and has to be catchable the same way.
+/// </remarks>
+public sealed class AttributeValueException : CryptographicException
 {
     /// <summary>
     /// Attribute whose value could not be read or converted
