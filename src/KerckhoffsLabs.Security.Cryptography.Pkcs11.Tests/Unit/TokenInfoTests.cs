@@ -52,8 +52,8 @@ public sealed class TokenInfoTests
         Assert.Equal(90000UL, info.FreePublicMemory);
         Assert.Equal(50000UL, info.TotalPrivateMemory);
         Assert.Equal(40000UL, info.FreePrivateMemory);
-        Assert.Equal("2.01", info.HardwareVersion);
-        Assert.Equal("3.40", info.FirmwareVersion);
+        Assert.Equal(new Version(2, 1), info.HardwareVersion);
+        Assert.Equal(new Version(3, 40), info.FirmwareVersion);
     }
 
     [Fact]

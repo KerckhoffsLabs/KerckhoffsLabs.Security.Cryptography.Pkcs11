@@ -20,11 +20,13 @@ public sealed record SlotInfo
     /// <summary>Flags that provide capabilities of the slot.</summary>
     public SlotFlags SlotFlags { get; }
 
-    /// <summary>Version number of the slot's hardware.</summary>
-    public string HardwareVersion { get; }
+    /// <summary>Version number of the slot's hardware. See
+    /// <see cref="LibraryInfo.CryptokiVersion"/> for how <c>CK_VERSION</c> encodes the minor field.</summary>
+    public Version HardwareVersion { get; }
 
-    /// <summary>Version number of the slot's firmware.</summary>
-    public string FirmwareVersion { get; }
+    /// <summary>Version number of the slot's firmware. See
+    /// <see cref="LibraryInfo.CryptokiVersion"/> for how <c>CK_VERSION</c> encodes the minor field.</summary>
+    public Version FirmwareVersion { get; }
 
     internal SlotInfo(NativeCULong slotId, CK_SLOT_INFO ck_slot_info)
     {
@@ -32,7 +34,7 @@ public sealed record SlotInfo
         SlotDescription = Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
         ManufacturerId = Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
         SlotFlags = new SlotFlags((ulong)ck_slot_info.Flags);
-        HardwareVersion = ck_slot_info.HardwareVersion.ToString();
-        FirmwareVersion = ck_slot_info.FirmwareVersion.ToString();
+        HardwareVersion = ck_slot_info.HardwareVersion.ToVersion();
+        FirmwareVersion = ck_slot_info.FirmwareVersion.ToVersion();
     }
 }

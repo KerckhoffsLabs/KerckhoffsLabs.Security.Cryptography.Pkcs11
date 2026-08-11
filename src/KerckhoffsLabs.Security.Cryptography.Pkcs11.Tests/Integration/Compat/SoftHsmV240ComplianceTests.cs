@@ -22,7 +22,7 @@ public sealed class SoftHsmV240ComplianceTests(SoftHsmBackendFixture backend)
 
     [ConditionalFact(nameof(ExpectV240))]
     public void Module_ReportsCryptokiVersion_2_40()
-        => Assert.Equal("2.40", _backend.Library.GetInfo().CryptokiVersion);
+        => Assert.Equal(new Version(2, 40), _backend.Library.GetInfo().CryptokiVersion);
 
     [ConditionalFact(nameof(ExpectV240))]
     public void Module_ExposesNoV3xSurface()

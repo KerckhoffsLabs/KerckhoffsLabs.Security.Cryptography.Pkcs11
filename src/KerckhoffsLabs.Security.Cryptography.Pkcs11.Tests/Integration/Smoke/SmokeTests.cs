@@ -1,4 +1,3 @@
-using System.Globalization;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
@@ -17,16 +16,15 @@ internal static class SmokeTestAssertions
         Assert.False(string.IsNullOrWhiteSpace(info.ManufacturerId));
         Assert.False(string.IsNullOrWhiteSpace(info.LibraryDescription));
 
-        // CryptokiVersion must parse as "major.minor" with a Cryptoki-2-or-later major — a
-        // version-rendering regression (e.g. a swapped/zeroed CK_VERSION byte) would slip past a
-        // mere non-empty-string check but is caught here.
-        Assert.Matches(@"^\d+\.\d+$", info.CryptokiVersion);
-        int cryptokiMajor = int.Parse(info.CryptokiVersion.Split('.')[0], CultureInfo.InvariantCulture);
-        Assert.True(cryptokiMajor >= 2,
-            $"Cryptoki major version should be >= 2, was '{info.CryptokiVersion}'.");
+        // A swapped or zeroed CK_VERSION byte would slip past a mere non-null check but is caught
+        // here: every module this suite loads is Cryptoki 2 or later.
+        Assert.True(info.CryptokiVersion >= new Version(2, 0),
+            $"Cryptoki version should be >= 2.0, was '{info.CryptokiVersion}'.");
+        Assert.True(backend.Library.SupportsCryptokiVersion(2, 0));
 
-        // LibraryVersion is likewise a "major.minor" string.
-        Assert.Matches(@"^\d+\.\d+$", info.LibraryVersion);
+        // The vendor's own library version is independent of the spec version, but is equally
+        // required to be present rather than a default-constructed 0.0.
+        Assert.NotEqual(new Version(0, 0), info.LibraryVersion);
 
         // The module must report at least one slot (independent of token presence).
         Assert.NotEmpty(backend.Library.GetSlotList(tokenPresent: false));

@@ -21,8 +21,8 @@ public sealed class SlotInfoTests
         Assert.Equal(9UL, info.SlotId.Value);
         Assert.Equal("USB Reader Slot 0", info.SlotDescription);
         Assert.Equal("Acme Corp", info.ManufacturerId);
-        Assert.Equal("1.0", info.HardwareVersion);   // minor 0 -> "M.0"
-        Assert.Equal("2.05", info.FirmwareVersion);  // minor as hundredths
+        Assert.Equal(new Version(1, 0), info.HardwareVersion);
+        Assert.Equal(new Version(2, 5), info.FirmwareVersion);
         Assert.True(info.SlotFlags.TokenPresent);
         Assert.True(info.SlotFlags.HardwareSlot);
         Assert.False(info.SlotFlags.RemovableDevice);
@@ -37,16 +37,20 @@ public sealed class SlotInfoTests
         Assert.Equal("slot", info.SlotDescription);
     }
 
+    // The two CK_VERSION bytes reach the caller verbatim, including minor values above the
+    // hundredths range that a real module (NSS softoken reports 3.125) actually emits.
     [Theory]
-    [InlineData(3, 0, "3.0")]      // minor 0 -> "M.0"
-    [InlineData(3, 7, "3.07")]     // 1..99 -> zero-padded hundredths
-    [InlineData(3, 99, "3.99")]    // upper bound of the hundredths range
-    [InlineData(3, 125, "3.125")]  // > 99: a real module (NSS softoken) exceeds the hundredths range
-    [InlineData(3, 200, "3.200")]  // rendered as a plain minor rather than a sentinel string
-    public void Version_RendersPerCkVersionRules(byte major, byte minor, string expected)
+    [InlineData(3, 0)]
+    [InlineData(3, 7)]
+    [InlineData(3, 99)]   // upper bound of the hundredths range
+    [InlineData(3, 125)]  // beyond it, and still not a sentinel
+    [InlineData(3, 200)]
+    public void Version_CarriesTheRawCkVersionFields(byte major, byte minor)
     {
         var native = new CK_SLOT_INFO { HardwareVersion = new CK_VERSION { Major = major, Minor = minor } };
         var info = new SlotInfo((NativeCULong)0UL, native);
-        Assert.Equal(expected, info.HardwareVersion);
+
+        Assert.Equal(new Version(major, minor), info.HardwareVersion);
+        Assert.Equal(-1, info.HardwareVersion.Build);  // CK_VERSION has no third field to invent
     }
 }

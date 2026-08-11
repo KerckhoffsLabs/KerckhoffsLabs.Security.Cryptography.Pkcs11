@@ -197,6 +197,25 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
+    /// Whether the module reports a Cryptoki interface version of at least <paramref name="major"/>.<paramref name="minor"/>
+    /// — the readable form of <c>GetInfo().CryptokiVersion &gt;= new Version(major, minor)</c>, and the
+    /// supported alternative to driving version detection off a <c>CKR_FUNCTION_NOT_SUPPORTED</c>
+    /// exception from <see cref="GetInterfaces"/>.
+    /// </summary>
+    /// <remarks>
+    /// This is what the module claims to be *compatible with*, not which function tables actually
+    /// bound: a module may report 3.2 and still refuse an individual v3.2 entry point. Remember that
+    /// <c>CK_VERSION</c>'s minor is the hundredths portion, so the v3.1 written on a datasheet is
+    /// <c>SupportsCryptokiVersion(3, 10)</c>, not <c>(3, 1)</c>. Queries the module on every call.
+    /// </remarks>
+    /// <param name="major">Required major version.</param>
+    /// <param name="minor">Required minor version, as the raw <c>CK_VERSION</c> field.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetInfo</c> call.</exception>
+    public bool SupportsCryptokiVersion(int major, int minor)
+        => GetInfo().CryptokiVersion >= new Version(major, minor);
+
+    /// <summary>
     /// Obtains a list of slots in the system.
     /// </summary>
     /// <param name="tokenPresent">

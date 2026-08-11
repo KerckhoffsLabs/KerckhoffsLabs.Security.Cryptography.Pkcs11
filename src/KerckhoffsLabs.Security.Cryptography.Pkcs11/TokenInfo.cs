@@ -56,11 +56,13 @@ public sealed record TokenInfo
     /// <summary>The amount of free (unused) memory on the token in bytes for private objects.</summary>
     public ulong FreePrivateMemory { get; }
 
-    /// <summary>Version number of hardware.</summary>
-    public string HardwareVersion { get; }
+    /// <summary>Version number of hardware. See
+    /// <see cref="LibraryInfo.CryptokiVersion"/> for how <c>CK_VERSION</c> encodes the minor field.</summary>
+    public Version HardwareVersion { get; }
 
-    /// <summary>Version number of firmware.</summary>
-    public string FirmwareVersion { get; }
+    /// <summary>Version number of firmware. See
+    /// <see cref="LibraryInfo.CryptokiVersion"/> for how <c>CK_VERSION</c> encodes the minor field.</summary>
+    public Version FirmwareVersion { get; }
 
     /// <summary>Current time (the value of this field only makes sense for tokens equipped with a clock).</summary>
     public string UtcTimeString { get; }
@@ -86,8 +88,8 @@ public sealed record TokenInfo
         FreePublicMemory = (ulong)ck_token_info.FreePublicMemory;
         TotalPrivateMemory = (ulong)ck_token_info.TotalPrivateMemory;
         FreePrivateMemory = (ulong)ck_token_info.FreePrivateMemory;
-        HardwareVersion = ck_token_info.HardwareVersion.ToString();
-        FirmwareVersion = ck_token_info.FirmwareVersion.ToString();
+        HardwareVersion = ck_token_info.HardwareVersion.ToVersion();
+        FirmwareVersion = ck_token_info.FirmwareVersion.ToVersion();
         UtcTimeString = Encoding.UTF8.GetString(ck_token_info.UtcTime).TrimEnd();
 
         UtcTime = DateTime.TryParseExact(
