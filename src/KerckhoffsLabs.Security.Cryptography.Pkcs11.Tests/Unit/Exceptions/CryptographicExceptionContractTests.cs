@@ -57,7 +57,7 @@ public sealed class CryptographicExceptionContractTests
 
         // The CKR and failing method survive the reparenting — a caller that does know about PKCS#11
         // can still narrow to Pkcs11Exception and read them.
-        var pkcs11 = Assert.IsAssignableFrom<Pkcs11Exception>(ex);
+        var pkcs11 = Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
         Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, pkcs11.ReturnValue);
         Assert.False(string.IsNullOrEmpty(pkcs11.Method));
     }

@@ -29,15 +29,17 @@ public sealed class StaticLinkBootstrapTests
         Assert.Empty(pinvokes);
     }
 
-    // The test host does not export a cryptoki bootstrap, so this is the "you asked for the static
-    // path but did not link the module in" diagnostic. Reaching it at all is the point: the old code
-    // failed earlier and for the wrong reason, with a DllNotFoundException for a library literally
-    // named "__Internal".
-    [Fact]
-    public void LoadStaticallyLinked_WhenTheHostExportsNoBootstrap_ThrowsEntryPointNotFound()
-    {
-        var ex = Assert.Throws<EntryPointNotFoundException>(Pkcs11Library.LoadStaticallyLinked);
-
-        Assert.Contains("C_GetFunctionList", ex.Message, StringComparison.Ordinal);
-    }
+    // There is deliberately no in-process test of LoadStaticallyLinked's behaviour here. One was
+    // tried and removed: it asserted that a host exporting no bootstrap gets an
+    // EntryPointNotFoundException, which held on Linux and failed intermittently on macOS, where
+    // dyld resolves through the entry-point module permissively enough that a module some other test
+    // had already dlopened satisfied the lookup. That is not a flaky assertion to be stabilised, it
+    // is an unsafe one: on the runs where it "passed" the call really did bind and C_Initialize
+    // somebody else's module, and disposing the result would have called C_Finalize underneath the
+    // tests still using it.
+    //
+    // The behaviour is covered where it can be covered honestly — the AotSmoke `static` mode in CI,
+    // which links a module into the binary and runs on both Linux and macOS. That proves the path
+    // works, which is the stronger claim; this file keeps the invariant that the old mechanism
+    // cannot come back.
 }

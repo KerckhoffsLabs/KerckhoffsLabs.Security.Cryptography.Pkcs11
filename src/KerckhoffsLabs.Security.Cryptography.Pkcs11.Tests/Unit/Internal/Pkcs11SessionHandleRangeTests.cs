@@ -33,7 +33,7 @@ public sealed class Pkcs11SessionHandleRangeTests
     public static TheoryData<ulong> HandleValues()
     {
         ulong max = UnmanagedMemory.NativeULongSize == sizeof(uint) ? uint.MaxValue : ulong.MaxValue;
-        return [1UL, 42UL, (max >> 1) + 1, max - 1, max];
+        return new TheoryData<ulong>(1UL, 42UL, (max >> 1) + 1, max - 1, max);
     }
 
     [Theory]

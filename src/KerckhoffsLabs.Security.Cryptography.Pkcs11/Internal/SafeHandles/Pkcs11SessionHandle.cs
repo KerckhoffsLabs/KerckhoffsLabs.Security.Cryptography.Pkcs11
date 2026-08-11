@@ -18,15 +18,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 /// </remarks>
 internal sealed class Pkcs11SessionHandle : SafeHandle
 {
-    /// <summary>
-    /// Opaque non-zero value parked in the base <see cref="SafeHandle.handle"/> field for a live
-    /// session. It is a presence flag, never dereferenced and never sent to the module — the real
-    /// id lives in <see cref="_sessionId"/>. Keeping it non-zero means
-    /// <see cref="SafeHandle.DangerousGetHandle"/> and a debugger agree with
-    /// <see cref="IsInvalid"/> about whether this instance owns something.
-    /// </summary>
-    private static readonly IntPtr LiveSessionMarker = 1;
-
     private readonly ILowLevelPkcs11Library _library;
 
     /// <summary>
@@ -49,8 +40,6 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         ArgumentNullException.ThrowIfNull(library);
         _library = library;
         _sessionId = sessionId;
-        if ((ulong)sessionId != CK.CK_INVALID_HANDLE)
-            SetHandle(LiveSessionMarker);
         // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
         // unloads the function table.
         _library.RegisterSession(this);

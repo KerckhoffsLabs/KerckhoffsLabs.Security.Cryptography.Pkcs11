@@ -107,6 +107,13 @@ public sealed class Pkcs11Library : IDisposable
     /// call — no other unmanaged bindings are required. The v3.0/v3.2 surface is bound
     /// best-effort from the same symbol table, exactly as for a dynamically loaded module.
     /// </para>
+    /// <para>
+    /// What counts as reachable through the entry-point module is the platform's business, not this
+    /// library's, and the platforms differ. A dynamically loaded module's symbols stay private to it
+    /// on Linux, but macOS resolves more permissively: in a process that has already loaded a PKCS#11
+    /// module by path, this method can bind <i>that</i> module rather than failing. Use
+    /// <see cref="Pkcs11Library(string)"/> when you mean a specific module.
+    /// </para>
     /// </remarks>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
     /// <exception cref="EntryPointNotFoundException">
