@@ -102,6 +102,47 @@ X.509 chains, code signing — and because the gate also governs verification, b
 break verifying third-party signatures. Only v1.5 over a *broken hash*, and v1.5 *encryption* / raw
 RSA (Bleichenbacher / ROBOT territory), are gated. Prefer RSA-PSS for new code all the same.
 
+### Wrap hardening
+
+Keys are non-extractable by default, which closes the direct exfiltration path. For a key
+deliberately made wrappable, PKCS#11 offers four defence-in-depth controls, all available as
+builder helpers:
+
+```csharp
+using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+    .ValueLen(32)
+    .Wrap()
+    .WrapWithTrusted()                      // only a CKA_TRUSTED key may wrap this one
+    .WrapTemplate(t => t                    // ...and only keys matching this may be wrapped
+        .Class(CKO.CKO_SECRET_KEY)
+        .Sensitive()
+        .NonExtractable())
+    .UnwrapTemplate(t => t                  // keys arriving through this one are born hardened
+        .Sensitive()
+        .NonExtractable())
+    .Build();
+```
+
+The two nested templates look alike and mean opposite things — this is the part worth reading
+twice:
+
+- **`WrapTemplate` is a filter.** Keys that do not match it *cannot be wrapped* by this key. It
+  narrows what this key can be used to exfiltrate.
+- **`UnwrapTemplate` is an imposition.** Its attributes are applied to every key unwrapped with
+  this key, as if the object already carried them, before any caller-supplied template. It
+  constrains what can be smuggled *in* — for example, forcing an arriving key to be
+  non-extractable so it cannot be immediately re-exported in the clear.
+
+`DeriveTemplate` works like `UnwrapTemplate`, for keys produced by derivation.
+
+Nested templates carry no secure defaults, deliberately: an attribute you did not write must never
+silently change which keys a wrapping key will accept.
+
+**`Trusted()` is SO-only.** PKCS#11 allows `CKA_TRUSTED` to be set to true only by the security
+officer. Setting it from a normal user session is rejected by a conformant token with
+`CKR_ATTRIBUTE_READ_ONLY`. The library does not gate this locally — it cannot know which user type
+opened the session, and refusing at build time would be wrong for SO sessions.
+
 ## Documentation
 
 - [**API reference**](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/api/) — the full generated surface.
