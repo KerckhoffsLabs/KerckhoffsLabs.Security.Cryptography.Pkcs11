@@ -23,12 +23,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </remarks>
 public sealed class ECDsaPkcs11Tests_Managed
 {
-    // Curve under test -> (library ECCurve to generate, curve-matched hash, expected exported OID value).
-    private static (ECCurve curve, HashAlgorithmName hash, string? expectedOidValue) Spec(string curve) => curve switch
+    // Curve under test -> (library Pkcs11ECCurve to generate, curve-matched hash, expected exported OID value).
+    private static (Pkcs11ECCurve curve, HashAlgorithmName hash, string? expectedOidValue) Spec(string curve) => curve switch
     {
-        "P-256" => (ECCurve.NamedCurves.NistP256, HashAlgorithmName.SHA256, BclECCurve.NamedCurves.nistP256.Oid.Value),
-        "P-384" => (ECCurve.NamedCurves.NistP384, HashAlgorithmName.SHA384, BclECCurve.NamedCurves.nistP384.Oid.Value),
-        "P-521" => (ECCurve.NamedCurves.NistP521, HashAlgorithmName.SHA512, BclECCurve.NamedCurves.nistP521.Oid.Value),
+        "P-256" => (Pkcs11ECCurve.NamedCurves.NistP256, HashAlgorithmName.SHA256, BclECCurve.NamedCurves.nistP256.Oid.Value),
+        "P-384" => (Pkcs11ECCurve.NamedCurves.NistP384, HashAlgorithmName.SHA384, BclECCurve.NamedCurves.nistP384.Oid.Value),
+        "P-521" => (Pkcs11ECCurve.NamedCurves.NistP521, HashAlgorithmName.SHA512, BclECCurve.NamedCurves.nistP521.Oid.Value),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 

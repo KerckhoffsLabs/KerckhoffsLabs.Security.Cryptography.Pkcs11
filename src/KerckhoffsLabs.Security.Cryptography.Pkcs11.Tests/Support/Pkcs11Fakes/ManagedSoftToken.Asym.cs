@@ -88,10 +88,10 @@ internal sealed partial class ManagedSoftToken
     // little-endian — matching how the session marshals CK_ULONG attributes.
     private static byte[] UlongAttr(ulong v) => BitConverter.GetBytes(v).AsSpan(0, UnmanagedMemory.NativeULongSize).ToArray();
 
-    // Map CKA_EC_PARAMS (DER curve OID) to a BCL ECCurve via the production ECCurve bridge — supports
+    // Map CKA_EC_PARAMS (DER curve OID) to a BCL ECCurve via the production Pkcs11ECCurve bridge — supports
     // whatever named curves the host BCL implements (NIST, brainpool, …), not just a hardcoded few.
-    private static System.Security.Cryptography.ECCurve CurveFromOid(byte[] ecParams) =>
-        ECCurve.FromEcParams(ecParams).ToECCurve();
+    private static ECCurve CurveFromOid(byte[] ecParams) =>
+        Pkcs11ECCurve.FromEcParams(ecParams).ToECCurve();
 
     // CKA_EC_POINT = DER OCTET STRING wrapping the uncompressed point (0x04 ‖ X ‖ Y).
     private static byte[] EncodeEcPoint(ECPoint q)

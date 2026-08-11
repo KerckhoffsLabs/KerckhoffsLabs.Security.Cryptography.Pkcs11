@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using BclECCurve = System.Security.Cryptography.ECCurve;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
@@ -38,7 +37,7 @@ internal static class Pkcs11PublicKeyView
 
     /// <summary>
     /// Parses raw <c>CKA_EC_POINT</c> + <c>CKA_EC_PARAMS</c> bytes into an <see cref="ECParameters"/>
-    /// for a named curve (any curve in <see cref="ECCurve.NamedCurves"/>, and any other named-curve
+    /// for a named curve (any curve in <see cref="Pkcs11ECCurve.NamedCurves"/>, and any other named-curve
     /// OID the host BCL recognises). Returns <c>null</c> when the inputs don't decode as a
     /// DER-OCTET-wrapped uncompressed point or <c>CKA_EC_PARAMS</c> isn't a DER-encoded curve OID.
     /// </summary>
@@ -109,13 +108,13 @@ internal static class Pkcs11PublicKeyView
     }
 
     // CKA_EC_PARAMS for a named curve is the DER-encoded curve OID; bridge it to a BCL named curve
-    // over that OID. Covers the whole ECCurve.NamedCurves catalog (NIST, secp256k1, Brainpool, SM2),
+    // over that OID. Covers the whole Pkcs11ECCurve.NamedCurves catalog (NIST, secp256k1, Brainpool, SM2),
     // not just the NIST primes. Returns null when the bytes aren't a DER-encoded OID.
-    private static BclECCurve? ResolveNamedCurve(byte[] derOid)
+    private static ECCurve? ResolveNamedCurve(byte[] derOid)
     {
         try
         {
-            return ECCurve.FromEcParams(derOid).ToECCurve();
+            return Pkcs11ECCurve.FromEcParams(derOid).ToECCurve();
         }
         catch (ArgumentException)
         {

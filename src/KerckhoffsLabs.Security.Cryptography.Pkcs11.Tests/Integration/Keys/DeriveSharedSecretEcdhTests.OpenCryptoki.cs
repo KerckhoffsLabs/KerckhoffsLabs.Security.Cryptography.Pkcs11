@@ -27,8 +27,8 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
-        using var alice = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
-        using var bob = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 
         byte[] alicePoint = ReadEcPoint(workspace, alice.PublicHandle);
         byte[] bobPoint = ReadEcPoint(workspace, bob.PublicHandle);
@@ -49,7 +49,7 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
-        using var alice = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         byte[] point = ReadEcPoint(workspace, alice.PublicHandle);
 
         Assert.Throws<ArgumentOutOfRangeException>(

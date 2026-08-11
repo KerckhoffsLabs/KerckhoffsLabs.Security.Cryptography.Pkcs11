@@ -1,0 +1,240 @@
+using System.Security.Cryptography;
+using BclECCurve = System.Security.Cryptography.ECCurve;
+
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
+
+// Covers the Pkcs11ECCurve value type: CKA_EC_PARAMS (DER OID) encoding/round-trip, the BCL bridge, the
+// named-curve catalog, and equality. No token needed — this only manipulates curve metadata.
+public sealed class Pkcs11ECCurveTests
+{
+    [Fact]
+    public void EcParams_MatchIndependentDerVectors()
+    {
+        // TestKeys holds hand-encoded DER OIDs — an oracle independent of Pkcs11ECCurve's AsnWriter path,
+        // so this pins the encoding for every NIST prime (e.g. P-256 = 06 08 2A 86 48 CE 3D 03 01 07).
+        Assert.Equal(TestKeys.EcP256Oid, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams());
+        Assert.Equal(TestKeys.EcP384Oid, Pkcs11ECCurve.NamedCurves.NistP384.GetEcParams());
+        Assert.Equal(TestKeys.EcP521Oid, Pkcs11ECCurve.NamedCurves.NistP521.GetEcParams());
+    }
+
+    [Fact]
+    public void NamedCurve_HasOid_FriendlyName_And_NamedCurveType()
+    {
+        Pkcs11ECCurve curve = Pkcs11ECCurve.NamedCurves.NistP384;
+        Assert.Equal("1.3.132.0.34", curve.Oid);
+        Assert.Equal("nistP384", curve.FriendlyName);
+        Assert.True(curve.IsNamed);
+        Assert.False(curve.IsDefault);
+        Assert.Equal(BclECCurve.ECCurveType.Named, curve.CurveType);
+    }
+
+    [Fact]
+    public void FromEcParams_RoundTrips_OidAndName()
+    {
+        Pkcs11ECCurve original = Pkcs11ECCurve.NamedCurves.BrainpoolP256r1;
+        Pkcs11ECCurve parsed = Pkcs11ECCurve.FromEcParams(original.GetEcParams());
+
+        Assert.Equal(original.Oid, parsed.Oid);
+        Assert.Equal("brainpoolP256r1", parsed.FriendlyName);
+        Assert.Equal(original, parsed);
+    }
+
+    [Fact]
+    public void CreateFromValue_ResolvesKnownName_AndHonorsExplicitName()
+    {
+        Assert.Equal("secp256k1", Pkcs11ECCurve.CreateFromValue("1.3.132.0.10").FriendlyName);
+        Assert.Equal("my-curve", Pkcs11ECCurve.CreateFromValue("1.2.3.4", "my-curve").FriendlyName);
+    }
+
+    [Fact]
+    public void CreateFromValue_UnknownOid_HasNullName_ButValidEcParams()
+    {
+        Pkcs11ECCurve curve = Pkcs11ECCurve.CreateFromValue("1.2.3.4");
+        Assert.Null(curve.FriendlyName);
+        // Still encodes a valid DER OID, so a token could be asked for an unlisted curve.
+        Assert.Equal(curve, Pkcs11ECCurve.FromEcParams(curve.GetEcParams()));
+    }
+
+    [Fact]
+    public void CreateFromValue_NullOid_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => Pkcs11ECCurve.CreateFromValue(null!));
+
+    [Fact]
+    public void FromEcParams_NonOidBytes_Throws() =>
+        Assert.Throws<ArgumentException>(() => Pkcs11ECCurve.FromEcParams([0x01, 0x02, 0x03]));
+
+    [Fact]
+    public void CreateFromFriendlyName_ResolvesOid()
+    {
+        Pkcs11ECCurve curve = Pkcs11ECCurve.CreateFromFriendlyName("nistP521");
+        Assert.Equal("1.3.132.0.35", curve.Oid);
+    }
+
+    [Fact]
+    public void ToECCurve_BridgesToNamedBclCurve_WithSameOid()
+    {
+        BclECCurve bcl = Pkcs11ECCurve.NamedCurves.NistP256.ToECCurve();
+        Assert.True(bcl.IsNamed);
+        Assert.Equal("1.2.840.10045.3.1.7", bcl.Oid.Value);
+    }
+
+    [Fact]
+    public void FromECCurve_RoundTripsThroughBcl()
+    {
+        Pkcs11ECCurve roundTripped = Pkcs11ECCurve.FromECCurve(BclECCurve.NamedCurves.nistP256);
+        Assert.Equal(Pkcs11ECCurve.NamedCurves.NistP256, roundTripped);
+    }
+
+    [Fact]
+    public void FromECCurve_ExplicitCurve_Throws()
+    {
+        // An explicit curve has no OID and cannot be represented by a PKCS#11 namedCurve.
+        BclECCurve explicitCurve = default;
+        explicitCurve.CurveType = BclECCurve.ECCurveType.PrimeShortWeierstrass;
+        Assert.Throws<ArgumentException>(() => Pkcs11ECCurve.FromECCurve(explicitCurve));
+    }
+
+    [Fact]
+    public void Default_IsUninitialized_AndEcParamsThrows()
+    {
+        Pkcs11ECCurve def = default;
+        Assert.True(def.IsDefault);
+        Assert.False(def.IsNamed);
+        Assert.Equal(BclECCurve.ECCurveType.Implicit, def.CurveType);
+        Assert.Null(def.Oid);
+        Assert.Throws<InvalidOperationException>(() => def.GetEcParams());
+    }
+
+    [Fact]
+    public void Equality_IsByOid()
+    {
+        Pkcs11ECCurve a = Pkcs11ECCurve.CreateFromValue("1.2.840.10045.3.1.7");
+        Pkcs11ECCurve b = Pkcs11ECCurve.NamedCurves.NistP256;
+        Assert.True(a == b);
+        Assert.False(a != b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        Assert.True(Pkcs11ECCurve.NamedCurves.NistP256 != Pkcs11ECCurve.NamedCurves.NistP384);
+    }
+
+    [Fact]
+    public void CreateFromOid_HonorsValueAndExplicitName()
+    {
+        Pkcs11ECCurve curve = Pkcs11ECCurve.CreateFromOid(new Oid("1.2.3.4", "explicit"));
+        Assert.Equal("1.2.3.4", curve.Oid);
+        Assert.Equal("explicit", curve.FriendlyName);
+    }
+
+    [Fact]
+    public void CreateFromOid_NullOrValueless_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => Pkcs11ECCurve.CreateFromOid(null!));
+        Assert.Throws<ArgumentException>(() => Pkcs11ECCurve.CreateFromOid(new Oid()));
+    }
+
+    [Fact]
+    public void CreateFromFriendlyName_Null_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => Pkcs11ECCurve.CreateFromFriendlyName(null!));
+
+    [Fact]
+    public void EcParams_ReturnsIndependentCopy()
+    {
+        Pkcs11ECCurve curve = Pkcs11ECCurve.NamedCurves.NistP256;
+
+        byte[] first = curve.GetEcParams();
+        first[0] = 0xFF; // a caller mutating the returned buffer must not corrupt the curve
+        Assert.Equal(TestKeys.EcP256Oid, curve.GetEcParams());
+        Assert.NotSame(curve.GetEcParams(), curve.GetEcParams()); // a fresh array each call
+    }
+
+    [Fact]
+    public void ToString_RendersNameOidOrDefault()
+    {
+        Assert.Equal("nistP256 (1.2.840.10045.3.1.7)", Pkcs11ECCurve.NamedCurves.NistP256.ToString());
+        Assert.Equal("1.2.3.4", Pkcs11ECCurve.CreateFromValue("1.2.3.4").ToString()); // unknown OID, no name
+        Assert.Equal("<default>", default(Pkcs11ECCurve).ToString());
+    }
+
+    [Fact]
+    public void Equals_Object_DistinguishesTypeAndNull()
+    {
+        Pkcs11ECCurve p256 = Pkcs11ECCurve.NamedCurves.NistP256;
+        Assert.True(p256.Equals((object)Pkcs11ECCurve.CreateFromValue("1.2.840.10045.3.1.7")));
+        Assert.False(p256.Equals("not a curve"));
+        Assert.False(p256.Equals(null));
+        Assert.Equal(0, default(Pkcs11ECCurve).GetHashCode());
+    }
+
+    [Fact]
+    public void IsBelowSecurityBaseline_FlagsSub128BitCurves()
+    {
+#pragma warning disable KLPKCS11007 // deliberately referencing the obsolete sub-128-bit curves
+        Pkcs11ECCurve[] weak =
+        [
+            Pkcs11ECCurve.NamedCurves.NistP192, Pkcs11ECCurve.NamedCurves.NistP224,
+            Pkcs11ECCurve.NamedCurves.BrainpoolP160r1, Pkcs11ECCurve.NamedCurves.BrainpoolP160t1,
+            Pkcs11ECCurve.NamedCurves.BrainpoolP192r1, Pkcs11ECCurve.NamedCurves.BrainpoolP192t1,
+            Pkcs11ECCurve.NamedCurves.BrainpoolP224r1, Pkcs11ECCurve.NamedCurves.BrainpoolP224t1,
+            Pkcs11ECCurve.NamedCurves.Secp192k1, Pkcs11ECCurve.NamedCurves.Secp224k1,
+        ];
+#pragma warning restore KLPKCS11007
+        Assert.All(weak, c => Assert.True(c.IsBelowSecurityBaseline, $"{c} should be sub-baseline"));
+
+        Pkcs11ECCurve[] strong =
+        [
+            Pkcs11ECCurve.NamedCurves.NistP256, Pkcs11ECCurve.NamedCurves.NistP384, Pkcs11ECCurve.NamedCurves.NistP521,
+            Pkcs11ECCurve.NamedCurves.Secp256k1, Pkcs11ECCurve.NamedCurves.BrainpoolP256r1,
+            Pkcs11ECCurve.NamedCurves.BrainpoolP512t1, Pkcs11ECCurve.NamedCurves.Sm2,
+        ];
+        Assert.All(strong, c => Assert.False(c.IsBelowSecurityBaseline, $"{c} should meet baseline"));
+
+        // An OID outside the catalog can't be classified from the OID alone -> not flagged.
+        Assert.False(Pkcs11ECCurve.CreateFromValue("1.2.3.4").IsBelowSecurityBaseline);
+    }
+
+    [Fact]
+    public void NamedCurves_Catalog_OidsNamesAndEncodingAreConsistent()
+    {
+        // Every entry pairs the NamedCurves property with an independently written OID + name, so a
+        // typo in any catalog OID (e.g. a swapped Brainpool r1/t1 index) fails here. Covers all of
+        // the PKCS#11 v3.2 prime-field named curves. The sub-128-bit curves are intentionally
+        // [Obsolete]; this catalog test references them on purpose.
+#pragma warning disable KLPKCS11007
+        (Pkcs11ECCurve curve, string oid, string name)[] catalog =
+        [
+            (Pkcs11ECCurve.NamedCurves.NistP192, "1.2.840.10045.3.1.1", "nistP192"),
+            (Pkcs11ECCurve.NamedCurves.NistP224, "1.3.132.0.33", "nistP224"),
+            (Pkcs11ECCurve.NamedCurves.NistP256, "1.2.840.10045.3.1.7", "nistP256"),
+            (Pkcs11ECCurve.NamedCurves.NistP384, "1.3.132.0.34", "nistP384"),
+            (Pkcs11ECCurve.NamedCurves.NistP521, "1.3.132.0.35", "nistP521"),
+            (Pkcs11ECCurve.NamedCurves.Secp192k1, "1.3.132.0.31", "secp192k1"),
+            (Pkcs11ECCurve.NamedCurves.Secp224k1, "1.3.132.0.32", "secp224k1"),
+            (Pkcs11ECCurve.NamedCurves.Secp256k1, "1.3.132.0.10", "secp256k1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP160r1, "1.3.36.3.3.2.8.1.1.1", "brainpoolP160r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP160t1, "1.3.36.3.3.2.8.1.1.2", "brainpoolP160t1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP192r1, "1.3.36.3.3.2.8.1.1.3", "brainpoolP192r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP192t1, "1.3.36.3.3.2.8.1.1.4", "brainpoolP192t1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP224r1, "1.3.36.3.3.2.8.1.1.5", "brainpoolP224r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP224t1, "1.3.36.3.3.2.8.1.1.6", "brainpoolP224t1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP256r1, "1.3.36.3.3.2.8.1.1.7", "brainpoolP256r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP256t1, "1.3.36.3.3.2.8.1.1.8", "brainpoolP256t1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP320r1, "1.3.36.3.3.2.8.1.1.9", "brainpoolP320r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP320t1, "1.3.36.3.3.2.8.1.1.10", "brainpoolP320t1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP384r1, "1.3.36.3.3.2.8.1.1.11", "brainpoolP384r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP384t1, "1.3.36.3.3.2.8.1.1.12", "brainpoolP384t1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP512r1, "1.3.36.3.3.2.8.1.1.13", "brainpoolP512r1"),
+            (Pkcs11ECCurve.NamedCurves.BrainpoolP512t1, "1.3.36.3.3.2.8.1.1.14", "brainpoolP512t1"),
+            (Pkcs11ECCurve.NamedCurves.Sm2, "1.2.156.10197.1.301", "sm2"),
+        ];
+#pragma warning restore KLPKCS11007
+
+        Assert.Equal(23, catalog.Length);
+        foreach (var (curve, oid, name) in catalog)
+        {
+            Assert.Equal(oid, curve.Oid);
+            Assert.Equal(name, curve.FriendlyName);
+            Assert.Equal(BclECCurve.ECCurveType.Named, curve.CurveType);
+            Assert.Equal(curve, Pkcs11ECCurve.CreateFromValue(oid));          // property == factory
+            Assert.Equal(curve, Pkcs11ECCurve.FromEcParams(curve.GetEcParams()));  // CKA_EC_PARAMS round-trip
+        }
+    }
+}

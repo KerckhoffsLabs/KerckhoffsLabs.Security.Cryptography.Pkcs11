@@ -36,7 +36,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
 
 #pragma warning disable KLPKCS11007 // exercising the gate with an intentionally-obsolete weak curve
         Assert.Throws<InsecureOperationException>(
-            () => workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP224));
+            () => workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224));
 #pragma warning restore KLPKCS11007
     }
 
@@ -49,7 +49,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
         using (workspace.AllowInsecureScope())
         {
 #pragma warning disable KLPKCS11007
-            using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP224);
+            using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224);
 #pragma warning restore KLPKCS11007
             Assert.False(key.PrivateHandle.IsInvalid);
             Assert.False(key.PublicHandle.IsInvalid);
@@ -62,7 +62,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
 
-        using var key = workspace.GenerateEcKeyPair(ECCurve.NamedCurves.NistP256);
+        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
     }

@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 // Covers Pkcs11PublicKeyView.TryParseEcPublicKey: building an ECParameters view from raw CKA_EC_POINT
-// + CKA_EC_PARAMS. Since the curve is resolved through ECCurve.FromEcParams, the whole named-curve
+// + CKA_EC_PARAMS. Since the curve is resolved through Pkcs11ECCurve.FromEcParams, the whole named-curve
 // catalog is supported — not just the NIST primes the helper used to hardcode. The point bytes are
 // only parsed for structure (not validated on-curve), so synthetic coordinates are fine here.
 public sealed class Pkcs11PublicKeyViewTests
@@ -29,7 +29,7 @@ public sealed class Pkcs11PublicKeyViewTests
     [InlineData("nistP521", 66)]      // 133-byte point -> exercises the long-form DER length branch
     public void TryParseEcPublicKey_ResolvesNamedCurveFromEcParams(string curveName, int coordLen)
     {
-        ECCurve curve = ECCurve.CreateFromFriendlyName(curveName);
+        Pkcs11ECCurve curve = Pkcs11ECCurve.CreateFromFriendlyName(curveName);
         byte[] ecParams = curve.GetEcParams();
         byte[] ecPoint = EcPoint(coordLen);
 
@@ -53,7 +53,7 @@ public sealed class Pkcs11PublicKeyViewTests
     public void TryParseEcPublicKey_NonUncompressedPoint_ReturnsNull()
     {
         // 0x02-prefixed compressed point is not supported by the uncompressed-only parser.
-        byte[] ecParams = ECCurve.NamedCurves.NistP256.GetEcParams();
+        byte[] ecParams = Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams();
         byte[] compressed = [0x04, 0x21, 0x02, .. new byte[32]];
         Assert.Null(Pkcs11PublicKeyView.TryParseEcPublicKey(compressed, ecParams));
     }

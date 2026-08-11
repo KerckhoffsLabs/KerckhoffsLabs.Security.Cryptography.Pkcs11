@@ -430,21 +430,21 @@ public sealed class Pkcs11Workspace : IDisposable
     /// Generates an EC key pair on a NIST prime curve. The private key is sensitive,
     /// non-extractable, and usable for signing and ECDH derivation.
     /// </summary>
-    /// <param name="curve">Named curve from <see cref="ECCurve.NamedCurves"/> (or <see cref="ECCurve.CreateFromValue(string, string?)"/>).
-    /// Defaults to <see cref="ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
+    /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?)"/>).
+    /// Defaults to <see cref="Pkcs11ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated EC key pair.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="curve"/> is the default (uninitialized) <see cref="ECCurve"/>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="curve"/> is the default (uninitialized) <see cref="Pkcs11ECCurve"/>.</exception>
     /// <exception cref="InsecureOperationException">The curve provides less than 128-bit
     /// security (the 160/192/224-bit NIST and Brainpool curves) and <see cref="AllowInsecure"/> is false.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
-    public Pkcs11Key GenerateEcKeyPair(ECCurve? curve = null, string? label = null, bool persistOnToken = false)
+    public Pkcs11Key GenerateEcKeyPair(Pkcs11ECCurve? curve = null, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        ECCurve resolved = curve ?? ECCurve.NamedCurves.NistP256;
+        Pkcs11ECCurve resolved = curve ?? Pkcs11ECCurve.NamedCurves.NistP256;
         if (resolved.IsDefault)
             throw new ArgumentException("An EC curve must be specified.", nameof(curve));
         if (resolved.IsBelowSecurityBaseline && !AllowInsecure)

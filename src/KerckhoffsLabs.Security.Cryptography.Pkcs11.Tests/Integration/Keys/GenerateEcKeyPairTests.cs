@@ -15,7 +15,7 @@ internal static class GenerateEcKeyPairTestCases
     internal static void Assert_GeneratesP256KeyPair(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
-        using var key = workspace.GenerateEcKeyPair(curve: ECCurve.NamedCurves.NistP256);
+        using var key = workspace.GenerateEcKeyPair(curve: Pkcs11ECCurve.NamedCurves.NistP256);
 
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
@@ -24,7 +24,7 @@ internal static class GenerateEcKeyPairTestCases
     internal static void Assert_RejectsUnspecifiedCurve(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
-        // The uninitialized default(ECCurve) carries no OID and must be rejected.
-        Assert.Throws<ArgumentException>(() => workspace.GenerateEcKeyPair(curve: default(ECCurve)));
+        // The uninitialized default(Pkcs11ECCurve) carries no OID and must be rejected.
+        Assert.Throws<ArgumentException>(() => workspace.GenerateEcKeyPair(curve: default(Pkcs11ECCurve)));
     }
 }

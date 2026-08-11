@@ -45,19 +45,19 @@ public sealed class ObsoleteDiagnosticIdTests
     }
 
     [Theory]
-    [InlineData(nameof(ECCurve.NamedCurves.NistP192))]
-    [InlineData(nameof(ECCurve.NamedCurves.NistP224))]
-    [InlineData(nameof(ECCurve.NamedCurves.Secp192k1))]
-    [InlineData(nameof(ECCurve.NamedCurves.Secp224k1))]
-    [InlineData(nameof(ECCurve.NamedCurves.BrainpoolP160r1))]
-    [InlineData(nameof(ECCurve.NamedCurves.BrainpoolP160t1))]
-    [InlineData(nameof(ECCurve.NamedCurves.BrainpoolP192r1))]
-    [InlineData(nameof(ECCurve.NamedCurves.BrainpoolP192t1))]
-    [InlineData(nameof(ECCurve.NamedCurves.BrainpoolP224r1))]
-    [InlineData(nameof(ECCurve.NamedCurves.BrainpoolP224t1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.NistP192))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.NistP224))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.Secp192k1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.Secp224k1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.BrainpoolP160r1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.BrainpoolP160t1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.BrainpoolP192r1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.BrainpoolP192t1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.BrainpoolP224r1))]
+    [InlineData(nameof(Pkcs11ECCurve.NamedCurves.BrainpoolP224t1))]
     public void WeakCurve_CarriesTheWeakCurveDiagnosticId(string curveName)
     {
-        PropertyInfo? curve = typeof(ECCurve.NamedCurves)
+        PropertyInfo? curve = typeof(Pkcs11ECCurve.NamedCurves)
             .GetProperty(curveName, BindingFlags.Public | BindingFlags.Static);
         Assert.NotNull(curve);
 

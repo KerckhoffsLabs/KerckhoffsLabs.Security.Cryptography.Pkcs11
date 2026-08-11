@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
-using Pkcs11ECCurve = KerckhoffsLabs.Security.Cryptography.Pkcs11.ECCurve;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -37,7 +36,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
-    // Maps a named-curve name to the production ECCurve (token side) and the BCL ECCurve (peer side).
+    // Maps a named-curve name to the production Pkcs11ECCurve (token side) and the BCL ECCurve (peer side).
     private static (Pkcs11ECCurve token, BclECCurve bcl) Curves(string curve) => curve switch
     {
         "P-256" => (Pkcs11ECCurve.NamedCurves.NistP256, BclECCurve.NamedCurves.nistP256),
