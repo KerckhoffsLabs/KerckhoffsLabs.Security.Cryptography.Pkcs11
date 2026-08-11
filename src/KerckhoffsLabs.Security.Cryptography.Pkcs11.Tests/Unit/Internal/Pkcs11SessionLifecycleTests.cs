@@ -323,4 +323,30 @@ public sealed class Pkcs11SessionLifecycleTests
         Assert.Throws<ObjectDisposedException>(() => s.AllowInsecure = true);
         Assert.Throws<ObjectDisposedException>(() => s.AllowInsecureScope());
     }
+
+    /// <summary>
+    /// The disposed check runs while the busy lock is held — before it, the check would race Dispose,
+    /// which sets the flag under that lock. So the throw has to release the lock on its way out, or
+    /// the first call on a disposed session would poison it: the second caller would be told it was a
+    /// concurrency violation, and any caller on another thread would be told that forever.
+    /// </summary>
+    [Fact]
+    public void OperationsOnADisposedSession_KeepThrowingObjectDisposed_NotConcurrencyViolations()
+    {
+        var s = NewSession();
+        s.Dispose();
+
+        for (int attempt = 0; attempt < 3; attempt++)
+            Assert.Throws<ObjectDisposedException>(() => s.GetSessionInfo());
+
+        // And the lock is genuinely free, not merely re-entered by this thread. The exception is
+        // carried back rather than asserted in the worker: an assertion failure there is an unhandled
+        // exception on a foreign thread, which takes the test host down instead of failing this test.
+        Exception? fromAnotherThread = null;
+        var worker = new Thread(() => fromAnotherThread = Record.Exception(() => s.GetSessionInfo()));
+        worker.Start();
+
+        Assert.True(worker.Join(TimeSpan.FromSeconds(10)), "A disposed session deadlocked another thread.");
+        Assert.IsType<ObjectDisposedException>(fromAnotherThread);
+    }
 }

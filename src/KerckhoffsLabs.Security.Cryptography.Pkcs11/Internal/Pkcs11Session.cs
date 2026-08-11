@@ -117,7 +117,21 @@ internal sealed class Pkcs11Session : IDisposable
                 $"Method '{caller ?? "<unknown>"}' was invoked while another operation is in progress " +
                 $"on a different thread. Use a separate Session per thread.");
         }
-        return new ExclusiveLease(_busyLock);
+
+        var lease = new ExclusiveLease(_busyLock);
+        try
+        {
+            // Under the lock, deliberately: checking before it would race Dispose, which sets the
+            // flag while holding it. Every operation needs this, so it lives here rather than being
+            // restated at each call site, where the omission of one line would be invisible.
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return lease;
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -229,7 +243,6 @@ internal sealed class Pkcs11Session : IDisposable
     internal bool SupportsMechanism(CKM mechanism)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_supportedMechanisms is null)
         {
@@ -276,7 +289,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void CloseSession()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_sessionHandle is null || _sessionHandle.IsInvalid)
             return;
@@ -303,7 +315,6 @@ internal sealed class Pkcs11Session : IDisposable
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(userPin);
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
 
@@ -334,7 +345,6 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(oldPin);
         ArgumentNullException.ThrowIfNull(newPin);
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin");
 
@@ -362,7 +372,6 @@ internal sealed class Pkcs11Session : IDisposable
     public SessionInfo GetSessionInfo()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetSessionInfo");
 
@@ -380,7 +389,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] GetOperationState()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetOperationState");
 
@@ -398,7 +406,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void SetOperationState(byte[] state, ObjectHandle encryptionKey, ObjectHandle authenticationKey)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetOperationState");
 
@@ -423,7 +430,6 @@ internal sealed class Pkcs11Session : IDisposable
         using var _ = AcquireExclusive();
         ArgumentNullException.ThrowIfNull(pin);
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
@@ -497,7 +503,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void CancelOperations(ulong flags)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionCancelOperations(_logger, (ulong)_sessionId, flags);
 
@@ -539,7 +544,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Logout()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Logout");
 
@@ -555,7 +559,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void GetFunctionStatus()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetFunctionStatus");
 
@@ -569,7 +572,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void CancelFunction()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "CancelFunction");
 
@@ -904,7 +906,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle CreateObject(List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "CreateObject");
 
@@ -933,7 +934,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle CopyObject(ObjectHandle objectHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "CopyObject");
 
@@ -961,7 +961,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void DestroyObject(ObjectHandle objectHandle)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DestroyObject");
 
@@ -978,7 +977,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ulong GetObjectSize(ObjectHandle objectHandle)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetObjectSize");
 
@@ -999,7 +997,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<CKA> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue1");
 
@@ -1025,7 +1022,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<ulong> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue2");
 
@@ -1279,7 +1275,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void SetAttributeValue(ObjectHandle objectHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetAttributeValue");
 
@@ -1307,7 +1302,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void FindObjectsInit(List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsInit");
 
@@ -1328,7 +1322,6 @@ internal sealed class Pkcs11Session : IDisposable
     public List<ObjectHandle> FindObjects(int objectCount)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjects");
 
@@ -1351,7 +1344,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void FindObjectsFinal()
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsFinal");
 
@@ -1367,7 +1359,6 @@ internal sealed class Pkcs11Session : IDisposable
     public List<ObjectHandle> FindAllObjects(List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindAllObjects");
 
@@ -1451,7 +1442,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -1496,7 +1486,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void GenerateKeyPair(Mechanism mechanism, List<ObjectAttribute> publicKeyAttributes, List<ObjectAttribute> privateKeyAttributes, out ObjectHandle publicKeyHandle, out ObjectHandle privateKeyHandle)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -1545,7 +1534,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] WrapKey(Mechanism mechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -1580,7 +1568,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(attributes);
         // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
@@ -1600,7 +1587,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, byte[] wrappedKey, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -1958,7 +1944,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2034,7 +2019,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2061,7 +2045,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Encrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2144,7 +2127,6 @@ internal sealed class Pkcs11Session : IDisposable
         ReadOnlySpan<byte> plaintext)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
@@ -2232,7 +2214,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] encryptedData)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2282,7 +2263,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Decrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2308,7 +2288,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Decrypt(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2380,7 +2359,6 @@ internal sealed class Pkcs11Session : IDisposable
         ReadOnlySpan<byte> ciphertext)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
@@ -2451,7 +2429,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Sign(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism(mechanism);
@@ -2507,7 +2484,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2543,7 +2519,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2571,7 +2546,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, Stream inputStream, byte[] signature, out bool isValid, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2631,7 +2605,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] VerifyRecover(Mechanism mechanism, ObjectHandle keyHandle, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2678,7 +2651,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, byte[] data, byte[] signature, out byte[] decryptedData, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
@@ -2714,7 +2686,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
@@ -2753,7 +2724,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void DecryptVerify(Mechanism verificationMechanism, ObjectHandle verificationKeyHandle, Mechanism decryptionMechanism, ObjectHandle decryptionKeyHandle, Stream inputStream, Stream outputStream, byte[] signature, out bool isValid, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(verificationMechanism);
 
@@ -2823,7 +2793,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] DigestKey(Mechanism mechanism, ObjectHandle keyHandle)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2884,7 +2853,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Digest(Mechanism mechanism, byte[] data)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2919,7 +2887,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Digest(Mechanism mechanism, Stream inputStream)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -2942,7 +2909,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Digest(Mechanism mechanism, Stream inputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -3008,7 +2974,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] encryptedData)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -3039,7 +3004,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -3071,7 +3035,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] DigestEncrypt(Mechanism digestingMechanism, Mechanism encryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -3120,7 +3083,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, byte[] data, out byte[] digest, out byte[] decryptedData)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -3151,7 +3113,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -3183,7 +3144,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] DecryptDigest(Mechanism digestingMechanism, Mechanism decryptionMechanism, ObjectHandle keyHandle, Stream inputStream, Stream outputStream, int bufferLength)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(digestingMechanism);
 
@@ -3232,7 +3192,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -3296,7 +3255,6 @@ internal sealed class Pkcs11Session : IDisposable
     public void SeedRandom(byte[] seed)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "SeedRandom");
 
@@ -3340,7 +3298,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] GenerateRandom(int length)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateRandom");
 
@@ -3391,7 +3348,6 @@ internal sealed class Pkcs11Session : IDisposable
         int expectedCiphertextLen = 0)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
@@ -3479,7 +3435,6 @@ internal sealed class Pkcs11Session : IDisposable
         List<ObjectAttribute> sharedKeyTemplate)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
@@ -3534,7 +3489,6 @@ internal sealed class Pkcs11Session : IDisposable
         ReadOnlySpan<byte> associatedData)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism(mechanism);
@@ -3582,7 +3536,6 @@ internal sealed class Pkcs11Session : IDisposable
         List<ObjectAttribute> unwrappedKeyTemplate)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
@@ -3639,7 +3592,6 @@ internal sealed class Pkcs11Session : IDisposable
         ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         GuardMechanism(mechanism);
@@ -3679,7 +3631,6 @@ internal sealed class Pkcs11Session : IDisposable
         int bufferLength = 4096)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(inputStream);
@@ -3727,7 +3678,6 @@ internal sealed class Pkcs11Session : IDisposable
     public ulong GetSessionValidationFlags(CksValidationFlagsType validationType)
     {
         using var _ = AcquireExclusive();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         Log.SessionGetValidationFlags(_logger, (ulong)_sessionId, (ulong)validationType);
 
