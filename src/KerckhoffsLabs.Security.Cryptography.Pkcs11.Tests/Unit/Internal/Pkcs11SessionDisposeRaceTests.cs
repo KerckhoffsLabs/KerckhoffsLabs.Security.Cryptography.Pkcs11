@@ -52,6 +52,13 @@ public sealed class Pkcs11SessionDisposeRaceTests
             Interlocked.Increment(ref _closes);
             return CKR.CKR_OK;
         }
+
+        /// <summary>Releases the two gates. Callers join every thread before disposing the fake.</summary>
+        public override void Dispose()
+        {
+            Entered.Dispose();
+            Release.Dispose();
+        }
     }
 
     private sealed record RaceOutcome(bool ClosedDuringNativeCall, int Closes, Exception? DisposeFailure);
@@ -62,7 +69,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
     /// </summary>
     private static RaceOutcome DisposeWhileACallIsInFlight()
     {
-        var fake = new ParkingFake();
+        using var fake = new ParkingFake();
         var session = new Pkcs11Session(fake, SessionId);
 
         Exception? disposeFailure = null;
@@ -131,11 +138,11 @@ public sealed class Pkcs11SessionDisposeRaceTests
     [Fact]
     public void Dispose_FromInsideAnExclusiveSection_OnTheSameThread_DoesNotDeadlock()
     {
-        var fake = new ParkingFake();
+        using var fake = new ParkingFake();
         fake.Release.Set();
         var session = new Pkcs11Session(fake, SessionId);
 
-        var completed = new ManualResetEventSlim(false);
+        using var completed = new ManualResetEventSlim(false);
         var thread = new Thread(() =>
         {
             using (session.AcquireExclusive(nameof(Dispose_FromInsideAnExclusiveSection_OnTheSameThread_DoesNotDeadlock)))

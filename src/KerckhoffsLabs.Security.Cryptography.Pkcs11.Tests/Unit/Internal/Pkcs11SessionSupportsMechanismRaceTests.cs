@@ -71,6 +71,13 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
         }
 
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
+
+        /// <summary>Releases the two gates. Callers join every thread before disposing the fake.</summary>
+        public override void Dispose()
+        {
+            Entered.Dispose();
+            Release.Dispose();
+        }
     }
 
     private sealed record ProbeOutcome(bool ProbedDuringNativeCall, Exception? ProbeFailure);
@@ -85,7 +92,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
     /// </param>
     private static ProbeOutcome ProbeWhileACallIsInFlight(bool warmTheCacheFirst)
     {
-        var fake = new ParkingMechListFake();
+        using var fake = new ParkingMechListFake();
         var session = new Pkcs11Session(fake, SessionId);
 
         if (warmTheCacheFirst)
@@ -157,7 +164,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
     [Fact]
     public void SupportsMechanism_FromInsideAnExclusiveSection_OnTheSameThread_Succeeds()
     {
-        var fake = new ParkingMechListFake();
+        using var fake = new ParkingMechListFake();
         var session = new Pkcs11Session(fake, SessionId);
 
         using var lease = session.AcquireExclusive(
