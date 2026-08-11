@@ -10,6 +10,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// declares it via <c>PKCS11_TEST_EXPECT_OPENCRYPTOKI=1</c> on its test step, so the guard is
 /// keyed on that marker rather than on the <c>CI</c> variable.
 /// </summary>
+[NoBackendCollection("Reads the fixture's static File.Exists probe only — it never loads or " +
+                     "initializes the module, so serializing it against the OpenCryptoki collection would buy nothing.")]
 public sealed class OpenCryptokiAvailabilityTests
 {
     [Fact]

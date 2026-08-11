@@ -38,3 +38,29 @@ dotnet test --filter "FullyQualifiedName~.Tests.Integration."
   unit/integration split.
 - A type can legitimately appear in both areas — e.g. `Pkcs11Session` has fake-driven unit tests
   *and* SoftHSM behavioral tests. That's expected: they're different kinds of test.
+
+## Parallelization and backend collections
+
+The assembly runs **one collection per class, collections in parallel** — stated explicitly in
+`Support/TestParallelization.cs` rather than left to the xUnit defaults. A class that declares no
+`[Collection]` therefore runs concurrently with everything else, which is right for the hermetic
+`Unit/` tests and wrong for anything touching a backend: pkcs11-mock is single-session and
+process-global, and each of the SoftHSM / NSS / opencryptoki fixtures owns one `C_Initialize`'d
+module.
+
+So **every test class under `Integration/` must declare one of two things**:
+
+| Declaration | When |
+|-------------|------|
+| `[Collection("Mock" \| "SoftHsm" \| "Nss" \| "OpenCryptoki" \| "MemoryLeaks")]` | It drives that backend — the collection serializes its tests and owns the module lifetime. |
+| `[NoBackendCollection("why")]` | It touches no process-global native state (in-process `ManagedSoftToken`, or a static `File.Exists` availability probe). |
+
+`Unit/TestCollectionConventionTests` enforces this, so a forgotten `[Collection]` fails
+deterministically at the moment the class is added instead of surfacing later as an intermittent
+native-state corruption. It also checks, across the whole assembly (`Algorithms/` included), that a
+class named `*_Mock` / `*_SoftHsm` / `*_Nss` / `*_OpenCryptoki` joins the matching collection, that
+an injected collection fixture is actually supplied by the declared collection, and that no
+`[Collection]` names a definition that doesn't exist.
+
+Note that a collection **serializes its members**, so don't park unrelated classes in one to satisfy
+the rule — `[NoBackendCollection]` exists precisely so parallel-safe classes stay parallel.

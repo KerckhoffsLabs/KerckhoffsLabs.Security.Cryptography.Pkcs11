@@ -8,6 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// SoftHSM is built from the vendored submodule on every CI leg (Linux, macOS, Windows x64+x86,
 /// each for its own architecture), so the guard enforces availability on all of them.
 /// </summary>
+[NoBackendCollection("Reads the fixture's static File.Exists probe only — it never loads or " +
+                     "initializes the module, so serializing it against the SoftHsm collection would buy nothing.")]
 public sealed class SoftHsmAvailabilityTests
 {
     [Fact]

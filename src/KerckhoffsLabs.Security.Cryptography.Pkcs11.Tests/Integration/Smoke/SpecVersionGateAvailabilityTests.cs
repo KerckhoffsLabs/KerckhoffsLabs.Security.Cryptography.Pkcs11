@@ -8,6 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// the BuildPkcs11Gate target on every non-Windows CI leg, so availability is enforced there;
 /// Windows gets its spec-version coverage from the hermetic <c>DelegatesLoaderTests</c>.
 /// </summary>
+[NoBackendCollection("Reads the gate fixtures' static File.Exists probes only — it constructs no " +
+                     "fixture, so none of the env-var mutation the SoftHsm collection serializes can happen here.")]
 public sealed class SpecVersionGateAvailabilityTests
 {
     [Fact]

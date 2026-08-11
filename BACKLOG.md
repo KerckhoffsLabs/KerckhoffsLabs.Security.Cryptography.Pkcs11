@@ -4,8 +4,8 @@ _Generated 2026-07-09 from a multi-specialist deep review (cryptography, PKCS#11
 
 ## Summary
 
-- Total items: 62 (24 resolved)
-- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (21 open, 11 resolved) | Low: 23 (14 open, 9 resolved)
+- Total items: 62 (30 resolved)
+- Critical: 0 | High: 7 (3 open, 4 resolved) | Medium: 32 (16 open, 16 resolved) | Low: 23 (13 open, 10 resolved)
 - Headline risks:
   - **The release pipeline cannot ship and the public surface is unguarded.** `publish.yml` fails by construction (no submodule checkout but solution-wide build/test), and there is no public-API snapshot, package validation, or API-diff gate — the #1-concern surface can drift silently.
   - **Real-HSM robustness gaps.** Vendor-defined return codes (spec-legal, common on real HSMs) escape the typed exception hierarchy as a bare `InvalidEnumValueException`; NUL-padded token labels (a ubiquitous vendor quirk) break label matching; a lying module's post-call `valueLen` is trusted, allowing an out-of-bounds unmanaged read.
@@ -328,7 +328,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA A
 
-### [BL-026] No assembly-level test-parallelization policy around the process-global native module
+### [BL-026] ✅ RESOLVED — No assembly-level test-parallelization policy around the process-global native module
+- **Status:** Resolved 2026-08-10. The policy is now stated in code (`Support/TestParallelization.cs`: `[assembly: CollectionBehavior(CollectionPerClass, DisableTestParallelization = false)]`) with the reasoning for keeping the fast default — an assembly attribute rather than an `xunit.runner.json`, so it can carry that comment and can't be silently left out of the output. The guardrail is `Unit/TestCollectionConventionTests`, four reflection rules: every `Integration/**` test class carries a `[Collection]` or an explicit `[NoBackendCollection("why")]`; any class named `*_Mock`/`*_SoftHsm`/`*_Nss`/`*_OpenCryptoki` anywhere in the assembly (so `Algorithms/**` too) joins the matching collection; an injected collection fixture is supplied by the declared collection; and no `[Collection]` names a non-existent definition. A fifth test guards against the four passing vacuously. Six existing classes took the opt-out (the four `*AvailabilityTests`, which only run static `File.Exists` probes, and the two `*.Managed.cs` classes, which drive per-test in-process `ManagedSoftToken`s). Verified by mutation: dropping a `[Collection]` and typoing another failed 4 of the 5 tests with the right diagnostics.
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** S
@@ -429,7 +430,8 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** QA C, .NET Engineer B
 
-### [BL-036] No CodeQL SAST workflow
+### [BL-036] ✅ RESOLVED — No CodeQL SAST workflow
+- **Status:** Resolved 2026-08-10 (configured 2026-07-21). CodeQL runs via GitHub's **default setup**, which is why no `.github/workflows/codeql.yml` exists — the scan is repo-configured rather than checked in. Confirmed against the API (`repos/.../code-scanning/default-setup`): `state: configured`, languages `csharp`, `c-cpp` (the vendored native shims), and `actions`, default query suite, `remote` threat model, weekly schedule on top of the push/PR triggers. Results land in the GitHub security tab and the advisory flow, which was the gap SonarCloud left open. Note the trade-off of default setup: the configuration is not reviewable in-tree, so a change to it leaves no diff — move to an advanced-setup workflow file if that ever needs to be gated by code review.
 - **Area:** Release Eng
 - **Severity:** Medium
 - **Effort:** S

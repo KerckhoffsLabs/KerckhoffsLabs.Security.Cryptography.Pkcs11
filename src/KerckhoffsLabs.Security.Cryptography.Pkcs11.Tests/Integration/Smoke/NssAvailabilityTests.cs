@@ -9,6 +9,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// on its dedicated leg, which declares the promise with <c>PKCS11_TEST_EXPECT_NSS=1</c> on its test
 /// step, so the guard is keyed on that marker rather than on the generic <c>CI</c> variable.
 /// </summary>
+[NoBackendCollection("Reads the fixture's static File.Exists probe only — it never loads or " +
+                     "initializes the module, so serializing it against the Nss collection would buy nothing.")]
 public sealed class NssAvailabilityTests
 {
     [Fact]
