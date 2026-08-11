@@ -11,4 +11,50 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\KerckhoffsLabs.Security.Cryptography.Pkcs11\KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj" />
   </ItemGroup>
+
+  <!--
+    Optional: link a PKCS#11 module straight into this executable so the `static` mode can exercise
+    Pkcs11Library.LoadStaticallyLinked(). Pass -p:StaticMockArchive=<abs path to libpkcs11-mock.a>
+    (build/build-pkcs11-mock-static.sh produces it). Left unset, the project still publishes and the
+    dynamic mode still works — only `static` is unavailable, and says so.
+
+    The linker flags below are the load-bearing half, and each is there for its own reason:
+
+      "undefined" forces the archive member in. A static archive contributes only the members that
+      resolve some undefined reference, and nothing in a managed AOT binary references the bootstrap
+      by name — the library resolves it at run time through the symbol table. Without this the
+      member is silently dropped and the archive contributes nothing at all.
+
+      "export dynamic symbol" puts that symbol in the executable's dynamic symbol table, which is
+      what a lookup against the entry-point module reads. ILC already passes a blanket export flag
+      today; naming the symbol keeps this working if that ever stops being the default, and states
+      the requirement LoadStaticallyLinked places on a host instead of inheriting it by luck.
+  -->
+  <ItemGroup Condition="'$(StaticMockArchive)' != ''">
+    <NativeLibrary Include="$(StaticMockArchive)" />
+    <LinkerArg Condition="!$([MSBuild]::IsOSPlatform('OSX'))" Include="-Wl,--undefined=C_GetFunctionList" />
+    <LinkerArg Condition="!$([MSBuild]::IsOSPlatform('OSX'))" Include="-Wl,--export-dynamic-symbol=C_GetFunctionList" />
+    <LinkerArg Condition="$([MSBuild]::IsOSPlatform('OSX'))" Include="-Wl,-u,_C_GetFunctionList" />
+    <LinkerArg Condition="$([MSBuild]::IsOSPlatform('OSX'))" Include="-Wl,-exported_symbol,_C_GetFunctionList" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(StaticMockArchive)' != ''">
+    <DefineConstants>$(DefineConstants);STATIC_MOCK_LINKED</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    ILC generates a version script that reads "global: DotNetRuntimeDebugHeader; local: *;" and
+    passes it to the linker, so by default a Native AOT executable exports nothing else — the blanket
+    export flag ILC also passes cannot win against it. A statically linked bootstrap symbol is
+    therefore invisible to a lookup against the entry-point module until the exports file names it.
+    That is a real requirement on any consumer doing this under AOT, not a quirk of this test, and it
+    is written up on Pkcs11Library.LoadStaticallyLinked.
+  -->
+  <Target Name="_ExportStaticBootstrapSymbol"
+          Condition="'$(StaticMockArchive)' != '' and !$([MSBuild]::IsOSPlatform('Windows'))"
+          AfterTargets="IlcCompile" BeforeTargets="LinkNative">
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('OSX'))"
+          Command="grep -q 'C_GetFunctionList' &quot;$(ExportsFile)&quot; || sed -i 's/^\( *\)DotNetRuntimeDebugHeader;/\1DotNetRuntimeDebugHeader;\n\1C_GetFunctionList;/' &quot;$(ExportsFile)&quot;" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+          Command="grep -q '_C_GetFunctionList' &quot;$(ExportsFile)&quot; || echo '_C_GetFunctionList' >> &quot;$(ExportsFile)&quot;" />
+  </Target>
 </Project>

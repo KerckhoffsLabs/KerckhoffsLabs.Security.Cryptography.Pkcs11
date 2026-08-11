@@ -365,6 +365,12 @@ jobs:
   # regressions in the wrapper before consumers hit them; the run proves C_GetInfo actually
   # works through the AOT-compiled interop layer. Linux-only: AOT publish warnings (the main
   # thing this guards) are platform-independent.
+  #
+  # The mock is linked in statically as well, so the same binary covers both ways into the
+  # library: the dynamic path (dlopen) and LoadStaticallyLinked, which resolves the bootstrap
+  # through the executable's own symbol table. The static half is the only end-to-end proof that
+  # entry point works at all — it has no unit-testable equivalent, since it needs a real linked
+  # module — and it is what would have caught the bootstrap depending on Mono's "__Internal".
   aot-smoke:
     name: AOT smoke (linux-x64)
     runs-on: ubuntu-latest
@@ -393,15 +399,29 @@ jobs:
       - name: Build pkcs11-mock
         run: ./build/build-pkcs11-mock.sh "$RUNNER_TEMP/mock"
 
+      # Same sources, built as an archive so the publish below can link the module into the binary.
+      - name: Build pkcs11-mock static archive
+        run: ./build/build-pkcs11-mock-static.sh "$RUNNER_TEMP/mock-static"
+
       - name: Publish AotSmoke (Native AOT)
-        run: dotnet publish tests/AotSmoke/AotSmoke.csproj -c Release -r linux-x64
+        run: |
+          dotnet publish tests/AotSmoke/AotSmoke.csproj -c Release -r linux-x64 \
+            -p:StaticMockArchive="$RUNNER_TEMP/mock-static/libpkcs11-mock.a"
 
       - name: Run AOT smoke against pkcs11-mock
         run: |
           set -euxo pipefail
           bin="tests/AotSmoke/bin/Release/net10.0/linux-x64/publish/AotSmoke"
           test -x "$bin"
+
+          # Dynamically loaded module.
           "$bin" "$RUNNER_TEMP/mock/runtimes/linux-x64/native/pkcs11-mock.so"
+
+          # Statically linked module, reached through LoadStaticallyLinked. Assert the bootstrap is
+          # actually exported first, so a linker/exports-file regression fails here saying so rather
+          # than as a bare "entry point not found" from the run.
+          nm -D "$bin" | grep -q ' T C_GetFunctionList'
+          "$bin" static
 
   # Real v2.40-only backend: SoftHSM 2.5, which predates the v3.0 C_GetInterface API. This exercises
   # the wrapper's v2.40 negotiation and single-part fallback paths against a genuine old module — the

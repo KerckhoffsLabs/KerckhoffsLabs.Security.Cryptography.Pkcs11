@@ -79,12 +79,29 @@ public sealed class Pkcs11Library : IDisposable
     /// <remarks>
     /// <para>
     /// The host executable must export the cryptoki <c>C_GetFunctionList</c> symbol from its
-    /// entry-point module — under Native AOT that means linking the module in and keeping the
-    /// symbol exported (<c>DirectPInvoke</c> plus a linker export, or an explicit exports file).
-    /// Resolution goes through the entry-point module's own symbol table, so it behaves the same
-    /// on CoreCLR and Native AOT; there is no <c>"__Internal"</c> pseudo-library involved, which
-    /// is a Mono-only convention that no runtime this package targets implements.
+    /// entry-point module: resolution goes through that module's own <i>dynamic</i> symbol table,
+    /// which behaves the same on CoreCLR and Native AOT. There is no <c>"__Internal"</c>
+    /// pseudo-library involved — that is a Mono-only convention no runtime this package targets
+    /// implements.
     /// </para>
+    /// <para>
+    /// Under Native AOT, linking the module in is not by itself enough, and both extra steps are
+    /// easy to miss because each fails silently into the same "entry point not found":
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><description>
+    ///     A static archive contributes only the members that resolve an undefined reference, and
+    ///     nothing in a managed binary references the bootstrap by name. Force the member in — GNU
+    ///     ld <c>--undefined=C_GetFunctionList</c>, Apple <c>-u _C_GetFunctionList</c> — or link the
+    ///     object file directly.
+    ///   </description></item>
+    ///   <item><description>
+    ///     ILC generates an exports file that keeps only its own symbol
+    ///     (<c>global: DotNetRuntimeDebugHeader; local: *;</c>) and hands it to the linker, so the
+    ///     symbol stays hidden no matter what export flags are also passed. Add
+    ///     <c>C_GetFunctionList</c> to that exports file.
+    ///   </description></item>
+    /// </list>
     /// <para>
     /// All subsequent PKCS#11 calls go through the function-pointer table returned by that single
     /// call — no other unmanaged bindings are required. The v3.0/v3.2 surface is bound
