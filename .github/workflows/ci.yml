@@ -359,22 +359,38 @@ jobs:
         # from $GITHUB_ENV set by the NSS build step above.
         run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
 
-  # Native-AOT smoke test (linux-x64): publishes tests/AotSmoke — a standalone app that
-  # references only the main library (not the test project) — with PublishAot, then runs the
-  # native binary against pkcs11-mock. A publish failure catches trim/reflection/AOT-incompat
-  # regressions in the wrapper before consumers hit them; the run proves C_GetInfo actually
-  # works through the AOT-compiled interop layer. Linux-only: AOT publish warnings (the main
-  # thing this guards) are platform-independent.
+  # Native-AOT smoke test: publishes tests/AotSmoke — a standalone app that references only the
+  # main library (not the test project) — with PublishAot, then runs the native binary against
+  # pkcs11-mock. A publish failure catches trim/reflection/AOT-incompat regressions in the wrapper
+  # before consumers hit them; the run proves C_GetInfo actually works through the AOT-compiled
+  # interop layer.
   #
   # The mock is linked in statically as well, so the same binary covers both ways into the
   # library: the dynamic path (dlopen) and LoadStaticallyLinked, which resolves the bootstrap
   # through the executable's own symbol table. The static half is the only end-to-end proof that
   # entry point works at all — it has no unit-testable equivalent, since it needs a real linked
   # module — and it is what would have caught the bootstrap depending on Mono's "__Internal".
+  #
+  # Two OSes, and only because of that static half. AOT publish warnings are platform-independent,
+  # but the static link is not: forcing an archive member in and exporting a symbol are different
+  # flags on GNU ld and ld64, and ILC hands the linker a version script on Linux versus an
+  # exported-symbols list on Apple. Those are the parts that can break per-platform, so each is
+  # exercised where it runs. Windows is out: its ExportsFile is a .def and the AotSmoke project
+  # does not implement that path.
   aot-smoke:
-    name: AOT smoke (linux-x64)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: AOT smoke (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            mock: pkcs11-mock.so
+          - os: macos-latest
+            rid: osx-arm64
+            mock: pkcs11-mock.dylib
     steps:
       # Only pkcs11-mock is needed here, so skip the (large) SoftHSM/opencryptoki submodules
       # that `submodules: recursive` would pull — init just the one module after checkout.
@@ -390,12 +406,14 @@ jobs:
           dotnet-version: '10.0.x'
 
       # Native AOT links with clang against zlib; build-essential also provides the gcc/make
-      # that build-pkcs11-mock.sh uses to compile the mock module below.
+      # that build-pkcs11-mock.sh uses to compile the mock module below. macOS runners already
+      # ship the Xcode command line tools that cover both.
       - name: Install AOT + native build deps
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev build-essential
 
       # Build the mock so the published binary has a real PKCS#11 module to load. The script
-      # drops it at <out>/runtimes/linux-x64/native/pkcs11-mock.so.
+      # drops it at <out>/runtimes/<rid>/native/pkcs11-mock.{so,dylib}.
       - name: Build pkcs11-mock
         run: ./build/build-pkcs11-mock.sh "$RUNNER_TEMP/mock"
 
@@ -405,22 +423,27 @@ jobs:
 
       - name: Publish AotSmoke (Native AOT)
         run: |
-          dotnet publish tests/AotSmoke/AotSmoke.csproj -c Release -r linux-x64 \
+          dotnet publish tests/AotSmoke/AotSmoke.csproj -c Release -r ${{ matrix.rid }} \
             -p:StaticMockArchive="$RUNNER_TEMP/mock-static/libpkcs11-mock.a"
 
       - name: Run AOT smoke against pkcs11-mock
         run: |
           set -euxo pipefail
-          bin="tests/AotSmoke/bin/Release/net10.0/linux-x64/publish/AotSmoke"
+          bin="tests/AotSmoke/bin/Release/net10.0/${{ matrix.rid }}/publish/AotSmoke"
           test -x "$bin"
 
           # Dynamically loaded module.
-          "$bin" "$RUNNER_TEMP/mock/runtimes/linux-x64/native/pkcs11-mock.so"
+          "$bin" "$RUNNER_TEMP/mock/runtimes/${{ matrix.rid }}/native/${{ matrix.mock }}"
 
           # Statically linked module, reached through LoadStaticallyLinked. Assert the bootstrap is
           # actually exported first, so a linker/exports-file regression fails here saying so rather
-          # than as a bare "entry point not found" from the run.
-          nm -D "$bin" | grep -q ' T C_GetFunctionList'
+          # than as a bare "entry point not found" from the run. Mach-O prefixes C symbols with an
+          # underscore and has no separate dynamic symbol table, hence the two spellings.
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            nm -gU "$bin" | grep -q ' T _C_GetFunctionList'
+          else
+            nm -D "$bin" | grep -q ' T C_GetFunctionList'
+          fi
           "$bin" static
 
   # Real v2.40-only backend: SoftHSM 2.5, which predates the v3.0 C_GetInterface API. This exercises
