@@ -117,9 +117,11 @@ public sealed class TestCollectionConventionTests
         {
             string? collection = CollectionOf(type);
 
-            foreach (ParameterInfo parameter in type.GetConstructors().SelectMany(c => c.GetParameters()))
+            foreach (ParameterInfo parameter in type.GetConstructors()
+                         .SelectMany(c => c.GetParameters())
+                         .Where(p => providers.ContainsKey(p.ParameterType)))
             {
-                if (!providers.TryGetValue(parameter.ParameterType, out List<string>? supplying)) continue;
+                List<string> supplying = providers[parameter.ParameterType];
 
                 if (collection is null || !supplying.Contains(collection))
                 {
@@ -230,10 +232,10 @@ public sealed class TestCollectionConventionTests
             string? name = AttributeName(definition, typeof(CollectionDefinitionAttribute));
             if (name is null) continue;
 
-            foreach (Type fixtureInterface in definition.GetInterfaces()
-                         .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollectionFixture<>)))
+            foreach (Type fixtureType in definition.GetInterfaces()
+                         .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollectionFixture<>))
+                         .Select(i => i.GetGenericArguments()[0]))
             {
-                Type fixtureType = fixtureInterface.GetGenericArguments()[0];
                 if (!providers.TryGetValue(fixtureType, out List<string>? names))
                     providers[fixtureType] = names = [];
                 names.Add(name);
