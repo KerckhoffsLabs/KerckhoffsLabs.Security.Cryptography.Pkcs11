@@ -809,7 +809,7 @@ public enum CKA : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKAExtensions
+internal static class CKAExtensions
 {
     /// <summary>
     /// Converts CKA to NativeCULong

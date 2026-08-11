@@ -51,7 +51,7 @@ public enum CKP : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKPExtensions
+internal static class CKPExtensions
 {
     /// <summary>Converts <see cref="CKP"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKP value) => (NativeCULong)(ulong)value;

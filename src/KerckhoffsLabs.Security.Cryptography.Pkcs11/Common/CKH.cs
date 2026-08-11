@@ -31,7 +31,7 @@ public enum CKH : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKHExtensions
+internal static class CKHExtensions
 {
     /// <summary>Converts <see cref="CKH"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKH value) => (NativeCULong)(ulong)value;

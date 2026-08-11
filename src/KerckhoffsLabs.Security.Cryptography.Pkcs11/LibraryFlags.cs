@@ -11,5 +11,5 @@ public sealed record LibraryFlags
     /// <summary>Bit flags reserved for future versions.</summary>
     public ulong Flags { get; }
 
-    internal LibraryFlags(NativeCULong flags) => Flags = (ulong)flags;
+    internal LibraryFlags(ulong flags) => Flags = flags;
 }

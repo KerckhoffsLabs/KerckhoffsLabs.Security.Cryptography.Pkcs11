@@ -59,7 +59,7 @@ internal readonly record struct ObjectHandle
     /// <summary>
     /// <c>true</c> when this handle equals <see cref="CK.CK_INVALID_HANDLE"/> (i.e. <c>default</c>).
     /// </summary>
-    public bool IsInvalid => _objectId == CK.CK_INVALID_HANDLE;
+    public bool IsInvalid => ObjectId == CK.CK_INVALID_HANDLE;
 
     /// <inheritdoc />
     public override string ToString() => $"ObjectHandle(0x{ObjectId:X})";

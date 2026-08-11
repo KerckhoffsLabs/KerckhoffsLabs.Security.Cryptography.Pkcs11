@@ -354,7 +354,7 @@ public enum CKK : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKKExtensions
+internal static class CKKExtensions
 {
     /// <summary>Converts <see cref="CKK"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKK value) => (NativeCULong)(ulong)value;

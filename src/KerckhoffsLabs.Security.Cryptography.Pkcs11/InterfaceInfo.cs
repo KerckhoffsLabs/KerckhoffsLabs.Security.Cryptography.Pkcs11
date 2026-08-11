@@ -13,7 +13,7 @@ public sealed record InterfaceInfo
     /// <summary>Flags describing the interface.</summary>
     public InterfaceFlags InterfaceFlags { get; }
 
-    internal InterfaceInfo(string name, NativeCULong flags)
+    internal InterfaceInfo(string name, ulong flags)
     {
         Name = name;
         InterfaceFlags = new InterfaceFlags(flags);

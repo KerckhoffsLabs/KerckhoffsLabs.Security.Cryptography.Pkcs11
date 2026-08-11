@@ -107,7 +107,7 @@ public enum CKD : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKDExtensions
+internal static class CKDExtensions
 {
     /// <summary>Converts <see cref="CKD"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKD value) => (NativeCULong)(ulong)value;

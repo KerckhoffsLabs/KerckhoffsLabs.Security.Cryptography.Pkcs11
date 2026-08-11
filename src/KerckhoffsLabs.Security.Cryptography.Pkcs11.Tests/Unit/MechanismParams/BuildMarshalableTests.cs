@@ -173,7 +173,7 @@ public sealed class BuildMarshalableTests
         Assert.Equal((ulong)CKG.CKG_MGF1_SHA256, (ulong)s.Mgf);
         // Hardcoded, not caller-supplied: a change here would mean the struct stopped declaring that
         // the source data is present, and the token would ignore the buffer.
-        Assert.Equal((ulong)CKZ.CKZ_DATA_SPECIFIED, (ulong)s.Source);
+        Assert.Equal(CKZ.CKZ_DATA_SPECIFIED, (ulong)s.Source);
         Assert.Equal(2UL, (ulong)s.SourceDataLen);
         AssertBlockHolds(s.SourceData, [0x0A, 0x0B]);
     }

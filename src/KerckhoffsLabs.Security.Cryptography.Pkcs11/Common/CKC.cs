@@ -31,7 +31,7 @@ public enum CKC : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKCExtensions
+internal static class CKCExtensions
 {
     /// <summary>
     /// Converts CKC to NativeCULong

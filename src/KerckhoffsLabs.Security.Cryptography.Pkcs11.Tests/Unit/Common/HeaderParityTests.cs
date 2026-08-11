@@ -72,11 +72,11 @@ public sealed class HeaderParityTests
     {
         ulong[] values =
         [
-            (ulong)CKF.CKF_MESSAGE_ENCRYPT.Value, (ulong)CKF.CKF_MESSAGE_DECRYPT.Value,
-            (ulong)CKF.CKF_MESSAGE_SIGN.Value, (ulong)CKF.CKF_MESSAGE_VERIFY.Value,
-            (ulong)CKF.CKF_MULTI_MESSAGE.Value, (ulong)CKF.CKF_FIND_OBJECTS.Value,
-            (ulong)CKF.CKF_EC_OID.Value, (ulong)CKF.CKF_EC_CURVENAME.Value,
-            (ulong)CKF.CKF_SEED_RANDOM_REQUIRED.Value,
+            CKF.CKF_MESSAGE_ENCRYPT, CKF.CKF_MESSAGE_DECRYPT,
+            CKF.CKF_MESSAGE_SIGN, CKF.CKF_MESSAGE_VERIFY,
+            CKF.CKF_MULTI_MESSAGE, CKF.CKF_FIND_OBJECTS,
+            CKF.CKF_EC_OID, CKF.CKF_EC_CURVENAME,
+            CKF.CKF_SEED_RANDOM_REQUIRED,
         ];
         Assert.Contains(bit, values);
     }
@@ -85,11 +85,11 @@ public sealed class HeaderParityTests
     public void MechanismFlags_MessageAndEcAccessors_ReflectBits()
     {
         ulong bits =
-            (ulong)CKF.CKF_MESSAGE_ENCRYPT.Value | (ulong)CKF.CKF_MESSAGE_DECRYPT.Value |
-            (ulong)CKF.CKF_MESSAGE_SIGN.Value | (ulong)CKF.CKF_MESSAGE_VERIFY.Value |
-            (ulong)CKF.CKF_MULTI_MESSAGE.Value | (ulong)CKF.CKF_EC_OID.Value |
-            (ulong)CKF.CKF_EC_CURVENAME.Value;
-        var flags = new MechanismFlags((NativeCULong)bits);
+            CKF.CKF_MESSAGE_ENCRYPT | CKF.CKF_MESSAGE_DECRYPT |
+            CKF.CKF_MESSAGE_SIGN | CKF.CKF_MESSAGE_VERIFY |
+            CKF.CKF_MULTI_MESSAGE | CKF.CKF_EC_OID |
+            CKF.CKF_EC_CURVENAME;
+        var flags = new MechanismFlags(bits);
 
         Assert.True(flags.MessageEncrypt);
         Assert.True(flags.MessageDecrypt);
@@ -99,7 +99,7 @@ public sealed class HeaderParityTests
         Assert.True(flags.EcOid);
         Assert.True(flags.EcCurveName);
 
-        var empty = new MechanismFlags((NativeCULong)0UL);
+        var empty = new MechanismFlags(0UL);
         Assert.False(empty.MessageEncrypt);
         Assert.False(empty.EcCurveName);
     }
@@ -108,6 +108,6 @@ public sealed class HeaderParityTests
     public void TokenFlags_SeedRandomRequired_ReflectsBit()
     {
         Assert.True(new TokenFlags(CKF.CKF_SEED_RANDOM_REQUIRED).SeedRandomRequired);
-        Assert.False(new TokenFlags((NativeCULong)0UL).SeedRandomRequired);
+        Assert.False(new TokenFlags(0UL).SeedRandomRequired);
     }
 }

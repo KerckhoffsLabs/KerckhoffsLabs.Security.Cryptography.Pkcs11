@@ -15,7 +15,7 @@ public sealed class TokenInfoTests
         NativeTestStructs.FillPadded(info.ManufacturerId, "Acme Corp");
         NativeTestStructs.FillPadded(info.Model, "Model-X");
         NativeTestStructs.FillPadded(info.SerialNumber, "SN12345");
-        info.Flags = (NativeCULong)(CKF.CKF_RNG.Value | CKF.CKF_LOGIN_REQUIRED.Value);
+        info.Flags = (NativeCULong)(CKF.CKF_RNG | CKF.CKF_LOGIN_REQUIRED);
         info.MaxSessionCount = (NativeCULong)10UL;
         info.SessionCount = (NativeCULong)3UL;
         info.MaxRwSessionCount = (NativeCULong)8UL;

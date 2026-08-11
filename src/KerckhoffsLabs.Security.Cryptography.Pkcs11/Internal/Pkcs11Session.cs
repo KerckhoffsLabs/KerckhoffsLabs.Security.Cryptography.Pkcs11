@@ -49,7 +49,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// if the session is not yet open or has been closed. Read-only; assignments go through
     /// <see cref="_sessionHandle"/>.
     /// </summary>
-    private NativeCULong _sessionId => _sessionHandle is null ? CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
+    private NativeCULong _sessionId => _sessionHandle is null ? (NativeCULong)CK.CK_INVALID_HANDLE : _sessionHandle.SessionId;
 
     /// <summary>
     /// Lock object guarding concurrent native-call access to this <see cref="Pkcs11Session"/>.
@@ -513,11 +513,11 @@ internal sealed class Pkcs11Session : IDisposable
     /// active, but the caller's exception is the appropriate signal to the consumer.
     /// Errors are logged and swallowed so the original exception is never masked on unwind.
     /// </summary>
-    private void TryCancelOperation(NativeCULong flags, string operationName)
+    private void TryCancelOperation(ulong flags, string operationName)
     {
         try
         {
-            CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, flags);
+            CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, (NativeCULong)flags);
             if (rv is not CKR.CKR_OK and not CKR.CKR_FUNCTION_NOT_SUPPORTED)
             {
                 _logger.LogWarning(
@@ -911,7 +911,7 @@ internal sealed class Pkcs11Session : IDisposable
         // Any object class may arrive here, so the refusal applies but key defaults do not.
         GuardInsecureKeyAttributes(attributes);
 
-        NativeCULong objectId = CK.CK_INVALID_HANDLE;
+        NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
@@ -941,7 +941,7 @@ internal sealed class Pkcs11Session : IDisposable
         GuardInsecureKeyAttributes(attributes);
 
 
-        NativeCULong objectId = CK.CK_INVALID_HANDLE;
+        NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
@@ -1418,7 +1418,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
-        NativeCULong keyId = CK.CK_INVALID_HANDLE;
+        NativeCULong keyId = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
@@ -1465,8 +1465,8 @@ internal sealed class Pkcs11Session : IDisposable
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
         CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
 
-        NativeCULong publicKeyId = CK.CK_INVALID_HANDLE;
-        NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
+        NativeCULong publicKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
+        NativeCULong privateKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
         // Root the managed attributes past the native call: the template holds raw copies of
@@ -1566,7 +1566,7 @@ internal sealed class Pkcs11Session : IDisposable
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
-        NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
+        NativeCULong unwrappedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
         // Root the managed attributes past the native call: the template holds raw copies of
@@ -3031,10 +3031,10 @@ internal sealed class Pkcs11Session : IDisposable
         {
             // Cancel whichever sub-operations are still live. Encrypt-init may not have
             // succeeded; both are independent active operations on the session per v3.0+.
-            NativeCULong cancelFlags = (NativeCULong)0;
-            if (!digestFinalized) cancelFlags = (NativeCULong)((ulong)cancelFlags | (ulong)CKF.CKF_DIGEST);
-            if (encryptInited && !encryptFinalized) cancelFlags = (NativeCULong)((ulong)cancelFlags | (ulong)CKF.CKF_ENCRYPT);
-            if ((ulong)cancelFlags != 0)
+            ulong cancelFlags = 0;
+            if (!digestFinalized) cancelFlags |= CKF.CKF_DIGEST;
+            if (encryptInited && !encryptFinalized) cancelFlags |= CKF.CKF_ENCRYPT;
+            if (cancelFlags != 0)
                 TryCancelOperation(cancelFlags, "DigestEncrypt");
         }
     }
@@ -3209,10 +3209,10 @@ internal sealed class Pkcs11Session : IDisposable
         }
         finally
         {
-            NativeCULong cancelFlags = (NativeCULong)0;
-            if (!digestFinalized) cancelFlags = (NativeCULong)((ulong)cancelFlags | (ulong)CKF.CKF_DIGEST);
-            if (decryptInited && !decryptFinalized) cancelFlags = (NativeCULong)((ulong)cancelFlags | (ulong)CKF.CKF_DECRYPT);
-            if ((ulong)cancelFlags != 0)
+            ulong cancelFlags = 0;
+            if (!digestFinalized) cancelFlags |= CKF.CKF_DIGEST;
+            if (decryptInited && !decryptFinalized) cancelFlags |= CKF.CKF_DECRYPT;
+            if (cancelFlags != 0)
                 TryCancelOperation(cancelFlags, "DecryptDigest");
         }
     }
@@ -3247,7 +3247,7 @@ internal sealed class Pkcs11Session : IDisposable
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
-        NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
+        NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
         Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
         // Root the managed attributes past the native call: the template holds raw copies of
@@ -3412,7 +3412,7 @@ internal sealed class Pkcs11Session : IDisposable
             template[idx++] = d.CkAttribute;
 
         NativeCULong ctLen = (NativeCULong)0;
-        NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
+        NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv;
         byte[] ct;
 
@@ -3500,7 +3500,7 @@ internal sealed class Pkcs11Session : IDisposable
             template[idx++] = d.CkAttribute;
 
         byte[] ct = ciphertext.ToArray();
-        NativeCULong sharedHandle = CK.CK_INVALID_HANDLE;
+        NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DecapsulateKey(
             _sessionId, ref ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
             template, (NativeCULong)template.Length,
@@ -3603,7 +3603,7 @@ internal sealed class Pkcs11Session : IDisposable
         foreach (ObjectAttribute d in secureDefaults)
             template[idx++] = d.CkAttribute;
 
-        NativeCULong newKey = CK.CK_INVALID_HANDLE;
+        NativeCULong newKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)unwrappingKey.ObjectId,
             wrapped, (NativeCULong)wrapped.Length,

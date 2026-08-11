@@ -75,7 +75,7 @@ public sealed record TokenInfo
         ManufacturerId = Encoding.UTF8.GetString(ck_token_info.ManufacturerId).TrimEnd();
         Model = Encoding.UTF8.GetString(ck_token_info.Model).TrimEnd();
         SerialNumber = Encoding.UTF8.GetString(ck_token_info.SerialNumber).TrimEnd();
-        TokenFlags = new TokenFlags(ck_token_info.Flags);
+        TokenFlags = new TokenFlags((ulong)ck_token_info.Flags);
         MaxSessionCount = (ulong)ck_token_info.MaxSessionCount;
         SessionCount = (ulong)ck_token_info.SessionCount;
         MaxRwSessionCount = (ulong)ck_token_info.MaxRwSessionCount;

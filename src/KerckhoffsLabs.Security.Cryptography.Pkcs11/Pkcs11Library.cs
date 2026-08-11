@@ -155,7 +155,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         Log.LibraryTrace(_logger, _libraryPath, "Initialize");
 
-        var initArgs = new CK_C_INITIALIZE_ARGS { Flags = CKF.CKF_OS_LOCKING_OK };
+        var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)CKF.CKF_OS_LOCKING_OK };
         CKR rv = LowLevel.C_Initialize(initArgs);
 
         // Another component already initialized the library — treat as success but
@@ -271,7 +271,7 @@ public sealed class Pkcs11Library : IDisposable
             string name = raw[i].InterfaceName != IntPtr.Zero
                 ? Marshal.PtrToStringUTF8(raw[i].InterfaceName) ?? string.Empty
                 : string.Empty;
-            list.Add(new InterfaceInfo(name, raw[i].Flags));
+            list.Add(new InterfaceInfo(name, (ulong)raw[i].Flags));
         }
 
         return list;
@@ -302,7 +302,7 @@ public sealed class Pkcs11Library : IDisposable
         string name = iface.InterfaceName != IntPtr.Zero
             ? Marshal.PtrToStringUTF8(iface.InterfaceName) ?? string.Empty
             : string.Empty;
-        return new InterfaceInfo(name, iface.Flags);
+        return new InterfaceInfo(name, (ulong)iface.Flags);
     }
 
     /// <summary>
@@ -323,7 +323,7 @@ public sealed class Pkcs11Library : IDisposable
 
         Log.LibraryTrace(_logger, _libraryPath, "WaitForSlotEvent");
 
-        NativeCULong flags = nonBlocking ? CKF.CKF_DONT_BLOCK : new(0);
+        NativeCULong flags = (NativeCULong)(nonBlocking ? CKF.CKF_DONT_BLOCK : 0UL);
         NativeCULong slotIdOut = new(0);
         CKR rv = LowLevel.C_WaitForSlotEvent(flags, ref slotIdOut, IntPtr.Zero);
 

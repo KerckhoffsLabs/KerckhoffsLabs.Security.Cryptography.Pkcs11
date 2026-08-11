@@ -76,7 +76,7 @@ public enum CKO : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKOExtensions
+internal static class CKOExtensions
 {
     /// <summary>Converts <see cref="CKO"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKO value) => (NativeCULong)(ulong)value;

@@ -15,7 +15,7 @@ public sealed class SessionInfoTests
         {
             SlotId = (NativeCULong)4UL,
             State = (NativeCULong)(ulong)CKS.CKS_RW_USER_FUNCTIONS,
-            Flags = (NativeCULong)(CKF.CKF_RW_SESSION.Value | CKF.CKF_SERIAL_SESSION.Value),
+            Flags = (NativeCULong)(CKF.CKF_RW_SESSION | CKF.CKF_SERIAL_SESSION),
             DeviceError = (NativeCULong)0UL,
         };
 
@@ -54,7 +54,7 @@ public sealed class SessionInfoTests
     public void ReadOnlySession_RwSessionFlagFalse()
     {
         // SerialSession alone (the read-only case): RW flag must be false.
-        var native = new CK_SESSION_INFO { Flags = (NativeCULong)CKF.CKF_SERIAL_SESSION.Value };
+        var native = new CK_SESSION_INFO { Flags = (NativeCULong)CKF.CKF_SERIAL_SESSION };
         var info = new SessionInfo((NativeCULong)0UL, native);
         Assert.False(info.SessionFlags.RwSession);
         Assert.True(info.SessionFlags.SerialSession);

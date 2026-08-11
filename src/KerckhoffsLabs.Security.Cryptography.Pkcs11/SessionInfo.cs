@@ -30,7 +30,7 @@ public sealed record SessionInfo
         SessionId = new SessionId((ulong)sessionId);
         SlotId = new SlotId((ulong)ck_session_info.SlotId);
         State = (CKS)ck_session_info.State.Value;
-        SessionFlags = new SessionFlags(ck_session_info.Flags);
+        SessionFlags = new SessionFlags((ulong)ck_session_info.Flags);
         DeviceError = (ulong)ck_session_info.DeviceError;
     }
 }

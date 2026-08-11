@@ -88,7 +88,7 @@ public sealed class MechanismParamsMarshalTests
 
         Assert.Equal((ulong)CKM.CKM_SHA256, (ulong)s.HashAlg);
         Assert.Equal((ulong)CKG.CKG_MGF1_SHA256, (ulong)s.Mgf);
-        Assert.Equal((ulong)CKZ.CKZ_DATA_SPECIFIED, (ulong)s.Source);
+        Assert.Equal(CKZ.CKZ_DATA_SPECIFIED, (ulong)s.Source);
         Assert.Equal((ulong)src.Length, (ulong)s.SourceDataLen);
         Assert.Equal(src, UnmanagedMemory.Read(s.SourceData, src.Length));
     }
@@ -100,7 +100,7 @@ public sealed class MechanismParamsMarshalTests
         using var scope = new MechanismParameterScope();
         var s = Marshalled<CK_RSA_PKCS_OAEP_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.Equal((ulong)CKZ.CKZ_DATA_SPECIFIED, (ulong)s.Source);
+        Assert.Equal(CKZ.CKZ_DATA_SPECIFIED, (ulong)s.Source);
         Assert.Equal(0UL, (ulong)s.SourceDataLen);
         Assert.Equal(IntPtr.Zero, s.SourceData);
     }

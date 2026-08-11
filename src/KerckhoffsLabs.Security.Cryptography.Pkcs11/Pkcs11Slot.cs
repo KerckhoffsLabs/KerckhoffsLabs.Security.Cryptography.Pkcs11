@@ -198,12 +198,12 @@ public sealed class Pkcs11Slot
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "OpenSession");
 
-        NativeCULong flags = CKF.CKF_SERIAL_SESSION;
+        ulong flags = CKF.CKF_SERIAL_SESSION;
         if (readWrite)
             flags |= CKF.CKF_RW_SESSION;
 
-        NativeCULong sessionId = CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_OpenSession(_slotId, flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);
+        NativeCULong sessionId = (NativeCULong)CK.CK_INVALID_HANDLE;
+        CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);
         Pkcs11Exception.ThrowIfError(rv, "C_OpenSession");
 
         if (_logger.IsEnabled(LogLevel.Information))

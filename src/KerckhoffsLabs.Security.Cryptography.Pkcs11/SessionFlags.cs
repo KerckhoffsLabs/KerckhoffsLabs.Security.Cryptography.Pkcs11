@@ -12,11 +12,11 @@ public sealed record SessionFlags
 
     /// <summary>True if the session is read/write; false if the session is read-only.</summary>
     public bool RwSession
-        => (Flags & CKF.CKF_RW_SESSION.Value) == CKF.CKF_RW_SESSION.Value;
+        => (Flags & CKF.CKF_RW_SESSION) == CKF.CKF_RW_SESSION;
 
     /// <summary>This flag is provided for backward compatibility, and should always be set to true.</summary>
     public bool SerialSession
-        => (Flags & CKF.CKF_SERIAL_SESSION.Value) == CKF.CKF_SERIAL_SESSION.Value;
+        => (Flags & CKF.CKF_SERIAL_SESSION) == CKF.CKF_SERIAL_SESSION;
 
-    internal SessionFlags(NativeCULong flags) => Flags = (ulong)flags;
+    internal SessionFlags(ulong flags) => Flags = flags;
 }

@@ -21,7 +21,7 @@ public enum CKN : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKNExtensions
+internal static class CKNExtensions
 {
     /// <summary>Converts <see cref="CKN"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKN value) => (NativeCULong)(ulong)value;

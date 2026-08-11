@@ -27,7 +27,7 @@ public sealed record LibraryInfo
     {
         CryptokiVersion = ck_info.CryptokiVersion.ToString();
         ManufacturerId = Encoding.UTF8.GetString(ck_info.ManufacturerId).TrimEnd();
-        LibraryFlags = new LibraryFlags(ck_info.Flags);
+        LibraryFlags = new LibraryFlags((ulong)ck_info.Flags);
         LibraryDescription = Encoding.UTF8.GetString(ck_info.LibraryDescription).TrimEnd();
         LibraryVersion = ck_info.LibraryVersion.ToString();
     }

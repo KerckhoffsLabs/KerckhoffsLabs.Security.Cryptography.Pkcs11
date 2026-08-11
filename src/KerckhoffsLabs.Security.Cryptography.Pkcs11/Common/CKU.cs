@@ -26,7 +26,7 @@ public enum CKU : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKUExtensions
+internal static class CKUExtensions
 {
     /// <summary>Converts <see cref="CKU"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKU value) => (NativeCULong)(ulong)value;

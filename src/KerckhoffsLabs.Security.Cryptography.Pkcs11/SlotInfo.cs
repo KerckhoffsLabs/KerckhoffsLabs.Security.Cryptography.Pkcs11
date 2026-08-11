@@ -31,7 +31,7 @@ public sealed record SlotInfo
         SlotId = new SlotId((ulong)slotId);
         SlotDescription = Encoding.UTF8.GetString(ck_slot_info.SlotDescription).TrimEnd();
         ManufacturerId = Encoding.UTF8.GetString(ck_slot_info.ManufacturerId).TrimEnd();
-        SlotFlags = new SlotFlags(ck_slot_info.Flags);
+        SlotFlags = new SlotFlags((ulong)ck_slot_info.Flags);
         HardwareVersion = ck_slot_info.HardwareVersion.ToString();
         FirmwareVersion = ck_slot_info.FirmwareVersion.ToString();
     }

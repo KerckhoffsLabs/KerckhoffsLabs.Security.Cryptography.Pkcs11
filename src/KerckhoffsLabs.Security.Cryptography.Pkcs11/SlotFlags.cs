@@ -12,15 +12,15 @@ public sealed record SlotFlags
 
     /// <summary>True if a token is present in the slot (e.g. a device is in the reader).</summary>
     public bool TokenPresent
-        => (Flags & CKF.CKF_TOKEN_PRESENT.Value) == CKF.CKF_TOKEN_PRESENT.Value;
+        => (Flags & CKF.CKF_TOKEN_PRESENT) == CKF.CKF_TOKEN_PRESENT;
 
     /// <summary>True if the reader supports removable devices.</summary>
     public bool RemovableDevice
-        => (Flags & CKF.CKF_REMOVABLE_DEVICE.Value) == CKF.CKF_REMOVABLE_DEVICE.Value;
+        => (Flags & CKF.CKF_REMOVABLE_DEVICE) == CKF.CKF_REMOVABLE_DEVICE;
 
     /// <summary>True if the slot is a hardware slot, as opposed to a software slot implementing a "soft token".</summary>
     public bool HardwareSlot
-        => (Flags & CKF.CKF_HW_SLOT.Value) == CKF.CKF_HW_SLOT.Value;
+        => (Flags & CKF.CKF_HW_SLOT) == CKF.CKF_HW_SLOT;
 
-    internal SlotFlags(NativeCULong flags) => Flags = (ulong)flags;
+    internal SlotFlags(ulong flags) => Flags = flags;
 }

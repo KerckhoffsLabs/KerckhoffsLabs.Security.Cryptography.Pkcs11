@@ -2391,7 +2391,7 @@ public enum CKM : uint
 }
 
 /// <summary>Conversion helpers between <see cref="CKM"/> and the native <c>CK_ULONG</c> width.</summary>
-public static class CKMExtensions
+internal static class CKMExtensions
 {
     /// <summary>
     /// Converts CKM to NativeCULong

@@ -51,7 +51,7 @@ public enum CksValidationFlagsType : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKSExtensions
+internal static class CKSExtensions
 {
     /// <summary>Converts <see cref="CKS"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKS value) => (NativeCULong)(ulong)value;

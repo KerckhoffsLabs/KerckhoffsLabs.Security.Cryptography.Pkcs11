@@ -12,7 +12,7 @@ public sealed record InterfaceFlags
 
     /// <summary>True if the interface's functions are safe to call from a child process after <c>fork()</c>.</summary>
     public bool ForkSafe
-        => (Flags & CKF.CKF_INTERFACE_FORK_SAFE.Value) == CKF.CKF_INTERFACE_FORK_SAFE.Value;
+        => (Flags & CKF.CKF_INTERFACE_FORK_SAFE) == CKF.CKF_INTERFACE_FORK_SAFE;
 
-    internal InterfaceFlags(NativeCULong flags) => Flags = (ulong)flags;
+    internal InterfaceFlags(ulong flags) => Flags = flags;
 }

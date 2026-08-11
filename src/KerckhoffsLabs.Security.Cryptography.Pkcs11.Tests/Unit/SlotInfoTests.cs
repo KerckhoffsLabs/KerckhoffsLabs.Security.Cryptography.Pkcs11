@@ -12,7 +12,7 @@ public sealed class SlotInfoTests
         var native = new CK_SLOT_INFO();
         NativeTestStructs.FillPadded(native.SlotDescription, "USB Reader Slot 0");
         NativeTestStructs.FillPadded(native.ManufacturerId, "Acme Corp");
-        native.Flags = (NativeCULong)(CKF.CKF_TOKEN_PRESENT.Value | CKF.CKF_HW_SLOT.Value);
+        native.Flags = (NativeCULong)(CKF.CKF_TOKEN_PRESENT | CKF.CKF_HW_SLOT);
         native.HardwareVersion = new CK_VERSION { Major = 1, Minor = 0 };
         native.FirmwareVersion = new CK_VERSION { Major = 2, Minor = 5 };
 

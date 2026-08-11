@@ -25,6 +25,6 @@ public sealed record MechanismInfo
         Mechanism = mechanism;
         MinKeySize = (ulong)ck_mechanism_info.MinKeySize;
         MaxKeySize = (ulong)ck_mechanism_info.MaxKeySize;
-        MechanismFlags = new MechanismFlags(ck_mechanism_info.Flags);
+        MechanismFlags = new MechanismFlags((ulong)ck_mechanism_info.Flags);
     }
 }

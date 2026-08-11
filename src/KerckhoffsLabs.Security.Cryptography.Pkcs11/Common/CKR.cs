@@ -536,7 +536,7 @@ public enum CKR : uint
 /// <summary>
 /// Utility class that helps with data type conversions.
 /// </summary>
-public static class CKRExtensions
+internal static class CKRExtensions
 {
     /// <summary>Converts <see cref="CKR"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKR value) => (NativeCULong)(ulong)value;

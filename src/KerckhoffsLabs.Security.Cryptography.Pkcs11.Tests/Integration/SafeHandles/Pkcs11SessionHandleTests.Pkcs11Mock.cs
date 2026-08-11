@@ -15,7 +15,7 @@ public sealed class Pkcs11SessionHandleTests(MockBackendFixture f)
     public void InvalidHandle_IsInvalid_Returns_True()
     {
         var lib = GetLowLevelLibrary();
-        using var handle = new Pkcs11SessionHandle(lib, CK.CK_INVALID_HANDLE);
+        using var handle = new Pkcs11SessionHandle(lib, (NativeCULong)CK.CK_INVALID_HANDLE);
         Assert.True(handle.IsInvalid);
     }
 

@@ -13,7 +13,7 @@ public sealed class MechanismInfoTests
         {
             MinKeySize = (NativeCULong)128UL,
             MaxKeySize = (NativeCULong)256UL,
-            Flags = (NativeCULong)(CKF.CKF_ENCRYPT.Value | CKF.CKF_DECRYPT.Value),
+            Flags = (NativeCULong)(CKF.CKF_ENCRYPT | CKF.CKF_DECRYPT),
         };
 
         var info = new MechanismInfo(CKM.CKM_AES_GCM, native);
@@ -41,7 +41,7 @@ public sealed class MechanismInfoTests
     {
         var info = new MechanismInfo(CKM.CKM_SHA256, new CK_MECHANISM_INFO
         {
-            Flags = (NativeCULong)CKF.CKF_DIGEST.Value,
+            Flags = (NativeCULong)CKF.CKF_DIGEST,
         });
 
         Assert.Equal(0UL, info.MinKeySize);

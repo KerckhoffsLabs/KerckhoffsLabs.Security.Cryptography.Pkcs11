@@ -72,7 +72,7 @@ public sealed class Pkcs11SlotTests
     [Fact]
     public void GetSlotInfo_Ok_WrapsResultAndPassesSlotId()
     {
-        var fake = new SlotFake { SlotInfo = new CK_SLOT_INFO { Flags = CKF.CKF_TOKEN_PRESENT } };
+        var fake = new SlotFake { SlotInfo = new CK_SLOT_INFO { Flags = (NativeCULong)CKF.CKF_TOKEN_PRESENT } };
         var info = NewSlot(fake).GetSlotInfo();
 
         Assert.Equal(SlotId, (ulong)fake.LastSlotId);
@@ -92,7 +92,7 @@ public sealed class Pkcs11SlotTests
     [Fact]
     public void GetTokenInfo_Ok_WrapsResult()
     {
-        var fake = new SlotFake { TokenInfo = new CK_TOKEN_INFO { Flags = CKF.CKF_TOKEN_INITIALIZED } };
+        var fake = new SlotFake { TokenInfo = new CK_TOKEN_INFO { Flags = (NativeCULong)CKF.CKF_TOKEN_INITIALIZED } };
         var info = NewSlot(fake).GetTokenInfo();
 
         Assert.Equal(SlotId, info.SlotId.Value);
@@ -117,7 +117,7 @@ public sealed class Pkcs11SlotTests
             {
                 MinKeySize = (NativeCULong)128UL,
                 MaxKeySize = (NativeCULong)256UL,
-                Flags = CKF.CKF_ENCRYPT,
+                Flags = (NativeCULong)CKF.CKF_ENCRYPT,
             }
         };
         var info = NewSlot(fake).GetMechanismInfo(CKM.CKM_AES_GCM);
@@ -252,7 +252,7 @@ public sealed class Pkcs11SlotTests
         var fake = new SlotFake();
         var session = NewSlot(fake).OpenSession(readWrite: true);
         Assert.NotNull(session);
-        Assert.Equal(CKF.CKF_SERIAL_SESSION.Value | CKF.CKF_RW_SESSION.Value, (ulong)fake.CapturedOpenFlags);
+        Assert.Equal(CKF.CKF_SERIAL_SESSION | CKF.CKF_RW_SESSION, (ulong)fake.CapturedOpenFlags);
         session.Dispose();
     }
 
@@ -261,7 +261,7 @@ public sealed class Pkcs11SlotTests
     {
         var fake = new SlotFake();
         var session = NewSlot(fake).OpenSession(readWrite: false);
-        Assert.Equal(CKF.CKF_SERIAL_SESSION.Value, (ulong)fake.CapturedOpenFlags);
+        Assert.Equal(CKF.CKF_SERIAL_SESSION, (ulong)fake.CapturedOpenFlags);
         session.Dispose();
     }
 

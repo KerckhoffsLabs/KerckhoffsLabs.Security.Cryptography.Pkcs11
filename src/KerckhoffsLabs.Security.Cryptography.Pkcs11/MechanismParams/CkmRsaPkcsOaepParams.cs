@@ -35,7 +35,7 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
         {
             HashAlg = _hashAlg.ToCULong(),
             Mgf = _mgf.ToCULong(),
-            Source = CKZ.CKZ_DATA_SPECIFIED,
+            Source = (NativeCULong)CKZ.CKZ_DATA_SPECIFIED,
             SourceData = scope.Write(_sourceDataBytes),
             SourceDataLen = (NativeCULong)_sourceDataBytes.Length,
         };

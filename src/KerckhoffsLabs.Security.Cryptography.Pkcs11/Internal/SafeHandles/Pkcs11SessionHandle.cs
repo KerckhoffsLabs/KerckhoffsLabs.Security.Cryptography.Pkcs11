@@ -37,7 +37,7 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
     public NativeCULong SessionId => (NativeCULong)(ulong)handle;
 
     /// <inheritdoc/>
-    public override bool IsInvalid => SessionId == CK.CK_INVALID_HANDLE;
+    public override bool IsInvalid => (ulong)SessionId == CK.CK_INVALID_HANDLE;
 
     /// <inheritdoc/>
     protected override bool ReleaseHandle()
