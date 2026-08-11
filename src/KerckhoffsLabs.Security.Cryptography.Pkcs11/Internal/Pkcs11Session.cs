@@ -1035,24 +1035,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (attributes.Count < 1)
             throw new ArgumentException("No attributes specified", nameof(attributes));
 
-        // Prepare array of CK_ATTRIBUTEs. These are type-only: the first call asks the module how long
-        // each value is, so the template carries no values and needs no buffers.
-        //
-        // Built directly rather than through ObjectAttribute, which is IDisposable and was being
-        // constructed here only to have its struct copied out and the wrapper dropped. Adding a `using`
-        // would have been the wrong repair: the copy in the template shares the wrapper's pointer, so
-        // disposing would leave the template pointing at freed memory the moment a type-only attribute
-        // ever allocated one. Not creating the disposable avoids the question.
-        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
-        for (int i = 0; i < attributes.Count; i++)
-        {
-            template[i] = new CK_ATTRIBUTE
-            {
-                type = (NativeCULong)attributes[i],
-                value = IntPtr.Zero,
-                valueLen = (NativeCULong)0,
-            };
-        }
+        CK_ATTRIBUTE[] template = BuildTypeOnlyTemplate(attributes);
 
         // The size actually allocated for each attribute, kept so the post-call length can be checked
         // against it rather than trusted — see GuardReportedLength.
@@ -1067,95 +1050,23 @@ internal sealed class Pkcs11Session : IDisposable
         // the third call's lengths can be checked the same way.
         List<(IntPtr Pointer, NativeCULong Allocated)> nestedAllocations = [];
 
-        // Determine size of attribute values
-        CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-        if (IsGetAttributeValueFatal(rv))
-            Pkcs11Exception.ThrowIfError(rv, OpGetAttributeValue);
-
-        // Allocate memory for each attribute
-        for (int i = 0; i < template.Length; i++)
-        {
-            // PKCS#11 v2.20 page 133:
-            // If the specified attribute (i.e., the attribute specified by the type field) for the object
-            // cannot be revealed because the object is sensitive or unextractable, then the
-            // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
-            // CK_LONG, it holds -1).
-            // Compare against the canonical sentinel (NativeCULong.MaxValue = uint.MaxValue on Windows,
-            // ulong.MaxValue on Linux-LP64), as ObjectAttribute.CannotBeRead does. The previous
-            // `.Value != nuint.MaxValue` only matched on Linux: on Win64 nuint is 8 bytes but CK_ULONG
-            // is 4, so the -1 sentinel went unrecognized and (int)valueLen overflowed.
-            if (template[i].valueLen != NativeCULong.MaxValue)
-            {
-                allocatedLen[i] = template[i].valueLen;
-                template[i].value = UnmanagedMemory.Allocate((int)(template[i].valueLen));
-                allocatedBlocks.Add(template[i].value);
-            }
-        }
+        // First call: determine the size of each attribute value.
+        ReadAttributeValues(objectHandle, template);
+        AllocateValueBuffers(template, allocatedLen, allocatedBlocks);
 
         try
         {
-            // Read values of attributes
-            rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-            if (IsGetAttributeValueFatal(rv))
-                Pkcs11Exception.ThrowIfError(rv, OpGetAttributeValue);
+            // Second call: read the values themselves.
+            ReadAttributeValues(objectHandle, template);
 
             for (int i = 0; i < template.Length; i++)
                 GuardReportedLength(in template[i], allocatedLen[i]);
 
-            // Third call to C_GetAttributeValue is needed if any of the attributes is an array attribute
-            bool thirdCallNeeded = false;
-            for (int i = 0; i < template.Length; i++)
+            // Third call, needed only if some attribute is an array attribute whose children still
+            // have no buffers.
+            if (AllocateNestedBuffers(template, allocatedBlocks, nestedAllocations))
             {
-                if (IsNestedAttributeTemplate(template[i].type))
-                {
-                    // PKCS#11 v2.20 page 133:
-                    // If the specified attribute (i.e., the attribute specified by the type field) for the object
-                    // cannot be revealed because the object is sensitive or unextractable, then the
-                    // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
-                    // CK_LONG, it holds -1).
-                    if (template[i].valueLen == NativeCULong.MaxValue)
-                        continue;
-
-                    int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
-                    int nestedAttrCount = (int)(template[i].valueLen) / ckAttributeSize;
-                    int nestedAttrCountMod = (int)(template[i].valueLen) % ckAttributeSize;
-
-                    if (nestedAttrCountMod != 0)
-                        throw new AttributeValueException((ulong)template[i].type);
-
-                    if (nestedAttrCount == 0)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        thirdCallNeeded = true;
-
-                        // Allocate memory for each nested attribute
-                        for (int j = 0; j < nestedAttrCount; j++)
-                        {
-                            IntPtr tempPointer = new(template[i].value.ToInt64() + (j * ckAttributeSize));
-                            CK_ATTRIBUTE tempAttribute = UnmanagedMemory.Read<CK_ATTRIBUTE>(tempPointer);
-
-                            if (tempAttribute.valueLen != NativeCULong.MaxValue)
-                            {
-                                tempAttribute.value = UnmanagedMemory.Allocate((int)(tempAttribute.valueLen));
-                                allocatedBlocks.Add(tempAttribute.value);
-                                nestedAllocations.Add((tempPointer, tempAttribute.valueLen));
-                            }
-
-                            UnmanagedMemory.Write(tempPointer, in tempAttribute);
-                        }
-                    }
-                }
-            }
-
-            // Read values of all nested attributes
-            if (thirdCallNeeded)
-            {
-                rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
-                if (IsGetAttributeValueFatal(rv))
-                    Pkcs11Exception.ThrowIfError(rv, OpGetAttributeValue);
+                ReadAttributeValues(objectHandle, template);
 
                 // The nested attributes are read back the same way and are equally able to lie.
                 foreach ((IntPtr pointer, NativeCULong allocated) in nestedAllocations)
@@ -1164,12 +1075,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
         catch
         {
-            // Freed through a span so that Free's write-back lands in the list. Free nulls the pointer
-            // it is given and returns early on a null one — that pair is its double-free guard, and
-            // handing it a copy of each entry threw the guard away while looking like it was using it.
-            Span<IntPtr> blocks = CollectionsMarshal.AsSpan(allocatedBlocks);
-            for (int i = 0; i < blocks.Length; i++)
-                UnmanagedMemory.Free(ref blocks[i]);
+            FreeAllocatedBlocks(allocatedBlocks);
             throw;
         }
 
@@ -1181,6 +1087,155 @@ internal sealed class Pkcs11Session : IDisposable
 
         // The blocks belong to the caller from here; the returned list is what releases them.
         return new ReadOnlyDisposableList<ObjectAttribute>(outAttributes);
+    }
+
+    /// <summary>
+    /// Builds the type-only template the first <c>C_GetAttributeValue</c> call takes: it asks the
+    /// module how long each value is, so the template carries no values and needs no buffers.
+    /// </summary>
+    /// <remarks>
+    /// Built directly rather than through <c>ObjectAttribute</c>, which is <see cref="IDisposable"/>
+    /// and was being constructed here only to have its struct copied out and the wrapper dropped.
+    /// Adding a <c>using</c> would have been the wrong repair: the copy in the template shares the
+    /// wrapper's pointer, so disposing would leave the template pointing at freed memory the moment a
+    /// type-only attribute ever allocated one. Not creating the disposable avoids the question.
+    /// </remarks>
+    private static CK_ATTRIBUTE[] BuildTypeOnlyTemplate(List<ulong> attributes)
+    {
+        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
+        for (int i = 0; i < attributes.Count; i++)
+        {
+            template[i] = new CK_ATTRIBUTE
+            {
+                type = (NativeCULong)attributes[i],
+                value = IntPtr.Zero,
+                valueLen = (NativeCULong)0,
+            };
+        }
+
+        return template;
+    }
+
+    /// <summary>
+    /// Issues one <c>C_GetAttributeValue</c> call over <paramref name="template"/> and throws on a
+    /// return value that is fatal to the read — all three calls of the sequence go through here, so
+    /// none of them can drift from the others on what counts as fatal.
+    /// </summary>
+    private void ReadAttributeValues(ObjectHandle objectHandle, CK_ATTRIBUTE[] template)
+    {
+        CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
+        if (IsGetAttributeValueFatal(rv))
+            Pkcs11Exception.ThrowIfError(rv, OpGetAttributeValue);
+    }
+
+    /// <summary>
+    /// Allocates a buffer for every attribute the module reported a length for, recording both the
+    /// size allocated and the block, and leaves the unreadable ones alone.
+    /// </summary>
+    private static void AllocateValueBuffers(CK_ATTRIBUTE[] template, NativeCULong[] allocatedLen, List<IntPtr> allocatedBlocks)
+    {
+        for (int i = 0; i < template.Length; i++)
+        {
+            // PKCS#11 v2.20 page 133:
+            // If the specified attribute (i.e., the attribute specified by the type field) for the object
+            // cannot be revealed because the object is sensitive or unextractable, then the
+            // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
+            // CK_LONG, it holds -1).
+            // Compare against the canonical sentinel (NativeCULong.MaxValue = uint.MaxValue on Windows,
+            // ulong.MaxValue on Linux-LP64), as ObjectAttribute.CannotBeRead does. The previous
+            // `.Value != nuint.MaxValue` only matched on Linux: on Win64 nuint is 8 bytes but CK_ULONG
+            // is 4, so the -1 sentinel went unrecognized and (int)valueLen overflowed.
+            if (template[i].valueLen == NativeCULong.MaxValue)
+                continue;
+
+            allocatedLen[i] = template[i].valueLen;
+            template[i].value = UnmanagedMemory.Allocate((int)(template[i].valueLen));
+            allocatedBlocks.Add(template[i].value);
+        }
+    }
+
+    /// <summary>
+    /// Gives every nested attribute of every array attribute a buffer, and reports whether any were
+    /// found — which is exactly the question of whether a third <c>C_GetAttributeValue</c> call is
+    /// needed to fill them.
+    /// </summary>
+    private static bool AllocateNestedBuffers(
+        CK_ATTRIBUTE[] template,
+        List<IntPtr> allocatedBlocks,
+        List<(IntPtr Pointer, NativeCULong Allocated)> nestedAllocations)
+    {
+        bool thirdCallNeeded = false;
+
+        for (int i = 0; i < template.Length; i++)
+        {
+            if (!IsNestedAttributeTemplate(template[i].type))
+                continue;
+
+            // PKCS#11 v2.20 page 133:
+            // If the specified attribute (i.e., the attribute specified by the type field) for the object
+            // cannot be revealed because the object is sensitive or unextractable, then the
+            // ulValueLen field in that triple is modified to hold the value -1 (i.e., when it is cast to a
+            // CK_LONG, it holds -1).
+            if (template[i].valueLen == NativeCULong.MaxValue)
+                continue;
+
+            thirdCallNeeded |= AllocateNestedChildBuffers(in template[i], allocatedBlocks, nestedAllocations);
+        }
+
+        return thirdCallNeeded;
+    }
+
+    /// <summary>
+    /// Allocates the child buffers of one array attribute, returning <see langword="false"/> when it
+    /// declares no children.
+    /// </summary>
+    /// <exception cref="AttributeValueException">
+    /// The reported length is not a whole number of <c>CK_ATTRIBUTE</c>s, so the module is not
+    /// describing an attribute array at all.
+    /// </exception>
+    private static bool AllocateNestedChildBuffers(
+        in CK_ATTRIBUTE parent,
+        List<IntPtr> allocatedBlocks,
+        List<(IntPtr Pointer, NativeCULong Allocated)> nestedAllocations)
+    {
+        int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
+
+        if ((int)(parent.valueLen) % ckAttributeSize != 0)
+            throw new AttributeValueException((ulong)parent.type);
+
+        int nestedAttrCount = (int)(parent.valueLen) / ckAttributeSize;
+        if (nestedAttrCount == 0)
+            return false;
+
+        for (int j = 0; j < nestedAttrCount; j++)
+        {
+            IntPtr tempPointer = new(parent.value.ToInt64() + (j * ckAttributeSize));
+            CK_ATTRIBUTE tempAttribute = UnmanagedMemory.Read<CK_ATTRIBUTE>(tempPointer);
+
+            if (tempAttribute.valueLen != NativeCULong.MaxValue)
+            {
+                tempAttribute.value = UnmanagedMemory.Allocate((int)(tempAttribute.valueLen));
+                allocatedBlocks.Add(tempAttribute.value);
+                nestedAllocations.Add((tempPointer, tempAttribute.valueLen));
+            }
+
+            UnmanagedMemory.Write(tempPointer, in tempAttribute);
+        }
+
+        return true;
+    }
+
+    /// <summary>Releases every block allocated for a read that then failed.</summary>
+    /// <remarks>
+    /// Freed through a span so that <c>Free</c>'s write-back lands in the list. <c>Free</c> nulls the
+    /// pointer it is given and returns early on a null one — that pair is its double-free guard, and
+    /// handing it a copy of each entry threw the guard away while looking like it was using it.
+    /// </remarks>
+    private static void FreeAllocatedBlocks(List<IntPtr> allocatedBlocks)
+    {
+        Span<IntPtr> blocks = CollectionsMarshal.AsSpan(allocatedBlocks);
+        for (int i = 0; i < blocks.Length; i++)
+            UnmanagedMemory.Free(ref blocks[i]);
     }
 
     /// <summary>
