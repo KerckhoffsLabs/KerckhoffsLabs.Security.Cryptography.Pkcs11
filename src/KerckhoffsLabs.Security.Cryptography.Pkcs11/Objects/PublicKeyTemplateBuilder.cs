@@ -29,6 +29,20 @@ public sealed class PublicKeyTemplateBuilder : ObjectTemplateBuilderBase<PublicK
     /// <summary>Sets <c>CKA_DERIVE</c>.</summary>
     public PublicKeyTemplateBuilder Derive(bool value = true) => Attribute(CKA.CKA_DERIVE, value);
 
+    /// <summary>
+    /// Sets <c>CKA_TRUSTED</c> — marks this key as an approved wrapping key for keys that carry
+    /// <c>CKA_WRAP_WITH_TRUSTED</c>.
+    /// </summary>
+    /// <remarks>
+    /// Per PKCS#11, <c>CKA_TRUSTED</c> may be set to true <b>only by the SO</b>. A template that
+    /// sets it from a normal user session is rejected by a conformant token with
+    /// <see cref="CKR.CKR_ATTRIBUTE_READ_ONLY"/>. This is not gated locally: the builder cannot
+    /// know which user type opened the session, and refusing at build time would be wrong for SO
+    /// sessions.
+    /// </remarks>
+    public PublicKeyTemplateBuilder Trusted(bool value = true)
+        => Attribute(CKA.CKA_TRUSTED, value);
+
     /// <summary>Sets <c>CKA_MODULUS_BITS</c> — RSA modulus length (used by
     /// <c>C_GenerateKeyPair</c>).</summary>
     public PublicKeyTemplateBuilder ModulusBits(int bits) => Attribute(CKA.CKA_MODULUS_BITS, (ulong)bits);

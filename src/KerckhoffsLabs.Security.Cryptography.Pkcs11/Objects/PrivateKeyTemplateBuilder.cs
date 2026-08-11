@@ -43,6 +43,13 @@ public sealed class PrivateKeyTemplateBuilder : ObjectTemplateBuilderBase<Privat
     public PrivateKeyTemplateBuilder Derive(bool value = true) => Attribute(CKA.CKA_DERIVE, value);
 
     /// <summary>
+    /// Sets <c>CKA_WRAP_WITH_TRUSTED</c> — this key can only be wrapped by a wrapping key that
+    /// itself carries <c>CKA_TRUSTED</c>. Defence in depth for a key deliberately made wrappable.
+    /// </summary>
+    public PrivateKeyTemplateBuilder WrapWithTrusted(bool value = true)
+        => Attribute(CKA.CKA_WRAP_WITH_TRUSTED, value);
+
+    /// <summary>
     /// Sets <c>CKA_UNWRAP_TEMPLATE</c> — attributes <b>imposed</b> on every key unwrapped with this
     /// key. The token applies them as if the object already carried them, before any caller-supplied
     /// template.

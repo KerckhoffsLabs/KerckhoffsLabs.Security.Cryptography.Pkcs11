@@ -64,6 +64,27 @@ public sealed class SecretKeyTemplateBuilder : ObjectTemplateBuilderBase<SecretK
     public SecretKeyTemplateBuilder Derive(bool value = true) => Attribute(CKA.CKA_DERIVE, value);
 
     /// <summary>
+    /// Sets <c>CKA_WRAP_WITH_TRUSTED</c> — this key can only be wrapped by a wrapping key that
+    /// itself carries <c>CKA_TRUSTED</c>. Defence in depth for a key deliberately made wrappable.
+    /// </summary>
+    public SecretKeyTemplateBuilder WrapWithTrusted(bool value = true)
+        => Attribute(CKA.CKA_WRAP_WITH_TRUSTED, value);
+
+    /// <summary>
+    /// Sets <c>CKA_TRUSTED</c> — marks this key as an approved wrapping key for keys that carry
+    /// <c>CKA_WRAP_WITH_TRUSTED</c>.
+    /// </summary>
+    /// <remarks>
+    /// Per PKCS#11, <c>CKA_TRUSTED</c> may be set to true <b>only by the SO</b>. A template that
+    /// sets it from a normal user session is rejected by a conformant token with
+    /// <see cref="CKR.CKR_ATTRIBUTE_READ_ONLY"/>. This is not gated locally: the builder cannot
+    /// know which user type opened the session, and refusing at build time would be wrong for SO
+    /// sessions.
+    /// </remarks>
+    public SecretKeyTemplateBuilder Trusted(bool value = true)
+        => Attribute(CKA.CKA_TRUSTED, value);
+
+    /// <summary>
     /// Sets <c>CKA_WRAP_TEMPLATE</c> — the template a key must <b>match</b> to be wrapped by this
     /// key. Keys that do not match cannot be wrapped, so this narrows what this key can exfiltrate.
     /// Contrast <see cref="UnwrapTemplate"/>, which imposes attributes rather than matching them.
