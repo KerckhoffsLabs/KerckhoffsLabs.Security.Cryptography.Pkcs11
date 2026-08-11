@@ -549,7 +549,6 @@ public sealed class Pkcs11Key : IDisposable
 
         ObjectHandle resulting = _workspace.Session.UnwrapKey(
             mechanism, unwrapHandle, wrappedBytes, [.. template.Attributes]);
-        GC.KeepAlive(template);
 
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
@@ -589,7 +588,6 @@ public sealed class Pkcs11Key : IDisposable
 
         var (ct, sharedHandle) = _workspace.Session.EncapsulateKey(
             mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
-        GC.KeepAlive(sharedSecretTemplate);
         return new EncapsulationResult(ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
     }
 
@@ -617,7 +615,6 @@ public sealed class Pkcs11Key : IDisposable
 
         ObjectHandle sharedHandle = _workspace.Session.DecapsulateKey(
             mechanism, _privateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
-        GC.KeepAlive(sharedSecretTemplate);
         return _workspace.HydrateExistingHandleAsKey(sharedHandle);
     }
 
@@ -646,7 +643,6 @@ public sealed class Pkcs11Key : IDisposable
 
         ObjectHandle resulting = _workspace.Session.DeriveKey(
             mechanism, baseHandle, [.. template.Attributes]);
-        GC.KeepAlive(template);
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
 

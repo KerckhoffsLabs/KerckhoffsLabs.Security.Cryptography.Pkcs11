@@ -73,6 +73,19 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>
+    /// Sets an arbitrary attribute whose value is a nested template, from a configuration callback.
+    /// Escape hatch for nested-template attributes the typed API does not cover — chiefly the
+    /// vendor-defined object classes <see cref="GenericTemplateBuilder"/> exists for, which have no
+    /// typed <c>WrapTemplate</c>/<c>UnwrapTemplate</c> helpers of their own.
+    /// </summary>
+    /// <remarks>Completes the <c>Attribute(CKA, …)</c> family; see <see cref="NestedTemplate"/> for the ownership rules.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public TSelf Attribute(CKA attribute, Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(attribute, configure);
+
+    /// <summary>
     /// Sets a nested-template attribute (<c>CKA_WRAP_TEMPLATE</c>, <c>CKA_UNWRAP_TEMPLATE</c>,
     /// <c>CKA_DERIVE_TEMPLATE</c>) from a configuration callback.
     /// </summary>
@@ -117,19 +130,6 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
 
         return (TSelf)this;
     }
-
-    /// <summary>
-    /// Sets an arbitrary attribute whose value is a nested template, from a configuration callback.
-    /// Escape hatch for nested-template attributes the typed API does not cover — chiefly the
-    /// vendor-defined object classes <see cref="GenericTemplateBuilder"/> exists for, which have no
-    /// typed <c>WrapTemplate</c>/<c>UnwrapTemplate</c> helpers of their own.
-    /// </summary>
-    /// <remarks>Completes the <c>Attribute(CKA, …)</c> family; see <see cref="NestedTemplate"/> for the ownership rules.</remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
-    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
-    public TSelf Attribute(CKA attribute, Action<NestedKeyTemplateBuilder> configure)
-        => NestedTemplate(attribute, configure);
 
     /// <summary>Sets CKA_LABEL.</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is <c>null</c>.</exception>

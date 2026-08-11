@@ -49,11 +49,14 @@ public sealed class ObjectTemplate : IDisposable
         foreach (var child in _nested) child.Dispose();
         _nested.Clear();
         _disposed = true;
-        GC.SuppressFinalize(this);
     }
 
-    /// <summary>Finalizer safety net — releases unmanaged buffers if Dispose was not called.</summary>
-    ~ObjectTemplate() => Dispose();
+    // NOTE: no finalizer, deliberately. A template aggregates ObjectAttribute instances; it does not
+    // own their buffers. Finalizing it would free memory that live attributes still describe — an
+    // attribute handed to a native call outlives the template it came from, because marshalling
+    // copies the CK_ATTRIBUTE structs and drops the reference to the template itself. The safety net
+    // belongs on ObjectAttribute, which owns the buffer and is the right reachability to key on;
+    // it has a finalizer for exactly that reason.
 
     /// <summary>Begins a fluent template for a secret (symmetric) key of the given type.</summary>
     public static SecretKeyTemplateBuilder ForSecretKey(CKK keyType) => new(keyType);

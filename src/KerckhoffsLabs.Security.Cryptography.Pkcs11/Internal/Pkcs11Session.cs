@@ -936,6 +936,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, templateLength, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCreateObject);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
 
         return new ObjectHandle((ulong)objectId);
     }
@@ -963,6 +966,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, templateLength, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCopyObject);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
 
         return new ObjectHandle((ulong)objectId);
     }
@@ -1253,6 +1259,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
         Pkcs11Exception.ThrowIfError(rv, OpSetAttributeValue);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
     }
 
     /// <summary>
@@ -1270,6 +1279,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
     }
 
     /// <summary>
@@ -1329,6 +1341,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
 
         try
         {
@@ -1425,6 +1440,9 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong keyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -1470,6 +1488,10 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong privateKeyId = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(publicKeyAttributes);
+        GC.KeepAlive(privateKeyAttributes);
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -1566,6 +1588,10 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong unwrappedKey = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
+        GC.KeepAlive(secureDefaults);
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -1647,6 +1673,14 @@ internal sealed class Pkcs11Session : IDisposable
     /// (and length 0) when <paramref name="attributes"/> is <c>null</c> — the PKCS#11 convention of a
     /// null template meaning "no attributes".
     /// </summary>
+    /// <remarks>
+    /// <b>Callers must <c>GC.KeepAlive</c> the source collection until after the native call.</b> The
+    /// returned array holds raw copies of each attribute's <c>pValue</c> pointer and no reference to
+    /// the <see cref="ObjectAttribute"/> that owns the buffer, so once this returns, nothing else
+    /// keeps those attributes reachable — and <see cref="ObjectAttribute"/> has a finalizer that
+    /// zeroizes and frees. Left unrooted, a caller passing a temporary template can have its buffers
+    /// wiped mid-call.
+    /// </remarks>
     private static CK_ATTRIBUTE[]? BuildTemplate(List<ObjectAttribute>? attributes, out NativeCULong length)
     {
         if (attributes is null)
@@ -3235,6 +3269,10 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong derivedKey = CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
         Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
+        GC.KeepAlive(attributes);
+        GC.KeepAlive(secureDefaults);
 
         // SP800-108 sibling-key handles live in scope-owned slots the token wrote into; copy them
         // out before `scope` is disposed.
@@ -3437,6 +3475,10 @@ internal sealed class Pkcs11Session : IDisposable
         if (ct.Length != (int)ctLen)
             Array.Resize(ref ct, (int)ctLen);
 
+        // Root the managed attributes past every C_EncapsulateKey call above (probe and real):
+        // the template holds raw copies of their pValue pointers.
+        GC.KeepAlive(sharedKeyTemplate);
+        GC.KeepAlive(secureDefaults);
         return (ct, new ObjectHandle((ulong)sharedHandle));
     }
 
@@ -3483,6 +3525,10 @@ internal sealed class Pkcs11Session : IDisposable
             template, (NativeCULong)template.Length,
             ct, (NativeCULong)ct.Length, ref sharedHandle);
         Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
+        GC.KeepAlive(sharedKeyTemplate);
+        GC.KeepAlive(secureDefaults);
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -3583,6 +3629,10 @@ internal sealed class Pkcs11Session : IDisposable
             template, (NativeCULong)template.Length,
             aad, (NativeCULong)aad.Length, ref newKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
+        // Root the managed attributes past the native call: the template holds raw copies of
+        // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
+        GC.KeepAlive(unwrappedKeyTemplate);
+        GC.KeepAlive(secureDefaults);
 
         mechanism.AbsorbOutput(mechParams);
 

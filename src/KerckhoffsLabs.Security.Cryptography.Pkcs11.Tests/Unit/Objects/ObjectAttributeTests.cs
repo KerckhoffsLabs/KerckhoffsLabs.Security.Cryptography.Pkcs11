@@ -270,6 +270,40 @@ public sealed class ObjectAttributeTests
     }
 
     /// <summary>
+    /// The views handed back by <c>GetValueAsAttributeArray</c> point at buffers the nested
+    /// children own. They must not free on disposal, or a stray <c>using</c> over the read-back
+    /// array would release memory the original children still describe — and, now that
+    /// ObjectAttribute has a finalizer, would do so unprompted at the next GC.
+    /// </summary>
+    [Fact]
+    public void GetValueAsAttributeArray_ReturnsNonOwningViews()
+    {
+        using var child = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        using var parent = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [child]);
+
+        foreach (ObjectAttribute view in parent.GetValueAsAttributeArray())
+            view.Dispose();
+
+        // The child's buffer survived the views being disposed: still readable, still its value.
+        Assert.True(child.GetValueAsBool());
+    }
+
+    /// <summary>
+    /// Dispose and the finalizer can both reach the release path. UnmanagedMemory.Free throws on a
+    /// second free, and that throw on the finalizer thread would tear the process down, so the
+    /// claim is atomic and a repeated Dispose must be silent.
+    /// </summary>
+    [Fact]
+    public void Dispose_IsIdempotent()
+    {
+        var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+
+        attr.Dispose();
+
+        Assert.Null(Record.Exception(attr.Dispose));
+    }
+
+    /// <summary>
     /// A nested template copies each child's CK_ATTRIBUTE struct verbatim, so a disposed child
     /// would be copied as {type, NULL, 0} — an attribute that is present but empty. In a
     /// CKA_WRAP_TEMPLATE that is a different filter than the caller wrote, and it would reach the
@@ -282,6 +316,6 @@ public sealed class ObjectAttributeTests
         child.Dispose();
 
         Assert.Throws<ObjectDisposedException>(
-            () => new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, new List<ObjectAttribute> { child }));
+            () => new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [child]));
     }
 }

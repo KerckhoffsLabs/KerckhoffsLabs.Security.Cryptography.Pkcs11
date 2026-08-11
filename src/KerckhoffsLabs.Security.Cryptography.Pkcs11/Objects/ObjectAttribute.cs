@@ -13,7 +13,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 public sealed class ObjectAttribute : IDisposable
 {
     private CK_ATTRIBUTE _ckAttribute;
-    private bool _disposed;
+    private volatile bool _disposed;
+
+    /// <summary>
+    /// Whether this instance owns the unmanaged buffer <c>_ckAttribute.value</c> points at, and so
+    /// must free it. False for the read-only views <see cref="GetValueAsAttributeArray"/> hands back:
+    /// those point into buffers a nested template's children own, and freeing one from here would
+    /// release memory still described by a live attribute somewhere else.
+    /// </summary>
+    /// <remarks>Defaults to <c>true</c>: every value-constructing overload allocates its own buffer.
+    /// Only the explicit view constructor opts out.</remarks>
+    private readonly bool _ownsValue = true;
+
+    /// <summary>
+    /// Set once, atomically, by whichever of <see cref="Dispose()"/> or the finalizer arrives first.
+    /// <c>UnmanagedMemory.Free</c> throws on a second free, and a throw on the finalizer thread is
+    /// fatal to the process, so the claim has to be atomic rather than a plain flag test.
+    /// </summary>
+    private int _releaseClaimed;
 
     // --- Public read surface -------------------------------------------------
 
@@ -72,9 +89,19 @@ public sealed class ObjectAttribute : IDisposable
     // --- Constructors --------------------------------------------------------
 
     /// <summary>Wraps an existing low-level CK_ATTRIBUTE struct. The instance takes ownership of any unmanaged buffer the struct points at and frees it on <see cref="Dispose"/>.</summary>
-    internal ObjectAttribute(CK_ATTRIBUTE attribute)
+    internal ObjectAttribute(CK_ATTRIBUTE attribute) : this(attribute, ownsValue: true) { }
+
+    /// <summary>
+    /// Wraps an existing low-level CK_ATTRIBUTE struct, stating explicitly whether this instance
+    /// owns the buffer it points at. A non-owning instance is a read-only view: it never frees, and
+    /// it suppresses its own finalizer, because the memory belongs to someone still using it.
+    /// </summary>
+    internal ObjectAttribute(CK_ATTRIBUTE attribute, bool ownsValue)
     {
         _ckAttribute = attribute;
+        _ownsValue = ownsValue;
+        if (!ownsValue)
+            GC.SuppressFinalize(this);
     }
 
     /// <summary>Creates an attribute of the given vendor-defined attribute id with no value.</summary>
@@ -347,7 +374,9 @@ public sealed class ObjectAttribute : IDisposable
         {
             IntPtr slot = new(_ckAttribute.value.ToInt64() + (long)i * stride);
             CK_ATTRIBUTE attr = UnmanagedMemory.Read<CK_ATTRIBUTE>(slot);
-            result[i] = new ObjectAttribute(attr);
+            // Non-owning view: attr.value points at a buffer this attribute's nested children own.
+            // Freeing it from here would release memory a live ObjectAttribute still describes.
+            result[i] = new ObjectAttribute(attr, ownsValue: false);
         }
         return result;
     }
@@ -393,13 +422,32 @@ public sealed class ObjectAttribute : IDisposable
     /// <summary>Frees the unmanaged buffer backing this attribute's value.</summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        if (_ckAttribute.value != IntPtr.Zero)
-        {
-            UnmanagedMemory.Free(ref _ckAttribute.value);
-        }
-        _ckAttribute.valueLen = (NativeCULong)0;
+        Release();
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Safety net for an attribute that was never disposed. <c>UnmanagedMemory.Free</c> zeroizes
+    /// before releasing, so this is what wipes key material — a <c>CKA_VALUE</c> holding imported
+    /// key bytes, say — out of unmanaged memory when a caller forgets. Non-owning views suppress
+    /// this in their constructor and never reach it.
+    /// </summary>
+    ~ObjectAttribute() => Release();
+
+    private void Release()
+    {
+        // Claim atomically: Dispose and the finalizer can race, and UnmanagedMemory.Free throws on a
+        // second free — an exception escaping the finalizer thread would tear the process down.
+        if (Interlocked.Exchange(ref _releaseClaimed, 1) != 0) return;
+
+        // Publish disposal before freeing, so a concurrent reader is refused rather than handed a
+        // pointer that is about to be zeroized.
         _disposed = true;
+
+        if (_ownsValue && _ckAttribute.value != IntPtr.Zero)
+            UnmanagedMemory.Free(ref _ckAttribute.value);
+
+        _ckAttribute.valueLen = (NativeCULong)0;
     }
 
     // --- Private marshalling kernel ------------------------------------------
