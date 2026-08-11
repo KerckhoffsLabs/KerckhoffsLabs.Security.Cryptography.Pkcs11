@@ -15,11 +15,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 public sealed class ObjectTemplate : IDisposable
 {
     private readonly List<ObjectAttribute> _attributes;
+    private readonly List<ObjectTemplate> _nested;
     private bool _disposed;
 
-    internal ObjectTemplate(List<ObjectAttribute> attributes)
+    internal ObjectTemplate(List<ObjectAttribute> attributes, List<ObjectTemplate>? nested = null)
     {
         _attributes = attributes;
+        _nested = nested ?? [];
     }
 
     /// <summary>Number of attributes in the template.</summary>
@@ -34,6 +36,10 @@ public sealed class ObjectTemplate : IDisposable
         if (_disposed) return;
         foreach (var attr in _attributes) attr.Dispose();
         _attributes.Clear();
+        // Nested children come last: the parent's flat copy holds pointers into buffers these own,
+        // so they stay valid for as long as anything could still marshal the parent.
+        foreach (var child in _nested) child.Dispose();
+        _nested.Clear();
         _disposed = true;
         GC.SuppressFinalize(this);
     }
