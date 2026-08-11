@@ -296,7 +296,7 @@ public sealed class ObjectAttributeTests
     [Fact]
     public void Dispose_IsIdempotent()
     {
-        var attr = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+        var attr = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
 
         attr.Dispose();
 

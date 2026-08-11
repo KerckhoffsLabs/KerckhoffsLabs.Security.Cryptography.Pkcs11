@@ -96,6 +96,13 @@ public sealed class ObjectAttribute : IDisposable
     /// owns the buffer it points at. A non-owning instance is a read-only view: it never frees, and
     /// it suppresses its own finalizer, because the memory belongs to someone still using it.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S3971:Do not call 'GC.SuppressFinalize'",
+        Justification = "The rule guards against suppressing finalization outside Dispose to paper over a " +
+        "finalization bug. Here it states a fact fixed at construction: a non-owning view has no cleanup " +
+        "obligation for the whole of its life, so it has no reason to sit on the finalization queue. " +
+        "Correctness does not depend on it — Release() is already a no-op when _ownsValue is false — so this " +
+        "only keeps the read-only views GetValueAsAttributeArray hands back, which are created in bulk and " +
+        "die immediately, from being promoted for a finalizer that would do nothing.")]
     internal ObjectAttribute(CK_ATTRIBUTE attribute, bool ownsValue)
     {
         _ckAttribute = attribute;
