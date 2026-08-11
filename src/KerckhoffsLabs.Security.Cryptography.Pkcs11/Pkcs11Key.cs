@@ -93,8 +93,12 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>
     /// Returns <c>true</c> when the token backing this key advertises support for the given
     /// mechanism. Convenience for adapter logic that picks between a combined-hash mechanism and a
-    /// hash-then-sign fallback.
+    /// hash-then-sign fallback. The answer is probed from the token once and cached on the session.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if another thread is currently inside an operation on the underlying session. The
+    /// probe is a session operation like any other; use a separate workspace per thread.
+    /// </exception>
     public bool SupportsMechanism(CKM mechanism) => _workspace.Session.SupportsMechanism(mechanism);
 
     /// <summary>

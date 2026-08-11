@@ -207,7 +207,13 @@ _None. No memory-safety, key-leakage, or silent-data-corruption defect was confi
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist B
 
-### [BL-016] `SupportsMechanism` issues native calls and mutates cached state without the concurrency guard
+### [BL-016] ✅ RESOLVED — `SupportsMechanism` issues native calls and mutates cached state without the concurrency guard
+- **Status:** Resolved 2026-08-10. `SupportsMechanism` now opens with `using var _ = AcquireExclusive()`, so its `C_GetSessionInfo` + `C_GetMechanismList` probe obeys the same single-thread contract as every other native-touching method, and the lazy `_supportedMechanisms` write is no longer an unsynchronized publication.
+  - **The lock spans the whole body, not just the lazy population.** Reading the cache reference outside the lock is the unsafe-publication half of the same race — a thread can observe the reference before the `HashSet` it points at is fully constructed — and the cached read is the common path, taken by every call after the first. Bracketing only the population would have left it uncovered.
+  - **Every call site was verified to be outside the lock**, so this is a real cross-thread window rather than a theoretical one: `Pkcs11Key.SupportsMechanism` (public), and `ECDsaPkcs11`/`DSAPkcs11` both probe *before* the `Sign`/`Verify` that takes the lock. Same-thread reentrancy still works, so a future caller that probes from inside a locked section is fine.
+  - **Minor behaviour change on the public surface:** `Pkcs11Key.SupportsMechanism` now throws `InvalidOperationException` when another thread is mid-operation on the session, where it previously raced silently. That is the contract every other session member already enforces; a caller hitting it was already violating "a separate Session per thread".
+- **Verification:** `Pkcs11SessionSupportsMechanismRaceTests` parks a worker inside `C_GenerateRandom` and probes from a second thread. Three mutations, each killed by a different assertion — the lock removed (the fake records a probe issued while the call was on the stack), the lock narrowed to the population block (the warm-cache test, and only that one, fails), and the guard swallowing contention rather than reporting it (the `InvalidOperationException` assertion). A fourth test pins same-thread reentrancy. Full suite green: 1951 passed, 0 failed.
+- **Not addressed here:** `SupportsMechanism` still has no `_disposed` guard, so on a disposed session it probes with `CK_INVALID_HANDLE` and quietly answers `false` instead of throwing `ObjectDisposedException` like the rest of the class. That is a user-visible change to a public method and a different defect from the concurrency guard this entry names — worth its own entry.
 - **Area:** P/Invoke
 - **Severity:** Medium
 - **Effort:** S

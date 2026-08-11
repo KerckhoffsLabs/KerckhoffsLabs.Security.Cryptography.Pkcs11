@@ -224,7 +224,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Lazy-cached set of mechanism types supported by the token in this session's slot.
-    /// Populated on first access via C_GetSessionInfo + C_GetMechanismList.
+    /// Populated on first access via C_GetSessionInfo + C_GetMechanismList. Both the population
+    /// and the reads run under <see cref="_busyLock"/>, which is what publishes the set safely.
     /// </summary>
     private HashSet<CKM>? _supportedMechanisms;
 
@@ -232,8 +233,20 @@ internal sealed class Pkcs11Session : IDisposable
     /// Returns true if the token in this session's slot supports the given mechanism.
     /// Result is cached after the first call.
     /// </summary>
+    /// <remarks>
+    /// Takes the busy lock for the whole body, like every other native-touching method: the probe
+    /// issues C_GetSessionInfo and C_GetMechanismList, which must not overlap another thread's
+    /// in-flight call on this session. The lock spans the cached read as well, because reading the
+    /// cache reference outside it is the unsafe-publication half of the same race — one thread can
+    /// otherwise observe the reference before the set it points at is fully constructed.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if another thread is currently inside an operation on this session.
+    /// </exception>
     internal bool SupportsMechanism(CKM mechanism)
     {
+        using var _ = AcquireExclusive();
+
         if (_supportedMechanisms is null)
         {
             CK_SESSION_INFO info = new();
