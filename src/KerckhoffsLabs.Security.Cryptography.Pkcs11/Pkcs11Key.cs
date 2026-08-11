@@ -99,6 +99,10 @@ public sealed class Pkcs11Key : IDisposable
     /// Thrown if another thread is currently inside an operation on the underlying session. The
     /// probe is a session operation like any other; use a separate workspace per thread.
     /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when the underlying session has been disposed — including when the answer is already
+    /// cached, since a cached capability describes a session that no longer exists.
+    /// </exception>
     public bool SupportsMechanism(CKM mechanism) => _workspace.Session.SupportsMechanism(mechanism);
 
     /// <summary>

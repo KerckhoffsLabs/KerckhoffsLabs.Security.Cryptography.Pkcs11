@@ -60,6 +60,7 @@ public sealed class Pkcs11SessionTests
             ("CancelFunction", s => s.CancelFunction()),
             ("GetFunctionStatus", s => s.GetFunctionStatus()),
             ("GenerateRandom", s => s.GenerateRandom(8)),
+            ("SupportsMechanism", s => s.SupportsMechanism(CKM.CKM_AES_GCM)),
         ];
 
         foreach (var (name, op) in ops)

@@ -238,6 +238,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
             count = (NativeCULong)Mechanisms.Length;
             return MechListRv;
         }
+
+        public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
     }
 
     [Fact]
@@ -279,6 +281,24 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     {
         var s = NewSession(new MechListFake { Mechanisms = [] });
         Assert.False(s.SupportsMechanism(CKM.CKM_AES_GCM));
+    }
+
+    /// <summary>
+    /// A warm cache must not outlive the session. This is the path that answers from memory
+    /// without touching the token at all, so nothing else would catch a use-after-dispose here —
+    /// it would just keep reporting the mechanism support of a session that no longer exists.
+    /// </summary>
+    [Fact]
+    public void SupportsMechanism_AfterDispose_ThrowsEvenWhenTheAnswerIsCached()
+    {
+        var fake = new MechListFake();
+        var s = NewSession(fake);
+
+        Assert.True(s.SupportsMechanism(CKM.CKM_AES_GCM));   // populate the cache while still open
+        s.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => s.SupportsMechanism(CKM.CKM_AES_GCM));
+        Assert.Equal(1, fake.SessionInfoCalls);              // and it did not re-probe on the way out
     }
 
     // === DigestKey ==========================================================

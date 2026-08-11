@@ -243,9 +243,11 @@ internal sealed class Pkcs11Session : IDisposable
     /// <exception cref="InvalidOperationException">
     /// Thrown if another thread is currently inside an operation on this session.
     /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
     internal bool SupportsMechanism(CKM mechanism)
     {
         using var _ = AcquireExclusive();
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_supportedMechanisms is null)
         {
