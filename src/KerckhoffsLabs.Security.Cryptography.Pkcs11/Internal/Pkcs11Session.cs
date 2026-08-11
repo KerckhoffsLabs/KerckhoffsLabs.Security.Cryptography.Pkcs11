@@ -1794,6 +1794,142 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
+    /// One <c>C_*Update</c> call of a multi-part transform. Every such entry point in Cryptoki has
+    /// this shape — input, input length, output, in/out output length — which is what lets the five
+    /// streaming loops share <see cref="PumpStreamThrough"/>.
+    /// </summary>
+    private delegate CKR StreamingUpdate(byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen);
+
+    /// <summary>
+    /// Drives a multi-part transform over a stream: read a block, transform it, write the result,
+    /// until the input is exhausted.
+    /// </summary>
+    /// <remarks>
+    /// The output buffer is sized speculatively from <paramref name="bufferLength"/> and grown on
+    /// demand, because a mechanism can expand its input (block padding, or an AEAD emitting a tag)
+    /// and a token may report the true size only once it has seen the block. <c>CKR_BUFFER_TOO_SMALL</c>
+    /// is a length report rather than a failure here: PKCS#11 v3.2 §5.2 requires the operation to stay
+    /// active so the same block can be resubmitted, which is why the retry passes the same input
+    /// again. A grown buffer is kept for the following blocks rather than re-grown each time.
+    /// </remarks>
+    private static void PumpStreamThrough(
+        Stream inputStream,
+        Stream outputStream,
+        int bufferLength,
+        StreamingUpdate update,
+        string operation)
+    {
+        byte[] input = new byte[bufferLength];
+        byte[] output = new byte[bufferLength];
+
+        int bytesRead;
+        while ((bytesRead = inputStream.Read(input, 0, input.Length)) > 0)
+        {
+            NativeCULong outputLen = (NativeCULong)(output.Length);
+            CKR rv = update(input, (NativeCULong)(bytesRead), output, ref outputLen);
+            if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
+                Pkcs11Exception.ThrowIfError(rv, operation);
+
+            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+            {
+                output = new byte[(int)outputLen];
+
+                rv = update(input, (NativeCULong)(bytesRead), output, ref outputLen);
+                Pkcs11Exception.ThrowIfError(rv, operation);
+            }
+
+            outputStream.Write(output, 0, (int)(outputLen));
+        }
+    }
+
+    /// <summary>Initializes the non-digest half of a combined operation (<c>C_EncryptInit</c> / <c>C_DecryptInit</c>).</summary>
+    private delegate CKR TransformInit(ref CK_MECHANISM mechanism, NativeCULong keyHandle);
+
+    /// <summary>
+    /// The non-digest half of a combined digest-and-transform operation: the three native calls that
+    /// differ between <see cref="DigestEncrypt(Mechanism, Mechanism, ObjectHandle, Stream, Stream, int)"/>
+    /// and <see cref="DecryptDigest(Mechanism, Mechanism, ObjectHandle, Stream, Stream, int)"/>, plus
+    /// the <c>CKF_*</c> bit naming that half when an unwind has to cancel it.
+    /// </summary>
+    private sealed record CombinedTransform(
+        TransformInit Init, string InitOperation,
+        StreamingUpdate Update, string UpdateOperation,
+        LengthProbedCall Final, string FinalOperation,
+        ulong CancelFlag);
+
+    /// <summary>
+    /// Runs a digest interleaved with a transform over a stream — <c>C_DigestEncryptUpdate</c> and
+    /// <c>C_DecryptDigestUpdate</c> are the same algorithm with the roles of the two buffers swapped,
+    /// so both directions are driven from here rather than written twice.
+    /// </summary>
+    /// <remarks>
+    /// The digest and the transform are two independent active operations on the session, not one, so
+    /// each is finalized separately and the unwind cancels whichever is still live. The transform's
+    /// init can fail after the digest's succeeded, which is why the cancel is computed from what
+    /// actually completed rather than from where the exception came from.
+    /// </remarks>
+    /// <returns>The digest over the input, as read by <c>C_DigestFinal</c>.</returns>
+    private byte[] DigestAndTransformStream(
+        Mechanism digestingMechanism,
+        Mechanism transformMechanism,
+        ObjectHandle keyHandle,
+        Stream inputStream,
+        Stream outputStream,
+        int bufferLength,
+        CombinedTransform transform,
+        string operationName)
+    {
+        // Both mechanisms marshal into the same scope: the two operations run interleaved, so both
+        // parameter blocks have to stay alive until the last native call returns.
+        using var scope = new MechanismParameterScope();
+        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out object? digestParams);
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
+
+        bool transformInited = false;
+        bool transformFinalized = false;
+        bool digestFinalized = false;
+        try
+        {
+            CK_MECHANISM ckTransformMechanism = transformMechanism.Marshal(scope, out object? transformParams);
+
+            rv = transform.Init(ref ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
+            Pkcs11Exception.ThrowIfError(rv, transform.InitOperation);
+            transformInited = true;
+
+            PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation);
+
+            // Whatever the transform held back — a partial block, or an AEAD tag.
+            byte[] lastPart = CallWithLengthProbe(transform.Final, transform.FinalOperation);
+            transformFinalized = true;
+
+            if (lastPart.Length > 0)
+                outputStream.Write(lastPart, 0, lastPart.Length);
+
+            byte[] digest = CallWithLengthProbe(
+                (byte[]? buffer, ref NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, ref length),
+                OpDigestFinal);
+            digestFinalized = true;
+
+            digestingMechanism.AbsorbOutput(digestParams);
+            transformMechanism.AbsorbOutput(transformParams);
+
+            return digest;
+        }
+        finally
+        {
+            // Cancel whichever sub-operations are still live. The transform's init may not have
+            // succeeded; both are independent active operations on the session per v3.0+.
+            ulong cancelFlags = 0;
+            if (!digestFinalized) cancelFlags |= CKF.CKF_DIGEST;
+            if (transformInited && !transformFinalized) cancelFlags |= transform.CancelFlag;
+            if (cancelFlags != 0)
+                TryCancelOperation(cancelFlags, operationName);
+        }
+    }
+
+    /// <summary>
     /// Encrypts <paramref name="data"/> using the given mechanism and key. Throws
     /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
     /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
@@ -1950,28 +2086,10 @@ internal sealed class Pkcs11Session : IDisposable
         bool finalized = false;
         try
         {
-            byte[] part = new byte[bufferLength];
-            byte[] encryptedPart = new byte[bufferLength];
-            NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
-
-            int bytesRead = 0;
-            while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
-            {
-                encryptedPartLen = (NativeCULong)(encryptedPart.Length);
-                rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                    Pkcs11Exception.ThrowIfError(rv, OpEncryptUpdate);
-
-                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-                {
-                    encryptedPart = new byte[(int)encryptedPartLen];
-
-                    rv = _pkcs11Library.C_EncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                    Pkcs11Exception.ThrowIfError(rv, OpEncryptUpdate);
-                }
-
-                outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
-            }
+            PumpStreamThrough(inputStream, outputStream, bufferLength,
+                (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
+                    => _pkcs11Library.C_EncryptUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                OpEncryptUpdate);
 
             byte[]? lastEncryptedPart = null;
             NativeCULong lastEncryptedPartLen = (NativeCULong)0;
@@ -2214,28 +2332,10 @@ internal sealed class Pkcs11Session : IDisposable
         bool finalized = false;
         try
         {
-            byte[] encryptedPart = new byte[bufferLength];
-            byte[] part = new byte[bufferLength];
-            NativeCULong partLen = (NativeCULong)(part.Length);
-
-            int bytesRead = 0;
-            while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
-            {
-                partLen = (NativeCULong)(part.Length);
-                rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                    Pkcs11Exception.ThrowIfError(rv, OpDecryptUpdate);
-
-                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-                {
-                    part = new byte[(int)partLen];
-
-                    rv = _pkcs11Library.C_DecryptUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                    Pkcs11Exception.ThrowIfError(rv, OpDecryptUpdate);
-                }
-
-                outputStream.Write(part, 0, (int)(partLen));
-            }
+            PumpStreamThrough(inputStream, outputStream, bufferLength,
+                (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
+                    => _pkcs11Library.C_DecryptUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                OpDecryptUpdate);
 
             byte[]? lastPart = null;
             NativeCULong lastPartLen = (NativeCULong)0;
@@ -2688,28 +2788,10 @@ internal sealed class Pkcs11Session : IDisposable
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
 
-        byte[] encryptedPart = new byte[bufferLength];
-        byte[] part = new byte[bufferLength];
-        NativeCULong partLen = (NativeCULong)(part.Length);
-
-        int bytesRead = 0;
-        while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
-        {
-            partLen = (NativeCULong)(part.Length);
-            rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-            if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                Pkcs11Exception.ThrowIfError(rv, OpDecryptVerifyUpdate);
-
-            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-            {
-                part = new byte[(int)partLen];
-
-                rv = _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                Pkcs11Exception.ThrowIfError(rv, OpDecryptVerifyUpdate);
-            }
-
-            outputStream.Write(part, 0, (int)(partLen));
-        }
+        PumpStreamThrough(inputStream, outputStream, bufferLength,
+            (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
+                => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, inputLen, output, ref outputLen),
+            OpDecryptVerifyUpdate);
 
         byte[]? lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
@@ -3010,88 +3092,20 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        // Both mechanisms marshal into the same scope: digest and encrypt run interleaved, so both
-        // parameter blocks have to stay alive until the last native call returns.
-        using var scope = new MechanismParameterScope();
-        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out object? digestParams);
-
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
-
-        bool encryptInited = false;
-        bool encryptFinalized = false;
-        bool digestFinalized = false;
-        try
-        {
-            CK_MECHANISM ckEncryptionMechanism = encryptionMechanism.Marshal(scope, out object? encryptParams);
-
-            rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckEncryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
-            Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
-            encryptInited = true;
-
-            byte[] part = new byte[bufferLength];
-            byte[] encryptedPart = new byte[bufferLength];
-            NativeCULong encryptedPartLen = (NativeCULong)(encryptedPart.Length);
-
-            int bytesRead = 0;
-            while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
-            {
-                encryptedPartLen = (NativeCULong)(encryptedPart.Length);
-                rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                    Pkcs11Exception.ThrowIfError(rv, OpDigestEncryptUpdate);
-
-                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-                {
-                    encryptedPart = new byte[(int)encryptedPartLen];
-
-                    rv = _pkcs11Library.C_DigestEncryptUpdate(_sessionId, part, (NativeCULong)(bytesRead), encryptedPart, ref encryptedPartLen);
-                    Pkcs11Exception.ThrowIfError(rv, OpDigestEncryptUpdate);
-                }
-
-                outputStream.Write(encryptedPart, 0, (int)(encryptedPartLen));
-            }
-
-            byte[]? lastEncryptedPart = null;
-            NativeCULong lastEncryptedPartLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
-
-            lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
-            encryptFinalized = true;
-
-            if (lastEncryptedPartLen > (NativeCULong)0)
-                outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
-
-            NativeCULong digestLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-
-            byte[] digest = new byte[(int)digestLen];
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-            digestFinalized = true;
-
-            digestingMechanism.AbsorbOutput(digestParams);
-            encryptionMechanism.AbsorbOutput(encryptParams);
-
-            if (digest.Length != (int)(digestLen))
-                Array.Resize(ref digest, (int)(digestLen));
-
-            return digest;
-        }
-        finally
-        {
-            // Cancel whichever sub-operations are still live. Encrypt-init may not have
-            // succeeded; both are independent active operations on the session per v3.0+.
-            ulong cancelFlags = 0;
-            if (!digestFinalized) cancelFlags |= CKF.CKF_DIGEST;
-            if (encryptInited && !encryptFinalized) cancelFlags |= CKF.CKF_ENCRYPT;
-            if (cancelFlags != 0)
-                TryCancelOperation(cancelFlags, "DigestEncrypt");
-        }
+        return DigestAndTransformStream(
+            digestingMechanism, encryptionMechanism, keyHandle, inputStream, outputStream, bufferLength,
+            new CombinedTransform(
+                Init: (ref CK_MECHANISM mechanism, NativeCULong key)
+                    => _pkcs11Library.C_EncryptInit(_sessionId, ref mechanism, key),
+                InitOperation: OpEncryptInit,
+                Update: (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
+                    => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                UpdateOperation: OpDigestEncryptUpdate,
+                Final: (byte[]? buffer, ref NativeCULong length)
+                    => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, ref length),
+                FinalOperation: OpEncryptFinal,
+                CancelFlag: CKF.CKF_ENCRYPT),
+            "DigestEncrypt");
     }
 
     /// <summary>
@@ -3190,86 +3204,20 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        // Both mechanisms marshal into the same scope: decrypt and digest run interleaved, so both
-        // parameter blocks have to stay alive until the last native call returns.
-        using var scope = new MechanismParameterScope();
-        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out object? digestParams);
-
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
-
-        bool decryptInited = false;
-        bool decryptFinalized = false;
-        bool digestFinalized = false;
-        try
-        {
-            CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope, out object? decryptParams);
-
-            rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(keyHandle.ObjectId));
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
-            decryptInited = true;
-
-            byte[] encryptedPart = new byte[bufferLength];
-            byte[] part = new byte[bufferLength];
-            NativeCULong partLen = (NativeCULong)(part.Length);
-
-            int bytesRead = 0;
-            while ((bytesRead = inputStream.Read(encryptedPart, 0, encryptedPart.Length)) > 0)
-            {
-                partLen = (NativeCULong)(part.Length);
-                rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                    Pkcs11Exception.ThrowIfError(rv, OpDecryptDigestUpdate);
-
-                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
-                {
-                    part = new byte[(int)partLen];
-
-                    rv = _pkcs11Library.C_DecryptDigestUpdate(_sessionId, encryptedPart, (NativeCULong)(bytesRead), part, ref partLen);
-                    Pkcs11Exception.ThrowIfError(rv, OpDecryptDigestUpdate);
-                }
-
-                outputStream.Write(part, 0, (int)(partLen));
-            }
-
-            byte[]? lastPart = null;
-            NativeCULong lastPartLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
-
-            lastPart = new byte[(int)lastPartLen];
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
-            decryptFinalized = true;
-
-            if (lastPartLen > (NativeCULong)0)
-                outputStream.Write(lastPart, 0, (int)(lastPartLen));
-
-            NativeCULong digestLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-
-            byte[] digest = new byte[(int)digestLen];
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-            digestFinalized = true;
-
-            digestingMechanism.AbsorbOutput(digestParams);
-            decryptionMechanism.AbsorbOutput(decryptParams);
-
-            if (digest.Length != (int)(digestLen))
-                Array.Resize(ref digest, (int)(digestLen));
-
-            return digest;
-        }
-        finally
-        {
-            ulong cancelFlags = 0;
-            if (!digestFinalized) cancelFlags |= CKF.CKF_DIGEST;
-            if (decryptInited && !decryptFinalized) cancelFlags |= CKF.CKF_DECRYPT;
-            if (cancelFlags != 0)
-                TryCancelOperation(cancelFlags, "DecryptDigest");
-        }
+        return DigestAndTransformStream(
+            digestingMechanism, decryptionMechanism, keyHandle, inputStream, outputStream, bufferLength,
+            new CombinedTransform(
+                Init: (ref CK_MECHANISM mechanism, NativeCULong key)
+                    => _pkcs11Library.C_DecryptInit(_sessionId, ref mechanism, key),
+                InitOperation: OpDecryptInit,
+                Update: (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
+                    => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                UpdateOperation: OpDecryptDigestUpdate,
+                Final: (byte[]? buffer, ref NativeCULong length)
+                    => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, ref length),
+                FinalOperation: OpDecryptFinal,
+                CancelFlag: CKF.CKF_DECRYPT),
+            "DecryptDigest");
     }
 
     /// <summary>
