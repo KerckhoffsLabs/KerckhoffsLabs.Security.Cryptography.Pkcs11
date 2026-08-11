@@ -133,31 +133,13 @@ internal sealed class Pkcs11Session : IDisposable
         }
     }
 
-    /// <summary>
-    /// Flag indicating whether session should be closed when object is disposed
-    /// </summary>
-    private bool _closeWhenDisposed = true;
-
-    /// <summary>
-    /// Flag indicating whether session should be closed when object is disposed
-    /// </summary>
-    public bool CloseWhenDisposed
-    {
-        get
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            return _closeWhenDisposed;
-        }
-        set
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            Log.SessionTrace(_logger, (ulong)_sessionId, "CloseWhenDisposed");
-
-            _closeWhenDisposed = value;
-        }
-    }
+    // NOTE: no CloseWhenDisposed flag. It used to gate whether Dispose released the session handle,
+    // but it could not deliver what its name promised: Pkcs11SessionHandle is a SafeHandle with a
+    // critical finalizer, so a session held back from closing still got C_CloseSession once the
+    // handle became unreachable — just nondeterministically, and in principle after C_Finalize.
+    // Honouring it properly would mean detaching the handle (SetHandleAsInvalid plus untracking it),
+    // which leaks a live session on the token by design. Nothing in the library or tests ever set
+    // it, so there was no behaviour to preserve — only a misleading contract to remove.
 
     /// <summary>Backing field for <see cref="AllowInsecure"/>.</summary>
     private bool _allowInsecure = false;
@@ -888,8 +870,7 @@ internal sealed class Pkcs11Session : IDisposable
                 return;
 
             // Managed cleanup — release the session handle (SafeHandle releases via C_CloseSession).
-            // Honour _closeWhenDisposed: only close if the caller wants automatic close on dispose.
-            if (disposing && _closeWhenDisposed)
+            if (disposing)
             {
                 _sessionHandle?.Dispose();
                 _sessionHandle = null!;

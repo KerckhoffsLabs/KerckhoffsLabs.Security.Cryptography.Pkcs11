@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -35,14 +36,17 @@ internal static class UnmanagedMemory
     private static readonly ILogger _logger = Pkcs11Logging.CreateLogger(typeof(UnmanagedMemory));
 
     /// <summary>
-    /// Lock object for list of all memory allocations
+    /// Every allocation performed by this class, by pointer and size.
     /// </summary>
-    private static readonly Lock _allocationsLock = new();
-
-    /// <summary>
-    /// List of all memory allocations performed by this class
-    /// </summary>
-    private static readonly Dictionary<IntPtr, int> _allocations = [];
+    /// <remarks>
+    /// Concurrent rather than a dictionary behind a lock, and the distinction is not about
+    /// throughput. <see cref="Free"/> runs on the finalizer thread — <c>ObjectAttribute</c> has a
+    /// finalizer — so a process-global lock here would let one application thread holding it stall
+    /// finalization for the entire process, not just for this library. <c>TryAdd</c> and
+    /// <c>TryRemove</c> are atomic on their own, which is all the tracker ever needed; the lock was
+    /// also serializing every attribute allocation across every session.
+    /// </remarks>
+    private static readonly ConcurrentDictionary<IntPtr, int> _allocations = new();
 
     /// <summary>
     /// When <c>true</c>, every <see cref="Allocate"/> / <see cref="Free"/> writes a debug log line.
@@ -63,16 +67,7 @@ internal static class UnmanagedMemory
     /// snapshot this value before and after; do not assume it is zero between tests, since
     /// other in-process allocations may be outstanding.
     /// </remarks>
-    public static int OutstandingAllocationCount
-    {
-        get
-        {
-            lock (_allocationsLock)
-            {
-                return _allocations.Count;
-            }
-        }
-    }
+    public static int OutstandingAllocationCount => _allocations.Count;
 
     /// <summary>
     /// Allocates unmanaged zero-filled memory
@@ -90,19 +85,16 @@ internal static class UnmanagedMemory
         if (size > 0)
             unsafe { NativeMemory.Clear((void*)memory, (nuint)size); }
 
-        lock (_allocationsLock)
+        if (!_allocations.TryAdd(memory, size))
         {
-            if (!_allocations.TryAdd(memory, size))
-            {
-                // AllocHGlobal handed us a pointer the tracker thinks is already live —
-                // would mean a missed Free somewhere upstream.
-                throw new InvalidOperationException(
-                    $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
-            }
-
-            if (DebugModeEnabled)
-                Log.AllocatedMemory(_logger, size, memory, _allocations.Count);
+            // AllocHGlobal handed us a pointer the tracker thinks is already live —
+            // would mean a missed Free somewhere upstream.
+            throw new InvalidOperationException(
+                $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
         }
+
+        if (DebugModeEnabled)
+            Log.AllocatedMemory(_logger, size, memory, _allocations.Count);
 
         return memory;
     }
@@ -120,18 +112,16 @@ internal static class UnmanagedMemory
         if (memory == IntPtr.Zero)
             return;
 
-        int size;
-        lock (_allocationsLock)
+        // TryRemove is the atomic claim: whichever caller removes the entry owns the free, so a
+        // Dispose racing a finalizer cannot double-free even without a lock around the pair.
+        if (!_allocations.TryRemove(memory, out int size))
         {
-            if (!_allocations.Remove(memory, out size))
-            {
-                throw new InvalidOperationException(
-                    $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
-            }
-
-            if (DebugModeEnabled)
-                Log.FreeingMemory(_logger, size, memory, _allocations.Count);
+            throw new InvalidOperationException(
+                $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
         }
+
+        if (DebugModeEnabled)
+            Log.FreeingMemory(_logger, size, memory, _allocations.Count);
 
         Zeroize(memory, size);
         Marshal.FreeHGlobal(memory);
