@@ -41,11 +41,15 @@ internal sealed partial class ManagedSoftToken
             ? UnmanagedMemory.Read(p.Context, (int)p.ContextLen) : [];
     }
 
-    public override CKR C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
+    public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
     {
+        signatureLen = (NativeCULong)0;
+        signatureLen = (NativeCULong)0;
+        signatureLen = (NativeCULong)0;
+        signatureLen = (NativeCULong)0;
         if (!_signOps.TryGetValue((ulong)session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
 
-        byte[] input = data.AsSpan(0, (int)dataLen).ToArray();
+        byte[] input = data.ToArray();
         var m = (CKM)op.Mechanism;
         byte[] sig;
         try
@@ -63,22 +67,22 @@ internal sealed partial class ManagedSoftToken
         }
         catch (CryptographicException) { _signOps.Remove((ulong)session); return CKR.CKR_FUNCTION_FAILED; }
 
-        if (signature is null) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
+        if (signature.IsEmpty) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
         if (signature.Length < sig.Length) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
-        Array.Copy(sig, signature, sig.Length);
+        sig.AsSpan(0, sig.Length).CopyTo(signature);
         signatureLen = (NativeCULong)(ulong)sig.Length;
         _signOps.Remove((ulong)session);
         return CKR.CKR_OK;
     }
 
-    public override CKR C_Verify(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    public override CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         if (!_verifyOps.TryGetValue((ulong)session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
         _verifyOps.Remove((ulong)session);
 
-        byte[] input = data.AsSpan(0, (int)dataLen).ToArray();
-        byte[] sig = signature.AsSpan(0, (int)signatureLen).ToArray();
+        byte[] input = data.ToArray();
+        byte[] sig = signature.ToArray();
         var m = (CKM)op.Mechanism;
 
         bool ok;

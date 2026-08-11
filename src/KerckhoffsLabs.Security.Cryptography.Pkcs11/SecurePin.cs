@@ -78,6 +78,13 @@ public sealed class SecurePin : IDisposable
     }
 
     /// <summary>Returns a read-only span over the PIN bytes. Valid until <see cref="Dispose"/> is called.</summary>
+    /// <remarks>
+    /// This is what the interop layer consumes: it takes <see cref="ReadOnlySpan{T}"/>, so the PIN
+    /// is never duplicated into a transient array that a caller must remember to zero, and that a
+    /// GC compaction could relocate — leaving an unzeroed PIN image behind — between the copy and
+    /// the zeroing. The only plaintext image is this buffer, pinned for its lifetime and zeroed by
+    /// <see cref="Dispose"/>.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the pin has been disposed.</exception>
     public ReadOnlySpan<byte> Pin
     {
@@ -97,25 +104,6 @@ public sealed class SecurePin : IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             return _buffer.Length;
         }
-    }
-
-    /// <summary>
-    /// Copies the PIN into a fresh array allocated on the pinned object heap, for handing to an
-    /// interop signature that requires <c>byte[]</c>. The caller must zero the returned array
-    /// (<see cref="CryptographicOperations.ZeroMemory"/>) as soon as the native call returns.
-    /// </summary>
-    /// <remarks>
-    /// A plain <c>ToArray()</c> copy would be unpinned: a GC compaction between the copy and the
-    /// zeroing can relocate it and leave an unzeroed PIN image behind — the exact leak this type's
-    /// pinned buffer exists to prevent. A pinned-object-heap array never moves, so zeroing it
-    /// destroys the only transient copy.
-    /// </remarks>
-    internal byte[] ToPinnedArray()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        byte[] copy = GC.AllocateArray<byte>(_buffer.Length, pinned: true);
-        _buffer.CopyTo(copy, 0);
-        return copy;
     }
 
     /// <summary>Zeroes the underlying buffer and releases the GC pin.</summary>

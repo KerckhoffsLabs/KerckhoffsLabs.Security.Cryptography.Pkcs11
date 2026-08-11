@@ -1,6 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -141,8 +140,8 @@ public sealed class Pkcs11Slot
     /// any prior keys, certificates, or user PIN are destroyed.
     /// </summary>
     /// <param name="soPin">Security Officer's initial PIN. Caller retains
-    /// ownership of the <see cref="SecurePin"/>; this method copies into a
-    /// transient buffer and zeroes it after the native call returns.</param>
+    /// ownership of the <see cref="SecurePin"/>; its bytes go to the native call
+    /// straight out of the pinned buffer it owns, with no transient copy.</param>
     /// <param name="label">Token label. Encoded as UTF-8; must encode to 32
     /// bytes or fewer. PKCS#11 pads the label with ASCII spaces (0x20) to fill
     /// the on-token 32-byte field; it must NOT be null-terminated.</param>
@@ -170,19 +169,10 @@ public sealed class Pkcs11Slot
         Array.Fill(tokenLabel, (byte)0x20);
         Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
 
-        // Copy the SecurePin into a pinned transient buffer for the native call
-        // and zero it on the way out. Matches Pkcs11Session.Login's pattern.
-        byte[] pinBuffer = soPin.ToPinnedArray();
-        try
-        {
-            CKR rv = _pkcs11Library.C_InitToken(
-                _slotId, pinBuffer, (NativeCULong)pinBuffer.Length, tokenLabel);
-            Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(pinBuffer);
-        }
+        // The PIN goes to the native call straight out of the pinned buffer SecurePin owns;
+        // no transient copy to zero. Matches Pkcs11Session.Login's pattern.
+        CKR rv = _pkcs11Library.C_InitToken(_slotId, soPin.Pin, tokenLabel);
+        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
     }
 
     /// <summary>

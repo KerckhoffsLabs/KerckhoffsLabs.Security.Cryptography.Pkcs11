@@ -66,28 +66,19 @@ public sealed class SecurePinTests
     }
 
     [Fact]
-    public void ToPinnedArray_CopiesBytes_IndependentOfSource()
+    public unsafe void Pin_IsTheOwnedBuffer_NotACopy()
     {
         byte[] source = Encoding.UTF8.GetBytes("hunter2");
         using var pin = new SecurePin(source);
 
-        byte[] first = pin.ToPinnedArray();
-        byte[] second = pin.ToPinnedArray();
-
-        Assert.Equal(source, first);
-        Assert.NotSame(first, second); // fresh transient per call — each is zeroed by its own consumer
-
-        // Zeroing the transient (the consumer's contract) must not disturb the SecurePin itself.
-        Array.Clear(first);
         Assert.Equal(source, pin.Pin.ToArray());
-    }
 
-    [Fact]
-    public void ToPinnedArray_AfterDispose_ThrowsObjectDisposed()
-    {
-        var pin = new SecurePin("hunter2");
-        pin.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => pin.ToPinnedArray());
+        // The interop layer takes this span straight to the native call, so it must be a view over
+        // the pinned buffer rather than a transient copy — two reads see the same address.
+        IntPtr first, second;
+        fixed (byte* p = pin.Pin) first = (IntPtr)p;
+        fixed (byte* p = pin.Pin) second = (IntPtr)p;
+        Assert.Equal(first, second);
     }
 
     [Fact]

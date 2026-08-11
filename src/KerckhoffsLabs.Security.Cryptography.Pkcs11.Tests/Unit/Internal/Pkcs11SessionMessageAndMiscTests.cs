@@ -43,20 +43,20 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         public override CKR C_MessageDecryptFinal(NativeCULong session) { DecryptFinalCalls++; return CKR.CKR_OK; }
 
-        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen)
+        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, out NativeCULong ciphertextLen)
         {
-            if (ciphertext is null) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
+            if (ciphertext.IsEmpty) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
             OnEncryptMessageParams?.Invoke(parameter);
-            Array.Copy(Ciphertext, ciphertext, Ciphertext.Length);
+            Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
             return EncMsgRv;
         }
 
-        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen)
+        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, out NativeCULong plaintextLen)
         {
-            if (plaintext is null) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
+            if (plaintext.IsEmpty) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
             OnDecryptMessageParams?.Invoke(parameter);
-            Array.Copy(Plaintext, plaintext, Plaintext.Length);
+            Plaintext.AsSpan(0, Plaintext.Length).CopyTo(plaintext);
             plaintextLen = (NativeCULong)Plaintext.Length;
             return DecMsgRv;
         }
@@ -310,10 +310,10 @@ public sealed class Pkcs11SessionMessageAndMiscTests
 
         public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => InitRv;
         public override CKR C_DigestKey(NativeCULong session, NativeCULong key) => KeyRv;
-        public override CKR C_DigestFinal(NativeCULong session, byte[]? digest, ref NativeCULong digestLen)
+        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen)
         {
-            if (digest is null) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
-            Array.Copy(DigestOutput, digest, DigestOutput.Length);
+            if (digest.IsEmpty) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;
         }

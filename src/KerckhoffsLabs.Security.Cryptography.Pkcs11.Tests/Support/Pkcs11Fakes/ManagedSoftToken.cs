@@ -62,7 +62,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         ];
         if (mechanismList is null) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
         if ((int)count < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
-        Array.Copy(mechs, mechanismList, mechs.Length);
+        mechs.AsSpan(0, mechs.Length).CopyTo(mechanismList);
         count = (NativeCULong)mechs.Length;
         return CKR.CKR_OK;
     }
@@ -90,7 +90,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_Login(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen) => CKR.CKR_OK;
+    public override CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin) => CKR.CKR_OK;
 
     /// <summary>Number of times <c>C_Logout</c> has been invoked. Used to assert logout-on-dispose.</summary>
     public int LogoutCallCount { get; private set; }
@@ -107,14 +107,14 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Objects =========================================================
 
-    public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong key)
+    public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         var keyGen = (CKM)(ulong)mechanism.Mechanism;
         if (keyGen is not (CKM.CKM_AES_KEY_GEN or CKM.CKM_GENERIC_SECRET_KEY_GEN))
             return CKR.CKR_MECHANISM_INVALID;
 
-        var attrs = ReadTemplate(template, count);
+        var attrs = ReadTemplate(template);
         if (!attrs.TryGetValue((ulong)CKA.CKA_VALUE_LEN, out var vl)) return CKR.CKR_TEMPLATE_INCOMPLETE;
         int len = (int)ToUlong(vl);
         if (len <= 0 || (keyGen == CKM.CKM_AES_KEY_GEN && len is not (16 or 24 or 32)))
@@ -125,9 +125,9 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong objectId)
+    public override CKR C_CreateObject(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong objectId)
     {
-        var attrs = ReadTemplate(template, count);
+        var attrs = ReadTemplate(template);
         ulong handle = Store(attrs);
         RegisterImportedAsymKey(handle, attrs); // reconstructs a live BCL DSA for CKK_DSA imports
         objectId = (NativeCULong)handle;
@@ -145,12 +145,12 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
     }
 
-    public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+    public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
         if (!_objects.TryGetValue((ulong)objectId, out var obj)) return CKR.CKR_OBJECT_HANDLE_INVALID;
 
         CKR rv = CKR.CKR_OK;
-        int n = (int)count;
+        int n = template.Length;
         for (int i = 0; i < n; i++)
         {
             ulong type = (ulong)template[i].type;
@@ -172,9 +172,9 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Find ============================================================
 
-    public override CKR C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count)
+    public override CKR C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template)
     {
-        var filter = ReadTemplate(template, count);
+        var filter = ReadTemplate(template);
         var matches = _objects
             .Where(kv => filter.All(f => kv.Value.TryGetValue(f.Key, out var v) && v.AsSpan().SequenceEqual(f.Value)))
             .Select(kv => kv.Key);
@@ -199,9 +199,9 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Random ==========================================================
 
-    public override CKR C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen)
+    public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
     {
-        RandomNumberGenerator.Fill(randomData.AsSpan(0, (int)randomLen));
+        RandomNumberGenerator.Fill(randomData);
         return CKR.CKR_OK;
     }
 
@@ -216,11 +216,10 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return handle;
     }
 
-    private static Dictionary<ulong, byte[]> ReadTemplate(CK_ATTRIBUTE[]? template, NativeCULong count)
+    private static Dictionary<ulong, byte[]> ReadTemplate(ReadOnlySpan<CK_ATTRIBUTE> template)
     {
         var dict = new Dictionary<ulong, byte[]>();
-        if (template is null) return dict;
-        int n = (int)count;
+        int n = template.Length;
         for (int i = 0; i < n; i++)
         {
             ulong type = (ulong)template[i].type;

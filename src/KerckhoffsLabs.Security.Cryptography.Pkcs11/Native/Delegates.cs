@@ -38,10 +38,16 @@ internal class Delegates
     /// Copies a unified attribute template into the Pack=1 Windows layout for the duration of a
     /// single call. Null in, null out: a null template is a legitimate cryptoki argument.
     /// </summary>
-    private static CK_ATTRIBUTE_Windows[]? ToWindowsTemplate(CK_ATTRIBUTE[]? template)
-        => template is null
-            ? null
-            : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+    private static CK_ATTRIBUTE_Windows[]? ToWindowsTemplate(ReadOnlySpan<CK_ATTRIBUTE> template)
+    {
+        if (template.IsEmpty)
+            return null;
+
+        var packed = new CK_ATTRIBUTE_Windows[template.Length];
+        for (int i = 0; i < template.Length; i++)
+            packed[i] = CK_ATTRIBUTE_Windows.FromUnified(in template[i]);
+        return packed;
+    }
 
     /// <summary>Wrapper for <c>C_Initialize</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Initialize(IntPtr pInitArgs)
@@ -162,29 +168,29 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_InitToken</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_InitToken(NativeCULong slotId, byte[] pin, NativeCULong pinLen, byte[] label)
+    public unsafe NativeCULong C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label)
     {
         ThrowIfUnbound(_fp.C_InitToken);
         fixed (byte* pinPtr = pin)
         fixed (byte* labelPtr = label)
-            return _fp.C_InitToken(slotId, pinPtr, pinLen, labelPtr);
+            return _fp.C_InitToken(slotId, pinPtr, (NativeCULong)pin.Length, labelPtr);
     }
 
     /// <summary>Wrapper for <c>C_InitPIN</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_InitPIN(NativeCULong session, byte[] pin, NativeCULong pinLen)
+    public unsafe NativeCULong C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin)
     {
         ThrowIfUnbound(_fp.C_InitPIN);
         fixed (byte* pinPtr = pin)
-            return _fp.C_InitPIN(session, pinPtr, pinLen);
+            return _fp.C_InitPIN(session, pinPtr, (NativeCULong)pin.Length);
     }
 
     /// <summary>Wrapper for <c>C_SetPIN</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SetPIN(NativeCULong session, byte[] oldPin, NativeCULong oldPinLen, byte[] newPin, NativeCULong newPinLen)
+    public unsafe NativeCULong C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
     {
         ThrowIfUnbound(_fp.C_SetPIN);
         fixed (byte* oldPinPtr = oldPin)
         fixed (byte* newPinPtr = newPin)
-            return _fp.C_SetPIN(session, oldPinPtr, oldPinLen, newPinPtr, newPinLen);
+            return _fp.C_SetPIN(session, oldPinPtr, (NativeCULong)oldPin.Length, newPinPtr, (NativeCULong)newPin.Length);
     }
 
     /// <summary>Wrapper for <c>C_OpenSession</c>. Matches the prior delegate signature exactly.</summary>
@@ -229,8 +235,9 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_GetOperationState</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetOperationState(NativeCULong session, byte[]? operationState, ref NativeCULong operationStateLen)
+    public unsafe NativeCULong C_GetOperationState(NativeCULong session, Span<byte> operationState, out NativeCULong operationStateLen)
     {
+        operationStateLen = (NativeCULong)operationState.Length;
         ThrowIfUnbound(_fp.C_GetOperationState);
         fixed (byte* statePtr = operationState)
         fixed (NativeCULong* lenPtr = &operationStateLen)
@@ -238,19 +245,20 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SetOperationState</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SetOperationState(NativeCULong session, byte[] operationState, NativeCULong operationStateLen, NativeCULong encryptionKey, NativeCULong authenticationKey)
+    public unsafe NativeCULong C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey,
+        NativeCULong authenticationKey)
     {
         ThrowIfUnbound(_fp.C_SetOperationState);
         fixed (byte* statePtr = operationState)
-            return _fp.C_SetOperationState(session, statePtr, operationStateLen, encryptionKey, authenticationKey);
+            return _fp.C_SetOperationState(session, statePtr, (NativeCULong)operationState.Length, encryptionKey, authenticationKey);
     }
 
     /// <summary>Wrapper for <c>C_Login</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Login(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen)
+    public unsafe NativeCULong C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin)
     {
         ThrowIfUnbound(_fp.C_Login);
         fixed (byte* pinPtr = pin)
-            return _fp.C_Login(session, userType, pinPtr, pinLen);
+            return _fp.C_Login(session, userType, pinPtr, (NativeCULong)pin.Length);
     }
 
     /// <summary>Wrapper for <c>C_Logout</c>. Matches the prior delegate signature exactly.</summary>
@@ -264,7 +272,7 @@ internal class Delegates
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_CreateObject(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong objectId)
+    public unsafe NativeCULong C_CreateObject(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong objectId)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -272,20 +280,21 @@ internal class Delegates
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* idPtr = &objectId)
-                return _fp.C_CreateObject_Windows(session, t, count, idPtr);
+                return _fp.C_CreateObject_Windows(session, t, (NativeCULong)template.Length, idPtr);
         }
 
         ThrowIfUnbound(_fp.C_CreateObject);
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* idPtr = &objectId)
-            return _fp.C_CreateObject(session, t, count, idPtr);
+            return _fp.C_CreateObject(session, t, (NativeCULong)template.Length, idPtr);
     }
 
     /// <summary>Wrapper for <c>C_CopyObject</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong newObjectId)
+    public unsafe NativeCULong C_CopyObject(NativeCULong session, NativeCULong objectId, ReadOnlySpan<CK_ATTRIBUTE> template,
+        ref NativeCULong newObjectId)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -293,13 +302,13 @@ internal class Delegates
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* idPtr = &newObjectId)
-                return _fp.C_CopyObject_Windows(session, objectId, t, count, idPtr);
+                return _fp.C_CopyObject_Windows(session, objectId, t, (NativeCULong)template.Length, idPtr);
         }
 
         ThrowIfUnbound(_fp.C_CopyObject);
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* idPtr = &newObjectId)
-            return _fp.C_CopyObject(session, objectId, t, count, idPtr);
+            return _fp.C_CopyObject(session, objectId, t, (NativeCULong)template.Length, idPtr);
     }
 
     /// <summary>Wrapper for <c>C_DestroyObject</c>. Matches the prior delegate signature exactly.</summary>
@@ -321,7 +330,7 @@ internal class Delegates
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+    public unsafe NativeCULong C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -329,7 +338,7 @@ internal class Delegates
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             NativeCULong winRv;
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
-                winRv = _fp.C_GetAttributeValue_Windows(session, objectId, t, count);
+                winRv = _fp.C_GetAttributeValue_Windows(session, objectId, t, (NativeCULong)template.Length);
             // The token writes the value and its length back into the packed copy, so
             // mirror the result into the caller's template before returning.
             if (winTpl is not null)
@@ -340,45 +349,45 @@ internal class Delegates
 
         ThrowIfUnbound(_fp.C_GetAttributeValue);
         fixed (CK_ATTRIBUTE* t = template)
-            return _fp.C_GetAttributeValue(session, objectId, t, count);
+            return _fp.C_GetAttributeValue(session, objectId, t, (NativeCULong)template.Length);
     }
 
     /// <summary>Wrapper for <c>C_SetAttributeValue</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_SetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+    public unsafe NativeCULong C_SetAttributeValue(NativeCULong session, NativeCULong objectId, ReadOnlySpan<CK_ATTRIBUTE> template)
     {
         if (Pkcs11Marshal.IsWindows)
         {
             ThrowIfUnbound(_fp.C_SetAttributeValue_Windows);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
-                return _fp.C_SetAttributeValue_Windows(session, objectId, t, count);
+                return _fp.C_SetAttributeValue_Windows(session, objectId, t, (NativeCULong)template.Length);
         }
 
         ThrowIfUnbound(_fp.C_SetAttributeValue);
         fixed (CK_ATTRIBUTE* t = template)
-            return _fp.C_SetAttributeValue(session, objectId, t, count);
+            return _fp.C_SetAttributeValue(session, objectId, t, (NativeCULong)template.Length);
     }
 
     /// <summary>Wrapper for <c>C_FindObjectsInit</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count)
+    public unsafe NativeCULong C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template)
     {
         if (Pkcs11Marshal.IsWindows)
         {
             ThrowIfUnbound(_fp.C_FindObjectsInit_Windows);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
-                return _fp.C_FindObjectsInit_Windows(session, t, count);
+                return _fp.C_FindObjectsInit_Windows(session, t, (NativeCULong)template.Length);
         }
 
         ThrowIfUnbound(_fp.C_FindObjectsInit);
         fixed (CK_ATTRIBUTE* t = template)
-            return _fp.C_FindObjectsInit(session, t, count);
+            return _fp.C_FindObjectsInit(session, t, (NativeCULong)template.Length);
     }
 
     /// <summary>Wrapper for <c>C_FindObjects</c>. Matches the prior delegate signature exactly.</summary>
@@ -415,28 +424,32 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Encrypt</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? encryptedData, ref NativeCULong encryptedDataLen)
+    public unsafe NativeCULong C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen)
     {
+        encryptedDataLen = (NativeCULong)encryptedData.Length;
         ThrowIfUnbound(_fp.C_Encrypt);
         fixed (byte* dataPtr = data)
         fixed (byte* encDataPtr = encryptedData)
         fixed (NativeCULong* encLenPtr = &encryptedDataLen)
-            return _fp.C_Encrypt(session, dataPtr, dataLen, encDataPtr, encLenPtr);
+            return _fp.C_Encrypt(session, dataPtr, (NativeCULong)data.Length, encDataPtr, encLenPtr);
     }
 
     /// <summary>Wrapper for <c>C_EncryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_EncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
+    public unsafe NativeCULong C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart,
+        out NativeCULong encryptedPartLen)
     {
+        encryptedPartLen = (NativeCULong)encryptedPart.Length;
         ThrowIfUnbound(_fp.C_EncryptUpdate);
         fixed (byte* partPtr = part)
         fixed (byte* encPartPtr = encryptedPart)
         fixed (NativeCULong* encLenPtr = &encryptedPartLen)
-            return _fp.C_EncryptUpdate(session, partPtr, partLen, encPartPtr, encLenPtr);
+            return _fp.C_EncryptUpdate(session, partPtr, (NativeCULong)part.Length, encPartPtr, encLenPtr);
     }
 
     /// <summary>Wrapper for <c>C_EncryptFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_EncryptFinal(NativeCULong session, byte[]? lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
+    public unsafe NativeCULong C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, out NativeCULong lastEncryptedPartLen)
     {
+        lastEncryptedPartLen = (NativeCULong)lastEncryptedPart.Length;
         ThrowIfUnbound(_fp.C_EncryptFinal);
         fixed (byte* partPtr = lastEncryptedPart)
         fixed (NativeCULong* lenPtr = &lastEncryptedPartLen)
@@ -461,28 +474,31 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Decrypt</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[]? data, ref NativeCULong dataLen)
+    public unsafe NativeCULong C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
     {
+        dataLen = (NativeCULong)data.Length;
         ThrowIfUnbound(_fp.C_Decrypt);
         fixed (byte* encDataPtr = encryptedData)
         fixed (byte* dataPtr = data)
         fixed (NativeCULong* lenPtr = &dataLen)
-            return _fp.C_Decrypt(session, encDataPtr, encryptedDataLen, dataPtr, lenPtr);
+            return _fp.C_Decrypt(session, encDataPtr, (NativeCULong)encryptedData.Length, dataPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DecryptUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
+    public unsafe NativeCULong C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
     {
+        partLen = (NativeCULong)part.Length;
         ThrowIfUnbound(_fp.C_DecryptUpdate);
         fixed (byte* encPartPtr = encryptedPart)
         fixed (byte* partPtr = part)
         fixed (NativeCULong* lenPtr = &partLen)
-            return _fp.C_DecryptUpdate(session, encPartPtr, encryptedPartLen, partPtr, lenPtr);
+            return _fp.C_DecryptUpdate(session, encPartPtr, (NativeCULong)encryptedPart.Length, partPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecryptFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DecryptFinal(NativeCULong session, byte[]? lastPart, ref NativeCULong lastPartLen)
+    public unsafe NativeCULong C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen)
     {
+        lastPartLen = (NativeCULong)lastPart.Length;
         ThrowIfUnbound(_fp.C_DecryptFinal);
         fixed (byte* partPtr = lastPart)
         fixed (NativeCULong* lenPtr = &lastPartLen)
@@ -507,21 +523,22 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Digest</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? digest, ref NativeCULong digestLen)
+    public unsafe NativeCULong C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen)
     {
+        digestLen = (NativeCULong)digest.Length;
         ThrowIfUnbound(_fp.C_Digest);
         fixed (byte* dataPtr = data)
         fixed (byte* digestPtr = digest)
         fixed (NativeCULong* lenPtr = &digestLen)
-            return _fp.C_Digest(session, dataPtr, dataLen, digestPtr, lenPtr);
+            return _fp.C_Digest(session, dataPtr, (NativeCULong)data.Length, digestPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DigestUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DigestUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
+    public unsafe NativeCULong C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part)
     {
         ThrowIfUnbound(_fp.C_DigestUpdate);
         fixed (byte* partPtr = part)
-            return _fp.C_DigestUpdate(session, partPtr, partLen);
+            return _fp.C_DigestUpdate(session, partPtr, (NativeCULong)part.Length);
     }
 
     /// <summary>Wrapper for <c>C_DigestKey</c>. Matches the prior delegate signature exactly.</summary>
@@ -532,8 +549,9 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DigestFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DigestFinal(NativeCULong session, byte[]? digest, ref NativeCULong digestLen)
+    public unsafe NativeCULong C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen)
     {
+        digestLen = (NativeCULong)digest.Length;
         ThrowIfUnbound(_fp.C_DigestFinal);
         fixed (byte* digestPtr = digest)
         fixed (NativeCULong* lenPtr = &digestLen)
@@ -558,26 +576,28 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Sign</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
     {
+        signatureLen = (NativeCULong)signature.Length;
         ThrowIfUnbound(_fp.C_Sign);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* lenPtr = &signatureLen)
-            return _fp.C_Sign(session, dataPtr, dataLen, sigPtr, lenPtr);
+            return _fp.C_Sign(session, dataPtr, (NativeCULong)data.Length, sigPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_SignUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SignUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
+    public unsafe NativeCULong C_SignUpdate(NativeCULong session, ReadOnlySpan<byte> part)
     {
         ThrowIfUnbound(_fp.C_SignUpdate);
         fixed (byte* partPtr = part)
-            return _fp.C_SignUpdate(session, partPtr, partLen);
+            return _fp.C_SignUpdate(session, partPtr, (NativeCULong)part.Length);
     }
 
     /// <summary>Wrapper for <c>C_SignFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SignFinal(NativeCULong session, byte[]? signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignFinal(NativeCULong session, Span<byte> signature, out NativeCULong signatureLen)
     {
+        signatureLen = (NativeCULong)signature.Length;
         ThrowIfUnbound(_fp.C_SignFinal);
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* lenPtr = &signatureLen)
@@ -602,13 +622,14 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignRecover</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
     {
+        signatureLen = (NativeCULong)signature.Length;
         ThrowIfUnbound(_fp.C_SignRecover);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* lenPtr = &signatureLen)
-            return _fp.C_SignRecover(session, dataPtr, dataLen, sigPtr, lenPtr);
+            return _fp.C_SignRecover(session, dataPtr, (NativeCULong)data.Length, sigPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_VerifyInit</c>. Matches the prior delegate signature exactly.</summary>
@@ -629,28 +650,28 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_Verify</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_Verify(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    public unsafe NativeCULong C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         ThrowIfUnbound(_fp.C_Verify);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
-            return _fp.C_Verify(session, dataPtr, dataLen, sigPtr, signatureLen);
+            return _fp.C_Verify(session, dataPtr, (NativeCULong)data.Length, sigPtr, (NativeCULong)signature.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifyUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_VerifyUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
+    public unsafe NativeCULong C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part)
     {
         ThrowIfUnbound(_fp.C_VerifyUpdate);
         fixed (byte* partPtr = part)
-            return _fp.C_VerifyUpdate(session, partPtr, partLen);
+            return _fp.C_VerifyUpdate(session, partPtr, (NativeCULong)part.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifyFinal</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_VerifyFinal(NativeCULong session, byte[] signature, NativeCULong signatureLen)
+    public unsafe NativeCULong C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature)
     {
         ThrowIfUnbound(_fp.C_VerifyFinal);
         fixed (byte* sigPtr = signature)
-            return _fp.C_VerifyFinal(session, sigPtr, signatureLen);
+            return _fp.C_VerifyFinal(session, sigPtr, (NativeCULong)signature.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifyRecoverInit</c>. Matches the prior delegate signature exactly.</summary>
@@ -671,60 +692,70 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_VerifyRecover</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[]? data, ref NativeCULong dataLen)
+    public unsafe NativeCULong C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, out NativeCULong dataLen)
     {
+        dataLen = (NativeCULong)data.Length;
         ThrowIfUnbound(_fp.C_VerifyRecover);
         fixed (byte* sigPtr = signature)
         fixed (byte* dataPtr = data)
         fixed (NativeCULong* lenPtr = &dataLen)
-            return _fp.C_VerifyRecover(session, sigPtr, signatureLen, dataPtr, lenPtr);
+            return _fp.C_VerifyRecover(session, sigPtr, (NativeCULong)signature.Length, dataPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DigestEncryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DigestEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
+    public unsafe NativeCULong C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart,
+        out NativeCULong encryptedPartLen)
     {
+        encryptedPartLen = (NativeCULong)encryptedPart.Length;
         ThrowIfUnbound(_fp.C_DigestEncryptUpdate);
         fixed (byte* partPtr = part)
         fixed (byte* encPartPtr = encryptedPart)
         fixed (NativeCULong* lenPtr = &encryptedPartLen)
-            return _fp.C_DigestEncryptUpdate(session, partPtr, partLen, encPartPtr, lenPtr);
+            return _fp.C_DigestEncryptUpdate(session, partPtr, (NativeCULong)part.Length, encPartPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecryptDigestUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DecryptDigestUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
+    public unsafe NativeCULong C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part,
+        out NativeCULong partLen)
     {
+        partLen = (NativeCULong)part.Length;
         ThrowIfUnbound(_fp.C_DecryptDigestUpdate);
         fixed (byte* encPartPtr = encryptedPart)
         fixed (byte* partPtr = part)
         fixed (NativeCULong* lenPtr = &partLen)
-            return _fp.C_DecryptDigestUpdate(session, encPartPtr, encryptedPartLen, partPtr, lenPtr);
+            return _fp.C_DecryptDigestUpdate(session, encPartPtr, (NativeCULong)encryptedPart.Length, partPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_SignEncryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SignEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
+    public unsafe NativeCULong C_SignEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart,
+        out NativeCULong encryptedPartLen)
     {
+        encryptedPartLen = (NativeCULong)encryptedPart.Length;
         ThrowIfUnbound(_fp.C_SignEncryptUpdate);
         fixed (byte* partPtr = part)
         fixed (byte* encPartPtr = encryptedPart)
         fixed (NativeCULong* lenPtr = &encryptedPartLen)
-            return _fp.C_SignEncryptUpdate(session, partPtr, partLen, encPartPtr, lenPtr);
+            return _fp.C_SignEncryptUpdate(session, partPtr, (NativeCULong)part.Length, encPartPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecryptVerifyUpdate</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_DecryptVerifyUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
+    public unsafe NativeCULong C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part,
+        out NativeCULong partLen)
     {
+        partLen = (NativeCULong)part.Length;
         ThrowIfUnbound(_fp.C_DecryptVerifyUpdate);
         fixed (byte* encPartPtr = encryptedPart)
         fixed (byte* partPtr = part)
         fixed (NativeCULong* lenPtr = &partLen)
-            return _fp.C_DecryptVerifyUpdate(session, encPartPtr, encryptedPartLen, partPtr, lenPtr);
+            return _fp.C_DecryptVerifyUpdate(session, encPartPtr, (NativeCULong)encryptedPart.Length, partPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_GenerateKey</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong key)
+    public unsafe NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template,
+        ref NativeCULong key)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -733,24 +764,22 @@ internal class Delegates
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_GenerateKey_Windows(session, &winMech, t, count, kPtr);
+                return _fp.C_GenerateKey_Windows(session, &winMech, t, (NativeCULong)template.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_GenerateKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* kPtr = &key)
-            return _fp.C_GenerateKey(session, m, t, count, kPtr);
+            return _fp.C_GenerateKey(session, m, t, (NativeCULong)template.Length, kPtr);
     }
 
     /// <summary>Wrapper for <c>C_GenerateKeyPair</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism,
-        CK_ATTRIBUTE[]? publicKeyTemplate, NativeCULong publicKeyAttributeCount,
-        CK_ATTRIBUTE[]? privateKeyTemplate, NativeCULong privateKeyAttributeCount,
-        ref NativeCULong publicKey, ref NativeCULong privateKey)
+    public unsafe NativeCULong C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate,
+        ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -762,7 +791,7 @@ internal class Delegates
             fixed (CK_ATTRIBUTE_Windows* priv = winPriv)
             fixed (NativeCULong* pubK = &publicKey)
             fixed (NativeCULong* privK = &privateKey)
-                return _fp.C_GenerateKeyPair_Windows(session, &winMech, pub, publicKeyAttributeCount, priv, privateKeyAttributeCount, pubK, privK);
+                return _fp.C_GenerateKeyPair_Windows(session, &winMech, pub, (NativeCULong)publicKeyTemplate.Length, priv, (NativeCULong)privateKeyTemplate.Length, pubK, privK);
         }
 
         ThrowIfUnbound(_fp.C_GenerateKeyPair);
@@ -771,15 +800,17 @@ internal class Delegates
         fixed (CK_ATTRIBUTE* priv = privateKeyTemplate)
         fixed (NativeCULong* pubK = &publicKey)
         fixed (NativeCULong* privK = &privateKey)
-            return _fp.C_GenerateKeyPair(session, m, pub, publicKeyAttributeCount, priv, privateKeyAttributeCount, pubK, privK);
+            return _fp.C_GenerateKeyPair(session, m, pub, (NativeCULong)publicKeyTemplate.Length, priv, (NativeCULong)privateKeyTemplate.Length, pubK, privK);
     }
 
     /// <summary>Wrapper for <c>C_WrapKey</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
+    public unsafe NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key,
+        Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
     {
+        wrappedKeyLen = (NativeCULong)wrappedKey.Length;
         if (Pkcs11Marshal.IsWindows)
         {
             ThrowIfUnbound(_fp.C_WrapKey_Windows);
@@ -800,7 +831,8 @@ internal class Delegates
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
+    public unsafe NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey,
+        ReadOnlySpan<byte> wrappedKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -810,7 +842,7 @@ internal class Delegates
             fixed (byte* wkPtr = wrappedKey)
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_UnwrapKey_Windows(session, &winMech, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, kPtr);
+                return _fp.C_UnwrapKey_Windows(session, &winMech, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_UnwrapKey);
@@ -818,14 +850,15 @@ internal class Delegates
         fixed (byte* wkPtr = wrappedKey)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* kPtr = &key)
-            return _fp.C_UnwrapKey(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, kPtr);
+            return _fp.C_UnwrapKey(session, m, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, kPtr);
     }
 
     /// <summary>Wrapper for <c>C_DeriveKey</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
+    public unsafe NativeCULong C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey,
+        ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -834,30 +867,30 @@ internal class Delegates
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_DeriveKey_Windows(session, &winMech, baseKey, t, attributeCount, kPtr);
+                return _fp.C_DeriveKey_Windows(session, &winMech, baseKey, t, (NativeCULong)template.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_DeriveKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* kPtr = &key)
-            return _fp.C_DeriveKey(session, m, baseKey, t, attributeCount, kPtr);
+            return _fp.C_DeriveKey(session, m, baseKey, t, (NativeCULong)template.Length, kPtr);
     }
 
     /// <summary>Wrapper for <c>C_SeedRandom</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_SeedRandom(NativeCULong session, byte[] seed, NativeCULong seedLen)
+    public unsafe NativeCULong C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed)
     {
         ThrowIfUnbound(_fp.C_SeedRandom);
         fixed (byte* seedPtr = seed)
-            return _fp.C_SeedRandom(session, seedPtr, seedLen);
+            return _fp.C_SeedRandom(session, seedPtr, (NativeCULong)seed.Length);
     }
 
     /// <summary>Wrapper for <c>C_GenerateRandom</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen)
+    public unsafe NativeCULong C_GenerateRandom(NativeCULong session, Span<byte> randomData)
     {
         ThrowIfUnbound(_fp.C_GenerateRandom);
         fixed (byte* dataPtr = randomData)
-            return _fp.C_GenerateRandom(session, dataPtr, randomLen);
+            return _fp.C_GenerateRandom(session, dataPtr, (NativeCULong)randomData.Length);
     }
 
     /// <summary>Wrapper for <c>C_GetFunctionStatus</c>. Matches the prior delegate signature exactly.</summary>
@@ -886,12 +919,12 @@ internal class Delegates
     internal unsafe bool HasC_LoginUser => _fp.C_LoginUser is not null;
 
     /// <summary>Wrapper for <c>C_LoginUser</c> (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
-    public unsafe NativeCULong C_LoginUser(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen)
+    public unsafe NativeCULong C_LoginUser(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username)
     {
         ThrowIfUnbound(_fp.C_LoginUser);
         fixed (byte* pinPtr = pin)
         fixed (byte* userPtr = username)
-            return _fp.C_LoginUser(session, userType, pinPtr, pinLen, userPtr, usernameLen);
+            return _fp.C_LoginUser(session, userType, pinPtr, (NativeCULong)pin.Length, userPtr, (NativeCULong)username.Length);
     }
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SessionCancel</c> (PKCS#11 v3.0+).</summary>
@@ -951,7 +984,7 @@ internal class Delegates
     /// sibling wrapper is needed (unlike <c>C_GetInterfaceList</c>, the token owns the memory and we
     /// only read it).
     /// </summary>
-    public unsafe NativeCULong C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface)
+    public unsafe NativeCULong C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface)
     {
         iface = default;
         ThrowIfUnbound(_fp.C_GetInterface);
@@ -1075,32 +1108,37 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_EncryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen)
+    public unsafe NativeCULong C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, out NativeCULong ciphertextLen)
     {
+        ciphertextLen = (NativeCULong)ciphertext.Length;
         ThrowIfUnbound(_fp.C_EncryptMessage);
         fixed (byte* adPtr = associatedData)
         fixed (byte* ptPtr = plaintext)
         fixed (byte* ctPtr = ciphertext)
         fixed (NativeCULong* ctLenPtr = &ciphertextLen)
-            return _fp.C_EncryptMessage(session, parameter, parameterLen, adPtr, associatedDataLen, ptPtr, plaintextLen, ctPtr, ctLenPtr);
+            return _fp.C_EncryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length, ptPtr, (NativeCULong)plaintext.Length, ctPtr, ctLenPtr);
     }
 
     /// <summary>Wrapper for <c>C_EncryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
+    public unsafe NativeCULong C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen,
+        ReadOnlySpan<byte> associatedData)
     {
         ThrowIfUnbound(_fp.C_EncryptMessageBegin);
         fixed (byte* adPtr = associatedData)
-            return _fp.C_EncryptMessageBegin(session, parameter, parameterLen, adPtr, associatedDataLen);
+            return _fp.C_EncryptMessageBegin(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length);
     }
 
     /// <summary>Wrapper for <c>C_EncryptMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] plaintextPart, NativeCULong plaintextPartLen, byte[] ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags)
+    public unsafe NativeCULong C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen,
+        ReadOnlySpan<byte> plaintextPart, Span<byte> ciphertextPart, out NativeCULong ciphertextPartLen, NativeCULong flags)
     {
+        ciphertextPartLen = (NativeCULong)ciphertextPart.Length;
         ThrowIfUnbound(_fp.C_EncryptMessageNext);
         fixed (byte* ptPtr = plaintextPart)
         fixed (byte* ctPtr = ciphertextPart)
         fixed (NativeCULong* ctLenPtr = &ciphertextPartLen)
-            return _fp.C_EncryptMessageNext(session, parameter, parameterLen, ptPtr, plaintextPartLen, ctPtr, ctLenPtr, flags);
+            return _fp.C_EncryptMessageNext(session, parameter, parameterLen, ptPtr, (NativeCULong)plaintextPart.Length, ctPtr, ctLenPtr, flags);
     }
 
     /// <summary>Wrapper for <c>C_MessageEncryptFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1128,32 +1166,37 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DecryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen)
+    public unsafe NativeCULong C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, out NativeCULong plaintextLen)
     {
+        plaintextLen = (NativeCULong)plaintext.Length;
         ThrowIfUnbound(_fp.C_DecryptMessage);
         fixed (byte* adPtr = associatedData)
         fixed (byte* ctPtr = ciphertext)
         fixed (byte* ptPtr = plaintext)
         fixed (NativeCULong* ptLenPtr = &plaintextLen)
-            return _fp.C_DecryptMessage(session, parameter, parameterLen, adPtr, associatedDataLen, ctPtr, ciphertextLen, ptPtr, ptLenPtr);
+            return _fp.C_DecryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length, ctPtr, (NativeCULong)ciphertext.Length, ptPtr, ptLenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
+    public unsafe NativeCULong C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen,
+        ReadOnlySpan<byte> associatedData)
     {
         ThrowIfUnbound(_fp.C_DecryptMessageBegin);
         fixed (byte* adPtr = associatedData)
-            return _fp.C_DecryptMessageBegin(session, parameter, parameterLen, adPtr, associatedDataLen);
+            return _fp.C_DecryptMessageBegin(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length);
     }
 
     /// <summary>Wrapper for <c>C_DecryptMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] ciphertextPart, NativeCULong ciphertextPartLen, byte[] plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags)
+    public unsafe NativeCULong C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen,
+        ReadOnlySpan<byte> ciphertextPart, Span<byte> plaintextPart, out NativeCULong plaintextPartLen, NativeCULong flags)
     {
+        plaintextPartLen = (NativeCULong)plaintextPart.Length;
         ThrowIfUnbound(_fp.C_DecryptMessageNext);
         fixed (byte* ctPtr = ciphertextPart)
         fixed (byte* ptPtr = plaintextPart)
         fixed (NativeCULong* ptLenPtr = &plaintextPartLen)
-            return _fp.C_DecryptMessageNext(session, parameter, parameterLen, ctPtr, ciphertextPartLen, ptPtr, ptLenPtr, flags);
+            return _fp.C_DecryptMessageNext(session, parameter, parameterLen, ctPtr, (NativeCULong)ciphertextPart.Length, ptPtr, ptLenPtr, flags);
     }
 
     /// <summary>Wrapper for <c>C_MessageDecryptFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1181,13 +1224,15 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data,
+        Span<byte> signature, out NativeCULong signatureLen)
     {
+        signatureLen = (NativeCULong)signature.Length;
         ThrowIfUnbound(_fp.C_SignMessage);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* sigLenPtr = &signatureLen)
-            return _fp.C_SignMessage(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, sigLenPtr);
+            return _fp.C_SignMessage(session, parameter, parameterLen, dataPtr, (NativeCULong)data.Length, sigPtr, sigLenPtr);
     }
 
     /// <summary>Wrapper for <c>C_SignMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1198,13 +1243,15 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_SignMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
+    public unsafe NativeCULong C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data,
+        Span<byte> signature, out NativeCULong signatureLen)
     {
+        signatureLen = (NativeCULong)signature.Length;
         ThrowIfUnbound(_fp.C_SignMessageNext);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* sigLenPtr = &signatureLen)
-            return _fp.C_SignMessageNext(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, sigLenPtr);
+            return _fp.C_SignMessageNext(session, parameter, parameterLen, dataPtr, (NativeCULong)data.Length, sigPtr, sigLenPtr);
     }
 
     /// <summary>Wrapper for <c>C_MessageSignFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1232,12 +1279,13 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_VerifyMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    public unsafe NativeCULong C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> signature)
     {
         ThrowIfUnbound(_fp.C_VerifyMessage);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
-            return _fp.C_VerifyMessage(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, signatureLen);
+            return _fp.C_VerifyMessage(session, parameter, parameterLen, dataPtr, (NativeCULong)data.Length, sigPtr, (NativeCULong)signature.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifyMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1248,12 +1296,13 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_VerifyMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
+    public unsafe NativeCULong C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> signature)
     {
         ThrowIfUnbound(_fp.C_VerifyMessageNext);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
-            return _fp.C_VerifyMessageNext(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, signatureLen);
+            return _fp.C_VerifyMessageNext(session, parameter, parameterLen, dataPtr, (NativeCULong)data.Length, sigPtr, (NativeCULong)signature.Length);
     }
 
     /// <summary>Wrapper for <c>C_MessageVerifyFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1269,8 +1318,10 @@ internal class Delegates
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    public unsafe NativeCULong C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey,
+        ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
+        ciphertextLen = (NativeCULong)ciphertext.Length;
         if (Pkcs11Marshal.IsWindows)
         {
             ThrowIfUnbound(_fp.C_EncapsulateKey_Windows);
@@ -1280,7 +1331,7 @@ internal class Delegates
             fixed (byte* ctPtr = ciphertext)
             fixed (NativeCULong* ctLenPtr = &ciphertextLen)
             fixed (NativeCULong* dkPtr = &derivedKey)
-                return _fp.C_EncapsulateKey_Windows(session, &winMech, publicKey, t, attributeCount, ctPtr, ctLenPtr, dkPtr);
+                return _fp.C_EncapsulateKey_Windows(session, &winMech, publicKey, t, (NativeCULong)template.Length, ctPtr, ctLenPtr, dkPtr);
         }
 
         ThrowIfUnbound(_fp.C_EncapsulateKey);
@@ -1289,14 +1340,15 @@ internal class Delegates
         fixed (byte* ctPtr = ciphertext)
         fixed (NativeCULong* ctLenPtr = &ciphertextLen)
         fixed (NativeCULong* dkPtr = &derivedKey)
-            return _fp.C_EncapsulateKey(session, m, publicKey, t, attributeCount, ctPtr, ctLenPtr, dkPtr);
+            return _fp.C_EncapsulateKey(session, m, publicKey, t, (NativeCULong)template.Length, ctPtr, ctLenPtr, dkPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecapsulateKey</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    public unsafe NativeCULong C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey,
+        ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -1306,7 +1358,7 @@ internal class Delegates
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (byte* ctPtr = ciphertext)
             fixed (NativeCULong* dkPtr = &derivedKey)
-                return _fp.C_DecapsulateKey_Windows(session, &winMech, privateKey, t, attributeCount, ctPtr, ciphertextLen, dkPtr);
+                return _fp.C_DecapsulateKey_Windows(session, &winMech, privateKey, t, (NativeCULong)template.Length, ctPtr, (NativeCULong)ciphertext.Length, dkPtr);
         }
 
         ThrowIfUnbound(_fp.C_DecapsulateKey);
@@ -1314,43 +1366,43 @@ internal class Delegates
         fixed (CK_ATTRIBUTE* t = template)
         fixed (byte* ctPtr = ciphertext)
         fixed (NativeCULong* dkPtr = &derivedKey)
-            return _fp.C_DecapsulateKey(session, m, privateKey, t, attributeCount, ctPtr, ciphertextLen, dkPtr);
+            return _fp.C_DecapsulateKey(session, m, privateKey, t, (NativeCULong)template.Length, ctPtr, (NativeCULong)ciphertext.Length, dkPtr);
     }
 
     /// <summary>Wrapper for <c>C_VerifySignatureInit</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen)
+    public unsafe NativeCULong C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature)
     {
         if (Pkcs11Marshal.IsWindows)
         {
             ThrowIfUnbound(_fp.C_VerifySignatureInit_Windows);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             fixed (byte* sigPtr = signature)
-                return _fp.C_VerifySignatureInit_Windows(session, &winMech, key, sigPtr, signatureLen);
+                return _fp.C_VerifySignatureInit_Windows(session, &winMech, key, sigPtr, (NativeCULong)signature.Length);
         }
 
         ThrowIfUnbound(_fp.C_VerifySignatureInit);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* sigPtr = signature)
-            return _fp.C_VerifySignatureInit(session, m, key, sigPtr, signatureLen);
+            return _fp.C_VerifySignatureInit(session, m, key, sigPtr, (NativeCULong)signature.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifySignature</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_VerifySignature(NativeCULong session, byte[] data, NativeCULong dataLen)
+    public unsafe NativeCULong C_VerifySignature(NativeCULong session, ReadOnlySpan<byte> data)
     {
         ThrowIfUnbound(_fp.C_VerifySignature);
         fixed (byte* dataPtr = data)
-            return _fp.C_VerifySignature(session, dataPtr, dataLen);
+            return _fp.C_VerifySignature(session, dataPtr, (NativeCULong)data.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifySignatureUpdate</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_VerifySignatureUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
+    public unsafe NativeCULong C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part)
     {
         ThrowIfUnbound(_fp.C_VerifySignatureUpdate);
         fixed (byte* partPtr = part)
-            return _fp.C_VerifySignatureUpdate(session, partPtr, partLen);
+            return _fp.C_VerifySignatureUpdate(session, partPtr, (NativeCULong)part.Length);
     }
 
     /// <summary>Wrapper for <c>C_VerifySignatureFinal</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
@@ -1372,7 +1424,7 @@ internal class Delegates
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_AsyncComplete(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA result)
+    public unsafe NativeCULong C_AsyncComplete(NativeCULong session, ReadOnlySpan<byte> functionName, ref CK_ASYNC_DATA result)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -1395,7 +1447,7 @@ internal class Delegates
     internal unsafe bool HasC_AsyncComplete => _fp.C_AsyncComplete is not null;
 
     /// <summary>Wrapper for <c>C_AsyncGetID</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_AsyncGetID(NativeCULong session, byte[] functionName, ref NativeCULong id)
+    public unsafe NativeCULong C_AsyncGetID(NativeCULong session, ReadOnlySpan<byte> functionName, ref NativeCULong id)
     {
         ThrowIfUnbound(_fp.C_AsyncGetID);
         fixed (byte* fnPtr = functionName)
@@ -1407,12 +1459,12 @@ internal class Delegates
     internal unsafe bool HasC_AsyncGetID => _fp.C_AsyncGetID is not null;
 
     /// <summary>Wrapper for <c>C_AsyncJoin</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
-    public unsafe NativeCULong C_AsyncJoin(NativeCULong session, byte[] functionName, NativeCULong id, byte[] data, NativeCULong dataLen)
+    public unsafe NativeCULong C_AsyncJoin(NativeCULong session, ReadOnlySpan<byte> functionName, NativeCULong id, ReadOnlySpan<byte> data)
     {
         ThrowIfUnbound(_fp.C_AsyncJoin);
         fixed (byte* fnPtr = functionName)
         fixed (byte* dataPtr = data)
-            return _fp.C_AsyncJoin(session, fnPtr, id, dataPtr, dataLen);
+            return _fp.C_AsyncJoin(session, fnPtr, id, dataPtr, (NativeCULong)data.Length);
     }
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_AsyncJoin</c> (PKCS#11 v3.2+).</summary>
@@ -1422,8 +1474,10 @@ internal class Delegates
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
+    public unsafe NativeCULong C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key,
+        ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
     {
+        wrappedKeyLen = (NativeCULong)wrappedKey.Length;
         if (Pkcs11Marshal.IsWindows)
         {
             ThrowIfUnbound(_fp.C_WrapKeyAuthenticated_Windows);
@@ -1431,7 +1485,7 @@ internal class Delegates
             fixed (byte* adPtr = associatedData)
             fixed (byte* wkPtr = wrappedKey)
             fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-                return _fp.C_WrapKeyAuthenticated_Windows(session, &winMech, wrappingKey, key, adPtr, associatedDataLen, wkPtr, lenPtr);
+                return _fp.C_WrapKeyAuthenticated_Windows(session, &winMech, wrappingKey, key, adPtr, (NativeCULong)associatedData.Length, wkPtr, lenPtr);
         }
 
         ThrowIfUnbound(_fp.C_WrapKeyAuthenticated);
@@ -1439,14 +1493,15 @@ internal class Delegates
         fixed (byte* adPtr = associatedData)
         fixed (byte* wkPtr = wrappedKey)
         fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-            return _fp.C_WrapKeyAuthenticated(session, m, wrappingKey, key, adPtr, associatedDataLen, wkPtr, lenPtr);
+            return _fp.C_WrapKeyAuthenticated(session, m, wrappingKey, key, adPtr, (NativeCULong)associatedData.Length, wkPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_UnwrapKeyAuthenticated</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
     /// the packed types and never branch on the platform themselves.</remarks>
-    public unsafe NativeCULong C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key)
+    public unsafe NativeCULong C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey,
+        ReadOnlySpan<byte> wrappedKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> associatedData, ref NativeCULong key)
     {
         if (Pkcs11Marshal.IsWindows)
         {
@@ -1457,7 +1512,7 @@ internal class Delegates
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (byte* adPtr = associatedData)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_UnwrapKeyAuthenticated_Windows(session, &winMech, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
+                return _fp.C_UnwrapKeyAuthenticated_Windows(session, &winMech, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, adPtr, (NativeCULong)associatedData.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_UnwrapKeyAuthenticated);
@@ -1466,7 +1521,7 @@ internal class Delegates
         fixed (CK_ATTRIBUTE* t = template)
         fixed (byte* adPtr = associatedData)
         fixed (NativeCULong* kPtr = &key)
-            return _fp.C_UnwrapKeyAuthenticated(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
+            return _fp.C_UnwrapKeyAuthenticated(session, m, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, adPtr, (NativeCULong)associatedData.Length, kPtr);
     }
 
     /// <summary>

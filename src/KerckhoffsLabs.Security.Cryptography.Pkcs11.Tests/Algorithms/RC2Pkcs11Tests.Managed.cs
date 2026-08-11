@@ -186,7 +186,7 @@ public sealed class RC2Pkcs11Tests_Managed
         using var bcl = BclRc2();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
 
-        byte[] wrongIv = (byte[])Iv8.Clone();
+        byte[] wrongIv = Iv8.ToArray();
         wrongIv[0] ^= 0xFF;
         using (workspace.AllowInsecureScope())
         {

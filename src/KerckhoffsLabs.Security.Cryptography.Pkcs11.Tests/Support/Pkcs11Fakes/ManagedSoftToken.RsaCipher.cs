@@ -28,15 +28,16 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
-    private CKR RsaTransform(ulong session, byte[] input, int inputLen, byte[]? output, ref NativeCULong outputLen, bool encrypt)
+    private CKR RsaTransform(ulong session, ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen, bool encrypt)
     {
+        outputLen = (NativeCULong)0;
         if (!_rsaEncOps.TryGetValue(session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
         var rsa = (RSA)_asymKeys[op.key];
 
         byte[] result;
         try
         {
-            byte[] data = input.AsSpan(0, inputLen).ToArray();
+            byte[] data = input.ToArray();
             result = encrypt ? rsa.Encrypt(data, op.padding) : rsa.Decrypt(data, op.padding);
         }
         catch (CryptographicException)
@@ -45,10 +46,10 @@ internal sealed partial class ManagedSoftToken
             return encrypt ? CKR.CKR_DATA_LEN_RANGE : CKR.CKR_ENCRYPTED_DATA_INVALID;
         }
 
-        if (output is null) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
+        if (output.IsEmpty) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
         if (output.Length < result.Length) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
-        Array.Copy(result, output, result.Length);
+        result.AsSpan(0, result.Length).CopyTo(output);
         outputLen = (NativeCULong)(ulong)result.Length;
         _rsaEncOps.Remove(session);
         return CKR.CKR_OK;

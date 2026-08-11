@@ -23,7 +23,7 @@ public sealed class Pkcs11SessionTests
 
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
         public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info) => SessionInfoRv;
-        public override CKR C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen) => GenerateRandomRv;
+        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => GenerateRandomRv;
         public override CKR C_Logout(NativeCULong session) => CKR.CKR_OK;
         public override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_OK;
     }
@@ -243,34 +243,34 @@ public sealed class Pkcs11SessionTests
         public ulong CreatedObjectId = 77;
         public ulong ObjectSizeBytes = 256;
 
-        private CKR TwoCall(byte[]? outBuf, ref NativeCULong outLen)
+        private CKR TwoCall(Span<byte> outBuf, out NativeCULong outLen)
         {
-            // Null-buffer probe (Sign/Digest report the size on the first call).
-            if (outBuf is null) { outLen = (NativeCULong)Output.Length; return ProbeRv; }
+            // Empty-buffer probe (Sign/Digest report the size on the first call).
+            if (outBuf.IsEmpty) { outLen = (NativeCULong)Output.Length; return ProbeRv; }
             // Too-small buffer (Encrypt/Decrypt size to the input first, then retry on this).
             if (outBuf.Length < Output.Length) { outLen = (NativeCULong)Output.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
             int n = SecondLen ?? Output.Length;
-            Array.Copy(Output, outBuf, Math.Min(n, outBuf.Length));
+            Output.AsSpan(0, Math.Min(n, outBuf.Length)).CopyTo(outBuf);
             outLen = (NativeCULong)n;
             return FinalRv;
         }
 
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
         public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => InitRv;
-        public override CKR C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? digest, ref NativeCULong digestLen) => TwoCall(digest, ref digestLen);
+        public override CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen) => TwoCall(digest, out digestLen);
         public override CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen) => TwoCall(signature, ref signatureLen);
+        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen) => TwoCall(signature, out signatureLen);
         public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? encryptedData, ref NativeCULong encryptedDataLen) => TwoCall(encryptedData, ref encryptedDataLen);
+        public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen) => TwoCall(encryptedData, out encryptedDataLen);
         public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[]? data, ref NativeCULong dataLen) => TwoCall(data, ref dataLen);
-        public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong key)
+        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen) => TwoCall(data, out dataLen);
+        public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         { key = (NativeCULong)GeneratedKeyId; return GenerateKeyRv; }
         public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
         { info.State = (NativeCULong)(ulong)SessionState; return CKR.CKR_OK; }
         public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_Verify(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen) => VerifyRv;
-        public override CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong objectId)
+        public override CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => VerifyRv;
+        public override CKR C_CreateObject(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong objectId)
         { objectId = (NativeCULong)CreatedObjectId; return CKR.CKR_OK; }
         public override CKR C_DestroyObject(NativeCULong session, NativeCULong objectId) => CKR.CKR_OK;
         public override CKR C_GetObjectSize(NativeCULong session, NativeCULong objectId, ref NativeCULong size)

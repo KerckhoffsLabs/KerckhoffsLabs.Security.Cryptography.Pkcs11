@@ -36,7 +36,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
 
         internal CKM[] Mechanisms = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
 
-        public override CKR C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen)
+        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
             _inFlight = true;
             Entered.Set();

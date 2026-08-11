@@ -91,7 +91,7 @@ internal static class KnownAnswerTestCases
                 session.Verify(eddsa, pub, message, expectedSig, out bool ok);
                 Assert.True(ok, "RFC 8032 test 1 signature should verify against the imported public key.");
 
-                byte[] tampered = (byte[])expectedSig.Clone();
+                byte[] tampered = expectedSig.ToArray();
                 tampered[0] ^= 0xFF;
                 session.Verify(eddsa, pub, message, tampered, out bool bad);
                 Assert.False(bad, "A tampered signature must not verify.");
@@ -234,7 +234,7 @@ internal static class KnownAnswerTestCases
                 session.Verify(mech, pub, msg, sig, out bool ok);
                 Assert.True(ok, "RFC 8017 RSA-PSS signature should verify under the imported public key.");
 
-                byte[] tampered = (byte[])sig.Clone();
+                byte[] tampered = sig.ToArray();
                 tampered[0] ^= 0xFF;
                 session.Verify(mech, pub, msg, tampered, out bool bad);
                 Assert.False(bad, "A tampered RSA-PSS signature must not verify.");
@@ -263,7 +263,7 @@ internal static class KnownAnswerTestCases
                 session.Verify(mech, pub, hash, sig, out bool ok);
                 Assert.True(ok, "ECDSA P-256 signature should verify under the imported public key.");
 
-                byte[] tampered = (byte[])sig.Clone();
+                byte[] tampered = sig.ToArray();
                 tampered[0] ^= 0xFF;
                 session.Verify(mech, pub, hash, tampered, out bool bad);
                 Assert.False(bad, "A tampered ECDSA signature must not verify.");

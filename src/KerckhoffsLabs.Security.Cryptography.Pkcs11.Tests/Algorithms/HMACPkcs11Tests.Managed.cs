@@ -110,7 +110,7 @@ public sealed class HMACPkcs11Tests_Managed
     {
         byte[] keyBytes = RandomNumberGenerator.GetBytes(32);
         byte[] data = Encoding.UTF8.GetBytes("the quick brown fox");
-        byte[] tampered = (byte[])data.Clone();
+        byte[] tampered = data.ToArray();
         tampered[0] ^= 0xFF;
 
         WithImportedHmacKey(keyBytes, (_, key) =>

@@ -22,16 +22,13 @@ public sealed class EncapsulateKeyBufferProbeTests
         public int Calls { get; private set; }
         public const int CiphertextSize = 16;
 
-        public override CKR C_EncapsulateKey(
-            NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey,
-            CK_ATTRIBUTE[] template, NativeCULong attributeCount,
-            byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
         {
             Calls++;
 
             // First (probe) call: the high-level wrapper passes a null buffer. A conformant
             // token may signal "I populated the length, your buffer was inadequate".
-            if (ciphertext is null)
+            if (ciphertext.IsEmpty)
             {
                 ciphertextLen = (NativeCULong)CiphertextSize;
                 return CKR.CKR_BUFFER_TOO_SMALL;
@@ -79,16 +76,16 @@ public sealed class EncapsulateKeyBufferProbeTests
         public int Calls { get; private set; }
         public const int CiphertextSize = 1088; // ML-KEM-768
 
-        public override CKR C_EncapsulateKey(
-            NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey,
-            CK_ATTRIBUTE[] template, NativeCULong attributeCount,
-            byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
         {
+            // A native token that never writes *pulCiphertextLen leaves the caller looking at the
+            // capacity it passed in, which is what the interop layer seeds the out parameter with.
+            ciphertextLen = (NativeCULong)ciphertext.Length;
             Calls++;
             derivedKey = (NativeCULong)42UL; // side-effect on every call, even the would-be "probe"
 
-            // SoftHSM ignores a null buffer entirely: it does not populate the length.
-            if (ciphertext is null)
+            // SoftHSM ignores an empty (NULL) buffer entirely: it does not populate the length.
+            if (ciphertext.IsEmpty)
                 return CKR.CKR_OK;
 
             if (ciphertext.Length < CiphertextSize)
@@ -126,9 +123,10 @@ public sealed class EncapsulateKeyBufferProbeTests
     [Fact]
     public void EncapsulateKey_NoExpectedLength_AgainstNonProbingToken_Throws()
     {
-        // Without the size hint the two-call probe is used; a SoftHSM-like token leaves the length at 0,
-        // so the real call gets an empty buffer and CKR_BUFFER_TOO_SMALL — demonstrating why the hint
-        // path exists. (The library's ML-KEM surface always supplies the hint.)
+        // Without the size hint the two-call probe is used; a SoftHSM-like token reports no size, so
+        // the probe fails loudly rather than returning an empty ciphertext for an encapsulation that
+        // really happened — demonstrating why the hint path exists. (The library's ML-KEM surface
+        // always supplies the hint.)
         var fake = new SoftHsmLikeFake();
         var session = new Pkcs11Session(fake, sessionId: 1);
         try

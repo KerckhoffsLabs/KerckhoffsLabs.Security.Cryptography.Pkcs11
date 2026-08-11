@@ -14,16 +14,12 @@ internal sealed partial class ManagedSoftToken
     // (MLDsa/SlhDsa/MLKem), which are not AsymmetricAlgorithm — hence object.
     private readonly Dictionary<ulong, object> _asymKeys = [];
 
-    public override CKR C_GenerateKeyPair(
-        NativeCULong session, ref CK_MECHANISM mechanism,
-        CK_ATTRIBUTE[]? publicKeyTemplate, NativeCULong publicKeyAttributeCount,
-        CK_ATTRIBUTE[]? privateKeyTemplate, NativeCULong privateKeyAttributeCount,
-        ref NativeCULong publicKey, ref NativeCULong privateKey)
+    public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
 
-        var pub = ReadTemplate(publicKeyTemplate, publicKeyAttributeCount);
-        var priv = ReadTemplate(privateKeyTemplate, privateKeyAttributeCount);
+        var pub = ReadTemplate(publicKeyTemplate);
+        var priv = ReadTemplate(privateKeyTemplate);
 
         switch ((CKM)(ulong)mechanism.Mechanism)
         {

@@ -27,10 +27,10 @@ public sealed class GetInterfaceTests
         public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
         public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
 
-        public override CKR C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface)
+        public override CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface)
         {
-            NameWasNull = interfaceName is null;
-            CapturedName = interfaceName;
+            NameWasNull = interfaceName.IsEmpty;
+            CapturedName = interfaceName.ToArray();
             iface = default;
             if (Rv != CKR.CKR_OK) return Rv;
 

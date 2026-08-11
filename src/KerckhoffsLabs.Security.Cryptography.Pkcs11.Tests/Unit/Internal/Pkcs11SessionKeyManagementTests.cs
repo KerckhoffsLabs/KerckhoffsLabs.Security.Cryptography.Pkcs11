@@ -25,22 +25,22 @@ public sealed class Pkcs11SessionKeyManagementTests
         public byte[] Wrapped = [0xAA, 0xBB, 0xCC];
         public int? WrapSecondLen; // when set, the real call reports fewer bytes than the probe -> resize down
 
-        public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? publicKeyTemplate, NativeCULong publicKeyAttributeCount, CK_ATTRIBUTE[]? privateKeyTemplate, NativeCULong privateKeyAttributeCount, ref NativeCULong publicKey, ref NativeCULong privateKey)
+        public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
         { publicKey = (NativeCULong)PublicId; privateKey = (NativeCULong)PrivateId; return GenPairRv; }
 
-        public override CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
+        public override CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
         {
-            if (wrappedKey is null) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapRv; }
+            if (wrappedKey.IsEmpty) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapRv; }
             int n = WrapSecondLen ?? Wrapped.Length;
-            Array.Copy(Wrapped, wrappedKey, Math.Min(n, wrappedKey.Length));
+            Wrapped.AsSpan(0, Math.Min(n, wrappedKey.Length)).CopyTo(wrappedKey);
             wrappedKeyLen = (NativeCULong)n;
             return WrapRv;
         }
 
-        public override CKR C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
+        public override CKR C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         { key = (NativeCULong)UnwrappedId; return UnwrapRv; }
 
-        public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
+        public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         { key = (NativeCULong)DerivedId; return DeriveRv; }
     }
 

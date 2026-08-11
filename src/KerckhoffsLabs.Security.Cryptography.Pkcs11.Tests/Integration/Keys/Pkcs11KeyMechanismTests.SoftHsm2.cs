@@ -75,7 +75,7 @@ internal static class Pkcs11KeyMechanismCases
             byte[] signature = key.Sign(sha256Rsa, data);
             Assert.True(key.Verify(sha256Rsa, data, signature));
 
-            byte[] tampered = (byte[])data.Clone();
+            byte[] tampered = data.ToArray();
             tampered[0] ^= 0xFF;
             Assert.False(key.Verify(sha256Rsa, tampered, signature));
         }

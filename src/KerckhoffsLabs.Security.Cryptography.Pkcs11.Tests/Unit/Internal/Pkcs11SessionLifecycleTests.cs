@@ -42,36 +42,36 @@ public sealed class Pkcs11SessionLifecycleTests
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
         public override CKR C_Logout(NativeCULong session) => CKR.CKR_OK;
 
-        public override CKR C_Login(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen)
-        { CapturedUserType = userType; CapturedPin = pin[..(int)pinLen]; return LoginRv; }
+        public override CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin)
+        { CapturedUserType = userType; CapturedPin = pin.ToArray(); return LoginRv; }
 
-        public override CKR C_LoginUser(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen)
-        { CapturedUserType = userType; CapturedPin = pin[..(int)pinLen]; CapturedUsername = username[..(int)usernameLen]; return LoginUserRv; }
+        public override CKR C_LoginUser(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username)
+        { CapturedUserType = userType; CapturedPin = pin.ToArray(); CapturedUsername = username.ToArray(); return LoginUserRv; }
 
-        public override CKR C_InitPIN(NativeCULong session, byte[] pin, NativeCULong pinLen)
-        { CapturedPin = pin[..(int)pinLen]; return InitPinRv; }
+        public override CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin)
+        { CapturedPin = pin.ToArray(); return InitPinRv; }
 
-        public override CKR C_SetPIN(NativeCULong session, byte[] oldPin, NativeCULong oldPinLen, byte[] newPin, NativeCULong newPinLen)
+        public override CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
             => SetPinRv;
 
-        public override CKR C_SeedRandom(NativeCULong session, byte[] seed, NativeCULong seedLen)
-        { CapturedSeed = seed[..(int)seedLen]; return SeedRv; }
+        public override CKR C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed)
+        { CapturedSeed = seed.ToArray(); return SeedRv; }
 
-        public override CKR C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen)
-        { for (int i = 0; i < (int)randomLen; i++) randomData[i] = (byte)(i + 1); return GenRandomRv; }
+        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        { for (int i = 0; i < randomData.Length; i++) randomData[i] = (byte)(i + 1); return GenRandomRv; }
 
-        public override CKR C_GetOperationState(NativeCULong session, byte[]? operationState, ref NativeCULong operationStateLen)
+        public override CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, out NativeCULong operationStateLen)
         {
-            if (operationState is null) { operationStateLen = (NativeCULong)OperationState.Length; return GetOpStateRv; }
-            Array.Copy(OperationState, operationState, OperationState.Length);
+            if (operationState.IsEmpty) { operationStateLen = (NativeCULong)OperationState.Length; return GetOpStateRv; }
+            OperationState.AsSpan(0, OperationState.Length).CopyTo(operationState);
             operationStateLen = (NativeCULong)OperationState.Length;
             return GetOpStateRv;
         }
 
-        public override CKR C_SetOperationState(NativeCULong session, byte[] operationState, NativeCULong operationStateLen, NativeCULong encryptionKey, NativeCULong authenticationKey)
-        { CapturedOpState = operationState[..(int)operationStateLen]; CapturedEncKey = (ulong)encryptionKey; CapturedAuthKey = (ulong)authenticationKey; return SetOpStateRv; }
+        public override CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey)
+        { CapturedOpState = operationState.ToArray(); CapturedEncKey = (ulong)encryptionKey; CapturedAuthKey = (ulong)authenticationKey; return SetOpStateRv; }
 
-        public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong key)
+        public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         { key = (NativeCULong)GeneratedKeyId; return GenerateKeyRv; }
 
         public override CKR C_GetFunctionStatus(NativeCULong session) => FunctionStatusRv;

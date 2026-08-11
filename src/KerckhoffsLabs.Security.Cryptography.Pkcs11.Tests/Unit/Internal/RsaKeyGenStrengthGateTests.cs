@@ -19,11 +19,7 @@ public sealed class RsaKeyGenStrengthGateTests
     {
         public int Calls { get; private set; }
 
-        public override CKR C_GenerateKeyPair(
-            NativeCULong session, ref CK_MECHANISM mechanism,
-            CK_ATTRIBUTE[]? publicKeyTemplate, NativeCULong publicKeyAttributeCount,
-            CK_ATTRIBUTE[]? privateKeyTemplate, NativeCULong privateKeyAttributeCount,
-            ref NativeCULong publicKey, ref NativeCULong privateKey)
+        public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
         {
             Calls++;
             publicKey = (NativeCULong)10UL;

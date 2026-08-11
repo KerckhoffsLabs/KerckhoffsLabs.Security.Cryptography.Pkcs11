@@ -47,8 +47,8 @@ public sealed class Pkcs11SlotTests
             count = (NativeCULong)Mechs.Length; // token may report fewer than the probe (shrink)
             return MechListRv2;
         }
-        public override CKR C_InitToken(NativeCULong slotId, byte[] pin, NativeCULong pinLen, byte[] label)
-        { CapturedPin = (byte[])pin.Clone(); CapturedPinLen = pinLen; CapturedLabel = (byte[])label.Clone(); return InitTokenRv; }
+        public override CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label)
+        { CapturedPin = pin.ToArray(); CapturedPinLen = (NativeCULong)pin.Length; CapturedLabel = label.ToArray(); return InitTokenRv; }
         public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
         { CapturedOpenFlags = flags; session = OpenSessionId; return OpenRv; }
         public override CKR C_CloseAllSessions(NativeCULong slotId) { CloseAllCalled = true; return CloseAllRv; }

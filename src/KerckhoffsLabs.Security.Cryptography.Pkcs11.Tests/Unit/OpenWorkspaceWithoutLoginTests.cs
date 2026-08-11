@@ -45,7 +45,7 @@ public sealed class OpenWorkspaceWithoutLoginTests
         }
 
         // A no-login token rejects C_Login; record any call so the test can prove it never happens.
-        public override CKR C_Login(NativeCULong session, CKU userType, byte[] pin, NativeCULong pinLen)
+        public override CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin)
         {
             LoginCalls++;
             return CKR.CKR_USER_TYPE_INVALID;

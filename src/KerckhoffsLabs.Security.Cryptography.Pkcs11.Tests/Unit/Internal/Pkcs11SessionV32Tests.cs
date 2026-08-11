@@ -35,38 +35,38 @@ public sealed class Pkcs11SessionV32Tests
         public int VerifyUpdateCalls { get; private set; }
         public byte[]? CapturedAad;
 
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
         {
             derivedKey = (NativeCULong)SharedId;
-            if (ciphertext is null)
+            if (ciphertext.IsEmpty)
             {
                 ciphertextLen = (NativeCULong)Ciphertext.Length;
                 return EncapsProbeBufferTooSmall ? CKR.CKR_BUFFER_TOO_SMALL : EncapsRv;
             }
-            Array.Copy(Ciphertext, ciphertext, Ciphertext.Length);
+            Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
             return EncapsRv;
         }
 
-        public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
         { derivedKey = (NativeCULong)SharedId; return DecapsRv; }
 
-        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
+        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
         {
-            CapturedAad = associatedData[..(int)associatedDataLen];
-            if (wrappedKey is null) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapAuthRv; }
+            CapturedAad = associatedData.ToArray();
+            if (wrappedKey.IsEmpty) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapAuthRv; }
             int n = WrapSecondLen ?? Wrapped.Length;
-            Array.Copy(Wrapped, wrappedKey, Math.Min(n, wrappedKey.Length));
+            Wrapped.AsSpan(0, Math.Min(n, wrappedKey.Length)).CopyTo(wrappedKey);
             wrappedKeyLen = (NativeCULong)n;
             return WrapAuthRv;
         }
 
-        public override CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key)
-        { CapturedAad = associatedData[..(int)associatedDataLen]; key = (NativeCULong)UnwrappedId; return UnwrapAuthRv; }
+        public override CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> associatedData, ref NativeCULong key)
+        { CapturedAad = associatedData.ToArray(); key = (NativeCULong)UnwrappedId; return UnwrapAuthRv; }
 
-        public override CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen) => VerifySigInitRv;
-        public override CKR C_VerifySignature(NativeCULong session, byte[] data, NativeCULong dataLen) => VerifySigRv;
-        public override CKR C_VerifySignatureUpdate(NativeCULong session, byte[] part, NativeCULong partLen) { VerifyUpdateCalls++; return CKR.CKR_OK; }
+        public override CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature) => VerifySigInitRv;
+        public override CKR C_VerifySignature(NativeCULong session, ReadOnlySpan<byte> data) => VerifySigRv;
+        public override CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part) { VerifyUpdateCalls++; return CKR.CKR_OK; }
         public override CKR C_VerifySignatureFinal(NativeCULong session) => VerifySigFinalRv;
 
         public override CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)

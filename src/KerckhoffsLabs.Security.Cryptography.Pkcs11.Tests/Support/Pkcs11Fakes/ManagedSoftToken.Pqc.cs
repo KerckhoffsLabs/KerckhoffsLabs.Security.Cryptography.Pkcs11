@@ -75,41 +75,41 @@ internal sealed partial class ManagedSoftToken
 
     // === ML-KEM encapsulate / decapsulate ================================
 
-    public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey,
-        CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
+        ciphertextLen = (NativeCULong)0;
+        ciphertextLen = (NativeCULong)0;
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!_asymKeys.TryGetValue((ulong)publicKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;
 
         int ctSize = kem.Algorithm.CiphertextSizeInBytes;
-        if (ciphertext is null || ciphertext.Length < ctSize)
+        if (ciphertext.IsEmpty || ciphertext.Length < ctSize)
         {
             ciphertextLen = (NativeCULong)(ulong)ctSize; // length probe
             return CKR.CKR_BUFFER_TOO_SMALL;
         }
 
         kem.Encapsulate(out byte[] ct, out byte[] sharedSecret);
-        Array.Copy(ct, ciphertext, ct.Length);
+        ct.AsSpan(0, ct.Length).CopyTo(ciphertext);
         ciphertextLen = (NativeCULong)(ulong)ct.Length;
-        derivedKey = (NativeCULong)StoreSharedSecret(template, attributeCount, sharedSecret);
+        derivedKey = (NativeCULong)StoreSharedSecret(template, sharedSecret);
         return CKR.CKR_OK;
     }
 
-    public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey,
-        CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!_asymKeys.TryGetValue((ulong)privateKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;
 
-        byte[] ct = ciphertext.AsSpan(0, (int)ciphertextLen).ToArray();
+        byte[] ct = ciphertext.ToArray();
         byte[] sharedSecret = kem.Decapsulate(ct);
-        derivedKey = (NativeCULong)StoreSharedSecret(template, attributeCount, sharedSecret);
+        derivedKey = (NativeCULong)StoreSharedSecret(template, sharedSecret);
         return CKR.CKR_OK;
     }
 
-    private ulong StoreSharedSecret(CK_ATTRIBUTE[] template, NativeCULong count, byte[] sharedSecret)
+    private ulong StoreSharedSecret(ReadOnlySpan<CK_ATTRIBUTE> template, byte[] sharedSecret)
     {
-        var attrs = ReadTemplate(template, count);
+        var attrs = ReadTemplate(template);
         attrs[(ulong)CKA.CKA_VALUE] = sharedSecret;
         attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
         return Store(attrs);

@@ -18,18 +18,20 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
-    public override CKR C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? digest, ref NativeCULong digestLen)
+    public override CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen)
     {
+        digestLen = (NativeCULong)0;
+        digestLen = (NativeCULong)0;
         if (!_digestOps.TryGetValue((ulong)session, out var mech)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
 
         byte[] result;
-        try { result = ComputeDigest((CKM)mech, data.AsSpan(0, (int)dataLen).ToArray()); }
+        try { result = ComputeDigest((CKM)mech, data.ToArray()); }
         catch (PlatformNotSupportedException) { _digestOps.Remove((ulong)session); return CKR.CKR_MECHANISM_INVALID; }
 
-        if (digest is null) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
+        if (digest.IsEmpty) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
         if (digest.Length < result.Length) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
-        Array.Copy(result, digest, result.Length);
+        result.AsSpan(0, result.Length).CopyTo(digest);
         digestLen = (NativeCULong)(ulong)result.Length;
         _digestOps.Remove((ulong)session);
         return CKR.CKR_OK;

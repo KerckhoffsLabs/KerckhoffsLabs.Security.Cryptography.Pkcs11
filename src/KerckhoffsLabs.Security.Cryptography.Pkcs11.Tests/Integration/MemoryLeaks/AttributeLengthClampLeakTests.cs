@@ -33,8 +33,7 @@ public sealed class AttributeLengthClampLeakTests
     {
         private int _calls;
 
-        public override CKR C_GetAttributeValue(
-            NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
         {
             _calls++;
             for (int i = 0; i < template.Length; i++)

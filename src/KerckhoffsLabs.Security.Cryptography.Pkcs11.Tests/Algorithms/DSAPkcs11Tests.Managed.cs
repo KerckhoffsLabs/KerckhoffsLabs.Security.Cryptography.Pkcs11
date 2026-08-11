@@ -90,12 +90,12 @@ public sealed class DSAPkcs11Tests_Managed
             Assert.True(dsa.VerifyData(data, sig, hash));
 
             // Tamper the message: verify must fail.
-            byte[] tampered = (byte[])data.Clone();
+            byte[] tampered = data.ToArray();
             tampered[0] ^= 0xFF;
             Assert.False(dsa.VerifyData(tampered, sig, hash));
 
             // Tamper the signature: verify must fail.
-            byte[] badSig = (byte[])sig.Clone();
+            byte[] badSig = sig.ToArray();
             badSig[0] ^= 0xFF;
             Assert.False(dsa.VerifyData(data, badSig, hash));
         }
@@ -160,7 +160,7 @@ public sealed class DSAPkcs11Tests_Managed
             DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
             Assert.Equal(2 * pub.Q!.Length, sig.Length);
 
-            byte[] badSig = (byte[])sig.Clone();
+            byte[] badSig = sig.ToArray();
             badSig[0] ^= 0xFF;
             Assert.False(dsa.VerifySignature(hash, badSig));
         }

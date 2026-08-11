@@ -27,11 +27,9 @@ public sealed class SecureDefaultsAreAddedTests
     {
         public readonly List<(ulong Type, byte[] Value)> Captured = [];
 
-        public override CKR C_GenerateKey(
-            NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template,
-            NativeCULong count, ref NativeCULong key)
+        public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         {
-            foreach (CK_ATTRIBUTE attribute in template ?? [])
+            foreach (CK_ATTRIBUTE attribute in template)
             {
                 byte[] value = new byte[(int)attribute.valueLen];
                 if (value.Length > 0)

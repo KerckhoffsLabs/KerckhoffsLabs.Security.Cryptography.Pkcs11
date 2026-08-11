@@ -29,15 +29,15 @@ internal sealed partial class ManagedSoftToken
             ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
             : InitSym((ulong)session, ref mechanism, (ulong)key);
 
-    public override CKR C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? encryptedData, ref NativeCULong encryptedDataLen)
+    public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen)
         => _rsaEncOps.ContainsKey((ulong)session)
-            ? RsaTransform((ulong)session, data, (int)dataLen, encryptedData, ref encryptedDataLen, encrypt: true)
-            : TransformSym((ulong)session, data, (int)dataLen, encryptedData, ref encryptedDataLen, encrypt: true);
+            ? RsaTransform((ulong)session, data, encryptedData, out encryptedDataLen, encrypt: true)
+            : TransformSym((ulong)session, data, encryptedData, out encryptedDataLen, encrypt: true);
 
-    public override CKR C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[]? data, ref NativeCULong dataLen)
+    public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
         => _rsaEncOps.ContainsKey((ulong)session)
-            ? RsaTransform((ulong)session, encryptedData, (int)encryptedDataLen, data, ref dataLen, encrypt: false)
-            : TransformSym((ulong)session, encryptedData, (int)encryptedDataLen, data, ref dataLen, encrypt: false);
+            ? RsaTransform((ulong)session, encryptedData, data, out dataLen, encrypt: false)
+            : TransformSym((ulong)session, encryptedData, data, out dataLen, encrypt: false);
 
     private CKR InitSym(ulong session, ref CK_MECHANISM mech, ulong key)
     {
@@ -101,14 +101,15 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
-    private CKR TransformSym(ulong session, byte[] input, int inputLen, byte[]? output, ref NativeCULong outputLen, bool encrypt)
+    private CKR TransformSym(ulong session, ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen, bool encrypt)
     {
+        outputLen = (NativeCULong)0;
         if (!_ops.TryGetValue(session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
 
         byte[] result;
         try
         {
-            byte[] inBytes = input.AsSpan(0, inputLen).ToArray();
+            byte[] inBytes = input.ToArray();
             result = IsAead((CKM)op.Mechanism)
                 ? AeadTransform(op, inBytes, encrypt)
                 : BlockTransform(op, inBytes, encrypt);
@@ -117,10 +118,10 @@ internal sealed partial class ManagedSoftToken
         catch (CryptographicException) { _ops.Remove(session); return encrypt ? CKR.CKR_DATA_LEN_RANGE : CKR.CKR_ENCRYPTED_DATA_INVALID; }
 
         // Size probe / under-allocation: report the required length, keep the op live for retry.
-        if (output is null) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
+        if (output.IsEmpty) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
         if (output.Length < result.Length) { outputLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
-        Array.Copy(result, output, result.Length);
+        result.AsSpan(0, result.Length).CopyTo(output);
         outputLen = (NativeCULong)(ulong)result.Length;
         _ops.Remove(session); // single-shot operation complete
         return CKR.CKR_OK;

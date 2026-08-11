@@ -28,11 +28,11 @@ public sealed class Pkcs11SessionObjectsTests
         public ulong CopiedId = 0x99;
         public ulong SizeBytes = 128;
 
-        public override CKR C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong newObjectId)
+        public override CKR C_CopyObject(NativeCULong session, NativeCULong objectId, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong newObjectId)
         { newObjectId = (NativeCULong)CopiedId; return CopyRv; }
         public override CKR C_GetObjectSize(NativeCULong session, NativeCULong objectId, ref NativeCULong size)
         { size = (NativeCULong)SizeBytes; return SizeRv; }
-        public override CKR C_SetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+        public override CKR C_SetAttributeValue(NativeCULong session, NativeCULong objectId, ReadOnlySpan<CK_ATTRIBUTE> template)
             => SetAttrRv;
     }
 
@@ -95,7 +95,7 @@ public sealed class Pkcs11SessionObjectsTests
         public int FindCalls { get; private set; }
         public int FinalCalls { get; private set; }
 
-        public override CKR C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count) => InitRv;
+        public override CKR C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template) => InitRv;
         public override CKR C_FindObjectsFinal(NativeCULong session) { FinalCalls++; return FinalRv; }
 
         public override CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
@@ -168,7 +168,7 @@ public sealed class Pkcs11SessionObjectsTests
         public CKR Rv = CKR.CKR_OK;
         public bool MarkSensitive; // set the -1 (MaxValue) sentinel so the value cannot be read
 
-        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
         {
             if (MarkSensitive)
                 for (int i = 0; i < template.Length; i++)

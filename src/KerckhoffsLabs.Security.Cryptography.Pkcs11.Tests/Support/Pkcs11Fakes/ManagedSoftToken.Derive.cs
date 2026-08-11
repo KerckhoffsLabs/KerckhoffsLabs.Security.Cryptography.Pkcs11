@@ -10,12 +10,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 // HMAC KDF. Produces a new secret-key object whose CKA_VALUE is the derived material.
 internal sealed partial class ManagedSoftToken
 {
-    public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey,
-        CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
+    public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
 
-        var attrs = ReadTemplate(template, attributeCount);
+        var attrs = ReadTemplate(template);
         int valueLen = attrs.TryGetValue((ulong)CKA.CKA_VALUE_LEN, out var vl) ? (int)ToUlong(vl) : 0;
 
         byte[] derived;

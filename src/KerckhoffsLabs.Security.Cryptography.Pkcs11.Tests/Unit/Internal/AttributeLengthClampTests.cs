@@ -37,8 +37,7 @@ public sealed class AttributeLengthClampTests
     {
         private int _calls;
 
-        public override CKR C_GetAttributeValue(
-            NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
         {
             _calls++;
             for (int i = 0; i < template.Length; i++)
@@ -53,8 +52,7 @@ public sealed class AttributeLengthClampTests
     /// <summary>Consistent and well-behaved — the control for the tests below.</summary>
     private sealed class HonestFake(int len) : FakeLowLevelPkcs11Library
     {
-        public override CKR C_GetAttributeValue(
-            NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
+        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
         {
             for (int i = 0; i < template.Length; i++)
                 template[i].valueLen = (NativeCULong)len;

@@ -318,16 +318,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin");
 
-        byte[] tmp = userPin.ToPinnedArray();
-        try
-        {
-            CKR rv = _pkcs11Library.C_InitPIN(_sessionId, tmp, (NativeCULong)tmp.Length);
-            Pkcs11Exception.ThrowIfError(rv, OpInitPIN);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(tmp);
-        }
+        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, userPin.Pin);
+        Pkcs11Exception.ThrowIfError(rv, OpInitPIN);
     }
 
     // -----------------------------------------------------------------------
@@ -348,21 +340,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin");
 
-        byte[] oldTmp = oldPin.ToPinnedArray();
-        byte[] newTmp = newPin.ToPinnedArray();
-        try
-        {
-            CKR rv = _pkcs11Library.C_SetPIN(
-                _sessionId,
-                oldTmp, (NativeCULong)oldTmp.Length,
-                newTmp, (NativeCULong)newTmp.Length);
-            Pkcs11Exception.ThrowIfError(rv, OpSetPIN);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(oldTmp);
-            CryptographicOperations.ZeroMemory(newTmp);
-        }
+        CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPin.Pin, newPin.Pin);
+        Pkcs11Exception.ThrowIfError(rv, OpSetPIN);
     }
 
     /// <summary>
@@ -393,7 +372,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetOperationState");
 
         return CallWithLengthProbe(
-            (byte[]? buffer, ref NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, ref len),
+            (Span<byte> buffer, out NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, out len),
             OpGetOperationState);
     }
 
@@ -412,7 +391,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(state);
 
 
-        CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(state.Length), (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
+        CKR rv = _pkcs11Library.C_SetOperationState(_sessionId, state, (NativeCULong)(encryptionKey.ObjectId), (NativeCULong)(authenticationKey.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpSetOperationState);
     }
 
@@ -436,16 +415,8 @@ internal sealed class Pkcs11Session : IDisposable
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation("Logging as {UserType} into session {SessionId}", Pkcs11LogUtils.ToString(userType), _sessionId);
 
-        byte[] tmp = pin.ToPinnedArray();
-        try
-        {
-            CKR rv = _pkcs11Library.C_Login(_sessionId, userType, tmp, (NativeCULong)tmp.Length);
-            Pkcs11Exception.ThrowIfError(rv, OpLogin);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(tmp);
-        }
+        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
+        Pkcs11Exception.ThrowIfError(rv, OpLogin);
     }
 
     /// <summary>
@@ -453,8 +424,8 @@ internal sealed class Pkcs11Session : IDisposable
     /// Use this overload for HSMs that support named user accounts beyond SO/User.
     /// </summary>
     /// <param name="userType">Type of user.</param>
-    /// <param name="pin">User's PIN. Caller retains ownership; the PIN bytes are copied
-    /// into a transient buffer and zeroed before the method returns.</param>
+    /// <param name="pin">User's PIN. Caller retains ownership; its bytes go to the native
+    /// call straight out of the pinned buffer it owns, with no transient copy.</param>
     /// <param name="username">Account username (UTF-8 encoded). Must not be null or empty.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="pin"/> or <paramref name="username"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="username"/> is empty.</exception>
@@ -476,19 +447,14 @@ internal sealed class Pkcs11Session : IDisposable
                 "Logging in as {UserType} (username supplied) on session {SessionId}",
                 Pkcs11LogUtils.ToString(userType), _sessionId);
 
-        byte[] pinTmp = pin.ToPinnedArray();
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
         {
-            CKR rv = _pkcs11Library.C_LoginUser(
-                _sessionId, userType,
-                pinTmp, (NativeCULong)pinTmp.Length,
-                usernameBytes, (NativeCULong)usernameBytes.Length);
+            CKR rv = _pkcs11Library.C_LoginUser(_sessionId, userType, pin.Pin, usernameBytes);
             Pkcs11Exception.ThrowIfError(rv, OpLoginUser);
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(pinTmp);
             CryptographicOperations.ZeroMemory(usernameBytes);
         }
     }
@@ -916,7 +882,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
-        CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, templateLength, ref objectId);
+        CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCreateObject);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -945,7 +911,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
-        CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, templateLength, ref objectId);
+        CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCopyObject);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1119,7 +1085,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// </summary>
     private void ReadAttributeValues(ObjectHandle objectHandle, CK_ATTRIBUTE[] template)
     {
-        CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
+        CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template);
         if (IsGetAttributeValueFatal(rv))
             Pkcs11Exception.ThrowIfError(rv, OpGetAttributeValue);
     }
@@ -1288,7 +1254,7 @@ internal sealed class Pkcs11Session : IDisposable
         for (int i = 0; i < attributes.Count; i++)
             template[i] = attributes[i].CkAttribute;
 
-        CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, (NativeCULong)(template.Length));
+        CKR rv = _pkcs11Library.C_SetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template);
         Pkcs11Exception.ThrowIfError(rv, OpSetAttributeValue);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1307,7 +1273,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
-        CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
+        CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1366,7 +1332,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
-        CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template, templateLength);
+        CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1464,7 +1430,7 @@ internal sealed class Pkcs11Session : IDisposable
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
 
         NativeCULong keyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, templateLength, ref keyId);
+        CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, ref keyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1511,7 +1477,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong publicKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
         NativeCULong privateKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, publicKeyTemplateLength, privateKeyTemplate, privateKeyTemplateLength, ref publicKeyId, ref privateKeyId);
+        CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, privateKeyTemplate, ref publicKeyId, ref privateKeyId);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1546,7 +1512,7 @@ internal sealed class Pkcs11Session : IDisposable
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
         byte[] wrappedKey = CallWithLengthProbe(
-            (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, ref len),
+            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
             OpWrapKey);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -1608,7 +1574,7 @@ internal sealed class Pkcs11Session : IDisposable
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
         NativeCULong unwrappedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, (NativeCULong)(wrappedKey.Length), template, templateLen, ref unwrappedKey);
+        CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, ref unwrappedKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -1755,23 +1721,23 @@ internal sealed class Pkcs11Session : IDisposable
         throw Pkcs11Exception.Create(rv, operation);
     }
 
-    /// <summary>One step of a Cryptoki two-call length probe: invoke with a null buffer to learn the
-    /// size, then again with the allocated buffer.</summary>
-    private delegate CKR LengthProbedCall(byte[]? buffer, ref NativeCULong length);
+    /// <summary>One step of a Cryptoki two-call length probe: invoke with an empty buffer to learn
+    /// the size, then again with the allocated one. Capacity comes from the buffer itself, so the
+    /// two can never disagree.</summary>
+    private delegate CKR LengthProbedCall(Span<byte> buffer, out NativeCULong length);
 
     /// <summary>
-    /// Runs the standard PKCS#11 two-call pattern — probe the output length with a null buffer,
+    /// Runs the standard PKCS#11 two-call pattern — probe the output length with an empty buffer,
     /// allocate, fill, then trim to the reported length — throwing on any non-OK return from either
     /// call (both tagged with <paramref name="operation"/>).
     /// </summary>
     private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation)
     {
-        NativeCULong length = (NativeCULong)0;
-        CKR rv = call(null, ref length);
+        CKR rv = call(default, out NativeCULong length);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[(int)length];
-        rv = call(buffer, ref length);
+        rv = call(buffer, out length);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         if (buffer.Length != (int)length)
@@ -1781,10 +1747,10 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// One <c>C_*Update</c> call of a multi-part transform. Every such entry point in Cryptoki has
-    /// this shape — input, input length, output, in/out output length — which is what lets the five
-    /// streaming loops share <see cref="PumpStreamThrough"/>.
+    /// this shape — input, output, bytes written — which is what lets the five streaming loops share
+    /// <see cref="PumpStreamThrough"/>.
     /// </summary>
-    private delegate CKR StreamingUpdate(byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen);
+    private delegate CKR StreamingUpdate(ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen);
 
     /// <summary>
     /// Drives a multi-part transform over a stream: read a block, transform it, write the result,
@@ -1811,8 +1777,7 @@ internal sealed class Pkcs11Session : IDisposable
         int bytesRead;
         while ((bytesRead = inputStream.Read(input, 0, input.Length)) > 0)
         {
-            NativeCULong outputLen = (NativeCULong)(output.Length);
-            CKR rv = update(input, (NativeCULong)(bytesRead), output, ref outputLen);
+            CKR rv = update(input.AsSpan(0, bytesRead), output, out NativeCULong outputLen);
             if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
                 Pkcs11Exception.ThrowIfError(rv, operation);
 
@@ -1820,7 +1785,7 @@ internal sealed class Pkcs11Session : IDisposable
             {
                 output = new byte[(int)outputLen];
 
-                rv = update(input, (NativeCULong)(bytesRead), output, ref outputLen);
+                rv = update(input.AsSpan(0, bytesRead), output, out outputLen);
                 Pkcs11Exception.ThrowIfError(rv, operation);
             }
 
@@ -1894,7 +1859,7 @@ internal sealed class Pkcs11Session : IDisposable
                 outputStream.Write(lastPart, 0, lastPart.Length);
 
             byte[] digest = CallWithLengthProbe(
-                (byte[]? buffer, ref NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, ref length),
+                (Span<byte> buffer, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, out length),
                 OpDigestFinal);
             digestFinalized = true;
 
@@ -1969,12 +1934,12 @@ internal sealed class Pkcs11Session : IDisposable
         // the CKR_BUFFER_TOO_SMALL retry below.
         byte[] encryptedData = new byte[data.Length + 16];
         NativeCULong encryptedDataLen = (NativeCULong)encryptedData.Length;
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
             encryptedData = new byte[(int)encryptedDataLen];
-            rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+            rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
 
             // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
             // NSS softoken's classic C_Encrypt violates this — it terminates the operation, so the retry
@@ -1988,12 +1953,12 @@ internal sealed class Pkcs11Session : IDisposable
                 Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
 
                 NativeCULong probeLen = (NativeCULong)0;
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, null, ref probeLen);
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, null, out probeLen);
                 Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
 
                 encryptedData = new byte[(int)probeLen];
                 encryptedDataLen = probeLen;
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, (NativeCULong)data.Length, encryptedData, ref encryptedDataLen);
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
             }
         }
 
@@ -2070,17 +2035,17 @@ internal sealed class Pkcs11Session : IDisposable
         try
         {
             PumpStreamThrough(inputStream, outputStream, bufferLength,
-                (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
-                    => _pkcs11Library.C_EncryptUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                    => _pkcs11Library.C_EncryptUpdate(_sessionId, input, output, out outputLen),
                 OpEncryptUpdate);
 
             byte[]? lastEncryptedPart = null;
             NativeCULong lastEncryptedPartLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, ref lastEncryptedPartLen);
+            rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
             lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, ref lastEncryptedPartLen);
+            rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, out lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
             finalized = true;
 
@@ -2157,17 +2122,17 @@ internal sealed class Pkcs11Session : IDisposable
             NativeCULong ctLen = (NativeCULong)0;
             rv = _pkcs11Library.C_EncryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad, (NativeCULong)aad.Length,
-                pt, (NativeCULong)pt.Length,
-                null!, ref ctLen);
+                aad,
+                pt,
+                null!, out ctLen);
             Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
 
             byte[] ct = new byte[(int)ctLen];
             rv = _pkcs11Library.C_EncryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad, (NativeCULong)aad.Length,
-                pt, (NativeCULong)pt.Length,
-                ct, ref ctLen);
+                aad,
+                pt,
+                ct, out ctLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptMessage);
 
             // The token wrote the authentication tag into the scope-owned block; copy it back into
@@ -2235,12 +2200,12 @@ internal sealed class Pkcs11Session : IDisposable
         // if the token needs more space (e.g. padding expansion on some mechanisms).
         NativeCULong decryptedDataLen = (NativeCULong)encryptedData.Length;
         byte[] decryptedData = new byte[encryptedData.Length];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, decryptedData, ref decryptedDataLen);
+        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out decryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
             decryptedData = new byte[(int)decryptedDataLen];
-            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, (NativeCULong)encryptedData.Length, decryptedData, ref decryptedDataLen);
+            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out decryptedDataLen);
         }
 
         Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
@@ -2312,17 +2277,17 @@ internal sealed class Pkcs11Session : IDisposable
         try
         {
             PumpStreamThrough(inputStream, outputStream, bufferLength,
-                (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
-                    => _pkcs11Library.C_DecryptUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                    => _pkcs11Library.C_DecryptUpdate(_sessionId, input, output, out outputLen),
                 OpDecryptUpdate);
 
             byte[]? lastPart = null;
             NativeCULong lastPartLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out lastPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
             lastPart = new byte[(int)lastPartLen];
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
             finalized = true;
 
@@ -2389,17 +2354,17 @@ internal sealed class Pkcs11Session : IDisposable
             NativeCULong ptLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DecryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad, (NativeCULong)aad.Length,
-                ct, (NativeCULong)ct.Length,
-                null!, ref ptLen);
+                aad,
+                ct,
+                null!, out ptLen);
             Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
 
             byte[] pt = new byte[(int)ptLen];
             rv = _pkcs11Library.C_DecryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad, (NativeCULong)aad.Length,
-                ct, (NativeCULong)ct.Length,
-                pt, ref ptLen);
+                aad,
+                ct,
+                pt, out ptLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
 
             messageParams.AbsorbOutput(paramsStruct);
@@ -2445,7 +2410,7 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpSignInit);
 
         byte[] signature = CallWithLengthProbe(
-            (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, buffer, (NativeCULong)buffer.Length, buf, ref len),
+            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, buffer, buf, out len),
             OpSign);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -2502,7 +2467,7 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
 
-        rv = _pkcs11Library.C_Verify(_sessionId, data, (NativeCULong)(data.Length), signature, (NativeCULong)(signature.Length));
+        rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
         isValid = IsVerified(rv, OpVerify);
 
         mechanism.AbsorbOutput(mechParams);
@@ -2575,11 +2540,11 @@ internal sealed class Pkcs11Session : IDisposable
 
             while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
             {
-                rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part, (NativeCULong)(bytesRead));
+                rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part.AsSpan(0, bytesRead));
                 Pkcs11Exception.ThrowIfError(rv, OpVerifyUpdate);
             }
 
-            rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
+            rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
             // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
             // the call failed with any other CKR — the verify operation is consumed.
             finalized = true;
@@ -2622,11 +2587,11 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecoverInit);
 
         NativeCULong dataLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), null, ref dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, null, out dataLen);
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
 
         byte[] data = new byte[(int)dataLen];
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, (NativeCULong)(signature.Length), data, ref dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, data, out dataLen);
         isValid = IsVerified(rv, OpVerifyRecover);
 
         mechanism.AbsorbOutput(mechParams);
@@ -2759,23 +2724,23 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
-            (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
-                => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, inputLen, output, ref outputLen),
+            (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, output, out outputLen),
             OpDecryptVerifyUpdate);
 
         byte[]? lastPart = null;
         NativeCULong lastPartLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, ref lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[(int)lastPartLen];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, ref lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         if (lastPartLen > (NativeCULong)0)
             outputStream.Write(lastPart, 0, (int)(lastPartLen));
 
-        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature, (NativeCULong)(signature.Length));
+        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
         isValid = IsVerified(rv, OpVerifyFinal);
 
         verificationMechanism.AbsorbOutput(verifyParams);
@@ -2811,11 +2776,11 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
 
         NativeCULong digestLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         byte[] digest = new byte[(int)digestLen];
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         mechanism.AbsorbOutput(mechParams);
@@ -2869,7 +2834,7 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
         byte[] digest = CallWithLengthProbe(
-            (byte[]? buf, ref NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, data, (NativeCULong)(data.Length), buf, ref len),
+            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, data, buf, out len),
             OpDigest);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -2935,16 +2900,16 @@ internal sealed class Pkcs11Session : IDisposable
 
             while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
             {
-                rv = _pkcs11Library.C_DigestUpdate(_sessionId, part, (NativeCULong)(bytesRead));
+                rv = _pkcs11Library.C_DigestUpdate(_sessionId, part.AsSpan(0, bytesRead));
                 Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
             }
 
             NativeCULong digestLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, ref digestLen);
+            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
             byte[] digest = new byte[(int)digestLen];
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, ref digestLen);
+            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             finalized = true;
 
@@ -3061,11 +3026,11 @@ internal sealed class Pkcs11Session : IDisposable
                 Init: (ref CK_MECHANISM mechanism, NativeCULong key)
                     => _pkcs11Library.C_EncryptInit(_sessionId, ref mechanism, key),
                 InitOperation: OpEncryptInit,
-                Update: (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
-                    => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                    => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, output, out outputLen),
                 UpdateOperation: OpDigestEncryptUpdate,
-                Final: (byte[]? buffer, ref NativeCULong length)
-                    => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, ref length),
+                Final: (Span<byte> buffer, out NativeCULong length)
+                    => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, out length),
                 FinalOperation: OpEncryptFinal,
                 CancelFlag: CKF.CKF_ENCRYPT),
             "DigestEncrypt");
@@ -3170,11 +3135,11 @@ internal sealed class Pkcs11Session : IDisposable
                 Init: (ref CK_MECHANISM mechanism, NativeCULong key)
                     => _pkcs11Library.C_DecryptInit(_sessionId, ref mechanism, key),
                 InitOperation: OpDecryptInit,
-                Update: (byte[] input, NativeCULong inputLen, byte[] output, ref NativeCULong outputLen)
-                    => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, inputLen, output, ref outputLen),
+                Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                    => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, output, out outputLen),
                 UpdateOperation: OpDecryptDigestUpdate,
-                Final: (byte[]? buffer, ref NativeCULong length)
-                    => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, ref length),
+                Final: (Span<byte> buffer, out NativeCULong length)
+                    => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, out length),
                 FinalOperation: OpDecryptFinal,
                 CancelFlag: CKF.CKF_DECRYPT),
             "DecryptDigest");
@@ -3210,7 +3175,7 @@ internal sealed class Pkcs11Session : IDisposable
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
 
         NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, templateLen, ref derivedKey);
+        CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, ref derivedKey);
         Pkcs11Exception.ThrowIfError(rv, OpDeriveKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
@@ -3235,17 +3200,11 @@ internal sealed class Pkcs11Session : IDisposable
     {
         using var _ = AcquireExclusive();
 
-        // The interop signature takes byte[], so the caller's entropy has to be copied. Zero the
-        // copy on the way out: seed material is as sensitive as the keys it will help produce.
-        byte[] buffer = seed.ToArray();
-        try
-        {
-            SeedRandom(buffer);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(buffer);
-        }
+        Log.SessionTrace(_logger, (ulong)_sessionId, "SeedRandom");
+
+        // The caller's entropy goes straight to the token: no copy to zero on the way out.
+        CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed);
+        Pkcs11Exception.ThrowIfError(rv, OpSeedRandom);
     }
 
     /// <summary>
@@ -3260,7 +3219,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(seed);
 
-        CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed, (NativeCULong)(seed.Length));
+        CKR rv = _pkcs11Library.C_SeedRandom(_sessionId, seed);
         Pkcs11Exception.ThrowIfError(rv, OpSeedRandom);
     }
 
@@ -3275,19 +3234,13 @@ internal sealed class Pkcs11Session : IDisposable
         using var _ = AcquireExclusive();
         if (destination.IsEmpty) return 0;
 
-        // The interop signature takes byte[], so the token's output lands in a transient before it
-        // reaches the caller's span. Zero it: this is freshly generated key material, and leaving a
-        // second copy on the GC heap defeats the point of the caller passing a span it controls.
-        byte[] random = GenerateRandom(destination.Length);
-        try
-        {
-            random.CopyTo(destination);
-            return destination.Length;
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(random);
-        }
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateRandom");
+
+        // The token fills the caller's span directly. There is no transient array holding a second
+        // copy of freshly generated key material, which is the point of passing a span you control.
+        CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, destination);
+        Pkcs11Exception.ThrowIfError(rv, OpGenerateRandom);
+        return destination.Length;
     }
 
     /// <summary>
@@ -3305,7 +3258,7 @@ internal sealed class Pkcs11Session : IDisposable
             throw new ArgumentException(ValueMustBePositive, nameof(length));
 
         byte[] randomData = new byte[length];
-        CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData, (NativeCULong)(length));
+        CKR rv = _pkcs11Library.C_GenerateRandom(_sessionId, randomData);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateRandom);
 
         return randomData;
@@ -3385,8 +3338,8 @@ internal sealed class Pkcs11Session : IDisposable
             ctLen = (NativeCULong)expectedCiphertextLen;
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                template, (NativeCULong)template.Length,
-                ct, ref ctLen, ref sharedHandle);
+                template,
+                ct, out ctLen, ref sharedHandle);
             Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
         }
         else
@@ -3394,19 +3347,29 @@ internal sealed class Pkcs11Session : IDisposable
             // Two-call: query size first, then real encaps (size unknown to the caller).
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                template, (NativeCULong)template.Length,
-                null!, ref ctLen, ref sharedHandle);
+                template,
+                null!, out ctLen, ref sharedHandle);
             // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
             // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
             // Only a genuine error aborts the probe.
             if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
                 Pkcs11Exception.ThrowIfError(rv, "C_EncapsulateKey (length probe)");
 
+            // A token that ignores the probe (SoftHSM does) reports no size at all. Continuing would
+            // allocate an empty buffer and hand the caller an empty ciphertext for an encapsulation
+            // the token really performed, side effects and all — so fail here instead. The CKR is
+            // synthesized: no native call failed, but the caller is who must act, and
+            // CKR_BUFFER_TOO_SMALL maps to Pkcs11ArgumentException, which says so. Callers that know
+            // the size pass expectedCiphertextLen and never reach this path.
+            if (ctLen == (NativeCULong)0)
+                throw Pkcs11Exception.Create(CKR.CKR_BUFFER_TOO_SMALL,
+                    "C_EncapsulateKey (length probe reported no size — pass expectedCiphertextLen)");
+
             ct = new byte[(int)ctLen];
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
-                template, (NativeCULong)template.Length,
-                ct, ref ctLen, ref sharedHandle);
+                template,
+                ct, out ctLen, ref sharedHandle);
             Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
         }
 
@@ -3461,8 +3424,8 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DecapsulateKey(
             _sessionId, ref ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
-            template, (NativeCULong)template.Length,
-            ct, (NativeCULong)ct.Length, ref sharedHandle);
+            template,
+            ct, ref sharedHandle);
         Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
@@ -3502,7 +3465,7 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong wrappedLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            aad, (NativeCULong)aad.Length, null!, ref wrappedLen);
+            aad, null!, out wrappedLen);
         // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome (PKCS#11 v3.2 §5.2):
         // the token populated wrappedLen despite the (null) output buffer. Only a genuine
         // error aborts the probe.
@@ -3512,7 +3475,7 @@ internal sealed class Pkcs11Session : IDisposable
         byte[] wrapped = new byte[(int)wrappedLen];
         rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            aad, (NativeCULong)aad.Length, wrapped, ref wrappedLen);
+            aad, wrapped, out wrappedLen);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKeyAuthenticated);
 
         mechanism.AbsorbOutput(mechParams);
@@ -3562,9 +3525,9 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong newKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)unwrappingKey.ObjectId,
-            wrapped, (NativeCULong)wrapped.Length,
-            template, (NativeCULong)template.Length,
-            aad, (NativeCULong)aad.Length, ref newKey);
+            wrapped,
+            template,
+            aad, ref newKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
@@ -3605,10 +3568,10 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
             _sessionId, ref ckMechanism, (NativeCULong)verificationKey.ObjectId,
-            sig, (NativeCULong)sig.Length);
+            sig);
         Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
 
-        rv = _pkcs11Library.C_VerifySignature(_sessionId, dataBuf, (NativeCULong)dataBuf.Length);
+        rv = _pkcs11Library.C_VerifySignature(_sessionId, dataBuf);
         bool verified = IsVerified(rv, OpVerifySignature);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -3646,14 +3609,14 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
             _sessionId, ref ckMechanism, (NativeCULong)verificationKey.ObjectId,
-            sig, (NativeCULong)sig.Length);
+            sig);
         Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
 
         byte[] buffer = new byte[bufferLength];
         int read;
         while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
         {
-            rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer, (NativeCULong)read);
+            rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer.AsSpan(0, read));
             Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureUpdate);
         }
 

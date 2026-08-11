@@ -38,25 +38,25 @@ public sealed class Pkcs11SessionStreamTests
         public bool Canceled { get; private set; }
         private bool _retried;
 
-        private CKR Update(byte[] input, NativeCULong inLen, byte[] output, ref NativeCULong outLen)
+        private CKR Update(ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outLen)
         {
             UpdateCalls++;
-            int n = (int)inLen;
+            int n = input.Length;
             if (FirstUpdateBufferTooSmall && !_retried)
             {
                 _retried = true;
                 outLen = (NativeCULong)n;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
-            Array.Copy(input, output, n);
+            input[..n].CopyTo(output);
             outLen = (NativeCULong)n;
             return UpdateRv;
         }
 
-        private CKR Final(byte[]? buffer, ref NativeCULong len)
+        private CKR Final(Span<byte> buffer, out NativeCULong len)
         {
-            if (buffer is null) { len = (NativeCULong)LastBlock.Length; return CKR.CKR_OK; }
-            Array.Copy(LastBlock, buffer, LastBlock.Length);
+            if (buffer.IsEmpty) { len = (NativeCULong)LastBlock.Length; return CKR.CKR_OK; }
+            LastBlock.AsSpan(0, LastBlock.Length).CopyTo(buffer);
             len = (NativeCULong)LastBlock.Length;
             return CKR.CKR_OK;
         }
@@ -67,31 +67,31 @@ public sealed class Pkcs11SessionStreamTests
         public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
         public override CKR C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
 
-        public override CKR C_EncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
-            => Update(part, partLen, encryptedPart, ref encryptedPartLen);
-        public override CKR C_DecryptUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
-            => Update(encryptedPart, encryptedPartLen, part, ref partLen);
-        public override CKR C_EncryptFinal(NativeCULong session, byte[]? lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
-            => Final(lastEncryptedPart, ref lastEncryptedPartLen);
-        public override CKR C_DecryptFinal(NativeCULong session, byte[]? lastPart, ref NativeCULong lastPartLen)
-            => Final(lastPart, ref lastPartLen);
+        public override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen)
+            => Update(part, encryptedPart, out encryptedPartLen);
+        public override CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
+            => Update(encryptedPart, part, out partLen);
+        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, out NativeCULong lastEncryptedPartLen)
+            => Final(lastEncryptedPart, out lastEncryptedPartLen);
+        public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen)
+            => Final(lastPart, out lastPartLen);
 
-        public override CKR C_DigestUpdate(NativeCULong session, byte[] part, NativeCULong partLen) { UpdateCalls++; return UpdateRv; }
-        public override CKR C_DigestFinal(NativeCULong session, byte[]? digest, ref NativeCULong digestLen)
+        public override CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
+        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen)
         {
-            if (digest is null) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
-            Array.Copy(DigestOutput, digest, DigestOutput.Length);
+            if (digest.IsEmpty) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_VerifyUpdate(NativeCULong session, byte[] part, NativeCULong partLen) { UpdateCalls++; return UpdateRv; }
-        public override CKR C_VerifyFinal(NativeCULong session, byte[] signature, NativeCULong signatureLen) => VerifyFinalRv;
+        public override CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
+        public override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
 
-        public override CKR C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[]? data, ref NativeCULong dataLen)
+        public override CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, out NativeCULong dataLen)
         {
-            if (data is null) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
-            Array.Copy(RecoveredData, data, RecoveredData.Length);
+            if (data.IsEmpty) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
+            RecoveredData.AsSpan(0, RecoveredData.Length).CopyTo(data);
             dataLen = (NativeCULong)RecoveredData.Length;
             return VerifyRecoverRv;
         }

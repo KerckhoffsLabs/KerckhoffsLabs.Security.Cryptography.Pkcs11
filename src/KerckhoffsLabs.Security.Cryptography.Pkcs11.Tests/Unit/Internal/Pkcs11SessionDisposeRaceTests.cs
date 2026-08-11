@@ -36,7 +36,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
         private int _closes;
         internal int Closes => Volatile.Read(ref _closes);
 
-        public override CKR C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen)
+        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
             _inFlight = true;
             Entered.Set();
