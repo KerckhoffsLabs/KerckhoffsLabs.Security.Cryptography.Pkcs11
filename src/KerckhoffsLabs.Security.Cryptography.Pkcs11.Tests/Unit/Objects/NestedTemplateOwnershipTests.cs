@@ -49,8 +49,12 @@ public sealed class NestedTemplateOwnershipTests
     }
 
     /// <summary>
-    /// Ownership must transfer at Build rather than be shared. If the builder kept its nested
-    /// children, disposing it afterwards would free buffers the produced template still points at.
+    /// Ownership must transfer at Build rather than be shared. Both halves are asserted, because
+    /// each alone is satisfiable by a broken implementation: the builder letting go proves nothing
+    /// if nobody catches, and a template holding children proves nothing if the builder also kept
+    /// them. Dropping the nested list from the <c>ObjectTemplate</c> the builder returns leaves
+    /// the children unreferenced, so a later GC finalizes them and frees the buffers the parent's
+    /// flat <c>CK_ATTRIBUTE</c> copy still points at, mid token call.
     /// </summary>
     [Fact]
     public void Build_TransfersOwnershipOfNestedChildren()
@@ -58,11 +62,30 @@ public sealed class NestedTemplateOwnershipTests
         using var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
         builder.WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY));
 
-        Assert.Equal(1, builder.NestedTemplateCount);
+        Assert.Single(builder.NestedTemplates);
 
         using ObjectTemplate template = builder.Build();
 
-        Assert.Equal(0, builder.NestedTemplateCount);
+        Assert.Empty(builder.NestedTemplates);      // the builder let go...
+        Assert.Single(template.NestedChildren);     // ...and the template caught
+    }
+
+    /// <summary>
+    /// Setting the same nested attribute twice must release the displaced child, not orphan it.
+    /// The displaced parent attribute is freed by <c>Set</c>; its children are this builder's to
+    /// release.
+    /// </summary>
+    [Fact]
+    public void WrapTemplate_CalledTwice_DisposesTheDisplacedChild()
+    {
+        using var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
+        builder.WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY));
+
+        ObjectAttribute displaced = builder.NestedTemplates.Single().Attributes.Single();
+
+        builder.WrapTemplate(t => t.Sensitive());
+
+        Assert.Throws<ObjectDisposedException>(() => displaced.GetValueAsUlong());
     }
 
     [Fact]
@@ -75,6 +98,24 @@ public sealed class NestedTemplateOwnershipTests
 
         ObjectAttribute parent = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
         Assert.Equal(3, parent.GetValueAsAttributeArray().Length);
+    }
+
+    /// <summary>
+    /// The vendor-defined-CKO builder has no typed wrap/unwrap helpers, so without the generic
+    /// <c>Attribute(CKA, Action&lt;…&gt;)</c> overload nested templates stay unreachable there —
+    /// the same gap this work exists to close, just moved to a different builder.
+    /// </summary>
+    [Fact]
+    public void GenericBuilder_ReachesNestedTemplates_ThroughTheAttributeEscapeHatch()
+    {
+        using ObjectTemplate template = ObjectTemplate.Empty()
+            .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_SECRET_KEY)
+            .Attribute(CKA.CKA_WRAP_TEMPLATE, t => t.Sensitive().NonExtractable())
+            .Build();
+
+        ObjectAttribute parent = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        Assert.Equal(2, parent.GetValueAsAttributeArray().Length);
+        Assert.Single(template.NestedChildren);
     }
 
     [Fact]

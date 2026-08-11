@@ -30,6 +30,14 @@ public sealed class ObjectTemplate : IDisposable
     /// <summary>Internal accessor used by call sites that marshal the template to PKCS#11.</summary>
     internal IReadOnlyList<ObjectAttribute> Attributes => _attributes;
 
+    /// <summary>
+    /// Test seam: the nested child templates this template owns. A nested attribute
+    /// (<c>CKA_WRAP_TEMPLATE</c> and friends) is a flat copy of these children's
+    /// <c>CK_ATTRIBUTE</c> structs, pointers included, so holding them here is what keeps those
+    /// pointers valid and their targets un-finalized for as long as this template lives.
+    /// </summary>
+    internal IReadOnlyList<ObjectTemplate> NestedChildren => _nested;
+
     /// <inheritdoc/>
     public void Dispose()
     {

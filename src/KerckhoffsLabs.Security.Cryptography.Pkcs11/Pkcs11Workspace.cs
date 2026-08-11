@@ -161,6 +161,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(filter);
 
         var handles = _session.FindAllObjects([.. filter.Attributes]);
+        GC.KeepAlive(filter);
         var result = new List<Pkcs11Key>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateKeyFromHandle(handle));
@@ -186,6 +187,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(filter);
 
         var handles = _session.FindAllObjects([.. filter.Attributes]);
+        GC.KeepAlive(filter);
         var result = new List<Pkcs11Object>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateObjectFromHandle(handle));
@@ -212,6 +214,7 @@ public sealed class Pkcs11Workspace : IDisposable
             .Build();
 
         var handles = _session.FindAllObjects([.. filter.Attributes]);
+        GC.KeepAlive(filter);
         var result = new List<Pkcs11Certificate>(handles.Count);
         foreach (var handle in handles)
             result.Add(HydrateCertificateFromHandle(handle));
@@ -247,6 +250,7 @@ public sealed class Pkcs11Workspace : IDisposable
             .Build();
 
         var handles = _session.FindAllObjects([.. filter.Attributes]);
+        GC.KeepAlive(filter);
         return handles.Count == 0 ? null : HydrateKeyFromHandle(handles[0]);
     }
 
@@ -277,6 +281,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(template);
 
         var handle = _session.CreateObject([.. template.Attributes]);
+        GC.KeepAlive(template);
         return HydrateKeyFromHandle(handle);
     }
 
@@ -296,6 +301,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(template);
 
         var handle = _session.GenerateKey(mechanism, [.. template.Attributes]);
+        GC.KeepAlive(template);
         return HydrateKeyFromHandle(handle);
     }
 
@@ -326,6 +332,8 @@ public sealed class Pkcs11Workspace : IDisposable
             [.. privateTemplate.Attributes],
             out var publicHandle,
             out var privateHandle);
+        GC.KeepAlive(publicTemplate);
+        GC.KeepAlive(privateTemplate);
 
         // Read identifying metadata off the private side — we already have both
         // handles in hand so we bypass the companion-discovery lookup.
@@ -608,12 +616,14 @@ public sealed class Pkcs11Workspace : IDisposable
             .Id(id)
             .Build();
         var handles = _session.FindAllObjects([.. filter.Attributes]);
+        GC.KeepAlive(filter);
         return handles.Count > 0 ? handles[0] : ObjectHandle.Invalid;
     }
 
     private Pkcs11Key OpenKeyByFilter(ObjectTemplate filter, string queryDescription)
     {
         var handles = _session.FindAllObjects([.. filter.Attributes]);
+        GC.KeepAlive(filter);
         if (handles.Count == 0)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 $"OpenKey({queryDescription})");

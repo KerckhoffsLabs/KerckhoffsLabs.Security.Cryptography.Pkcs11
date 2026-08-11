@@ -268,4 +268,20 @@ public sealed class ObjectAttributeTests
         Assert.Equal(vendorAttrId, attr.Type);
         Assert.Single(attr.GetValueAsByteArray(), (byte)0xAA);
     }
+
+    /// <summary>
+    /// A nested template copies each child's CK_ATTRIBUTE struct verbatim, so a disposed child
+    /// would be copied as {type, NULL, 0} — an attribute that is present but empty. In a
+    /// CKA_WRAP_TEMPLATE that is a different filter than the caller wrote, and it would reach the
+    /// token silently. Refuse instead.
+    /// </summary>
+    [Fact]
+    public void NestedAttributeList_WithADisposedChild_Throws()
+    {
+        var child = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        child.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(
+            () => new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, new List<ObjectAttribute> { child }));
+    }
 }

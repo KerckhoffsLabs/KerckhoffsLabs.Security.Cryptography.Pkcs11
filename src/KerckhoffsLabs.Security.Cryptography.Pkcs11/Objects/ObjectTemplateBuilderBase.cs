@@ -79,16 +79,22 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     /// <remarks>
     /// The children are marshalled as flat copies of their <c>CK_ATTRIBUTE</c> structs, pointers
     /// included, so this builder keeps the child template alive and hands ownership to the
-    /// <see cref="ObjectTemplate"/> at <see cref="Build"/>. The caller never sees a disposable child.
+    /// <see cref="ObjectTemplate"/> at <see cref="Build"/>. The caller never has to dispose a child:
+    /// the builder that <paramref name="configure"/> receives is created, consumed and released
+    /// here. (That builder does inherit <c>Build</c> and <c>Dispose</c>; calling either from inside
+    /// the callback is pointless but safe, since both leave this method's own copy unaffected.)
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     protected TSelf NestedTemplate(CKA attribute, Action<NestedKeyTemplateBuilder> configure)
     {
+        // Null-check first, matching the Attribute(...) overloads: their argument is evaluated (and
+        // throws) before Set's guards run, so a null argument reports as ArgumentNullException there
+        // whether or not the builder is also disposed. Same ordering here.
+        ArgumentNullException.ThrowIfNull(configure);
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_built) throw new InvalidOperationException("Builder has already produced an ObjectTemplate. Start a new builder.");
-        ArgumentNullException.ThrowIfNull(configure);
 
         using var inner = new NestedKeyTemplateBuilder();
         configure(inner);
@@ -111,6 +117,19 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
 
         return (TSelf)this;
     }
+
+    /// <summary>
+    /// Sets an arbitrary attribute whose value is a nested template, from a configuration callback.
+    /// Escape hatch for nested-template attributes the typed API does not cover — chiefly the
+    /// vendor-defined object classes <see cref="GenericTemplateBuilder"/> exists for, which have no
+    /// typed <c>WrapTemplate</c>/<c>UnwrapTemplate</c> helpers of their own.
+    /// </summary>
+    /// <remarks>Completes the <c>Attribute(CKA, …)</c> family; see <see cref="NestedTemplate"/> for the ownership rules.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public TSelf Attribute(CKA attribute, Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(attribute, configure);
 
     /// <summary>Sets CKA_LABEL.</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is <c>null</c>.</exception>
@@ -146,10 +165,11 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>
-    /// Test seam: how many nested templates this builder still owns. Zero once <see cref="Build"/>
-    /// has transferred them to the produced <see cref="ObjectTemplate"/>.
+    /// Test seam: the nested templates this builder still owns. Empty once <see cref="Build"/>
+    /// has transferred them to the produced <see cref="ObjectTemplate"/>, whose own
+    /// <c>NestedChildren</c> seam is the receiving half of the same invariant.
     /// </summary>
-    internal int NestedTemplateCount => _nested.Count;
+    internal IReadOnlyCollection<ObjectTemplate> NestedTemplates => _nested.Values;
 
     /// <summary>Disposes any attributes the builder still owns. Safe to call before <see cref="Build"/>.</summary>
     public void Dispose()
@@ -159,11 +179,17 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>
-    /// Disposes the attributes the builder still owns. The builder holds only managed
-    /// <see cref="ObjectAttribute"/> values — each with its own finalizer — so cleanup runs only on
-    /// the deterministic (<paramref name="disposing"/> = <see langword="true"/>) path and this type
-    /// needs no finalizer of its own.
+    /// Disposes the attributes and nested child templates the builder still owns. Cleanup runs only
+    /// on the deterministic (<paramref name="disposing"/> = <see langword="true"/>) path.
     /// </summary>
+    /// <remarks>
+    /// This type has no finalizer, and neither does <see cref="ObjectAttribute"/>. A builder that is
+    /// neither built nor disposed therefore leaks its attribute buffers with nothing to reclaim
+    /// them. That is the deliberate trade: a finalizer here could free a buffer that a produced
+    /// <see cref="ObjectTemplate"/> — or a native call already holding the pointer — still needs,
+    /// and freeing memory out from under a token is far worse than leaking it. Dispose, or call
+    /// <see cref="Build"/> and dispose the template it returns.
+    /// </remarks>
     /// <param name="disposing"><see langword="true"/> when called from <see cref="Dispose()"/>.</param>
     protected virtual void Dispose(bool disposing)
     {

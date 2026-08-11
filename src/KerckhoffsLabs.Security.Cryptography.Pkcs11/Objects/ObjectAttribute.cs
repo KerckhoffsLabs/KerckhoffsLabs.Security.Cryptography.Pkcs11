@@ -161,7 +161,14 @@ public sealed class ObjectAttribute : IDisposable
             try
             {
                 for (int i = 0; i < value.Count; i++)
-                    UnmanagedMemory.Write(IntPtr.Add(scratch, i * stride), in value[i]._ckAttribute);
+                {
+                    // Read through CkAttribute, not the field: a disposed child would otherwise be
+                    // copied verbatim as {type, NULL, 0} — an attribute that is present but empty,
+                    // which in a CKA_WRAP_TEMPLATE is a different filter than the caller wrote and
+                    // would reach the token silently. The property's guard turns that into a throw.
+                    CK_ATTRIBUTE childAttribute = value[i].CkAttribute;
+                    UnmanagedMemory.Write(IntPtr.Add(scratch, i * stride), in childAttribute);
+                }
                 UnmanagedMemory.Read(scratch, flat);
             }
             finally
