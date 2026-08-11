@@ -154,11 +154,10 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     }
 
     /// <summary>
-    /// Binds to a statically-linked PKCS#11 implementation. The cryptoki symbols
-    /// are expected to be linked into the host executable (iOS-style
-    /// <c>DllImport("__Internal")</c>). The function-list pointer is acquired via
-    /// the statically-bound <c>C_GetFunctionList</c>; all subsequent calls go
-    /// through the returned function-pointer table, same as the dynamic-load path.
+    /// Binds to a statically-linked PKCS#11 implementation. The cryptoki symbols are expected to be
+    /// linked into the host executable and exported from it, so <c>C_GetFunctionList</c> resolves
+    /// against the entry-point module's own symbol table. All subsequent calls go through the
+    /// returned function-pointer table, same as the dynamic-load path.
     /// </summary>
     internal LowLevelPkcs11Library()
     {

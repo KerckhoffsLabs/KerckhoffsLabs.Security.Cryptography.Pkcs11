@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Holds delegates for all PKCS#11 functions
 /// </summary>
-internal partial class Delegates
+internal class Delegates
 {
     /// <summary>
     /// Typed function pointer table. Populated by Initialize / TryLoadV30Symbols /
@@ -19,25 +19,6 @@ internal partial class Delegates
 
     /// <summary>Native cryptoki bootstrap symbol name, used for export lookup and error context (S1192).</summary>
     private const string GetFunctionListSymbol = "C_GetFunctionList";
-
-    /// <summary>
-    /// Definition of unmanaged methods (used on iOS)
-    /// </summary>
-    private static partial class NativeMethods
-    {
-        /// <summary>
-        /// Bootstrap entry point for the statically-linked path. Returns a function
-        /// list whose entries are unmanaged function pointers; <see cref="Delegates"/>
-        /// then resolves all 67 other cryptoki functions through that table — no
-        /// further <c>DllImport</c> declarations are needed.
-        /// </summary>
-        // Source-generated P/Invoke. Viable because [assembly: DisableRuntimeMarshalling]
-        // (see AssemblyAttributes.cs) lets LibraryImport marshal the blittable NativeCULong
-        // return + out IntPtr without runtime marshalling.
-        [LibraryImport("__Internal")]
-        [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-        internal static partial NativeCULong C_GetFunctionList(out IntPtr functionList);
-    }
 
     /// <summary>Wrapper for <c>C_Initialize</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Initialize(IntPtr pInitArgs)
@@ -1479,38 +1460,20 @@ internal partial class Delegates
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
     /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library
-    /// when <paramref name="libraryHandle"/> is non-zero, or against the
-    /// statically-linked PKCS#11 symbols otherwise (iOS-style "__Internal" link).
+    /// when <paramref name="libraryHandle"/> is non-zero, or against the host
+    /// executable's own symbol table otherwise (a statically-linked module).
     /// </summary>
     /// <param name="libraryHandle">Handle to the dynamically loaded PKCS#11 library,
     /// or <see cref="IntPtr.Zero"/> for a statically-linked library.</param>
     internal Delegates(IntPtr libraryHandle)
-    {
-        if (libraryHandle != IntPtr.Zero)
-        {
-            Load(ResolverFor(libraryHandle));
-        }
-        else
-        {
-            // Statically-linked module (iOS / Native AOT): bind the v2.40 surface via the
-            // __Internal C_GetFunctionList bootstrap.
-            InitializeWithGetFunctionList();
-
-            // Then attempt the v3.0/v3.2 surface against the process's own symbol table.
-            // GetMainProgramHandle() resolves statically-linked exports, and the resolver
-            // (used inside TryLoadV30Symbols) returns Zero — no throw, no link-time symbol
-            // requirement — for functions a v2.40-only module doesn't provide, so we degrade
-            // gracefully instead of silently skipping v3.0 as before.
-            try
-            {
-                TryLoadV30Symbols(ResolverFor(NativeLibrary.GetMainProgramHandle()));
-            }
-            catch
-            {
-                // Process-global symbol resolution unavailable on this platform; remain v2.40-only.
-            }
-        }
-    }
+        // A statically-linked module's exports live in the entry-point module, which
+        // GetMainProgramHandle() resolves against on CoreCLR and Native AOT alike. That makes the
+        // static path the ordinary load sequence over a different handle rather than a separate
+        // bootstrap: same C_GetFunctionList entry, same best-effort v3.0/v3.2 binding, same
+        // graceful degradation for exports a v2.40-only module does not provide.
+        => Load(ResolverFor(libraryHandle != IntPtr.Zero
+            ? libraryHandle
+            : NativeLibrary.GetMainProgramHandle()));
 
     /// <summary>
     /// Initializes the dispatch table through an export resolver instead of an OS library
@@ -1855,22 +1818,6 @@ internal partial class Delegates
         CK_FUNCTION_LIST funcList = UnmanagedMemory.Read<CK_FUNCTION_LIST>(functionList);
         Initialize(funcList);
     }
-
-    /// <summary>
-    /// Get delegates with C_GetFunctionList function from the statically linked PKCS#11 library
-    /// </summary>
-    private void InitializeWithGetFunctionList()
-    {
-        CKR returnValue = NativeMethods.C_GetFunctionList(out IntPtr functionList).ToCKR();
-        Pkcs11Exception.ThrowIfError(returnValue, GetFunctionListSymbol);
-        if (functionList == IntPtr.Zero)
-            throw new InvalidOperationException(
-                "C_GetFunctionList succeeded but returned a null function-list pointer.");
-
-        CK_FUNCTION_LIST funcList = UnmanagedMemory.Read<CK_FUNCTION_LIST>(functionList);
-        Initialize(funcList);
-    }
-
 
     /// <summary>
     /// Get delegates from unmanaged function pointers

@@ -74,15 +74,27 @@ public sealed class Pkcs11Library : IDisposable
     /// Binds to a PKCS#11 implementation that is statically linked into the host
     /// executable, rather than dynamically loaded from a path. Use this entry
     /// point on platforms where dynamic library loading is unavailable or
-    /// restricted (iOS, Native AOT, single-file embedded builds).
+    /// restricted (Native AOT, single-file embedded builds).
     /// </summary>
     /// <remarks>
-    /// The host must export the cryptoki <c>C_GetFunctionList</c> symbol at link
-    /// time via <c>DllImport("__Internal")</c>. All subsequent PKCS#11 calls go
-    /// through the function-pointer table returned by that single call — no
-    /// other unmanaged bindings are required.
+    /// <para>
+    /// The host executable must export the cryptoki <c>C_GetFunctionList</c> symbol from its
+    /// entry-point module — under Native AOT that means linking the module in and keeping the
+    /// symbol exported (<c>DirectPInvoke</c> plus a linker export, or an explicit exports file).
+    /// Resolution goes through the entry-point module's own symbol table, so it behaves the same
+    /// on CoreCLR and Native AOT; there is no <c>"__Internal"</c> pseudo-library involved, which
+    /// is a Mono-only convention that no runtime this package targets implements.
+    /// </para>
+    /// <para>
+    /// All subsequent PKCS#11 calls go through the function-pointer table returned by that single
+    /// call — no other unmanaged bindings are required. The v3.0/v3.2 surface is bound
+    /// best-effort from the same symbol table, exactly as for a dynamically loaded module.
+    /// </para>
     /// </remarks>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
+    /// <exception cref="EntryPointNotFoundException">
+    /// The host executable does not export <c>C_GetFunctionList</c>.
+    /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library LoadStaticallyLinked()
         => new(libraryPath: "<statically-linked>", useStaticLink: true);
