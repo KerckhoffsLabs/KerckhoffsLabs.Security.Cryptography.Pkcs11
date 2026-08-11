@@ -102,4 +102,59 @@ public sealed class NestedTemplateOwnershipTests
 
         Assert.Throws<ObjectDisposedException>(() => builder.WrapTemplate(t => t.Sensitive()));
     }
+
+    [Fact]
+    public void SecretKey_SupportsUnwrapAndDeriveTemplates()
+    {
+        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .UnwrapTemplate(t => t.Sensitive().NonExtractable())
+            .DeriveTemplate(t => t.Sensitive())
+            .Build();
+
+        ulong[] present = [.. template.Attributes.Select(a => a.Type)];
+        Assert.Contains((ulong)CKA.CKA_UNWRAP_TEMPLATE, present);
+        Assert.Contains((ulong)CKA.CKA_DERIVE_TEMPLATE, present);
+    }
+
+    [Fact]
+    public void PrivateKey_SupportsUnwrapAndDeriveTemplates()
+    {
+        using ObjectTemplate template = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
+            .UnwrapTemplate(t => t.Sensitive().NonExtractable())
+            .DeriveTemplate(t => t.Sensitive())
+            .Build();
+
+        ulong[] present = [.. template.Attributes.Select(a => a.Type)];
+        Assert.Contains((ulong)CKA.CKA_UNWRAP_TEMPLATE, present);
+        Assert.Contains((ulong)CKA.CKA_DERIVE_TEMPLATE, present);
+    }
+
+    [Fact]
+    public void PublicKey_SupportsWrapTemplate()
+    {
+        using ObjectTemplate template = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
+            .WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY).NonExtractable())
+            .Build();
+
+        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+    }
+
+    /// <summary>
+    /// Two different nested templates on one builder are independent - setting the second must not
+    /// disturb the first, which the shared _nested dictionary keyed by CKA is what guarantees.
+    /// </summary>
+    [Fact]
+    public void TwoDifferentNestedTemplates_AreIndependent()
+    {
+        using ObjectTemplate template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY))
+            .UnwrapTemplate(t => t.Sensitive().NonExtractable().Class(CKO.CKO_SECRET_KEY))
+            .Build();
+
+        ObjectAttribute wrap = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        ObjectAttribute unwrap = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_UNWRAP_TEMPLATE);
+
+        Assert.Single(wrap.GetValueAsAttributeArray());
+        Assert.Equal(3, unwrap.GetValueAsAttributeArray().Length);
+    }
 }

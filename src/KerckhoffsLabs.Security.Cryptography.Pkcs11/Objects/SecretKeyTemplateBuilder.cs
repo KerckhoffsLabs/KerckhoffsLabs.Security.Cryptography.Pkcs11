@@ -66,11 +66,31 @@ public sealed class SecretKeyTemplateBuilder : ObjectTemplateBuilderBase<SecretK
     /// <summary>
     /// Sets <c>CKA_WRAP_TEMPLATE</c> — the template a key must <b>match</b> to be wrapped by this
     /// key. Keys that do not match cannot be wrapped, so this narrows what this key can exfiltrate.
-    /// Contrast <c>UnwrapTemplate</c>, which imposes attributes rather than matching them.
+    /// Contrast <see cref="UnwrapTemplate"/>, which imposes attributes rather than matching them.
     /// </summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public SecretKeyTemplateBuilder WrapTemplate(Action<NestedKeyTemplateBuilder> configure)
         => NestedTemplate(CKA.CKA_WRAP_TEMPLATE, configure);
+
+    /// <summary>
+    /// Sets <c>CKA_UNWRAP_TEMPLATE</c> — attributes <b>imposed</b> on every key unwrapped with this
+    /// key. The token applies them as if the object already carried them, before any caller-supplied
+    /// template. Contrast <see cref="WrapTemplate"/>, which matches rather than imposes.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public SecretKeyTemplateBuilder UnwrapTemplate(Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(CKA.CKA_UNWRAP_TEMPLATE, configure);
+
+    /// <summary>
+    /// Sets <c>CKA_DERIVE_TEMPLATE</c> — attributes <b>imposed</b> on every key derived from this key.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public SecretKeyTemplateBuilder DeriveTemplate(Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(CKA.CKA_DERIVE_TEMPLATE, configure);
 }

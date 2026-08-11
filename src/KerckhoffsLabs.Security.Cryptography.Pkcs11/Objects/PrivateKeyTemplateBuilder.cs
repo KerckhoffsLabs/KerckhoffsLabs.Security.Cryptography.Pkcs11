@@ -41,4 +41,24 @@ public sealed class PrivateKeyTemplateBuilder : ObjectTemplateBuilderBase<Privat
 
     /// <summary>Sets <c>CKA_DERIVE</c>.</summary>
     public PrivateKeyTemplateBuilder Derive(bool value = true) => Attribute(CKA.CKA_DERIVE, value);
+
+    /// <summary>
+    /// Sets <c>CKA_UNWRAP_TEMPLATE</c> — attributes <b>imposed</b> on every key unwrapped with this
+    /// key. The token applies them as if the object already carried them, before any caller-supplied
+    /// template.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public PrivateKeyTemplateBuilder UnwrapTemplate(Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(CKA.CKA_UNWRAP_TEMPLATE, configure);
+
+    /// <summary>
+    /// Sets <c>CKA_DERIVE_TEMPLATE</c> — attributes <b>imposed</b> on every key derived from this key.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public PrivateKeyTemplateBuilder DeriveTemplate(Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(CKA.CKA_DERIVE_TEMPLATE, configure);
 }

@@ -40,4 +40,14 @@ public sealed class PublicKeyTemplateBuilder : ObjectTemplateBuilderBase<PublicK
     /// <summary>Sets <c>CKA_EC_PARAMS</c> — EC curve parameters (DER-encoded).</summary>
     public PublicKeyTemplateBuilder EcParams(ReadOnlySpan<byte> derParams)
         => Attribute(CKA.CKA_EC_PARAMS, derParams);
+
+    /// <summary>
+    /// Sets <c>CKA_WRAP_TEMPLATE</c> — the template a key must <b>match</b> to be wrapped by this
+    /// key. Keys that do not match cannot be wrapped, so this narrows what this key can exfiltrate.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
+    public PublicKeyTemplateBuilder WrapTemplate(Action<NestedKeyTemplateBuilder> configure)
+        => NestedTemplate(CKA.CKA_WRAP_TEMPLATE, configure);
 }
