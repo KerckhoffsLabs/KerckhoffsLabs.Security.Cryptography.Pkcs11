@@ -252,15 +252,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetInfo_Windows)
-        {
-            var winInfo = default(CK_INFO_Windows);
-            var rv = _delegates.C_GetInfo_Windows(ref winInfo);
-            info = winInfo.ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_GetInfo(ref info);
-        return rv2.ToCKR();
+        return _delegates.C_GetInfo(ref info).ToCKR();
     }
 
     /// <summary>
@@ -304,15 +296,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetSlotInfo_Windows)
-        {
-            var winInfo = default(CK_SLOT_INFO_Windows);
-            var rv = _delegates.C_GetSlotInfo_Windows(slotId, ref winInfo);
-            info = winInfo.ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_GetSlotInfo(slotId, ref info);
-        return rv2.ToCKR();
+        return _delegates.C_GetSlotInfo(slotId, ref info).ToCKR();
     }
 
     /// <summary>
@@ -325,15 +309,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetTokenInfo_Windows)
-        {
-            var winInfo = default(CK_TOKEN_INFO_Windows);
-            var rv = _delegates.C_GetTokenInfo_Windows(slotId, ref winInfo);
-            info = winInfo.ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_GetTokenInfo(slotId, ref info);
-        return rv2.ToCKR();
+        return _delegates.C_GetTokenInfo(slotId, ref info).ToCKR();
     }
 
     /// <summary>
@@ -377,15 +353,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetMechanismInfo_Windows)
-        {
-            var winInfo = default(CK_MECHANISM_INFO_Windows);
-            var rv = _delegates.C_GetMechanismInfo_Windows(slotId, type.ToCULong(), ref winInfo);
-            info = winInfo.ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_GetMechanismInfo(slotId, type.ToCULong(), ref info);
-        return rv2.ToCKR();
+        return _delegates.C_GetMechanismInfo(slotId, type.ToCULong(), ref info).ToCKR();
     }
 
     /// <summary>
@@ -489,15 +457,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetSessionInfo_Windows)
-        {
-            var winInfo = default(CK_SESSION_INFO_Windows);
-            var rv = _delegates.C_GetSessionInfo_Windows(session, ref winInfo);
-            info = winInfo.ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_GetSessionInfo(session, ref info);
-        return rv2.ToCKR();
+        return _delegates.C_GetSessionInfo(session, ref info).ToCKR();
     }
 
     /// <summary>
@@ -634,19 +594,6 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_GetInterfaceList)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetInterfaceList_Windows)
-        {
-            if (interfaces is null)
-                return (CKR)(ulong)_delegates.C_GetInterfaceList_Windows(null, ref count);
-
-            var winList = new CK_INTERFACE_Windows[interfaces.Length];
-            CKR winRv = (CKR)(ulong)_delegates.C_GetInterfaceList_Windows(winList, ref count);
-            if (winRv == CKR.CKR_OK)
-                for (int i = 0; i < interfaces.Length; i++)
-                    interfaces[i] = winList[i].ToUnified();
-            return winRv;
-        }
-
         return _delegates.C_GetInterfaceList(interfaces, ref count).ToCKR();
     }
 
@@ -682,13 +629,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_MessageEncryptInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_MessageEncryptInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_MessageEncryptInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_MessageEncryptInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_MessageEncryptInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -762,13 +703,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_MessageDecryptInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_MessageDecryptInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_MessageDecryptInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_MessageDecryptInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_MessageDecryptInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -842,13 +777,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_MessageSignInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_MessageSignInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_MessageSignInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_MessageSignInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_MessageSignInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -922,13 +851,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_MessageVerifyInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_MessageVerifyInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_MessageVerifyInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_MessageVerifyInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_MessageVerifyInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1002,14 +925,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_EncapsulateKey)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_EncapsulateKey_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_EncapsulateKey_Windows(session, ref winMech, publicKey, winTpl, attributeCount, ciphertext, ref ciphertextLen, ref derivedKey);
-        }
-        NativeCULong rv = _delegates.C_EncapsulateKey(session, ref mechanism, publicKey, template, attributeCount, ciphertext, ref ciphertextLen, ref derivedKey);
-        return rv.ToCKR();
+        return _delegates.C_EncapsulateKey(session, ref mechanism, publicKey, template, attributeCount, ciphertext, ref ciphertextLen, ref derivedKey).ToCKR();
     }
 
     /// <summary>
@@ -1023,14 +939,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_DecapsulateKey)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_DecapsulateKey_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_DecapsulateKey_Windows(session, ref winMech, privateKey, winTpl, attributeCount, ciphertext, ciphertextLen, ref derivedKey);
-        }
-        NativeCULong rv = _delegates.C_DecapsulateKey(session, ref mechanism, privateKey, template, attributeCount, ciphertext, ciphertextLen, ref derivedKey);
-        return rv.ToCKR();
+        return _delegates.C_DecapsulateKey(session, ref mechanism, privateKey, template, attributeCount, ciphertext, ciphertextLen, ref derivedKey).ToCKR();
     }
 
     /// <summary>
@@ -1044,13 +953,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_VerifySignatureInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_VerifySignatureInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_VerifySignatureInit_Windows(session, ref winMech, key, signature, signatureLen);
-        }
-        NativeCULong rv = _delegates.C_VerifySignatureInit(session, ref mechanism, key, signature, signatureLen);
-        return rv.ToCKR();
+        return _delegates.C_VerifySignatureInit(session, ref mechanism, key, signature, signatureLen).ToCKR();
     }
 
     /// <summary>
@@ -1124,15 +1027,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_AsyncComplete)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_AsyncComplete_Windows)
-        {
-            var winResult = default(CK_ASYNC_DATA_Windows);
-            var rv = _delegates.C_AsyncComplete_Windows(session, functionName, ref winResult);
-            result = winResult.ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_AsyncComplete(session, functionName, ref result);
-        return rv2.ToCKR();
+        return _delegates.C_AsyncComplete(session, functionName, ref result).ToCKR();
     }
 
     /// <summary>
@@ -1176,13 +1071,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_WrapKeyAuthenticated)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_WrapKeyAuthenticated_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_WrapKeyAuthenticated_Windows(session, ref winMech, wrappingKey, key, associatedData, associatedDataLen, wrappedKey, ref wrappedKeyLen);
-        }
-        NativeCULong rv = _delegates.C_WrapKeyAuthenticated(session, ref mechanism, wrappingKey, key, associatedData, associatedDataLen, wrappedKey, ref wrappedKeyLen);
-        return rv.ToCKR();
+        return _delegates.C_WrapKeyAuthenticated(session, ref mechanism, wrappingKey, key, associatedData, associatedDataLen, wrappedKey, ref wrappedKeyLen).ToCKR();
     }
 
     /// <summary>
@@ -1196,14 +1085,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (!_delegates.HasC_UnwrapKeyAuthenticated)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_UnwrapKeyAuthenticated_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_UnwrapKeyAuthenticated_Windows(session, ref winMech, unwrappingKey, wrappedKey, wrappedKeyLen, winTpl, attributeCount, associatedData, associatedDataLen, ref key);
-        }
-        NativeCULong rv = _delegates.C_UnwrapKeyAuthenticated(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, associatedData, associatedDataLen, ref key);
-        return rv.ToCKR();
+        return _delegates.C_UnwrapKeyAuthenticated(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, associatedData, associatedDataLen, ref key).ToCKR();
     }
 
 
@@ -1233,13 +1115,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_CreateObject_Windows)
-        {
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_CreateObject_Windows(session, winTpl, count, ref objectId);
-        }
-        NativeCULong rv = _delegates.C_CreateObject(session, template, count, ref objectId);
-        return rv.ToCKR();
+        return _delegates.C_CreateObject(session, template, count, ref objectId).ToCKR();
     }
 
     /// <summary>
@@ -1255,13 +1131,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_CopyObject_Windows)
-        {
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_CopyObject_Windows(session, objectId, winTpl, count, ref newObjectId);
-        }
-        NativeCULong rv = _delegates.C_CopyObject(session, objectId, template, count, ref newObjectId);
-        return rv.ToCKR();
+        return _delegates.C_CopyObject(session, objectId, template, count, ref newObjectId).ToCKR();
     }
 
     /// <summary>
@@ -1305,22 +1175,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GetAttributeValue_Windows)
-        {
-            // Defensive against a null slipping past the non-nullable annotation, as the sibling
-            // attribute paths are. Split into its own branch rather than a null-forgiving local so
-            // that the write-back below needs no null test the compiler considers unreachable.
-            if (template is null)
-                return (CKR)(ulong)_delegates.C_GetAttributeValue_Windows(session, objectId, null!, count);
-
-            var winTpl = System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            var rv = _delegates.C_GetAttributeValue_Windows(session, objectId, winTpl, count);
-            for (int i = 0; i < winTpl.Length; i++)
-                template[i] = winTpl[i].ToUnified();
-            return (CKR)(ulong)rv;
-        }
-        NativeCULong rv2 = _delegates.C_GetAttributeValue(session, objectId, template, count);
-        return rv2.ToCKR();
+        return _delegates.C_GetAttributeValue(session, objectId, template, count).ToCKR();
     }
 
     /// <summary>
@@ -1335,13 +1190,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_SetAttributeValue_Windows)
-        {
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_SetAttributeValue_Windows(session, objectId, winTpl, count);
-        }
-        NativeCULong rv = _delegates.C_SetAttributeValue(session, objectId, template, count);
-        return rv.ToCKR();
+        return _delegates.C_SetAttributeValue(session, objectId, template, count).ToCKR();
     }
 
     /// <summary>
@@ -1355,13 +1204,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_FindObjectsInit_Windows)
-        {
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_FindObjectsInit_Windows(session, winTpl, count);
-        }
-        NativeCULong rv = _delegates.C_FindObjectsInit(session, template, count);
-        return rv.ToCKR();
+        return _delegates.C_FindObjectsInit(session, template, count).ToCKR();
     }
 
     /// <summary>
@@ -1404,13 +1247,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_EncryptInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_EncryptInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_EncryptInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_EncryptInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1482,13 +1319,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_DecryptInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_DecryptInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_DecryptInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_DecryptInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1559,13 +1390,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_DigestInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_DigestInit_Windows(session, ref winMech);
-        }
-        NativeCULong rv = _delegates.C_DigestInit(session, ref mechanism);
-        return rv.ToCKR();
+        return _delegates.C_DigestInit(session, ref mechanism).ToCKR();
     }
 
     /// <summary>
@@ -1646,13 +1471,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_SignInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_SignInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_SignInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_SignInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1719,13 +1538,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_SignRecoverInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_SignRecoverInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_SignRecoverInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_SignRecoverInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1759,13 +1572,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_VerifyInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_VerifyInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_VerifyInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_VerifyInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1826,13 +1633,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_VerifyRecoverInit_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_VerifyRecoverInit_Windows(session, ref winMech, key);
-        }
-        NativeCULong rv = _delegates.C_VerifyRecoverInit(session, ref mechanism, key);
-        return rv.ToCKR();
+        return _delegates.C_VerifyRecoverInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -1948,14 +1749,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GenerateKey_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_GenerateKey_Windows(session, ref winMech, winTpl, count, ref key);
-        }
-        NativeCULong rv = _delegates.C_GenerateKey(session, ref mechanism, template, count, ref key);
-        return rv.ToCKR();
+        return _delegates.C_GenerateKey(session, ref mechanism, template, count, ref key).ToCKR();
     }
 
     /// <summary>
@@ -1974,15 +1768,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_GenerateKeyPair_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winPubTpl = publicKeyTemplate is null ? null! : System.Array.ConvertAll(publicKeyTemplate, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            var winPrivTpl = privateKeyTemplate is null ? null! : System.Array.ConvertAll(privateKeyTemplate, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_GenerateKeyPair_Windows(session, ref winMech, winPubTpl, publicKeyAttributeCount, winPrivTpl, privateKeyAttributeCount, ref publicKey, ref privateKey);
-        }
-        NativeCULong rv = _delegates.C_GenerateKeyPair(session, ref mechanism, publicKeyTemplate, publicKeyAttributeCount, privateKeyTemplate, privateKeyAttributeCount, ref publicKey, ref privateKey);
-        return rv.ToCKR();
+        return _delegates.C_GenerateKeyPair(session, ref mechanism, publicKeyTemplate, publicKeyAttributeCount, privateKeyTemplate, privateKeyAttributeCount, ref publicKey, ref privateKey).ToCKR();
     }
 
     /// <summary>
@@ -2002,13 +1788,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_WrapKey_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return (CKR)(ulong)_delegates.C_WrapKey_Windows(session, ref winMech, wrappingKey, key, wrappedKey, ref wrappedKeyLen);
-        }
-        NativeCULong rv = _delegates.C_WrapKey(session, ref mechanism, wrappingKey, key, wrappedKey, ref wrappedKeyLen);
-        return rv.ToCKR();
+        return _delegates.C_WrapKey(session, ref mechanism, wrappingKey, key, wrappedKey, ref wrappedKeyLen).ToCKR();
     }
 
     /// <summary>
@@ -2027,14 +1807,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_UnwrapKey_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_UnwrapKey_Windows(session, ref winMech, unwrappingKey, wrappedKey, wrappedKeyLen, winTpl, attributeCount, ref key);
-        }
-        NativeCULong rv = _delegates.C_UnwrapKey(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, ref key);
-        return rv.ToCKR();
+        return _delegates.C_UnwrapKey(session, ref mechanism, unwrappingKey, wrappedKey, wrappedKeyLen, template, attributeCount, ref key).ToCKR();
     }
 
     /// <summary>
@@ -2051,14 +1824,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (Pkcs11Marshal.IsWindows && _delegates.HasC_DeriveKey_Windows)
-        {
-            var winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            var winTpl = template is null ? null! : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
-            return (CKR)(ulong)_delegates.C_DeriveKey_Windows(session, ref winMech, baseKey, winTpl, attributeCount, ref key);
-        }
-        NativeCULong rv = _delegates.C_DeriveKey(session, ref mechanism, baseKey, template, attributeCount, ref key);
-        return rv.ToCKR();
+        return _delegates.C_DeriveKey(session, ref mechanism, baseKey, template, attributeCount, ref key).ToCKR();
     }
 
     /// <summary>

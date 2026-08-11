@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -20,44 +21,65 @@ internal class Delegates
     /// <summary>Native cryptoki bootstrap symbol name, used for export lookup and error context (S1192).</summary>
     private const string GetFunctionListSymbol = "C_GetFunctionList";
 
+    /// <summary>
+    /// Guards a wrapper against a function the loaded module never provided. The cryptoki name
+    /// comes from the calling wrapper — each one is named after the function it dispatches to —
+    /// so the error context cannot drift from the pointer being tested.
+    /// </summary>
+    /// <param name="function">Dispatch-table entry; <see langword="null"/> when unbound.</param>
+    /// <param name="name">Supplied by the compiler. Do not pass explicitly.</param>
+    private static unsafe void ThrowIfUnbound(void* function, [CallerMemberName] string name = "")
+    {
+        if (function is null)
+            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, name);
+    }
+
+    /// <summary>
+    /// Copies a unified attribute template into the Pack=1 Windows layout for the duration of a
+    /// single call. Null in, null out: a null template is a legitimate cryptoki argument.
+    /// </summary>
+    private static CK_ATTRIBUTE_Windows[]? ToWindowsTemplate(CK_ATTRIBUTE[]? template)
+        => template is null
+            ? null
+            : System.Array.ConvertAll(template, static a => CK_ATTRIBUTE_Windows.FromUnified(in a));
+
     /// <summary>Wrapper for <c>C_Initialize</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Initialize(IntPtr pInitArgs)
     {
-        if (_fp.C_Initialize is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Initialize");
+        ThrowIfUnbound(_fp.C_Initialize);
         return _fp.C_Initialize(pInitArgs);
     }
 
     /// <summary>Wrapper for <c>C_Finalize</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Finalize(IntPtr reserved)
     {
-        if (_fp.C_Finalize is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Finalize");
+        ThrowIfUnbound(_fp.C_Finalize);
         return _fp.C_Finalize(reserved);
     }
 
     /// <summary>Wrapper for <c>C_GetInfo</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetInfo(ref CK_INFO info)
     {
-        if (_fp.C_GetInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInfo");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetInfo_Windows);
+            CK_INFO_Windows win = default;
+            NativeCULong winRv = _fp.C_GetInfo_Windows(&win);
+            info = win.ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetInfo);
         fixed (CK_INFO* p = &info) return _fp.C_GetInfo(p);
     }
-
-    /// <summary>Wrapper for <c>C_GetInfo</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetInfo_Windows(ref CK_INFO_Windows info)
-    {
-        if (_fp.C_GetInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInfo_Windows");
-        fixed (CK_INFO_Windows* p = &info) return _fp.C_GetInfo_Windows(p);
-    }
-
-    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetInfo</c> fptr is bound.</summary>
-    internal unsafe bool HasC_GetInfo_Windows => _fp.C_GetInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_GetFunctionList</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetFunctionList(out IntPtr functionList)
     {
-        if (_fp.C_GetFunctionList is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, GetFunctionListSymbol);
+        ThrowIfUnbound(_fp.C_GetFunctionList);
         IntPtr local = IntPtr.Zero;
         NativeCULong rv = _fp.C_GetFunctionList(&local);
         functionList = local;
@@ -67,79 +89,82 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_GetSlotList</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
     {
-        if (_fp.C_GetSlotList is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotList");
+        ThrowIfUnbound(_fp.C_GetSlotList);
         fixed (NativeCULong* slotPtr = slotList)
         fixed (NativeCULong* countPtr = &count)
             return _fp.C_GetSlotList((byte)(tokenPresent ? 1 : 0), slotPtr, countPtr);
     }
 
     /// <summary>Wrapper for <c>C_GetSlotInfo</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
     {
-        if (_fp.C_GetSlotInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotInfo");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetSlotInfo_Windows);
+            CK_SLOT_INFO_Windows win = default;
+            NativeCULong winRv = _fp.C_GetSlotInfo_Windows(slotId, &win);
+            info = win.ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetSlotInfo);
         fixed (CK_SLOT_INFO* p = &info) return _fp.C_GetSlotInfo(slotId, p);
     }
 
-    /// <summary>Wrapper for <c>C_GetSlotInfo</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetSlotInfo_Windows(NativeCULong slotId, ref CK_SLOT_INFO_Windows info)
-    {
-        if (_fp.C_GetSlotInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSlotInfo_Windows");
-        fixed (CK_SLOT_INFO_Windows* p = &info) return _fp.C_GetSlotInfo_Windows(slotId, p);
-    }
-
-    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetSlotInfo</c> fptr is bound.</summary>
-    internal unsafe bool HasC_GetSlotInfo_Windows => _fp.C_GetSlotInfo_Windows is not null;
-
     /// <summary>Wrapper for <c>C_GetTokenInfo</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
     {
-        if (_fp.C_GetTokenInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetTokenInfo");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetTokenInfo_Windows);
+            CK_TOKEN_INFO_Windows win = default;
+            NativeCULong winRv = _fp.C_GetTokenInfo_Windows(slotId, &win);
+            info = win.ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetTokenInfo);
         fixed (CK_TOKEN_INFO* p = &info) return _fp.C_GetTokenInfo(slotId, p);
     }
-
-    /// <summary>Wrapper for <c>C_GetTokenInfo</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetTokenInfo_Windows(NativeCULong slotId, ref CK_TOKEN_INFO_Windows info)
-    {
-        if (_fp.C_GetTokenInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetTokenInfo_Windows");
-        fixed (CK_TOKEN_INFO_Windows* p = &info) return _fp.C_GetTokenInfo_Windows(slotId, p);
-    }
-
-    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetTokenInfo</c> fptr is bound.</summary>
-    internal unsafe bool HasC_GetTokenInfo_Windows => _fp.C_GetTokenInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_GetMechanismList</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetMechanismList(NativeCULong slotId, NativeCULong[]? mechanismList, ref NativeCULong count)
     {
-        if (_fp.C_GetMechanismList is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetMechanismList");
+        ThrowIfUnbound(_fp.C_GetMechanismList);
         fixed (NativeCULong* mechPtr = mechanismList)
         fixed (NativeCULong* countPtr = &count)
             return _fp.C_GetMechanismList(slotId, mechPtr, countPtr);
     }
 
     /// <summary>Wrapper for <c>C_GetMechanismInfo</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info)
     {
-        if (_fp.C_GetMechanismInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetMechanismInfo");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetMechanismInfo_Windows);
+            CK_MECHANISM_INFO_Windows win = default;
+            NativeCULong winRv = _fp.C_GetMechanismInfo_Windows(slotId, type, &win);
+            info = win.ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetMechanismInfo);
         fixed (CK_MECHANISM_INFO* p = &info) return _fp.C_GetMechanismInfo(slotId, type, p);
     }
-
-    /// <summary>Wrapper for <c>C_GetMechanismInfo</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetMechanismInfo_Windows(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO_Windows info)
-    {
-        if (_fp.C_GetMechanismInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetMechanismInfo_Windows");
-        fixed (CK_MECHANISM_INFO_Windows* p = &info) return _fp.C_GetMechanismInfo_Windows(slotId, type, p);
-    }
-
-    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetMechanismInfo</c> fptr is bound.</summary>
-    internal unsafe bool HasC_GetMechanismInfo_Windows => _fp.C_GetMechanismInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_InitToken</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_InitToken(NativeCULong slotId, byte[] pin, NativeCULong pinLen, byte[] label)
     {
-        if (_fp.C_InitToken is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_InitToken");
+        ThrowIfUnbound(_fp.C_InitToken);
         fixed (byte* pinPtr = pin)
         fixed (byte* labelPtr = label)
             return _fp.C_InitToken(slotId, pinPtr, pinLen, labelPtr);
@@ -148,8 +173,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_InitPIN</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_InitPIN(NativeCULong session, byte[] pin, NativeCULong pinLen)
     {
-        if (_fp.C_InitPIN is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_InitPIN");
+        ThrowIfUnbound(_fp.C_InitPIN);
         fixed (byte* pinPtr = pin)
             return _fp.C_InitPIN(session, pinPtr, pinLen);
     }
@@ -157,8 +181,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SetPIN</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SetPIN(NativeCULong session, byte[] oldPin, NativeCULong oldPinLen, byte[] newPin, NativeCULong newPinLen)
     {
-        if (_fp.C_SetPIN is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SetPIN");
+        ThrowIfUnbound(_fp.C_SetPIN);
         fixed (byte* oldPinPtr = oldPin)
         fixed (byte* newPinPtr = newPin)
             return _fp.C_SetPIN(session, oldPinPtr, oldPinLen, newPinPtr, newPinLen);
@@ -167,8 +190,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_OpenSession</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
     {
-        if (_fp.C_OpenSession is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_OpenSession");
+        ThrowIfUnbound(_fp.C_OpenSession);
         fixed (NativeCULong* sessionPtr = &session)
             return _fp.C_OpenSession(slotId, flags, application, notify, sessionPtr);
     }
@@ -176,41 +198,40 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_CloseSession</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_CloseSession(NativeCULong session)
     {
-        if (_fp.C_CloseSession is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CloseSession");
+        ThrowIfUnbound(_fp.C_CloseSession);
         return _fp.C_CloseSession(session);
     }
 
     /// <summary>Wrapper for <c>C_CloseAllSessions</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_CloseAllSessions(NativeCULong slotId)
     {
-        if (_fp.C_CloseAllSessions is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CloseAllSessions");
+        ThrowIfUnbound(_fp.C_CloseAllSessions);
         return _fp.C_CloseAllSessions(slotId);
     }
 
     /// <summary>Wrapper for <c>C_GetSessionInfo</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
     {
-        if (_fp.C_GetSessionInfo is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSessionInfo");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetSessionInfo_Windows);
+            CK_SESSION_INFO_Windows win = default;
+            NativeCULong winRv = _fp.C_GetSessionInfo_Windows(session, &win);
+            info = win.ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetSessionInfo);
         fixed (CK_SESSION_INFO* p = &info) return _fp.C_GetSessionInfo(session, p);
     }
-
-    /// <summary>Wrapper for <c>C_GetSessionInfo</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetSessionInfo_Windows(NativeCULong session, ref CK_SESSION_INFO_Windows info)
-    {
-        if (_fp.C_GetSessionInfo_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSessionInfo_Windows");
-        fixed (CK_SESSION_INFO_Windows* p = &info) return _fp.C_GetSessionInfo_Windows(session, p);
-    }
-
-    /// <summary>Returns <c>true</c> when the Windows-layout <c>C_GetSessionInfo</c> fptr is bound.</summary>
-    internal unsafe bool HasC_GetSessionInfo_Windows => _fp.C_GetSessionInfo_Windows is not null;
 
     /// <summary>Wrapper for <c>C_GetOperationState</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetOperationState(NativeCULong session, byte[]? operationState, ref NativeCULong operationStateLen)
     {
-        if (_fp.C_GetOperationState is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetOperationState");
+        ThrowIfUnbound(_fp.C_GetOperationState);
         fixed (byte* statePtr = operationState)
         fixed (NativeCULong* lenPtr = &operationStateLen)
             return _fp.C_GetOperationState(session, statePtr, lenPtr);
@@ -219,8 +240,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SetOperationState</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SetOperationState(NativeCULong session, byte[] operationState, NativeCULong operationStateLen, NativeCULong encryptionKey, NativeCULong authenticationKey)
     {
-        if (_fp.C_SetOperationState is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SetOperationState");
+        ThrowIfUnbound(_fp.C_SetOperationState);
         fixed (byte* statePtr = operationState)
             return _fp.C_SetOperationState(session, statePtr, operationStateLen, encryptionKey, authenticationKey);
     }
@@ -228,8 +248,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_Login</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Login(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen)
     {
-        if (_fp.C_Login is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Login");
+        ThrowIfUnbound(_fp.C_Login);
         fixed (byte* pinPtr = pin)
             return _fp.C_Login(session, userType, pinPtr, pinLen);
     }
@@ -237,24 +256,47 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_Logout</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Logout(NativeCULong session)
     {
-        if (_fp.C_Logout is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Logout");
+        ThrowIfUnbound(_fp.C_Logout);
         return _fp.C_Logout(session);
     }
 
     /// <summary>Wrapper for <c>C_CreateObject</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_CreateObject(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong objectId)
     {
-        if (_fp.C_CreateObject is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CreateObject");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_CreateObject_Windows);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (NativeCULong* idPtr = &objectId)
+                return _fp.C_CreateObject_Windows(session, t, count, idPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_CreateObject);
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* idPtr = &objectId)
             return _fp.C_CreateObject(session, t, count, idPtr);
     }
 
     /// <summary>Wrapper for <c>C_CopyObject</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong newObjectId)
     {
-        if (_fp.C_CopyObject is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CopyObject");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_CopyObject_Windows);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (NativeCULong* idPtr = &newObjectId)
+                return _fp.C_CopyObject_Windows(session, objectId, t, count, idPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_CopyObject);
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* idPtr = &newObjectId)
             return _fp.C_CopyObject(session, objectId, t, count, idPtr);
@@ -263,40 +305,78 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DestroyObject</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DestroyObject(NativeCULong session, NativeCULong objectId)
     {
-        if (_fp.C_DestroyObject is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DestroyObject");
+        ThrowIfUnbound(_fp.C_DestroyObject);
         return _fp.C_DestroyObject(session, objectId);
     }
 
     /// <summary>Wrapper for <c>C_GetObjectSize</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetObjectSize(NativeCULong session, NativeCULong objectId, ref NativeCULong size)
     {
-        if (_fp.C_GetObjectSize is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetObjectSize");
+        ThrowIfUnbound(_fp.C_GetObjectSize);
         fixed (NativeCULong* sizePtr = &size)
             return _fp.C_GetObjectSize(session, objectId, sizePtr);
     }
 
     /// <summary>Wrapper for <c>C_GetAttributeValue</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
     {
-        if (_fp.C_GetAttributeValue is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetAttributeValue");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetAttributeValue_Windows);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            NativeCULong winRv;
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+                winRv = _fp.C_GetAttributeValue_Windows(session, objectId, t, count);
+            // The token writes the value and its length back into the packed copy, so
+            // mirror the result into the caller's template before returning.
+            if (winTpl is not null)
+                for (int i = 0; i < winTpl.Length; i++)
+                    template[i] = winTpl[i].ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetAttributeValue);
         fixed (CK_ATTRIBUTE* t = template)
             return _fp.C_GetAttributeValue(session, objectId, t, count);
     }
 
     /// <summary>Wrapper for <c>C_SetAttributeValue</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_SetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, NativeCULong count)
     {
-        if (_fp.C_SetAttributeValue is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SetAttributeValue");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_SetAttributeValue_Windows);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+                return _fp.C_SetAttributeValue_Windows(session, objectId, t, count);
+        }
+
+        ThrowIfUnbound(_fp.C_SetAttributeValue);
         fixed (CK_ATTRIBUTE* t = template)
             return _fp.C_SetAttributeValue(session, objectId, t, count);
     }
 
     /// <summary>Wrapper for <c>C_FindObjectsInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[]? template, NativeCULong count)
     {
-        if (_fp.C_FindObjectsInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjectsInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_FindObjectsInit_Windows);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+                return _fp.C_FindObjectsInit_Windows(session, t, count);
+        }
+
+        ThrowIfUnbound(_fp.C_FindObjectsInit);
         fixed (CK_ATTRIBUTE* t = template)
             return _fp.C_FindObjectsInit(session, t, count);
     }
@@ -304,8 +384,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_FindObjects</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
     {
-        if (_fp.C_FindObjects is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjects");
+        ThrowIfUnbound(_fp.C_FindObjects);
         fixed (NativeCULong* objPtr = objectId)
         fixed (NativeCULong* countPtr = &objectCount)
             return _fp.C_FindObjects(session, objPtr, maxObjectCount, countPtr);
@@ -314,23 +393,31 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_FindObjectsFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_FindObjectsFinal(NativeCULong session)
     {
-        if (_fp.C_FindObjectsFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjectsFinal");
+        ThrowIfUnbound(_fp.C_FindObjectsFinal);
         return _fp.C_FindObjectsFinal(session);
     }
 
     /// <summary>Wrapper for <c>C_EncryptInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_EncryptInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_EncryptInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_EncryptInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_EncryptInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_EncryptInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_Encrypt</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Encrypt(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? encryptedData, ref NativeCULong encryptedDataLen)
     {
-        if (_fp.C_Encrypt is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Encrypt");
+        ThrowIfUnbound(_fp.C_Encrypt);
         fixed (byte* dataPtr = data)
         fixed (byte* encDataPtr = encryptedData)
         fixed (NativeCULong* encLenPtr = &encryptedDataLen)
@@ -340,8 +427,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_EncryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_EncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
     {
-        if (_fp.C_EncryptUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptUpdate");
+        ThrowIfUnbound(_fp.C_EncryptUpdate);
         fixed (byte* partPtr = part)
         fixed (byte* encPartPtr = encryptedPart)
         fixed (NativeCULong* encLenPtr = &encryptedPartLen)
@@ -351,25 +437,33 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_EncryptFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_EncryptFinal(NativeCULong session, byte[]? lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
     {
-        if (_fp.C_EncryptFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptFinal");
+        ThrowIfUnbound(_fp.C_EncryptFinal);
         fixed (byte* partPtr = lastEncryptedPart)
         fixed (NativeCULong* lenPtr = &lastEncryptedPartLen)
             return _fp.C_EncryptFinal(session, partPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DecryptInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_DecryptInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_DecryptInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_DecryptInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_DecryptInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_DecryptInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_Decrypt</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Decrypt(NativeCULong session, byte[] encryptedData, NativeCULong encryptedDataLen, byte[]? data, ref NativeCULong dataLen)
     {
-        if (_fp.C_Decrypt is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Decrypt");
+        ThrowIfUnbound(_fp.C_Decrypt);
         fixed (byte* encDataPtr = encryptedData)
         fixed (byte* dataPtr = data)
         fixed (NativeCULong* lenPtr = &dataLen)
@@ -379,8 +473,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DecryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DecryptUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
     {
-        if (_fp.C_DecryptUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptUpdate");
+        ThrowIfUnbound(_fp.C_DecryptUpdate);
         fixed (byte* encPartPtr = encryptedPart)
         fixed (byte* partPtr = part)
         fixed (NativeCULong* lenPtr = &partLen)
@@ -390,25 +483,33 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DecryptFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DecryptFinal(NativeCULong session, byte[]? lastPart, ref NativeCULong lastPartLen)
     {
-        if (_fp.C_DecryptFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptFinal");
+        ThrowIfUnbound(_fp.C_DecryptFinal);
         fixed (byte* partPtr = lastPart)
         fixed (NativeCULong* lenPtr = &lastPartLen)
             return _fp.C_DecryptFinal(session, partPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_DigestInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism)
     {
-        if (_fp.C_DigestInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_DigestInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_DigestInit_Windows(session, &winMech);
+        }
+
+        ThrowIfUnbound(_fp.C_DigestInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_DigestInit(session, m);
     }
 
     /// <summary>Wrapper for <c>C_Digest</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Digest(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? digest, ref NativeCULong digestLen)
     {
-        if (_fp.C_Digest is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Digest");
+        ThrowIfUnbound(_fp.C_Digest);
         fixed (byte* dataPtr = data)
         fixed (byte* digestPtr = digest)
         fixed (NativeCULong* lenPtr = &digestLen)
@@ -418,8 +519,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DigestUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DigestUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
     {
-        if (_fp.C_DigestUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestUpdate");
+        ThrowIfUnbound(_fp.C_DigestUpdate);
         fixed (byte* partPtr = part)
             return _fp.C_DigestUpdate(session, partPtr, partLen);
     }
@@ -427,33 +527,40 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DigestKey</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DigestKey(NativeCULong session, NativeCULong key)
     {
-        if (_fp.C_DigestKey is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestKey");
+        ThrowIfUnbound(_fp.C_DigestKey);
         return _fp.C_DigestKey(session, key);
     }
 
     /// <summary>Wrapper for <c>C_DigestFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DigestFinal(NativeCULong session, byte[]? digest, ref NativeCULong digestLen)
     {
-        if (_fp.C_DigestFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestFinal");
+        ThrowIfUnbound(_fp.C_DigestFinal);
         fixed (byte* digestPtr = digest)
         fixed (NativeCULong* lenPtr = &digestLen)
             return _fp.C_DigestFinal(session, digestPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_SignInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_SignInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_SignInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_SignInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_SignInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_SignInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_Sign</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Sign(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
-        if (_fp.C_Sign is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Sign");
+        ThrowIfUnbound(_fp.C_Sign);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* lenPtr = &signatureLen)
@@ -463,8 +570,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SignUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SignUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
     {
-        if (_fp.C_SignUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignUpdate");
+        ThrowIfUnbound(_fp.C_SignUpdate);
         fixed (byte* partPtr = part)
             return _fp.C_SignUpdate(session, partPtr, partLen);
     }
@@ -472,25 +578,33 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SignFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SignFinal(NativeCULong session, byte[]? signature, ref NativeCULong signatureLen)
     {
-        if (_fp.C_SignFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignFinal");
+        ThrowIfUnbound(_fp.C_SignFinal);
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* lenPtr = &signatureLen)
             return _fp.C_SignFinal(session, sigPtr, lenPtr);
     }
 
     /// <summary>Wrapper for <c>C_SignRecoverInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_SignRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_SignRecoverInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignRecoverInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_SignRecoverInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_SignRecoverInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_SignRecoverInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_SignRecoverInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_SignRecover</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SignRecover(NativeCULong session, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
-        if (_fp.C_SignRecover is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignRecover");
+        ThrowIfUnbound(_fp.C_SignRecover);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* lenPtr = &signatureLen)
@@ -498,17 +612,26 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_VerifyInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_VerifyInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_VerifyInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_VerifyInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_VerifyInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_VerifyInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_Verify</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_Verify(NativeCULong session, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
     {
-        if (_fp.C_Verify is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_Verify");
+        ThrowIfUnbound(_fp.C_Verify);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
             return _fp.C_Verify(session, dataPtr, dataLen, sigPtr, signatureLen);
@@ -517,8 +640,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_VerifyUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_VerifyUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
     {
-        if (_fp.C_VerifyUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyUpdate");
+        ThrowIfUnbound(_fp.C_VerifyUpdate);
         fixed (byte* partPtr = part)
             return _fp.C_VerifyUpdate(session, partPtr, partLen);
     }
@@ -526,24 +648,32 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_VerifyFinal</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_VerifyFinal(NativeCULong session, byte[] signature, NativeCULong signatureLen)
     {
-        if (_fp.C_VerifyFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyFinal");
+        ThrowIfUnbound(_fp.C_VerifyFinal);
         fixed (byte* sigPtr = signature)
             return _fp.C_VerifyFinal(session, sigPtr, signatureLen);
     }
 
     /// <summary>Wrapper for <c>C_VerifyRecoverInit</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_VerifyRecoverInit is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyRecoverInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_VerifyRecoverInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_VerifyRecoverInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_VerifyRecoverInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_VerifyRecoverInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_VerifyRecover</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_VerifyRecover(NativeCULong session, byte[] signature, NativeCULong signatureLen, byte[]? data, ref NativeCULong dataLen)
     {
-        if (_fp.C_VerifyRecover is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyRecover");
+        ThrowIfUnbound(_fp.C_VerifyRecover);
         fixed (byte* sigPtr = signature)
         fixed (byte* dataPtr = data)
         fixed (NativeCULong* lenPtr = &dataLen)
@@ -553,8 +683,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DigestEncryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DigestEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
     {
-        if (_fp.C_DigestEncryptUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestEncryptUpdate");
+        ThrowIfUnbound(_fp.C_DigestEncryptUpdate);
         fixed (byte* partPtr = part)
         fixed (byte* encPartPtr = encryptedPart)
         fixed (NativeCULong* lenPtr = &encryptedPartLen)
@@ -564,8 +693,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DecryptDigestUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DecryptDigestUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
     {
-        if (_fp.C_DecryptDigestUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptDigestUpdate");
+        ThrowIfUnbound(_fp.C_DecryptDigestUpdate);
         fixed (byte* encPartPtr = encryptedPart)
         fixed (byte* partPtr = part)
         fixed (NativeCULong* lenPtr = &partLen)
@@ -575,8 +703,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SignEncryptUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SignEncryptUpdate(NativeCULong session, byte[] part, NativeCULong partLen, byte[] encryptedPart, ref NativeCULong encryptedPartLen)
     {
-        if (_fp.C_SignEncryptUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignEncryptUpdate");
+        ThrowIfUnbound(_fp.C_SignEncryptUpdate);
         fixed (byte* partPtr = part)
         fixed (byte* encPartPtr = encryptedPart)
         fixed (NativeCULong* lenPtr = &encryptedPartLen)
@@ -586,8 +713,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DecryptVerifyUpdate</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_DecryptVerifyUpdate(NativeCULong session, byte[] encryptedPart, NativeCULong encryptedPartLen, byte[] part, ref NativeCULong partLen)
     {
-        if (_fp.C_DecryptVerifyUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptVerifyUpdate");
+        ThrowIfUnbound(_fp.C_DecryptVerifyUpdate);
         fixed (byte* encPartPtr = encryptedPart)
         fixed (byte* partPtr = part)
         fixed (NativeCULong* lenPtr = &partLen)
@@ -595,9 +721,22 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_GenerateKey</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, CK_ATTRIBUTE[]? template, NativeCULong count, ref NativeCULong key)
     {
-        if (_fp.C_GenerateKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKey");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GenerateKey_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (NativeCULong* kPtr = &key)
+                return _fp.C_GenerateKey_Windows(session, &winMech, t, count, kPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_GenerateKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* kPtr = &key)
@@ -605,12 +744,28 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_GenerateKeyPair</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism,
         CK_ATTRIBUTE[]? publicKeyTemplate, NativeCULong publicKeyAttributeCount,
         CK_ATTRIBUTE[]? privateKeyTemplate, NativeCULong privateKeyAttributeCount,
         ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
-        if (_fp.C_GenerateKeyPair is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKeyPair");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GenerateKeyPair_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winPub = ToWindowsTemplate(publicKeyTemplate);
+            CK_ATTRIBUTE_Windows[]? winPriv = ToWindowsTemplate(privateKeyTemplate);
+            fixed (CK_ATTRIBUTE_Windows* pub = winPub)
+            fixed (CK_ATTRIBUTE_Windows* priv = winPriv)
+            fixed (NativeCULong* pubK = &publicKey)
+            fixed (NativeCULong* privK = &privateKey)
+                return _fp.C_GenerateKeyPair_Windows(session, &winMech, pub, publicKeyAttributeCount, priv, privateKeyAttributeCount, pubK, privK);
+        }
+
+        ThrowIfUnbound(_fp.C_GenerateKeyPair);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* pub = publicKeyTemplate)
         fixed (CK_ATTRIBUTE* priv = privateKeyTemplate)
@@ -620,9 +775,21 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_WrapKey</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
     {
-        if (_fp.C_WrapKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKey");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_WrapKey_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            fixed (byte* wkPtr = wrappedKey)
+            fixed (NativeCULong* lenPtr = &wrappedKeyLen)
+                return _fp.C_WrapKey_Windows(session, &winMech, wrappingKey, key, wkPtr, lenPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_WrapKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* wkPtr = wrappedKey)
         fixed (NativeCULong* lenPtr = &wrappedKeyLen)
@@ -630,9 +797,23 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_UnwrapKey</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
     {
-        if (_fp.C_UnwrapKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKey");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_UnwrapKey_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (byte* wkPtr = wrappedKey)
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (NativeCULong* kPtr = &key)
+                return _fp.C_UnwrapKey_Windows(session, &winMech, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, kPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_UnwrapKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* wkPtr = wrappedKey)
         fixed (CK_ATTRIBUTE* t = template)
@@ -641,9 +822,22 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DeriveKey</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[]? template, NativeCULong attributeCount, ref NativeCULong key)
     {
-        if (_fp.C_DeriveKey is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DeriveKey");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_DeriveKey_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (NativeCULong* kPtr = &key)
+                return _fp.C_DeriveKey_Windows(session, &winMech, baseKey, t, attributeCount, kPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_DeriveKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (NativeCULong* kPtr = &key)
@@ -653,8 +847,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SeedRandom</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_SeedRandom(NativeCULong session, byte[] seed, NativeCULong seedLen)
     {
-        if (_fp.C_SeedRandom is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SeedRandom");
+        ThrowIfUnbound(_fp.C_SeedRandom);
         fixed (byte* seedPtr = seed)
             return _fp.C_SeedRandom(session, seedPtr, seedLen);
     }
@@ -662,8 +855,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_GenerateRandom</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GenerateRandom(NativeCULong session, byte[] randomData, NativeCULong randomLen)
     {
-        if (_fp.C_GenerateRandom is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateRandom");
+        ThrowIfUnbound(_fp.C_GenerateRandom);
         fixed (byte* dataPtr = randomData)
             return _fp.C_GenerateRandom(session, dataPtr, randomLen);
     }
@@ -671,24 +863,21 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_GetFunctionStatus</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_GetFunctionStatus(NativeCULong session)
     {
-        if (_fp.C_GetFunctionStatus is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetFunctionStatus");
+        ThrowIfUnbound(_fp.C_GetFunctionStatus);
         return _fp.C_GetFunctionStatus(session);
     }
 
     /// <summary>Wrapper for <c>C_CancelFunction</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_CancelFunction(NativeCULong session)
     {
-        if (_fp.C_CancelFunction is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CancelFunction");
+        ThrowIfUnbound(_fp.C_CancelFunction);
         return _fp.C_CancelFunction(session);
     }
 
     /// <summary>Wrapper for <c>C_WaitForSlotEvent</c>. Matches the prior delegate signature exactly.</summary>
     public unsafe NativeCULong C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot, IntPtr reserved)
     {
-        if (_fp.C_WaitForSlotEvent is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WaitForSlotEvent");
+        ThrowIfUnbound(_fp.C_WaitForSlotEvent);
         fixed (NativeCULong* slotPtr = &slot)
             return _fp.C_WaitForSlotEvent(flags, slotPtr, reserved);
     }
@@ -699,8 +888,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_LoginUser</c> (PKCS#11 v3.0). Null on v2.40 libraries.</summary>
     public unsafe NativeCULong C_LoginUser(NativeCULong session, NativeCULong userType, byte[] pin, NativeCULong pinLen, byte[] username, NativeCULong usernameLen)
     {
-        if (_fp.C_LoginUser is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_LoginUser");
+        ThrowIfUnbound(_fp.C_LoginUser);
         fixed (byte* pinPtr = pin)
         fixed (byte* userPtr = username)
             return _fp.C_LoginUser(session, userType, pinPtr, pinLen, userPtr, usernameLen);
@@ -712,35 +900,43 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SessionCancel</c> (PKCS#11 v3.0). Throws <see cref="Pkcs11Exception"/> if the loaded library is v2.40 or does not export the symbol.</summary>
     public unsafe NativeCULong C_SessionCancel(NativeCULong session, NativeCULong flags)
     {
-        if (_fp.C_SessionCancel is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SessionCancel");
+        ThrowIfUnbound(_fp.C_SessionCancel);
         return _fp.C_SessionCancel(session, flags);
     }
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_GetInterfaceList</c> (PKCS#11 v3.0+).</summary>
     internal unsafe bool HasC_GetInterfaceList => _fp.C_GetInterfaceList is not null;
 
-    /// <summary>Returns <see langword="true"/> if the Windows-packed <c>C_GetInterfaceList</c> sibling is bound.</summary>
-    internal unsafe bool HasC_GetInterfaceList_Windows => _fp.C_GetInterfaceList_Windows is not null;
-
     /// <summary>Wrapper for <c>C_GetInterfaceList</c> (PKCS#11 v3.0). Two-call idiom: pass <c>null</c> to get the count.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
     {
-        if (_fp.C_GetInterfaceList is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInterfaceList");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_GetInterfaceList_Windows);
+            if (interfaces is null)
+            {
+                fixed (NativeCULong* c = &count)
+                    return _fp.C_GetInterfaceList_Windows(null, c);
+            }
+
+            var winList = new CK_INTERFACE_Windows[interfaces.Length];
+            NativeCULong winRv;
+            fixed (CK_INTERFACE_Windows* list = winList)
+            fixed (NativeCULong* c = &count)
+                winRv = _fp.C_GetInterfaceList_Windows(list, c);
+            if (winRv.ToCKR() == CKR.CKR_OK)
+                for (int i = 0; i < interfaces.Length; i++)
+                    interfaces[i] = winList[i].ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_GetInterfaceList);
         fixed (CK_INTERFACE* list = interfaces)
         fixed (NativeCULong* c = &count)
             return _fp.C_GetInterfaceList(list, c);
-    }
-
-    /// <summary>Wrapper for <c>C_GetInterfaceList</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetInterfaceList_Windows(CK_INTERFACE_Windows[]? interfaces, ref NativeCULong count)
-    {
-        if (_fp.C_GetInterfaceList_Windows is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInterfaceList_Windows");
-        fixed (CK_INTERFACE_Windows* list = interfaces)
-        fixed (NativeCULong* c = &count)
-            return _fp.C_GetInterfaceList_Windows(list, c);
     }
 
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_GetInterface</c> (PKCS#11 v3.0+).</summary>
@@ -758,8 +954,7 @@ internal class Delegates
     public unsafe NativeCULong C_GetInterface(byte[]? interfaceName, NativeCULong flags, out CK_INTERFACE iface)
     {
         iface = default;
-        if (_fp.C_GetInterface is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetInterface");
+        ThrowIfUnbound(_fp.C_GetInterface);
 
         IntPtr interfacePtr;
         NativeCULong rv;
@@ -863,18 +1058,26 @@ internal class Delegates
     // ── Message-AEAD family wrappers (v3.0) ──────────────────────────────────────
 
     /// <summary>Wrapper for <c>C_MessageEncryptInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_MessageEncryptInit is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageEncryptInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_MessageEncryptInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_MessageEncryptInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_MessageEncryptInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageEncryptInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_EncryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] plaintext, NativeCULong plaintextLen, byte[] ciphertext, ref NativeCULong ciphertextLen)
     {
-        if (_fp.C_EncryptMessage is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptMessage");
+        ThrowIfUnbound(_fp.C_EncryptMessage);
         fixed (byte* adPtr = associatedData)
         fixed (byte* ptPtr = plaintext)
         fixed (byte* ctPtr = ciphertext)
@@ -885,8 +1088,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_EncryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
     {
-        if (_fp.C_EncryptMessageBegin is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptMessageBegin");
+        ThrowIfUnbound(_fp.C_EncryptMessageBegin);
         fixed (byte* adPtr = associatedData)
             return _fp.C_EncryptMessageBegin(session, parameter, parameterLen, adPtr, associatedDataLen);
     }
@@ -894,8 +1096,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_EncryptMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] plaintextPart, NativeCULong plaintextPartLen, byte[] ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags)
     {
-        if (_fp.C_EncryptMessageNext is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptMessageNext");
+        ThrowIfUnbound(_fp.C_EncryptMessageNext);
         fixed (byte* ptPtr = plaintextPart)
         fixed (byte* ctPtr = ciphertextPart)
         fixed (NativeCULong* ctLenPtr = &ciphertextPartLen)
@@ -905,24 +1106,31 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_MessageEncryptFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_MessageEncryptFinal(NativeCULong session)
     {
-        if (_fp.C_MessageEncryptFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageEncryptFinal");
+        ThrowIfUnbound(_fp.C_MessageEncryptFinal);
         return _fp.C_MessageEncryptFinal(session);
     }
 
     /// <summary>Wrapper for <c>C_MessageDecryptInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_MessageDecryptInit is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageDecryptInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_MessageDecryptInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_MessageDecryptInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_MessageDecryptInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageDecryptInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_DecryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen, byte[] ciphertext, NativeCULong ciphertextLen, byte[] plaintext, ref NativeCULong plaintextLen)
     {
-        if (_fp.C_DecryptMessage is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptMessage");
+        ThrowIfUnbound(_fp.C_DecryptMessage);
         fixed (byte* adPtr = associatedData)
         fixed (byte* ctPtr = ciphertext)
         fixed (byte* ptPtr = plaintext)
@@ -933,8 +1141,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DecryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] associatedData, NativeCULong associatedDataLen)
     {
-        if (_fp.C_DecryptMessageBegin is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptMessageBegin");
+        ThrowIfUnbound(_fp.C_DecryptMessageBegin);
         fixed (byte* adPtr = associatedData)
             return _fp.C_DecryptMessageBegin(session, parameter, parameterLen, adPtr, associatedDataLen);
     }
@@ -942,8 +1149,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_DecryptMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] ciphertextPart, NativeCULong ciphertextPartLen, byte[] plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags)
     {
-        if (_fp.C_DecryptMessageNext is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptMessageNext");
+        ThrowIfUnbound(_fp.C_DecryptMessageNext);
         fixed (byte* ctPtr = ciphertextPart)
         fixed (byte* ptPtr = plaintextPart)
         fixed (NativeCULong* ptLenPtr = &plaintextPartLen)
@@ -953,24 +1159,31 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_MessageDecryptFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_MessageDecryptFinal(NativeCULong session)
     {
-        if (_fp.C_MessageDecryptFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageDecryptFinal");
+        ThrowIfUnbound(_fp.C_MessageDecryptFinal);
         return _fp.C_MessageDecryptFinal(session);
     }
 
     /// <summary>Wrapper for <c>C_MessageSignInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_MessageSignInit is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageSignInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_MessageSignInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_MessageSignInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_MessageSignInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageSignInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_SignMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
-        if (_fp.C_SignMessage is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessage");
+        ThrowIfUnbound(_fp.C_SignMessage);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* sigLenPtr = &signatureLen)
@@ -980,16 +1193,14 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_SignMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
     {
-        if (_fp.C_SignMessageBegin is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessageBegin");
+        ThrowIfUnbound(_fp.C_SignMessageBegin);
         return _fp.C_SignMessageBegin(session, parameter, parameterLen);
     }
 
     /// <summary>Wrapper for <c>C_SignMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[]? signature, ref NativeCULong signatureLen)
     {
-        if (_fp.C_SignMessageNext is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignMessageNext");
+        ThrowIfUnbound(_fp.C_SignMessageNext);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
         fixed (NativeCULong* sigLenPtr = &signatureLen)
@@ -999,24 +1210,31 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_MessageSignFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_MessageSignFinal(NativeCULong session)
     {
-        if (_fp.C_MessageSignFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageSignFinal");
+        ThrowIfUnbound(_fp.C_MessageSignFinal);
         return _fp.C_MessageSignFinal(session);
     }
 
     /// <summary>Wrapper for <c>C_MessageVerifyInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_MessageVerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        if (_fp.C_MessageVerifyInit is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageVerifyInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_MessageVerifyInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return _fp.C_MessageVerifyInit_Windows(session, &winMech, key);
+        }
+
+        ThrowIfUnbound(_fp.C_MessageVerifyInit);
         fixed (CK_MECHANISM* m = &mechanism) return _fp.C_MessageVerifyInit(session, m, key);
     }
 
     /// <summary>Wrapper for <c>C_VerifyMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
     {
-        if (_fp.C_VerifyMessage is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyMessage");
+        ThrowIfUnbound(_fp.C_VerifyMessage);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
             return _fp.C_VerifyMessage(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, signatureLen);
@@ -1025,16 +1243,14 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_VerifyMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_VerifyMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
     {
-        if (_fp.C_VerifyMessageBegin is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyMessageBegin");
+        ThrowIfUnbound(_fp.C_VerifyMessageBegin);
         return _fp.C_VerifyMessageBegin(session, parameter, parameterLen);
     }
 
     /// <summary>Wrapper for <c>C_VerifyMessageNext</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, byte[] data, NativeCULong dataLen, byte[] signature, NativeCULong signatureLen)
     {
-        if (_fp.C_VerifyMessageNext is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyMessageNext");
+        ThrowIfUnbound(_fp.C_VerifyMessageNext);
         fixed (byte* dataPtr = data)
         fixed (byte* sigPtr = signature)
             return _fp.C_VerifyMessageNext(session, parameter, parameterLen, dataPtr, dataLen, sigPtr, signatureLen);
@@ -1043,18 +1259,31 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_MessageVerifyFinal</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_MessageVerifyFinal(NativeCULong session)
     {
-        if (_fp.C_MessageVerifyFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageVerifyFinal");
+        ThrowIfUnbound(_fp.C_MessageVerifyFinal);
         return _fp.C_MessageVerifyFinal(session);
     }
 
     // ── v3.2 PQC / signature / async / authenticated-wrap wrappers ───────────────
 
     /// <summary>Wrapper for <c>C_EncapsulateKey</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
-        if (_fp.C_EncapsulateKey is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncapsulateKey");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_EncapsulateKey_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (byte* ctPtr = ciphertext)
+            fixed (NativeCULong* ctLenPtr = &ciphertextLen)
+            fixed (NativeCULong* dkPtr = &derivedKey)
+                return _fp.C_EncapsulateKey_Windows(session, &winMech, publicKey, t, attributeCount, ctPtr, ctLenPtr, dkPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_EncapsulateKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (byte* ctPtr = ciphertext)
@@ -1064,10 +1293,23 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_DecapsulateKey</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
-        if (_fp.C_DecapsulateKey is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecapsulateKey");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_DecapsulateKey_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (byte* ctPtr = ciphertext)
+            fixed (NativeCULong* dkPtr = &derivedKey)
+                return _fp.C_DecapsulateKey_Windows(session, &winMech, privateKey, t, attributeCount, ctPtr, ciphertextLen, dkPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_DecapsulateKey);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (CK_ATTRIBUTE* t = template)
         fixed (byte* ctPtr = ciphertext)
@@ -1076,10 +1318,20 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_VerifySignatureInit</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen)
     {
-        if (_fp.C_VerifySignatureInit is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureInit");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_VerifySignatureInit_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            fixed (byte* sigPtr = signature)
+                return _fp.C_VerifySignatureInit_Windows(session, &winMech, key, sigPtr, signatureLen);
+        }
+
+        ThrowIfUnbound(_fp.C_VerifySignatureInit);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* sigPtr = signature)
             return _fp.C_VerifySignatureInit(session, m, key, sigPtr, signatureLen);
@@ -1088,8 +1340,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_VerifySignature</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_VerifySignature(NativeCULong session, byte[] data, NativeCULong dataLen)
     {
-        if (_fp.C_VerifySignature is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignature");
+        ThrowIfUnbound(_fp.C_VerifySignature);
         fixed (byte* dataPtr = data)
             return _fp.C_VerifySignature(session, dataPtr, dataLen);
     }
@@ -1097,8 +1348,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_VerifySignatureUpdate</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_VerifySignatureUpdate(NativeCULong session, byte[] part, NativeCULong partLen)
     {
-        if (_fp.C_VerifySignatureUpdate is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureUpdate");
+        ThrowIfUnbound(_fp.C_VerifySignatureUpdate);
         fixed (byte* partPtr = part)
             return _fp.C_VerifySignatureUpdate(session, partPtr, partLen);
     }
@@ -1106,25 +1356,36 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_VerifySignatureFinal</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_VerifySignatureFinal(NativeCULong session)
     {
-        if (_fp.C_VerifySignatureFinal is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureFinal");
+        ThrowIfUnbound(_fp.C_VerifySignatureFinal);
         return _fp.C_VerifySignatureFinal(session);
     }
 
     /// <summary>Wrapper for <c>C_GetSessionValidationFlags</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)
     {
-        if (_fp.C_GetSessionValidationFlags is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetSessionValidationFlags");
+        ThrowIfUnbound(_fp.C_GetSessionValidationFlags);
         fixed (NativeCULong* flagsPtr = &flags)
             return _fp.C_GetSessionValidationFlags(session, type, flagsPtr);
     }
 
     /// <summary>Wrapper for <c>C_AsyncComplete</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_AsyncComplete(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA result)
     {
-        if (_fp.C_AsyncComplete is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncComplete");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_AsyncComplete_Windows);
+            CK_ASYNC_DATA_Windows win = default;
+            NativeCULong winRv;
+            fixed (byte* fnPtr = functionName)
+                winRv = _fp.C_AsyncComplete_Windows(session, fnPtr, &win);
+            result = win.ToUnified();
+            return winRv;
+        }
+
+        ThrowIfUnbound(_fp.C_AsyncComplete);
         fixed (byte* fnPtr = functionName)
         fixed (CK_ASYNC_DATA* rPtr = &result)
             return _fp.C_AsyncComplete(session, fnPtr, rPtr);
@@ -1136,8 +1397,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_AsyncGetID</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_AsyncGetID(NativeCULong session, byte[] functionName, ref NativeCULong id)
     {
-        if (_fp.C_AsyncGetID is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncGetID");
+        ThrowIfUnbound(_fp.C_AsyncGetID);
         fixed (byte* fnPtr = functionName)
         fixed (NativeCULong* idPtr = &id)
             return _fp.C_AsyncGetID(session, fnPtr, idPtr);
@@ -1149,8 +1409,7 @@ internal class Delegates
     /// <summary>Wrapper for <c>C_AsyncJoin</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_AsyncJoin(NativeCULong session, byte[] functionName, NativeCULong id, byte[] data, NativeCULong dataLen)
     {
-        if (_fp.C_AsyncJoin is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncJoin");
+        ThrowIfUnbound(_fp.C_AsyncJoin);
         fixed (byte* fnPtr = functionName)
         fixed (byte* dataPtr = data)
             return _fp.C_AsyncJoin(session, fnPtr, id, dataPtr, dataLen);
@@ -1160,10 +1419,22 @@ internal class Delegates
     internal unsafe bool HasC_AsyncJoin => _fp.C_AsyncJoin is not null;
 
     /// <summary>Wrapper for <c>C_WrapKeyAuthenticated</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
     {
-        if (_fp.C_WrapKeyAuthenticated is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKeyAuthenticated");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_WrapKeyAuthenticated_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            fixed (byte* adPtr = associatedData)
+            fixed (byte* wkPtr = wrappedKey)
+            fixed (NativeCULong* lenPtr = &wrappedKeyLen)
+                return _fp.C_WrapKeyAuthenticated_Windows(session, &winMech, wrappingKey, key, adPtr, associatedDataLen, wkPtr, lenPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_WrapKeyAuthenticated);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* adPtr = associatedData)
         fixed (byte* wkPtr = wrappedKey)
@@ -1172,10 +1443,24 @@ internal class Delegates
     }
 
     /// <summary>Wrapper for <c>C_UnwrapKeyAuthenticated</c> (PKCS#11 v3.2). Throws if the fptr is null.</summary>
+    /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
+    /// conversion to and from the unified structs happens here, so callers never see
+    /// the packed types and never branch on the platform themselves.</remarks>
     public unsafe NativeCULong C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key)
     {
-        if (_fp.C_UnwrapKeyAuthenticated is null)
-            throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKeyAuthenticated");
+        if (Pkcs11Marshal.IsWindows)
+        {
+            ThrowIfUnbound(_fp.C_UnwrapKeyAuthenticated_Windows);
+            CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
+            fixed (byte* wkPtr = wrappedKey)
+            fixed (CK_ATTRIBUTE_Windows* t = winTpl)
+            fixed (byte* adPtr = associatedData)
+            fixed (NativeCULong* kPtr = &key)
+                return _fp.C_UnwrapKeyAuthenticated_Windows(session, &winMech, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
+        }
+
+        ThrowIfUnbound(_fp.C_UnwrapKeyAuthenticated);
         fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* wkPtr = wrappedKey)
         fixed (CK_ATTRIBUTE* t = template)
@@ -1183,279 +1468,6 @@ internal class Delegates
         fixed (NativeCULong* kPtr = &key)
             return _fp.C_UnwrapKeyAuthenticated(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
     }
-
-    // ── Windows-layout fptr wrapper methods ──────────────────────────────────
-    // These wrap the fptrs in FunctionPointers._fp for blittable _Windows types.
-    // Callers check HasC_X_Windows before invoking; the wrapper throws Pkcs11Exception
-    // if the fptr is unexpectedly null (defensive only).
-
-    /// <summary>Wrapper for <c>C_CreateObject</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_CreateObject_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong objectId)
-    {
-        if (_fp.C_CreateObject_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CreateObject_Windows");
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (NativeCULong* idPtr = &objectId)
-            return _fp.C_CreateObject_Windows(session, t, count, idPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_CopyObject</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_CopyObject_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong newObjectId)
-    {
-        if (_fp.C_CopyObject_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_CopyObject_Windows");
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (NativeCULong* idPtr = &newObjectId)
-            return _fp.C_CopyObject_Windows(session, objectId, t, count, idPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_GetAttributeValue</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GetAttributeValue_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count)
-    {
-        if (_fp.C_GetAttributeValue_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GetAttributeValue_Windows");
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-            return _fp.C_GetAttributeValue_Windows(session, objectId, t, count);
-    }
-
-    /// <summary>Wrapper for <c>C_SetAttributeValue</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_SetAttributeValue_Windows(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE_Windows[] template, NativeCULong count)
-    {
-        if (_fp.C_SetAttributeValue_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SetAttributeValue_Windows");
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-            return _fp.C_SetAttributeValue_Windows(session, objectId, t, count);
-    }
-
-    /// <summary>Wrapper for <c>C_FindObjectsInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_FindObjectsInit_Windows(NativeCULong session, CK_ATTRIBUTE_Windows[] template, NativeCULong count)
-    {
-        if (_fp.C_FindObjectsInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_FindObjectsInit_Windows");
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-            return _fp.C_FindObjectsInit_Windows(session, t, count);
-    }
-
-    /// <summary>Wrapper for <c>C_EncryptInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_EncryptInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_EncryptInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncryptInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_EncryptInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_DecryptInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_DecryptInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_DecryptInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecryptInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_DecryptInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_DigestInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_DigestInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism)
-    {
-        if (_fp.C_DigestInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DigestInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_DigestInit_Windows(session, m);
-    }
-
-    /// <summary>Wrapper for <c>C_SignInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_SignInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_SignInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_SignInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_SignRecoverInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_SignRecoverInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_SignRecoverInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_SignRecoverInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_SignRecoverInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_VerifyInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_VerifyInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_VerifyInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_VerifyInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_VerifyRecoverInit</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_VerifyRecoverInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_VerifyRecoverInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifyRecoverInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_VerifyRecoverInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_GenerateKey</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GenerateKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, CK_ATTRIBUTE_Windows[] template, NativeCULong count, ref NativeCULong key)
-    {
-        if (_fp.C_GenerateKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKey_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (NativeCULong* kPtr = &key)
-            return _fp.C_GenerateKey_Windows(session, m, t, count, kPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_GenerateKeyPair</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_GenerateKeyPair_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism,
-        CK_ATTRIBUTE_Windows[] publicKeyTemplate, NativeCULong publicKeyAttributeCount,
-        CK_ATTRIBUTE_Windows[] privateKeyTemplate, NativeCULong privateKeyAttributeCount,
-        ref NativeCULong publicKey, ref NativeCULong privateKey)
-    {
-        if (_fp.C_GenerateKeyPair_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_GenerateKeyPair_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (CK_ATTRIBUTE_Windows* pub = publicKeyTemplate)
-        fixed (CK_ATTRIBUTE_Windows* priv = privateKeyTemplate)
-        fixed (NativeCULong* pubK = &publicKey)
-        fixed (NativeCULong* privK = &privateKey)
-            return _fp.C_GenerateKeyPair_Windows(session, m, pub, publicKeyAttributeCount, priv, privateKeyAttributeCount, pubK, privK);
-    }
-
-    /// <summary>Wrapper for <c>C_WrapKey</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_WrapKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
-    {
-        if (_fp.C_WrapKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKey_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (byte* wkPtr = wrappedKey)
-        fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-            return _fp.C_WrapKey_Windows(session, m, wrappingKey, key, wkPtr, lenPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_UnwrapKey</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_UnwrapKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, ref NativeCULong key)
-    {
-        if (_fp.C_UnwrapKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKey_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (byte* wkPtr = wrappedKey)
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (NativeCULong* kPtr = &key)
-            return _fp.C_UnwrapKey_Windows(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, kPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_DeriveKey</c> with Pack=1 Windows struct layout.</summary>
-    public unsafe NativeCULong C_DeriveKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong baseKey, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, ref NativeCULong key)
-    {
-        if (_fp.C_DeriveKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DeriveKey_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (NativeCULong* kPtr = &key)
-            return _fp.C_DeriveKey_Windows(session, m, baseKey, t, attributeCount, kPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_MessageEncryptInit</c> with Pack=1 Windows struct layout (v3.0).</summary>
-    public unsafe NativeCULong C_MessageEncryptInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_MessageEncryptInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageEncryptInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_MessageEncryptInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_MessageDecryptInit</c> with Pack=1 Windows struct layout (v3.0).</summary>
-    public unsafe NativeCULong C_MessageDecryptInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_MessageDecryptInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageDecryptInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_MessageDecryptInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_MessageSignInit</c> with Pack=1 Windows struct layout (v3.0).</summary>
-    public unsafe NativeCULong C_MessageSignInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_MessageSignInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageSignInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_MessageSignInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_MessageVerifyInit</c> with Pack=1 Windows struct layout (v3.0).</summary>
-    public unsafe NativeCULong C_MessageVerifyInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key)
-    {
-        if (_fp.C_MessageVerifyInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_MessageVerifyInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism) return _fp.C_MessageVerifyInit_Windows(session, m, key);
-    }
-
-    /// <summary>Wrapper for <c>C_EncapsulateKey</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_EncapsulateKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong publicKey, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, byte[] ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
-    {
-        if (_fp.C_EncapsulateKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_EncapsulateKey_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (byte* ctPtr = ciphertext)
-        fixed (NativeCULong* ctLenPtr = &ciphertextLen)
-        fixed (NativeCULong* dkPtr = &derivedKey)
-            return _fp.C_EncapsulateKey_Windows(session, m, publicKey, t, attributeCount, ctPtr, ctLenPtr, dkPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_DecapsulateKey</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_DecapsulateKey_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong privateKey, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, byte[] ciphertext, NativeCULong ciphertextLen, ref NativeCULong derivedKey)
-    {
-        if (_fp.C_DecapsulateKey_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_DecapsulateKey_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (byte* ctPtr = ciphertext)
-        fixed (NativeCULong* dkPtr = &derivedKey)
-            return _fp.C_DecapsulateKey_Windows(session, m, privateKey, t, attributeCount, ctPtr, ciphertextLen, dkPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_VerifySignatureInit</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_VerifySignatureInit_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong key, byte[] signature, NativeCULong signatureLen)
-    {
-        if (_fp.C_VerifySignatureInit_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_VerifySignatureInit_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (byte* sigPtr = signature)
-            return _fp.C_VerifySignatureInit_Windows(session, m, key, sigPtr, signatureLen);
-    }
-
-    /// <summary>Wrapper for <c>C_AsyncComplete</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_AsyncComplete_Windows(NativeCULong session, byte[] functionName, ref CK_ASYNC_DATA_Windows result)
-    {
-        if (_fp.C_AsyncComplete_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_AsyncComplete_Windows");
-        fixed (byte* fnPtr = functionName)
-        fixed (CK_ASYNC_DATA_Windows* rPtr = &result)
-            return _fp.C_AsyncComplete_Windows(session, fnPtr, rPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_WrapKeyAuthenticated</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_WrapKeyAuthenticated_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong wrappingKey, NativeCULong key, byte[] associatedData, NativeCULong associatedDataLen, byte[]? wrappedKey, ref NativeCULong wrappedKeyLen)
-    {
-        if (_fp.C_WrapKeyAuthenticated_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_WrapKeyAuthenticated_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (byte* adPtr = associatedData)
-        fixed (byte* wkPtr = wrappedKey)
-        fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-            return _fp.C_WrapKeyAuthenticated_Windows(session, m, wrappingKey, key, adPtr, associatedDataLen, wkPtr, lenPtr);
-    }
-
-    /// <summary>Wrapper for <c>C_UnwrapKeyAuthenticated</c> with Pack=1 Windows struct layout (v3.2).</summary>
-    public unsafe NativeCULong C_UnwrapKeyAuthenticated_Windows(NativeCULong session, ref CK_MECHANISM_Windows mechanism, NativeCULong unwrappingKey, byte[] wrappedKey, NativeCULong wrappedKeyLen, CK_ATTRIBUTE_Windows[] template, NativeCULong attributeCount, byte[] associatedData, NativeCULong associatedDataLen, ref NativeCULong key)
-    {
-        if (_fp.C_UnwrapKeyAuthenticated_Windows is null) throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, "C_UnwrapKeyAuthenticated_Windows");
-        fixed (CK_MECHANISM_Windows* m = &mechanism)
-        fixed (byte* wkPtr = wrappedKey)
-        fixed (CK_ATTRIBUTE_Windows* t = template)
-        fixed (byte* adPtr = associatedData)
-        fixed (NativeCULong* kPtr = &key)
-            return _fp.C_UnwrapKeyAuthenticated_Windows(session, m, unwrappingKey, wkPtr, wrappedKeyLen, t, attributeCount, adPtr, associatedDataLen, kPtr);
-    }
-
-    // Has* properties — safe-context null checks for _Windows fptrs (unsafe internally).
-    internal unsafe bool HasC_MessageEncryptInit_Windows => _fp.C_MessageEncryptInit_Windows is not null;
-    internal unsafe bool HasC_MessageDecryptInit_Windows => _fp.C_MessageDecryptInit_Windows is not null;
-    internal unsafe bool HasC_MessageSignInit_Windows => _fp.C_MessageSignInit_Windows is not null;
-    internal unsafe bool HasC_MessageVerifyInit_Windows => _fp.C_MessageVerifyInit_Windows is not null;
-    internal unsafe bool HasC_EncapsulateKey_Windows => _fp.C_EncapsulateKey_Windows is not null;
-    internal unsafe bool HasC_DecapsulateKey_Windows => _fp.C_DecapsulateKey_Windows is not null;
-    internal unsafe bool HasC_VerifySignatureInit_Windows => _fp.C_VerifySignatureInit_Windows is not null;
-    internal unsafe bool HasC_AsyncComplete_Windows => _fp.C_AsyncComplete_Windows is not null;
-    internal unsafe bool HasC_WrapKeyAuthenticated_Windows => _fp.C_WrapKeyAuthenticated_Windows is not null;
-    internal unsafe bool HasC_UnwrapKeyAuthenticated_Windows => _fp.C_UnwrapKeyAuthenticated_Windows is not null;
-    internal unsafe bool HasC_CreateObject_Windows => _fp.C_CreateObject_Windows is not null;
-    internal unsafe bool HasC_CopyObject_Windows => _fp.C_CopyObject_Windows is not null;
-    internal unsafe bool HasC_GetAttributeValue_Windows => _fp.C_GetAttributeValue_Windows is not null;
-    internal unsafe bool HasC_SetAttributeValue_Windows => _fp.C_SetAttributeValue_Windows is not null;
-    internal unsafe bool HasC_FindObjectsInit_Windows => _fp.C_FindObjectsInit_Windows is not null;
-    internal unsafe bool HasC_EncryptInit_Windows => _fp.C_EncryptInit_Windows is not null;
-    internal unsafe bool HasC_DecryptInit_Windows => _fp.C_DecryptInit_Windows is not null;
-    internal unsafe bool HasC_DigestInit_Windows => _fp.C_DigestInit_Windows is not null;
-    internal unsafe bool HasC_SignInit_Windows => _fp.C_SignInit_Windows is not null;
-    internal unsafe bool HasC_SignRecoverInit_Windows => _fp.C_SignRecoverInit_Windows is not null;
-    internal unsafe bool HasC_VerifyInit_Windows => _fp.C_VerifyInit_Windows is not null;
-    internal unsafe bool HasC_VerifyRecoverInit_Windows => _fp.C_VerifyRecoverInit_Windows is not null;
-    internal unsafe bool HasC_GenerateKey_Windows => _fp.C_GenerateKey_Windows is not null;
-    internal unsafe bool HasC_GenerateKeyPair_Windows => _fp.C_GenerateKeyPair_Windows is not null;
-    internal unsafe bool HasC_WrapKey_Windows => _fp.C_WrapKey_Windows is not null;
-    internal unsafe bool HasC_UnwrapKey_Windows => _fp.C_UnwrapKey_Windows is not null;
-    internal unsafe bool HasC_DeriveKey_Windows => _fp.C_DeriveKey_Windows is not null;
 
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
