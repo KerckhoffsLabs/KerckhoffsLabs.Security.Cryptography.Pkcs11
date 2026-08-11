@@ -1522,110 +1522,47 @@ internal class Delegates
 
         // Fallback: per-symbol lookup. Works for libraries that export the v3.0
         // functions as plain symbols even though they don't expose C_GetInterface.
-        if (TryResolve(resolveExport, "C_LoginUser", out IntPtr loginUserPtr))
-            unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)loginUserPtr; }
-        if (TryResolve(resolveExport, "C_SessionCancel", out IntPtr sessionCancelPtr))
-            unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)sessionCancelPtr; }
-        if (TryResolve(resolveExport, "C_GetInterfaceList", out IntPtr getInterfaceListPtr))
-            unsafe
-            {
-                _fp.C_GetInterfaceList = (delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong>)getInterfaceListPtr;
-                _fp.C_GetInterfaceList_Windows = (delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong>)getInterfaceListPtr;
-            }
-        if (TryResolve(resolveExport, "C_MessageEncryptInit", out IntPtr msgEncInitPtr))
-        {
-            unsafe { _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgEncInitPtr; }
-            unsafe { _fp.C_MessageEncryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgEncInitPtr; }
-        }
-        if (TryResolve(resolveExport, "C_EncryptMessage", out IntPtr encMsgPtr))
-            unsafe { _fp.C_EncryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)encMsgPtr; }
-        if (TryResolve(resolveExport, "C_EncryptMessageBegin", out IntPtr encMsgBeginPtr))
-            unsafe { _fp.C_EncryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)encMsgBeginPtr; }
-        if (TryResolve(resolveExport, "C_EncryptMessageNext", out IntPtr encMsgNextPtr))
-            unsafe { _fp.C_EncryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)encMsgNextPtr; }
-        if (TryResolve(resolveExport, "C_MessageEncryptFinal", out IntPtr msgEncFinalPtr))
-            unsafe { _fp.C_MessageEncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgEncFinalPtr; }
-        if (TryResolve(resolveExport, "C_MessageDecryptInit", out IntPtr msgDecInitPtr))
-        {
-            unsafe { _fp.C_MessageDecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgDecInitPtr; }
-            unsafe { _fp.C_MessageDecryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgDecInitPtr; }
-        }
-        if (TryResolve(resolveExport, "C_DecryptMessage", out IntPtr decMsgPtr))
-            unsafe { _fp.C_DecryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)decMsgPtr; }
-        if (TryResolve(resolveExport, "C_DecryptMessageBegin", out IntPtr decMsgBeginPtr))
-            unsafe { _fp.C_DecryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)decMsgBeginPtr; }
-        if (TryResolve(resolveExport, "C_DecryptMessageNext", out IntPtr decMsgNextPtr))
-            unsafe { _fp.C_DecryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)decMsgNextPtr; }
-        if (TryResolve(resolveExport, "C_MessageDecryptFinal", out IntPtr msgDecFinalPtr))
-            unsafe { _fp.C_MessageDecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgDecFinalPtr; }
-        if (TryResolve(resolveExport, "C_MessageSignInit", out IntPtr msgSignInitPtr))
-        {
-            unsafe { _fp.C_MessageSignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgSignInitPtr; }
-            unsafe { _fp.C_MessageSignInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgSignInitPtr; }
-        }
-        if (TryResolve(resolveExport, "C_SignMessage", out IntPtr signMsgPtr))
-            unsafe { _fp.C_SignMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)signMsgPtr; }
-        if (TryResolve(resolveExport, "C_SignMessageBegin", out IntPtr signMsgBeginPtr))
-            unsafe { _fp.C_SignMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)signMsgBeginPtr; }
-        if (TryResolve(resolveExport, "C_SignMessageNext", out IntPtr signMsgNextPtr))
-            unsafe { _fp.C_SignMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)signMsgNextPtr; }
-        if (TryResolve(resolveExport, "C_MessageSignFinal", out IntPtr msgSignFinalPtr))
-            unsafe { _fp.C_MessageSignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgSignFinalPtr; }
-        if (TryResolve(resolveExport, "C_MessageVerifyInit", out IntPtr msgVerifyInitPtr))
-        {
-            unsafe { _fp.C_MessageVerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)msgVerifyInitPtr; }
-            unsafe { _fp.C_MessageVerifyInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)msgVerifyInitPtr; }
-        }
-        if (TryResolve(resolveExport, "C_VerifyMessage", out IntPtr verMsgPtr))
-            unsafe { _fp.C_VerifyMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)verMsgPtr; }
-        if (TryResolve(resolveExport, "C_VerifyMessageBegin", out IntPtr verMsgBeginPtr))
-            unsafe { _fp.C_VerifyMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)verMsgBeginPtr; }
-        if (TryResolve(resolveExport, "C_VerifyMessageNext", out IntPtr verMsgNextPtr))
-            unsafe { _fp.C_VerifyMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)verMsgNextPtr; }
-        if (TryResolve(resolveExport, "C_MessageVerifyFinal", out IntPtr msgVerifyFinalPtr))
-            unsafe { _fp.C_MessageVerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)msgVerifyFinalPtr; }
-        if (TryResolve(resolveExport, "C_EncapsulateKey", out IntPtr encapPtr))
-        {
-            unsafe { _fp.C_EncapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)encapPtr; }
-            unsafe { _fp.C_EncapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)encapPtr; }
-        }
-        if (TryResolve(resolveExport, "C_DecapsulateKey", out IntPtr decapPtr))
-        {
-            unsafe { _fp.C_DecapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)decapPtr; }
-            unsafe { _fp.C_DecapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)decapPtr; }
-        }
-        if (TryResolve(resolveExport, "C_VerifySignatureInit", out IntPtr vsiPtr))
-        {
-            unsafe { _fp.C_VerifySignatureInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong>)vsiPtr; }
-            unsafe { _fp.C_VerifySignatureInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong>)vsiPtr; }
-        }
-        if (TryResolve(resolveExport, "C_VerifySignature", out IntPtr vsPtr))
-            unsafe { _fp.C_VerifySignature = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)vsPtr; }
-        if (TryResolve(resolveExport, "C_VerifySignatureUpdate", out IntPtr vsuPtr))
-            unsafe { _fp.C_VerifySignatureUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)vsuPtr; }
-        if (TryResolve(resolveExport, "C_VerifySignatureFinal", out IntPtr vsfPtr))
-            unsafe { _fp.C_VerifySignatureFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)vsfPtr; }
-        if (TryResolve(resolveExport, "C_GetSessionValidationFlags", out IntPtr gsvfPtr))
-            unsafe { _fp.C_GetSessionValidationFlags = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)gsvfPtr; }
-        if (TryResolve(resolveExport, "C_AsyncComplete", out IntPtr asyncCompletePtr))
-        {
-            unsafe { _fp.C_AsyncComplete = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong>)asyncCompletePtr; }
-            unsafe { _fp.C_AsyncComplete_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong>)asyncCompletePtr; }
-        }
-        if (TryResolve(resolveExport, "C_AsyncGetID", out IntPtr asyncGetIdPtr))
-            unsafe { _fp.C_AsyncGetID = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)asyncGetIdPtr; }
-        if (TryResolve(resolveExport, "C_AsyncJoin", out IntPtr asyncJoinPtr))
-            unsafe { _fp.C_AsyncJoin = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)asyncJoinPtr; }
-        if (TryResolve(resolveExport, "C_WrapKeyAuthenticated", out IntPtr wkaPtr))
-        {
-            unsafe { _fp.C_WrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)wkaPtr; }
-            unsafe { _fp.C_WrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)wkaPtr; }
-        }
-        if (TryResolve(resolveExport, "C_UnwrapKeyAuthenticated", out IntPtr uwkaPtr))
-        {
-            unsafe { _fp.C_UnwrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)uwkaPtr; }
-            unsafe { _fp.C_UnwrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)uwkaPtr; }
-        }
+        // A missing export resolves to Zero, which each binder treats as "absent".
+        BindLoginUser(resolveExport("C_LoginUser"));
+        BindSessionCancel(resolveExport("C_SessionCancel"));
+        BindGetInterfaceList(resolveExport("C_GetInterfaceList"));
+
+        BindMessageEncryptInit(resolveExport("C_MessageEncryptInit"));
+        BindEncryptMessage(resolveExport("C_EncryptMessage"));
+        BindEncryptMessageBegin(resolveExport("C_EncryptMessageBegin"));
+        BindEncryptMessageNext(resolveExport("C_EncryptMessageNext"));
+        BindMessageEncryptFinal(resolveExport("C_MessageEncryptFinal"));
+
+        BindMessageDecryptInit(resolveExport("C_MessageDecryptInit"));
+        BindDecryptMessage(resolveExport("C_DecryptMessage"));
+        BindDecryptMessageBegin(resolveExport("C_DecryptMessageBegin"));
+        BindDecryptMessageNext(resolveExport("C_DecryptMessageNext"));
+        BindMessageDecryptFinal(resolveExport("C_MessageDecryptFinal"));
+
+        BindMessageSignInit(resolveExport("C_MessageSignInit"));
+        BindSignMessage(resolveExport("C_SignMessage"));
+        BindSignMessageBegin(resolveExport("C_SignMessageBegin"));
+        BindSignMessageNext(resolveExport("C_SignMessageNext"));
+        BindMessageSignFinal(resolveExport("C_MessageSignFinal"));
+
+        BindMessageVerifyInit(resolveExport("C_MessageVerifyInit"));
+        BindVerifyMessage(resolveExport("C_VerifyMessage"));
+        BindVerifyMessageBegin(resolveExport("C_VerifyMessageBegin"));
+        BindVerifyMessageNext(resolveExport("C_VerifyMessageNext"));
+        BindMessageVerifyFinal(resolveExport("C_MessageVerifyFinal"));
+
+        BindEncapsulateKey(resolveExport("C_EncapsulateKey"));
+        BindDecapsulateKey(resolveExport("C_DecapsulateKey"));
+        BindVerifySignatureInit(resolveExport("C_VerifySignatureInit"));
+        BindVerifySignature(resolveExport("C_VerifySignature"));
+        BindVerifySignatureUpdate(resolveExport("C_VerifySignatureUpdate"));
+        BindVerifySignatureFinal(resolveExport("C_VerifySignatureFinal"));
+        BindGetSessionValidationFlags(resolveExport("C_GetSessionValidationFlags"));
+        BindAsyncComplete(resolveExport("C_AsyncComplete"));
+        BindAsyncGetID(resolveExport("C_AsyncGetID"));
+        BindAsyncJoin(resolveExport("C_AsyncJoin"));
+        BindWrapKeyAuthenticated(resolveExport("C_WrapKeyAuthenticated"));
+        BindUnwrapKeyAuthenticated(resolveExport("C_UnwrapKeyAuthenticated"));
     }
 
     /// <summary>
@@ -1641,7 +1578,31 @@ internal class Delegates
             return false;
         unsafe { _fp.C_GetInterface = (delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)getInterfaceRawPtr; }
 
-        // Request the default interface: null name, null version, flags = 0.
+        if (!TryGetDefaultInterfaceFunctionList(out IntPtr functionList, out CK_VERSION version))
+            return false;
+
+        BindV30FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(functionList));
+
+        // v3.2 token: re-read the function table as CK_FUNCTION_LIST_3_2 and bind
+        // the 12 v3.2 additions on top of the v3.0 bindings.
+        if (version.Minor >= 2)
+            BindV32FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(functionList));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Asks the already-bound C_GetInterface for the default interface (null name, null
+    /// version, flags = 0) and validates the table it hands back. Yields the function-list
+    /// pointer and its CK_VERSION header only for a v3.x table; returns false — with
+    /// <paramref name="functionList"/> left at <see cref="IntPtr.Zero"/> — when the call
+    /// throws, fails, or returns a v2.40 table the v3.0 binders must not read.
+    /// </summary>
+    private bool TryGetDefaultInterfaceFunctionList(out IntPtr functionList, out CK_VERSION version)
+    {
+        functionList = IntPtr.Zero;
+        version = default;
+
         IntPtr interfacePtr;
         NativeCULong rv;
         try
@@ -1663,130 +1624,303 @@ internal class Delegates
         // The function-list pointer can be either CK_FUNCTION_LIST (v2.40) or
         // CK_FUNCTION_LIST_3_0 (v3.0+). The CK_VERSION header at offset 0 distinguishes
         // them. Read just the version first to decide.
-        CK_VERSION version = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
-        if (version.Major < 3) return false;
+        version = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
+        if (version.Major < 3)
+            return false;
 
-        CK_FUNCTION_LIST_3_0 v30 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(iface.FunctionList);
-
-        if (v30.C_LoginUser != IntPtr.Zero)
-            unsafe { _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_LoginUser; }
-        if (v30.C_SessionCancel != IntPtr.Zero)
-            unsafe { _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)v30.C_SessionCancel; }
-        // v3.0 func; present at the same offset in the v3.2 table, so this also covers v3.2 tokens.
-        if (v30.C_GetInterfaceList != IntPtr.Zero)
-            unsafe
-            {
-                _fp.C_GetInterfaceList = (delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong>)v30.C_GetInterfaceList;
-                _fp.C_GetInterfaceList_Windows = (delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong>)v30.C_GetInterfaceList;
-            }
-
-        if (v30.C_MessageEncryptInit != IntPtr.Zero)
-        {
-            unsafe { _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageEncryptInit; }
-            unsafe { _fp.C_MessageEncryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageEncryptInit; }
-        }
-        if (v30.C_EncryptMessage != IntPtr.Zero)
-            unsafe { _fp.C_EncryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_EncryptMessage; }
-        if (v30.C_EncryptMessageBegin != IntPtr.Zero)
-            unsafe { _fp.C_EncryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_EncryptMessageBegin; }
-        if (v30.C_EncryptMessageNext != IntPtr.Zero)
-            unsafe { _fp.C_EncryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)v30.C_EncryptMessageNext; }
-        if (v30.C_MessageEncryptFinal != IntPtr.Zero)
-            unsafe { _fp.C_MessageEncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageEncryptFinal; }
-
-        if (v30.C_MessageDecryptInit != IntPtr.Zero)
-        {
-            unsafe { _fp.C_MessageDecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageDecryptInit; }
-            unsafe { _fp.C_MessageDecryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageDecryptInit; }
-        }
-        if (v30.C_DecryptMessage != IntPtr.Zero)
-            unsafe { _fp.C_DecryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_DecryptMessage; }
-        if (v30.C_DecryptMessageBegin != IntPtr.Zero)
-            unsafe { _fp.C_DecryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_DecryptMessageBegin; }
-        if (v30.C_DecryptMessageNext != IntPtr.Zero)
-            unsafe { _fp.C_DecryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)v30.C_DecryptMessageNext; }
-        if (v30.C_MessageDecryptFinal != IntPtr.Zero)
-            unsafe { _fp.C_MessageDecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageDecryptFinal; }
-
-        if (v30.C_MessageSignInit != IntPtr.Zero)
-        {
-            unsafe { _fp.C_MessageSignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageSignInit; }
-            unsafe { _fp.C_MessageSignInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageSignInit; }
-        }
-        if (v30.C_SignMessage != IntPtr.Zero)
-            unsafe { _fp.C_SignMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_SignMessage; }
-        if (v30.C_SignMessageBegin != IntPtr.Zero)
-            unsafe { _fp.C_SignMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)v30.C_SignMessageBegin; }
-        if (v30.C_SignMessageNext != IntPtr.Zero)
-            unsafe { _fp.C_SignMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v30.C_SignMessageNext; }
-        if (v30.C_MessageSignFinal != IntPtr.Zero)
-            unsafe { _fp.C_MessageSignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageSignFinal; }
-
-        if (v30.C_MessageVerifyInit != IntPtr.Zero)
-        {
-            unsafe { _fp.C_MessageVerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)v30.C_MessageVerifyInit; }
-            unsafe { _fp.C_MessageVerifyInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)v30.C_MessageVerifyInit; }
-        }
-        if (v30.C_VerifyMessage != IntPtr.Zero)
-            unsafe { _fp.C_VerifyMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_VerifyMessage; }
-        if (v30.C_VerifyMessageBegin != IntPtr.Zero)
-            unsafe { _fp.C_VerifyMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)v30.C_VerifyMessageBegin; }
-        if (v30.C_VerifyMessageNext != IntPtr.Zero)
-            unsafe { _fp.C_VerifyMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v30.C_VerifyMessageNext; }
-        if (v30.C_MessageVerifyFinal != IntPtr.Zero)
-            unsafe { _fp.C_MessageVerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v30.C_MessageVerifyFinal; }
-
-        // v3.2 token: re-read the function table as CK_FUNCTION_LIST_3_2 and bind
-        // the 12 v3.2 additions on top of the v3.0 bindings.
-        if (version.Minor >= 2)
-        {
-            CK_FUNCTION_LIST_3_2 v32 = UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(iface.FunctionList);
-
-            if (v32.C_EncapsulateKey != IntPtr.Zero)
-            {
-                unsafe { _fp.C_EncapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)v32.C_EncapsulateKey; }
-                unsafe { _fp.C_EncapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)v32.C_EncapsulateKey; }
-            }
-            if (v32.C_DecapsulateKey != IntPtr.Zero)
-            {
-                unsafe { _fp.C_DecapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_DecapsulateKey; }
-                unsafe { _fp.C_DecapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_DecapsulateKey; }
-            }
-            if (v32.C_VerifySignatureInit != IntPtr.Zero)
-            {
-                unsafe { _fp.C_VerifySignatureInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignatureInit; }
-                unsafe { _fp.C_VerifySignatureInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignatureInit; }
-            }
-            if (v32.C_VerifySignature != IntPtr.Zero)
-                unsafe { _fp.C_VerifySignature = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignature; }
-            if (v32.C_VerifySignatureUpdate != IntPtr.Zero)
-                unsafe { _fp.C_VerifySignatureUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_VerifySignatureUpdate; }
-            if (v32.C_VerifySignatureFinal != IntPtr.Zero)
-                unsafe { _fp.C_VerifySignatureFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)v32.C_VerifySignatureFinal; }
-            if (v32.C_GetSessionValidationFlags != IntPtr.Zero)
-                unsafe { _fp.C_GetSessionValidationFlags = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)v32.C_GetSessionValidationFlags; }
-            if (v32.C_AsyncComplete != IntPtr.Zero)
-            {
-                unsafe { _fp.C_AsyncComplete = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong>)v32.C_AsyncComplete; }
-                unsafe { _fp.C_AsyncComplete_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong>)v32.C_AsyncComplete; }
-            }
-            if (v32.C_AsyncGetID != IntPtr.Zero)
-                unsafe { _fp.C_AsyncGetID = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)v32.C_AsyncGetID; }
-            if (v32.C_AsyncJoin != IntPtr.Zero)
-                unsafe { _fp.C_AsyncJoin = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)v32.C_AsyncJoin; }
-            if (v32.C_WrapKeyAuthenticated != IntPtr.Zero)
-            {
-                unsafe { _fp.C_WrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v32.C_WrapKeyAuthenticated; }
-                unsafe { _fp.C_WrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)v32.C_WrapKeyAuthenticated; }
-            }
-            if (v32.C_UnwrapKeyAuthenticated != IntPtr.Zero)
-            {
-                unsafe { _fp.C_UnwrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_UnwrapKeyAuthenticated; }
-                unsafe { _fp.C_UnwrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)v32.C_UnwrapKeyAuthenticated; }
-            }
-        }
-
+        functionList = iface.FunctionList;
         return true;
+    }
+
+    /// <summary>Binds the v3.0 additions carried by a <see cref="CK_FUNCTION_LIST_3_0"/> table.</summary>
+    private void BindV30FunctionList(CK_FUNCTION_LIST_3_0 v30)
+    {
+        BindLoginUser(v30.C_LoginUser);
+        BindSessionCancel(v30.C_SessionCancel);
+        // v3.0 func; present at the same offset in the v3.2 table, so this also covers v3.2 tokens.
+        BindGetInterfaceList(v30.C_GetInterfaceList);
+
+        BindMessageEncryptInit(v30.C_MessageEncryptInit);
+        BindEncryptMessage(v30.C_EncryptMessage);
+        BindEncryptMessageBegin(v30.C_EncryptMessageBegin);
+        BindEncryptMessageNext(v30.C_EncryptMessageNext);
+        BindMessageEncryptFinal(v30.C_MessageEncryptFinal);
+
+        BindMessageDecryptInit(v30.C_MessageDecryptInit);
+        BindDecryptMessage(v30.C_DecryptMessage);
+        BindDecryptMessageBegin(v30.C_DecryptMessageBegin);
+        BindDecryptMessageNext(v30.C_DecryptMessageNext);
+        BindMessageDecryptFinal(v30.C_MessageDecryptFinal);
+
+        BindMessageSignInit(v30.C_MessageSignInit);
+        BindSignMessage(v30.C_SignMessage);
+        BindSignMessageBegin(v30.C_SignMessageBegin);
+        BindSignMessageNext(v30.C_SignMessageNext);
+        BindMessageSignFinal(v30.C_MessageSignFinal);
+
+        BindMessageVerifyInit(v30.C_MessageVerifyInit);
+        BindVerifyMessage(v30.C_VerifyMessage);
+        BindVerifyMessageBegin(v30.C_VerifyMessageBegin);
+        BindVerifyMessageNext(v30.C_VerifyMessageNext);
+        BindMessageVerifyFinal(v30.C_MessageVerifyFinal);
+    }
+
+    /// <summary>Binds the 12 v3.2 additions carried by a <see cref="CK_FUNCTION_LIST_3_2"/> table.</summary>
+    private void BindV32FunctionList(CK_FUNCTION_LIST_3_2 v32)
+    {
+        BindEncapsulateKey(v32.C_EncapsulateKey);
+        BindDecapsulateKey(v32.C_DecapsulateKey);
+        BindVerifySignatureInit(v32.C_VerifySignatureInit);
+        BindVerifySignature(v32.C_VerifySignature);
+        BindVerifySignatureUpdate(v32.C_VerifySignatureUpdate);
+        BindVerifySignatureFinal(v32.C_VerifySignatureFinal);
+        BindGetSessionValidationFlags(v32.C_GetSessionValidationFlags);
+        BindAsyncComplete(v32.C_AsyncComplete);
+        BindAsyncGetID(v32.C_AsyncGetID);
+        BindAsyncJoin(v32.C_AsyncJoin);
+        BindWrapKeyAuthenticated(v32.C_WrapKeyAuthenticated);
+        BindUnwrapKeyAuthenticated(v32.C_UnwrapKeyAuthenticated);
+    }
+
+    // Per-function binders for the v3.0 / v3.2 additions. Each takes a raw entry-point
+    // address — IntPtr.Zero means "the token doesn't provide this function", and binding
+    // is then skipped so the pointer stays null and the wrapper reports
+    // CKR_FUNCTION_NOT_SUPPORTED. Both loader paths funnel through these, so the
+    // signature of a function is spelled out exactly once instead of once per path,
+    // and the interface-table and per-symbol routes cannot drift apart. Functions whose
+    // parameters embed a NativeCULong-sensitive struct bind the Linux and Windows
+    // variants from the same address; the call site picks the layout at dispatch time.
+
+    private unsafe void BindLoginUser(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_LoginUser = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindSessionCancel(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_SessionCancel = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindGetInterfaceList(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_GetInterfaceList = (delegate* unmanaged[Cdecl]<CK_INTERFACE*, NativeCULong*, NativeCULong>)address;
+        _fp.C_GetInterfaceList_Windows = (delegate* unmanaged[Cdecl]<CK_INTERFACE_Windows*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageEncryptInit(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_MessageEncryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)address;
+        _fp.C_MessageEncryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindEncryptMessage(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_EncryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindEncryptMessageBegin(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_EncryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindEncryptMessageNext(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_EncryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageEncryptFinal(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_MessageEncryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageDecryptInit(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_MessageDecryptInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)address;
+        _fp.C_MessageDecryptInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindDecryptMessage(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_DecryptMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindDecryptMessageBegin(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_DecryptMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindDecryptMessageNext(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_DecryptMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageDecryptFinal(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_MessageDecryptFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageSignInit(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_MessageSignInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)address;
+        _fp.C_MessageSignInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindSignMessage(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_SignMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindSignMessageBegin(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_SignMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindSignMessageNext(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_SignMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageSignFinal(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_MessageSignFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageVerifyInit(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_MessageVerifyInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong>)address;
+        _fp.C_MessageVerifyInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifyMessage(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_VerifyMessage = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifyMessageBegin(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_VerifyMessageBegin = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifyMessageNext(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_VerifyMessageNext = (delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindMessageVerifyFinal(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_MessageVerifyFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindEncapsulateKey(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_EncapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)address;
+        _fp.C_EncapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindDecapsulateKey(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_DecapsulateKey = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)address;
+        _fp.C_DecapsulateKey_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifySignatureInit(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_VerifySignatureInit = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+        _fp.C_VerifySignatureInit_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifySignature(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_VerifySignature = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifySignatureUpdate(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_VerifySignatureUpdate = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindVerifySignatureFinal(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_VerifySignatureFinal = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindGetSessionValidationFlags(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_GetSessionValidationFlags = (delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindAsyncComplete(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_AsyncComplete = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA*, NativeCULong>)address;
+        _fp.C_AsyncComplete_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, CK_ASYNC_DATA_Windows*, NativeCULong>)address;
+    }
+
+    private unsafe void BindAsyncGetID(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_AsyncGetID = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindAsyncJoin(IntPtr address)
+    {
+        if (address != IntPtr.Zero)
+            _fp.C_AsyncJoin = (delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)address;
+    }
+
+    private unsafe void BindWrapKeyAuthenticated(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_WrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+        _fp.C_WrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)address;
+    }
+
+    private unsafe void BindUnwrapKeyAuthenticated(IntPtr address)
+    {
+        if (address == IntPtr.Zero)
+            return;
+        _fp.C_UnwrapKeyAuthenticated = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)address;
+        _fp.C_UnwrapKeyAuthenticated_Windows = (delegate* unmanaged[Cdecl]<NativeCULong, CK_MECHANISM_Windows*, NativeCULong, byte*, NativeCULong, CK_ATTRIBUTE_Windows*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)address;
     }
 
     /// <summary>
