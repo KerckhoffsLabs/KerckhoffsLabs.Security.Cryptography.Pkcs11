@@ -11,7 +11,8 @@ internal sealed record ParamSpec(
     RefKind RefKind,
     bool Unsized,
     bool FilledByToken,
-    bool PackedStruct);
+    bool PackedStruct,
+    bool FillsToCapacity);
 
 internal sealed record FunctionSpec(
     string Name,
@@ -31,6 +32,7 @@ internal static class DispatchModel
     private const string UnsizedAttr = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.UnsizedAttribute";
     private const string FilledAttr = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.FilledByTokenAttribute";
     private const string PackedAttr = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.PackedForPkcs11Attribute";
+    private const string FillsToCapacityAttr = "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.FillsToCapacityAttribute";
 
     private const string ReadOnlySpanByte = "System.ReadOnlySpan<byte>";
     private const string SpanByte = "System.Span<byte>";
@@ -53,14 +55,18 @@ internal static class DispatchModel
     private static readonly DiagnosticDescriptor UnpairedOutputSpan = new(
         "KLPKCS11012",
         title: "Output span needs a paired length",
-        messageFormat: "Parameter '{0}' of '{1}' is a Span<byte> not followed by 'out NativeCULong {0}Len'; the direction is ambiguous",
+        messageFormat: "Parameter '{0}' of '{1}' is a Span<byte> not followed by 'out NativeCULong {0}Len'; " +
+            "the direction is ambiguous. Add the pairing, or [FillsToCapacity] if the token fills the buffer " +
+            "to its own capacity and reports nothing back.",
         category: "Interop",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "A Span<byte> that is the last parameter fills to its own capacity (the C_GenerateRandom " +
-            "idiom) and needs no pairing. A Span<byte> anywhere else must be immediately followed by " +
-            "'out NativeCULong' so the token can report how much of the buffer it actually wrote; anything else " +
-            "in that position means the pairing was intended but the shape is wrong.",
+        description: "A Span<byte> must be immediately followed by 'out NativeCULong {name}Len' so the token " +
+            "can report how much of the buffer it actually wrote, in every parameter position including the " +
+            "last. The one exception is [FillsToCapacity] (the C_GenerateRandom idiom): a Span<byte> marked " +
+            "with it fills to its own capacity and needs no pairing. Without the marker, a forgotten pairing " +
+            "would otherwise emit the span's length BY VALUE where cryptoki expects a CK_ULONG_PTR, and the " +
+            "token would write through it as a pointer.",
         helpLinkUri: HelpBase + "KLPKCS11012");
 
     private static readonly DiagnosticDescriptor MisplacedAnnotation = new(
@@ -73,8 +79,10 @@ internal static class DispatchModel
         description: "[Unsized] only applies to a ReadOnlySpan<byte> (it suppresses the trailing length " +
             "argument for a fixed-width field or NUL-terminated string). [FilledByToken] only applies to a " +
             "ref or out parameter of a [PackedForPkcs11] struct (it selects the Windows write-back arm). " +
-            "Either attribute on any other parameter shape is silently ignored by the emitter, which is " +
-            "exactly the kind of guess this generator refuses to make.",
+            "[FillsToCapacity] only applies to a Span<byte> that is NOT immediately followed by " +
+            "'out NativeCULong {name}Len' — a paired Span<byte> already has somewhere to report its length " +
+            "and does not need it. Any of these attributes on any other parameter shape is silently ignored " +
+            "by the emitter, which is exactly the kind of guess this generator refuses to make.",
         helpLinkUri: HelpBase + "KLPKCS11013");
 
     private static readonly DiagnosticDescriptor WindowsLayoutMismatch = new(
@@ -139,8 +147,23 @@ internal static class DispatchModel
         }
         else
         {
-            object? raw = attr.ConstructorArguments[0].Value;
-            string? mapped = raw switch { 0 => "V240", 1 => "V300", 2 => "V320", _ => null };
+            TypedConstant arg = attr.ConstructorArguments[0];
+            object? raw = arg.Value;
+
+            // Resolve the enum MEMBER NAME the constant denotes, rather than trusting its ordinal.
+            // Reordering the Cryptoki enum (swapping V300/V320, inserting a member before V240)
+            // must not silently rebind functions to the wrong table: an ordinal switch stays in
+            // range and fires no diagnostic when that happens, while resolving by name turns a
+            // reorder into a no-op and a rename into a build error here instead.
+            string? mapped = null;
+            if (arg.Type is INamedTypeSymbol enumType)
+            {
+                IFieldSymbol? match = enumType.GetMembers().OfType<IFieldSymbol>()
+                    .FirstOrDefault(f => f.HasConstantValue && Equals(f.ConstantValue, raw));
+                if (match is { Name: "V240" or "V300" or "V320" })
+                    mapped = match.Name;
+            }
+
             if (mapped is null)
             {
                 report(Diagnostic.Create(UnrecognizedVersion, Loc(m), m.Name, raw?.ToString() ?? "<none>"));
@@ -162,6 +185,7 @@ internal static class DispatchModel
             string managedType = p.Type.ToDisplayString();
             bool unsized = p.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == UnsizedAttr);
             bool filled = p.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == FilledAttr);
+            bool fillsToCapacity = p.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == FillsToCapacityAttr);
             bool packedStruct = IsPackedForPkcs11(p.Type);
 
             if (!IsSupportedShape(p, managedType))
@@ -187,24 +211,34 @@ internal static class DispatchModel
                 packedParamName ??= p.Name;
             }
 
-            paramsBuilder.Add(new ParamSpec(p.Name, managedType, p.RefKind, unsized, filled, packedStruct));
+            paramsBuilder.Add(new ParamSpec(p.Name, managedType, p.RefKind, unsized, filled, packedStruct, fillsToCapacity));
         }
 
         ImmutableArray<ParamSpec> ps = paramsBuilder.MoveToImmutable();
 
-        // KLPKCS11012: a Span<byte> that isn't the last parameter and isn't immediately followed by
-        // 'out NativeCULong' has nowhere for the token to report how much it wrote. A trailing
-        // Span<byte> is exempt — C_GenerateRandom fills the buffer to its own capacity and reports
-        // nothing back, which is unambiguous precisely because nothing else follows it to confuse the
-        // pairing with.
-        for (int i = 0; i < ps.Length - 1; i++)
+        // KLPKCS11012/KLPKCS11013: a Span<byte> that isn't immediately followed by
+        // 'out NativeCULong {name}Len' has nowhere for the token to report how much it wrote, in
+        // every parameter position including the last — [FillsToCapacity] is the one, explicit
+        // exemption (the C_GenerateRandom idiom: the token fills to capacity and reports nothing
+        // back). The pairing test requires the SAME name suffix the diagnostic message promises, so
+        // 'Span<byte> data, out NativeCULong unrelatedCount' is rejected rather than silently paired.
+        for (int i = 0; i < ps.Length; i++)
         {
-            if (ps[i].ManagedType != SpanByte) continue;
-            ParamSpec next = ps[i + 1];
-            bool paired = next.RefKind == RefKind.Out && SimpleName(next.ManagedType) == "NativeCULong";
-            if (!paired)
+            ParamSpec p = ps[i];
+            bool isSpanByte = p.ManagedType == SpanByte;
+            ParamSpec? next = i + 1 < ps.Length ? ps[i + 1] : null;
+            bool paired = isSpanByte && next is { RefKind: RefKind.Out }
+                && SimpleName(next.ManagedType) == "NativeCULong" && next.Name == p.Name + "Len";
+
+            if (p.FillsToCapacity && (!isSpanByte || paired))
             {
-                report(Diagnostic.Create(UnpairedOutputSpan, Loc(m.Parameters[i]), ps[i].Name, m.Name));
+                report(Diagnostic.Create(MisplacedAnnotation, Loc(m.Parameters[i]), "FillsToCapacity", p.Name, m.Name, p.ManagedType));
+                ok = false;
+            }
+
+            if (isSpanByte && !paired && !p.FillsToCapacity)
+            {
+                report(Diagnostic.Create(UnpairedOutputSpan, Loc(m.Parameters[i]), p.Name, m.Name));
                 ok = false;
             }
         }

@@ -11,13 +11,18 @@ internal static class DispatchEmitter
     /// <summary>The out-length parameter paired with an output span, or null.</summary>
     internal static ParamSpec? PairedLength(FunctionSpec f, int index)
     {
-        if (f.Params[index].ManagedType != "System.Span<byte>") return null;
+        var p = f.Params[index];
+        if (p.ManagedType != "System.Span<byte>") return null;
         if (index + 1 >= f.Params.Length) return null;
         var next = f.Params[index + 1];
         // NativeCULong is reached only through a global using, so ToDisplayString() fully
         // qualifies it here just as it does for the ref/out case in NativeTypes — normalize
-        // through Simple() before comparing, or every span looks unpaired.
-        return next.RefKind == RefKind.Out && Simple(next.ManagedType) == "NativeCULong" ? next : null;
+        // through Simple() before comparing, or every span looks unpaired. The name must also
+        // match "{span}Len" — matching by type and RefKind alone would silently pair a span with
+        // an unrelated 'out NativeCULong', dropping the span's own length argument from the call.
+        return next.RefKind == RefKind.Out && Simple(next.ManagedType) == "NativeCULong" && next.Name == p.Name + "Len"
+            ? next
+            : null;
     }
 
     /// <summary>The native argument types a managed parameter expands to.</summary>

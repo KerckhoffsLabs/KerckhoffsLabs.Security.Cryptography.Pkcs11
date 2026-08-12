@@ -43,3 +43,15 @@ internal sealed class UnsizedAttribute : Attribute;
 /// </summary>
 [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
 internal sealed class FilledByTokenAttribute : Attribute;
+
+/// <summary>
+/// Marks an unpaired <c>Span&lt;byte&gt;</c> parameter the token fills to its own capacity and
+/// reports nothing back for — the <c>C_GenerateRandom</c> idiom. Only this marker exempts a
+/// <c>Span&lt;byte&gt;</c> from KLPKCS11012's paired-length requirement; without it, every
+/// <c>Span&lt;byte&gt;</c> not immediately followed by <c>out NativeCULong {name}Len</c> is a build
+/// error, including one in the last parameter position. Omitting a trailing length parameter by
+/// mistake is otherwise invisible: the emitter would pass the span's length BY VALUE where cryptoki
+/// expects a <c>CK_ULONG_PTR</c>, and the token would write through it as a pointer.
+/// </summary>
+[AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+internal sealed class FillsToCapacityAttribute : Attribute;

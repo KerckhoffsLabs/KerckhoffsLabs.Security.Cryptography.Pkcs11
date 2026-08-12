@@ -65,6 +65,10 @@ internal partial class Delegates
     public unsafe partial NativeCULong C_GetInfo([FilledByToken] ref CK_INFO info);
 
     /// <summary>Wrapper for <c>C_GetFunctionList</c>. Matches the prior delegate signature exactly.</summary>
+    /// <remarks>Deliberately not <c>partial</c>: <c>out IntPtr</c> has no native mapping DispatchModel
+    /// knows (it is the bootstrap call that hands back the address every other function pointer is
+    /// bound from, not a cryptoki-shaped argument). The generator still emits the field and binding
+    /// from the attribute; only this body is hand-written.</remarks>
     [Pkcs11Function(Cryptoki.V240)]
     public unsafe NativeCULong C_GetFunctionList(out IntPtr functionList)
     {
@@ -392,7 +396,7 @@ internal partial class Delegates
 
     /// <summary>Wrapper for <c>C_GenerateRandom</c>. Matches the prior delegate signature exactly.</summary>
     [Pkcs11Function(Cryptoki.V240)]
-    public unsafe partial NativeCULong C_GenerateRandom(NativeCULong session, Span<byte> randomData);
+    public unsafe partial NativeCULong C_GenerateRandom(NativeCULong session, [FillsToCapacity] Span<byte> randomData);
 
     /// <summary>Wrapper for <c>C_GetFunctionStatus</c>. Matches the prior delegate signature exactly.</summary>
     [Pkcs11Function(Cryptoki.V240)]
@@ -410,9 +414,6 @@ internal partial class Delegates
     [Pkcs11Function(Cryptoki.V300)]
     public unsafe partial NativeCULong C_LoginUser(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username);
 
-    /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_SessionCancel</c> (PKCS#11 v3.0+).</summary>
-    public unsafe bool IsC_SessionCancelSupported => _fp.C_SessionCancel is not null;
-
     /// <summary>Wrapper for <c>C_SessionCancel</c> (PKCS#11 v3.0). Throws <see cref="Pkcs11Exception"/> if the loaded library is v2.40 or does not export the symbol.</summary>
     [Pkcs11Function(Cryptoki.V300)]
     public unsafe partial NativeCULong C_SessionCancel(NativeCULong session, NativeCULong flags);
@@ -420,7 +421,12 @@ internal partial class Delegates
     /// <summary>Wrapper for <c>C_GetInterfaceList</c> (PKCS#11 v3.0). Two-call idiom: pass <c>null</c> to get the count.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
-    /// the packed types and never branch on the platform themselves.</remarks>
+    /// the packed types and never branch on the platform themselves.
+    /// Deliberately not <c>partial</c>: the null-array two-call idiom branches on
+    /// <c>interfaces is null</c> to skip pinning and pass a null pointer for the count-only call,
+    /// which is not one of the uniform per-parameter shapes DispatchEmitter emits. The generator
+    /// still emits the field, the Windows twin field, and the binding from the attribute; only
+    /// this body is hand-written.</remarks>
     [Pkcs11Function(Cryptoki.V300, WindowsLayout = true)]
     public unsafe NativeCULong C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
     {
