@@ -44,9 +44,6 @@ internal sealed partial class ManagedSoftToken
     public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
     {
         signatureLen = (NativeCULong)0;
-        signatureLen = (NativeCULong)0;
-        signatureLen = (NativeCULong)0;
-        signatureLen = (NativeCULong)0;
         if (!_signOps.TryGetValue((ulong)session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
 
         byte[] input = data.ToArray();

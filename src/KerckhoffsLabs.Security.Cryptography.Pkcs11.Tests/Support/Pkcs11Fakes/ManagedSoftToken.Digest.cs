@@ -21,7 +21,6 @@ internal sealed partial class ManagedSoftToken
     public override CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen)
     {
         digestLen = (NativeCULong)0;
-        digestLen = (NativeCULong)0;
         if (!_digestOps.TryGetValue((ulong)session, out var mech)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
 
         byte[] result;
