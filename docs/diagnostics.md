@@ -112,6 +112,78 @@ SHA-256 or stronger.
 Note that **verifying** an existing SHA-1 signature is gated too — the mechanism guard is
 direction-agnostic, so legacy verification needs `AllowInsecure` as well.
 
+## Dispatch-generator diagnostics
+
+`[Pkcs11Function]` on a method in `Delegates.cs` tells the `DispatchGenerator` source generator to
+emit that function's native field, binder, and — for a `partial` method — its body. The generator
+follows one rule throughout: **anything it cannot map is a build error, never a guess.** A
+declaration it cannot handle is reported and skipped rather than emitted from, so a bad shape fails
+loudly at compile time instead of producing silently wrong (or non-compiling) generated code. These
+ids are only ever seen while adding or editing a `[Pkcs11Function]` declaration — they cannot fire
+from ordinary consumer code.
+
+<a id="KLPKCS11011"></a>
+### KLPKCS11011 — Parameter type has no interop mapping
+
+The generator knows how to marshal `ReadOnlySpan<byte>`/`Span<byte>`,
+`ReadOnlySpan<CK_ATTRIBUTE>`/`Span<CK_ATTRIBUTE>` templates, `bool`, arrays of an unmanaged type,
+ref/out of an unmanaged type, and any other unmanaged type passed by value (the same criterion the
+`unmanaged` constraint and `fixed` use — it is what makes a type safe to pin and pass as a pointer).
+A parameter of any other shape — a reference type such as `string`, a managed type, or a ref struct
+other than the two spans above — has nowhere to go. Fix it by changing the parameter to one of the
+supported shapes.
+
+<a id="KLPKCS11012"></a>
+### KLPKCS11012 — Output span needs a paired length
+
+A `Span<byte>` that is the *last* parameter fills to its own capacity and reports nothing back — the
+`C_GenerateRandom` idiom, which is unambiguous precisely because nothing follows it. A `Span<byte>`
+anywhere else must be immediately followed by `out NativeCULong <name>Len` so the token can report
+how much of the buffer it actually wrote; anything else in that position (another parameter, a
+differently-typed out, a span) means a pairing was intended but the shape is wrong. Fix it by adding
+the paired `out NativeCULong` immediately after the span, or moving the span to the end of the
+parameter list if it is genuinely meant to fill to capacity.
+
+<a id="KLPKCS11013"></a>
+### KLPKCS11013 — Annotation does not apply to this parameter shape
+
+`[Unsized]` only applies to a `ReadOnlySpan<byte>` (it suppresses the trailing length argument for a
+fixed-width field or a NUL-terminated string). `[FilledByToken]` only applies to a `ref`/`out`
+parameter of a `[PackedForPkcs11]` struct (it selects the Windows write-back arm instead of the
+convert-before-call arm). On any other parameter shape the emitter silently ignores the attribute —
+exactly the kind of guess this generator refuses to make, so it is reported instead. Fix it by
+removing the attribute or changing the parameter to the shape the attribute requires.
+
+<a id="KLPKCS11014"></a>
+### KLPKCS11014 — WindowsLayout disagrees with the parameters
+
+`WindowsLayout = true` emits a second, `Pack = 1` function-pointer field and a conversion arm that
+runs on Windows; it needs a `[PackedForPkcs11]` parameter to convert — directly (`ref CK_MECHANISM`),
+as a span element (`ReadOnlySpan<CK_ATTRIBUTE>`), or as an array element (`CK_INTERFACE[]?`). This
+fires in both directions:
+
+- `WindowsLayout = true` with no packed struct parameter: the second field and conversion arm are
+  generated for nothing.
+- A packed struct parameter without `WindowsLayout = true`: **this is the direction that matters.**
+  Without the flag, the call unpacks the struct using the unified (non-`Pack = 1`) layout on Windows.
+  That compiles cleanly, passes every test that doesn't run on an actual Windows PKCS#11 module, and
+  is a real struct-layout bug — silently reading/writing the wrong offsets against the token's ABI.
+  This repository's CI runs on Linux, where `Pkcs11Marshal.IsWindows` is always false and the bug
+  cannot be observed at all. KLPKCS11014 is what turns it into a build error on every platform,
+  instead of a bug that only a Windows run (or a Windows user) would ever find.
+
+Fix it by adding `WindowsLayout = true` when a packed struct parameter is present, or removing it
+when none is.
+
+<a id="KLPKCS11015"></a>
+### KLPKCS11015 — Unrecognized Cryptoki version
+
+The `Cryptoki` enum value passed to `[Pkcs11Function]` selects which native function-list the pointer
+is bound from (`CK_FUNCTION_LIST` / `_3_0` / `_3_2`, via `Initialize`/`BindV30FunctionList`/
+`BindV32FunctionList`). A future `Cryptoki` member the generator does not recognize would otherwise
+fall through to a default version and bind from the wrong table — silently, since nothing about that
+mismatch fails to compile. Fix it by adding the new version to `DispatchModel`'s version mapping.
+
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early
