@@ -276,7 +276,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
 
-        if (sessionId == (ulong)CK.CK_INVALID_HANDLE)
+        if (sessionId == CK.CK_INVALID_HANDLE)
             throw new ArgumentException("Invalid handle specified", nameof(sessionId));
 
         _pkcs11Library = pkcs11Library;
