@@ -181,7 +181,7 @@ public sealed class DESPkcs11Tests_Managed
         using var bcl = BclDes();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
 
-        byte[] wrongIv = Iv8.ToArray();
+        byte[] wrongIv = [.. Iv8];
         wrongIv[0] ^= 0xFF;
         using (workspace.AllowInsecureScope())
         {

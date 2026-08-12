@@ -197,7 +197,7 @@ public sealed class TripleDESPkcs11Tests_Managed
         using var bcl = BclDes3();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
 
-        byte[] wrongIv = Iv8.ToArray();
+        byte[] wrongIv = [.. Iv8];
         wrongIv[0] ^= 0xFF;
         using (workspace.AllowInsecureScope())
         {
