@@ -76,10 +76,10 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
     // message; the implementation is expected to produce / verify a HashML-DSA signature
     // (FIPS 204 §5.4) over that digest. PKCS#11 v3.2 offers two relevant mechanisms:
     //
-    //  - CKM_ML_DSA: signs M' = 0x00 || len(ctx) || ctx || M (pure ML-DSA with the 0x00
+    //  - CKM_ML_DSA signs M' as 0x00 ‖ len(ctx) ‖ ctx ‖ M (pure ML-DSA with the 0x00
     //    domain prefix). Cannot produce a HashML-DSA signature because the domain
     //    prefix is structurally 0x00, never 0x01.
-    //  - CKM_HASH_ML_DSA_<H>: signs M' = 0x01 || len(ctx) || ctx || OID(H) || H(M).
+    //  - CKM_HASH_ML_DSA_<H> signs M' as 0x01 ‖ len(ctx) ‖ ctx ‖ OID(H) ‖ H(M).
     //    The mechanism's input is the MESSAGE — it hashes internally. Feeding it the
     //    caller's pre-computed hash would sign H(H(M)) instead of the FIPS 204 value
     //    over the message; the resulting signature is well-formed but interoperates

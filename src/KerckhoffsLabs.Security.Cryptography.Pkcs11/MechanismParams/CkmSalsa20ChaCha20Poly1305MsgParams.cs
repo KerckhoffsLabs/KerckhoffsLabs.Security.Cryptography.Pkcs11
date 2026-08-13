@@ -13,8 +13,8 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     private const int Poly1305TagLen = 16;
 
     private readonly byte[] _nonceBytes;
-    // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
-    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
+    // The tag as managed state, and what CopyTagTo serves. For decrypt it is seeded from the
+    // caller's tag. For encrypt AbsorbOutput fills it from the scope-owned block the token wrote.
     private readonly byte[] _tagBuffer;
 
     /// <summary>For encryption — wrapper allocates a 16-byte zero-filled tag buffer.</summary>

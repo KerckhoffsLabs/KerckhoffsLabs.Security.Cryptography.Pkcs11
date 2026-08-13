@@ -11,8 +11,8 @@ public sealed class CkmGcmMessageParams : MechanismParameters
 {
     private readonly int _tagLen;
     private readonly byte[] _ivBytes;
-    // The tag as managed state, and what CopyTagTo serves. Seeded from the caller's tag for decrypt;
-    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
+    // The tag as managed state, and what CopyTagTo serves. For decrypt it is seeded from the
+    // caller's tag. For encrypt AbsorbOutput fills it from the scope-owned block the token wrote.
     private readonly byte[] _tagBuffer;
 
     /// <summary>For encryption — the wrapper allocates a zero-filled tag buffer of

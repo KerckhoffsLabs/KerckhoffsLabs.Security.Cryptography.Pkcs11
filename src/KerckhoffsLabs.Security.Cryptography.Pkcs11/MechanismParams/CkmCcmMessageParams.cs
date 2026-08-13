@@ -13,8 +13,8 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     private readonly int _macLen;
     private readonly int _dataLen;
     private readonly byte[] _nonceBytes;
-    // The MAC as managed state, and what CopyMacTo serves. Seeded from the caller's MAC for decrypt;
-    // filled by AbsorbOutput from the scope-owned block the token wrote for encrypt.
+    // The MAC as managed state, and what CopyMacTo serves. For decrypt it is seeded from the
+    // caller's MAC. For encrypt AbsorbOutput fills it from the scope-owned block the token wrote.
     private readonly byte[] _macBuffer;
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>

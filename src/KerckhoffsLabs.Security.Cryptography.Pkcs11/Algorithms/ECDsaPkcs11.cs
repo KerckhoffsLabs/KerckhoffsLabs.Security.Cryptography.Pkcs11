@@ -100,8 +100,8 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     // -----------------------------------------------------------------------
     // Sign/verify hash — raw ECDSA (no on-token hashing)
-    // ECDsa.SignHash(byte[]) and VerifyHash(byte[], byte[]) are abstract in the BCL;
-    // the byte[] overloads must be implemented directly.
+    // The BCL declares the byte-array SignHash and VerifyHash overloads abstract, so
+    // they must be implemented directly here.
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
