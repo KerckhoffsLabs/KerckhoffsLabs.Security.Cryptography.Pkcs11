@@ -8,6 +8,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// generator-emitted <c>PackedDispatch</c> class which hard-codes the <c>T_Windows</c>
 /// sibling conversions — no reflection, no <c>[RequiresDynamicCode]</c>.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
+    Justification = "This type is the platform layout switch: it copies structs to and from unmanaged "
+    + "memory using the Pack=1 sibling layout on Windows and the natural layout elsewhere. Both "
+    + "paths dereference a raw IntPtr, which C# permits only in unsafe code. Suppressed at the type "
+    + "so the rule keeps its value elsewhere. The copies are blittable by construction — the "
+    + "unmanaged constraint enforces it at compile time — and no longer route through the runtime "
+    + "marshaller, so there is no reflection and no layout reinterpretation to get wrong.")]
 internal static class Pkcs11Marshal
 {
     public static readonly bool IsWindows = OperatingSystem.IsWindows();

@@ -14,6 +14,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// Visible to the test assembly via <c>InternalsVisibleTo</c> for the leak-detection
 /// harness (<see cref="OutstandingAllocationCount"/>, <see cref="DebugModeEnabled"/>).
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
+    Justification = "This type exists to read and write raw unmanaged addresses: allocate a block, zero it, "
+    + "copy bytes in or out, free it. Dereferencing an IntPtr is only expressible in unsafe code, "
+    + "and .NET offers no safe API that reinterprets an arbitrary address as a managed reference — "
+    + "by design. Suppressed at the type so the rule keeps its value elsewhere. The safety argument "
+    + "is the unmanaged generic constraint, which makes every struct copy blittable by construction, "
+    + "plus a null check on every entry point and NativeStructLayoutTests asserting managed and "
+    + "marshalled layouts agree for every native struct.")]
 internal static class UnmanagedMemory
 {
     /// <summary>
