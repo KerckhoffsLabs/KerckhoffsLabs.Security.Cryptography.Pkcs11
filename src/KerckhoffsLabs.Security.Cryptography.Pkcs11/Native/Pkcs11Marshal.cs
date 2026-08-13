@@ -31,7 +31,7 @@ internal static class Pkcs11Marshal
     /// and the one this type reads and writes.
     /// </remarks>
     public static int SizeOf<T>() where T : unmanaged
-        => IsWindows && IsPackedForPkcs11(typeof(T)) ? PackedDispatch.SizeOfWindows<T>() : Unsafe.SizeOf<T>();
+        => IsWindows && Packed<T>.Value ? PackedDispatch.SizeOfWindows<T>() : Unsafe.SizeOf<T>();
 
     /// <summary>
     /// Marshals <paramref name="value"/> into the unmanaged buffer at <paramref name="ptr"/>,
@@ -40,7 +40,7 @@ internal static class Pkcs11Marshal
     /// </summary>
     public static void WriteStructure<T>(IntPtr ptr, in T value) where T : unmanaged
     {
-        if (IsWindows && IsPackedForPkcs11(typeof(T)))
+        if (IsWindows && Packed<T>.Value)
             PackedDispatch.WriteWindows(ptr, in value);
         else
             unsafe { Unsafe.WriteUnaligned((void*)ptr, value); }
@@ -59,7 +59,7 @@ internal static class Pkcs11Marshal
     /// </remarks>
     public static T ReadStructure<T>(IntPtr ptr) where T : unmanaged
     {
-        if (IsWindows && IsPackedForPkcs11(typeof(T)))
+        if (IsWindows && Packed<T>.Value)
             return PackedDispatch.ReadWindows<T>(ptr);
 
         unsafe { return Unsafe.ReadUnaligned<T>((void*)ptr); }
@@ -72,6 +72,27 @@ internal static class Pkcs11Marshal
     /// natural (unified-layout) path even on Windows. Uses <c>Type.IsDefined</c>, which only
     /// reads the metadata token — AOT-safe, no dynamic code.
     /// </summary>
-    private static bool IsPackedForPkcs11(Type t) =>
+    /// <remarks>
+    /// The generic paths must go through <see cref="Packed{T}"/> instead: this walks the custom
+    /// attribute blob on every call, which is not something the per-element marshalling loops in
+    /// <c>ObjectAttribute</c> and <c>MechanismParameterScope</c> should pay. Only the reflective
+    /// <c>Type</c>-based entry points on <see cref="UnmanagedMemory"/>, which have no type
+    /// parameter to key a cache on, call this directly.
+    /// </remarks>
+    internal static bool IsPackedForPkcs11(Type t) =>
         t.IsDefined(typeof(PackedForPkcs11Attribute), inherit: false);
+
+    /// <summary>
+    /// Per-instantiation cache of the <see cref="IsPackedForPkcs11(Type)"/> lookup.
+    /// </summary>
+    /// <remarks>
+    /// A <c>static readonly</c> field of a generic type is initialized once per closed type and is
+    /// visible to the JIT as a constant, so <c>IsWindows &amp;&amp; Packed&lt;T&gt;.Value</c> folds
+    /// away entirely and the branch costs nothing at the call site. The alternative — calling
+    /// <c>Type.IsDefined</c> per operation — walks metadata every time.
+    /// </remarks>
+    private static class Packed<T> where T : unmanaged
+    {
+        internal static readonly bool Value = IsPackedForPkcs11(typeof(T));
+    }
 }

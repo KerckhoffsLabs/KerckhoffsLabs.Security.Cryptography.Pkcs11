@@ -156,14 +156,13 @@ internal static class UnmanagedMemory
     /// Windows and the natural size on Linux/macOS; otherwise the blittable size.
     /// </summary>
     /// <remarks>
-    /// Both branches measure the blittable layout, which is the one that governs under
+    /// Measures the blittable layout, which is the one that governs under
     /// <c>[assembly: DisableRuntimeMarshalling]</c>. Every native struct is verified to have an
     /// identical managed and marshalled layout by
     /// <c>NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize</c>, so this agrees
     /// with the blittable copy that fills the buffer.
     /// </remarks>
-    public static int SizeOf<T>() where T : unmanaged
-        => IsPackedForPkcs11(typeof(T)) ? Pkcs11Marshal.SizeOf<T>() : Unsafe.SizeOf<T>();
+    public static int SizeOf<T>() where T : unmanaged => Pkcs11Marshal.SizeOf<T>();
 
     /// <summary>
     /// Returns the unmanaged size of the structure type <paramref name="structureType"/> in bytes.
@@ -175,7 +174,7 @@ internal static class UnmanagedMemory
     public static int SizeOf(Type structureType)
     {
         ArgumentNullException.ThrowIfNull(structureType);
-        if (!IsPackedForPkcs11(structureType))
+        if (!Pkcs11Marshal.IsPackedForPkcs11(structureType))
             throw new NotSupportedException(
                 $"SizeOf(Type) is only supported for [PackedForPkcs11]-marked types. Use SizeOf<T>() for '{structureType.FullName}'.");
         return Pkcs11Marshal.IsWindows
@@ -221,10 +220,7 @@ internal static class UnmanagedMemory
     public static void Write<T>(IntPtr memory, in T structure) where T : unmanaged
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
-        if (IsPackedForPkcs11(typeof(T)))
-            Pkcs11Marshal.WriteStructure(memory, in structure);
-        else
-            unsafe { Unsafe.WriteUnaligned((void*)memory, structure); }
+        Pkcs11Marshal.WriteStructure(memory, in structure);
     }
 
     /// <summary>
@@ -239,7 +235,7 @@ internal static class UnmanagedMemory
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         ArgumentNullException.ThrowIfNull(structure);
 
-        if (!IsPackedForPkcs11(structure.GetType()))
+        if (!Pkcs11Marshal.IsPackedForPkcs11(structure.GetType()))
             throw new NotSupportedException(
                 $"Write(object) is only supported for [PackedForPkcs11]-marked types. Use Write<T>() for '{structure.GetType().FullName}'.");
 
@@ -306,18 +302,14 @@ internal static class UnmanagedMemory
     /// <param name="memory">Pointer to unmanaged memory</param>
     /// <returns>The struct read from unmanaged memory</returns>
     /// <remarks>
-    /// The non-packed fallback is a blittable copy rather than <c>Marshal.PtrToStructure</c>: the
-    /// <c>unmanaged</c> constraint makes that sound by construction, and it needs no
-    /// <c>[DynamicallyAccessedMembers]</c> annotation because nothing reflects over
-    /// <typeparamref name="T"/>.
+    /// The layout choice belongs to <see cref="Pkcs11Marshal.ReadStructure{T}"/>, which this
+    /// forwards to once the null check has run — repeating the packed-type test here would only
+    /// pay for the same lookup twice and reach the same branch.
     /// </remarks>
     public static T Read<T>(IntPtr memory) where T : unmanaged
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
-        if (IsPackedForPkcs11(typeof(T)))
-            return Pkcs11Marshal.ReadStructure<T>(memory);
-
-        unsafe { return Unsafe.ReadUnaligned<T>((void*)memory); }
+        return Pkcs11Marshal.ReadStructure<T>(memory);
     }
 
     /// <summary>
@@ -333,7 +325,7 @@ internal static class UnmanagedMemory
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         ArgumentNullException.ThrowIfNull(structureType);
 
-        if (!IsPackedForPkcs11(structureType))
+        if (!Pkcs11Marshal.IsPackedForPkcs11(structureType))
             throw new NotSupportedException(
                 $"Read(Type) is only supported for [PackedForPkcs11]-marked types. Use Read<T>() for '{structureType.FullName}'.");
 
@@ -342,13 +334,4 @@ internal static class UnmanagedMemory
             : PackedDispatch.ReadUnified(memory, structureType);
     }
 
-    // ---- Private helpers ----
-
-    /// <summary>
-    /// Returns <c>true</c> when <paramref name="t"/> is decorated with
-    /// <see cref="PackedForPkcs11Attribute"/>. Uses <c>Type.IsDefined</c> which
-    /// only reads the metadata token — AOT-safe, no dynamic code generation required.
-    /// </summary>
-    private static bool IsPackedForPkcs11(Type t) =>
-        t.IsDefined(typeof(PackedForPkcs11Attribute), inherit: false);
 }
