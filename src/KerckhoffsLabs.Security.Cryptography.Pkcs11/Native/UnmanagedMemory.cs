@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -153,7 +152,7 @@ internal static class UnmanagedMemory
     /// <c>[assembly: DisableRuntimeMarshalling]</c>. Every native struct is verified to have an
     /// identical managed and marshalled layout by
     /// <c>NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize</c>, so this agrees
-    /// with the <c>Marshal.StructureToPtr</c> that fills the buffer.
+    /// with the blittable copy that fills the buffer.
     /// </remarks>
     public static int SizeOf<T>() where T : unmanaged
         => IsPackedForPkcs11(typeof(T)) ? Pkcs11Marshal.SizeOf<T>() : Unsafe.SizeOf<T>();
@@ -217,7 +216,7 @@ internal static class UnmanagedMemory
         if (IsPackedForPkcs11(typeof(T)))
             Pkcs11Marshal.WriteStructure(memory, in structure);
         else
-            Marshal.StructureToPtr(structure, memory, false);
+            unsafe { Unsafe.WriteUnaligned((void*)memory, structure); }
     }
 
     /// <summary>
@@ -293,22 +292,24 @@ internal static class UnmanagedMemory
     /// Reads a struct from unmanaged memory using the correct on-wire layout for the
     /// current platform. For <c>[PackedForPkcs11]</c>-marked types, uses the Windows-packed
     /// sibling on Windows and the natural layout on Linux/macOS; for all other types,
-    /// delegates to <see cref="Marshal.PtrToStructure{T}(nint)"/>.
+    /// performs a blittable read of the unified layout.
     /// </summary>
     /// <typeparam name="T">The unified struct type to read</typeparam>
     /// <param name="memory">Pointer to unmanaged memory</param>
     /// <returns>The struct read from unmanaged memory</returns>
     /// <remarks>
-    /// The <c>[DynamicallyAccessedMembers]</c> constraint on <typeparamref name="T"/> satisfies
-    /// the trimmer's requirement for <see cref="Marshal.PtrToStructure{T}(nint)"/> in the
-    /// non-packed fallback path. Struct types always satisfy this requirement.
+    /// The non-packed fallback is a blittable copy rather than <c>Marshal.PtrToStructure</c>: the
+    /// <c>unmanaged</c> constraint makes that sound by construction, and it needs no
+    /// <c>[DynamicallyAccessedMembers]</c> annotation because nothing reflects over
+    /// <typeparamref name="T"/>.
     /// </remarks>
-    public static T Read<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(IntPtr memory) where T : unmanaged
+    public static T Read<T>(IntPtr memory) where T : unmanaged
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         if (IsPackedForPkcs11(typeof(T)))
             return Pkcs11Marshal.ReadStructure<T>(memory);
-        return Marshal.PtrToStructure<T>(memory);
+
+        unsafe { return Unsafe.ReadUnaligned<T>((void*)memory); }
     }
 
     /// <summary>

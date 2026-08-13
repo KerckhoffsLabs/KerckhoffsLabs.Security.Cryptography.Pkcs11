@@ -260,7 +260,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitGenericWriteWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Converts <paramref name=\"src\"/> to its Windows-packed sibling and writes it to <paramref name=\"memory\"/>.</summary>");
-        sb.AppendLine("    public static void WriteWindows<T>(System.IntPtr memory, in T src) where T : unmanaged");
+        sb.AppendLine("    public static unsafe void WriteWindows<T>(System.IntPtr memory, in T src) where T : unmanaged");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
@@ -269,7 +269,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
             sb.Append("            var win = ").Append(FqWindows(sym))
               .Append(".FromUnified(in Unsafe.As<T, ").Append(FqUnified(sym))
               .AppendLine(">(ref Unsafe.AsRef(in src)));");
-            sb.Append("            Marshal.StructureToPtr(win, memory, false);");
+            sb.Append("            Unsafe.WriteUnaligned((void*)memory, win);");
             sb.AppendLine();
             sb.AppendLine("            return;");
             sb.AppendLine(CloseBraceNested);
@@ -281,13 +281,13 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitGenericReadWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Reads the Windows-packed sibling from <paramref name=\"memory\"/> and converts it to the unified <typeparamref name=\"T\"/>.</summary>");
-        sb.AppendLine("    public static T ReadWindows<T>(System.IntPtr memory) where T : unmanaged");
+        sb.AppendLine("    public static unsafe T ReadWindows<T>(System.IntPtr memory) where T : unmanaged");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
             sb.Append("        if (typeof(T) == typeof(").Append(FqUnified(sym)).AppendLine("))");
             sb.AppendLine(OpenBraceNested);
-            sb.Append("            var win = Marshal.PtrToStructure<").Append(FqWindows(sym)).AppendLine(">(memory);");
+            sb.Append("            var win = Unsafe.ReadUnaligned<").Append(FqWindows(sym)).AppendLine(">((void*)memory);");
             sb.AppendLine("            var u = win.ToUnified();");
             sb.Append("            return Unsafe.As<").Append(FqUnified(sym)).AppendLine(", T>(ref u);");
             sb.AppendLine(CloseBraceNested);
@@ -329,14 +329,14 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitNonGenericWriteWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Converts the boxed packed struct <paramref name=\"src\"/> to its Windows sibling and writes it to <paramref name=\"memory\"/>.</summary>");
-        sb.AppendLine("    public static void WriteWindows(System.IntPtr memory, object src)");
+        sb.AppendLine("    public static unsafe void WriteWindows(System.IntPtr memory, object src)");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
             sb.Append("        if (src is ").Append(FqUnified(sym)).AppendLine(" v" + sym.Name + ")");
             sb.AppendLine(OpenBraceNested);
             sb.Append("            var win = ").Append(FqWindows(sym)).Append(".FromUnified(in v").Append(sym.Name).AppendLine(");");
-            sb.Append("            Marshal.StructureToPtr(win, memory, false);");
+            sb.Append("            Unsafe.WriteUnaligned((void*)memory, win);");
             sb.AppendLine();
             sb.AppendLine("            return;");
             sb.AppendLine(CloseBraceNested);
@@ -348,13 +348,13 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitNonGenericWriteUnified(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Writes the boxed packed struct <paramref name=\"src\"/> (unified layout) to <paramref name=\"memory\"/>.</summary>");
-        sb.AppendLine("    public static void WriteUnified(System.IntPtr memory, object src)");
+        sb.AppendLine("    public static unsafe void WriteUnified(System.IntPtr memory, object src)");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
             sb.Append("        if (src is ").Append(FqUnified(sym)).AppendLine(" v" + sym.Name + ")");
             sb.AppendLine(OpenBraceNested);
-            sb.Append("            Marshal.StructureToPtr(v").Append(sym.Name).AppendLine(", memory, false);");
+            sb.Append("            Unsafe.WriteUnaligned((void*)memory, v").Append(sym.Name).AppendLine(");");
             sb.AppendLine("            return;");
             sb.AppendLine(CloseBraceNested);
         }
@@ -365,13 +365,13 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitNonGenericReadWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Reads the Windows-packed sibling from <paramref name=\"memory\"/> and returns the boxed unified struct.</summary>");
-        sb.AppendLine("    public static object ReadWindows(System.IntPtr memory, System.Type t)");
+        sb.AppendLine("    public static unsafe object ReadWindows(System.IntPtr memory, System.Type t)");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
             sb.Append(IfTypeEquals).Append(FqUnified(sym)).AppendLine("))");
             sb.AppendLine(OpenBraceNested);
-            sb.Append("            var win = Marshal.PtrToStructure<").Append(FqWindows(sym)).AppendLine(">(memory);");
+            sb.Append("            var win = Unsafe.ReadUnaligned<").Append(FqWindows(sym)).AppendLine(">((void*)memory);");
             sb.AppendLine("            return win.ToUnified();");
             sb.AppendLine(CloseBraceNested);
         }
@@ -382,13 +382,13 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitNonGenericReadUnified(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Reads the unified (non-packed) struct from <paramref name=\"memory\"/> and returns it boxed.</summary>");
-        sb.AppendLine("    public static object ReadUnified(System.IntPtr memory, System.Type t)");
+        sb.AppendLine("    public static unsafe object ReadUnified(System.IntPtr memory, System.Type t)");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
             sb.Append(IfTypeEquals).Append(FqUnified(sym)).AppendLine("))");
             sb.AppendLine(OpenBraceNested);
-            sb.Append("            return Marshal.PtrToStructure<").Append(FqUnified(sym)).AppendLine(">(memory);");
+            sb.Append("            return Unsafe.ReadUnaligned<").Append(FqUnified(sym)).AppendLine(">((void*)memory);");
             sb.AppendLine(CloseBraceNested);
         }
         sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.ReadUnified(Type): type {t} is not a known [PackedForPkcs11] type.\");");

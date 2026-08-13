@@ -1,6 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -22,7 +20,8 @@ internal static class Pkcs11Marshal
     /// Uses the blittable size rather than the runtime-marshalling size. Every native struct is
     /// verified to have an identical managed and marshalled layout by
     /// <c>NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize</c>, and the
-    /// blittable layout is the one that governs under <c>[assembly: DisableRuntimeMarshalling]</c>.
+    /// blittable layout is the one that governs under <c>[assembly: DisableRuntimeMarshalling]</c>
+    /// and the one this type reads and writes.
     /// </remarks>
     public static int SizeOf<T>() where T : unmanaged
         => IsWindows && IsPackedForPkcs11(typeof(T)) ? PackedDispatch.SizeOfWindows<T>() : Unsafe.SizeOf<T>();
@@ -37,7 +36,7 @@ internal static class Pkcs11Marshal
         if (IsWindows && IsPackedForPkcs11(typeof(T)))
             PackedDispatch.WriteWindows(ptr, in value);
         else
-            Marshal.StructureToPtr(value, ptr, fDeleteOld: false);
+            unsafe { Unsafe.WriteUnaligned((void*)ptr, value); }
     }
 
     /// <summary>
@@ -46,18 +45,24 @@ internal static class Pkcs11Marshal
     /// and round-tripping back to the unified type via the generator-emitted converter.
     /// </summary>
     /// <remarks>
-    /// The <c>[DynamicallyAccessedMembers]</c> constraint on <typeparamref name="T"/> satisfies
-    /// the trimmer's requirement for <see cref="Marshal.PtrToStructure{T}(nint)"/> on the
-    /// non-Windows code path. Struct types always have constructors, so no caller is burdened.
+    /// The non-Windows path is a blittable copy rather than <c>Marshal.PtrToStructure</c>: the
+    /// <c>unmanaged</c> constraint makes that sound by construction, and it needs no
+    /// <c>[DynamicallyAccessedMembers]</c> annotation because nothing reflects over
+    /// <typeparamref name="T"/>.
     /// </remarks>
-    public static T ReadStructure<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(IntPtr ptr) where T : unmanaged
-        => IsWindows && IsPackedForPkcs11(typeof(T)) ? PackedDispatch.ReadWindows<T>(ptr) : Marshal.PtrToStructure<T>(ptr);
+    public static T ReadStructure<T>(IntPtr ptr) where T : unmanaged
+    {
+        if (IsWindows && IsPackedForPkcs11(typeof(T)))
+            return PackedDispatch.ReadWindows<T>(ptr);
+
+        unsafe { return Unsafe.ReadUnaligned<T>((void*)ptr); }
+    }
 
     /// <summary>
     /// Returns <c>true</c> when <paramref name="t"/> carries <see cref="PackedForPkcs11Attribute"/>
     /// (i.e. the generator emitted a Windows-packed sibling for it). Types without a sibling —
     /// e.g. <c>CK_VERSION</c>, which is blittable and identical on every platform — must use the
-    /// natural <see cref="Marshal"/> path even on Windows. Uses <c>Type.IsDefined</c>, which only
+    /// natural (unified-layout) path even on Windows. Uses <c>Type.IsDefined</c>, which only
     /// reads the metadata token — AOT-safe, no dynamic code.
     /// </summary>
     private static bool IsPackedForPkcs11(Type t) =>
