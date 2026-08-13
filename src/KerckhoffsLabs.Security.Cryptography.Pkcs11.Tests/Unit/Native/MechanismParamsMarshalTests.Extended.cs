@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// </summary>
 internal static class ParamMarshal
 {
-    public static T RoundTrip<T>(object raw) where T : struct
+    public static T RoundTrip<T>(object raw) where T : unmanaged
     {
         int size = UnmanagedMemory.SizeOf<T>();
         IntPtr mem = UnmanagedMemory.Allocate(size);

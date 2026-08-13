@@ -27,7 +27,7 @@ public sealed class VendorParameterWriterTests
     }
 
     /// <summary>Bytes the real marshalling path produces for an interop struct.</summary>
-    private static byte[] RealBytes<T>(in T value) where T : struct
+    private static byte[] RealBytes<T>(in T value) where T : unmanaged
     {
         using var scope = new MechanismParameterScope();
         int size = UnmanagedMemory.SizeOf<T>();

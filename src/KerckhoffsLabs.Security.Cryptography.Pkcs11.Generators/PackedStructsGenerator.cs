@@ -246,7 +246,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitGenericSizeOfWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Returns the unmanaged size of the Windows-packed sibling of <typeparamref name=\"T\"/>.</summary>");
-        sb.AppendLine("    public static int SizeOfWindows<T>() where T : struct");
+        sb.AppendLine("    public static int SizeOfWindows<T>() where T : unmanaged");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
@@ -260,7 +260,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitGenericWriteWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Converts <paramref name=\"src\"/> to its Windows-packed sibling and writes it to <paramref name=\"memory\"/>.</summary>");
-        sb.AppendLine("    public static void WriteWindows<T>(System.IntPtr memory, in T src) where T : struct");
+        sb.AppendLine("    public static void WriteWindows<T>(System.IntPtr memory, in T src) where T : unmanaged");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
@@ -281,7 +281,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitGenericReadWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Reads the Windows-packed sibling from <paramref name=\"memory\"/> and converts it to the unified <typeparamref name=\"T\"/>.</summary>");
-        sb.AppendLine("    public static T ReadWindows<T>(System.IntPtr memory) where T : struct");
+        sb.AppendLine("    public static T ReadWindows<T>(System.IntPtr memory) where T : unmanaged");
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {

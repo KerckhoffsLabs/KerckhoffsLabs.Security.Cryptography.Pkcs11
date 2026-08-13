@@ -99,7 +99,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     /// packed-struct dispatch the loader reads with, so the round-trip holds on every platform.
     /// </summary>
     private (IntPtr Table, Dictionary<string, IntPtr> Sentinels) BuildTable<T>(byte major, byte minor, long sentinelBase)
-        where T : struct
+        where T : unmanaged
     {
         object boxed = default(T);
         var sentinels = new Dictionary<string, IntPtr>();
@@ -124,7 +124,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         return (table, sentinels);
     }
 
-    private static void WriteTable<T>(IntPtr memory, in T value) where T : struct
+    private static void WriteTable<T>(IntPtr memory, in T value) where T : unmanaged
         => UnmanagedMemory.Write(memory, in value);
 
     /// <summary>Builds the CK_INTERFACE descriptor C_GetInterface hands back.</summary>
@@ -154,7 +154,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     private static bool FpFieldExists(string name)
         => typeof(FunctionPointers).GetField(name, BindingFlags.Instance | BindingFlags.Public) is not null;
 
-    private static IEnumerable<string> SlotNames<T>() where T : struct
+    private static IEnumerable<string> SlotNames<T>() where T : unmanaged
         => typeof(T).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
             .Where(f => f.FieldType == typeof(IntPtr))
             .Select(f => f.Name);

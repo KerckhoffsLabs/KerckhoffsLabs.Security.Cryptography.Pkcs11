@@ -155,7 +155,7 @@ internal static class UnmanagedMemory
     /// <c>NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize</c>, so this agrees
     /// with the <c>Marshal.StructureToPtr</c> that fills the buffer.
     /// </remarks>
-    public static int SizeOf<T>() where T : struct
+    public static int SizeOf<T>() where T : unmanaged
         => IsPackedForPkcs11(typeof(T)) ? Pkcs11Marshal.SizeOf<T>() : Unsafe.SizeOf<T>();
 
     /// <summary>
@@ -211,7 +211,7 @@ internal static class UnmanagedMemory
     /// </summary>
     /// <param name="memory">Previously allocated unmanaged memory to write to</param>
     /// <param name="structure">Struct to marshal</param>
-    public static void Write<T>(IntPtr memory, in T structure) where T : struct
+    public static void Write<T>(IntPtr memory, in T structure) where T : unmanaged
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         if (IsPackedForPkcs11(typeof(T)))
@@ -303,7 +303,7 @@ internal static class UnmanagedMemory
     /// the trimmer's requirement for <see cref="Marshal.PtrToStructure{T}(nint)"/> in the
     /// non-packed fallback path. Struct types always satisfy this requirement.
     /// </remarks>
-    public static T Read<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(IntPtr memory) where T : struct
+    public static T Read<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(IntPtr memory) where T : unmanaged
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         if (IsPackedForPkcs11(typeof(T)))

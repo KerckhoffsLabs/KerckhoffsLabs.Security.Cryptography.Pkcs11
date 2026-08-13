@@ -18,7 +18,7 @@ public sealed class MechanismParamsMarshalTests
     // Writes the boxed CK_* struct through the marshaller and reads it back as T. The pointers in the
     // result reference the scope the struct was built into, so the caller must keep that scope alive
     // (a `using` in scope) while dereferencing them.
-    private static T Marshalled<T>(object raw) where T : struct
+    private static T Marshalled<T>(object raw) where T : unmanaged
     {
         int size = UnmanagedMemory.SizeOf<T>();
         IntPtr mem = UnmanagedMemory.Allocate(size);

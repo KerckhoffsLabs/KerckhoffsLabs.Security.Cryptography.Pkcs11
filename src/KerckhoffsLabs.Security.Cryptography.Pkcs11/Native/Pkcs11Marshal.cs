@@ -24,7 +24,7 @@ internal static class Pkcs11Marshal
     /// <c>NativeStructLayoutTests.EveryCkStruct_ManagedSizeMatchesMarshalledSize</c>, and the
     /// blittable layout is the one that governs under <c>[assembly: DisableRuntimeMarshalling]</c>.
     /// </remarks>
-    public static int SizeOf<T>() where T : struct
+    public static int SizeOf<T>() where T : unmanaged
         => IsWindows && IsPackedForPkcs11(typeof(T)) ? PackedDispatch.SizeOfWindows<T>() : Unsafe.SizeOf<T>();
 
     /// <summary>
@@ -32,7 +32,7 @@ internal static class Pkcs11Marshal
     /// using the Windows-packed sibling layout when running on Windows.
     /// The buffer must already be allocated and at least <see cref="SizeOf{T}"/> bytes.
     /// </summary>
-    public static void WriteStructure<T>(IntPtr ptr, in T value) where T : struct
+    public static void WriteStructure<T>(IntPtr ptr, in T value) where T : unmanaged
     {
         if (IsWindows && IsPackedForPkcs11(typeof(T)))
             PackedDispatch.WriteWindows(ptr, in value);
@@ -50,7 +50,7 @@ internal static class Pkcs11Marshal
     /// the trimmer's requirement for <see cref="Marshal.PtrToStructure{T}(nint)"/> on the
     /// non-Windows code path. Struct types always have constructors, so no caller is burdened.
     /// </remarks>
-    public static T ReadStructure<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(IntPtr ptr) where T : struct
+    public static T ReadStructure<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(IntPtr ptr) where T : unmanaged
         => IsWindows && IsPackedForPkcs11(typeof(T)) ? PackedDispatch.ReadWindows<T>(ptr) : Marshal.PtrToStructure<T>(ptr);
 
     /// <summary>

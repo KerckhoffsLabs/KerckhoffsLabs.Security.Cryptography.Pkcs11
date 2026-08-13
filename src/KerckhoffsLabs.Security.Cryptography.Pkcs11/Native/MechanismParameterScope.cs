@@ -40,7 +40,7 @@ internal sealed class MechanismParameterScope : IDisposable
     }
 
     /// <summary>Marshals a single struct into a new block owned by this scope.</summary>
-    public IntPtr WriteStruct<T>(in T value) where T : struct
+    public IntPtr WriteStruct<T>(in T value) where T : unmanaged
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         IntPtr p = Allocate(UnmanagedMemory.SizeOf<T>());
@@ -49,7 +49,7 @@ internal sealed class MechanismParameterScope : IDisposable
     }
 
     /// <summary>Marshals a contiguous array of structs into a new block owned by this scope.</summary>
-    public IntPtr WriteStructArray<T>(ReadOnlySpan<T> values) where T : struct
+    public IntPtr WriteStructArray<T>(ReadOnlySpan<T> values) where T : unmanaged
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (values.IsEmpty) return IntPtr.Zero;
