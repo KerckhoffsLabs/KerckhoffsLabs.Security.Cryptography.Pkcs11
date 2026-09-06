@@ -41,6 +41,8 @@ internal static class SHA3_256Pkcs11TestCases
     internal static void Assert_ComputeHash_MatchesBcl(IPkcs11Backend backend)
     {
         Require(backend);
+        if (!SHA3_256.IsSupported)
+            throw new SkipTestException("Host BCL does not support SHA3-256 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_256Pkcs11(workspace);
 
@@ -51,6 +53,8 @@ internal static class SHA3_256Pkcs11TestCases
     internal static void Assert_ComputeHash_Streamed_MatchesOneShot(IPkcs11Backend backend)
     {
         Require(backend);
+        if (!SHA3_256.IsSupported)
+            throw new SkipTestException("Host BCL does not support SHA3-256 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_256Pkcs11(workspace);
 
@@ -65,6 +69,8 @@ internal static class SHA3_256Pkcs11TestCases
     internal static void Assert_Reuse_AfterInitialize_ProducesFreshHash(IPkcs11Backend backend)
     {
         Require(backend);
+        if (!SHA3_256.IsSupported)
+            throw new SkipTestException("Host BCL does not support SHA3-256 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_256Pkcs11(workspace);
 
