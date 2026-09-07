@@ -880,7 +880,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
-        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_CreateObject(_sessionId, template, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCreateObject);
@@ -909,7 +909,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
-        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_CopyObject(_sessionId, (NativeCULong)(objectHandle.ObjectId), template, ref objectId);
         Pkcs11Exception.ThrowIfError(rv, OpCopyObject);
@@ -1271,7 +1271,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "FindObjectsInit");
 
-        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
@@ -1330,7 +1330,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         List<ObjectHandle> foundObjects = [];
 
-        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         CKR rv = _pkcs11Library.C_FindObjectsInit(_sessionId, template);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjectsInit);
@@ -1427,7 +1427,7 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope();
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        CK_ATTRIBUTE[]? template = BuildTemplate(attributes, out NativeCULong templateLength);
+        CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
         NativeCULong keyId = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_GenerateKey(_sessionId, ref ckMechanism, template, ref keyId);
@@ -1472,8 +1472,8 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope();
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes, out NativeCULong publicKeyTemplateLength);
-        CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes, out NativeCULong privateKeyTemplateLength);
+        CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes);
+        CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes);
 
         NativeCULong publicKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
         NativeCULong privateKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
@@ -1571,7 +1571,7 @@ internal sealed class Pkcs11Session : IDisposable
         // template builders establish. Append CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the
         // caller omitted them; an explicit insecure value requires AllowInsecure (throws otherwise).
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
-        CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
+        CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         NativeCULong unwrappedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKey(_sessionId, ref ckMechanism, (NativeCULong)(unwrappingKeyHandle.ObjectId), wrappedKey, template, ref unwrappedKey);
@@ -1669,15 +1669,11 @@ internal sealed class Pkcs11Session : IDisposable
     /// zeroizes and frees. Left unrooted, a caller passing a temporary template can have its buffers
     /// wiped mid-call.
     /// </remarks>
-    private static CK_ATTRIBUTE[]? BuildTemplate(List<ObjectAttribute>? attributes, out NativeCULong length)
+    private static CK_ATTRIBUTE[]? BuildTemplate(List<ObjectAttribute>? attributes)
     {
         if (attributes is null)
-        {
-            length = (NativeCULong)0;
             return null;
-        }
 
-        length = (NativeCULong)attributes.Count;
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
         for (int i = 0; i < attributes.Count; i++)
             template[i] = attributes[i].CkAttribute;
@@ -1689,15 +1685,12 @@ internal sealed class Pkcs11Session : IDisposable
     /// appended <paramref name="secureDefaults"/>. Returns <c>null</c> (length 0) only when both are
     /// empty, matching the "null template = no attributes" convention.
     /// </summary>
-    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, ReadOnlyDisposableList<ObjectAttribute> secureDefaults, out NativeCULong length)
+    private static CK_ATTRIBUTE[]? BuildTemplateWithDefaults(List<ObjectAttribute>? attributes, ReadOnlyDisposableList<ObjectAttribute> secureDefaults)
     {
         int attrCount = attributes?.Count ?? 0;
         int total = attrCount + secureDefaults.Count;
         if (total == 0)
-        {
-            length = (NativeCULong)0;
             return null;
-        }
 
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[total];
         int idx = 0;
@@ -1705,7 +1698,6 @@ internal sealed class Pkcs11Session : IDisposable
             template[idx++] = attributes![i].CkAttribute;
         foreach (ObjectAttribute d in secureDefaults)
             template[idx++] = d.CkAttribute;
-        length = (NativeCULong)total;
         return template;
     }
 
@@ -3160,7 +3152,7 @@ internal sealed class Pkcs11Session : IDisposable
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
         // value requires AllowInsecure (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
         using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
-        CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults, out NativeCULong templateLen);
+        CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DeriveKey(_sessionId, ref ckMechanism, (NativeCULong)(baseKeyHandle.ObjectId), template, ref derivedKey);
