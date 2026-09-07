@@ -260,4 +260,14 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Equal(2048, only.MinSize);
         Assert.Equal(2048, only.MaxSize);
     });
+
+    // A real token can't be coaxed into failing to read CKA_PRIME — it's a required domain-parameter
+    // attribute of every DSA key object — so this drives the fallback's error path via a fake library.
+    [Fact]
+    public void KeySize_PrimeAttributeFails_StaysAtBclDefault()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_DEVICE_ERROR, null));
+        using var dsa = new DSAPkcs11(key);
+        Assert.Equal(0, dsa.KeySize);
+    }
 }

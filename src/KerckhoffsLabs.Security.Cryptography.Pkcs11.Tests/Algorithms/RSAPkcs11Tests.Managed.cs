@@ -305,4 +305,14 @@ public sealed class RSAPkcs11Tests_Managed
     [Fact]
     public void GetMaxOutputSize_Succeeds() => WithRsa((_, rsa) =>
         Assert.Equal(2048 / 8, rsa.GetMaxOutputSize()));
+
+    // A real token can't be coaxed into failing to read CKA_MODULUS — it's a required attribute of
+    // every RSA key object — so this drives the fallback's error paths directly via a fake library.
+    [Fact]
+    public void KeySize_BothModulusAttributesFail_StaysAtBclDefault()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_RSA, _ => (CKR.CKR_DEVICE_ERROR, null));
+        using var rsa = new RSAPkcs11(key);
+        Assert.Equal(0, rsa.KeySize);
+    }
 }

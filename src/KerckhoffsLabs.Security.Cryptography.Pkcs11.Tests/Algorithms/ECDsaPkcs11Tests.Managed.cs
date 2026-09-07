@@ -329,4 +329,24 @@ public sealed class ECDsaPkcs11Tests_Managed
         byte[] csr = req.CreateSigningRequest();
         Assert.NotEmpty(csr);
     });
+
+    // A real token can't be coaxed into failing to read CKA_EC_PARAMS — it's a required attribute of
+    // every EC key object — so this drives the fallback's error path via a fake library.
+    [Fact]
+    public void KeySize_EcParamsAttributeFails_StaysAtBclDefault()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_DEVICE_ERROR, null));
+        using var ec = new ECDsaPkcs11(key);
+        Assert.Equal(0, ec.KeySize);
+    }
+
+    // CKA_EC_PARAMS readable but not a DER-encoded named-curve OID: Pkcs11ECCurve.FromEcParams
+    // throws ArgumentException, which the fallback must also treat as "unknown, leave default".
+    [Fact]
+    public void KeySize_EcParamsNotAValidOid_StaysAtBclDefault()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_OK, (byte[])[0xFF, 0xFF, 0xFF]));
+        using var ec = new ECDsaPkcs11(key);
+        Assert.Equal(0, ec.KeySize);
+    }
 }
