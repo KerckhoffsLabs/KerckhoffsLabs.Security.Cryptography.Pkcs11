@@ -1933,8 +1933,7 @@ internal sealed class Pkcs11Session : IDisposable
         // report the required length. RSA and other output-larger-than-input mechanisms still grow via
         // the CKR_BUFFER_TOO_SMALL retry below.
         byte[] encryptedData = new byte[data.Length + 16];
-        NativeCULong encryptedDataLen = (NativeCULong)encryptedData.Length;
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
+        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out NativeCULong encryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
@@ -1952,12 +1951,10 @@ internal sealed class Pkcs11Session : IDisposable
                 rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
                 Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
 
-                NativeCULong probeLen = (NativeCULong)0;
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, null, out probeLen);
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, null, out NativeCULong probeLen);
                 Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
 
                 encryptedData = new byte[(int)probeLen];
-                encryptedDataLen = probeLen;
                 rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
             }
         }
@@ -2040,8 +2037,7 @@ internal sealed class Pkcs11Session : IDisposable
                 OpEncryptUpdate);
 
             byte[]? lastEncryptedPart = null;
-            NativeCULong lastEncryptedPartLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out lastEncryptedPartLen);
+            rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out NativeCULong lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
             lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
@@ -2119,12 +2115,11 @@ internal sealed class Pkcs11Session : IDisposable
             byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
             byte[] pt = plaintext.ToArray();
 
-            NativeCULong ctLen = (NativeCULong)0;
             rv = _pkcs11Library.C_EncryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
                 aad,
                 pt,
-                null!, out ctLen);
+                null!, out NativeCULong ctLen);
             Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
 
             byte[] ct = new byte[(int)ctLen];
@@ -2198,9 +2193,8 @@ internal sealed class Pkcs11Session : IDisposable
         // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
         // an opaque error instead of the plaintext length. Resize via CKR_BUFFER_TOO_SMALL
         // if the token needs more space (e.g. padding expansion on some mechanisms).
-        NativeCULong decryptedDataLen = (NativeCULong)encryptedData.Length;
         byte[] decryptedData = new byte[encryptedData.Length];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out decryptedDataLen);
+        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out NativeCULong decryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
@@ -2282,8 +2276,7 @@ internal sealed class Pkcs11Session : IDisposable
                 OpDecryptUpdate);
 
             byte[]? lastPart = null;
-            NativeCULong lastPartLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out lastPartLen);
+            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
             lastPart = new byte[(int)lastPartLen];
@@ -2351,12 +2344,11 @@ internal sealed class Pkcs11Session : IDisposable
             byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
             byte[] ct = ciphertext.ToArray();
 
-            NativeCULong ptLen = (NativeCULong)0;
             rv = _pkcs11Library.C_DecryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
                 aad,
                 ct,
-                null!, out ptLen);
+                null!, out NativeCULong ptLen);
             Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
 
             byte[] pt = new byte[(int)ptLen];
@@ -2586,8 +2578,7 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecoverInit);
 
-        NativeCULong dataLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, null, out dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, null, out NativeCULong dataLen);
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
 
         byte[] data = new byte[(int)dataLen];
@@ -2729,8 +2720,7 @@ internal sealed class Pkcs11Session : IDisposable
             OpDecryptVerifyUpdate);
 
         byte[]? lastPart = null;
-        NativeCULong lastPartLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[(int)lastPartLen];
@@ -2775,8 +2765,7 @@ internal sealed class Pkcs11Session : IDisposable
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
 
-        NativeCULong digestLen = (NativeCULong)0;
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         byte[] digest = new byte[(int)digestLen];
@@ -2904,8 +2893,7 @@ internal sealed class Pkcs11Session : IDisposable
                 Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
             }
 
-            NativeCULong digestLen = (NativeCULong)0;
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out digestLen);
+            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
             byte[] digest = new byte[(int)digestLen];
@@ -3323,7 +3311,7 @@ internal sealed class Pkcs11Session : IDisposable
         foreach (ObjectAttribute d in secureDefaults)
             template[idx++] = d.CkAttribute;
 
-        NativeCULong ctLen = (NativeCULong)0;
+        NativeCULong ctLen;
         NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv;
         byte[] ct;
@@ -3335,7 +3323,6 @@ internal sealed class Pkcs11Session : IDisposable
             // and the only correct path on SoftHSM, whose C_EncapsulateKey ignores a NULL buffer
             // (no length probe) and performs a side-effectful encapsulation on each call.
             ct = new byte[expectedCiphertextLen];
-            ctLen = (NativeCULong)expectedCiphertextLen;
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
@@ -3462,10 +3449,9 @@ internal sealed class Pkcs11Session : IDisposable
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
         byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
-        NativeCULong wrappedLen = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            aad, null!, out wrappedLen);
+            aad, null!, out NativeCULong wrappedLen);
         // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome (PKCS#11 v3.2 §5.2):
         // the token populated wrappedLen despite the (null) output buffer. Only a genuine
         // error aborts the probe.
