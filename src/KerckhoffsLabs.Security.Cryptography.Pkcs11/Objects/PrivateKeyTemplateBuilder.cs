@@ -7,6 +7,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 /// <c>CKA_PRIVATE = true</c>, <c>CKA_SENSITIVE = true</c>, and
 /// <c>CKA_EXTRACTABLE = false</c>; callers can opt out explicitly.
 /// </summary>
+/// <remarks>
+/// Every capability attribute (<c>CKA_SIGN</c>, <c>CKA_SIGN_RECOVER</c>, <c>CKA_DECRYPT</c>,
+/// <c>CKA_UNWRAP</c>, <c>CKA_DERIVE</c>) also defaults to <c>false</c>. PKCS#11's own spec default
+/// for an omitted capability attribute is <c>CK_TRUE</c> (verified against NSS and SoftHSM) — an
+/// omission-means-safe assumption would silently grant every role on every key this builder
+/// produces. Callers opt in to each role explicitly.
+/// </remarks>
 public sealed class PrivateKeyTemplateBuilder : ObjectTemplateBuilderBase<PrivateKeyTemplateBuilder>
 {
     internal PrivateKeyTemplateBuilder(CKK keyType)
@@ -16,6 +23,11 @@ public sealed class PrivateKeyTemplateBuilder : ObjectTemplateBuilderBase<Privat
         Set(new ObjectAttribute(CKA.CKA_PRIVATE, true));
         Set(new ObjectAttribute(CKA.CKA_SENSITIVE, true));
         Set(new ObjectAttribute(CKA.CKA_EXTRACTABLE, false));
+        Set(new ObjectAttribute(CKA.CKA_SIGN, false));
+        Set(new ObjectAttribute(CKA.CKA_SIGN_RECOVER, false));
+        Set(new ObjectAttribute(CKA.CKA_DECRYPT, false));
+        Set(new ObjectAttribute(CKA.CKA_UNWRAP, false));
+        Set(new ObjectAttribute(CKA.CKA_DERIVE, false));
     }
 
     /// <summary>Sets <c>CKA_SENSITIVE</c>.</summary>

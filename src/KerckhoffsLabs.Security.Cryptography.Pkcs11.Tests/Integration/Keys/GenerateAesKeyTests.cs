@@ -31,4 +31,39 @@ internal static class GenerateAesKeyTestCases
         Assert.Single(attrs);
         Assert.Equal(32UL, attrs[0].GetValueAsUlong());
     }
+
+    /// <summary>
+    /// BL-070: a key from <c>GenerateAesKey</c> must not be usable to wrap or unwrap other keys —
+    /// combining data-decryption and key-wrapping roles on one key is a wrap-oracle vector. Use
+    /// <c>GenerateAesKeyEncryptionKey</c> for a dedicated KEK instead.
+    /// </summary>
+    internal static void Assert_GeneratedKey_HasNoWrapCapability(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        using var key = workspace.GenerateAesKey(bitLength: 256);
+
+        using var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP]);
+        Assert.True(attrs[0].GetValueAsBool());
+        Assert.True(attrs[1].GetValueAsBool());
+        Assert.False(attrs[2].GetValueAsBool());
+        Assert.False(attrs[3].GetValueAsBool());
+    }
+
+    /// <summary>
+    /// BL-070: <c>GenerateAesKeyEncryptionKey</c> must be usable only to wrap/unwrap — it must not
+    /// carry <c>CKA_ENCRYPT</c>/<c>CKA_DECRYPT</c>, or it becomes the same wrap-oracle risk.
+    /// </summary>
+    internal static void Assert_GeneratesKeyEncryptionKey_WrapUnwrapOnly(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        using var kek = workspace.GenerateAesKeyEncryptionKey(bitLength: 256);
+
+        Assert.False(kek.PrivateHandle.IsInvalid);
+
+        using var attrs = workspace.Session.GetAttributeValue(kek.PrivateHandle, [CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP]);
+        Assert.False(attrs[0].GetValueAsBool());
+        Assert.False(attrs[1].GetValueAsBool());
+        Assert.True(attrs[2].GetValueAsBool());
+        Assert.True(attrs[3].GetValueAsBool());
+    }
 }

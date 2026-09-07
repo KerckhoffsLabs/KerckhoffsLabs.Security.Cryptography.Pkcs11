@@ -73,8 +73,10 @@ public sealed class ObjectTemplateTests
     {
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Build();
 
-        // CKA_CLASS, CKA_KEY_TYPE, CKA_SENSITIVE, CKA_EXTRACTABLE = 4 defaults.
-        Assert.Equal(4, template.Count);
+        // CKA_CLASS, CKA_KEY_TYPE, CKA_SENSITIVE, CKA_EXTRACTABLE, and the seven capability
+        // attributes (CKA_ENCRYPT/DECRYPT/SIGN/VERIFY/WRAP/UNWRAP/DERIVE, all false-by-default
+        // per BL-070 — PKCS#11 itself defaults an omitted one to CK_TRUE) = 11 defaults.
+        Assert.Equal(11, template.Count);
     }
 
     [Fact]
@@ -102,8 +104,8 @@ public sealed class ObjectTemplateTests
             .Extractable()
             .Build();
 
-        // Count is still 4 — Extractable() replaces the default value, not adds a new one.
-        Assert.Equal(4, template.Count);
+        // Count is still 11 — Extractable() replaces the default value, not adds a new one.
+        Assert.Equal(11, template.Count);
     }
 
     [Fact]
@@ -143,9 +145,10 @@ public sealed class ObjectTemplateTests
     {
         using var template = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA).Build();
 
-        // CKA_CLASS, CKA_KEY_TYPE, CKA_PRIVATE=true, CKA_SENSITIVE=true,
-        // CKA_EXTRACTABLE=false = 5 defaults.
-        Assert.Equal(5, template.Count);
+        // CKA_CLASS, CKA_KEY_TYPE, CKA_PRIVATE=true, CKA_SENSITIVE=true, CKA_EXTRACTABLE=false,
+        // and the five capability attributes (CKA_SIGN/SIGN_RECOVER/DECRYPT/UNWRAP/DERIVE, all
+        // false-by-default per BL-070 — PKCS#11 itself defaults an omitted one to CK_TRUE) = 10.
+        Assert.Equal(10, template.Count);
     }
 
     [Fact]
@@ -167,9 +170,11 @@ public sealed class ObjectTemplateTests
     {
         using var template = ObjectTemplate.ForPublicKey(CKK.CKK_RSA).Build();
 
-        // CKA_CLASS, CKA_KEY_TYPE = 2 defaults. Public keys do not get the
-        // sensitive/non-extractable defaults — they are not sensitive material.
-        Assert.Equal(2, template.Count);
+        // CKA_CLASS, CKA_KEY_TYPE = 2. Public keys do not get the sensitive/non-extractable
+        // defaults — they are not sensitive material — but do get the five capability attributes
+        // (CKA_VERIFY/VERIFY_RECOVER/ENCRYPT/WRAP/DERIVE, all false-by-default per BL-070 —
+        // PKCS#11 itself defaults an omitted one to CK_TRUE) = 7 defaults.
+        Assert.Equal(7, template.Count);
     }
 
     [Fact]

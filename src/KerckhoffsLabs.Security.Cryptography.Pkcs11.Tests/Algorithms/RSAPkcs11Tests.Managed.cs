@@ -28,7 +28,16 @@ public sealed class RSAPkcs11Tests_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateRsaKeyPair(modulusBits: 2048);
+        using var key = workspace.GenerateRsaSigningKeyPair(modulusBits: 2048);
+        using var rsa = new RSAPkcs11(key);
+        body(workspace, rsa);
+    }
+
+    private static void WithTransportRsa(Action<Pkcs11Workspace, RSAPkcs11> body)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var key = workspace.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
         using var rsa = new RSAPkcs11(key);
         body(workspace, rsa);
     }
@@ -63,7 +72,7 @@ public sealed class RSAPkcs11Tests_Managed
         using var workspace = ManagedToken.OpenWorkspace(library);
 
         using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
-        using var key = workspace.GenerateRsaKeyPair(modulusBits);
+        using var key = workspace.GenerateRsaSigningKeyPair(modulusBits);
         using var rsa = new RSAPkcs11(key);
 
         byte[] data = Encoding.UTF8.GetBytes($"rsa-{modulusBits} payload");
@@ -193,7 +202,7 @@ public sealed class RSAPkcs11Tests_Managed
     // the managed-backend coverage and the BCL-interop check.
     [Theory]
     [MemberData(nameof(OaepHashes))]
-    public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithRsa((_, rsa) =>
+    public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithTransportRsa((_, rsa) =>
     {
         var oaep = oaepHash == "SHA256" ? RSAEncryptionPadding.OaepSHA256 : RSAEncryptionPadding.OaepSHA1;
         byte[] plaintext = RandomNumberGenerator.GetBytes(32);
@@ -213,7 +222,7 @@ public sealed class RSAPkcs11Tests_Managed
 
     // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires AllowInsecure.
     [Fact]
-    public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => WithRsa((workspace, rsa) =>
+    public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => WithTransportRsa((workspace, rsa) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
         using (workspace.AllowInsecureScope())
@@ -224,14 +233,14 @@ public sealed class RSAPkcs11Tests_Managed
     });
 
     [Fact]
-    public void Encrypt_Pkcs1_WithoutAllowInsecure_Throws() => WithRsa((_, rsa) =>
+    public void Encrypt_Pkcs1_WithoutAllowInsecure_Throws() => WithTransportRsa((_, rsa) =>
         Assert.Throws<InsecureOperationException>(() =>
             rsa.Encrypt(Encoding.UTF8.GetBytes("nope"), RSAEncryptionPadding.Pkcs1)));
 
     // A ciphertext whose padding is corrupted must fail decryption — the token surfaces this as
     // CKR_ENCRYPTED_DATA_INVALID.
     [Fact]
-    public void Decrypt_TamperedOaepCiphertext_Throws() => WithRsa((_, rsa) =>
+    public void Decrypt_TamperedOaepCiphertext_Throws() => WithTransportRsa((_, rsa) =>
     {
         byte[] plaintext = RandomNumberGenerator.GetBytes(32);
         byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA256);
@@ -243,14 +252,14 @@ public sealed class RSAPkcs11Tests_Managed
     });
 
     [Fact]
-    public void Encrypt_NullArguments_Throw() => WithRsa((_, rsa) =>
+    public void Encrypt_NullArguments_Throw() => WithTransportRsa((_, rsa) =>
     {
         Assert.Throws<ArgumentNullException>(() => rsa.Encrypt(null!, RSAEncryptionPadding.OaepSHA1));
         Assert.Throws<ArgumentNullException>(() => rsa.Encrypt(new byte[4], null!));
     });
 
     [Fact]
-    public void Decrypt_NullArguments_Throw() => WithRsa((_, rsa) =>
+    public void Decrypt_NullArguments_Throw() => WithTransportRsa((_, rsa) =>
     {
         Assert.Throws<ArgumentNullException>(() => rsa.Decrypt(null!, RSAEncryptionPadding.OaepSHA1));
         Assert.Throws<ArgumentNullException>(() => rsa.Decrypt(new byte[4], null!));

@@ -13,4 +13,10 @@ public sealed class GenerateAesKeyTests_SoftHsm(SoftHsmBackendFixture f)
 
     [ConditionalFact(nameof(SoftHsmAvailable))]
     public void GeneratesAes256Key() => GenerateAesKeyTestCases.Assert_GeneratesAes256Key(_backend);
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void GeneratedKey_HasNoWrapCapability() => GenerateAesKeyTestCases.Assert_GeneratedKey_HasNoWrapCapability(_backend);
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void GeneratesKeyEncryptionKey_WrapUnwrapOnly() => GenerateAesKeyTestCases.Assert_GeneratesKeyEncryptionKey_WrapUnwrapOnly(_backend);
 }

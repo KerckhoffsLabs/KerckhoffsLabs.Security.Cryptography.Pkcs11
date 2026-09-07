@@ -14,4 +14,10 @@ public sealed class GenerateAesKeyTests_OpenCryptoki(OpenCryptokiBackendFixture 
 
     [ConditionalFact(nameof(Available))]
     public void GeneratesAes256Key() => GenerateAesKeyTestCases.Assert_GeneratesAes256Key(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void GeneratedKey_HasNoWrapCapability() => GenerateAesKeyTestCases.Assert_GeneratedKey_HasNoWrapCapability(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void GeneratesKeyEncryptionKey_WrapUnwrapOnly() => GenerateAesKeyTestCases.Assert_GeneratesKeyEncryptionKey_WrapUnwrapOnly(_backend);
 }

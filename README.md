@@ -118,6 +118,32 @@ X.509 chains, code signing — and because the gate also governs verification, b
 break verifying third-party signatures. Only v1.5 over a *broken hash*, and v1.5 *encryption* / raw
 RSA (Bleichenbacher / ROBOT territory), are gated. Prefer RSA-PSS for new code all the same.
 
+### Key role separation
+
+`Pkcs11Workspace`'s key-generation helpers each grant exactly one role, deliberately. Mixing
+data-processing roles (encrypt/decrypt, sign/verify) with key-management roles (wrap/unwrap) on the
+same key turns the key into a self-service oracle: wrap an extractable key, then decrypt the
+resulting blob with the same key to read it in the clear; or encrypt a chosen plaintext, then unwrap
+it as if it were a wrapped key, injecting a "sensitive" key of known value (Clulow, *On the Security
+of PKCS#11*, CHES 2003).
+
+- `GenerateAesKey` → encrypt/decrypt only. `GenerateAesKeyEncryptionKey` → a dedicated wrap/unwrap-only
+  KEK, with `CKA_UNWRAP_TEMPLATE` forcing every key it unwraps to be sensitive and non-extractable.
+- `GenerateRsaSigningKeyPair` → sign/verify only. `GenerateRsaKeyTransportKeyPair` → encrypt/decrypt
+  only (RSA-OAEP key transport). Neither grants `CKA_WRAP`/`CKA_UNWRAP`; a caller who specifically
+  needs RSA `C_WrapKey`/`C_UnwrapKey` should build that template explicitly.
+
+There is no single "do everything" key-generation helper — pick the one that names the role the key
+will actually play.
+
+**Every capability attribute defaults to `false`, deliberately.** PKCS#11's own spec default for an
+*omitted* `CKA_ENCRYPT`/`CKA_DECRYPT`/`CKA_SIGN`/`CKA_VERIFY`/`CKA_WRAP`/`CKA_UNWRAP`/`CKA_DERIVE` is
+`CK_TRUE`, not `CK_FALSE` (confirmed against real NSS and SoftHSM tokens) — leaving a role out of a
+template does not refuse it, it grants it. `SecretKeyTemplateBuilder`, `PublicKeyTemplateBuilder`,
+and `PrivateKeyTemplateBuilder` all set every applicable capability attribute to `false` at
+construction, the same fail-safe-default pattern used for `CKA_SENSITIVE`/`CKA_EXTRACTABLE`; a
+caller opts in to each role explicitly via `.Encrypt()`, `.Sign()`, `.Wrap()`, and so on.
+
 ### Wrap hardening
 
 Keys are non-extractable by default, which closes the direct exfiltration path. For a key

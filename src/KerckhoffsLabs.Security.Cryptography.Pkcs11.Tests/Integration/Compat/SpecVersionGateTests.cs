@@ -54,7 +54,7 @@ internal static class SpecVersionGateTestSupport
     /// <summary>RSA-PSS sign/verify round-trip through <see cref="RSAPkcs11"/>.</summary>
     internal static void AssertRsaSignVerifyRoundTrips(Pkcs11Workspace workspace)
     {
-        using var key = workspace.GenerateRsaKeyPair(2048);
+        using var key = workspace.GenerateRsaSigningKeyPair(2048);
         using var rsa = new RSAPkcs11(key);
 
         byte[] data = Encoding.UTF8.GetBytes("spec-version gate signature");

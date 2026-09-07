@@ -14,4 +14,10 @@ public sealed class GenerateRsaKeyPairTests_OpenCryptoki(OpenCryptokiBackendFixt
 
     [ConditionalFact(nameof(Available))]
     public void GeneratesRsa2048KeyPair() => GenerateRsaKeyPairTestCases.Assert_GeneratesRsa2048KeyPair(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void SigningKeyPair_HasNoEncryptCapability() => GenerateRsaKeyPairTestCases.Assert_SigningKeyPair_HasNoEncryptCapability(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void GeneratesTransportKeyPair_EncryptDecryptOnly() => GenerateRsaKeyPairTestCases.Assert_GeneratesTransportKeyPair_EncryptDecryptOnly(_backend);
 }

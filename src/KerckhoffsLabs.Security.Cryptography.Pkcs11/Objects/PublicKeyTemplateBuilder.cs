@@ -6,12 +6,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 /// Fluent builder for an asymmetric public-key template. Public keys are not sensitive
 /// material; no secure-default sensitivity attributes are pre-set.
 /// </summary>
+/// <remarks>
+/// Every capability attribute (<c>CKA_VERIFY</c>, <c>CKA_VERIFY_RECOVER</c>, <c>CKA_ENCRYPT</c>,
+/// <c>CKA_WRAP</c>, <c>CKA_DERIVE</c>) defaults to <c>false</c>. PKCS#11's own spec default for an
+/// omitted capability attribute is <c>CK_TRUE</c> (verified against NSS and SoftHSM) — an
+/// omission-means-safe assumption would silently grant every role on every key this builder
+/// produces. Callers opt in to each role explicitly.
+/// </remarks>
 public sealed class PublicKeyTemplateBuilder : ObjectTemplateBuilderBase<PublicKeyTemplateBuilder>
 {
     internal PublicKeyTemplateBuilder(CKK keyType)
     {
         Set(new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY));
         Set(new ObjectAttribute(CKA.CKA_KEY_TYPE, keyType));
+        Set(new ObjectAttribute(CKA.CKA_VERIFY, false));
+        Set(new ObjectAttribute(CKA.CKA_VERIFY_RECOVER, false));
+        Set(new ObjectAttribute(CKA.CKA_ENCRYPT, false));
+        Set(new ObjectAttribute(CKA.CKA_WRAP, false));
+        Set(new ObjectAttribute(CKA.CKA_DERIVE, false));
     }
 
     /// <summary>Sets <c>CKA_VERIFY</c>.</summary>
