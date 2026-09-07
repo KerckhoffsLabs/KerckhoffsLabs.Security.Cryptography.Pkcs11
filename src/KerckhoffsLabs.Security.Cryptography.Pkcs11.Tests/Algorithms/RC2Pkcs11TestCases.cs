@@ -132,6 +132,30 @@ internal static class RC2Pkcs11TestCases
             Assert.Equal(plaintext, rc2.DecryptEcb(ct, PaddingMode.None));
         });
 
+    // RFC 2268 effective-key-bits narrower than the key itself. There is no BCL cross-check for this:
+    // System.Security.Cryptography.RC2Implementation throws CryptographicUnexpectedOperationException
+    // ("EffectiveKeySize must be the same as KeySize in this implementation") whenever EffectiveKeySize
+    // differs from KeySize, on every OS it runs on (verified directly on Linux and reported by CI on
+    // Windows) — this is not a Windows-only limitation. Instead this is a fixed known-answer vector
+    // for Key128/Iv8 with EffectiveKeySize=64, computed and cross-checked independently against
+    // PyCryptodome's ARC2 (which does support a separate effective_keylen): a second RC2
+    // implementation, unrelated to the BCL, agreeing with the token's own crypto.
+    private static readonly byte[] ReducedEffectiveBitsPlaintext =
+        Convert.FromHexString("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF");
+    private static readonly byte[] ReducedEffectiveBitsCiphertext =
+        Convert.FromHexString("99C1E52A8AF40EFC387B958633E7B7B7");
+
+    internal static void Assert_EncryptCbc_ReducedEffectiveKeySize_MatchesKnownAnswer(IPkcs11Backend backend) =>
+        WithImportedRc2(backend, (workspace, rc2) =>
+        {
+            rc2.EffectiveKeySize = 64; // narrower than the 128-bit token key
+            workspace.AllowInsecure = true;
+
+            byte[] ct = rc2.EncryptCbc(ReducedEffectiveBitsPlaintext, Iv8, PaddingMode.None);
+            Assert.Equal(ReducedEffectiveBitsCiphertext, ct);
+            Assert.Equal(ReducedEffectiveBitsPlaintext, rc2.DecryptCbc(ct, Iv8, PaddingMode.None));
+        });
+
     internal static void Assert_EncryptCbc_UnsupportedPadding_Throws(IPkcs11Backend backend) =>
         WithImportedRc2(backend, (_, rc2) =>
             Assert.Throws<NotSupportedException>(() => rc2.EncryptCbc(new byte[8], Iv8, PaddingMode.Zeros)));

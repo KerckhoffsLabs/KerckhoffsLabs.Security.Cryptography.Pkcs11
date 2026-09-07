@@ -28,6 +28,12 @@ public sealed class RC2Pkcs11Tests_Nss(NssBackendFixture backend)
     [ConditionalFact(nameof(Available))]
     public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => RC2Pkcs11TestCases.Assert_EncryptCbc_NonePadding_AllowInsecure_MatchesBcl(_backend);
 
+    // NSS is the only real backend that implements RC2-CBC (SoftHSM/OpenCryptoki don't implement RC2
+    // at all), so it's the only place a reduced RFC 2268 effective-key-bits round-trip can be
+    // exercised against real token crypto instead of the BCL, which cannot represent this case at all.
+    [ConditionalFact(nameof(Available))]
+    public void EncryptCbc_ReducedEffectiveKeySize_MatchesKnownAnswer() => RC2Pkcs11TestCases.Assert_EncryptCbc_ReducedEffectiveKeySize_MatchesKnownAnswer(_backend);
+
     [ConditionalFact(nameof(Rc2Ecb))]
     public void EncryptEcb_AllowInsecure_MatchesBcl() => RC2Pkcs11TestCases.Assert_EncryptEcb_AllowInsecure_MatchesBcl(_backend);
 

@@ -155,16 +155,18 @@ public sealed class RC2Pkcs11Tests_Managed
         }
     });
 
-    // No KAT for a reduced RFC 2268 effective-key-bits (< the key's own size): confirmed on real
-    // Windows CI that the CNG-backed System.Security.Cryptography.RC2Implementation throws
-    // CryptographicUnexpectedOperationException("EffectiveKeySize must be the same as KeySize in
-    // this implementation.") the moment EffectiveKeySize is set to anything other than KeySize. The
-    // ManagedSoftToken fake's own RC2 crypto (ManagedSoftToken.Symmetric.cs) also goes through
-    // RC2.Create() internally, so it hits the identical restriction — there is no way to drive a
-    // reduced effective-key-bits round-trip through the BCL on the one platform (Windows) where this
-    // suite's RC2 crypto actually runs. (NSS softoken does implement real CKM_RC2_CBC with a
-    // configurable effective-bits parameter and could exercise this against a published RFC 2268
-    // test vector instead of a live BCL cross-check, but that is new coverage, not this fix.)
+    // No KAT for a reduced RFC 2268 effective-key-bits (< the key's own size): every OS's
+    // System.Security.Cryptography.RC2Implementation — confirmed directly on Linux, and by CI on
+    // Windows — throws CryptographicUnexpectedOperationException("EffectiveKeySize must be the same
+    // as KeySize in this implementation.") the moment EffectiveKeySize is set to anything other than
+    // KeySize. This is not a Windows-only restriction; it is the one cross-platform managed RC2
+    // implementation .NET ships. The ManagedSoftToken fake's own RC2 crypto
+    // (ManagedSoftToken.Symmetric.cs) goes through the same RC2.Create() internally, so it hits the
+    // identical restriction — there is no way to drive a reduced effective-key-bits round-trip
+    // through the BCL at all, on any platform. See RC2Pkcs11Tests.Nss.cs
+    // (EncryptCbc_ReducedEffectiveKeySize_MatchesKnownAnswer) for real coverage of this case: NSS
+    // softoken implements genuine CKM_RC2_CBC with a configurable effective-bits parameter,
+    // cross-checked against a fixed vector computed independently with PyCryptodome's ARC2.
 
     // No test for "effective > KeySize" / "effective < 1": the base RC2.EffectiveKeySize and
     // RC2.KeySize setters already enforce EffectiveKeySize <= KeySize symmetrically (each throws
