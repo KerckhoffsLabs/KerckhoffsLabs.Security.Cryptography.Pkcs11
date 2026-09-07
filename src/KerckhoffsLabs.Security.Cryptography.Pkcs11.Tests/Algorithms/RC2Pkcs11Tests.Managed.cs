@@ -22,15 +22,26 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <para>
 /// RC2 is gated on two fronts. The secure-defaults policy means each cipher op must run inside
 /// <c>AllowInsecureScope()</c> and throws <see cref="InsecureOperationException"/> without it. The BCL
-/// <see cref="RC2"/> implementation is Windows-only (it throws <c>PlatformNotSupportedException</c>
-/// elsewhere), so the crypto cases are gated on <see cref="Rc2Supported"/>; the construction and
+/// <see cref="RC2"/> implementation is cross-platform today (confirmed on Linux and Windows) but is
+/// still probed via <see cref="Rc2Supported"/> rather than assumed, matching how this suite probes
+/// other host-BCL-dependent capabilities (ML-DSA/ML-KEM/SLH-DSA); the construction and
 /// argument-validation cases that throw before any token call stay <c>[Fact]</c>.
 /// </para>
 /// </summary>
 public sealed class RC2Pkcs11Tests_Managed
 {
-    // The BCL RC2 is Windows-only; gate every case that reaches the token (encrypt/decrypt) on this.
-    public static bool Rc2Supported => OperatingSystem.IsWindows();
+    // RC2.Create() throws PlatformNotSupportedException on a host without an RC2 implementation;
+    // probe rather than assume a specific OS. Confirmed working (construction, EffectiveKeySize,
+    // and full CBC/ECB encrypt/decrypt cross-checked against real NSS token crypto) on Linux, not
+    // just Windows as an earlier version of this suite assumed.
+    public static bool Rc2Supported
+    {
+        get
+        {
+            try { using var rc2 = RC2.Create(); return true; }
+            catch (PlatformNotSupportedException) { return false; }
+        }
+    }
 
     // Shared with RC2Pkcs11TestCases (the backend-agnostic suite), so the Managed and real-backend
     // suites validate against the same key/IV/effective-bits vectors.
@@ -88,7 +99,7 @@ public sealed class RC2Pkcs11Tests_Managed
         Assert.Equal(128, rc2.KeySize);
     }
 
-    // === Secure-defaults gate (fires before any token call — no Windows RC2 needed) =================
+    // === Secure-defaults gate (fires before any token call — no RC2-capable host needed) ============
 
     [Fact]
     public void EncryptCbc_Pkcs7_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
@@ -106,7 +117,7 @@ public sealed class RC2Pkcs11Tests_Managed
     public void EncryptEcb_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
         Assert.Throws<InsecureOperationException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.None)));
 
-    // === Known-answer round-trips vs the BCL (the managed token implements RC2 on Windows) ==========
+    // === Known-answer round-trips vs the BCL (the managed token implements RC2 wherever the host does) ==
 
     [ConditionalFact(nameof(Rc2Supported))]
     public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
