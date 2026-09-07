@@ -62,8 +62,8 @@ using var library = new Pkcs11Library("/usr/lib/softhsm/libsofthsm2.so");
 using var pin = new SecurePin(Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("TOKEN_PIN")!));
 using var workspace = library.OpenWorkspace(slotLabel: "my-token", CKU.CKU_USER, pin);
 
-// 3. Generate a token-resident RSA key pair. The private key is non-extractable by default.
-using var key = workspace.GenerateRsaKeyPair(modulusBits: 3072, label: "signing-key");
+// 3. Generate a token-resident RSA signing key pair. The private key is non-extractable by default.
+using var key = workspace.GenerateRsaSigningKeyPair(modulusBits: 3072, label: "signing-key");
 
 // 4. Sign and verify through the familiar System.Security.Cryptography shape (RSA-PSS by default).
 using var rsa = new RSAPkcs11(key);
