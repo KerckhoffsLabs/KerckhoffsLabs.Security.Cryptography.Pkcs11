@@ -42,6 +42,49 @@ public sealed class RSAPkcs11 : RSA
             throw new ArgumentException(
                 $"Expected an RSA key, got {key.KeyType}.", nameof(key));
         _key = key;
+
+        // Reflect the token key's real modulus size. Best-effort: the RSA base constructor leaves
+        // KeySize=0 (via KeySizeValue), which we keep if the token exposes neither attribute —
+        // callers relying on KeySize/LegalKeySizes would already be broken in that case.
+        int? bits = TryReadKeySizeBits(key);
+        if (bits is int b)
+        {
+            KeySizeValue = b;
+            LegalKeySizesValue = [new KeySizes(b, b, 0)];
+        }
+    }
+
+    // A token-resident key has exactly one size — it can't be resized — so LegalKeySizesValue
+    // reports that single size rather than a generic range the token may not actually support.
+    private static int? TryReadKeySizeBits(Pkcs11Key key)
+    {
+        try
+        {
+            // CKA_MODULUS_BITS is exact and required on every RSA public key object.
+            using var attrs = key.GetAttributeValue(CKA.CKA_MODULUS_BITS);
+            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
+                return checked((int)attrs[0].GetValueAsUlong());
+        }
+        catch (Pkcs11Exception)
+        {
+            // Fall through to the modulus-length fallback below.
+        }
+
+        try
+        {
+            // Fallback for a token that omits CKA_MODULUS_BITS: derive from CKA_MODULUS's byte
+            // length. Approximate in principle (the top byte could theoretically use fewer than 8
+            // bits), but exact in practice for any RSA modulus generated to a specific key size.
+            using var attrs = key.GetAttributeValue(CKA.CKA_MODULUS);
+            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
+                return attrs[0].GetValueAsByteArray().Length * 8;
+        }
+        catch (Pkcs11Exception)
+        {
+            // Token exposes neither — leave KeySize at the RSA base-class default.
+        }
+
+        return null;
     }
 
     // -----------------------------------------------------------------------

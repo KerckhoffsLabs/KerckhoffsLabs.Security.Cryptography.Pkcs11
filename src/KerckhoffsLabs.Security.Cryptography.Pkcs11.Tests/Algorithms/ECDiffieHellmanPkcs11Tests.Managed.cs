@@ -334,4 +334,25 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         var ex = Assert.Throws<ArgumentException>(() => new ECDiffieHellmanPkcs11(key));
         Assert.Equal("key", ex.ParamName);
     }
+
+    // === KeySize / LegalKeySizes =============================================
+    // Regression coverage for the adapter never assigning KeySizeValue: KeySize was 0 and
+    // LegalKeySizes threw NullReferenceException.
+
+    [ConditionalTheory(nameof(Supported))]
+    [InlineData("P-256", 256)]
+    [InlineData("P-384", 384)]
+    public void KeySize_ReflectsTokenCurve(string curve, int expectedBits) => WithEcdhStrict(curve, ecdh =>
+        Assert.Equal(expectedBits, ecdh.KeySize));
+
+    [ConditionalTheory(nameof(Supported))]
+    [InlineData("P-256", 256)]
+    [InlineData("P-384", 384)]
+    public void LegalKeySizes_ReflectsTokenCurve(string curve, int expectedBits) => WithEcdhStrict(curve, ecdh =>
+    {
+        KeySizes[] sizes = ecdh.LegalKeySizes;
+        KeySizes only = Assert.Single(sizes);
+        Assert.Equal(expectedBits, only.MinSize);
+        Assert.Equal(expectedBits, only.MaxSize);
+    });
 }

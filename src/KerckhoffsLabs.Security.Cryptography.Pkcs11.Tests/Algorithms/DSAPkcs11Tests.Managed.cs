@@ -243,4 +243,21 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Throws<ArgumentNullException>(() => dsa.VerifySignature(null!, new byte[64]));
         Assert.Throws<ArgumentNullException>(() => dsa.VerifySignature(hash, null!));
     });
+
+    // === KeySize / LegalKeySizes =============================================
+    // Regression coverage for the adapter never assigning KeySizeValue: KeySize was 0 and
+    // LegalKeySizes threw NullReferenceException.
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void KeySize_ReflectsTokenPrime() => WithDsa((dsa, _) =>
+        Assert.Equal(2048, dsa.KeySize));
+
+    [ConditionalFact(nameof(DsaSupported))]
+    public void LegalKeySizes_ReflectsTokenPrime() => WithDsa((dsa, _) =>
+    {
+        KeySizes[] sizes = dsa.LegalKeySizes;
+        KeySizes only = Assert.Single(sizes);
+        Assert.Equal(2048, only.MinSize);
+        Assert.Equal(2048, only.MaxSize);
+    });
 }

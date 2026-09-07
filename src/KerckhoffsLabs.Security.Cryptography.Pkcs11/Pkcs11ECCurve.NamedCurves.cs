@@ -132,6 +132,34 @@ public readonly partial struct Pkcs11ECCurve
     private static readonly Dictionary<string, string> _oidsByName =
         _namesByOid.ToDictionary(kv => kv.Value, kv => kv.Key, StringComparer.Ordinal);
 
+    // Field size in bits per catalog curve. See FieldSizeBits.
+    private static readonly Dictionary<string, int> _fieldSizeBitsByOid = new(StringComparer.Ordinal)
+    {
+        ["1.2.840.10045.3.1.1"] = 192,   // nistP192
+        ["1.3.132.0.33"] = 224,          // nistP224
+        ["1.2.840.10045.3.1.7"] = 256,   // nistP256
+        ["1.3.132.0.34"] = 384,          // nistP384
+        ["1.3.132.0.35"] = 521,          // nistP521
+        ["1.3.132.0.31"] = 192,          // secp192k1
+        ["1.3.132.0.32"] = 224,          // secp224k1
+        ["1.3.132.0.10"] = 256,          // secp256k1
+        ["1.3.36.3.3.2.8.1.1.1"] = 160,  // brainpoolP160r1
+        ["1.3.36.3.3.2.8.1.1.2"] = 160,  // brainpoolP160t1
+        ["1.3.36.3.3.2.8.1.1.3"] = 192,  // brainpoolP192r1
+        ["1.3.36.3.3.2.8.1.1.4"] = 192,  // brainpoolP192t1
+        ["1.3.36.3.3.2.8.1.1.5"] = 224,  // brainpoolP224r1
+        ["1.3.36.3.3.2.8.1.1.6"] = 224,  // brainpoolP224t1
+        ["1.3.36.3.3.2.8.1.1.7"] = 256,  // brainpoolP256r1
+        ["1.3.36.3.3.2.8.1.1.8"] = 256,  // brainpoolP256t1
+        ["1.3.36.3.3.2.8.1.1.9"] = 320,  // brainpoolP320r1
+        ["1.3.36.3.3.2.8.1.1.10"] = 320, // brainpoolP320t1
+        ["1.3.36.3.3.2.8.1.1.11"] = 384, // brainpoolP384r1
+        ["1.3.36.3.3.2.8.1.1.12"] = 384, // brainpoolP384t1
+        ["1.3.36.3.3.2.8.1.1.13"] = 512, // brainpoolP512r1
+        ["1.3.36.3.3.2.8.1.1.14"] = 512, // brainpoolP512t1
+        ["1.2.156.10197.1.301"] = 256,   // sm2
+    };
+
     // Catalog curves providing < 128-bit security (field size < 256-bit): the 160/192/224-bit NIST
     // and Brainpool curves. GenerateEcKeyPair gates these behind AllowInsecure. See IsBelowSecurityBaseline.
     private static readonly HashSet<string> _belowBaselineOids = new(StringComparer.Ordinal)

@@ -33,9 +33,9 @@ internal static class GenerateRsaKeyPairTestCases
     }
 
     /// <summary>
-    /// BL-070: a signing pair must not carry <c>CKA_ENCRYPT</c>/<c>CKA_DECRYPT</c> — mixing signing
-    /// and key-transport roles on one RSA key pair is unsafe. Use
-    /// <c>GenerateRsaKeyTransportKeyPair</c> for a dedicated encryption pair.
+    /// A signing pair must not carry <c>CKA_ENCRYPT</c>/<c>CKA_DECRYPT</c> — mixing signing and
+    /// key-transport roles on one RSA key pair is unsafe. Use <c>GenerateRsaKeyTransportKeyPair</c>
+    /// for a dedicated encryption pair.
     /// </summary>
     internal static void Assert_SigningKeyPair_HasNoEncryptCapability(IPkcs11Backend backend)
     {
@@ -52,8 +52,8 @@ internal static class GenerateRsaKeyPairTestCases
     }
 
     /// <summary>
-    /// BL-070: a key-transport pair must not carry <c>CKA_SIGN</c>/<c>CKA_VERIFY</c> and must not
-    /// carry <c>CKA_WRAP</c>/<c>CKA_UNWRAP</c> either — see <c>GenerateRsaKeyTransportKeyPair</c>.
+    /// A key-transport pair must not carry <c>CKA_SIGN</c>/<c>CKA_VERIFY</c> and must not carry
+    /// <c>CKA_WRAP</c>/<c>CKA_UNWRAP</c> either.
     /// </summary>
     internal static void Assert_GeneratesTransportKeyPair_EncryptDecryptOnly(IPkcs11Backend backend)
     {

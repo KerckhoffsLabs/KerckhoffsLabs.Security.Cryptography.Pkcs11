@@ -284,4 +284,25 @@ public sealed class RSAPkcs11Tests_Managed
     [Fact]
     public void ImportParameters_Throws() => WithRsa((_, rsa) =>
         Assert.Throws<NotSupportedException>(() => rsa.ImportParameters(default)));
+
+    // === KeySize / LegalKeySizes =============================================
+    // Regression coverage for the adapter never assigning KeySizeValue: KeySize was 0,
+    // LegalKeySizes threw NullReferenceException, and GetMaxOutputSize() threw CryptographicException.
+
+    [Fact]
+    public void KeySize_ReflectsTokenModulus() => WithRsa((_, rsa) =>
+        Assert.Equal(2048, rsa.KeySize));
+
+    [Fact]
+    public void LegalKeySizes_ReflectsTokenModulus() => WithRsa((_, rsa) =>
+    {
+        KeySizes[] sizes = rsa.LegalKeySizes;
+        KeySizes only = Assert.Single(sizes);
+        Assert.Equal(2048, only.MinSize);
+        Assert.Equal(2048, only.MaxSize);
+    });
+
+    [Fact]
+    public void GetMaxOutputSize_Succeeds() => WithRsa((_, rsa) =>
+        Assert.Equal(2048 / 8, rsa.GetMaxOutputSize()));
 }

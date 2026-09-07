@@ -50,6 +50,37 @@ public sealed class DSAPkcs11 : DSA
         if (key.KeyType != CKK.CKK_DSA)
             throw new ArgumentException($"Expected a DSA key, got {key.KeyType}.", nameof(key));
         _key = key;
+
+        // Reflect the token key's real prime-modulus size. Best-effort: the DSA base constructor
+        // leaves KeySize=0 (via KeySizeValue), which we keep if the token doesn't expose CKA_PRIME —
+        // callers relying on KeySize/LegalKeySizes would already be broken in that case.
+        int? bits = TryReadKeySizeBits(key);
+        if (bits is int b)
+        {
+            KeySizeValue = b;
+            LegalKeySizesValue = [new KeySizes(b, b, 0)];
+        }
+    }
+
+    // A token-resident key has exactly one size — it can't be resized — so LegalKeySizesValue
+    // reports that single size rather than a generic range the token may not actually support.
+    private static int? TryReadKeySizeBits(Pkcs11Key key)
+    {
+        try
+        {
+            // No CKA_PRIME_BITS attribute exists in PKCS#11 for DSA (unlike RSA's CKA_MODULUS_BITS),
+            // so CKA_PRIME's byte length is the only source — exact for the standard DSA primes,
+            // whose bit length is always a multiple of 8 (commonly 64).
+            using var attrs = key.GetAttributeValue(CKA.CKA_PRIME);
+            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
+                return attrs[0].GetValueAsByteArray().Length * 8;
+        }
+        catch (Pkcs11Exception)
+        {
+            // Token doesn't expose CKA_PRIME — leave KeySize at the DSA base-class default.
+        }
+
+        return null;
     }
 
     // -----------------------------------------------------------------------

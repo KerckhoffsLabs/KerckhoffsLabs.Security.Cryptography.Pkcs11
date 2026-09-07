@@ -53,6 +53,38 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         if (key.KeyType != CKK.CKK_EC)
             throw new ArgumentException($"Expected an EC key, got {key.KeyType}.", nameof(key));
         _key = key;
+
+        // Reflect the token key's real curve field size. Best-effort: the ECDiffieHellman base
+        // constructor leaves KeySize=0 (via KeySizeValue), which we keep if the curve can't be
+        // identified — callers relying on KeySize/LegalKeySizes would already be broken in that case.
+        int? bits = TryReadKeySizeBits(key);
+        if (bits is int b)
+        {
+            KeySizeValue = b;
+            LegalKeySizesValue = [new KeySizes(b, b, 0)];
+        }
+    }
+
+    // A token-resident key has exactly one size — it can't be resized — so LegalKeySizesValue
+    // reports that single size rather than a generic range the token may not actually support.
+    private static int? TryReadKeySizeBits(Pkcs11Key key)
+    {
+        try
+        {
+            using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
+            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
+                return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()).FieldSizeBits;
+        }
+        catch (Pkcs11Exception)
+        {
+            // Token doesn't expose CKA_EC_PARAMS — leave KeySize at the ECDiffieHellman base-class default.
+        }
+        catch (ArgumentException)
+        {
+            // CKA_EC_PARAMS wasn't a DER-encoded named-curve OID.
+        }
+
+        return null;
     }
 
     /// <inheritdoc/>

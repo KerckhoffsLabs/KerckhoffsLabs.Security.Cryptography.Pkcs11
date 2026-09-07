@@ -33,8 +33,8 @@ internal static class GenerateAesKeyTestCases
     }
 
     /// <summary>
-    /// BL-070: a key from <c>GenerateAesKey</c> must not be usable to wrap or unwrap other keys —
-    /// combining data-decryption and key-wrapping roles on one key is a wrap-oracle vector. Use
+    /// A key from <c>GenerateAesKey</c> must not be usable to wrap or unwrap other keys — combining
+    /// data-decryption and key-wrapping roles on one key is a wrap-oracle vector. Use
     /// <c>GenerateAesKeyEncryptionKey</c> for a dedicated KEK instead.
     /// </summary>
     internal static void Assert_GeneratedKey_HasNoWrapCapability(IPkcs11Backend backend)
@@ -50,8 +50,8 @@ internal static class GenerateAesKeyTestCases
     }
 
     /// <summary>
-    /// BL-070: <c>GenerateAesKeyEncryptionKey</c> must be usable only to wrap/unwrap — it must not
-    /// carry <c>CKA_ENCRYPT</c>/<c>CKA_DECRYPT</c>, or it becomes the same wrap-oracle risk.
+    /// <c>GenerateAesKeyEncryptionKey</c> must be usable only to wrap/unwrap — it must not carry
+    /// <c>CKA_ENCRYPT</c>/<c>CKA_DECRYPT</c>, or it becomes the same wrap-oracle risk.
     /// </summary>
     internal static void Assert_GeneratesKeyEncryptionKey_WrapUnwrapOnly(IPkcs11Backend backend)
     {

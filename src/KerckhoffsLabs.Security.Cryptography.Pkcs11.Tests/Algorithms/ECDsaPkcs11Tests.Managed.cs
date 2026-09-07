@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using BclECCurve = System.Security.Cryptography.ECCurve;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -274,4 +275,58 @@ public sealed class ECDsaPkcs11Tests_Managed
     [Fact]
     public void GenerateKey_Throws() => WithEcDsa("P-256", (ec, _) =>
         Assert.Throws<NotSupportedException>(() => ec.GenerateKey(BclECCurve.NamedCurves.nistP256)));
+
+    // === KeySize / LegalKeySizes / DER-format signing =======================
+    // Regression coverage for the adapter never assigning KeySizeValue: KeySize was 0,
+    // LegalKeySizes threw NullReferenceException, and GetMaxSignatureSize/SignData with
+    // DSASignatureFormat.Rfc3279DerSequence — the format X509SignatureGenerator.CreateForECDsa uses —
+    // both threw NotSupportedException, making token-backed CSR/certificate signing impossible.
+
+    [Theory]
+    [InlineData("P-256", 256)]
+    [InlineData("P-384", 384)]
+    [InlineData("P-521", 521)]
+    public void KeySize_ReflectsTokenCurve(string curve, int expectedBits) => WithEcDsa(curve, (ec, _) =>
+        Assert.Equal(expectedBits, ec.KeySize));
+
+    [Theory]
+    [InlineData("P-256", 256)]
+    [InlineData("P-384", 384)]
+    [InlineData("P-521", 521)]
+    public void LegalKeySizes_ReflectsTokenCurve(string curve, int expectedBits) => WithEcDsa(curve, (ec, _) =>
+    {
+        KeySizes[] sizes = ec.LegalKeySizes;
+        KeySizes only = Assert.Single(sizes);
+        Assert.Equal(expectedBits, only.MinSize);
+        Assert.Equal(expectedBits, only.MaxSize);
+    });
+
+    [Theory]
+    [InlineData("P-256")]
+    [InlineData("P-384")]
+    [InlineData("P-521")]
+    public void SignData_Rfc3279DerSequenceFormat_RoundTrips(string curve) => WithEcDsa(curve, (ec, hash) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes($"der-format signature {curve}");
+
+        int maxSize = ec.GetMaxSignatureSize(DSASignatureFormat.Rfc3279DerSequence);
+        Assert.True(maxSize > 0);
+
+        byte[] sig = ec.SignData(data, hash, DSASignatureFormat.Rfc3279DerSequence);
+        Assert.True(sig.Length <= maxSize);
+        Assert.True(ec.VerifyData(data, sig, hash, DSASignatureFormat.Rfc3279DerSequence));
+
+        using var bcl = ECDsa.Create(ec.ExportParameters(includePrivateParameters: false));
+        Assert.True(bcl.VerifyData(data, sig, hash, DSASignatureFormat.Rfc3279DerSequence));
+    });
+
+    // Token-backed CSR signing: CertificateRequest.Create uses X509SignatureGenerator.CreateForECDsa,
+    // which signs with DSASignatureFormat.Rfc3279DerSequence.
+    [Fact]
+    public void CertificateRequest_Create_SigningRequest_Succeeds() => WithEcDsa("P-256", (ec, hash) =>
+    {
+        var req = new CertificateRequest("CN=pkcs11-test", ec, hash);
+        byte[] csr = req.CreateSigningRequest();
+        Assert.NotEmpty(csr);
+    });
 }
