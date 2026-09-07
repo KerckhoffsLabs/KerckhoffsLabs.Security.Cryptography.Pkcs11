@@ -15,13 +15,13 @@ public readonly partial struct Pkcs11ECCurve
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve NistP192 { get; } = CreateFromValue("1.2.840.10045.3.1.1", "nistP192");
+        public static Pkcs11ECCurve NistP192 { get; } = CreateFromValue(NistP192Oid, "nistP192");
         /// <summary>NIST P-224 / secp224r1.</summary>
         [Obsolete("P-224 provides ~112-bit security, below the 128-bit baseline (NIST legacy-approved through 2030 only). Use NistP256 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve NistP224 { get; } = CreateFromValue("1.3.132.0.33", "nistP224");
+        public static Pkcs11ECCurve NistP224 { get; } = CreateFromValue(NistP224Oid, "nistP224");
         /// <summary>NIST P-256 / secp256r1 / prime256v1. Recommended for most use cases.</summary>
         public static Pkcs11ECCurve NistP256 { get; } = CreateFromValue("1.2.840.10045.3.1.7", "nistP256");
         /// <summary>NIST P-384 / secp384r1.</summary>
@@ -34,13 +34,13 @@ public readonly partial struct Pkcs11ECCurve
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve Secp192k1 { get; } = CreateFromValue("1.3.132.0.31", "secp192k1");
+        public static Pkcs11ECCurve Secp192k1 { get; } = CreateFromValue(Secp192k1Oid, "secp192k1");
         /// <summary>Koblitz curve secp224k1 (SEC 2).</summary>
         [Obsolete("secp224k1 provides ~112-bit security, below the 128-bit baseline. Use Secp256k1 or NistP256 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve Secp224k1 { get; } = CreateFromValue("1.3.132.0.32", "secp224k1");
+        public static Pkcs11ECCurve Secp224k1 { get; } = CreateFromValue(Secp224k1Oid, "secp224k1");
         /// <summary>Koblitz curve secp256k1 (SEC 2).</summary>
         public static Pkcs11ECCurve Secp256k1 { get; } = CreateFromValue("1.3.132.0.10", "secp256k1");
 
@@ -50,37 +50,37 @@ public readonly partial struct Pkcs11ECCurve
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve BrainpoolP160r1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.1", "brainpoolP160r1");
+        public static Pkcs11ECCurve BrainpoolP160r1 { get; } = CreateFromValue(BrainpoolP160r1Oid, "brainpoolP160r1");
         /// <summary>brainpoolP160t1.</summary>
         [Obsolete("brainpoolP160t1 provides ~80-bit security and is unsafe for modern use. Use BrainpoolP256r1 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve BrainpoolP160t1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.2", "brainpoolP160t1");
+        public static Pkcs11ECCurve BrainpoolP160t1 { get; } = CreateFromValue(BrainpoolP160t1Oid, "brainpoolP160t1");
         /// <summary>brainpoolP192r1.</summary>
         [Obsolete("brainpoolP192r1 provides ~96-bit security, below the 128-bit baseline. Use BrainpoolP256r1 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve BrainpoolP192r1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.3", "brainpoolP192r1");
+        public static Pkcs11ECCurve BrainpoolP192r1 { get; } = CreateFromValue(BrainpoolP192r1Oid, "brainpoolP192r1");
         /// <summary>brainpoolP192t1.</summary>
         [Obsolete("brainpoolP192t1 provides ~96-bit security, below the 128-bit baseline. Use BrainpoolP256r1 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve BrainpoolP192t1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.4", "brainpoolP192t1");
+        public static Pkcs11ECCurve BrainpoolP192t1 { get; } = CreateFromValue(BrainpoolP192t1Oid, "brainpoolP192t1");
         /// <summary>brainpoolP224r1.</summary>
         [Obsolete("brainpoolP224r1 provides ~112-bit security, below the 128-bit baseline. Use BrainpoolP256r1 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve BrainpoolP224r1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.5", "brainpoolP224r1");
+        public static Pkcs11ECCurve BrainpoolP224r1 { get; } = CreateFromValue(BrainpoolP224r1Oid, "brainpoolP224r1");
         /// <summary>brainpoolP224t1.</summary>
         [Obsolete("brainpoolP224t1 provides ~112-bit security, below the 128-bit baseline. Use BrainpoolP256r1 or stronger. " +
                   "Pkcs11Workspace.GenerateEcKeyPair throws InsecureOperationException unless Pkcs11Workspace.AllowInsecure = true.",
             DiagnosticId = DiagnosticIds.WeakEcCurve,
             UrlFormat = DiagnosticIds.UrlFormat)]
-        public static Pkcs11ECCurve BrainpoolP224t1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.6", "brainpoolP224t1");
+        public static Pkcs11ECCurve BrainpoolP224t1 { get; } = CreateFromValue(BrainpoolP224t1Oid, "brainpoolP224t1");
         /// <summary>brainpoolP256r1.</summary>
         public static Pkcs11ECCurve BrainpoolP256r1 { get; } = CreateFromValue("1.3.36.3.3.2.8.1.1.7", "brainpoolP256r1");
         /// <summary>brainpoolP256t1.</summary>
@@ -102,22 +102,35 @@ public readonly partial struct Pkcs11ECCurve
         public static Pkcs11ECCurve Sm2 { get; } = CreateFromValue("1.2.156.10197.1.301", "sm2");
     }
 
+    // OID constants for the curves referenced from more than one table below (NamedCurves,
+    // _namesByOid, _fieldSizeBitsByOid, and _belowBaselineOids) — avoids repeating the literal.
+    private const string NistP192Oid = "1.2.840.10045.3.1.1";
+    private const string NistP224Oid = "1.3.132.0.33";
+    private const string Secp192k1Oid = "1.3.132.0.31";
+    private const string Secp224k1Oid = "1.3.132.0.32";
+    private const string BrainpoolP160r1Oid = "1.3.36.3.3.2.8.1.1.1";
+    private const string BrainpoolP160t1Oid = "1.3.36.3.3.2.8.1.1.2";
+    private const string BrainpoolP192r1Oid = "1.3.36.3.3.2.8.1.1.3";
+    private const string BrainpoolP192t1Oid = "1.3.36.3.3.2.8.1.1.4";
+    private const string BrainpoolP224r1Oid = "1.3.36.3.3.2.8.1.1.5";
+    private const string BrainpoolP224t1Oid = "1.3.36.3.3.2.8.1.1.6";
+
     private static readonly Dictionary<string, string> _namesByOid = new(StringComparer.Ordinal)
     {
-        ["1.2.840.10045.3.1.1"] = "nistP192",
-        ["1.3.132.0.33"] = "nistP224",
+        [NistP192Oid] = "nistP192",
+        [NistP224Oid] = "nistP224",
         ["1.2.840.10045.3.1.7"] = "nistP256",
         ["1.3.132.0.34"] = "nistP384",
         ["1.3.132.0.35"] = "nistP521",
-        ["1.3.132.0.31"] = "secp192k1",
-        ["1.3.132.0.32"] = "secp224k1",
+        [Secp192k1Oid] = "secp192k1",
+        [Secp224k1Oid] = "secp224k1",
         ["1.3.132.0.10"] = "secp256k1",
-        ["1.3.36.3.3.2.8.1.1.1"] = "brainpoolP160r1",
-        ["1.3.36.3.3.2.8.1.1.2"] = "brainpoolP160t1",
-        ["1.3.36.3.3.2.8.1.1.3"] = "brainpoolP192r1",
-        ["1.3.36.3.3.2.8.1.1.4"] = "brainpoolP192t1",
-        ["1.3.36.3.3.2.8.1.1.5"] = "brainpoolP224r1",
-        ["1.3.36.3.3.2.8.1.1.6"] = "brainpoolP224t1",
+        [BrainpoolP160r1Oid] = "brainpoolP160r1",
+        [BrainpoolP160t1Oid] = "brainpoolP160t1",
+        [BrainpoolP192r1Oid] = "brainpoolP192r1",
+        [BrainpoolP192t1Oid] = "brainpoolP192t1",
+        [BrainpoolP224r1Oid] = "brainpoolP224r1",
+        [BrainpoolP224t1Oid] = "brainpoolP224t1",
         ["1.3.36.3.3.2.8.1.1.7"] = "brainpoolP256r1",
         ["1.3.36.3.3.2.8.1.1.8"] = "brainpoolP256t1",
         ["1.3.36.3.3.2.8.1.1.9"] = "brainpoolP320r1",
@@ -135,20 +148,20 @@ public readonly partial struct Pkcs11ECCurve
     // Field size in bits per catalog curve. See FieldSizeBits.
     private static readonly Dictionary<string, int> _fieldSizeBitsByOid = new(StringComparer.Ordinal)
     {
-        ["1.2.840.10045.3.1.1"] = 192,   // nistP192
-        ["1.3.132.0.33"] = 224,          // nistP224
+        [NistP192Oid] = 192,             // nistP192
+        [NistP224Oid] = 224,             // nistP224
         ["1.2.840.10045.3.1.7"] = 256,   // nistP256
         ["1.3.132.0.34"] = 384,          // nistP384
         ["1.3.132.0.35"] = 521,          // nistP521
-        ["1.3.132.0.31"] = 192,          // secp192k1
-        ["1.3.132.0.32"] = 224,          // secp224k1
+        [Secp192k1Oid] = 192,            // secp192k1
+        [Secp224k1Oid] = 224,            // secp224k1
         ["1.3.132.0.10"] = 256,          // secp256k1
-        ["1.3.36.3.3.2.8.1.1.1"] = 160,  // brainpoolP160r1
-        ["1.3.36.3.3.2.8.1.1.2"] = 160,  // brainpoolP160t1
-        ["1.3.36.3.3.2.8.1.1.3"] = 192,  // brainpoolP192r1
-        ["1.3.36.3.3.2.8.1.1.4"] = 192,  // brainpoolP192t1
-        ["1.3.36.3.3.2.8.1.1.5"] = 224,  // brainpoolP224r1
-        ["1.3.36.3.3.2.8.1.1.6"] = 224,  // brainpoolP224t1
+        [BrainpoolP160r1Oid] = 160,      // brainpoolP160r1
+        [BrainpoolP160t1Oid] = 160,      // brainpoolP160t1
+        [BrainpoolP192r1Oid] = 192,      // brainpoolP192r1
+        [BrainpoolP192t1Oid] = 192,      // brainpoolP192t1
+        [BrainpoolP224r1Oid] = 224,      // brainpoolP224r1
+        [BrainpoolP224t1Oid] = 224,      // brainpoolP224t1
         ["1.3.36.3.3.2.8.1.1.7"] = 256,  // brainpoolP256r1
         ["1.3.36.3.3.2.8.1.1.8"] = 256,  // brainpoolP256t1
         ["1.3.36.3.3.2.8.1.1.9"] = 320,  // brainpoolP320r1
@@ -164,15 +177,15 @@ public readonly partial struct Pkcs11ECCurve
     // and Brainpool curves. GenerateEcKeyPair gates these behind AllowInsecure. See IsBelowSecurityBaseline.
     private static readonly HashSet<string> _belowBaselineOids = new(StringComparer.Ordinal)
     {
-        "1.2.840.10045.3.1.1",   // nistP192        ~96-bit
-        "1.3.132.0.33",          // nistP224        ~112-bit
-        "1.3.132.0.31",          // secp192k1       ~96-bit
-        "1.3.132.0.32",          // secp224k1       ~112-bit
-        "1.3.36.3.3.2.8.1.1.1",  // brainpoolP160r1 ~80-bit
-        "1.3.36.3.3.2.8.1.1.2",  // brainpoolP160t1 ~80-bit
-        "1.3.36.3.3.2.8.1.1.3",  // brainpoolP192r1 ~96-bit
-        "1.3.36.3.3.2.8.1.1.4",  // brainpoolP192t1 ~96-bit
-        "1.3.36.3.3.2.8.1.1.5",  // brainpoolP224r1 ~112-bit
-        "1.3.36.3.3.2.8.1.1.6",  // brainpoolP224t1 ~112-bit
+        NistP192Oid,          // nistP192        ~96-bit
+        NistP224Oid,          // nistP224        ~112-bit
+        Secp192k1Oid,         // secp192k1       ~96-bit
+        Secp224k1Oid,         // secp224k1       ~112-bit
+        BrainpoolP160r1Oid,   // brainpoolP160r1 ~80-bit
+        BrainpoolP160t1Oid,   // brainpoolP160t1 ~80-bit
+        BrainpoolP192r1Oid,   // brainpoolP192r1 ~96-bit
+        BrainpoolP192t1Oid,   // brainpoolP192t1 ~96-bit
+        BrainpoolP224r1Oid,   // brainpoolP224r1 ~112-bit
+        BrainpoolP224t1Oid,   // brainpoolP224t1 ~112-bit
     };
 }
