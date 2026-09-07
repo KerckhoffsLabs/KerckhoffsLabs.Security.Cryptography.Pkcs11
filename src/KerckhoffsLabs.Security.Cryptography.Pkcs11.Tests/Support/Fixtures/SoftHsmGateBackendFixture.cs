@@ -38,10 +38,8 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
     public IReadOnlySet<CKM> SupportedMechanisms { get; } = new HashSet<CKM>();
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
-    // Same physical SoftHSM build underneath, so the same capability gates apply.
-    public bool SupportsMlDsa => SoftHsmBackendFixture.SoftHsmSupportsMlDsa;
-    public bool SupportsMlKem => SoftHsmBackendFixture.SoftHsmSupportsMlKem;
-    public bool SupportsSlhDsa => SoftHsmBackendFixture.SoftHsmSupportsSlhDsa;
+    // Same physical SoftHSM build underneath; SupportsMlDsa/MlKem/SlhDsa use the default interface
+    // member (advertised mechanism list), same as SoftHsmBackendFixture.
     public CKR? AeadAuthFailureCode => CKR.CKR_ENCRYPTED_DATA_INVALID;
 
     private readonly string _gateDir;

@@ -134,23 +134,18 @@ chmod +x "${DEST_UTIL}"
 echo "Installed ${DEST_LIB}"
 echo "Installed ${DEST_UTIL}"
 
-# Record whether ML-DSA was actually compiled in (depends on OpenSSL 3.5+), so the test suite
-# can gate its ML-DSA cases on a cheap file check instead of probing the token at discovery time.
-MLDSA_MARKER="${DEST_DIR}/softhsm-mldsa.enabled"
+# Log whether ML-DSA/ML-KEM actually compiled in (depends on OpenSSL 3.5+). WITH_ML_DSA/WITH_ML_KEM
+# gate the mechanism's entry into SoftHSM's own supportedMechanisms set (SoftHSM.cpp), so
+# C_GetMechanismList already tells the test suite the truth at fixture construction time — no
+# marker file needed, this is diagnostic output only.
 if grep -q '^#define WITH_ML_DSA' "${BUILD_DIR}/config.h" 2>/dev/null; then
-  : > "${MLDSA_MARKER}"
-  echo "ML-DSA: enabled (marker written)"
+  echo "ML-DSA: enabled"
 else
-  rm -f "${MLDSA_MARKER}"
   echo "ML-DSA: not available in this build (OpenSSL < 3.5)"
 fi
 
-# Same for ML-KEM (CKM_ML_KEM): compiled in via `--enable-mlkem=detect` against OpenSSL 3.5+.
-MLKEM_MARKER="${DEST_DIR}/softhsm-mlkem.enabled"
 if grep -q '^#define WITH_ML_KEM' "${BUILD_DIR}/config.h" 2>/dev/null; then
-  : > "${MLKEM_MARKER}"
-  echo "ML-KEM: enabled (marker written)"
+  echo "ML-KEM: enabled"
 else
-  rm -f "${MLKEM_MARKER}"
   echo "ML-KEM: not available in this build (OpenSSL < 3.5)"
 fi

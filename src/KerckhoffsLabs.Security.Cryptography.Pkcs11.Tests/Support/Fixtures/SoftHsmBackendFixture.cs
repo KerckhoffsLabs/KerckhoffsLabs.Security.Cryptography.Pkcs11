@@ -36,14 +36,10 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
-    // PQC capability is gated by the build marker, not the advertised mechanism list: a SoftHSM build
-    // can list a PQC mechanism without a working operation path (it depends on the OpenSSL it links).
-    /// <inheritdoc/>
-    public bool SupportsMlDsa => SoftHsmSupportsMlDsa;
-    /// <inheritdoc/>
-    public bool SupportsMlKem => SoftHsmSupportsMlKem;
-    /// <inheritdoc/>
-    public bool SupportsSlhDsa => SoftHsmSupportsSlhDsa;
+    // SupportsMlDsa/MlKem/SlhDsa use the default interface member (advertised mechanism list):
+    // WITH_ML_DSA/WITH_ML_KEM gate the mechanism's entry into SoftHSM's own supportedMechanisms
+    // set (vendor/softhsmv2/src/lib/SoftHSM.cpp), which is the same C_GetMechanismList this
+    // fixture already reads into SupportedMechanisms — no separate build marker needed.
 
     /// <inheritdoc/>
     // SoftHSM 2.7 returns CKR_ENCRYPTED_DATA_INVALID for an AEAD tag-verification failure; pin it so
@@ -92,50 +88,6 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True if the token accepts an ECDH1 KDF other than <c>CKD_NULL</c>.
     /// SoftHSM 2.7 hardcodes <c>kdf == CKD_NULL</c>; see <c>SoftHSM.cpp:deriveECDH</c>.</summary>
     public static bool SoftHsmSupportsEcdh1WithKdf => false;
-
-    /// <summary>True if the SoftHSM build we load actually has ML-DSA (FIPS 204) compiled in
-    /// (<see cref="CKM.CKM_ML_DSA_KEY_PAIR_GEN"/> / <see cref="CKM.CKM_ML_DSA"/>). ML-DSA only
-    /// compiles in when SoftHSM is built against OpenSSL 3.5+; <c>build-softhsmv2.sh</c> records
-    /// that as a marker file next to the library, so this gate reflects the real capability of the
-    /// loaded build — true on an OpenSSL-3.5 CI build, false on a system-OpenSSL-3.0 local build.</summary>
-    public static bool SoftHsmSupportsMlDsa
-    {
-        get
-        {
-            string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
-            return lib is not null
-                && File.Exists(Path.Join(Path.GetDirectoryName(lib)!, "softhsm-mldsa.enabled"));
-        }
-    }
-
-    /// <summary>True if the SoftHSM build we load has ML-KEM (FIPS 203) compiled in
-    /// (<see cref="CKM.CKM_ML_KEM_KEY_PAIR_GEN"/> / <see cref="CKM.CKM_ML_KEM"/>). Like ML-DSA, ML-KEM
-    /// only compiles in against OpenSSL 3.5+; reflects a <c>softhsm-mlkem.enabled</c> marker next to
-    /// the library, kept symmetric with <see cref="SoftHsmSupportsMlDsa"/>.</summary>
-    public static bool SoftHsmSupportsMlKem
-    {
-        get
-        {
-            string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
-            return lib is not null
-                && File.Exists(Path.Join(Path.GetDirectoryName(lib)!, "softhsm-mlkem.enabled"));
-        }
-    }
-
-    /// <summary>True if the SoftHSM build we load has SLH-DSA (FIPS 205) compiled in
-    /// (<see cref="CKM.CKM_SLH_DSA_KEY_PAIR_GEN"/> / <see cref="CKM.CKM_SLH_DSA"/>). Upstream SoftHSM
-    /// has no SLH-DSA support today, so this is effectively always false; the gate is kept symmetric
-    /// with <see cref="SoftHsmSupportsMlDsa"/> and reflects a <c>softhsm-slhdsa.enabled</c> marker
-    /// next to the library, so SLH-DSA tests light up automatically against a future capable build.</summary>
-    public static bool SoftHsmSupportsSlhDsa
-    {
-        get
-        {
-            string? lib = Settings.SoftHsmLibraryPath ?? BuiltLibraryPath();
-            return lib is not null
-                && File.Exists(Path.Join(Path.GetDirectoryName(lib)!, "softhsm-slhdsa.enabled"));
-        }
-    }
 
     // Parent directory that SoftHSM2 creates UUID token subdirs inside.
     private readonly string _tokenStoreDir;
