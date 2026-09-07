@@ -21,9 +21,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 internal static class RC2Pkcs11TestCases
 {
-    private static readonly byte[] Key128 = Convert.FromHexString("000102030405060708090A0B0C0D0E0F");
-    private static readonly byte[] Iv8 = Convert.FromHexString("1020304050607080");
-    private const int EffectiveBits = 128;
+    // Shared with RC2Pkcs11Tests_Managed (the only backend that actually runs RC2 crypto), so both
+    // suites validate against the same key/IV/effective-bits vectors.
+    internal static readonly byte[] Key128 = Convert.FromHexString("000102030405060708090A0B0C0D0E0F");
+    internal static readonly byte[] Iv8 = Convert.FromHexString("1020304050607080");
+    internal const int EffectiveBits = 128;
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
@@ -58,7 +60,7 @@ internal static class RC2Pkcs11TestCases
         finally { DestroyByLabel(workspace, label); }
     }
 
-    private static RC2 BclRc2()
+    internal static RC2 BclRc2()
     {
         var bcl = RC2.Create();
         bcl.Key = Key128;
@@ -148,5 +150,6 @@ internal static class RC2Pkcs11TestCases
             Assert.Throws<NotSupportedException>(() => rc2.CreateDecryptor(new byte[16], new byte[8]));
             Assert.Throws<NotSupportedException>(() => rc2.GenerateKey());
             Assert.Throws<NotSupportedException>(() => rc2.Key);
+            Assert.Throws<NotSupportedException>(() => rc2.Key = new byte[16]);
         });
 }

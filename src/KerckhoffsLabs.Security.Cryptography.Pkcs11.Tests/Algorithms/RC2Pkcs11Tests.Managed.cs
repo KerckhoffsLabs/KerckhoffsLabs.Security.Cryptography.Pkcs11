@@ -32,11 +32,11 @@ public sealed class RC2Pkcs11Tests_Managed
     // The BCL RC2 is Windows-only; gate every case that reaches the token (encrypt/decrypt) on this.
     public static bool Rc2Supported => OperatingSystem.IsWindows();
 
-    private static readonly byte[] Key128 = Convert.FromHexString("000102030405060708090A0B0C0D0E0F");
-    private static readonly byte[] Iv8 = Convert.FromHexString("1020304050607080");
-    private const int EffectiveBits = 128;
-
-    private static byte[] H(string hex) => Convert.FromHexString(hex);
+    // Shared with RC2Pkcs11TestCases (the backend-agnostic suite), so the Managed and real-backend
+    // suites validate against the same key/IV/effective-bits vectors.
+    private static readonly byte[] Key128 = RC2Pkcs11TestCases.Key128;
+    private static readonly byte[] Iv8 = RC2Pkcs11TestCases.Iv8;
+    private const int EffectiveBits = RC2Pkcs11TestCases.EffectiveBits;
 
     // Imports Key128 as a token RC2 key and hands a wrapping RC2Pkcs11 (and its workspace) to the body.
     private static void WithImportedRc2(Action<Pkcs11Workspace, RC2Pkcs11> body)
@@ -50,13 +50,7 @@ public sealed class RC2Pkcs11Tests_Managed
         body(workspace, rc2);
     }
 
-    private static RC2 BclRc2()
-    {
-        var bcl = RC2.Create();
-        bcl.Key = Key128;
-        bcl.EffectiveKeySize = EffectiveBits;
-        return bcl;
-    }
+    private static RC2 BclRc2() => RC2Pkcs11TestCases.BclRc2();
 
     // === Construction / argument surface (throws before any token call) =============================
 
@@ -161,9 +155,35 @@ public sealed class RC2Pkcs11Tests_Managed
         }
     });
 
-    // (The RFC 2268 effective-key-bits KAT and the effective>key rejection are exercised by the
-    // SoftHsm suite over OpenSSL RC2; the managed token's BCL RC2 is Windows-only and Windows CNG
-    // applies a different default EffectiveKeySize, so those sub-128-bit-key cases aren't run here.)
+    // RFC 2268 effective-key-bits: an effective size narrower than the key itself must produce the
+    // same ciphertext as the BCL given the same reduced EffectiveKeySize.
+    [ConditionalFact(nameof(Rc2Supported))]
+    public void EncryptCbc_ReducedEffectiveKeySize_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
+    {
+        const int reducedBits = 64; // narrower than the 128-bit token key
+        rc2.EffectiveKeySize = reducedBits;
+        byte[] plaintext = Encoding.UTF8.GetBytes("RC2 with effective-key-bits narrower than the key.");
+
+        using var bcl = RC2.Create();
+        bcl.Key = Key128;
+        bcl.EffectiveKeySize = reducedBits;
+        byte[] expected = bcl.EncryptCbc(plaintext, Iv8);
+        using (workspace.AllowInsecureScope())
+        {
+            byte[] ct = rc2.EncryptCbc(plaintext, Iv8);
+            Assert.Equal(expected, ct);
+            Assert.Equal(plaintext, rc2.DecryptCbc(ct, Iv8));
+        }
+    });
+
+    // ValidatedEffectiveBits()'s "effective > KeySize" rejection is not reachable through the public
+    // API today: the base RC2.EffectiveKeySize and RC2.KeySize setters already enforce
+    // EffectiveKeySize <= KeySize symmetrically (each throws CryptographicException if the other
+    // would end up smaller), and the "effective < 1" arm is likewise unreachable since the BCL's
+    // legal RC2 key sizes start at 40 bits. Confirmed empirically: setting either property to violate
+    // the invariant throws from the BCL setter itself, before RC2Pkcs11 code ever runs. The check in
+    // ValidatedEffectiveBits() is defense-in-depth against a future BCL/derived-type change relaxing
+    // that invariant, not a path a black-box test can drive today.
 
     // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
     [ConditionalFact(nameof(Rc2Supported))]
