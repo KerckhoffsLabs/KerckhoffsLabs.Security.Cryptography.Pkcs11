@@ -34,9 +34,6 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Information, Message = "Unloading PKCS#11 library {LibraryPath}")]
     public static partial void UnloadingLibrary(ILogger logger, string? libraryPath);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Closing all sessions with token in slot {SlotId}")]
-    public static partial void ClosingAllSessions(ILogger logger, ulong slotId);
-
     [LoggerMessage(Level = LogLevel.Debug, Message = "Allocated {Size} bytes at {Address}. Allocations: {AllocationCount}")]
     public static partial void AllocatedMemory(ILogger logger, int size, nint address, int allocationCount);
 

@@ -107,16 +107,6 @@ public sealed class LogTests
     }
 
     [Fact]
-    public void ClosingAllSessions_IsInformation()
-    {
-        var log = new CapturingLogger();
-        Log.ClosingAllSessions(log, 9);
-        var e = Only(log);
-        Assert.Equal(LogLevel.Information, e.Level);
-        Assert.Equal("Closing all sessions with token in slot 9", e.Message);
-    }
-
-    [Fact]
     public void AllocatedMemory_RendersSizeAddressCount()
     {
         var log = new CapturingLogger();

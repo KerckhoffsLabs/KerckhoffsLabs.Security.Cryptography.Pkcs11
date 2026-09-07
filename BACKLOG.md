@@ -193,7 +193,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** Cryptographer B
 - **Spec / References:** Clulow, *On the Security of PKCS#11* (CHES 2003); Bortolozzo et al., CCS 2010; PKCS#11 v3.2 §5.2 attribute-conflict guidance
 
-### [BL-071] `Pkcs11Slot.CloseAllSessions()` invalidates every tracked session handle with no bookkeeping — a later finalizer can close an unrelated live session
+### [BL-071] ✅ RESOLVED — `Pkcs11Slot.CloseAllSessions()` invalidates every tracked session handle with no bookkeeping — a later finalizer can close an unrelated live session
+- **Status:** Resolved 2026-09-07. Removed `CloseAllSessions()` from the public API (still pre-release, so no external callers to break) rather than building out the bookkeeping fix — the method's only legitimate use (force-closing sessions the caller holds no handle to, e.g. crash recovery) is narrow enough that disposing tracked workspaces/sessions is the supported path. Removed the dead `Log.ClosingAllSessions` log method and its unit tests (`Pkcs11SlotTests.CloseAllSessions_Ok_CallsNative`/`_Error_Throws`) along with it.
 - **Area:** PKCS#11 Conformance
 - **Severity:** High
 - **Effort:** M

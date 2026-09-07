@@ -26,7 +26,6 @@ public sealed class Pkcs11SlotTests
         public CKR InitTokenRv = CKR.CKR_OK;
         public byte[]? CapturedPin; public NativeCULong CapturedPinLen; public byte[]? CapturedLabel;
         public CKR OpenRv = CKR.CKR_OK; public NativeCULong OpenSessionId = (NativeCULong)7UL; public NativeCULong CapturedOpenFlags;
-        public CKR CloseAllRv = CKR.CKR_OK; public bool CloseAllCalled;
 
         // Mechanism-list two-call probe knobs.
         public CKR MechListRv1 = CKR.CKR_OK, MechListRv2 = CKR.CKR_OK;
@@ -51,7 +50,6 @@ public sealed class Pkcs11SlotTests
         { CapturedPin = pin.ToArray(); CapturedPinLen = (NativeCULong)pin.Length; CapturedLabel = label.ToArray(); return InitTokenRv; }
         public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
         { CapturedOpenFlags = flags; session = OpenSessionId; return OpenRv; }
-        public override CKR C_CloseAllSessions(NativeCULong slotId) { CloseAllCalled = true; return CloseAllRv; }
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK; // let opened sessions dispose cleanly
     }
 
@@ -270,22 +268,5 @@ public sealed class Pkcs11SlotTests
     {
         var fake = new SlotFake { OpenRv = CKR.CKR_SESSION_COUNT };
         Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).OpenSession());
-    }
-
-    // === CloseAllSessions =================================================
-
-    [Fact]
-    public void CloseAllSessions_Ok_CallsNative()
-    {
-        var fake = new SlotFake();
-        NewSlot(fake).CloseAllSessions();
-        Assert.True(fake.CloseAllCalled);
-    }
-
-    [Fact]
-    public void CloseAllSessions_Error_Throws()
-    {
-        var fake = new SlotFake { CloseAllRv = CKR.CKR_DEVICE_ERROR };
-        Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).CloseAllSessions());
     }
 }

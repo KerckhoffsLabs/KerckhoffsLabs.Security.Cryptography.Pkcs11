@@ -203,18 +203,4 @@ public sealed class Pkcs11Slot
 
         return new Pkcs11Session(_pkcs11Library, (ulong)sessionId);
     }
-
-    /// <summary>
-    /// Closes all sessions an application has with a token
-    /// </summary>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CloseAllSessions</c> call.</exception>
-    public void CloseAllSessions()
-    {
-        Log.SlotTrace(_logger, (ulong)_slotId, "CloseAllSessions");
-
-        Log.ClosingAllSessions(_logger, (ulong)_slotId);
-
-        CKR rv = _pkcs11Library.C_CloseAllSessions(_slotId);
-        Pkcs11Exception.ThrowIfError(rv, "C_CloseAllSessions");
-    }
 }
