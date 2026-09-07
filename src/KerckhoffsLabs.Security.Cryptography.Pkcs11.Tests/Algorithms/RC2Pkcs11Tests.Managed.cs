@@ -176,14 +176,12 @@ public sealed class RC2Pkcs11Tests_Managed
         }
     });
 
-    // ValidatedEffectiveBits()'s "effective > KeySize" rejection is not reachable through the public
-    // API today: the base RC2.EffectiveKeySize and RC2.KeySize setters already enforce
-    // EffectiveKeySize <= KeySize symmetrically (each throws CryptographicException if the other
-    // would end up smaller), and the "effective < 1" arm is likewise unreachable since the BCL's
-    // legal RC2 key sizes start at 40 bits. Confirmed empirically: setting either property to violate
-    // the invariant throws from the BCL setter itself, before RC2Pkcs11 code ever runs. The check in
-    // ValidatedEffectiveBits() is defense-in-depth against a future BCL/derived-type change relaxing
-    // that invariant, not a path a black-box test can drive today.
+    // No test for "effective > KeySize" / "effective < 1": the base RC2.EffectiveKeySize and
+    // RC2.KeySize setters already enforce EffectiveKeySize <= KeySize symmetrically (each throws
+    // CryptographicException if the other would end up smaller), and the BCL's legal RC2 key sizes
+    // start at 40 bits, so RC2Pkcs11 has no reachable path to an inconsistent value in the first
+    // place — confirmed empirically; setting either property to violate the invariant throws from
+    // the BCL setter itself, before any RC2Pkcs11 code runs.
 
     // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
     [ConditionalFact(nameof(Rc2Supported))]

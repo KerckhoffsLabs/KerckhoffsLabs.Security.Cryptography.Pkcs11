@@ -148,7 +148,10 @@ public sealed class RC2Pkcs11 : RC2
 
     private Mechanism CbcMechanism(ReadOnlySpan<byte> iv, PaddingMode paddingMode)
     {
-        ulong effectiveBits = ValidatedEffectiveBits();
+        // EffectiveKeySize (RFC 2268 effective-key-bits) as the CK_RC2_CBC_PARAMS mechanism
+        // parameter. The base RC2.EffectiveKeySize/KeySize setters already enforce
+        // EffectiveKeySize <= KeySize (and a >= 40-bit floor), so no separate check is needed here.
+        ulong effectiveBits = (ulong)EffectiveKeySize;
         return paddingMode switch
         {
             PaddingMode.PKCS7 => new Mechanism(CKM.CKM_RC2_CBC_PAD, new CkmRc2CbcParams(effectiveBits, iv)),
@@ -164,23 +167,7 @@ public sealed class RC2Pkcs11 : RC2
             throw new NotSupportedException(
                 "RC2Pkcs11 supports only PaddingMode.None for ECB (PKCS#11 has no CKM_RC2_ECB_PAD). " +
                 "Pre-pad the input, or use CBC with PKCS7.");
-        return new Mechanism(CKM.CKM_RC2_ECB, new CkmRc2Params(ValidatedEffectiveBits()));
-    }
-
-    /// <summary>
-    /// Returns <see cref="RC2.EffectiveKeySize"/> as the RC2 effective-key-bits mechanism parameter
-    /// (RFC 2268), after checking it does not exceed the key's bit length
-    /// (<see cref="SymmetricAlgorithm.KeySize"/>, reflected from the token's <c>CKA_VALUE_LEN</c>).
-    /// Effective bits larger than the key bits would silently change the cipher; reject rather than
-    /// forward an inconsistent value to the token.
-    /// </summary>
-    private ulong ValidatedEffectiveBits()
-    {
-        int effective = EffectiveKeySize;
-        if (effective < 1 || effective > KeySize)
-            throw new CryptographicException(
-                $"RC2 effective key size ({effective} bits) must be between 1 and the key size ({KeySize} bits).");
-        return (ulong)effective;
+        return new Mechanism(CKM.CKM_RC2_ECB, new CkmRc2Params((ulong)EffectiveKeySize));
     }
 
     /// <summary>Generates a random initialization vector (8 bytes) for CBC mode.</summary>
