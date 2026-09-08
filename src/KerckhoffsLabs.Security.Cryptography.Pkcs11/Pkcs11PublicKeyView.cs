@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -80,6 +81,74 @@ internal static class Pkcs11PublicKeyView
         if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
             return null;
         return TryParseEcPublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
+    }
+
+    /// <summary>
+    /// Reads <c>CKA_EC_PARAMS</c> off <paramref name="key"/> and parses it into a
+    /// <see cref="Pkcs11ECCurve"/>. Used to establish the curve a peer's public key must match
+    /// before an ECDH agreement reaches the token — see <see cref="ValidatePeerEcKey"/>.
+    /// </summary>
+    /// <param name="key">The token-resident EC key whose curve is being established.</param>
+    /// <param name="operationName">The operation name to attribute a thrown exception to.</param>
+    /// <exception cref="Pkcs11Exception">Thrown if <c>CKA_EC_PARAMS</c> is unreadable.</exception>
+    /// <exception cref="ArgumentException">Thrown if <c>CKA_EC_PARAMS</c> is not a DER-encoded curve OID.</exception>
+    internal static Pkcs11ECCurve GetCurve(Pkcs11Key key, string operationName)
+    {
+        using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
+        if (attrs.Count == 0 || attrs[0].CannotBeRead)
+            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
+                $"{operationName} (local CKA_EC_PARAMS not readable — cannot validate the peer's curve)");
+        return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray());
+    }
+
+    /// <summary>
+    /// Validates a peer's ECDH public key against <paramref name="localCurve"/> before it reaches
+    /// <c>CKM_ECDH1_DERIVE</c>: the peer must be on that exact named curve, its coordinates must
+    /// match the curve's field size, and the point itself must satisfy the curve equation.
+    /// PKCS#11 does not require the token to check either the curve or the point, so skipping this
+    /// lets a peer on a different (weaker) curve — or an off-curve point on the right curve — reach
+    /// the token unchecked; the invalid-curve / small-subgroup attack then recovers a token-resident
+    /// private key one residue at a time (Antipa et al., PKC 2003; NIST SP 800-56A Rev. 3 §5.6.2.3.2).
+    /// </summary>
+    /// <param name="localCurve">The local private key's curve, from <see cref="GetCurve"/>.</param>
+    /// <param name="peer">The peer's public key, as reported by the caller.</param>
+    /// <param name="x">The peer's X coordinate (already null-checked by the caller).</param>
+    /// <param name="y">The peer's Y coordinate (already null-checked by the caller).</param>
+    /// <param name="operationName">The operation name to attribute a thrown exception to.</param>
+    /// <exception cref="Pkcs11ArgumentException">
+    /// Thrown if <paramref name="peer"/>'s curve does not match <paramref name="localCurve"/>, its
+    /// coordinate lengths don't match that curve's field size, or the point does not satisfy the
+    /// curve equation.
+    /// </exception>
+    internal static void ValidatePeerEcKey(Pkcs11ECCurve localCurve, ECParameters peer, byte[] x, byte[] y, string operationName)
+    {
+        string? peerOid = peer.Curve.Oid.Value;
+        if (peerOid is null || !string.Equals(peerOid, localCurve.Oid, StringComparison.Ordinal))
+            throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
+                $"{operationName} (peer public key is on curve {peer.Curve.Oid.FriendlyName ?? peerOid ?? "unknown"}, expected {localCurve.FriendlyName ?? localCurve.Oid})");
+
+        // Skip when the local curve isn't one this library's catalog knows the field size for —
+        // the OID-equality check above already pins the peer to that exact (uncommon) curve, and
+        // the point-on-curve check below still runs regardless.
+        if (localCurve.FieldSizeBits is int bits)
+        {
+            int fieldSizeBytes = (bits + 7) / 8;
+            if (x.Length != fieldSizeBytes || y.Length != fieldSizeBytes)
+                throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
+                    $"{operationName} (peer coordinate length {x.Length}/{y.Length} bytes does not match the curve's {fieldSizeBytes}-byte field size)");
+        }
+
+        // Both the OpenSSL and CNG backends reject an off-curve point on import, which is what
+        // actually defends against a maliciously chosen point on the right curve.
+        try
+        {
+            using ECDiffieHellman probe = ECDiffieHellman.Create(peer);
+        }
+        catch (CryptographicException)
+        {
+            throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
+                $"{operationName} (peer public key point does not satisfy the curve equation)");
+        }
     }
 
     private static ReadOnlySpan<byte> StripDerOctetString(byte[] der)

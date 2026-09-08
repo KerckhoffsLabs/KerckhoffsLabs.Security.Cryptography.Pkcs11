@@ -107,6 +107,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <remarks>Hashes the raw agreement Z with SHA-256, matching the BCL's legacy default.</remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyMaterial(ECDiffieHellmanPublicKey otherPartyPublicKey)
@@ -118,6 +119,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
@@ -131,6 +133,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <remarks>Computes <c>Hash(secretPrepend ‖ Z ‖ secretAppend)</c> over the raw agreement Z.</remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveKeyFromHash(
         ECDiffieHellmanPublicKey otherPartyPublicKey,
@@ -165,6 +168,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyFromHmac(
@@ -210,7 +214,15 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
         ECParameters peer = otherPartyPublicKey.ExportParameters();
         byte[] x = peer.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(otherPartyPublicKey));
         byte[] y = peer.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(otherPartyPublicKey));
-        int fieldSize = x.Length;
+
+        const string op = "ECDiffieHellmanPkcs11.DeriveRawSecret";
+        Pkcs11ECCurve localCurve = Pkcs11PublicKeyView.GetCurve(_key, op);
+        Pkcs11PublicKeyView.ValidatePeerEcKey(localCurve, peer, x, y, op);
+        // Field size from the local key, not the peer's coordinate encoding — a subclassed
+        // ECDiffieHellmanPublicKey could otherwise report a short X and silently truncate the
+        // shared secret the token derives. Falls back to the peer's (now curve-matched) length only
+        // for a curve outside this library's field-size catalog.
+        int fieldSize = localCurve.FieldSizeBits is int bits ? bits / 8 : x.Length;
 
         byte[] peerPoint = EncodeEcPointAsDerOctetString(x, y);
         var p = new CkmEcdh1DeriveParams(CKD.CKD_NULL, peerPoint);
@@ -275,9 +287,11 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     /// <summary>
     /// Encodes an uncompressed EC point (0x04 ‖ X ‖ Y) as a DER OCTET STRING, the form PKCS#11 expects
-    /// for the ECDH1 public-data parameter (the full <c>CKA_EC_POINT</c> value).
+    /// for the ECDH1 public-data parameter (the full <c>CKA_EC_POINT</c> value). Also used by
+    /// <see cref="Pkcs11Workspace.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/> to
+    /// build the raw-span form after validating the peer.
     /// </summary>
-    private static byte[] EncodeEcPointAsDerOctetString(byte[] x, byte[] y)
+    internal static byte[] EncodeEcPointAsDerOctetString(byte[] x, byte[] y)
     {
         byte[] raw = new byte[1 + x.Length + y.Length];
         raw[0] = 0x04;

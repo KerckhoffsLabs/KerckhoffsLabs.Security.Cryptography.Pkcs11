@@ -375,4 +375,63 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         Assert.Equal(0, ecdh.KeySize);
     }
+
+    // === Peer validation: invalid-curve / off-curve point rejection =========================
+    // A peer key on a different (weaker) curve, or an off-curve point on the right curve, must
+    // never reach CKM_ECDH1_DERIVE — PKCS#11 does not require the token to check either, and the
+    // standard invalid-curve / small-subgroup attack recovers the token-resident private key one
+    // residue at a time if it does (Antipa et al., PKC 2003).
+
+    /// <summary>A test-only peer whose <see cref="ExportParameters()"/> returns a fixed, possibly
+    /// malformed, value — lets a test hand the adapter a peer point a real BCL key could never
+    /// produce (e.g. off-curve), which is exactly what an untrusted caller could pass in.</summary>
+    private sealed class FixedPublicKey(ECParameters parameters) : ECDiffieHellmanPublicKey
+    {
+        public override ECParameters ExportParameters() => parameters;
+    }
+
+    [ConditionalFact(nameof(Supported))]
+    public void DeriveKeyFromHash_PeerOnDifferentCurve_Throws() => WithEcdh("P-256", alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP384);
+        Assert.Throws<Pkcs11ArgumentException>(
+            () => alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null));
+    });
+
+    [ConditionalFact(nameof(Supported))]
+    public void DeriveRawSecretAgreement_PeerOnDifferentCurve_Throws() => WithEcdh("P-256", alice =>
+    {
+        using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP384);
+        Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(bob.PublicKey));
+    });
+
+    [ConditionalFact(nameof(Supported))]
+    public void DeriveKeyFromHash_OffCurvePoint_Throws() => WithEcdh("P-256", alice =>
+    {
+        // Right curve (P-256), right coordinate length, but a point that does not satisfy the
+        // curve equation y^2 = x^3 - 3x + b — the invalid-curve attack's actual payload shape.
+        int size = FieldSize("P-256");
+        var badPeer = new FixedPublicKey(new ECParameters
+        {
+            Curve = BclECCurve.NamedCurves.nistP256,
+            Q = new ECPoint { X = new byte[size], Y = new byte[size] }, // (0, 0) is not on the curve
+        });
+        Assert.Throws<Pkcs11ArgumentException>(
+            () => alice.DeriveKeyFromHash(badPeer, HashAlgorithmName.SHA256, null, null));
+    });
+
+    [ConditionalFact(nameof(Supported))]
+    public void DeriveKeyFromHash_PeerCoordinateLengthMismatch_Throws() => WithEcdh("P-256", alice =>
+    {
+        // Claims the P-256 OID but hands over P-384-sized coordinates — same curve identity, wrong
+        // field size, which the curve-equality check alone would miss.
+        int wrongSize = FieldSize("P-384");
+        var badPeer = new FixedPublicKey(new ECParameters
+        {
+            Curve = BclECCurve.NamedCurves.nistP256,
+            Q = new ECPoint { X = new byte[wrongSize], Y = new byte[wrongSize] },
+        });
+        Assert.Throws<Pkcs11ArgumentException>(
+            () => alice.DeriveKeyFromHash(badPeer, HashAlgorithmName.SHA256, null, null));
+    });
 }

@@ -1,5 +1,8 @@
+using System.Security.Cryptography;
 using System.Text;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -65,5 +68,41 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         using var workspace = OpenWorkspace();
         Assert.Throws<ArgumentNullException>(
             () => workspace.DeriveSharedSecretEcdh(null!, new byte[1]));
+    }
+
+    // === ECParameters overload: validates the peer, then agrees exactly like the raw-span form ===
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
+    {
+        using var workspace = OpenWorkspace();
+        using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+
+        using var aliceEcdh = new ECDiffieHellmanPkcs11(alice);
+        using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
+        ECParameters alicePub = aliceEcdh.ExportParameters(includePrivateParameters: false);
+        ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
+
+        using var aliceAes = workspace.DeriveSharedSecretEcdh(alice, bobPub, kdf: CKD.CKD_NULL);
+        using var bobAes = workspace.DeriveSharedSecretEcdh(bob, alicePub, kdf: CKD.CKD_NULL);
+
+        byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        byte[] plaintext = Encoding.UTF8.GetBytes("ECParameters overload must validate and still agree");
+        byte[] ciphertext = TestAesGcm.Encrypt(workspace.Session, aliceAes.PrivateHandle, iv, plaintext);
+        byte[] recovered = TestAesGcm.Decrypt(workspace.Session, bobAes.PrivateHandle, iv, ciphertext);
+        Assert.Equal(plaintext, recovered);
+    }
+
+    [ConditionalFact(nameof(SoftHsmAvailable))]
+    public void ECParametersOverload_RejectsPeerOnDifferentCurve()
+    {
+        using var workspace = OpenWorkspace();
+        using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bob = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP384);
+        using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
+        ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
+
+        Assert.Throws<Pkcs11ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
     }
 }

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
@@ -584,8 +585,18 @@ public sealed class Pkcs11Workspace : IDisposable
     /// point, deriving an AES secret key on the token. The derived key is session-only, sensitive,
     /// non-extractable, and non-modifiable — suitable for use with AES-GCM.
     /// </summary>
+    /// <remarks>
+    /// <b>The peer's point is not validated here.</b> A raw DER-encoded octet string carries no
+    /// curve identity, so this overload cannot check that <paramref name="peerPublicPoint"/> is on
+    /// the same curve as <paramref name="ecPrivateKey"/> or that it satisfies that curve's equation
+    /// — PKCS#11 does not require the token to check either, and skipping both is the invalid-curve
+    /// / small-subgroup attack (it recovers a token-resident private key one residue at a time).
+    /// The caller is responsible for that validation before calling this overload. Prefer
+    /// <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>, which validates the
+    /// peer automatically because <see cref="ECParameters"/> carries its own curve.
+    /// </remarks>
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
-    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value).</param>
+    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value). Caller-validated — see remarks.</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
     /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
     /// pass <see cref="CKD.CKD_NULL"/> to take the raw shared secret as the key material (do your own KDF off-token).
@@ -616,6 +627,51 @@ public sealed class Pkcs11Workspace : IDisposable
             .Attribute(CKA.CKA_MODIFIABLE, false)
             .Build();
         return ecPrivateKey.Derive(mechanism, template);
+    }
+
+    /// <summary>
+    /// Performs ECDH1 key agreement using <paramref name="ecPrivateKey"/> and the peer's public key,
+    /// deriving an AES secret key on the token. The derived key is session-only, sensitive,
+    /// non-extractable, and non-modifiable — suitable for use with AES-GCM.
+    /// </summary>
+    /// <remarks>
+    /// Validates <paramref name="peerPublicKey"/> before it reaches the token: it must be on the
+    /// same curve as <paramref name="ecPrivateKey"/>, its coordinates must match that curve's field
+    /// size, and the point must satisfy the curve equation — the validation the raw-span overload
+    /// cannot perform, because a DER-encoded octet string carries no curve identity for it to check
+    /// against. See <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/> for
+    /// why that matters (invalid-curve / small-subgroup recovery of the token-resident private key).
+    /// </remarks>
+    /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
+    /// <param name="peerPublicKey">The peer's public key. <see cref="ECParameters.Curve"/> and both coordinates of <see cref="ECParameters.Q"/> are required.</param>
+    /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
+    /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
+    /// pass <see cref="CKD.CKD_NULL"/> to take the raw shared secret as the key material (do your own KDF off-token).
+    /// Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
+    /// <returns>The derived AES key.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
+    /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="peerPublicKey"/>'s curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown if <paramref name="ecPrivateKey"/>'s <c>CKA_EC_PARAMS</c> cannot be read.</exception>
+    public Pkcs11Key DeriveSharedSecretEcdh(
+        Pkcs11Key ecPrivateKey,
+        ECParameters peerPublicKey,
+        int aesBitLength = 256,
+        CKD kdf = CKD.CKD_SHA256_KDF)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(ecPrivateKey);
+        byte[] x = peerPublicKey.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(peerPublicKey));
+        byte[] y = peerPublicKey.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(peerPublicKey));
+
+        const string op = "Pkcs11Workspace.DeriveSharedSecretEcdh";
+        Pkcs11ECCurve localCurve = Pkcs11PublicKeyView.GetCurve(ecPrivateKey, op);
+        Pkcs11PublicKeyView.ValidatePeerEcKey(localCurve, peerPublicKey, x, y, op);
+
+        byte[] peerPoint = Algorithms.ECDiffieHellmanPkcs11.EncodeEcPointAsDerOctetString(x, y);
+        return DeriveSharedSecretEcdh(ecPrivateKey, peerPoint, aesBitLength, kdf);
     }
 
     /// <summary>
