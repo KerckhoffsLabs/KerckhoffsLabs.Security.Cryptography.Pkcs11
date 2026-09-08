@@ -1,6 +1,7 @@
 using System.Text;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -57,6 +58,32 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
         {
             Library.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Opens a workspace, retrying a handful of times when <c>C_Login</c> fails with
+    /// <see cref="CKR.CKR_GENERAL_ERROR"/>. Under CI load, opencryptoki's soft-token STDLL
+    /// occasionally returns this transiently from its shared-memory session bookkeeping after
+    /// hundreds of rapid login/logout cycles in the same run — a token-side flake, not something
+    /// a caller did wrong, and PKCS#11 v3.2 §5.1 lists CKR_GENERAL_ERROR as a code a token may
+    /// return when "some horrible, unrecoverable error has occurred" without requiring that it be
+    /// permanent. SoftHSM and NSS don't exhibit this, so the retry lives here rather than in the
+    /// shared <see cref="IPkcs11Backend.OpenWorkspace"/> default.
+    /// </summary>
+    public Pkcs11Workspace OpenWorkspace()
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return Library.OpenWorkspace(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span));
+            }
+            catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_GENERAL_ERROR && attempt < maxAttempts)
+            {
+                Thread.Sleep(TimeSpan.FromMilliseconds(200 * attempt));
+            }
         }
     }
 
