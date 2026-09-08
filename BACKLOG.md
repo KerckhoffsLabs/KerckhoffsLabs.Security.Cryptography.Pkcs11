@@ -277,7 +277,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** PKCS#11 Specialist A
 - **Spec / References:** Distinct from BL-019: that covers the v3.2 *methods* being unreachable, this the support *predicate*, which stays unreachable even after BL-019 lands
 
-### [BL-078] `LowLevelPkcs11Library.Dispose` unmaps the native module before setting the disposed flag, and the flag is not `volatile`
+### [BL-078] ✅ RESOLVED — `LowLevelPkcs11Library.Dispose` unmaps the native module before setting the disposed flag, and the flag is not `volatile`
+- **Status:** Resolved 2026-09-07. Implemented the primary proposed action: `_disposed` is now `volatile` and `Dispose(bool)` sets it to `true` before releasing `_library`, matching `Pkcs11Session._disposed`'s existing pattern. This closes the window for any thread whose disposed-check happens after the disposing thread's write; a thread already past its check when `Dispose` starts can still race the unmap, which is exactly what the entry's "better still" `DangerousAddRef`/`DangerousRelease` alternative would close — left out of scope here since it would touch every one of the ~110 P/Invoke entry points for a High (not Critical), `Effort: S` item. Added `LowLevelPkcs11LibraryDisposeTests` (`Integration/ThreadSafety/`): a reflection check that `_disposed` carries the `IsVolatile` modifier (verified to fail when reverted), and a real-module (pkcs11-mock) check that a call after `Dispose()` still throws `ObjectDisposedException` rather than crashing. A true concurrent repro (parking a thread inside a native call while disposing) isn't achievable the way `Pkcs11SessionDisposeRaceTests` does it for `Pkcs11Session`, because `LowLevelPkcs11Library` owns the real `NativeLibrary.Load`'d module directly with no fakeable `ILowLevelPkcs11Library` seam underneath it.
 - **Area:** P/Invoke
 - **Severity:** High
 - **Effort:** S

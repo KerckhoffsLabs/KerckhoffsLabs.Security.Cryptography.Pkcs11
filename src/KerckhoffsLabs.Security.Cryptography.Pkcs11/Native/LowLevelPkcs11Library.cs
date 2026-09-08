@@ -8,9 +8,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
 {
     /// <summary>
-    /// Flag indicating whether instance has been disposed
+    /// Flag indicating whether instance has been disposed. <c>volatile</c> because it is written
+    /// from the disposing thread and read (via <c>ObjectDisposedException.ThrowIf</c>) from every
+    /// thread issuing a native call — a plain <c>bool</c> gives no guarantee another thread ever
+    /// observes the write.
     /// </summary>
-    private bool _disposed = false;
+    private volatile bool _disposed = false;
 
     /// <summary>
     /// Handle to the PKCS#11 library
@@ -1917,14 +1920,18 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
     private void Dispose(bool disposing)
     {
-        if (!_disposed)
-        {
-            if (disposing)
-            {
-                _library.Dispose();
-            }
+        if (_disposed) return;
 
-            _disposed = true;
+        // Set the flag before unmapping the module, not after: every native entry point guards
+        // with ObjectDisposedException.ThrowIf(_disposed, this) and then calls a
+        // delegate* unmanaged[Cdecl] loaded from this module. Flipping the flag first means a
+        // thread that reads it after this write is turned away before it can dispatch into
+        // memory NativeLibrary.Free (via _library.Dispose()) is about to unmap.
+        _disposed = true;
+
+        if (disposing)
+        {
+            _library.Dispose();
         }
     }
 
