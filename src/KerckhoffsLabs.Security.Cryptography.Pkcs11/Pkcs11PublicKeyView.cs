@@ -139,12 +139,17 @@ internal static class Pkcs11PublicKeyView
         }
 
         // Both the OpenSSL and CNG backends reject an off-curve point on import, which is what
-        // actually defends against a maliciously chosen point on the right curve.
+        // actually defends against a maliciously chosen point on the right curve. CNG's rejection
+        // for some malformed points (e.g. the all-zero point) surfaces as PlatformNotSupportedException
+        // ("curve ... not valid for this platform") wrapping a CryptographicException, not the
+        // CryptographicException itself — catch both. Reaching this point already means the curve
+        // OID matched a curve this token just generated a real key on, so a PlatformNotSupportedException
+        // here means "this point is rejected", not "this curve is unsupported".
         try
         {
             using ECDiffieHellman probe = ECDiffieHellman.Create(peer);
         }
-        catch (CryptographicException)
+        catch (Exception ex) when (ex is CryptographicException or PlatformNotSupportedException)
         {
             throw Pkcs11Exception.Create(CKR.CKR_ARGUMENTS_BAD,
                 $"{operationName} (peer public key point does not satisfy the curve equation)");
