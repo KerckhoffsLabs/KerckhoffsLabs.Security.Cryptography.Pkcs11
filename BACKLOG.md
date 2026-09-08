@@ -242,7 +242,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** Cryptographer A
 - **Spec / References:** Clulow, CHES 2003 §3; RFC 7568 (SSLv3 prohibited); Coron–Naccache–Stern forgery against ISO 9796-2
 
-### [BL-075] `CkmChaCha20Params` / `CkmSalsa20Params` let the bit-length field exceed the buffer it describes, producing an out-of-bounds read inside the token
+### [BL-075] ✅ RESOLVED — `CkmChaCha20Params` / `CkmSalsa20Params` let the bit-length field exceed the buffer it describes, producing an out-of-bounds read inside the token
+- **Status:** Resolved 2026-09-07. `CkmChaCha20Params` now restricts `blockCounterBits` to {32, 64} and `nonceBits` to {64, 96} — the only widths CKM_CHACHA20 defines — and separately checks `bits / 8 <= buffer.Length` for each, so a technically-valid width still can't overrun a caller's undersized buffer. `CkmSalsa20Params` restricts `nonceBits` to the only width CKM_SALSA20 defines (64) with the same buffer-length check; its block counter has no bit-length field to validate in the first place (`CK_SALSA20_PARAMS` carries no length for it — the module always reads 8 bytes), so instead the constructor now requires `blockCounter.Length == 8` exactly, closing the same class of out-of-bounds read through the one buffer the backlog's bits-based proposed action didn't cover. All exceptions are `ArgumentOutOfRangeException` (bit-width and buffer-length checks) or `ArgumentException` (the fixed-size block counter, matching the existing empty-buffer checks). Added 19 regression tests across both constructors' invalid discrete widths and buffer-too-small combinations; the 8 existing marshal-correctness call sites across the test suite all already used valid, spec-consistent values and needed no changes.
 - **Area:** P/Invoke
 - **Severity:** High
 - **Effort:** S

@@ -162,6 +162,29 @@ public sealed class MechanismStreamParamsTests
     public void Salsa20_RejectsEmptyNonce() =>
         Assert.Throws<ArgumentException>(() => new CkmSalsa20Params(new byte[8], default, 64));
 
+    // CK_SALSA20_PARAMS carries no length field for the block counter — the module always reads 8
+    // bytes from the pointer — and reads nonceBits/8 bytes from the nonce pointer regardless of the
+    // buffer's actual length. Either mismatch is an out-of-bounds read on the token.
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(7)]
+    [InlineData(9)]
+    [InlineData(16)]
+    public void Salsa20_RejectsWrongBlockCounterLength(int length) =>
+        Assert.Throws<ArgumentException>(() => new CkmSalsa20Params(new byte[length], new byte[8], 64));
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(96)]
+    public void Salsa20_RejectsInvalidNonceBits(int nonceBits) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkmSalsa20Params(new byte[8], new byte[8], nonceBits));
+
+    [Fact]
+    public void Salsa20_RejectsNonceBitsExceedingBufferLength() =>
+        // 64 bits (8 bytes) declared, but the buffer is only 4 bytes.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkmSalsa20Params(new byte[8], new byte[4], 64));
+
     [Fact]
     public void SalsaChaChaPoly1305_MarshalsNonceAndAad()
     {

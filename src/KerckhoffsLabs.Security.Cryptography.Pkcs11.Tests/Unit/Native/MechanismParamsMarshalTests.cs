@@ -238,4 +238,32 @@ public sealed class MechanismParamsMarshalTests
     [Fact]
     public void ChaCha20_RejectsEmptyNonce() =>
         Assert.Throws<ArgumentException>(() => new CkmChaCha20Params(new byte[4], 32, default, 96));
+
+    // The module reads blockCounterBits/8 and nonceBits/8 bytes from the buffer pointers
+    // regardless of the buffers' actual lengths — an oversized value is an out-of-bounds read on
+    // the token, not just a marshalling inconsistency.
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(8)]
+    [InlineData(128)]
+    public void ChaCha20_RejectsInvalidBlockCounterBits(int blockCounterBits) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkmChaCha20Params(new byte[8], blockCounterBits, new byte[12], 96));
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(48)]
+    [InlineData(128)]
+    public void ChaCha20_RejectsInvalidNonceBits(int nonceBits) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkmChaCha20Params(new byte[4], 32, new byte[12], nonceBits));
+
+    [Fact]
+    public void ChaCha20_RejectsBlockCounterBitsExceedingBufferLength() =>
+        // 64 bits (8 bytes) declared, but the buffer is only 4 bytes.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkmChaCha20Params(new byte[4], 64, new byte[12], 96));
+
+    [Fact]
+    public void ChaCha20_RejectsNonceBitsExceedingBufferLength() =>
+        // 96 bits (12 bytes) declared, but the buffer is only 8 bytes.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkmChaCha20Params(new byte[4], 32, new byte[8], 96));
 }
