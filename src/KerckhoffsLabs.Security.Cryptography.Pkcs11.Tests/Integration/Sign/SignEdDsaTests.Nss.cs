@@ -32,11 +32,15 @@ public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
         SignEdDsaTestCases.Assert_Ed25519_RoundTrip(_backend);
     }
 
-    // Ed448_RoundTrip is gated on Available (not EdDsa/SupportsEdDsa): that flag exists
-    // specifically because NSS rejects a *bare* CKM_EDDSA sign (the Ed25519 case above), not
-    // because Ed448 itself is unsupported. Assert_Ed448_RoundTrip passes an explicit
-    // CK_EDDSA_PARAMS, which is exactly the form NSS requires.
-    [ConditionalFact(nameof(Available))]
+    // NSS's C_GenerateKeyPair rejects the id-Ed448 OID (1.3.101.113) as CKA_EC_PARAMS for
+    // CKM_EC_EDWARDS_KEY_PAIR_GEN with CKR_DOMAIN_PARAMS_INVALID -- confirmed in CI
+    // (KerckhoffsLabs.Security.Cryptography.Pkcs11 run 34634992368): its EdDSA key generation
+    // supports Ed25519 only. This is a genuine key-generation gap, distinct from (and upstream
+    // of) the bare-CKM_EDDSA-vs-CK_EDDSA_PARAMS signing issue Assert_Ed448_RoundTrip's explicit
+    // params already fix elsewhere (Kryoptic, opencryptoki) -- NSS never reaches signing at all.
+    public static bool SupportsEd448KeyGeneration => false;
+
+    [ConditionalFact(nameof(SupportsEd448KeyGeneration))]
     public void Ed448_RoundTrip()
     {
         RequireEdDsa();
