@@ -322,7 +322,7 @@ jobs:
           set -euxo pipefail
           dotnet build src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj \
             --no-restore -c Release -t:BuildKryoptic
-          LIB="$(find src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes -name libkryoptic_pkcs11.so | head -1)"
+          LIB="$(find "$PWD/src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes" -name libkryoptic_pkcs11.so | head -1)"
           test -n "$LIB"
           echo "PKCS11_TEST_KRYOPTIC_LIBRARY=$LIB" >> "$GITHUB_ENV"
 
