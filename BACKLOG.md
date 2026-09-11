@@ -1774,6 +1774,16 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** QA C
 
+### [BL-157] Kryoptic backend gap: `CKA_WRAP_TEMPLATE`/`CKA_UNWRAP_TEMPLATE` unsupported, one test permanently gated
+- **Area:** Interop
+- **Severity:** Low
+- **Effort:** S (tracking only — the fix belongs upstream, not in this repo)
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Keys/GenerateAesKeyTests.Kryoptic.cs` (`SupportsWrapUnwrapTemplate => false` gate on `GeneratesKeyEncryptionKey_WrapUnwrapOnly`)
+- **Problem:** Kryoptic denies `CKA_WRAP_TEMPLATE`/`CKA_UNWRAP_TEMPLATE` outright at template-validation time (`CKR_ATTRIBUTE_TYPE_INVALID`), so this test cannot pass against it. Unlike other Kryoptic-specific gaps found during backend testing (e.g. Ed448 needing an explicit `CK_EDDSA_PARAMS`), there is no alternate, spec-correct call that succeeds instead — the attribute type is unconditionally rejected, a real missing capability rather than a usage mismatch. Upstream already tracks this as a feature, not a bug: issue [latchset/kryoptic#434](https://github.com/latchset/kryoptic/issues/434) ("Implement template attributes"), with an open PR implementing it at [latchset/kryoptic#500](https://github.com/latchset/kryoptic/pull/500) (adds real `CKA_WRAP_TEMPLATE`/`CKA_UNWRAP_TEMPLATE` enforcement in `wrap_key`/`unwrap_key`).
+- **Proposed action:** Once kryoptic#500 merges and a `vendor/kryoptic` submodule bump picks it up, flip `SupportsWrapUnwrapTemplate` back to `true` and remove the tracking comment.
+- **Breaks public API?** No
+- **Raised by:** Kryoptic backend interop testing
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Workspace` expose no `Stream` overload at all. See BL-087 and BL-099.

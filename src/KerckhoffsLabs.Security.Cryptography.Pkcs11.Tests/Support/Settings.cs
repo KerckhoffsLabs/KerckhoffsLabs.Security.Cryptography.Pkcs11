@@ -70,6 +70,14 @@ public static class Settings
     public static string NssTokenLabel =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_NSS_TOKEN") ?? "NSS Generic Crypto Services";
 
+    /// <summary>
+    /// Optional path to a Kryoptic PKCS#11 library — a fourth, fully independent real backend
+    /// (see BL-028). Falls back to the path the BuildKryoptic MSBuild target places next to the
+    /// test assembly. Tests that require it skip themselves when this resolves to null.
+    /// </summary>
+    public static string? KryopticLibraryPath =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_KRYOPTIC_LIBRARY");
+
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;

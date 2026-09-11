@@ -15,3 +15,7 @@
 	url = https://github.com/mozilla/nss.git
 	shallow = true
 	ignore = untracked
+[submodule "vendor/kryoptic"]
+	path = vendor/kryoptic
+	url = https://github.com/latchset/kryoptic.git
+	ignore = untracked

@@ -9,7 +9,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// </summary>
 internal static class SmokeTestAssertions
 {
-    internal static void AssertLibraryInfoAndSlots_AreWellFormed(IPkcs11Backend backend)
+    /// <param name="backend">The backend fixture under test.</param>
+    /// <param name="expectNonZeroLibraryVersion">
+    /// Most modules report a real vendor library version; Kryoptic 1.5.2 hardcodes
+    /// <c>LIBRARY_VERSION</c> to <c>CK_VERSION { major: 0, minor: 0 }</c> (vendor/kryoptic
+    /// src/lib.rs:560) — a genuine upstream value, not a marshalling defect — so its smoke test
+    /// passes <see langword="false"/> to skip just that one check.
+    /// </param>
+    internal static void AssertLibraryInfoAndSlots_AreWellFormed(IPkcs11Backend backend, bool expectNonZeroLibraryVersion = true)
     {
         LibraryInfo info = backend.Library.GetInfo();
 
@@ -24,7 +31,8 @@ internal static class SmokeTestAssertions
 
         // The vendor's own library version is independent of the spec version, but is equally
         // required to be present rather than a default-constructed 0.0.
-        Assert.NotEqual(new Version(0, 0), info.LibraryVersion);
+        if (expectNonZeroLibraryVersion)
+            Assert.NotEqual(new Version(0, 0), info.LibraryVersion);
 
         // The module must report at least one slot (independent of token presence).
         Assert.NotEmpty(backend.Library.GetSlotList(tokenPresent: false));

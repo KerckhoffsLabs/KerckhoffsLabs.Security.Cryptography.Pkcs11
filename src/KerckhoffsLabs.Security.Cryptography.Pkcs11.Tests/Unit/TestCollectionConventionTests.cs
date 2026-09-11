@@ -29,6 +29,7 @@ public sealed class TestCollectionConventionTests
         ("_SoftHsm", "SoftHsm"),
         ("_Nss", "Nss"),
         ("_OpenCryptoki", "OpenCryptoki"),
+        ("_Kryoptic", "Kryoptic"),
     ];
 
     // -----------------------------------------------------------------------------------------

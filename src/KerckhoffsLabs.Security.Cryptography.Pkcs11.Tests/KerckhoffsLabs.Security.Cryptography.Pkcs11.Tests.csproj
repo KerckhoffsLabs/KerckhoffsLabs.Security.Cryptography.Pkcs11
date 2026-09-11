@@ -77,4 +77,17 @@
     <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-softhsmv2.ps1&quot; -TestOutputDir &quot;$(_SoftHsmOutputDir)&quot; -Rid &quot;$(_SoftHsmRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
+  <!-- Kryoptic (BL-028): unlike pkcs11-mock/SoftHSM (built on every leg), this one is opt-in —
+       default OFF, flip it on with -p:BuildKryoptic=true (or the env var of the same name, which
+       MSBuild picks up as a property) — because it needs a Rust toolchain plus an OpenSSL 3.2+ it
+       links against, and is wired into CI on the ubuntu-latest leg only for now (see ci.yml).
+       build-kryoptic.sh itself no-ops on non-Linux; cargo's own target-dir caching plus the
+       script's own up-to-date check make repeat builds idempotent. -->
+  <Target Name="BuildKryoptic" BeforeTargets="PrepareForBuild" Condition="'$(BuildKryoptic)' == 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup>
+      <_KryopticOutputDir>$(MSBuildProjectDirectory)/bin/$(Configuration)/$(TargetFramework)</_KryopticOutputDir>
+    </PropertyGroup>
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-kryoptic.sh&quot; &quot;$(_KryopticOutputDir)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
 </Project>
