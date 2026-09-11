@@ -1,5 +1,6 @@
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
@@ -50,7 +51,12 @@ internal static class SignEdDsaTestCases
             try
             {
                 byte[] data = Encoding.UTF8.GetBytes("phase-2 Ed448 round-trip");
-                var eddsa = new Mechanism(CKM.CKM_EDDSA);
+                // Unlike Ed25519, a bare CKM_EDDSA (no CK_EDDSA_PARAMS) is not universally
+                // accepted for Ed448 — Kryoptic, opencryptoki, and NSS all require an explicit
+                // CK_EDDSA_PARAMS to pick pure Ed448 over Ed448ph, and return
+                // CKR_MECHANISM_PARAM_INVALID for a bare mechanism. Pass one explicitly
+                // (phFlag: false selects pure Ed448, no context data) so this works everywhere.
+                var eddsa = new Mechanism(CKM.CKM_EDDSA, new CkmEddsaParams(phFlag: false));
                 byte[] sig = session.Sign(eddsa, priv, data);
                 Assert.Equal(114, sig.Length);
 

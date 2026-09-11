@@ -32,8 +32,14 @@ public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
         SignEdDsaTestCases.Assert_Ed25519_RoundTrip(_backend);
     }
 
-    // No Ed448 round-trip here: NSS's C_Sign for Ed448 returns CKR_MECHANISM_PARAM_INVALID —
-    // it requires a CK_EDDSA_PARAMS structure for Ed448, whereas the wrapper drives pure EdDSA with a
-    // bare CKM_EDDSA mechanism (which SoftHSM and NSS both accept for Ed25519). Ed448 stays
-    // covered on SoftHSM (SignEdDsaTests_SoftHsm.Ed448_RoundTrip).
+    // Ed448_RoundTrip is gated on Available (not EdDsa/SupportsEdDsa): that flag exists
+    // specifically because NSS rejects a *bare* CKM_EDDSA sign (the Ed25519 case above), not
+    // because Ed448 itself is unsupported. Assert_Ed448_RoundTrip passes an explicit
+    // CK_EDDSA_PARAMS, which is exactly the form NSS requires.
+    [ConditionalFact(nameof(Available))]
+    public void Ed448_RoundTrip()
+    {
+        RequireEdDsa();
+        SignEdDsaTestCases.Assert_Ed448_RoundTrip(_backend);
+    }
 }
