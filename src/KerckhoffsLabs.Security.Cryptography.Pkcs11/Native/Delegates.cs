@@ -1120,15 +1120,27 @@ internal class Delegates
 
     /// <summary>Wrapper for <c>C_EncryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, out NativeCULong ciphertextLen)
+        ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen)
     {
-        ciphertextLen = (NativeCULong)ciphertext.Length;
+        ciphertextLen = (NativeCULong)(ciphertext?.Length ?? 0);
         ThrowIfUnbound(_fp.C_EncryptMessage);
-        fixed (byte* adPtr = associatedData)
-        fixed (byte* ptPtr = plaintext)
-        fixed (byte* ctPtr = ciphertext)
+        // `fixed` yields a null pointer for ANY empty array or span, even a real (non-null) one --
+        // that's fine for parameters where the caller never means "null" (associatedData,
+        // plaintext: always real, possibly-empty data here), so a dummy byte's address stands in,
+        // never dereferenced since the paired length is 0. ciphertext is the one parameter where
+        // null is a deliberate signal (the length-probe call) distinct from a real, empty output
+        // buffer, so it alone is allowed to reach the native call as a genuine null pointer.
+        byte sentinel = 0;
+        fixed (byte* adRaw = associatedData)
+        fixed (byte* ptRaw = plaintext)
+        fixed (byte* ctRaw = ciphertext)
         fixed (NativeCULong* ctLenPtr = &ciphertextLen)
+        {
+            byte* adPtr = associatedData.Length == 0 ? &sentinel : adRaw;
+            byte* ptPtr = plaintext.Length == 0 ? &sentinel : ptRaw;
+            byte* ctPtr = ciphertext is null ? null : ciphertext.Length == 0 ? &sentinel : ctRaw;
             return _fp.C_EncryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length, ptPtr, (NativeCULong)plaintext.Length, ctPtr, ctLenPtr);
+        }
     }
 
     /// <summary>Wrapper for <c>C_EncryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
@@ -1178,15 +1190,26 @@ internal class Delegates
 
     /// <summary>Wrapper for <c>C_DecryptMessage</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     public unsafe NativeCULong C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, out NativeCULong plaintextLen)
+        ReadOnlySpan<byte> ciphertext, byte[]? plaintext, out NativeCULong plaintextLen)
     {
-        plaintextLen = (NativeCULong)plaintext.Length;
+        plaintextLen = (NativeCULong)(plaintext?.Length ?? 0);
         ThrowIfUnbound(_fp.C_DecryptMessage);
-        fixed (byte* adPtr = associatedData)
-        fixed (byte* ctPtr = ciphertext)
-        fixed (byte* ptPtr = plaintext)
+        // See the identical comment in C_EncryptMessage: `fixed` yields a null pointer for any
+        // empty array/span, real or not, so a dummy byte's address stands in for associatedData
+        // and ciphertext (always real, possibly-empty data here) -- never dereferenced since the
+        // paired length is 0. plaintext alone may be a genuine null (the length-probe signal),
+        // which must reach the native call unchanged.
+        byte sentinel = 0;
+        fixed (byte* adRaw = associatedData)
+        fixed (byte* ctRaw = ciphertext)
+        fixed (byte* ptRaw = plaintext)
         fixed (NativeCULong* ptLenPtr = &plaintextLen)
+        {
+            byte* adPtr = associatedData.Length == 0 ? &sentinel : adRaw;
+            byte* ctPtr = ciphertext.Length == 0 ? &sentinel : ctRaw;
+            byte* ptPtr = plaintext is null ? null : plaintext.Length == 0 ? &sentinel : ptRaw;
             return _fp.C_DecryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length, ctPtr, (NativeCULong)ciphertext.Length, ptPtr, ptLenPtr);
+        }
     }
 
     /// <summary>Wrapper for <c>C_DecryptMessageBegin</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>

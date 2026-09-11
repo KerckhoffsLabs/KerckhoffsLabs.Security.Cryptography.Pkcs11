@@ -2111,7 +2111,7 @@ internal sealed class Pkcs11Session : IDisposable
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
                 aad,
                 pt,
-                null!, out NativeCULong ctLen);
+                null, out NativeCULong ctLen);
             Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
 
             byte[] ct = new byte[(int)ctLen];
@@ -2340,7 +2340,7 @@ internal sealed class Pkcs11Session : IDisposable
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
                 aad,
                 ct,
-                null!, out NativeCULong ptLen);
+                null, out NativeCULong ptLen);
             Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
 
             byte[] pt = new byte[(int)ptLen];

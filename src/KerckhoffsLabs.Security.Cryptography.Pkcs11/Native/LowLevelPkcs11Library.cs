@@ -633,7 +633,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, out NativeCULong ciphertextLen)
+        ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -715,7 +715,7 @@ internal sealed class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, out NativeCULong plaintextLen)
+        ReadOnlySpan<byte> ciphertext, byte[]? plaintext, out NativeCULong plaintextLen)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 

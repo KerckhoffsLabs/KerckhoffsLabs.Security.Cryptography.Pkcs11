@@ -43,18 +43,18 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         public override CKR C_MessageDecryptFinal(NativeCULong session) { DecryptFinalCalls++; return CKR.CKR_OK; }
 
-        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, out NativeCULong ciphertextLen)
+        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen)
         {
-            if (ciphertext.IsEmpty) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
+            if (ciphertext is null) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
             OnEncryptMessageParams?.Invoke(parameter);
             Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
             return EncMsgRv;
         }
 
-        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, out NativeCULong plaintextLen)
+        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, byte[]? plaintext, out NativeCULong plaintextLen)
         {
-            if (plaintext.IsEmpty) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
+            if (plaintext is null) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
             OnDecryptMessageParams?.Invoke(parameter);
             Plaintext.AsSpan(0, Plaintext.Length).CopyTo(plaintext);
             plaintextLen = (NativeCULong)Plaintext.Length;

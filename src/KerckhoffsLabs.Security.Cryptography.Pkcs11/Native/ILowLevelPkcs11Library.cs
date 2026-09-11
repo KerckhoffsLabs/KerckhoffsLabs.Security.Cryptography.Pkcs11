@@ -52,15 +52,20 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count);
     CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface);
     CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
+    // ciphertext is byte[]? (not Span<byte>) so a genuine null (length-probe call) stays
+    // distinguishable from a real, non-null, zero-length output buffer -- `fixed` collapses
+    // both an empty array and an empty span to a null pointer, so Span<byte> can't carry this
+    // distinction (see the implementation in Delegates.cs).
     CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, out NativeCULong ciphertextLen);
+        ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen);
     CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData);
     CKR C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> plaintextPart,
         Span<byte> ciphertextPart, out NativeCULong ciphertextPartLen, NativeCULong flags);
     CKR C_MessageEncryptFinal(NativeCULong session);
     CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
+    // plaintext is byte[]? for the same reason as C_EncryptMessage's ciphertext parameter above.
     CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, out NativeCULong plaintextLen);
+        ReadOnlySpan<byte> ciphertext, byte[]? plaintext, out NativeCULong plaintextLen);
     CKR C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData);
     CKR C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> ciphertextPart,
         Span<byte> plaintextPart, out NativeCULong plaintextPartLen, NativeCULong flags);
