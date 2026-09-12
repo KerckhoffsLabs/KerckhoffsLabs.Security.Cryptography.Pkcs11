@@ -1784,6 +1784,16 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** Kryoptic backend interop testing
 
+### [BL-158] `CKM_PKCS5_PBKD2` only exercised against Kryoptic and NSS — SoftHSM2/opencryptoki never register it
+- **Area:** Interop / Test coverage
+- **Severity:** Info
+- **Effort:** — (documented, no fix possible on either side)
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/Rfc2898DeriveBytesPkcs11.cs`, `MechanismParams/CkmPkcs5Pbkd2Params.cs`; `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Algorithms/Rfc2898DeriveBytesPkcs11Tests*.cs`, `Rfc2898DeriveBytesPkcs11TestCases.cs`
+- **Problem:** Prompted by [latchset/kryoptic#277](https://github.com/latchset/kryoptic/issues/277) (which asks Kryoptic's own suite to extend its PBKDF2 tests beyond the HMAC-SHA1 PRF), a source audit of all four vendored backends found `CKM_PKCS5_PBKD2` had zero coverage here at all — there wasn't even a high-level wrapper to call it with. Backend audit: Kryoptic implements it fully (`src/pbkdf2.rs`, all 7 `CKP_PKCS5_PBKD2_HMAC_*` PRFs except GOST). NSS implements it too (registered in `pkcs11.c`'s mechanism table, dispatched from `NSC_GenerateKey`, SHA1/224/256/384/512). SoftHSM2 only defines the `CKM_PKCS5_PBKD2` constant in its vendored `pkcs11.h` header — no dispatch anywhere in its crypto backend. opencryptoki's soft token has `compute_PKCS5_PBKDF2_HMAC`, but only as an internal helper deriving its own master key from the SO/user PIN — it is never registered in `mech_list.c` or reachable from `C_GenerateKey`/`C_DeriveKey`.
+- **Proposed action:** None — this is a real capability gap in SoftHSM2 and opencryptoki, not a wrapper bug. `Rfc2898DeriveBytesPkcs11` (BCL-`Rfc2898DeriveBytes`-shaped, over `CkmPkcs5Pbkd2Params`) is the exposed API; its test suite cross-checks Kryoptic and NSS output against `Rfc2898DeriveBytes.Pbkdf2` for every PRF both support, and also exercises `GetBytes`'s stream-continuation semantics against the BCL. SoftHSM2/opencryptoki's test files exist for symmetry but skip everything via `RequireMechanism`. Revisit only if either project adds the mechanism upstream.
+- **Breaks public API?** No (adds `Rfc2898DeriveBytesPkcs11` and `CkmPkcs5Pbkd2Params`, purely additive)
+- **Raised by:** Cross-referencing kryoptic#277 against this wrapper's own test coverage
+
 ## PKCS#11 v3.2 Coverage Matrix
 
 **Corrected 2026-08-11:** the three public-façade rows below marked ❌ were previously recorded as ✅. A grep over `Internal/`, `Algorithms/`, `Objects/` and the root types finds no caller for `C_SignUpdate`, `C_SignFinal` or `C_SignRecover`, while `C_EncryptUpdate`/`C_DigestUpdate`/`C_VerifyUpdate` all have callers — and `Pkcs11Key`/`Pkcs11Workspace` expose no `Stream` overload at all. See BL-087 and BL-099.
