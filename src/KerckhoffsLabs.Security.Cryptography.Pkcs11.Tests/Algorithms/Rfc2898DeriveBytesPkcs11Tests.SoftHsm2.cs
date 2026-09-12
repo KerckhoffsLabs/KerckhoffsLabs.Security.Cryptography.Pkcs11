@@ -64,4 +64,25 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_SoftHsm(SoftHsmBackendFixture 
 
     [ConditionalFact(nameof(Available))]
     public void GetBytes_AfterDispose_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_GetBytes_AfterDispose_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void HashAlgorithm_ReturnsConstructedValue() => Rfc2898DeriveBytesPkcs11TestCases.Assert_HashAlgorithm_ReturnsConstructedValue(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void StaticPbkdf2_MatchesBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_MatchesBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void StaticPbkdf2_DestinationSpan_MatchesBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_DestinationSpan_MatchesBcl(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void StaticPbkdf2_NullWorkspace_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_NullWorkspace_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void StaticPbkdf2_NegativeOutputLength_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_NegativeOutputLength_Throws(_backend);
+
+    [ConditionalFact(nameof(Available))]
+    public void StaticPbkdf2_UnsupportedHash_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnsupportedHash_Throws(_backend);
 }

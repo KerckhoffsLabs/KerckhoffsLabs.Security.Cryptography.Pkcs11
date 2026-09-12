@@ -8,6 +8,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 // and this file also drives the ctor's unsupported-hash rejection with MD5 on purpose, so the
 // compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11010
+// This file exercises the instance constructors on purpose (streaming GetBytes and their own
+// argument-validation), even though they are [Obsolete] (KLPKCS11011) in favor of the static
+// Pbkdf2 method.
+#pragma warning disable KLPKCS11011
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -186,5 +190,61 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
         var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
         kdf.Dispose();
         Assert.Throws<ObjectDisposedException>(() => kdf.GetBytes(16));
+    }
+
+    internal static void Assert_HashAlgorithm_ReturnsConstructedValue(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        using var kdf = NewKdf(workspace, HashAlgorithmName.SHA384);
+        Assert.Equal(HashAlgorithmName.SHA384, kdf.HashAlgorithm);
+    }
+
+    // === Static Pbkdf2 (the recommended, non-obsolete entry point) =======================
+
+    internal static void Assert_StaticPbkdf2_MatchesBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
+        using var workspace = OpenWorkspace(backend);
+        workspace.AllowInsecure = true;
+
+        byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
+        byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
+        Assert.Equal(expected, actual);
+    }
+
+    internal static void Assert_StaticPbkdf2_DestinationSpan_MatchesBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
+        using var workspace = OpenWorkspace(backend);
+        workspace.AllowInsecure = true;
+
+        byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
+        byte[] actual = new byte[32];
+        Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, actual, Iterations, HashAlgorithmName.SHA256);
+        Assert.Equal(expected, actual);
+    }
+
+    internal static void Assert_StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        // No RequireMechanism/AllowInsecure: a zero-length request must short-circuit before any
+        // token call, so this must pass even on backends that do not implement CKM_PKCS5_PBKD2.
+        byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, 0);
+        Assert.Empty(actual);
+    }
+
+    internal static void Assert_StaticPbkdf2_NullWorkspace_Throws(IPkcs11Backend backend) =>
+        Assert.Throws<ArgumentNullException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(null!, Password, Salt, Iterations, HashAlgorithmName.SHA256, 32));
+
+    internal static void Assert_StaticPbkdf2_NegativeOutputLength_Throws(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        Assert.Throws<ArgumentOutOfRangeException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, -1));
+    }
+
+    internal static void Assert_StaticPbkdf2_UnsupportedHash_Throws(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.MD5, 32));
     }
 }

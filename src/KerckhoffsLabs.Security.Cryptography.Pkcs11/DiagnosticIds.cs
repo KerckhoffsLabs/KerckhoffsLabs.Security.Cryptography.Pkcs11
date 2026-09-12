@@ -37,4 +37,12 @@ internal static class DiagnosticIds
 
     /// <summary>Named elliptic curves below the 128-bit security baseline.</summary>
     internal const string WeakEcCurve = "KLPKCS11007";
+
+    /// <summary>
+    /// <c>Rfc2898DeriveBytesPkcs11</c>'s instance constructors — not a security obsoletion (PBKDF2
+    /// via the streaming <c>GetBytes</c> path is exactly as secure as the static one-shot path), but
+    /// an API-shape one: mirrors the BCL's own <c>Rfc2898DeriveBytes</c>, whose eight constructors
+    /// are all <c>[Obsolete]</c> in favor of its static <c>Pbkdf2</c> method.
+    /// </summary>
+    internal const string Rfc2898DeriveBytesPkcs11Constructors = "KLPKCS11011";
 }

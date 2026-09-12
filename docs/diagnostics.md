@@ -112,6 +112,15 @@ SHA-256 or stronger.
 Note that **verifying** an existing SHA-1 signature is gated too — the mechanism guard is
 direction-agnostic, so legacy verification needs `AllowInsecure` as well.
 
+<a id="KLPKCS11011"></a>
+### KLPKCS11011 — Rfc2898DeriveBytesPkcs11 constructors
+
+Not a security obsoletion — PBKDF2 through the streaming `GetBytes` path is exactly as secure as
+the static one-shot path below it. This mirrors the BCL's own `Rfc2898DeriveBytes`, whose eight
+constructors are all `[Obsolete]` in favor of its static `Pbkdf2` method. Use the static
+`Rfc2898DeriveBytesPkcs11.Pbkdf2(...)` overloads instead; the constructors remain for streaming
+`GetBytes` calls that continue one PBKDF2 byte stream across several output chunks.
+
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early
