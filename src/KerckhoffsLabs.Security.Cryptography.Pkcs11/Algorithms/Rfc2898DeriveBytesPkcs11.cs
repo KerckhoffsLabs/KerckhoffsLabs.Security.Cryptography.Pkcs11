@@ -292,6 +292,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
             }
             catch (Pkcs11Exception) when (operationFailed)
             {
+                // Deliberately swallowed: see the remarks. The primary exception is the useful one.
             }
         }
     }

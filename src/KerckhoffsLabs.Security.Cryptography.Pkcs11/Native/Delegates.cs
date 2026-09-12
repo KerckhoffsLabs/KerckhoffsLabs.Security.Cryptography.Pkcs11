@@ -1101,6 +1101,19 @@ internal class Delegates
 
     // ── Message-AEAD family wrappers (v3.0) ──────────────────────────────────────
 
+    /// <summary>
+    /// Resolves the pointer to pass for a nullable, possibly-empty output buffer: <c>null</c> when
+    /// <paramref name="buffer"/> itself is <c>null</c> (the length-probe signal), the sentinel address
+    /// when it is real but empty (since <c>fixed</c> yields a null pointer for any empty array, and
+    /// null would be indistinguishable from the probe signal here), or <paramref name="raw"/> otherwise.
+    /// </summary>
+    private static unsafe byte* SentinelOrData(byte[]? buffer, byte* raw, byte* sentinel)
+    {
+        if (buffer is null)
+            return null;
+        return buffer.Length == 0 ? sentinel : raw;
+    }
+
     /// <summary>Wrapper for <c>C_MessageEncryptInit</c> (PKCS#11 v3.0). Throws if the fptr is null.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see
@@ -1138,7 +1151,7 @@ internal class Delegates
         {
             byte* adPtr = associatedData.Length == 0 ? &sentinel : adRaw;
             byte* ptPtr = plaintext.Length == 0 ? &sentinel : ptRaw;
-            byte* ctPtr = ciphertext is null ? null : ciphertext.Length == 0 ? &sentinel : ctRaw;
+            byte* ctPtr = SentinelOrData(ciphertext, ctRaw, &sentinel);
             return _fp.C_EncryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length, ptPtr, (NativeCULong)plaintext.Length, ctPtr, ctLenPtr);
         }
     }
@@ -1207,7 +1220,7 @@ internal class Delegates
         {
             byte* adPtr = associatedData.Length == 0 ? &sentinel : adRaw;
             byte* ctPtr = ciphertext.Length == 0 ? &sentinel : ctRaw;
-            byte* ptPtr = plaintext is null ? null : plaintext.Length == 0 ? &sentinel : ptRaw;
+            byte* ptPtr = SentinelOrData(plaintext, ptRaw, &sentinel);
             return _fp.C_DecryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length, ctPtr, (NativeCULong)ciphertext.Length, ptPtr, ptLenPtr);
         }
     }
