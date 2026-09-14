@@ -10,12 +10,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// xUnit collection fixture wrapping Kryoptic — a fourth, fully independent real PKCS#11
 /// implementation (Rust, OpenSSL-backed) alongside SoftHSM2, opencryptoki, and NSS softoken.
 /// NSS already covers ChaCha20-Poly1305 and the SP800-108 counter KDF on a real token, but
-/// AES-CCM and SLH-DSA still had zero real-backend coverage — Kryoptic 1.5.2 implements both
-/// (confirmed via its own <c>C_GetMechanismList</c>: <see cref="CKM.CKM_AES_CCM"/> and
-/// <see cref="CKM.CKM_SLH_DSA"/> are both advertised; <c>CKM_CHACHA20_POLY1305</c> is not — Kryoptic
-/// 1.5.2 has no ChaCha20 support at all, so that gap remains NSS-only), closing the remaining gap
-/// instead of leaving those two families' <c>CK_*_PARAMS</c> marshalling verified only by the
-/// in-process <c>ManagedSoftToken</c> fake.
+/// AES-CCM and SLH-DSA still had zero real-backend coverage — Kryoptic implements both (confirmed
+/// via its own <c>C_GetMechanismList</c>: <see cref="CKM.CKM_AES_CCM"/> and <see cref="CKM.CKM_SLH_DSA"/>
+/// are both advertised), closing the remaining gap instead of leaving those two families'
+/// <c>CK_*_PARAMS</c> marshalling verified only by the in-process <c>ManagedSoftToken</c> fake.
+/// Kryoptic also now implements <c>CKM_CHACHA20_POLY1305</c>, giving that family a second real
+/// backend alongside NSS.
 ///
 /// Uses the library built from the vendor/kryoptic submodule and placed next to the test assembly
 /// by the BuildKryoptic MSBuild target; <see cref="Settings.KryopticLibraryPath"/> may override the
@@ -48,11 +48,10 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     // override is needed because this backend is built with `pqc` on every leg that runs it
     // (see build-kryoptic.sh) — the mechanism list already tells the truth.
 
-    /// <summary>True if the token supports <see cref="CKM.CKM_CHACHA20_POLY1305"/>. Kryoptic 1.5.2
-    /// has no ChaCha20 support of any kind (confirmed against its own <c>C_GetMechanismList</c> and
-    /// its source, which defines no ChaCha20 mechanism at all) — NSS softoken remains the only real
-    /// backend for this mechanism family.</summary>
-    public static bool KryopticSupportsChaCha20Poly1305 => false;
+    /// <summary>True if the token supports <see cref="CKM.CKM_CHACHA20_POLY1305"/>. Added upstream
+    /// alongside <c>CKM_CHACHA20</c> — before that, Kryoptic had no ChaCha20 support of any kind and
+    /// NSS softoken was the only real backend for this mechanism family.</summary>
+    public static bool KryopticSupportsChaCha20Poly1305 => true;
 
     private const int SlotNumber = 0;
 

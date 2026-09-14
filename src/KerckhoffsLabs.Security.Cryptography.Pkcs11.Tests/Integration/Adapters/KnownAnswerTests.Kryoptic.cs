@@ -28,7 +28,6 @@ public sealed class KnownAnswerTests_Kryoptic(KryopticBackendFixture backend)
     [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void Ed25519_Kat() => KnownAnswerTestCases.Assert_Ed25519_Kat(_backend);
 
-    // Kryoptic 1.5.2 has no ChaCha20 support at all (see KryopticBackendFixture.KryopticSupportsChaCha20Poly1305).
     [Fact(SkipUnless = nameof(KryopticAvailableWithChaCha20Poly1305), Skip = "Requires " + nameof(KryopticAvailableWithChaCha20Poly1305))]
     public void ChaCha20Poly1305_Kat() => KnownAnswerTestCases.Assert_ChaCha20Poly1305_Kat(_backend);
 
