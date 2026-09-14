@@ -3,7 +3,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -31,7 +30,7 @@ internal static class AesCcmPkcs11TestCases
     private static void RequireCcm(IPkcs11Backend backend)
     {
         if (!backend.Supports(CKM.CKM_AES_CCM))
-            throw new SkipTestException("Backend does not advertise CKM_AES_CCM.");
+            Assert.Skip("Backend does not advertise CKM_AES_CCM.");
     }
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)

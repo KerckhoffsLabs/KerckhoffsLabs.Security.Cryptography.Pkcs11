@@ -18,16 +18,16 @@ public sealed class EncryptAesTests_Mock(MockBackendFixture f)
     // a fixed characteristic of the vendored mock shim's C source, not a per-host capability, so a
     // constant condition is appropriate here (flip it if pkcs11-mock is ever extended). A static
     // [Fact(Skip = "...")] (flagged by xUnit1004) hard-disables the test with no named, auditable
-    // gate; [ConditionalFact] ties it to this property instead, matching every other permanently-off
+    // gate; [Fact(SkipUnless = ...)] ties it to this property instead, matching every other permanently-off
     // capability gate in this suite (e.g. NssBackendFixture.SupportsRc2Ecb).
     public static bool SupportsAesCbcPad => false;
 
     // Crypto-correctness: needs a backend that actually implements AES-CBC-PAD.
-    [ConditionalFact(nameof(SupportsAesCbcPad))]
+    [Fact(SkipUnless = nameof(SupportsAesCbcPad), Skip = "Requires " + nameof(SupportsAesCbcPad))]
     public void AesCbcPad_ProducesCiphertext_Mock()
         => EncryptAesTestCases.Assert_AesCbcPad_ProducesCiphertext(_backend);
 
-    [ConditionalFact(nameof(SupportsAesCbcPad))]
+    [Fact(SkipUnless = nameof(SupportsAesCbcPad), Skip = "Requires " + nameof(SupportsAesCbcPad))]
     public void AesCbcPad_RoundTrip_Mock()
         => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 

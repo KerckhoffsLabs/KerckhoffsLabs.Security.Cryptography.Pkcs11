@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 
 /// <summary>
 /// CI-health guard: makes a missing NSS softoken fail loudly instead of silently skipping the whole
-/// <c>[ConditionalFact(NssAvailable)]</c> suite while CI stays green — without it, a build or staging
+/// <c>[Fact(SkipUnless = nameof(NssAvailable))]</c> suite while CI stays green — without it, a build or staging
 /// regression would erase the third-real-backend cross-check unnoticed. NSS is built from source only
 /// on its dedicated leg, which declares the promise with <c>PKCS11_TEST_EXPECT_NSS=1</c> on its test
 /// step, so the guard is keyed on that marker rather than on the generic <c>CI</c> variable.

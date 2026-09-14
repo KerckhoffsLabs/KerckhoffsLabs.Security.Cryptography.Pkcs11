@@ -48,7 +48,7 @@ public sealed class NativeStructLayoutTests
 
     // === #3 — field-offset pins (LP64: CK_ULONG = 8, pointer = 8, natural align) ==========
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void Lp64_Offsets_GcmParams()
     {
         Assert.Equal(0, Off<CK_GCM_PARAMS>("Iv"));
@@ -59,7 +59,7 @@ public sealed class NativeStructLayoutTests
         Assert.Equal(40, Off<CK_GCM_PARAMS>("TagBits"));
     }
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void Lp64_Offsets_Ecdh1DeriveParams()
     {
         Assert.Equal(0, Off<CK_ECDH1_DERIVE_PARAMS>("Kdf"));
@@ -69,7 +69,7 @@ public sealed class NativeStructLayoutTests
         Assert.Equal(32, Off<CK_ECDH1_DERIVE_PARAMS>("PublicData"));
     }
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void Lp64_Offsets_OaepParams()
     {
         Assert.Equal(0, Off<CK_RSA_PKCS_OAEP_PARAMS>("HashAlg"));
@@ -79,7 +79,7 @@ public sealed class NativeStructLayoutTests
         Assert.Equal(32, Off<CK_RSA_PKCS_OAEP_PARAMS>("SourceDataLen"));
     }
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void Lp64_Offsets_CcmParams()
     {
         Assert.Equal(0, Off<CK_CCM_PARAMS>("DataLen"));
@@ -90,7 +90,7 @@ public sealed class NativeStructLayoutTests
         Assert.Equal(40, Off<CK_CCM_PARAMS>("MACLen"));
     }
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void Lp64_Offsets_EddsaParams()
     {
         // PhFlag is a 1-byte BOOL; the following CK_ULONG re-aligns to offset 8.
@@ -115,7 +115,7 @@ public sealed class NativeStructLayoutTests
     /// mostly <c>vendor/opencryptoki/…/pkcs11types.h</c>, falling back to
     /// <c>vendor/pkcs11-mock/…/pkcs11t.h</c> for structs opencryptoki does not declare.
     /// </remarks>
-    [ConditionalTheory(nameof(IsUnix))]
+    [Theory(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     // BEGIN PROBED offset pins — Linux x64, LP64
     [InlineData(typeof(CK_AES_CBC_ENCRYPT_DATA_PARAMS), "Iv:0,Data:16,Length:24")]
     [InlineData(typeof(CK_AES_CTR_PARAMS), "CounterBits:0,Cb:8")]

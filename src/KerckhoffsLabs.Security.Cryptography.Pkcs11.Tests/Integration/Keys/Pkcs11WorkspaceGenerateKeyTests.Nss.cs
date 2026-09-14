@@ -16,7 +16,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_Nss(NssBackendFixture backen
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void GenerateKey_Symmetric_ReturnsKeyWithLabelAndType()
     {
         using var workspace = OpenWorkspace();
@@ -35,7 +35,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_Nss(NssBackendFixture backen
         finally { workspace.Session.DestroyObject(key.PrivateHandle); }
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void GenerateKey_Asymmetric_ReturnsKeyWithBothHandles()
     {
         using var workspace = OpenWorkspace();

@@ -53,7 +53,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         string.Equals(Environment.GetEnvironmentVariable("PKCS11_TEST_EXPECT_SOFTHSM_V240"), "1", StringComparison.Ordinal);
 
     // === SoftHSM 2.7 capability gates ======================================
-    // These are static so they can be passed to [ConditionalFact(nameof(...))],
+    // These are static so they can be passed to [Fact(SkipUnless = nameof(...))],
     // which is evaluated before any fixture instance exists. They encode the
     // capability gaps of the SoftHSM build we ship in vendor/softhsmv2 — when
     // we move to a newer SoftHSM or a real HSM, flip the relevant flag.
@@ -112,11 +112,25 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         LibraryPath = libPath;
         _utilPath = ResolveUtil(libPath);
 
-        // Write config next to the library so the baked-in DEFAULT_SOFTHSM2_CONF
-        // is satisfied. SoftHSM2 creates UUID subdirs inside _tokenStoreDir.
+        // Write config next to the library so the baked-in DEFAULT_SOFTHSM2_CONF is satisfied.
         string nativeDir = Path.GetDirectoryName(libPath)!;
         _configPath = Path.Join(nativeDir, "softhsm2.conf");
-        _tokenStoreDir = Path.Join(nativeDir, "tokens");
+
+        // On Windows, every token-object path SoftHSM2 creates here
+        // (<nativeDir>\tokens\<token-uuid>\<object-uuid>.object) lands at 278 characters --
+        // 18 over the classic Win32 MAX_PATH (260) -- because of how deep GitHub Actions'
+        // checkout ("D:\a\<repo>\<repo>\...") plus this project's own build output path nest.
+        // The vendored SoftHSM2 Windows build opens object files via narrow, non-long-path-aware
+        // fopen()/CreateFileA, so every C_CreateObject/C_GenerateKey* for a CKA_TOKEN object
+        // fails with ERROR_PATH_NOT_FOUND ("No such file or directory" -> CKR_GENERAL_ERROR),
+        // confirmed via SoftHSM's own DEBUG log: 100% of "Created new object" attempts were
+        // immediately followed by that exact failure, with zero exceptions. Session objects
+        // (no on-disk file) are unaffected, which is why some tests still passed. Rooting the
+        // token store at a short, OS-temp-based path instead keeps every object path comfortably
+        // under 260 chars regardless of how deep the repo checkout is.
+        _tokenStoreDir = OperatingSystem.IsWindows()
+            ? Path.Join(Path.GetTempPath(), "sthsm-" + Guid.NewGuid().ToString("N")[..8])
+            : Path.Join(nativeDir, "tokens");
         Directory.CreateDirectory(_tokenStoreDir);
 
         File.WriteAllText(_configPath,

@@ -204,7 +204,7 @@ dotnet build src/KerckhoffsLabs.sln
 If you already cloned without submodules, run `git submodule update --init --recursive` first.
 
 ```bash
-dotnet test src/KerckhoffsLabs.sln
+dotnet test --solution src/KerckhoffsLabs.sln
 ```
 
 Tests build `pkcs11-mock` from the vendored submodule automatically via an MSBuild target — this

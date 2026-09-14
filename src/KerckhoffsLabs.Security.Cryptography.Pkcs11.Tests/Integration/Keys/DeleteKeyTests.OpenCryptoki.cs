@@ -10,7 +10,7 @@ public sealed class DeleteKeyTests_OpenCryptoki(OpenCryptokiBackendFixture backe
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
         using var workspace = _backend.Library.OpenWorkspace(

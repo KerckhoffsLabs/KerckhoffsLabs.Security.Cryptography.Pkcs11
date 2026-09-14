@@ -26,7 +26,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
 
     // Two parties run ECDH1 (CKD_NULL) over P-256; the derived on-token AES keys must be identical,
     // proven by a cross-party AES-GCM encrypt-with-Alice / decrypt-with-Bob round-trip.
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
@@ -50,7 +50,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
@@ -61,7 +61,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
             () => workspace.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void NullKey_Throws()
     {
         using var workspace = OpenWorkspace();
@@ -71,7 +71,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
 
     // === ECParameters overload: validates the peer, then agrees exactly like the raw-span form ===
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
     {
         using var workspace = OpenWorkspace();
@@ -93,7 +93,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ECParametersOverload_RejectsPeerOnDifferentCurve()
     {
         using var workspace = OpenWorkspace();

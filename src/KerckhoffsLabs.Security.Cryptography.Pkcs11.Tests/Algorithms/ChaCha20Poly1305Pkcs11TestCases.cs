@@ -3,7 +3,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -44,7 +43,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
     private static void WithChaCha(IPkcs11Backend backend, Action<ChaCha20Poly1305Pkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_CHACHA20_POLY1305))
-            throw new SkipTestException("Backend does not advertise CKM_CHACHA20_POLY1305.");
+            Assert.Skip("Backend does not advertise CKM_CHACHA20_POLY1305.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"chacha-{Guid.NewGuid():N}";
@@ -65,7 +64,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
     private static void WithImportedChaCha(IPkcs11Backend backend, byte[] rawKey, Action<ChaCha20Poly1305Pkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_CHACHA20_POLY1305))
-            throw new SkipTestException("Backend does not advertise CKM_CHACHA20_POLY1305.");
+            Assert.Skip("Backend does not advertise CKM_CHACHA20_POLY1305.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"chacha-kat-{Guid.NewGuid():N}";

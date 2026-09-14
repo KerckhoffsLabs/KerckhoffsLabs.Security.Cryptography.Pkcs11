@@ -16,38 +16,40 @@ public sealed class KnownAnswerTests_Kryoptic(KryopticBackendFixture backend)
     private readonly KryopticBackendFixture _backend = backend;
     public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
     public static bool KryopticSupportsChaCha20Poly1305 => KryopticBackendFixture.KryopticSupportsChaCha20Poly1305;
+    // xUnit v3's SkipUnless takes a single member, unlike v2's ConditionalFact(params string[]).
+    public static bool KryopticAvailableWithChaCha20Poly1305 => KryopticAvailable && KryopticSupportsChaCha20Poly1305;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void AesGcm_Kat() => KnownAnswerTestCases.Assert_AesGcm_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void HmacSha256_Kat() => KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void Ed25519_Kat() => KnownAnswerTestCases.Assert_Ed25519_Kat(_backend);
 
     // Kryoptic 1.5.2 has no ChaCha20 support at all (see KryopticBackendFixture.KryopticSupportsChaCha20Poly1305).
-    [ConditionalFact(nameof(KryopticAvailable), nameof(KryopticSupportsChaCha20Poly1305))]
+    [Fact(SkipUnless = nameof(KryopticAvailableWithChaCha20Poly1305), Skip = "Requires " + nameof(KryopticAvailableWithChaCha20Poly1305))]
     public void ChaCha20Poly1305_Kat() => KnownAnswerTestCases.Assert_ChaCha20Poly1305_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void HmacSha384_Kat() => KnownAnswerTestCases.Assert_HmacSha384_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void HmacSha512_Kat() => KnownAnswerTestCases.Assert_HmacSha512_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void AesKeyWrap_Kat() => KnownAnswerTestCases.Assert_AesKeyWrap_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void RsaOaep_Kat() => KnownAnswerTestCases.Assert_RsaOaep_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void RsaPss_Kat() => KnownAnswerTestCases.Assert_RsaPss_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void EcdsaP256_Kat() => KnownAnswerTestCases.Assert_EcdsaP256_Kat(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void EcdhP256_Kat() => KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend);
 }

@@ -53,7 +53,7 @@ public sealed class AesCcmPkcs11Tests_Managed
 
     // === Real crypto: cross-checked against the BCL ======================================
 
-    [ConditionalTheory(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Theory(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     [InlineData(16)] // AES-128
     [InlineData(24)] // AES-192
     [InlineData(32)] // AES-256
@@ -83,7 +83,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    [ConditionalTheory(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Theory(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     [InlineData(7, 16)]  // shortest nonce, longest tag
     [InlineData(13, 4)]  // longest nonce, shortest tag
     [InlineData(12, 8)]
@@ -115,7 +115,7 @@ public sealed class AesCcmPkcs11Tests_Managed
     }
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_BclCiphertext_RoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -136,7 +136,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void EncryptDecrypt_EmptyPlaintext_AadOnly_MatchesBcl()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -157,7 +157,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         });
     }
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void EncryptDecrypt_NoAad_RoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(16);
@@ -180,7 +180,7 @@ public sealed class AesCcmPkcs11Tests_Managed
     // marshalling path and matching the published ciphertext/tag byte-for-byte catches a parameter
     // mis-encoding even if it were shared by the adapter and the fake. (Independently confirmed against
     // the BCL AesCcm primitive, which reproduces the same bytes.)
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector()
     {
         byte[] key = H("c0c1c2c3c4c5c6c7c8c9cacbcccdcecf");
@@ -206,7 +206,7 @@ public sealed class AesCcmPkcs11Tests_Managed
 
     // === Authenticity: every input the tag covers must be rejected when altered ===========
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_TamperedTag_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -218,7 +218,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, new byte[pt.Length]));
     });
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_TamperedCiphertext_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -230,7 +230,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, new byte[pt.Length]));
     });
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_WrongAad_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -241,7 +241,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, new byte[pt.Length], "aad-B"u8.ToArray()));
     });
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_WrongNonce_Throws() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);
@@ -254,7 +254,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         AssertAuthFailure(() => ccm.Decrypt(wrongNonce, ct, tag, new byte[pt.Length]));
     });
 
-    [ConditionalFact(typeof(AesCcm), nameof(AesCcm.IsSupported))]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_WrongKey_Throws()
     {
         byte[] keyA = RandomNumberGenerator.GetBytes(32);

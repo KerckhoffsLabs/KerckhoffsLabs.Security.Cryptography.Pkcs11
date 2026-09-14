@@ -27,7 +27,7 @@ public sealed class MD5Pkcs11_Managed
 
     // === The gate: MD5 is blocked by default, unlocked only inside an insecure scope =======
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_GatedByDefault_Throws()
     {
         using var library = ManagedToken.NewLibrary();
@@ -39,7 +39,7 @@ public sealed class MD5Pkcs11_Managed
         Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_OutsideScope_AfterScopeClosed_Throws()
     {
         using var library = ManagedToken.NewLibrary();
@@ -59,7 +59,7 @@ public sealed class MD5Pkcs11_Managed
 
     // === Known-answer + BCL cross-checks (computed inside the insecure scope) ==============
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_WithAllowInsecureScope_KnownAnswer_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -79,7 +79,7 @@ public sealed class MD5Pkcs11_Managed
         }
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_WithAllowInsecureFlag_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -96,7 +96,7 @@ public sealed class MD5Pkcs11_Managed
         Assert.Equal(MD5.HashData(data), digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_EmptyInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -114,7 +114,7 @@ public sealed class MD5Pkcs11_Managed
         }
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -128,7 +128,7 @@ public sealed class MD5Pkcs11_Managed
 
     // === Streaming / reuse ================================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -147,7 +147,7 @@ public sealed class MD5Pkcs11_Managed
         Assert.Equal(MD5.HashData(Encoding.UTF8.GetBytes("hello world")), streamed);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();

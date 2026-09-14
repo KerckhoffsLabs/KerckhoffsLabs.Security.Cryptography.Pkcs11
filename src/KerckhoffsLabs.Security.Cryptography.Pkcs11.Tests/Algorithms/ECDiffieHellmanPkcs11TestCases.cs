@@ -6,7 +6,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -53,7 +52,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
     private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDH1_DERIVE))
-            throw new SkipTestException("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
+            Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
 
         using var workspace = OpenWorkspace(backend);
         if (allowExtraction) workspace.AllowInsecure = true;

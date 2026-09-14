@@ -19,9 +19,9 @@ public sealed class EncapsulateKeyTests_Kryoptic(KryopticBackendFixture backend)
     // gap -- it is the CKF_ENCAPSULATE/CKF_DECAPSULATE flag on those mechanisms that is missing.
     public static bool SupportsAsymmetricEncapsulate => false;
 
-    [ConditionalFact(nameof(SupportsAsymmetricEncapsulate))]
+    [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void RsaOaep_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_RsaOaep_EncapsulateDecapsulate_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(SupportsAsymmetricEncapsulate))]
+    [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
 }

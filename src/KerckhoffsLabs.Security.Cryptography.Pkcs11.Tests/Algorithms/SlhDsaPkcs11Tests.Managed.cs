@@ -66,7 +66,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
 
     // === Sign / verify — pure SLH-DSA, round trip + tamper ================
 
-    [ConditionalTheory(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Theory(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F)]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192F)]
@@ -83,7 +83,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
             Assert.False(slhdsa.VerifyData(tampered, sig));
         });
 
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void SignVerifyData_WithContext_RoundTrips() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
         {
@@ -97,7 +97,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
         });
 
     // A tampered signature must be rejected by the token.
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void VerifyData_TamperedSignature_ReturnsFalse() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
         {
@@ -113,7 +113,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
 
     // The token's exported public key is the FIPS 205 standard encoding; an independent BCL SlhDsa
     // built from it must verify a signature the token produced.
-    [ConditionalTheory(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Theory(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F)]
     public void TokenSignature_VerifiesWithBcl(CkpSlhDsa parameterSet) =>
@@ -134,7 +134,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
 
     // The token's exported public key round-trips byte-for-byte through a BCL import/re-export, and
     // the BCL agrees on context binding for a token-produced, context-bound signature.
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void ExportedPublicKey_RoundTripsThroughBcl_AndBclAgreesOnContext() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
         {
@@ -155,7 +155,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
         });
 
     // The exported public key is exactly PublicKeySizeInBytes for the parameter set.
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void ExportSlhDsaPublicKey_ReturnsStandardEncoding() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
         {
@@ -165,7 +165,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
 
     // === Context-length validation =======================================
 
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void SignData_ContextTooLong_Throws() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
             // The BCL validates the >255-byte context first (ArgumentOutOfRangeException) before our
@@ -174,12 +174,12 @@ public sealed class SlhDsaPkcs11Tests_Managed
 
     // === Private-key export is refused ===================================
 
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void ExportSlhDsaPrivateKey_ThrowsInsecure() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
             Assert.Throws<InsecureOperationException>(() => slhdsa.ExportSlhDsaPrivateKey()));
 
-    [ConditionalFact(typeof(SlhDsa), nameof(SlhDsa.IsSupported))]
+    [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
             Assert.Throws<InsecureOperationException>(() => slhdsa.ExportPkcs8PrivateKey()));

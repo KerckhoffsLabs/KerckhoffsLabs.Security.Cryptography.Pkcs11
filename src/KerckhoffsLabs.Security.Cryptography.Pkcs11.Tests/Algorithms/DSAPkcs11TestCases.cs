@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // DSAPkcs11 is intentionally [Obsolete] (DSA is disallowed by FIPS 186-5); exercising it here is deliberate.
 #pragma warning disable KLPKCS11006
@@ -69,7 +68,7 @@ internal static class DSAPkcs11TestCases
     private static void WithDsa(IPkcs11Backend backend, bool allowInsecure, Action<Pkcs11Workspace, DSAPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DSA))
-            throw new SkipTestException("Backend does not advertise CKM_DSA.");
+            Assert.Skip("Backend does not advertise CKM_DSA.");
 
         using var workspace = OpenWorkspace(backend);
         if (allowInsecure) workspace.AllowInsecure = true;
@@ -151,7 +150,7 @@ internal static class DSAPkcs11TestCases
     internal static void Assert_SignData_VerifiesUnderBclWithExportedPublicKey(IPkcs11Backend backend)
     {
         if (!DsaSupported)
-            throw new SkipTestException("Platform BCL cannot import a 2048-bit DSA key (macOS DSASecurityTransforms).");
+            Assert.Skip("Platform BCL cannot import a 2048-bit DSA key (macOS DSASecurityTransforms).");
 
         WithDsa(backend, dsa =>
         {

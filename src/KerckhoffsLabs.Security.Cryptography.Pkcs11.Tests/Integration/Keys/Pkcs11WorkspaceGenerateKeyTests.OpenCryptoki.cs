@@ -15,7 +15,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_OpenCryptoki(OpenCryptokiBac
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void GenerateKey_Symmetric_ReturnsKeyWithLabelAndType()
     {
         using var workspace = OpenWorkspace();
@@ -34,7 +34,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_OpenCryptoki(OpenCryptokiBac
         finally { workspace.Session.DestroyObject(key.PrivateHandle); }
     }
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void GenerateKey_Asymmetric_ReturnsKeyWithBothHandles()
     {
         using var workspace = OpenWorkspace();

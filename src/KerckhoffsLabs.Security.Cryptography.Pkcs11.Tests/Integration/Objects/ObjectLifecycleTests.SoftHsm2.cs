@@ -30,12 +30,12 @@ internal static class ObjectLifecycleTestCases
                 using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA);
                 using var findLabel = new ObjectAttribute(CKA.CKA_LABEL, label);
                 var found = session.FindAllObjects([findClass, findLabel]);
-                Assert.Single(found);
+                var obj = Assert.Single(found);
 
                 // GetAttributeValue retrieves the value.
-                using var attrs = session.GetAttributeValue(found[0], [CKA.CKA_VALUE]);
-                Assert.Single(attrs);
-                Assert.Equal(value, attrs[0].GetValueAsByteArray());
+                using var attrs = session.GetAttributeValue(obj, [CKA.CKA_VALUE]);
+                var attr = Assert.Single(attrs);
+                Assert.Equal(value, attr.GetValueAsByteArray());
             }
             finally
             {
@@ -63,6 +63,6 @@ public sealed class ObjectLifecycleTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void CreateFindDestroy_DataObject() => ObjectLifecycleTestCases.Assert_CreateFindDestroy_DataObject(_backend);
 }

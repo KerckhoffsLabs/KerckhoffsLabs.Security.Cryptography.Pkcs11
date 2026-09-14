@@ -21,7 +21,7 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = OpenWorkspace();
@@ -43,9 +43,9 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
             using var objs = workspace.FindObjects(filter);
-            Assert.Single(objs);
-            Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
-            Assert.Equal(der, objs[0].GetValue());
+            var obj = Assert.Single(objs);
+            Assert.Equal(CKO.CKO_CERTIFICATE, obj.ObjectClass);
+            Assert.Equal(der, obj.GetValue());
         }
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
@@ -58,7 +58,7 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = OpenWorkspace();

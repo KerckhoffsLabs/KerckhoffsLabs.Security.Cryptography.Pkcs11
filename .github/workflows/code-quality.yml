@@ -117,8 +117,11 @@ jobs:
           /d:sonar.coverage.exclusions="**/*.Generators/**/*.cs"
           /d:sonar.exclusions="vendor/**,docs/images/**"
 
+      # -p:UseMicrosoftTestingPlatformRunner=true: only this (Linux-only) job needs the full MTP
+      # entry point, for coverlet.MTP's extension hook to register at all -- see the test csproj
+      # for why every other leg deliberately builds without it.
       - name: Build
-        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
+        run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release -p:UseMicrosoftTestingPlatformRunner=true
 
       # Both backends present on Linux → coverage spans the mock and SoftHSM2 paths. A single
       # pass emits BOTH coverage formats — OpenCover (Sonar's first-class .NET format, imported
@@ -128,10 +131,9 @@ jobs:
       # and can't be selected here.
       - name: Test with coverage
         run: >
-          dotnet test src/KerckhoffsLabs.sln --no-build -c Release
-          --collect:"XPlat Code Coverage;Format=opencover,cobertura"
-          --results-directory ./coverage
-          --logger "console;verbosity=normal"
+          dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release
+          --results-directory ./coverage --output Detailed
+          -- --coverlet --coverlet-output-format opencover --coverlet-output-format cobertura
 
       # Upload the Cobertura reports to Codecov. Push-only to preserve the previous coverage
       # workflow's trigger (and to avoid touching fork PRs, where the token is unavailable).

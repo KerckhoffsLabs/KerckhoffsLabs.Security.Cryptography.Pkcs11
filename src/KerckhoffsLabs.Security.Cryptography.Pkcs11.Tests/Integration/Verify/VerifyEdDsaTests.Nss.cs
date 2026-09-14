@@ -1,6 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
 
@@ -16,11 +15,11 @@ public sealed class VerifyEdDsaTests_Nss(NssBackendFixture backend)
 
     // NSS's CKM_EDDSA needs a CK_EDDSA_PARAMS the shared bare-parameter case does not pass; skip.
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.EdDsaAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.EdDsaAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.EdDsaAvailable))]
     public void Ed25519_RejectsTamperedData()
     {
         if (!_backend.Supports(CKM.CKM_EDDSA) || !_backend.Supports(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN))
-            throw new SkipTestException("NSS: EdDSA (CKM_EDDSA / CKM_EC_EDWARDS_KEY_PAIR_GEN) not available");
+            Assert.Skip("NSS: EdDSA (CKM_EDDSA / CKM_EC_EDWARDS_KEY_PAIR_GEN) not available");
         VerifyEdDsaTestCases.Assert_Ed25519_RejectsTamperedData(_backend);
     }
 }

@@ -8,7 +8,7 @@ public sealed class SmokeTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void GetInfo_AndSlots_AreWellFormed()
         => SmokeTestAssertions.AssertLibraryInfoAndSlots_AreWellFormed(_backend);
 }

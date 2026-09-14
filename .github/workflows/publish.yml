@@ -33,7 +33,7 @@ jobs:
 
       - run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release /p:Version=$VERSION
 
-      - run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release
+      - run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release
 
       - name: Pack
         run: dotnet pack src/KerckhoffsLabs.Security.Cryptography.Pkcs11/KerckhoffsLabs.Security.Cryptography.Pkcs11.csproj --no-build -c Release -o ./artifacts /p:Version=$VERSION

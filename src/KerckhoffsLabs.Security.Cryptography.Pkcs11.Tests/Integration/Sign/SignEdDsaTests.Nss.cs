@@ -1,6 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 
@@ -20,10 +19,10 @@ public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
     private void RequireEdDsa()
     {
         if (!_backend.Supports(CKM.CKM_EDDSA) || !_backend.Supports(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN))
-            throw new SkipTestException("NSS: EdDSA (CKM_EDDSA / CKM_EC_EDWARDS_KEY_PAIR_GEN) not available");
+            Assert.Skip("NSS: EdDSA (CKM_EDDSA / CKM_EC_EDWARDS_KEY_PAIR_GEN) not available");
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.EdDsaAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.EdDsaAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.EdDsaAvailable))]
     public void Ed25519_RoundTrip()
     {
         RequireEdDsa();
@@ -38,7 +37,7 @@ public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
     // params already fix elsewhere (Kryoptic, opencryptoki) -- NSS never reaches signing at all.
     public static bool SupportsEd448KeyGeneration => false;
 
-    [ConditionalFact(nameof(SupportsEd448KeyGeneration))]
+    [Fact(SkipUnless = nameof(SupportsEd448KeyGeneration), Skip = "Requires " + nameof(SupportsEd448KeyGeneration))]
     public void Ed448_RoundTrip()
     {
         RequireEdDsa();

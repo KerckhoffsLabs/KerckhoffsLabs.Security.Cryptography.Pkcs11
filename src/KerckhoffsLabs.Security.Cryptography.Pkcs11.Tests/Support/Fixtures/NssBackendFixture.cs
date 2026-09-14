@@ -51,7 +51,7 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     // === NSS generic-token capability gates ================================
     // The login-not-required "NSS Generic Crypto Services" token is write-protected and its classic
     // AES-GCM params path deviates from the other backends. These static gates let the shared-case
-    // wrappers skip the affected cases (ConditionalFact) instead of failing, the same way the
+    // wrappers skip the affected cases (SkipUnless) instead of failing, the same way the
     // mechanism-list gates skip unsupported mechanisms — so the boundary is visible, not hidden.
 
     /// <summary>NSS's generic crypto token is write-protected (<c>C_GenerateKey</c>/

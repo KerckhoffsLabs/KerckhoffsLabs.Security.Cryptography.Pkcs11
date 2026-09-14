@@ -6,7 +6,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
 // AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
@@ -30,7 +29,7 @@ internal static class RSAPkcs11TestCases
     {
         CKM[] missing = [.. mechanisms.Where(m => !backend.Supports(m))];
         if (missing.Length > 0)
-            throw new SkipTestException($"Backend does not advertise {string.Join(", ", missing)}.");
+            Assert.Skip($"Backend does not advertise {string.Join(", ", missing)}.");
     }
 
     private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace, int modulusBits = 2048)
@@ -86,7 +85,8 @@ internal static class RSAPkcs11TestCases
             CKR.CKR_MECHANISM_PARAM_INVALID or CKR.CKR_MECHANISM_INVALID or
             CKR.CKR_ARGUMENTS_BAD or CKR.CKR_FUNCTION_NOT_SUPPORTED)
         {
-            throw new SkipTestException("Token advertises OAEP but rejects this hash parameter.");
+            Assert.Skip("Token advertises OAEP but rejects this hash parameter.");
+            throw; // Assert.Skip always throws; xunit.v3.assert 4.0.1 lacks [DoesNotReturn].
         }
     }
 
@@ -142,7 +142,7 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_SignVerifyData_AcrossKeySizes_RoundTrips(IPkcs11Backend backend, int modulusBits)
     {
         if (modulusBits >= 8192 && !LargeRsaKeysEnabled)
-            throw new SkipTestException($"RSA-{modulusBits} keygen is restricted to the Linux x64 CI leg (too slow elsewhere).");
+            Assert.Skip($"RSA-{modulusBits} keygen is restricted to the Linux x64 CI leg (too slow elsewhere).");
 
         Require(backend, CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var workspace = OpenWorkspace(backend);

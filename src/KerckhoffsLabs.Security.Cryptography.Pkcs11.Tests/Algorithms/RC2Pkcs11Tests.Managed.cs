@@ -119,7 +119,7 @@ public sealed class RC2Pkcs11Tests_Managed
 
     // === Known-answer round-trips vs the BCL (the managed token implements RC2 wherever the host does) ==
 
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("RC2-CBC PKCS7 over a token key — variable length.");
@@ -134,7 +134,7 @@ public sealed class RC2Pkcs11Tests_Managed
         }
     });
 
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
     {
         byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
@@ -150,7 +150,7 @@ public sealed class RC2Pkcs11Tests_Managed
         }
     });
 
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void EncryptEcb_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
     {
         byte[] plaintext = new byte[8];
@@ -187,7 +187,7 @@ public sealed class RC2Pkcs11Tests_Managed
     // the BCL setter itself, before any RC2Pkcs11 code runs.
 
     // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedRc2((workspace, rc2) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("token decrypts BCL RC2 ciphertext");
@@ -199,7 +199,7 @@ public sealed class RC2Pkcs11Tests_Managed
     });
 
     // A wrong IV corrupts the leading block under CBC (no integrity, so it does not throw).
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void DecryptCbc_WrongIv_ProducesDifferentPlaintext() => WithImportedRc2((workspace, rc2) =>
     {
         byte[] plaintext = new byte[16];
@@ -224,7 +224,7 @@ public sealed class RC2Pkcs11Tests_Managed
         // gated mechanism throws before the (empty) buffer reaches the token.
         Assert.Throws<InsecureOperationException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedRc2((workspace, rc2) =>
     {
         // With AllowInsecure, empty decrypt is a no-op returned without touching the token.
@@ -232,7 +232,7 @@ public sealed class RC2Pkcs11Tests_Managed
             Assert.Empty(rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
     });
 
-    [ConditionalFact(nameof(Rc2Supported))]
+    [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void EncryptCbc_Pkcs7_EmptyInput_AllowInsecure_EmitsPaddingBlock() => WithImportedRc2((workspace, rc2) =>
     {
         // Empty plaintext with PKCS7 must still emit a full 8-byte padding block; that path goes to the

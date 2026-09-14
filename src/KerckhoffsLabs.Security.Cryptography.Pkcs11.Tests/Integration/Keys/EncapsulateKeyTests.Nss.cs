@@ -15,9 +15,9 @@ public sealed class EncapsulateKeyTests_Nss(NssBackendFixture backend)
     // CKM_NSS_KYBER -- no RSA or ECDH mechanism reaches its C_EncapsulateKey/C_DecapsulateKey path.
     public static bool SupportsAsymmetricEncapsulate => false;
 
-    [ConditionalFact(nameof(SupportsAsymmetricEncapsulate))]
+    [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void RsaOaep_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_RsaOaep_EncapsulateDecapsulate_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(SupportsAsymmetricEncapsulate))]
+    [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
 }

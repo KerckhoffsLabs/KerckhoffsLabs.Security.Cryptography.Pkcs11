@@ -8,6 +8,6 @@ public sealed class DecryptRsaTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault() => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

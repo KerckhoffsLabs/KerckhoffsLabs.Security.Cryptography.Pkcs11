@@ -83,7 +83,7 @@ public sealed class AesGcmPkcs11Tests_Managed
         });
     }
 
-    [ConditionalTheory(nameof(SmallTagsSupported))]
+    [Theory(SkipUnless = nameof(SmallTagsSupported), Skip = "Requires " + nameof(SmallTagsSupported))]
     [InlineData(12)] // shortest tag
     [InlineData(13)]
     [InlineData(14)]

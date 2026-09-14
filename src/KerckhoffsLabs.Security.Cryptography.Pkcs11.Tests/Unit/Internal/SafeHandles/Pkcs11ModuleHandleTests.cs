@@ -60,7 +60,7 @@ public sealed class Pkcs11ModuleHandleTests
         Assert.True(handle.IsClosed);
     }
 
-    [ConditionalFact(nameof(NativeLibAvailable))]
+    [Fact(SkipUnless = nameof(NativeLibAvailable), Skip = "Requires " + nameof(NativeLibAvailable))]
     public void Ctor_WithRealHandle_IsValid_AndDisposeFreesIt()
     {
         Assert.True(NativeLibrary.TryLoad(LoadableLib!, out IntPtr nativeHandle));

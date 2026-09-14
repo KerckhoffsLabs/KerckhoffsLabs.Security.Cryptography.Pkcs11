@@ -3,7 +3,6 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -24,7 +23,7 @@ internal static class SHA3_512Pkcs11TestCases
     private static void Require(IPkcs11Backend backend)
     {
         if (!backend.Supports(CKM.CKM_SHA3_512))
-            throw new SkipTestException("Backend does not advertise CKM_SHA3_512.");
+            Assert.Skip("Backend does not advertise CKM_SHA3_512.");
     }
 
     internal static void Assert_ComputeHash_KnownAnswer(IPkcs11Backend backend)
@@ -42,7 +41,7 @@ internal static class SHA3_512Pkcs11TestCases
     {
         Require(backend);
         if (!SHA3_512.IsSupported)
-            throw new SkipTestException("Host BCL does not support SHA3-512 (needs OpenSSL 3.x or Windows 11+).");
+            Assert.Skip("Host BCL does not support SHA3-512 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_512Pkcs11(workspace);
 
@@ -54,7 +53,7 @@ internal static class SHA3_512Pkcs11TestCases
     {
         Require(backend);
         if (!SHA3_512.IsSupported)
-            throw new SkipTestException("Host BCL does not support SHA3-512 (needs OpenSSL 3.x or Windows 11+).");
+            Assert.Skip("Host BCL does not support SHA3-512 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_512Pkcs11(workspace);
 
@@ -70,7 +69,7 @@ internal static class SHA3_512Pkcs11TestCases
     {
         Require(backend);
         if (!SHA3_512.IsSupported)
-            throw new SkipTestException("Host BCL does not support SHA3-512 (needs OpenSSL 3.x or Windows 11+).");
+            Assert.Skip("Host BCL does not support SHA3-512 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_512Pkcs11(workspace);
 

@@ -17,7 +17,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
 
     // === Known-answer tests: ported verbatim from the SoftHsm vectors =====================
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void ComputeHash_KnownAnswer_MatchesFips202Vector()
     {
         using var library = ManagedToken.NewLibrary();
@@ -33,7 +33,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
         Assert.Equal(expected, digest);
     }
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void ComputeHash_KnownAnswer_EmptyInput()
     {
         using var library = ManagedToken.NewLibrary();
@@ -52,7 +52,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
 
     // === BCL cross-checks ================================================================
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void ComputeHash_MatchesBclSha3_384()
     {
         using var library = ManagedToken.NewLibrary();
@@ -63,7 +63,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
         Assert.Equal(SHA3_384.HashData(data), sha.ComputeHash(data));
     }
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -76,7 +76,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
 
     // === Streaming / incremental hashing =================================================
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -92,7 +92,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
         Assert.Equal(SHA3_384.HashData(Encoding.UTF8.GetBytes("hello world")), streamed);
     }
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void ComputeHash_ManyBlocks_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -115,7 +115,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
 
     // === Reuse ===========================================================================
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
@@ -128,7 +128,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
         Assert.Equal(SHA3_384.HashData(Encoding.UTF8.GetBytes("two")), second);
     }
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void Initialize_DiscardsBufferedInput()
     {
         using var library = ManagedToken.NewLibrary();
@@ -148,7 +148,7 @@ public sealed class SHA3_384Pkcs11Tests_Managed
 
     // === Property surface ================================================================
 
-    [ConditionalFact(typeof(SHA3_384), nameof(SHA3_384.IsSupported))]
+    [Fact(SkipUnless = nameof(SHA3_384.IsSupported), SkipType = typeof(SHA3_384), Skip = "Requires " + nameof(SHA3_384.IsSupported))]
     public void HashSize_Is384Bits()
     {
         using var library = ManagedToken.NewLibrary();

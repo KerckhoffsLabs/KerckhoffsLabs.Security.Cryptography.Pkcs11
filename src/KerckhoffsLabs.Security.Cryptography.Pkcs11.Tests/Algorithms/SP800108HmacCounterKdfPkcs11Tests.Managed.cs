@@ -61,7 +61,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
 
     // === Known-answer derivations: cross-checked against the BCL =========================
 
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
@@ -79,7 +79,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         });
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_MatchesBcl() => WithImportedKdf((_, kdf) =>
     {
         const int length = 40; // spans two HMAC-SHA256 PRF blocks (32 bytes each)
@@ -91,7 +91,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         Assert.Equal(expected, actual);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_DestinationSpan_MatchesBcl() => WithImportedKdf((_, kdf) =>
     {
         const int length = 32;
@@ -104,7 +104,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         Assert.Equal(expected, actual);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_IsDeterministic_SameInputsSameOutput() => WithImportedKdf((_, kdf) =>
     {
         byte[] first = kdf.DeriveKey(Label, Context, 64);
@@ -112,7 +112,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         Assert.Equal(first, second);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_DifferentLabel_ProducesDifferentOutput() => WithImportedKdf((_, kdf) =>
     {
         byte[] a = kdf.DeriveKey(Label, Context, 32);
@@ -120,7 +120,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         Assert.NotEqual(a, b);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_DifferentContext_ProducesDifferentOutput() => WithImportedKdf((_, kdf) =>
     {
         byte[] a = kdf.DeriveKey(Label, Context, 32);
@@ -129,7 +129,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     });
 
     // A SHA384 PRF must produce different keying material than SHA256 for identical label/context.
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_DifferentPrf_ProducesDifferentOutput()
     {
         byte[] sha256 = null!;
@@ -142,7 +142,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     }
 
     // The byte[] overload must agree with the destination-span overload for identical inputs.
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_ArrayAndSpanOverloads_Agree() => WithImportedKdf((_, kdf) =>
     {
         byte[] viaArray = kdf.DeriveKey(Label, Context, 32);
@@ -151,7 +151,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         Assert.Equal(viaArray, viaSpan);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_EmptyLabelAndContext_MatchesBcl() => WithImportedKdf((_, kdf) =>
     {
         const int length = 32;
@@ -168,7 +168,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     // The on-token overload returns a Pkcs11Key handle; the managed token stores its CKA_VALUE, so we
     // can confirm the derived material matches the BCL. Non-extractability is enforced by a real HSM,
     // not by the in-process fake — that assertion lives in the SoftHsm/HSM test.
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_OnToken_DerivesBclMaterial() => WithImportedKdf((_, kdf) =>
     {
         const int length = 32;
@@ -193,7 +193,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
 
     // === No-op / boundary behavior (matches the BCL) =====================================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKey_ZeroLength_IsNoOp() => WithImportedKdf((_, kdf) =>
     {
         // Zero length is a no-op, matching the BCL SP800108HmacCounterKdf (no token call).

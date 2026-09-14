@@ -46,7 +46,7 @@ public sealed class MarshalSizeOfTests
     /// LP64 size is deterministic (8-byte CK_VERSION slot + N * 8). These are the structs the
     /// loader binds against, so drift here is the most consequential kind.
     /// </summary>
-    [ConditionalTheory(nameof(IsUnix))]
+    [Theory(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     // BEGIN PROBED InlineData — Linux x64, LP64
     [InlineData(typeof(CK_ASYNC_DATA), 40)]
     [InlineData(typeof(CK_ATTRIBUTE), 24)]
@@ -159,7 +159,7 @@ public sealed class MarshalSizeOfTests
     /// theory is skipped. The check is on the live <see cref="Marshal.SizeOf(System.Type)"/>, i.e.
     /// the loaded per-RID build, not the compile-time reference.
     /// </summary>
-    [ConditionalTheory(nameof(IsWindows64))]
+    [Theory(SkipUnless = nameof(IsWindows64), Skip = "Requires " + nameof(IsWindows64))]
     // BEGIN Windows InlineData — OASIS Windows x64 ABI (CK_ULONG=4, ptr=8, pack=1)
     [InlineData("CK_ASYNC_DATA_Windows", 24)]
     [InlineData("CK_ATTRIBUTE_Windows", 16)]
@@ -282,7 +282,7 @@ public sealed class MarshalSizeOfTests
     /// with pointer = 8: it matched every one, so the pointer = 4 variant rests on a model already
     /// checked against known-good values rather than on arithmetic done by hand.
     /// </remarks>
-    [ConditionalTheory(nameof(IsWindows32))]
+    [Theory(SkipUnless = nameof(IsWindows32), Skip = "Requires " + nameof(IsWindows32))]
     // BEGIN Windows x86 InlineData — OASIS Windows ILP32 ABI (CK_ULONG=4, ptr=4, pack=1)
     [InlineData("CK_AES_CBC_ENCRYPT_DATA_PARAMS_Windows", 24)]
     [InlineData("CK_AES_CTR_PARAMS_Windows", 20)]

@@ -26,7 +26,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
 
     // Two parties run ECDH1 (CKD_NULL) over P-256; the derived on-token AES keys must be identical,
     // proven by a cross-party AES-GCM encrypt-with-Alice / decrypt-with-Bob round-trip.
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
@@ -50,7 +50,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
@@ -61,7 +61,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
             () => workspace.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
     }
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void NullKey_Throws()
     {
         using var workspace = OpenWorkspace();
@@ -71,7 +71,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
 
     // === ECParameters overload: validates the peer, then agrees exactly like the raw-span form ===
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
     {
         using var workspace = OpenWorkspace();
@@ -93,7 +93,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ECParametersOverload_RejectsPeerOnDifferentCurve()
     {
         using var workspace = OpenWorkspace();

@@ -20,10 +20,10 @@ filtering:
 
 ```bash
 # hermetic unit tests only — no SoftHSM build needed, ~0.5s
-dotnet test --filter "FullyQualifiedName~.Tests.Unit."
+dotnet test -- --filter-query "/*/*.Tests.Unit*/*/*"
 
 # backend integration tests only
-dotnet test --filter "FullyQualifiedName~.Tests.Integration."
+dotnet test -- --filter-query "/*/*.Tests.Integration*/*/*"
 ```
 
 ## Conventions & exceptions

@@ -15,9 +15,9 @@ public sealed class EncapsulateKeyTests_SoftHsm(SoftHsmBackendFixture backend)
     // CKM_ML_KEM_KEY_PAIR_GEN/CKM_ML_KEM -- no RSA or ECDH mechanism is wired to it.
     public static bool SupportsAsymmetricEncapsulate => false;
 
-    [ConditionalFact(nameof(SupportsAsymmetricEncapsulate))]
+    [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void RsaOaep_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_RsaOaep_EncapsulateDecapsulate_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(SupportsAsymmetricEncapsulate))]
+    [Fact(SkipUnless = nameof(SupportsAsymmetricEncapsulate), Skip = "Requires " + nameof(SupportsAsymmetricEncapsulate))]
     public void Ecdh1_EncapsulateDecapsulate_RoundTrips() => EncapsulateKeyTestCases.Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(_backend);
 }

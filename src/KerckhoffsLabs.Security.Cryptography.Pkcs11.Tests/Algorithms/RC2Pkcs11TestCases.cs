@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -45,7 +44,7 @@ internal static class RC2Pkcs11TestCases
     private static void WithImportedRc2(IPkcs11Backend backend, Action<Pkcs11Workspace, RC2Pkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_RC2_CBC))
-            throw new SkipTestException("Backend does not advertise CKM_RC2_CBC.");
+            Assert.Skip("Backend does not advertise CKM_RC2_CBC.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"rc2-{Guid.NewGuid():N}";

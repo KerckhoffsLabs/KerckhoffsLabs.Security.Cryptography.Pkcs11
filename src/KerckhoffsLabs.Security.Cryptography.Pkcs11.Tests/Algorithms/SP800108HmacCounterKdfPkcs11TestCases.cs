@@ -4,7 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
@@ -41,7 +40,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     private static void RequireKdf(IPkcs11Backend backend)
     {
         if (!backend.Supports(CKM.CKM_SP800_108_COUNTER_KDF))
-            throw new SkipTestException("Backend does not advertise CKM_SP800_108_COUNTER_KDF.");
+            Assert.Skip("Backend does not advertise CKM_SP800_108_COUNTER_KDF.");
     }
 
     // Imports KeyBytes as a derive-capable generic-secret base key and hands the KDF to the body.

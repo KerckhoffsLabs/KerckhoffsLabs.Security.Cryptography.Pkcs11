@@ -20,7 +20,7 @@ public sealed class SHA512Pkcs11_Managed
 
     // === Known-answer + BCL cross-checks =================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_KnownAnswer_MatchesFips180Vector()
     {
         using var library = ManagedToken.NewLibrary();
@@ -38,7 +38,7 @@ public sealed class SHA512Pkcs11_Managed
         Assert.Equal(SHA512.HashData(Encoding.UTF8.GetBytes("abc")), digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_MatchesBclSha512()
     {
         using var library = ManagedToken.NewLibrary();
@@ -49,7 +49,7 @@ public sealed class SHA512Pkcs11_Managed
         Assert.Equal(SHA512.HashData(data), sha.ComputeHash(data));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -60,7 +60,7 @@ public sealed class SHA512Pkcs11_Managed
         Assert.Equal(SHA512.HashData(data), sha.ComputeHash(data));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_EmptyInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -79,7 +79,7 @@ public sealed class SHA512Pkcs11_Managed
 
     // === Streaming / reuse ===============================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -96,7 +96,7 @@ public sealed class SHA512Pkcs11_Managed
         Assert.Equal(SHA512.HashData(Encoding.UTF8.GetBytes("hello world")), streamed);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
@@ -109,7 +109,7 @@ public sealed class SHA512Pkcs11_Managed
         Assert.Equal(SHA512.HashData(Encoding.UTF8.GetBytes("two")), second);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void Initialize_ResetsBetweenComputations()
     {
         using var library = ManagedToken.NewLibrary();
