@@ -124,6 +124,14 @@ jobs:
       # them as text; icon.png in particular reports "Invalid character encountered ... at line 1",
       # which raises the same project-level encoding warning even when every real source file is
       # clean. They carry no analyzable content, so indexing them buys nothing.
+      #
+      # reportsPaths has a wildcard segment in the filename itself (coverage.opencover.*.xml, not a
+      # literal coverage.opencover.xml): coverlet.MTP (the xUnit v3/MTP-native coverage extension,
+      # unlike the old VSTest-collector coverlet.collector) names its own output
+      # coverage.opencover.<numeric-id>.xml. A literal-filename glob here silently matches nothing
+      # -- the scanner logs a WARN and imports zero coverage, which still lets the analysis
+      # "succeed" while every line reports uncovered and the new-code coverage gate fails. The
+      # Codecov "files:" glob below needs the same treatment for coverage.cobertura.*.xml.
       - name: Begin analysis
         run: >
           dotnet sonarscanner begin
@@ -131,7 +139,7 @@ jobs:
           /o:"kerckhoffslabs"
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.sourceEncoding="UTF-8"
-          /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml"
+          /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.*.xml"
           /d:sonar.coverage.exclusions="**/*.Generators/**/*.cs"
           /d:sonar.exclusions="vendor/**,docs/images/**"
 
@@ -174,7 +182,7 @@ jobs:
         if: github.event_name == 'push'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
-          files: ./coverage/**/coverage.cobertura.xml
+          files: ./coverage/**/coverage.cobertura.*.xml
           fail_ci_if_error: true
           verbose: true
         env:
