@@ -16,7 +16,7 @@ public sealed class InsecureOperationExceptionTests
         var ex = new InsecureOperationException(CKM.CKM_RSA_PKCS, "Use CKM_RSA_PKCS_OAEP instead.");
 
         Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
-        Assert.Contains(CKM.CKM_RSA_PKCS.ToString(), ex.Message);
+        Assert.Contains(nameof(CKM.CKM_RSA_PKCS), ex.Message);
         Assert.Contains("Use CKM_RSA_PKCS_OAEP instead.", ex.Message);
         Assert.Contains("AllowInsecure", ex.Message);
     }
