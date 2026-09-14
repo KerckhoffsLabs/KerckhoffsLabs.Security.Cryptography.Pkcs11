@@ -9,22 +9,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class Pkcs11WorkspaceFindKeysTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // Finding a freshly *generated* key needs a writable token; NSS's generic token is write-protected.
-    public static bool TokenObjects => NssBackendFixture.TokenObjectsAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void OpenKey_NotFound_Throws()
     {
         using var workspace = OpenWorkspace();
         WorkspaceKeyTestCases.Assert_OpenKey_NotFound_Throws(workspace);
     }
 
-    [ConditionalFact(nameof(TokenObjects))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void OpenKey_AfterGenerate_FindsKey()
     {
         using var workspace = OpenWorkspace();
@@ -51,7 +49,7 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Nss(NssBackendFixture backend)
         }
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void ImportKey_AesValue_RoundTrips()
     {
         using var workspace = OpenWorkspace();

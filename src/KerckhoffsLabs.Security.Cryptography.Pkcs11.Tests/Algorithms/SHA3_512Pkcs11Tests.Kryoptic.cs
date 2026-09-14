@@ -7,17 +7,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 public sealed class SHA3_512Pkcs11Tests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ComputeHash_KnownAnswer() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_KnownAnswer(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ComputeHash_MatchesBcl() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_MatchesBcl(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ComputeHash_Streamed_MatchesOneShot() => SHA3_512Pkcs11TestCases.Assert_ComputeHash_Streamed_MatchesOneShot(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Reuse_AfterInitialize_ProducesFreshHash() => SHA3_512Pkcs11TestCases.Assert_Reuse_AfterInitialize_ProducesFreshHash(_backend);
 }

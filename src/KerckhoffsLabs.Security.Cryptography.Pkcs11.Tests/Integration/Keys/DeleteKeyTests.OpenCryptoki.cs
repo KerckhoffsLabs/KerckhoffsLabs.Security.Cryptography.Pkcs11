@@ -9,9 +9,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class DeleteKeyTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
         using var workspace = _backend.Library.OpenWorkspace(

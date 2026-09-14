@@ -13,12 +13,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
 public sealed class VerifyEdDsaTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // NSS's CKM_EDDSA needs a CK_EDDSA_PARAMS the shared bare-parameter case does not pass; skip.
-    public static bool EdDsa => NssBackendFixture.EdDsaAvailable;
 
-    [ConditionalFact(nameof(EdDsa))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.EdDsaAvailable))]
     public void Ed25519_RejectsTamperedData()
     {
         if (!_backend.Supports(CKM.CKM_EDDSA) || !_backend.Supports(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN))

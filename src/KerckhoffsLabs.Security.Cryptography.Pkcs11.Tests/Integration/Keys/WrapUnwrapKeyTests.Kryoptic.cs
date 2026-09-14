@@ -11,25 +11,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class WrapUnwrapKeyTests_Kryoptic(KryopticBackendFixture backend)
 {
     private readonly KryopticBackendFixture _backend = backend;
-    public static bool Available => KryopticBackendFixture.KryopticAvailable;
 
     private void RequireAesKeyWrapPad() => _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PAD);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesKeyWrapPad_RoundTrip()
     {
         RequireAesKeyWrapPad();
         WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Unwrap_AppliesSecureDefaults()
     {
         RequireAesKeyWrapPad();
         WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Unwrap_ExplicitExtractable_IsAllowed()
     {
         RequireAesKeyWrapPad();

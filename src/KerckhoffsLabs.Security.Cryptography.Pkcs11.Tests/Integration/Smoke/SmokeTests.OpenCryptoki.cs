@@ -7,9 +7,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 public sealed class SmokeTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void GetInfo_AndSlots_AreWellFormed()
         => SmokeTestAssertions.AssertLibraryInfoAndSlots_AreWellFormed(_backend);
 }

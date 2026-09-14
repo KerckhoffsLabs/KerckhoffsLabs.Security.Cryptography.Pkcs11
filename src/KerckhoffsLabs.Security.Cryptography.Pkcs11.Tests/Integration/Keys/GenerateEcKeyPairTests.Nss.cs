@@ -7,11 +7,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class GenerateEcKeyPairTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void GeneratesP256KeyPair() => GenerateEcKeyPairTestCases.Assert_GeneratesP256KeyPair(_backend);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_RejectsUnspecifiedCurve(_backend);
 }

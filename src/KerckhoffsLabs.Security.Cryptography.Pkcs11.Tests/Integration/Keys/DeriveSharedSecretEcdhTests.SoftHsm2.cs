@@ -12,7 +12,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture backend)
 {
     private readonly SoftHsmBackendFixture _backend = backend;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
@@ -27,7 +26,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
 
     // Two parties run ECDH1 (CKD_NULL) over P-256; the derived on-token AES keys must be identical,
     // proven by a cross-party AES-GCM encrypt-with-Alice / decrypt-with-Bob round-trip.
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
@@ -51,7 +50,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
@@ -62,7 +61,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
             () => workspace.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void NullKey_Throws()
     {
         using var workspace = OpenWorkspace();
@@ -72,7 +71,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
 
     // === ECParameters overload: validates the peer, then agrees exactly like the raw-span form ===
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
     {
         using var workspace = OpenWorkspace();
@@ -94,7 +93,7 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ECParametersOverload_RejectsPeerOnDifferentCurve()
     {
         using var workspace = OpenWorkspace();

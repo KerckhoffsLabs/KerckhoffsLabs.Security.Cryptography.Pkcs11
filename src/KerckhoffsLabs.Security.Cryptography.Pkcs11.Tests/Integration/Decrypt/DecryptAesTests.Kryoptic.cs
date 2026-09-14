@@ -8,13 +8,12 @@ public sealed class DecryptAesTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
 
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesEcb_ThrowsInsecureOperationException_ByDefault_Kryoptic()
         => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue_Kryoptic()
         => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

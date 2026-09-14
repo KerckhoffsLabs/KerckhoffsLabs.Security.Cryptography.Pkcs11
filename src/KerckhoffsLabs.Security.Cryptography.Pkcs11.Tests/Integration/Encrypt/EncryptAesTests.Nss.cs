@@ -7,17 +7,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 public sealed class EncryptAesTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesCbcPad_ProducesCiphertext() => EncryptAesTestCases.Assert_AesCbcPad_ProducesCiphertext(_backend);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesCbcPad_RoundTrips() => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_ThrowsInsecureOperationException_ByDefault() => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue() => EncryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

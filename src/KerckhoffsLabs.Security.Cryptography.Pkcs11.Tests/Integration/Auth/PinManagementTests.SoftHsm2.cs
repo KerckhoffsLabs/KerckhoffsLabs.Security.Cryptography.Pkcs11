@@ -12,9 +12,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 public sealed class PinManagementTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void SetPin_ChangesUserPin_RoundTrip()
     {
         byte[] original = _backend.UserPin.ToArray();

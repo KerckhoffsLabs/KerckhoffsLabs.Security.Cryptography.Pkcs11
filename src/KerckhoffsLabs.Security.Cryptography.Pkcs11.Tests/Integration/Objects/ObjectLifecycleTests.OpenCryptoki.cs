@@ -7,8 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 public sealed class ObjectLifecycleTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void CreateFindDestroy_DataObject() => ObjectLifecycleTestCases.Assert_CreateFindDestroy_DataObject(_backend);
 }

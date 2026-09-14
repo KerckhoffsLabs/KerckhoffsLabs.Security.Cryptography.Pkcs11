@@ -7,8 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Decrypt;
 public sealed class DecryptRsaTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault() => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

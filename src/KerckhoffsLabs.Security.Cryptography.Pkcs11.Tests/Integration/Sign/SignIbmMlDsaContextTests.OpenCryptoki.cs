@@ -45,7 +45,6 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
     private const ulong HedgePreferred = 0;          // CK_IBM_HEDGE_PREFERRED
 
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
     /// <summary>The caller-authored descriptor, transcribed from the vendor header.</summary>
     private sealed class CkIbmSignAdditionalContext(ulong hedgeVariant, byte[] context)
@@ -65,7 +64,7 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
             throw new SkipTestException("opencryptoki: CKM_IBM_ML_DSA not advertised by this token.");
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void IbmMlDsa_WithSignAdditionalContext_TokenAcceptsTheParameterBlock()
     {
         RequireIbmMlDsa();

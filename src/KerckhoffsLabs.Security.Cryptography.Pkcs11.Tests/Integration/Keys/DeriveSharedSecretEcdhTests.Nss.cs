@@ -10,11 +10,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // The round-trip verifies the derived key with classic-params AES-GCM, which NSS rejects; the
     // derive itself works, but the verification path does not, so this case skips (see NssBackendFixture).
-    public static bool ClassicGcm => NssBackendFixture.ClassicAesGcmAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
@@ -26,7 +24,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
         return attrs[0].GetValueAsByteArray();
     }
 
-    [ConditionalFact(nameof(ClassicGcm))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
@@ -48,7 +46,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
@@ -59,7 +57,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
             () => workspace.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void NullKey_Throws()
     {
         using var workspace = OpenWorkspace();

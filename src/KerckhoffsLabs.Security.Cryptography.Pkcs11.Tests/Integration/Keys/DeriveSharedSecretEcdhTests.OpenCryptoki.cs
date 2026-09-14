@@ -10,7 +10,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
@@ -23,7 +22,7 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
         return attrs[0].GetValueAsByteArray();
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
@@ -45,7 +44,7 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
@@ -56,7 +55,7 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
             () => workspace.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void NullKey_Throws()
     {
         using var workspace = OpenWorkspace();

@@ -6,11 +6,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class GenerateEcKeyPairTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void GeneratesP256KeyPair() => GenerateEcKeyPairTestCases.Assert_GeneratesP256KeyPair(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void RejectsUnspecifiedCurve() => GenerateEcKeyPairTestCases.Assert_RejectsUnspecifiedCurve(_backend);
 }

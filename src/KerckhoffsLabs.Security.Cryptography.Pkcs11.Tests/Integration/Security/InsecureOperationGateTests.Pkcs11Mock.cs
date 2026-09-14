@@ -12,8 +12,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 [Collection("Mock")]
 public sealed class InsecureOperationGateTests_Mock(MockBackendFixture f)
 {
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
-
     private readonly MockBackendFixture _backend = f;
 
     // --- Encrypt gate ---

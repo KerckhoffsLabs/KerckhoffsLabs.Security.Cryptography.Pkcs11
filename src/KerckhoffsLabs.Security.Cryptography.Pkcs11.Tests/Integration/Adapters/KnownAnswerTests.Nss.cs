@@ -16,10 +16,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Adapters
 public sealed class KnownAnswerTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // NSS drives AES-GCM through the message API, not the classic CK_GCM_PARAMS path this KAT uses.
-    public static bool ClassicGcm => NssBackendFixture.ClassicAesGcmAvailable;
 
     private void Require(CKM mechanism)
     {
@@ -27,31 +25,31 @@ public sealed class KnownAnswerTests_Nss(NssBackendFixture backend)
             throw new SkipTestException($"NSS: {mechanism} not available");
     }
 
-    [ConditionalFact(nameof(ClassicGcm))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void AesGcm_Kat() { Require(CKM.CKM_AES_GCM); KnownAnswerTestCases.Assert_AesGcm_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void HmacSha256_Kat() { Require(CKM.CKM_SHA256_HMAC); KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void HmacSha384_Kat() { Require(CKM.CKM_SHA384_HMAC); KnownAnswerTestCases.Assert_HmacSha384_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void HmacSha512_Kat() { Require(CKM.CKM_SHA512_HMAC); KnownAnswerTestCases.Assert_HmacSha512_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesKeyWrap_Kat() { Require(CKM.CKM_AES_KEY_WRAP); KnownAnswerTestCases.Assert_AesKeyWrap_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void RsaOaep_Kat() { Require(CKM.CKM_RSA_PKCS_OAEP); KnownAnswerTestCases.Assert_RsaOaep_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void RsaPss_Kat() { Require(CKM.CKM_SHA256_RSA_PKCS_PSS); KnownAnswerTestCases.Assert_RsaPss_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void EcdsaP256_Kat() { Require(CKM.CKM_ECDSA); KnownAnswerTestCases.Assert_EcdsaP256_Kat(_backend); }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void EcdhP256_Kat() { Require(CKM.CKM_ECDH1_DERIVE); KnownAnswerTestCases.Assert_EcdhP256_Kat(_backend); }
 
     // No Ed25519 KAT here. A fixed-vector KAT requires importing a known key, but NSS's

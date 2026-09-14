@@ -7,12 +7,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // Verifies the unwrapped key via the classic CK_GCM_PARAMS path NSS rejects; skip (see NssBackendFixture).
-    public static bool ClassicGcm => NssBackendFixture.ClassicAesGcmAvailable;
 
-    [ConditionalFact(nameof(ClassicGcm))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void AesKeyWrapPad_RoundTrip() => WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
 
     // The secure-defaults unwrap cases (Unwrap_AppliesSecureDefaults /

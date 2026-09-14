@@ -9,20 +9,19 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Kryoptic(KryopticBackendFixture
 {
     private readonly KryopticBackendFixture _backend = backend;
 
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void OpenKey_NotFound_Throws()
     {
         using var workspace = OpenWorkspace();
         WorkspaceKeyTestCases.Assert_OpenKey_NotFound_Throws(workspace);
     }
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void OpenKey_AfterGenerate_FindsKey()
     {
         using var workspace = OpenWorkspace();
@@ -49,7 +48,7 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Kryoptic(KryopticBackendFixture
         }
     }
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ImportKey_AesValue_RoundTrips()
     {
         using var workspace = OpenWorkspace();

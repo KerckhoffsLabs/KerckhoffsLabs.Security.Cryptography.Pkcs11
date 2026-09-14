@@ -7,8 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 public sealed class EncryptRsaTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault() => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

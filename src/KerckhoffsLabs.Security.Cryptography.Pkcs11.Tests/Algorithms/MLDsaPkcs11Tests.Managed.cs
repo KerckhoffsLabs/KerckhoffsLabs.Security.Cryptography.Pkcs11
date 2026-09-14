@@ -22,8 +22,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class MLDsaPkcs11Tests_Managed
 {
-    public static bool MlDsaSupported => MLDsa.IsSupported;
-
     private static MLDsaAlgorithm MapAlgorithm(CkpMlDsa parameterSet) => parameterSet switch
     {
         CkpMlDsa.CKP_ML_DSA_44 => MLDsaAlgorithm.MLDsa44,
@@ -62,7 +60,7 @@ public sealed class MLDsaPkcs11Tests_Managed
 
     // === Sign / verify — pure ML-DSA, cross-checked against the BCL ========
 
-    [ConditionalTheory(nameof(MlDsaSupported))]
+    [ConditionalTheory(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
@@ -85,7 +83,7 @@ public sealed class MLDsaPkcs11Tests_Managed
     });
 
     // The token's signature must verify under a BCL MLDsa rebuilt from the exported public key.
-    [ConditionalTheory(nameof(MlDsaSupported))]
+    [ConditionalTheory(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
@@ -103,7 +101,7 @@ public sealed class MLDsaPkcs11Tests_Managed
         Assert.False(bcl.VerifyData(tampered, sig));
     });
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void SignVerifyData_WithContext_RoundTrips() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
     {
         byte[] data = Encoding.UTF8.GetBytes("context-bound message");
@@ -123,7 +121,7 @@ public sealed class MLDsaPkcs11Tests_Managed
         Assert.False(bcl.VerifyData(data, sig));
     });
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void SignData_ContextTooLong_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         // The BCL validates the >255-byte context first (ArgumentOutOfRangeException) before our own
         // ArgumentException would fire; both derive from ArgumentException.
@@ -135,18 +133,18 @@ public sealed class MLDsaPkcs11Tests_Managed
     // evaluation-only pre-hash wrappers validate/short-circuit before reaching our *Core overrides, so a
     // test would assert BCL behaviour, not ours. External-mu reaches our overrides and is asserted here.
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void SignMu_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         Assert.Throws<NotSupportedException>(() => mldsa.SignMu(new byte[64])));
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void VerifyMu_Throws() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         Assert.Throws<NotSupportedException>(() =>
             mldsa.VerifyMu(new byte[64], new byte[mldsa.Algorithm.SignatureSizeInBytes])));
 
     // === Key-material export ==============================================
 
-    [ConditionalTheory(nameof(MlDsaSupported))]
+    [ConditionalTheory(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     [InlineData(CkpMlDsa.CKP_ML_DSA_44)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_65)]
     [InlineData(CkpMlDsa.CKP_ML_DSA_87)]
@@ -160,15 +158,15 @@ public sealed class MLDsaPkcs11Tests_Managed
             Assert.Equal(MapAlgorithm(parameterSet), bcl.Algorithm);
         });
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void ExportMLDsaPrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         Assert.Throws<InsecureOperationException>(() => mldsa.ExportMLDsaPrivateKey()));
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void ExportMLDsaPrivateSeed_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         Assert.Throws<InsecureOperationException>(() => mldsa.ExportMLDsaPrivateSeed()));
 
-    [ConditionalFact(nameof(MlDsaSupported))]
+    [ConditionalFact(typeof(MLDsa), nameof(MLDsa.IsSupported))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
         Assert.Throws<InsecureOperationException>(() => mldsa.ExportPkcs8PrivateKey()));
 

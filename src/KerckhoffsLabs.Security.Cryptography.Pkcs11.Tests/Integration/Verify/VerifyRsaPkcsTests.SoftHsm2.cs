@@ -7,8 +7,7 @@ public sealed class VerifyRsaPkcsTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void VerifyRsaPkcs1V15_GatedByDefault() => VerifyRsaPkcsTestCases.Assert_VerifyRsaPkcs1V15_GatedByDefault(_backend);
 }

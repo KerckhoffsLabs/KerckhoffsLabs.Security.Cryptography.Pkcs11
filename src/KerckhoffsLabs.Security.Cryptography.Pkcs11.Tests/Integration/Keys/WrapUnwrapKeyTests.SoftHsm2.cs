@@ -185,14 +185,13 @@ internal static class WrapUnwrapKeyTestCases
 public sealed class WrapUnwrapKeyTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void AesKeyWrapPad_RoundTrip() => WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Unwrap_AppliesSecureDefaults() => WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Unwrap_ExplicitExtractable_IsAllowed() => WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend);
 }

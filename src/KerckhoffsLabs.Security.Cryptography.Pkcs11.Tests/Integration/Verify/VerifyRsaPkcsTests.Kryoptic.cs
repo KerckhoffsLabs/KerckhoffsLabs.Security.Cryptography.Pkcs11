@@ -7,8 +7,7 @@ public sealed class VerifyRsaPkcsTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
 
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void VerifyRsaPkcs1V15_GatedByDefault() => VerifyRsaPkcsTestCases.Assert_VerifyRsaPkcs1V15_GatedByDefault(_backend);
 }

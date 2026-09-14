@@ -7,11 +7,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Decrypt;
 public sealed class DecryptAesTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_ThrowsInsecureOperationException_ByDefault() => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue() => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

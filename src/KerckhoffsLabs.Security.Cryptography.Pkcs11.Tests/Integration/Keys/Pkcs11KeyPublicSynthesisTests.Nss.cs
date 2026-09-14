@@ -16,12 +16,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class Pkcs11KeyPublicSynthesisTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()
     {
         using var workspace = OpenWorkspace();
@@ -58,7 +57,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Nss(NssBackendFixture backend)
         }
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
         using var workspace = OpenWorkspace();

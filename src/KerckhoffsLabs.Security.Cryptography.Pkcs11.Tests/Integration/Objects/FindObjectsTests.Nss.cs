@@ -16,15 +16,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // NSS's generic token is write-protected, so these token-object cases skip (see NssBackendFixture).
-    public static bool TokenObjects => NssBackendFixture.TokenObjectsAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(nameof(TokenObjects))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = OpenWorkspace();
@@ -61,7 +59,7 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(nameof(TokenObjects))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = OpenWorkspace();

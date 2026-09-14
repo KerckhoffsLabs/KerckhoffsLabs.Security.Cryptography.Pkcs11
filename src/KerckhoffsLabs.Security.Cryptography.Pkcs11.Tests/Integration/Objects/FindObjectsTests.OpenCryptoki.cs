@@ -16,13 +16,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = OpenWorkspace();
@@ -59,7 +58,7 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = OpenWorkspace();

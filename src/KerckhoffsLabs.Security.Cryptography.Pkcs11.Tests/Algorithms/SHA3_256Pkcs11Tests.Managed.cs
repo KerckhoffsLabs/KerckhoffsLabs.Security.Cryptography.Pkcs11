@@ -14,11 +14,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class SHA3_256Pkcs11Tests_Managed
 {
-    public static bool Supported => SHA3_256.IsSupported;
 
     // === Known-answer tests: ported verbatim from the SoftHsm vectors =====================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void ComputeHash_KnownAnswer_MatchesFips202Vector()
     {
         using var library = ManagedToken.NewLibrary();
@@ -33,7 +32,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
         Assert.Equal(expected, digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void ComputeHash_KnownAnswer_EmptyInput()
     {
         using var library = ManagedToken.NewLibrary();
@@ -50,7 +49,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
 
     // === BCL cross-checks ================================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void ComputeHash_MatchesBclSha3_256()
     {
         using var library = ManagedToken.NewLibrary();
@@ -61,7 +60,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
         Assert.Equal(SHA3_256.HashData(data), sha.ComputeHash(data));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -74,7 +73,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
 
     // === Streaming / incremental hashing =================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -90,7 +89,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
         Assert.Equal(SHA3_256.HashData(Encoding.UTF8.GetBytes("hello world")), streamed);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void ComputeHash_ManyBlocks_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -113,7 +112,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
 
     // === Reuse ===========================================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
@@ -126,7 +125,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
         Assert.Equal(SHA3_256.HashData(Encoding.UTF8.GetBytes("two")), second);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void Initialize_DiscardsBufferedInput()
     {
         using var library = ManagedToken.NewLibrary();
@@ -145,7 +144,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
 
     // === Property surface ================================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(SHA3_256), nameof(SHA3_256.IsSupported))]
     public void HashSize_Is256Bits()
     {
         using var library = ManagedToken.NewLibrary();

@@ -11,9 +11,8 @@ public sealed class SmokeTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void GetInfo_AndSlots_AreWellFormed()
         => SmokeTestAssertions.AssertLibraryInfoAndSlots_AreWellFormed(_backend);
 }

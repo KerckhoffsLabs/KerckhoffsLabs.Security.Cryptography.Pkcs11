@@ -7,8 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 public sealed class EncryptRsaTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault() => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

@@ -12,13 +12,12 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
 {
     private readonly KryopticBackendFixture _backend = backend;
 
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()
     {
         using var workspace = OpenWorkspace();
@@ -65,7 +64,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
     // A private-only RSA key (no CKO_PUBLIC_KEY companion) must still verify via the synthesized
     // public params in managed code, for both PKCS#1 v1.5 (already supported) and RSA-PSS (the
     // mechanism map previously rejected the PSS combined mechanism).
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
         using var workspace = OpenWorkspace();

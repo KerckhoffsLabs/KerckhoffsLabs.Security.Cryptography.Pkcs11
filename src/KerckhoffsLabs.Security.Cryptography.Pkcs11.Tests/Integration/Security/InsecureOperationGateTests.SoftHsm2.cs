@@ -8,11 +8,10 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
     // --- Encrypt gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_AES_ECB)]
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
@@ -20,13 +19,13 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
     public void Encrypt_InsecureMechanismThrows_SoftHsm(ulong mech)
         => InsecureOperationGateTestCases.Assert_Encrypt_InsecureMechanismThrows(_backend, mech);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Encrypt_AllowInsecure_BypassesGate_SoftHsm()
         => InsecureOperationGateTestCases.Assert_Encrypt_AllowInsecureBypassesGate(_backend);
 
     // --- Decrypt gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_AES_ECB)]
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
@@ -34,13 +33,13 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
     public void Decrypt_InsecureMechanismThrows_SoftHsm(ulong mech)
         => InsecureOperationGateTestCases.Assert_Decrypt_InsecureMechanismThrows(_backend, mech);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Decrypt_AllowInsecure_BypassesGate_SoftHsm()
         => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
 
     // --- Sign gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
@@ -51,7 +50,7 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
 
     // --- Verify gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
@@ -60,7 +59,7 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
 
     // --- Digest gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_MD5)]
     [InlineData((ulong)CKM.CKM_SHA_1)]
     public void Digest_InsecureMechanismThrows(ulong mech)
@@ -68,7 +67,7 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
 
     // --- GenerateKey gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_DES_KEY_GEN)]
     [InlineData((ulong)CKM.CKM_DES2_KEY_GEN)]
     [InlineData((ulong)CKM.CKM_DES3_KEY_GEN)]
@@ -77,7 +76,7 @@ public sealed class InsecureOperationGateTests_SoftHsm(SoftHsmBackendFixture f)
 
     // --- DeriveKey gate ---
 
-    [ConditionalTheory(nameof(SoftHsmAvailable))]
+    [ConditionalTheory(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData((ulong)CKM.CKM_DES3_ECB_ENCRYPT_DATA)]
     [InlineData((ulong)CKM.CKM_DES3_CBC_ENCRYPT_DATA)]
     public void DeriveKey_InsecureMechanismThrows(ulong mech)

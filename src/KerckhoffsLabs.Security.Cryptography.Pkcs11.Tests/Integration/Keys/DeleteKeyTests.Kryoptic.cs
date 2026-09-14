@@ -12,9 +12,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class DeleteKeyTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
         using var workspace = _backend.Library.OpenWorkspace(

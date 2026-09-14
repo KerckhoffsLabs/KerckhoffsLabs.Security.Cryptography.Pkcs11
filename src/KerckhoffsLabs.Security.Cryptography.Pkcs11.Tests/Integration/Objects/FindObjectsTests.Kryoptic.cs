@@ -18,9 +18,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -65,7 +64,7 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = _backend.Library.OpenWorkspace(

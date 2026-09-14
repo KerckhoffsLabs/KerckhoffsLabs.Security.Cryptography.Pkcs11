@@ -7,17 +7,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 public sealed class SHA512Pkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ComputeHash_KnownAnswer() => SHA512Pkcs11TestCases.Assert_ComputeHash_KnownAnswer(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ComputeHash_MatchesBcl() => SHA512Pkcs11TestCases.Assert_ComputeHash_MatchesBcl(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ComputeHash_Streamed_MatchesOneShot() => SHA512Pkcs11TestCases.Assert_ComputeHash_Streamed_MatchesOneShot(_backend);
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Reuse_AfterInitialize_ProducesFreshHash() => SHA512Pkcs11TestCases.Assert_Reuse_AfterInitialize_ProducesFreshHash(_backend);
 }

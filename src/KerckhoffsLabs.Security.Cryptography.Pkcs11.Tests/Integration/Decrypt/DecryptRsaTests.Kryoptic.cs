@@ -8,9 +8,8 @@ public sealed class DecryptRsaTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
 
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_Kryoptic()
         => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

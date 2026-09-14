@@ -21,8 +21,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class MLKemPkcs11Tests_Managed
 {
-    public static bool Supported => MLKem.IsSupported;
-
     private static MLKemAlgorithm BclAlgorithm(CkpMlKem p) => p switch
     {
         CkpMlKem.CKP_ML_KEM_512 => MLKemAlgorithm.MLKem512,
@@ -74,7 +72,7 @@ public sealed class MLKemPkcs11Tests_Managed
 
     // === Encapsulate / decapsulate round-trips ============================
 
-    [ConditionalTheory(nameof(Supported))]
+    [ConditionalTheory(typeof(MLKem), nameof(MLKem.IsSupported))]
     [MemberData(nameof(ParameterSets))]
     public void EncapsulateDecapsulate_RoundTrips(CkpMlKem parameterSet) =>
         WithMlKem(parameterSet, allowInsecure: true, (ws, mlkem) =>
@@ -92,7 +90,7 @@ public sealed class MLKemPkcs11Tests_Managed
     // BCL cross-check: export the encapsulation key from the token, import it into a BCL MLKem,
     // encapsulate off-token, then decapsulate the resulting ciphertext on the token. The shared secrets
     // must match — the token holds the matching decapsulation key.
-    [ConditionalTheory(nameof(Supported))]
+    [ConditionalTheory(typeof(MLKem), nameof(MLKem.IsSupported))]
     [MemberData(nameof(ParameterSets))]
     public void Decapsulate_BclEncapsulation_MatchesSharedSecret(CkpMlKem parameterSet) =>
         WithMlKem(parameterSet, allowInsecure: true, (ws, mlkem) =>
@@ -108,7 +106,7 @@ public sealed class MLKemPkcs11Tests_Managed
 
     // Two encapsulations to the same key produce distinct ciphertexts and distinct shared secrets,
     // yet each round-trips correctly.
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void Encapsulate_TwiceProducesDistinctCiphertexts() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
     {
@@ -123,12 +121,12 @@ public sealed class MLKemPkcs11Tests_Managed
 
     // === Secure-defaults gating ===========================================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void Encapsulate_GatedByDefault_Throws() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (ws, mlkem) =>
             Assert.Throws<InsecureOperationException>(() => mlkem.Encapsulate(out _, out _)));
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void Decapsulate_GatedByDefault_Throws() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (ws, mlkem) =>
         {
@@ -142,7 +140,7 @@ public sealed class MLKemPkcs11Tests_Managed
         });
 
     // AllowInsecureScope() opts in only for its lifetime; outside it the gate re-engages.
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void Encapsulate_AllowInsecureScope_OptsInThenReengages() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (workspace, mlkem) =>
         {
@@ -158,7 +156,7 @@ public sealed class MLKemPkcs11Tests_Managed
     // token, reads its bytes, then destroys it. If C_DestroyObject fails, that extractable copy
     // lingers on-token — the adapter must surface the failure (not swallow it) and must not hand
     // back a shared secret alongside a failed cleanup.
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void Encapsulate_WhenDestroyFails_SurfacesPkcs11Exception()
     {
         var token = new ManagedSoftToken();
@@ -197,7 +195,7 @@ public sealed class MLKemPkcs11Tests_Managed
 
     // === Key material export ==============================================
 
-    [ConditionalTheory(nameof(Supported))]
+    [ConditionalTheory(typeof(MLKem), nameof(MLKem.IsSupported))]
     [MemberData(nameof(ParameterSets))]
     public void ExportEncapsulationKey_MatchesBclEncodingLength(CkpMlKem parameterSet) =>
         WithMlKem(parameterSet, allowInsecure: false, (ws, mlkem) =>
@@ -210,18 +208,18 @@ public sealed class MLKemPkcs11Tests_Managed
         Assert.Equal(BclAlgorithm(parameterSet), bcl.Algorithm);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void ExportDecapsulationKey_ThrowsInsecure() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
             // Refused even with AllowInsecure: PKCS#11 keys are non-extractable by design.
             Assert.Throws<InsecureOperationException>(() => mlkem.ExportDecapsulationKey()));
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void ExportPrivateSeed_ThrowsInsecure() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
             Assert.Throws<InsecureOperationException>(() => mlkem.ExportPrivateSeed()));
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(MLKem), nameof(MLKem.IsSupported))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
             Assert.Throws<InsecureOperationException>(() => mlkem.ExportPkcs8PrivateKey()));

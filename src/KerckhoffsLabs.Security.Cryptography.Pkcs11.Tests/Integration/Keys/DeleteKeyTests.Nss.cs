@@ -9,12 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class DeleteKeyTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // NSS's generic token is write-protected, so these token-object cases skip (see NssBackendFixture).
-    public static bool TokenObjects => NssBackendFixture.TokenObjectsAvailable;
 
-    [ConditionalFact(nameof(TokenObjects))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
         using var workspace = _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);

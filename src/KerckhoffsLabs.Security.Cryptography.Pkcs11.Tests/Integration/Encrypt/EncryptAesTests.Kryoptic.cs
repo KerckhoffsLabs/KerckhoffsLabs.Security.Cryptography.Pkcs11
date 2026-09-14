@@ -8,21 +8,20 @@ public sealed class EncryptAesTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
 
-    public static bool KryopticAvailable => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesCbcPad_ProducesCiphertext_Kryoptic()
         => EncryptAesTestCases.Assert_AesCbcPad_ProducesCiphertext(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesCbcPad_RoundTrips_Kryoptic()
         => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesEcb_ThrowsInsecureOperationException_ByDefault_Kryoptic()
         => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
-    [ConditionalFact(nameof(KryopticAvailable))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue_Kryoptic()
         => EncryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

@@ -9,11 +9,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 public sealed class SignEdDsaTests_Kryoptic(KryopticBackendFixture backend)
 {
     private readonly KryopticBackendFixture _backend = backend;
-    public static bool Available => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ed25519_RoundTrip() => SignEdDsaTestCases.Assert_Ed25519_RoundTrip(_backend);
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ed448_RoundTrip() => SignEdDsaTestCases.Assert_Ed448_RoundTrip(_backend);
 }

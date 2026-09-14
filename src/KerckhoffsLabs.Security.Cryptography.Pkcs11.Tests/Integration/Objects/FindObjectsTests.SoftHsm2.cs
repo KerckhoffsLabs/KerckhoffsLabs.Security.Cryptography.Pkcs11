@@ -18,9 +18,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
-    public static bool SoftHsmAvailable => SoftHsmBackendFixture.SoftHsmAvailable;
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -65,7 +64,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(nameof(SoftHsmAvailable))]
+    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = _backend.Library.OpenWorkspace(

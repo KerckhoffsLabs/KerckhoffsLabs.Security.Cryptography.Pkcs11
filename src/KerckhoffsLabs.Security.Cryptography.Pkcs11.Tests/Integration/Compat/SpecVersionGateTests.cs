@@ -72,9 +72,7 @@ internal static class SpecVersionGateTestSupport
 public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
 {
     private readonly SoftHsmGate240Fixture _backend = backend;
-    public static bool Available => SoftHsmGate240Fixture.Available;
-
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void Negotiation_ReportsV240OnlySurface()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -82,14 +80,14 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
         Assert.False(ws.Session.SupportsV32Api);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void GetInterfaces_Throws_FunctionNotSupported()
     {
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => _backend.Library.GetInterfaces());
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void LoginUser_Throws_FunctionNotSupported()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -98,7 +96,7 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void CancelOperations_Throws_FunctionNotSupported()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -108,7 +106,7 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
 
     // A v3.2 call on a v2.40 module must surface the documented
     // CKR through the real null-function-pointer dispatch guard — never an NRE.
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -121,7 +119,7 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     // The load-bearing crypto case: with the message API absent, AesGcmPkcs11 must take the
     // v2.40 single-part fallback (ciphertext‖tag concatenation) — a path no v3.x CI backend
     // exercises against real crypto.
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void AesGcm_RoundTrips_ViaV240ConcatFallback()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -129,14 +127,14 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
         SpecVersionGateTestSupport.AssertAesGcmRoundTrips(ws);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void Sha256_MatchesBcl()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
         SpecVersionGateTestSupport.AssertSha256MatchesBcl(ws);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate240Fixture), nameof(SoftHsmGate240Fixture.Available))]
     public void RsaPss_SignVerify_RoundTrips()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -149,9 +147,7 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
 public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
 {
     private readonly SoftHsmGate30Fixture _backend = backend;
-    public static bool Available => SoftHsmGate30Fixture.Available;
-
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate30Fixture), nameof(SoftHsmGate30Fixture.Available))]
     public void Negotiation_ReportsV30Surface_WithoutV32()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -161,7 +157,7 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
     }
 
     // The same v3.2 degradation contract holds on the v3.0 tier.
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate30Fixture), nameof(SoftHsmGate30Fixture.Available))]
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -171,7 +167,7 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate30Fixture), nameof(SoftHsmGate30Fixture.Available))]
     public void GetInterfaces_Succeeds()
     {
         // C_GetInterfaceList is bound from the (v3.0-truncated) interface table and reaches the
@@ -181,7 +177,7 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
         Assert.Contains(interfaces, i => i.Name == "PKCS 11");
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate30Fixture), nameof(SoftHsmGate30Fixture.Available))]
     public void AesGcm_RoundTrips()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
@@ -189,7 +185,7 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
         SpecVersionGateTestSupport.AssertAesGcmRoundTrips(ws);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(SoftHsmGate30Fixture), nameof(SoftHsmGate30Fixture.Available))]
     public void Sha256_MatchesBcl()
     {
         using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);

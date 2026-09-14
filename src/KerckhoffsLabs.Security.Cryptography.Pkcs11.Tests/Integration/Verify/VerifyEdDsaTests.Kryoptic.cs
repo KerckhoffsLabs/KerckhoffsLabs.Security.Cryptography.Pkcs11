@@ -8,8 +8,7 @@ public sealed class VerifyEdDsaTests_Kryoptic(KryopticBackendFixture backend)
 {
     private readonly KryopticBackendFixture _backend = backend;
 
-    public static bool Available => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ed25519_RejectsTamperedData() => VerifyEdDsaTestCases.Assert_Ed25519_RejectsTamperedData(_backend);
 }

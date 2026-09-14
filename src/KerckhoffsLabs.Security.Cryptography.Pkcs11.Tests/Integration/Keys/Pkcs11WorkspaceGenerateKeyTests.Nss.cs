@@ -10,15 +10,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class Pkcs11WorkspaceGenerateKeyTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // NSS's generic token is write-protected, so these token-object cases skip (see NssBackendFixture).
-    public static bool TokenObjects => NssBackendFixture.TokenObjectsAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(nameof(TokenObjects))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void GenerateKey_Symmetric_ReturnsKeyWithLabelAndType()
     {
         using var workspace = OpenWorkspace();
@@ -37,7 +35,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_Nss(NssBackendFixture backen
         finally { workspace.Session.DestroyObject(key.PrivateHandle); }
     }
 
-    [ConditionalFact(nameof(TokenObjects))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void GenerateKey_Asymmetric_ReturnsKeyWithBothHandles()
     {
         using var workspace = OpenWorkspace();

@@ -7,8 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 public sealed class ObjectLifecycleTests_Kryoptic(KryopticBackendFixture backend)
 {
     private readonly KryopticBackendFixture _backend = backend;
-    public static bool Available => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void CreateFindDestroy_DataObject() => ObjectLifecycleTestCases.Assert_CreateFindDestroy_DataObject(_backend);
 }

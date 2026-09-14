@@ -16,8 +16,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
 {
-    public static bool Supported => ChaCha20Poly1305.IsSupported;
-
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     private static byte[] Iota(int length)
@@ -51,7 +49,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
 
     // === Real crypto: cross-checked against the BCL ======================================
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Encrypt_MatchesBcl_AndRoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -79,7 +77,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
     }
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_BclCiphertext_RoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -100,7 +98,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         });
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void EncryptDecrypt_EmptyPlaintext_AadOnly_MatchesBcl()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -121,7 +119,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         });
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void EncryptDecrypt_NoAad_RoundTrips()
     {
         byte[] key = RandomNumberGenerator.GetBytes(32);
@@ -140,7 +138,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
     }
 
     // Known-answer test: RFC 8439 §2.8.2 AEAD_CHACHA20_POLY1305 example.
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Encrypt_KnownAnswer_MatchesReferenceVector()
     {
         byte[] key = H("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f");
@@ -166,7 +164,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
 
     // === Authenticity: every input the tag covers must be rejected when altered ===========
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_TamperedTag_Throws() => WithAnyChaCha(chacha =>
     {
         byte[] nonce = Iota(12);
@@ -178,7 +176,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         AssertAuthFailure(() => chacha.Decrypt(nonce, ct, tag, new byte[pt.Length]));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_TamperedCiphertext_Throws() => WithAnyChaCha(chacha =>
     {
         byte[] nonce = Iota(12);
@@ -190,7 +188,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         AssertAuthFailure(() => chacha.Decrypt(nonce, ct, tag, new byte[pt.Length]));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_WrongAad_Throws() => WithAnyChaCha(chacha =>
     {
         byte[] nonce = Iota(12);
@@ -201,7 +199,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         AssertAuthFailure(() => chacha.Decrypt(nonce, ct, tag, new byte[pt.Length], "aad-B"u8.ToArray()));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_WrongNonce_Throws() => WithAnyChaCha(chacha =>
     {
         byte[] nonce = Iota(12);
@@ -214,7 +212,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         AssertAuthFailure(() => chacha.Decrypt(wrongNonce, ct, tag, new byte[pt.Length]));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_WrongKey_Throws()
     {
         byte[] keyA = RandomNumberGenerator.GetBytes(32);
@@ -246,7 +244,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         Assert.Equal("key", ex.ParamName);
     }
 
-    [ConditionalTheory(nameof(Supported))]
+    [ConditionalTheory(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     [InlineData(11)] // below the fixed 12-byte nonce
     [InlineData(13)] // above it
     public void Encrypt_InvalidNonceLength_Throws(int nonceLength) => WithAnyChaCha(chacha =>
@@ -256,7 +254,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         Assert.Equal("nonce", ex.ParamName);
     });
 
-    [ConditionalTheory(nameof(Supported))]
+    [ConditionalTheory(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     [InlineData(15)] // below the fixed 16-byte tag
     [InlineData(17)] // above it
     public void Encrypt_InvalidTagLength_Throws(int tagLength) => WithAnyChaCha(chacha =>
@@ -266,7 +264,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         Assert.Equal("tagLength", ex.ParamName);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Encrypt_CiphertextLengthMismatch_Throws() => WithAnyChaCha(chacha =>
     {
         var ex = Assert.Throws<ArgumentException>(() =>
@@ -274,7 +272,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         Assert.Equal("ciphertext", ex.ParamName);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_PlaintextLengthMismatch_Throws() => WithAnyChaCha(chacha =>
     {
         var ex = Assert.Throws<ArgumentException>(() =>
@@ -282,7 +280,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         Assert.Equal("plaintext", ex.ParamName);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Encrypt_AfterDispose_Throws() => WithAnyChaCha(chacha =>
     {
         chacha.Dispose();
@@ -290,7 +288,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
             chacha.Encrypt(new byte[12], new byte[8], new byte[8], new byte[16]));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [ConditionalFact(typeof(ChaCha20Poly1305), nameof(ChaCha20Poly1305.IsSupported))]
     public void Decrypt_AfterDispose_Throws() => WithAnyChaCha(chacha =>
     {
         chacha.Dispose();

@@ -14,10 +14,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
-    public static bool Available => NssBackendFixture.NssAvailable;
 
     // NSS's CKM_EDDSA needs a CK_EDDSA_PARAMS the shared bare-parameter case does not pass; skip.
-    public static bool EdDsa => NssBackendFixture.EdDsaAvailable;
 
     private void RequireEdDsa()
     {
@@ -25,7 +23,7 @@ public sealed class SignEdDsaTests_Nss(NssBackendFixture backend)
             throw new SkipTestException("NSS: EdDSA (CKM_EDDSA / CKM_EC_EDWARDS_KEY_PAIR_GEN) not available");
     }
 
-    [ConditionalFact(nameof(EdDsa))]
+    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.EdDsaAvailable))]
     public void Ed25519_RoundTrip()
     {
         RequireEdDsa();

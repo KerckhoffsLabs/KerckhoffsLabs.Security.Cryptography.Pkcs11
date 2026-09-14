@@ -14,7 +14,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 public sealed class SignEdDsaTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
     private void RequireEdDsa()
     {
@@ -22,14 +21,14 @@ public sealed class SignEdDsaTests_OpenCryptoki(OpenCryptokiBackendFixture backe
             throw new SkipTestException("opencryptoki: EdDSA (CKM_EDDSA / CKM_EC_EDWARDS_KEY_PAIR_GEN) not available");
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Ed25519_RoundTrip()
     {
         RequireEdDsa();
         SignEdDsaTestCases.Assert_Ed25519_RoundTrip(_backend);
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Ed448_RoundTrip()
     {
         RequireEdDsa();

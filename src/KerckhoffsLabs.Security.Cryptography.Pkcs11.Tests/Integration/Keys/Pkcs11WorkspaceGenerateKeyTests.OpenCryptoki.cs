@@ -10,13 +10,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 public sealed class Pkcs11WorkspaceGenerateKeyTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
-    public static bool Available => OpenCryptokiBackendFixture.OpenCryptokiAvailable;
 
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void GenerateKey_Symmetric_ReturnsKeyWithLabelAndType()
     {
         using var workspace = OpenWorkspace();
@@ -35,7 +34,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_OpenCryptoki(OpenCryptokiBac
         finally { workspace.Session.DestroyObject(key.PrivateHandle); }
     }
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void GenerateKey_Asymmetric_ReturnsKeyWithBothHandles()
     {
         using var workspace = OpenWorkspace();

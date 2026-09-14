@@ -7,9 +7,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 public sealed class SmokeTests_Kryoptic(KryopticBackendFixture backend)
 {
     private readonly KryopticBackendFixture _backend = backend;
-    public static bool Available => KryopticBackendFixture.KryopticAvailable;
 
-    [ConditionalFact(nameof(Available))]
+    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
     public void GetInfo_AndSlots_AreWellFormed()
         => SmokeTestAssertions.AssertLibraryInfoAndSlots_AreWellFormed(_backend, expectNonZeroLibraryVersion: false);
 }
