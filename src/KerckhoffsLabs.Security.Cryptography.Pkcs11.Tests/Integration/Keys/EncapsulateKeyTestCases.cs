@@ -19,17 +19,24 @@ internal static class EncapsulateKeyTestCases
 {
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
 
-    private static ObjectTemplate SharedSecretTemplate(bool onToken) =>
-        ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .ValueLen(32).Extractable().Sensitive(false).OnToken(onToken).Build();
+    private static ObjectTemplate SharedSecretTemplate(bool onToken, bool valueLen = true)
+    {
+        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET);
+        if (valueLen)
+        {
+            builder = builder.ValueLen(32);
+        }
+        return builder.Extractable().Sensitive(false).OnToken(onToken).Build();
+    }
 
-    private static void AssertRoundTrips(Pkcs11Key key, Mechanism mechanism, bool onToken)
+    private static void AssertRoundTrips(
+        Pkcs11Key key, Mechanism mechanism, bool onToken, bool valueLenOnDecapsulate = true)
     {
         using var encTemplate = SharedSecretTemplate(onToken);
         var (ciphertext, encSecret) = key.EncapsulateKey(mechanism, encTemplate);
         try
         {
-            using var decTemplate = SharedSecretTemplate(onToken);
+            using var decTemplate = SharedSecretTemplate(onToken, valueLenOnDecapsulate);
             using Pkcs11Key decSecret = key.DecapsulateKey(mechanism, ciphertext, decTemplate);
 
             using var encAttrs = encSecret.GetAttributeValue(CKA.CKA_VALUE);
@@ -64,7 +71,12 @@ internal static class EncapsulateKeyTestCases
         try
         {
             var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
-            AssertRoundTrips(key, mechanism, backend.SupportsTokenObjects);
+            // C_DecapsulateKey for RSA-OAEP is equivalent to C_UnwrapKey (PKCS#11 v3.2 §5.18.11);
+            // opencryptoki's key_mgr_unwrap_key only allows CKA_VALUE_LEN in the unwrapping
+            // template for a handful of block-cipher mechanisms, rejecting it for
+            // CKM_RSA_PKCS_OAEP with CKR_TEMPLATE_INCONSISTENT. The decapsulated length is
+            // already fully determined by the OAEP-decrypted plaintext.
+            AssertRoundTrips(key, mechanism, backend.SupportsTokenObjects, valueLenOnDecapsulate: false);
         }
         finally
         {
