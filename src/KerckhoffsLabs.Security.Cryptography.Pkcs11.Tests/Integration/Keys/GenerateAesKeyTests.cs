@@ -28,8 +28,8 @@ internal static class GenerateAesKeyTestCases
         Assert.False(key.PrivateHandle.IsInvalid);
 
         using var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
-        Assert.Single(attrs);
-        Assert.Equal(32UL, attrs[0].GetValueAsUlong());
+        var attr = Assert.Single(attrs);
+        Assert.Equal(32UL, attr.GetValueAsUlong());
     }
 
     /// <summary>
