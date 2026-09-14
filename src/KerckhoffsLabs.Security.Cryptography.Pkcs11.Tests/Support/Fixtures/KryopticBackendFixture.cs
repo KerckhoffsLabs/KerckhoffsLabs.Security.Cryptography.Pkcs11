@@ -55,6 +55,9 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
 
     private const int SlotNumber = 0;
 
+    private readonly string _configPath = string.Empty;
+    private readonly string _dbPath = string.Empty;
+
     public static bool KryopticAvailable =>
         (Settings.KryopticLibraryPath is { } p && File.Exists(p)) ||
         BuiltLibraryPath() is not null;
@@ -75,21 +78,21 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
         // fresh sqlite file each run guarantees factory state without needing a delete/reinit
         // dance through an external tool.
         string nativeDir = Path.GetDirectoryName(libPath)!;
-        string configPath = Path.Join(nativeDir, "kryoptic.conf");
-        string dbPath = Path.Join(nativeDir, "kryoptic-token.sql");
-        try { File.Delete(dbPath); } catch { /* best-effort */ }
+        _configPath = Path.Join(nativeDir, "kryoptic.conf");
+        _dbPath = Path.Join(nativeDir, "kryoptic-token.sql");
+        try { File.Delete(_dbPath); } catch { /* best-effort */ }
 
-        File.WriteAllText(configPath,
+        File.WriteAllText(_configPath,
             "[[slots]]\n" +
             $"slot = {SlotNumber}\n" +
             "dbtype = \"sqlite\"\n" +
-            $"dbargs = \"{dbPath.Replace("\\", "\\\\")}\"\n");
+            $"dbargs = \"{_dbPath.Replace("\\", "\\\\")}\"\n");
 
         // libkryoptic_pkcs11.so reads KRYOPTIC_CONF via getenv() at C_Initialize time, same
         // caveat as SoftHSM2_CONF: .NET's Environment.SetEnvironmentVariable does not propagate
         // to native getenv() on Linux, so call setenv() directly too.
-        Environment.SetEnvironmentVariable("KRYOPTIC_CONF", configPath);
-        SetNativeEnv("KRYOPTIC_CONF", configPath);
+        Environment.SetEnvironmentVariable("KRYOPTIC_CONF", _configPath);
+        SetNativeEnv("KRYOPTIC_CONF", _configPath);
 
         Library = new Pkcs11Library(LibraryPath);
         try
@@ -117,6 +120,8 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     public void Dispose()
     {
         try { Library?.Dispose(); } catch { /* best-effort */ }
+        try { if (_configPath.Length > 0) File.Delete(_configPath); } catch { /* best-effort */ }
+        try { if (_dbPath.Length > 0) File.Delete(_dbPath); } catch { /* best-effort */ }
     }
 
     // -----------------------------------------------------------------------

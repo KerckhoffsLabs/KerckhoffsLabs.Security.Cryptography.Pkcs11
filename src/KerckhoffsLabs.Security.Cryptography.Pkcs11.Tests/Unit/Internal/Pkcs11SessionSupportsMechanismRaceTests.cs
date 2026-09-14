@@ -93,7 +93,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
     private static ProbeOutcome ProbeWhileACallIsInFlight(bool warmTheCacheFirst)
     {
         using var fake = new ParkingMechListFake();
-        var session = new Pkcs11Session(fake, SessionId);
+        using var session = new Pkcs11Session(fake, SessionId);
 
         if (warmTheCacheFirst)
             Assert.True(session.SupportsMechanism(CKM.CKM_AES_GCM));
@@ -165,7 +165,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
     public void SupportsMechanism_FromInsideAnExclusiveSection_OnTheSameThread_Succeeds()
     {
         using var fake = new ParkingMechListFake();
-        var session = new Pkcs11Session(fake, SessionId);
+        using var session = new Pkcs11Session(fake, SessionId);
 
         using var lease = session.AcquireExclusive(
             nameof(SupportsMechanism_FromInsideAnExclusiveSection_OnTheSameThread_Succeeds));

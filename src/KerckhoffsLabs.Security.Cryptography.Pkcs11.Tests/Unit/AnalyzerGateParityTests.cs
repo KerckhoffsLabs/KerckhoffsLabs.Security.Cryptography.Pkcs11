@@ -39,7 +39,7 @@ public sealed class AnalyzerGateParityTests
     /// <summary>Mechanisms the runtime gate actually throws on, obtained by invoking it directly.</summary>
     private static HashSet<CKM> RuntimeGatedMechanisms()
     {
-        var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1) { AllowInsecure = false };
+        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1) { AllowInsecure = false };
         MethodInfo guard = typeof(Pkcs11Session)
             .GetMethod("GuardMechanism", BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new InvalidOperationException("Pkcs11Session.GuardMechanism not found — did it move?");

@@ -48,7 +48,7 @@ public sealed class Pkcs11SessionRandomZeroizationTests
     public unsafe void GenerateRandom_Span_FillsTheCallersBufferWithNoTransientCopy()
     {
         var fake = new RngFake { TokenOutput = [0xA1, 0xA2, 0xA3, 0xA4] };
-        var session = new Pkcs11Session(fake, SessionId);
+        using var session = new Pkcs11Session(fake, SessionId);
         Span<byte> destination = stackalloc byte[4];
 
         int written = session.GenerateRandom(destination);
@@ -64,7 +64,7 @@ public sealed class Pkcs11SessionRandomZeroizationTests
     public unsafe void SeedRandom_Span_PassesTheCallersEntropyStraightThrough()
     {
         var fake = new RngFake();
-        var session = new Pkcs11Session(fake, SessionId);
+        using var session = new Pkcs11Session(fake, SessionId);
         byte[] entropy = [0xE1, 0xE2, 0xE3, 0xE4];
 
         fixed (byte* p = entropy)
