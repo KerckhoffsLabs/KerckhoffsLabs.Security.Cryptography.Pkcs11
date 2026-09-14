@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 /// <summary>
 /// xUnit collection fixture wrapping Kryoptic — a fourth, fully independent real PKCS#11
-/// implementation (Rust, OpenSSL-backed) alongside SoftHSM2, opencryptoki, and NSS softoken. See
-/// BL-028: NSS already covers ChaCha20-Poly1305 and the SP800-108 counter KDF on a real token, but
+/// implementation (Rust, OpenSSL-backed) alongside SoftHSM2, opencryptoki, and NSS softoken.
+/// NSS already covers ChaCha20-Poly1305 and the SP800-108 counter KDF on a real token, but
 /// AES-CCM and SLH-DSA still had zero real-backend coverage — Kryoptic 1.5.2 implements both
 /// (confirmed via its own <c>C_GetMechanismList</c>: <see cref="CKM.CKM_AES_CCM"/> and
 /// <see cref="CKM.CKM_SLH_DSA"/> are both advertised; <c>CKM_CHACHA20_POLY1305</c> is not — Kryoptic

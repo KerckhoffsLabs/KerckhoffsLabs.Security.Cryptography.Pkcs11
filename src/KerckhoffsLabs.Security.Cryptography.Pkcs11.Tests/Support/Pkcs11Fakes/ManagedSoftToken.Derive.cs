@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -59,7 +60,12 @@ internal sealed partial class ManagedSoftToken
     // CKM_SP800_108_COUNTER_KDF: the adapter emits the data-param sequence
     // [0]=counter, [1]=label, [2]=0x00 separator, [3]=context, [4]=[L]. We pull label/context and run
     // the same NIST counter-mode KDF via the BCL.
-    private static byte[] DeriveSp800108(byte[] baseKey, ref CK_MECHANISM mech, int valueLen)
+    //
+    // Additional derived keys (PKCS#11 v3.0 §2.42) are not independently re-derived -- they share
+    // one continuous derived-key-material stream with the primary key, sliced sequentially in
+    // request order. Each sibling's own template supplies its CKA_VALUE_LEN and object attributes;
+    // its handle is written into the CK_DERIVED_KEY slot the token would fill.
+    private byte[] DeriveSp800108(byte[] baseKey, ref CK_MECHANISM mech, int valueLen)
     {
         var p = UnmanagedMemory.Read<CK_SP800_108_KDF_PARAMS>(mech.Parameter);
         int n = (int)p.NumberOfDataParams;
@@ -70,7 +76,56 @@ internal sealed partial class ManagedSoftToken
         byte[] context = n > 3 ? PrfBytes(Param(3)) : [];
         HashAlgorithmName prf = PrfHash((CKM)(ulong)p.PrfType);
 
-        return SP800108HmacCounterKdf.DeriveBytes(baseKey, prf, label, context, valueLen);
+        int additionalCount = (int)p.AdditionalDerivedKeys;
+        int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
+        var siblingLens = new int[additionalCount];
+        var siblingAttrs = new Dictionary<ulong, byte[]>[additionalCount];
+        for (int i = 0; i < additionalCount; i++)
+        {
+            var dk = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(p.AdditionalDerivedKeysPtr, i * dkSize));
+            var siblingTemplate = ReadTemplate(ReadAttributeArray(dk.Template, (int)dk.AttributeCount));
+            siblingAttrs[i] = siblingTemplate;
+            siblingLens[i] = siblingTemplate.TryGetValue((ulong)CKA.CKA_VALUE_LEN, out var svl)
+                ? (int)ToUlong(svl) : 0;
+        }
+
+        int total = valueLen + siblingLens.Sum();
+        byte[] stream = SP800108HmacCounterKdf.DeriveBytes(baseKey, prf, label, context, total);
+
+        int offset = valueLen;
+        for (int i = 0; i < additionalCount; i++)
+        {
+            byte[] siblingValue = stream.AsSpan(offset, siblingLens[i]).ToArray();
+            offset += siblingLens[i];
+
+            siblingAttrs[i][(ulong)CKA.CKA_VALUE] = siblingValue;
+            siblingAttrs[i].TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
+            ulong siblingHandle = Store(siblingAttrs[i]);
+
+            var dk = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(p.AdditionalDerivedKeysPtr, i * dkSize));
+            WriteHandle(dk.Key, siblingHandle);
+        }
+
+        return stream.AsSpan(0, valueLen).ToArray();
+    }
+
+    private static CK_ATTRIBUTE[] ReadAttributeArray(IntPtr array, int count)
+    {
+        var result = new CK_ATTRIBUTE[count];
+        int size = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
+        for (int i = 0; i < count; i++)
+            result[i] = UnmanagedMemory.Read<CK_ATTRIBUTE>(IntPtr.Add(array, i * size));
+        return result;
+    }
+
+    private static void WriteHandle(IntPtr slot, ulong handle)
+    {
+        Span<byte> buffer = stackalloc byte[8];
+        if (UnmanagedMemory.NativeULongSize == 4)
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer, checked((uint)handle));
+        else
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer, handle);
+        UnmanagedMemory.Write(slot, buffer[..UnmanagedMemory.NativeULongSize]);
     }
 
     private static byte[] PrfBytes(CK_PRF_DATA_PARAM prm)

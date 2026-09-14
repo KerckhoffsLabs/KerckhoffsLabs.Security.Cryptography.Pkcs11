@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
@@ -44,6 +45,11 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     // that holds the slots is released.
     private readonly List<ulong> _derivedHandles = [];
 
+    // Populated by HydrateDerivedKeys, called by Pkcs11Key.Derive once it has both the raw handles
+    // (via AbsorbOutput, above) and the workspace needed to turn them into usable Pkcs11Key
+    // instances. Empty until then.
+    private readonly List<Pkcs11Key?> _hydratedKeys = [];
+
     /// <summary>Begins a counter-mode (<c>CKM_SP800_108_COUNTER_KDF</c>) parameter build.</summary>
     public static Sp800108KdfBuilder Counter(CKM prfType) => new(prfType, Sp800108KdfMode.Counter);
 
@@ -77,21 +83,53 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     }
 
     /// <summary>
-    /// Raw <c>CK_OBJECT_HANDLE</c> values of the additional sibling keys derived in the same call, in
-    /// the order added via <see cref="Sp800108KdfBuilder.AddDerivedKey"/>. Read after the
-    /// <c>C_DeriveKey</c> call. Empty when none were requested, and also before the call: the handles
-    /// live in the call scope's memory until the derive absorbs them out of it. A slot the token left
-    /// unwritten reads as <c>CK_INVALID_HANDLE</c> (0).
+    /// The additional sibling keys derived in the same call, in the order added via
+    /// <see cref="Sp800108KdfBuilder.AddDerivedKey"/>. Read after the <c>C_DeriveKey</c> call
+    /// completes (i.e. after <see cref="Pkcs11Key.Derive"/> returns) — empty before that, and also
+    /// when none were requested. A slot the token left unwritten (<c>CK_INVALID_HANDLE</c>) is
+    /// <c>null</c> in the list rather than a key wrapping an invalid handle.
     /// </summary>
     /// <remarks>
-    /// A snapshot, not a view: the returned list does not change when a later call absorbs again.
+    /// <para>
+    /// The caller owns every non-null entry and must dispose it (and call <see cref="Pkcs11Key.Destroy"/>
+    /// if it should not outlive this call) — same obligation as the primary key <c>Derive</c> returns.
+    /// Previously this returned raw <c>ulong</c> handles that no public API could turn into a usable
+    /// key, so a sibling with <c>CKA_TOKEN=true</c> was unreachable and undestroyable.
+    /// </para>
+    /// <para>A snapshot, not a view: the returned list does not change if the same params are reused
+    /// for a later derive.</para>
     /// </remarks>
-    public IReadOnlyList<ulong> AdditionalDerivedKeys
+    public IReadOnlyList<Pkcs11Key?> AdditionalDerivedKeys
     {
         get
         {
-            ulong[] snapshot = [.. _derivedHandles];
+            Pkcs11Key?[] snapshot = [.. _hydratedKeys];
             return snapshot;
+        }
+    }
+
+    /// <summary>
+    /// Raw <c>CK_OBJECT_HANDLE</c> values absorbed out of the scope-owned <c>CK_DERIVED_KEY</c> array
+    /// by <see cref="AbsorbOutput"/>, before <see cref="HydrateDerivedKeys"/> turns them into
+    /// <see cref="Pkcs11Key"/> instances. Exists so the marshalling round trip can be verified without
+    /// a live token/workspace; production code should use <see cref="AdditionalDerivedKeys"/>.
+    /// </summary>
+    internal IReadOnlyList<ulong> RawAdditionalDerivedKeyHandles => [.. _derivedHandles];
+
+    /// <summary>
+    /// Turns the raw handles <see cref="AbsorbOutput"/> collected into <see cref="Pkcs11Key"/>
+    /// instances, populating <see cref="AdditionalDerivedKeys"/>. Called by
+    /// <see cref="Pkcs11Key.Derive"/> right after a successful <c>C_DeriveKey</c> call — the only
+    /// place that has both the handles and the workspace needed to build them.
+    /// </summary>
+    internal void HydrateDerivedKeys(Pkcs11Workspace workspace)
+    {
+        _hydratedKeys.Clear();
+        foreach (ulong handle in _derivedHandles)
+        {
+            _hydratedKeys.Add(handle == 0UL
+                ? null
+                : workspace.HydrateExistingHandleAsKey(new ObjectHandle(handle)));
         }
     }
 

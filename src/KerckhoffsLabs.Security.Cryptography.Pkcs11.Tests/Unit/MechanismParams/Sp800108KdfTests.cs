@@ -116,7 +116,7 @@ public sealed class Sp800108KdfTests
     public void CounterModeHmac_Preset_HasNoAdditionalDerivedKeys()
     {
         var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, [1], [2]);
-        Assert.Empty(p.AdditionalDerivedKeys);
+        Assert.Empty(p.RawAdditionalDerivedKeyHandles);
         using var scope = new MechanismParameterScope();
         var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal(0UL, (ulong)s.AdditionalDerivedKeys);
@@ -152,13 +152,13 @@ public sealed class Sp800108KdfTests
             // Slots start zero-filled, so absorbing before the token has written reports
             // CK_INVALID_HANDLE rather than garbage.
             p.AbsorbOutput(s);
-            Assert.Equal([0, 0], p.AdditionalDerivedKeys);
+            Assert.Equal([0, 0], p.RawAdditionalDerivedKeyHandles);
 
             // Simulate the token writing the derived handles into the phKey slots.
             WriteHandle(dk0.Key, 0x111);
             WriteHandle(dk1.Key, 0x222);
             p.AbsorbOutput(s);
-            Assert.Equal([0x111, 0x222], p.AdditionalDerivedKeys);
+            Assert.Equal([0x111, 0x222], p.RawAdditionalDerivedKeyHandles);
         }
         finally
         {
@@ -206,7 +206,7 @@ public sealed class Sp800108KdfTests
             }
 
             // Read after the scope is gone: the handles must have been copied out, not re-read.
-            Assert.Equal([0xDEAD, 0xBEEF], p.AdditionalDerivedKeys);
+            Assert.Equal([0xDEAD, 0xBEEF], p.RawAdditionalDerivedKeyHandles);
         }
         finally
         {

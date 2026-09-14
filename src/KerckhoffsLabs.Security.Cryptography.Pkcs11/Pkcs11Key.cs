@@ -643,6 +643,12 @@ public sealed class Pkcs11Key : IDisposable
 
         ObjectHandle resulting = _workspace.Session.DeriveKey(
             mechanism, baseHandle, [.. template.Attributes]);
+
+        // SP800-108 sibling keys: the params object absorbed their raw handles during the call
+        // above; turn them into usable Pkcs11Key instances now, while the workspace is at hand.
+        if (mechanism.Parameters is CkmSp800108KdfParams sp800108)
+            sp800108.HydrateDerivedKeys(_workspace);
+
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
 

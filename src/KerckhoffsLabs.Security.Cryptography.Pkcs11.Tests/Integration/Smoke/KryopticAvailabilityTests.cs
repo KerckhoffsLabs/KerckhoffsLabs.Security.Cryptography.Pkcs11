@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// <summary>
 /// CI-health guard: makes a missing Kryoptic build fail loudly instead of silently skipping the
 /// whole <c>[ConditionalFact(KryopticAvailable)]</c> suite while CI stays green — without it, a
-/// build regression would erase the third-real-backend cross-check (see BL-028) unnoticed.
+/// build regression would erase the third-real-backend cross-check unnoticed.
 /// Like opencryptoki (and unlike SoftHSM, built on every leg), Kryoptic is built only where the CI
 /// leg declares it via <c>PKCS11_TEST_EXPECT_KRYOPTIC=1</c> on its test step, so the guard is keyed
 /// on that marker rather than on the <c>CI</c> variable.
