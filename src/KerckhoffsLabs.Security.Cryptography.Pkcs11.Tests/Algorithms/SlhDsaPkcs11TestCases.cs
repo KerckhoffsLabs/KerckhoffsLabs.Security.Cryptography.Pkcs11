@@ -4,7 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // SlhDsa (FIPS 205) and ExportPkcs8PrivateKey are evaluation-only BCL APIs (SYSLIB5006). We invoke
 // them deliberately to assert our adapter's behaviour; suppress the experimental diagnostic.
@@ -39,7 +38,7 @@ internal static class SlhDsaPkcs11TestCases
     private static void WithSlhDsa(IPkcs11Backend backend, CkpSlhDsa parameterSet, Action<SlhDsaPkcs11> body)
     {
         if (!backend.SupportsSlhDsa)
-            throw new SkipTestException("Backend cannot operate SLH-DSA (CKM_SLH_DSA unavailable).");
+            Assert.Skip("Backend cannot operate SLH-DSA (CKM_SLH_DSA unavailable).");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"slhdsa-{Guid.NewGuid():N}";

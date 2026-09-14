@@ -4,9 +4,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 
 /// <summary>
 /// CI-health guard: makes a missing SoftHSM2 fail loudly instead of silently skipping the
-/// whole <c>[ConditionalFact(SoftHsmAvailable)]</c> integration suite while CI stays green.
-/// SoftHSM is built from the vendored submodule on every CI leg (Linux, macOS, Windows x64+x86,
-/// each for its own architecture), so the guard enforces availability on all of them.
+/// whole <c>[Fact(SkipUnless = nameof(SoftHsmAvailable))]</c> integration suite while CI stays
+/// green. SoftHSM is built from the vendored submodule on every CI leg (Linux, macOS, Windows
+/// x64+x86+arm64, each for its own architecture), so the guard enforces availability on all of
+/// them.
 /// </summary>
 [NoBackendCollection("Reads the fixture's static File.Exists probe only — it never loads or " +
                      "initializes the module, so serializing it against the SoftHsm collection would buy nothing.")]

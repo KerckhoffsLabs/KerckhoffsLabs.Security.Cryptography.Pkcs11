@@ -11,7 +11,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
 
     // --- Encrypt gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_AES_ECB)]
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
@@ -19,13 +19,13 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
     public void Encrypt_InsecureMechanismThrows_Kryoptic(ulong mech)
         => InsecureOperationGateTestCases.Assert_Encrypt_InsecureMechanismThrows(_backend, mech);
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Encrypt_AllowInsecure_BypassesGate_Kryoptic()
         => InsecureOperationGateTestCases.Assert_Encrypt_AllowInsecureBypassesGate(_backend);
 
     // --- Decrypt gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_AES_ECB)]
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
@@ -33,13 +33,13 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
     public void Decrypt_InsecureMechanismThrows_Kryoptic(ulong mech)
         => InsecureOperationGateTestCases.Assert_Decrypt_InsecureMechanismThrows(_backend, mech);
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Decrypt_AllowInsecure_BypassesGate_Kryoptic()
         => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
 
     // --- Sign gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
@@ -50,7 +50,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
 
     // --- Verify gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
@@ -59,7 +59,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
 
     // --- Digest gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_MD5)]
     [InlineData((ulong)CKM.CKM_SHA_1)]
     public void Digest_InsecureMechanismThrows(ulong mech)
@@ -67,7 +67,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
 
     // --- GenerateKey gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_DES_KEY_GEN)]
     [InlineData((ulong)CKM.CKM_DES2_KEY_GEN)]
     [InlineData((ulong)CKM.CKM_DES3_KEY_GEN)]
@@ -76,7 +76,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
 
     // --- DeriveKey gate ---
 
-    [ConditionalTheory(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     [InlineData((ulong)CKM.CKM_DES3_ECB_ENCRYPT_DATA)]
     [InlineData((ulong)CKM.CKM_DES3_CBC_ENCRYPT_DATA)]
     public void DeriveKey_InsecureMechanismThrows(ulong mech)

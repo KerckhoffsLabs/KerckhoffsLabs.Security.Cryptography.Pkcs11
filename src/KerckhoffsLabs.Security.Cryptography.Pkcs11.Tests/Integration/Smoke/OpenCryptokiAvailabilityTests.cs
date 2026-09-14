@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 
 /// <summary>
 /// CI-health guard: makes a missing opencryptoki fail loudly instead of silently skipping the
-/// whole <c>[ConditionalFact(OpenCryptokiAvailable)]</c> suite while CI stays green — without
+/// whole <c>[Fact(SkipUnless = nameof(OpenCryptokiAvailable))]</c> suite while CI stays green — without
 /// it, a provisioning regression would erase the second-real-backend cross-check unnoticed.
 /// Unlike SoftHSM (built on every leg), opencryptoki is provisioned only where the CI leg
 /// declares it via <c>PKCS11_TEST_EXPECT_OPENCRYPTOKI=1</c> on its test step, so the guard is

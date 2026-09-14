@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // MLKem (FIPS 203) export-to-PKCS#8 etc. are evaluation-only BCL APIs (SYSLIB5006); suppress here.
 #pragma warning disable SYSLIB5006
@@ -39,7 +38,7 @@ internal static class MLKemPkcs11TestCases
     private static void WithMlKem(IPkcs11Backend backend, CkpMlKem parameterSet, Action<Pkcs11Workspace, MLKemPkcs11> body)
     {
         if (!backend.SupportsMlKem)
-            throw new SkipTestException("Backend cannot operate ML-KEM (CKM_ML_KEM unavailable).");
+            Assert.Skip("Backend cannot operate ML-KEM (CKM_ML_KEM unavailable).");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"mlkem-{Guid.NewGuid():N}";
@@ -112,7 +111,7 @@ internal static class MLKemPkcs11TestCases
     internal static void Assert_Decapsulate_BclEncapsulation_MatchesSharedSecret(IPkcs11Backend backend, CkpMlKem parameterSet)
     {
         if (!MLKem.IsSupported)
-            throw new SkipTestException("Host BCL cannot operate ML-KEM (needs OpenSSL 3.5+ or a recent Windows).");
+            Assert.Skip("Host BCL cannot operate ML-KEM (needs OpenSSL 3.5+ or a recent Windows).");
 
         WithMlKem(backend, parameterSet, (workspace, mlkem) =>
         {

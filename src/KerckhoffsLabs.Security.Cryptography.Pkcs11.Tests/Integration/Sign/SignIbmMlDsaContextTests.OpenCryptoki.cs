@@ -4,7 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 
@@ -59,12 +58,12 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
     private void RequireIbmMlDsa()
     {
         if (!_backend.Supports(CKM.CKM_ML_DSA_KEY_PAIR_GEN))
-            throw new SkipTestException("opencryptoki: CKM_ML_DSA_KEY_PAIR_GEN not available (needs OpenSSL 3.5).");
+            Assert.Skip("opencryptoki: CKM_ML_DSA_KEY_PAIR_GEN not available (needs OpenSSL 3.5).");
         if (!_backend.Supports((CKM)CkmIbmMlDsa))
-            throw new SkipTestException("opencryptoki: CKM_IBM_ML_DSA not advertised by this token.");
+            Assert.Skip("opencryptoki: CKM_IBM_ML_DSA not advertised by this token.");
     }
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void IbmMlDsa_WithSignAdditionalContext_TokenAcceptsTheParameterBlock()
     {
         RequireIbmMlDsa();
@@ -102,9 +101,10 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
             }
             catch (Pkcs11Exception ex)
             {
-                throw new SkipTestException(
+                Assert.Skip(
                     $"opencryptoki will not run CKM_IBM_ML_DSA against a CKK_ML_DSA key here ({ex.ReturnValue}); "
                     + "nothing to conclude about the parameter block.");
+                throw; // Assert.Skip always throws; xunit.v3.assert 4.0.1 lacks [DoesNotReturn].
             }
 
             Assert.NotEmpty(signature);

@@ -40,7 +40,7 @@ public sealed class GenerateEcKeyPairInsecureGateTests
 #pragma warning restore KLPKCS11007
     }
 
-    [ConditionalFact(nameof(P224Supported))]
+    [Fact(SkipUnless = nameof(P224Supported), Skip = "Requires " + nameof(P224Supported))]
     public void WeakCurve_Generates_UnderAllowInsecureScope()
     {
         using var library = ManagedToken.NewLibrary();

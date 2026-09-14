@@ -60,7 +60,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
         if (gatePath is null || softHsmPath is null)
         {
             LibraryPath = _gateDir = _configPath = _utilPath = _targetCopyPath = string.Empty;
-            return; // unavailable — tests skip via their ConditionalFact gate
+            return; // unavailable — tests skip via their SkipUnless gate
         }
 
         LibraryPath = gatePath;

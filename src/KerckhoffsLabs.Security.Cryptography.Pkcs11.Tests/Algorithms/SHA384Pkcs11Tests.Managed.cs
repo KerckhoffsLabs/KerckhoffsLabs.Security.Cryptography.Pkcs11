@@ -15,7 +15,7 @@ public sealed class SHA384Pkcs11_Managed
 {
     public static bool Supported => true;
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_KnownAnswer_MatchesFips180Vector()
     {
         using var library = ManagedToken.NewLibrary();
@@ -31,7 +31,7 @@ public sealed class SHA384Pkcs11_Managed
         Assert.Equal(expected, digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_MatchesBcl_OverManagedToken()
     {
         using var library = ManagedToken.NewLibrary();
@@ -42,7 +42,7 @@ public sealed class SHA384Pkcs11_Managed
         Assert.Equal(SHA384.HashData(data), sha.ComputeHash(data));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -53,7 +53,7 @@ public sealed class SHA384Pkcs11_Managed
         Assert.Equal(SHA384.HashData(data), sha.ComputeHash(data));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_EmptyInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -64,7 +64,7 @@ public sealed class SHA384Pkcs11_Managed
         Assert.Equal(SHA384.HashData([]), digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -79,7 +79,7 @@ public sealed class SHA384Pkcs11_Managed
         Assert.Equal(SHA384.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash!);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void Initialize_ResetsBetweenComputations()
     {
         using var library = ManagedToken.NewLibrary();

@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // External-mu (SignMu/VerifyMu) and ExportPkcs8PrivateKey are evaluation-only BCL APIs (SYSLIB5006).
 // We invoke them deliberately to assert our adapter's behaviour; suppress the experimental diagnostic.
@@ -41,7 +40,7 @@ internal static class MLDsaPkcs11TestCases
     private static void WithMlDsa(IPkcs11Backend backend, CkpMlDsa parameterSet, Action<MLDsaPkcs11> body)
     {
         if (!backend.SupportsMlDsa)
-            throw new SkipTestException("Backend cannot operate ML-DSA (CKM_ML_DSA unavailable).");
+            Assert.Skip("Backend cannot operate ML-DSA (CKM_ML_DSA unavailable).");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"mldsa-{Guid.NewGuid():N}";
@@ -110,7 +109,7 @@ internal static class MLDsaPkcs11TestCases
     internal static void Assert_SignData_VerifiesWithBcl(IPkcs11Backend backend, CkpMlDsa parameterSet)
     {
         if (!MLDsa.IsSupported)
-            throw new SkipTestException("Host BCL cannot operate ML-DSA (needs OpenSSL 3.5+ or a recent Windows).");
+            Assert.Skip("Host BCL cannot operate ML-DSA (needs OpenSSL 3.5+ or a recent Windows).");
 
         WithMlDsa(backend, parameterSet, mldsa =>
         {

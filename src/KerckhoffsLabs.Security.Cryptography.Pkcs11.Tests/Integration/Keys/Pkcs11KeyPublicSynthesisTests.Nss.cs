@@ -20,7 +20,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Nss(NssBackendFixture backend)
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()
     {
         using var workspace = OpenWorkspace();
@@ -57,7 +57,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Nss(NssBackendFixture backend)
         }
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
         using var workspace = OpenWorkspace();

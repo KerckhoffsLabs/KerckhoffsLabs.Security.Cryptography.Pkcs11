@@ -19,7 +19,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -48,9 +48,9 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
             using var objs = workspace.FindObjects(filter);
-            Assert.Single(objs);
-            Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
-            Assert.Equal(der, objs[0].GetValue());
+            var obj = Assert.Single(objs);
+            Assert.Equal(CKO.CKO_CERTIFICATE, obj.ObjectClass);
+            Assert.Equal(der, obj.GetValue());
         }
 
         // Delete via the view; confirm it's gone.
@@ -64,7 +64,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = _backend.Library.OpenWorkspace(

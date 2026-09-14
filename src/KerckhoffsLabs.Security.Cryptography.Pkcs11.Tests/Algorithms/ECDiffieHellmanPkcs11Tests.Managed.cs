@@ -75,7 +75,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
     // === Real crypto: cross-checked against the BCL (mirrors the SoftHSM set) =============
 
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256")]
     [InlineData("P-384")]
     public void DeriveKeyFromHash_AgreesWithBcl(string curve) => WithEcdh(curve, alice =>
@@ -89,7 +89,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobKey, aliceKey);
     });
 
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256")]
     [InlineData("P-384")]
     public void DeriveKeyFromHash_WithPrependAppend_AgreesWithBcl(string curve) => WithEcdh(curve, alice =>
@@ -104,7 +104,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobKey, aliceKey);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHmac_AgreesWithBcl() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
@@ -116,7 +116,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobKey, aliceKey);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHmac_NullKey_UsesSecret_AgreesWithBcl() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
@@ -127,7 +127,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobKey, aliceKey);
     });
 
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256")]
     [InlineData("P-384")]
     public void DeriveRawSecretAgreement_MatchesBcl(string curve) => WithEcdh(curve, alice =>
@@ -153,7 +153,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     /// own, which is the point: there is nothing here that can drift out of step with the policy, and
     /// a new adapter cannot forget to apply it.
     /// </remarks>
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("raw")]
     [InlineData("hash")]
     [InlineData("hmac")]
@@ -172,7 +172,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     });
 
     /// <summary>With the opt-in, the same calls work — the gate refuses, it does not disable.</summary>
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void WithAllowInsecure_DerivationWorks() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
@@ -182,7 +182,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     });
 
     // Two on-token key pairs agree with each other, and each agrees with the BCL in both directions.
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveRawSecret_BothOnTokenParties_Match_AndMatchBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -204,7 +204,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             alice.DeriveRawSecretAgreement(bcl.PublicKey));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyMaterial_AgreesWithBcl() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
@@ -217,7 +217,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     // against a fixed BCL key pair (imported from a known vector) yields a fixed BCL agreement we can
     // reproduce on both sides. The token key is fresh each run, so the KAT pins the token<->BCL
     // agreement to the BCL's own computation for the same inputs (round-trip identity in both directions).
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_KnownVectorPeer_RoundTripsBothDirections() => WithEcdh("P-256", alice =>
     {
         // RFC 5114 / SP 800-56A P-256 sample static key pair "dA" (a fixed, well-formed P-256 key).
@@ -244,7 +244,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             alice.DeriveRawSecretAgreement(peer.PublicKey));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void PublicKey_ExportsTokenPoint() => WithEcdh("P-256", alice =>
     {
         ECParameters fromExport = alice.ExportParameters(includePrivateParameters: false);
@@ -256,7 +256,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     });
 
     // The exported public point must be a valid P-256 point the BCL can agree against.
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ExportedPublicKey_IsUsableByBcl() => WithEcdh("P-256", alice =>
     {
         ECParameters pub = alice.ExportParameters(includePrivateParameters: false);
@@ -271,7 +271,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
     // === Negative / not-supported (run on every platform) =================================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyTls_NotSupported() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
@@ -279,28 +279,28 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             () => alice.DeriveKeyTls(bob.PublicKey, new byte[16], new byte[64]));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ExportParameters_Private_ThrowsInsecure() => WithEcdh("P-256", alice =>
         Assert.Throws<InsecureOperationException>(() => alice.ExportParameters(includePrivateParameters: true)));
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ExportExplicitParameters_NotSupported() => WithEcdh("P-256", alice =>
         Assert.Throws<NotSupportedException>(() => alice.ExportExplicitParameters(includePrivateParameters: false)));
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ImportParameters_NotSupported() => WithEcdh("P-256", alice =>
         Assert.Throws<NotSupportedException>(() => alice.ImportParameters(new ECParameters())));
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void GenerateKey_NotSupported() => WithEcdh("P-256", alice =>
         Assert.Throws<NotSupportedException>(() => alice.GenerateKey(BclECCurve.NamedCurves.nistP256)));
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_NullPeer_Throws() => WithEcdh("P-256", alice =>
         Assert.Throws<ArgumentNullException>(
             () => alice.DeriveKeyFromHash(null!, HashAlgorithmName.SHA256, null, null)));
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_EmptyHashName_Throws() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
@@ -309,7 +309,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal("hashAlgorithm", ex.ParamName);
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveRawSecretAgreement_NullPeer_Throws() => WithEcdh("P-256", alice =>
         Assert.Throws<ArgumentNullException>(() => alice.DeriveRawSecretAgreement(null!)));
 
@@ -339,13 +339,13 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     // Regression coverage for the adapter never assigning KeySizeValue: KeySize was 0 and
     // LegalKeySizes threw NullReferenceException.
 
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256", 256)]
     [InlineData("P-384", 384)]
     public void KeySize_ReflectsTokenCurve(string curve, int expectedBits) => WithEcdhStrict(curve, ecdh =>
         Assert.Equal(expectedBits, ecdh.KeySize));
 
-    [ConditionalTheory(nameof(Supported))]
+    [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256", 256)]
     [InlineData("P-384", 384)]
     public void LegalKeySizes_ReflectsTokenCurve(string curve, int expectedBits) => WithEcdhStrict(curve, ecdh =>
@@ -390,7 +390,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         public override ECParameters ExportParameters() => parameters;
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_PeerOnDifferentCurve_Throws() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP384);
@@ -398,14 +398,14 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             () => alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveRawSecretAgreement_PeerOnDifferentCurve_Throws() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP384);
         Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(bob.PublicKey));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_OffCurvePoint_Throws() => WithEcdh("P-256", alice =>
     {
         // Right curve (P-256), right coordinate length, but a point that does not satisfy the
@@ -420,7 +420,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             () => alice.DeriveKeyFromHash(badPeer, HashAlgorithmName.SHA256, null, null));
     });
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void DeriveKeyFromHash_PeerCoordinateLengthMismatch_Throws() => WithEcdh("P-256", alice =>
     {
         // Claims the P-256 OID but hands over P-384-sized coordinates — same curve identity, wrong

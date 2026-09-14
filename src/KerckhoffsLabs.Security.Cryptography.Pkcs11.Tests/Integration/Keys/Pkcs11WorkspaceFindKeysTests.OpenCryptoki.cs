@@ -14,14 +14,14 @@ public sealed class Pkcs11WorkspaceFindKeysTests_OpenCryptoki(OpenCryptokiBacken
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void OpenKey_NotFound_Throws()
     {
         using var workspace = OpenWorkspace();
         WorkspaceKeyTestCases.Assert_OpenKey_NotFound_Throws(workspace);
     }
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void OpenKey_AfterGenerate_FindsKey()
     {
         using var workspace = OpenWorkspace();
@@ -48,7 +48,7 @@ public sealed class Pkcs11WorkspaceFindKeysTests_OpenCryptoki(OpenCryptokiBacken
         }
     }
 
-    [ConditionalFact(typeof(OpenCryptokiBackendFixture), nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void ImportKey_AesValue_RoundTrips()
     {
         using var workspace = OpenWorkspace();

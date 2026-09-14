@@ -75,7 +75,7 @@ public sealed class DSAPkcs11Tests_Managed
 
     // === Sign / verify data: on-token round-trip + tamper rejection =======================
 
-    [ConditionalTheory(nameof(DsaSupported))]
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
@@ -104,19 +104,19 @@ public sealed class DSAPkcs11Tests_Managed
     // === Secure-defaults gate: DSA is insecure as an algorithm, so every sign/verify is refused =====
     // unless AllowInsecure (GuardMechanism gates all CKM_DSA* — raw and combined, every hash).
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void SignData_GatedByDefault_Throws() => WithDsa((dsa, _) =>
         Assert.Throws<InsecureOperationException>(
             () => dsa.SignData(Encoding.UTF8.GetBytes("x"), HashAlgorithmName.SHA256)));
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void CreateSignature_GatedByDefault_Throws() => WithDsa((dsa, _) =>
         Assert.Throws<InsecureOperationException>(
             () => dsa.CreateSignature(SHA256.HashData("x"u8.ToArray()))));
 
     // === BCL cross-check: token signature verifies under the exported public key ==========
 
-    [ConditionalTheory(nameof(DsaSupported))]
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
@@ -136,7 +136,7 @@ public sealed class DSAPkcs11Tests_Managed
     });
 
     // Reverse direction: a signature produced by the originating BCL key must verify on-token.
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void VerifyData_BclSignature_OnToken() => WithDsa((dsa, bcl, workspace) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("signed by the BCL, verified on the token");
@@ -147,7 +147,7 @@ public sealed class DSAPkcs11Tests_Managed
 
     // === Sign / verify a hash: raw CKM_DSA, IEEE P1363 (r‖s) ==============================
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void CreateSignature_VerifySignature_OverHash_RoundTrips() => WithDsa((dsa, _, workspace) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("hash to sign"));
@@ -167,7 +167,7 @@ public sealed class DSAPkcs11Tests_Managed
     });
 
     // The raw-hash signature must also verify under the BCL public key.
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void CreateSignature_VerifiesUnderBcl() => WithDsa((dsa, _, workspace) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("raw hash interop"));
@@ -184,7 +184,7 @@ public sealed class DSAPkcs11Tests_Managed
 
     // === Parameter export / import ========================================================
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void ExportParameters_ReturnsPublicDomainAndValue_ButNeverPrivate() => WithDsa((dsa, bcl) =>
     {
         DSAParameters expected = bcl.ExportParameters(includePrivateParameters: false);
@@ -199,11 +199,11 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Null(pub.X); // never exports the private value
     });
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void ExportParameters_Private_ThrowsInsecure() => WithDsa((dsa, _) =>
         Assert.Throws<InsecureOperationException>(() => dsa.ExportParameters(includePrivateParameters: true)));
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void ImportParameters_NotSupported() => WithDsa((dsa, bcl) =>
     {
         DSAParameters pub = bcl.ExportParameters(includePrivateParameters: false);
@@ -232,11 +232,11 @@ public sealed class DSAPkcs11Tests_Managed
         Assert.Equal("key", ex.ParamName);
     }
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void CreateSignature_NullHash_Throws() => WithDsa((dsa, _) =>
         Assert.Throws<ArgumentNullException>(() => dsa.CreateSignature(null!)));
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void VerifySignature_NullArguments_Throw() => WithDsa((dsa, _) =>
     {
         byte[] hash = SHA256.HashData("x"u8.ToArray());
@@ -248,11 +248,11 @@ public sealed class DSAPkcs11Tests_Managed
     // Regression coverage for the adapter never assigning KeySizeValue: KeySize was 0 and
     // LegalKeySizes threw NullReferenceException.
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void KeySize_ReflectsTokenPrime() => WithDsa((dsa, _) =>
         Assert.Equal(2048, dsa.KeySize));
 
-    [ConditionalFact(nameof(DsaSupported))]
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void LegalKeySizes_ReflectsTokenPrime() => WithDsa((dsa, _) =>
     {
         KeySizes[] sizes = dsa.LegalKeySizes;

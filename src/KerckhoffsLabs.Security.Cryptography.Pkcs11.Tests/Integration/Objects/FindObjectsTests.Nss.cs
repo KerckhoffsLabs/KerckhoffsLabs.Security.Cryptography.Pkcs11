@@ -22,7 +22,7 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = OpenWorkspace();
@@ -44,9 +44,9 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
             using var objs = workspace.FindObjects(filter);
-            Assert.Single(objs);
-            Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
-            Assert.Equal(der, objs[0].GetValue());
+            var obj = Assert.Single(objs);
+            Assert.Equal(CKO.CKO_CERTIFICATE, obj.ObjectClass);
+            Assert.Equal(der, obj.GetValue());
         }
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
@@ -59,7 +59,7 @@ public sealed class FindObjectsTests_Nss(NssBackendFixture backend)
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = OpenWorkspace();

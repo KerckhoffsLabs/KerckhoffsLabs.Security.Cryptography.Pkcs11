@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -45,7 +44,7 @@ internal static class AesGcmPkcs11TestCases
     private static void WithGcm(IPkcs11Backend backend, Action<AesGcmPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_AES_GCM))
-            throw new SkipTestException("Backend does not advertise CKM_AES_GCM.");
+            Assert.Skip("Backend does not advertise CKM_AES_GCM.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"gcm-{Guid.NewGuid():N}";
@@ -67,7 +66,7 @@ internal static class AesGcmPkcs11TestCases
     private static void WithImportedGcm(IPkcs11Backend backend, byte[] rawKey, Action<AesGcmPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_AES_GCM))
-            throw new SkipTestException("Backend does not advertise CKM_AES_GCM.");
+            Assert.Skip("Backend does not advertise CKM_AES_GCM.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"gcm-kat-{Guid.NewGuid():N}";
@@ -208,7 +207,7 @@ internal static class AesGcmPkcs11TestCases
             // AesGcmPkcs11.TagByteSizes mirrors the BCL AesGcm, which on macOS is 16..16 — so sub-16
             // tags are unsupported there regardless of the token. Skip those rather than fail.
             if (tagLen < AesGcm.TagByteSizes.MinSize)
-                throw new SkipTestException($"Platform AesGcm minimum tag size is {AesGcm.TagByteSizes.MinSize} bytes.");
+                Assert.Skip($"Platform AesGcm minimum tag size is {AesGcm.TagByteSizes.MinSize} bytes.");
 
             byte[] nonce = Iota(12);
             byte[] plaintext = Iota(40);

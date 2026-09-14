@@ -24,7 +24,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
         return attrs[0].GetValueAsByteArray();
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.ClassicAesGcmAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
@@ -46,7 +46,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
         Assert.Equal(plaintext, recovered);
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void RejectsWrongAesBitLength()
     {
         using var workspace = OpenWorkspace();
@@ -57,7 +57,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
             () => workspace.DeriveSharedSecretEcdh(alice, point, aesBitLength: 100));
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void NullKey_Throws()
     {
         using var workspace = OpenWorkspace();

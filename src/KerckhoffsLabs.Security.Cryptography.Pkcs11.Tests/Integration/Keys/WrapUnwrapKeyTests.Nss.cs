@@ -10,7 +10,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
 
     // Verifies the unwrapped key via the classic CK_GCM_PARAMS path NSS rejects; skip (see NssBackendFixture).
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.ClassicAesGcmAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void AesKeyWrapPad_RoundTrip() => WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
 
     // The secure-defaults unwrap cases (Unwrap_AppliesSecureDefaults /

@@ -89,7 +89,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
         { IsBackground = true };
 
         worker.Start();
-        Assert.True(fake.Entered.Wait(Generous), "the worker never reached the native call");
+        Assert.True(fake.Entered.Wait(Generous, TestContext.Current.CancellationToken), "the worker never reached the native call");
 
         // The worker is now parked inside C_GenerateRandom holding the busy lock, so a Dispose
         // that skips the lock closes the session out from under it.
@@ -155,7 +155,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
 
         thread.Start();
 
-        Assert.True(completed.Wait(Generous), "Dispose deadlocked against a lock its own thread held");
+        Assert.True(completed.Wait(Generous, TestContext.Current.CancellationToken), "Dispose deadlocked against a lock its own thread held");
         Assert.True(thread.Join(Generous));
         Assert.Equal(1, fake.Closes);
     }

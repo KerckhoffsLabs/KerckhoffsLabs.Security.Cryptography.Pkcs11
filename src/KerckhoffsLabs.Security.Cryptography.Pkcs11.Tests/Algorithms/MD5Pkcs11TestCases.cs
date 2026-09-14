@@ -4,7 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -38,7 +37,7 @@ internal static class MD5Pkcs11TestCases
     internal static void Assert_ComputeHash_WithAllowInsecure_MatchesBcl(IPkcs11Backend backend)
     {
         if (!backend.Supports(CKM.CKM_MD5))
-            throw new SkipTestException("Backend does not advertise CKM_MD5.");
+            Assert.Skip("Backend does not advertise CKM_MD5.");
 
         using var workspace = OpenWorkspace(backend);
         workspace.AllowInsecure = true;

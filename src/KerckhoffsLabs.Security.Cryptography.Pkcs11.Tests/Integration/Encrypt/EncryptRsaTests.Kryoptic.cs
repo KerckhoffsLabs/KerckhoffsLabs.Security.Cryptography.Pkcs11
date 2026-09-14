@@ -9,7 +9,7 @@ public sealed class EncryptRsaTests_Kryoptic(KryopticBackendFixture f)
     private readonly KryopticBackendFixture _backend = f;
 
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_Kryoptic()
         => EncryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

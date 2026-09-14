@@ -1,3 +1,5 @@
+using Xunit.Sdk;
+
 // -------------------------------------------------------------------------------------------
 // Assembly-wide test-parallelization policy — stated explicitly rather than inherited from the
 // xUnit defaults, because the safety of this suite depends on it.
@@ -21,4 +23,8 @@
 // while every hermetic unit test got serialized. Keep the fast default and keep the guardrail.
 // -------------------------------------------------------------------------------------------
 
-[assembly: CollectionBehavior(CollectionBehavior.CollectionPerClass, DisableTestParallelization = false)]
+[assembly: CollectionBehavior(CollectionBehavior.CollectionPerClass)]
+// xUnit v3: DisableTestParallelization is obsolete in favor of ParallelizationAttribute.Mode.
+// ParallelMode.Collections is the same "collections run concurrently, tests within one
+// collection run serially" semantics the old CollectionPerClass + enabled-parallelization pair had.
+[assembly: Xunit.v3.Parallelization(Mode = ParallelMode.Collections)]

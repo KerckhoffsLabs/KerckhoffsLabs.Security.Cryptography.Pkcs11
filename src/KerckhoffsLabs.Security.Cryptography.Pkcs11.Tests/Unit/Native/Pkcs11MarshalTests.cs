@@ -16,7 +16,7 @@ public sealed class Pkcs11MarshalTests
         // CK_VERSION is not [PackedForPkcs11] -> always the natural Marshal size, both platforms.
         Assert.Equal(Marshal.SizeOf<CK_VERSION>(), Pkcs11Marshal.SizeOf<CK_VERSION>());
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void SizeOf_ForCK_INFO_MatchesMarshalSizeOf_OnUnix() => Assert.Equal(Marshal.SizeOf<CK_INFO>(), Pkcs11Marshal.SizeOf<CK_INFO>());
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class Pkcs11MarshalTests
         finally { Marshal.FreeHGlobal(ptr); }
     }
 
-    [ConditionalFact(nameof(IsUnix))]
+    [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     public void SizeOf_ForCK_MECHANISM_INFO_MatchesMarshalSizeOf_OnUnix() => Assert.Equal(Marshal.SizeOf<CK_MECHANISM_INFO>(), Pkcs11Marshal.SizeOf<CK_MECHANISM_INFO>());
 
     [Fact]

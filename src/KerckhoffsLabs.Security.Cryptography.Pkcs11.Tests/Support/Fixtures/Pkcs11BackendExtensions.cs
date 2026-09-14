@@ -1,5 +1,4 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -14,6 +13,6 @@ internal static class Pkcs11BackendExtensions
     internal static void RequireMechanism(this IPkcs11Backend backend, CKM mechanism)
     {
         if (!backend.Supports(mechanism))
-            throw new SkipTestException($"Backend does not advertise {mechanism}.");
+            Assert.Skip($"Backend does not advertise {mechanism}.");
     }
 }

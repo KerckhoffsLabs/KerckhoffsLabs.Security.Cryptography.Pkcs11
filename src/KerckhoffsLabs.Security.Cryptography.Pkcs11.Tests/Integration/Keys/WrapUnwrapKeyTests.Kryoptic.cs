@@ -14,21 +14,21 @@ public sealed class WrapUnwrapKeyTests_Kryoptic(KryopticBackendFixture backend)
 
     private void RequireAesKeyWrapPad() => _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PAD);
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesKeyWrapPad_RoundTrip()
     {
         RequireAesKeyWrapPad();
         WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
     }
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Unwrap_AppliesSecureDefaults()
     {
         RequireAesKeyWrapPad();
         WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend);
     }
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Unwrap_ExplicitExtractable_IsAllowed()
     {
         RequireAesKeyWrapPad();

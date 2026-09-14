@@ -364,11 +364,11 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # All legs (Linux x64+arm64, macOS, Windows x64+x86+arm64) build both backends (pkcs11-mock +
-      # SoftHSM2), so the SoftHSM-gated [ConditionalFact] tests run everywhere and the
+      # SoftHSM2), so the SoftHSM-gated [Fact(SkipUnless = ...)] tests run everywhere and the
       # SoftHsm_IsAvailable_OnCiBuildPlatforms guard fails the job if the build failed to place libsofthsm2.
       - name: Test
         if: matrix.os != 'ubuntu-latest'
-        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger "console;verbosity=normal"
+        run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed
 
       # ubuntu-latest also exercises the opencryptoki, Kryoptic, and NSS backends. Run under the
       # pkcs11 group so the test host can read the opencryptoki token store. LD_LIBRARY_PATH must be
@@ -383,16 +383,16 @@ jobs:
         env:
           # Declares that THIS leg must have a working opencryptoki / Kryoptic / NSS: the
           # availability guard tests fail the job when a backend is missing, instead of letting
-          # every backend-gated ConditionalFact skip silently while CI stays green. Set on the test
-          # step (not by the provisioning scripts) so a regression that stops exporting a backend
-          # library is caught rather than masked.
+          # every backend-gated [Fact(SkipUnless = ...)] skip silently while CI stays green. Set on
+          # the test step (not by the provisioning scripts) so a regression that stops exporting a
+          # backend library is caught rather than masked.
           PKCS11_TEST_EXPECT_OPENCRYPTOKI: '1'
           PKCS11_TEST_EXPECT_KRYOPTIC: '1'
           PKCS11_TEST_EXPECT_NSS: '1'
         # NSS's libsoftokn3 carries an $ORIGIN runpath for its own siblings; its dir is also added to
         # LD_LIBRARY_PATH (belt-and-suspenders under sg's stripped environment). PKCS11_TEST_NSS_*/
         # PKCS11_TEST_KRYOPTIC_LIBRARY come from $GITHUB_ENV set by the build steps above.
-        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test src/KerckhoffsLabs.sln --no-build -c Release --logger 'console;verbosity=normal'"
+        run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed"
 
   # Native-AOT smoke test: publishes tests/AotSmoke — a standalone app that references only the
   # main library (not the test project) — with PublishAot, then runs the native binary against
@@ -522,4 +522,4 @@ jobs:
           PKCS11_TEST_SOFTHSM_LIBRARY: ${{ steps.stage.outputs.native }}/libsofthsm2.so
           LD_LIBRARY_PATH: ${{ steps.stage.outputs.native }}
           PKCS11_TEST_EXPECT_SOFTHSM_V240: '1'
-        run: dotnet test src/KerckhoffsLabs.sln --no-build -c Release --filter "FullyQualifiedName~SoftHsm" --logger "console;verbosity=normal"
+        run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "/*/*/*SoftHsm*/*"

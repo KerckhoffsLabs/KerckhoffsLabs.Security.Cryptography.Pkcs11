@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -49,7 +48,7 @@ internal static class TripleDESPkcs11TestCases
     private static void WithImportedDes3(IPkcs11Backend backend, Action<Pkcs11Workspace, TripleDESPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DES3_CBC))
-            throw new SkipTestException("Backend does not advertise CKM_DES3_CBC.");
+            Assert.Skip("Backend does not advertise CKM_DES3_CBC.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"des3-{Guid.NewGuid():N}";
@@ -70,7 +69,7 @@ internal static class TripleDESPkcs11TestCases
     private static void WithImportedDes2(IPkcs11Backend backend, Action<Pkcs11Workspace, TripleDESPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DES3_CBC))
-            throw new SkipTestException("Backend does not advertise CKM_DES3_CBC.");
+            Assert.Skip("Backend does not advertise CKM_DES3_CBC.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"des2-{Guid.NewGuid():N}";
@@ -87,8 +86,9 @@ internal static class TripleDESPkcs11TestCases
             catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_ATTRIBUTE_VALUE_INVALID
                 or CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_KEY_SIZE_RANGE)
             {
-                throw new SkipTestException(
+                Assert.Skip(
                     "Backend advertises CKM_DES3_CBC but rejects the CKK_DES2 (two-key) key type.");
+                throw; // Assert.Skip always throws; xunit.v3.assert 4.0.1 lacks [DoesNotReturn].
             }
             using (key)
             {
@@ -108,8 +108,9 @@ internal static class TripleDESPkcs11TestCases
         }
         catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_MECHANISM_INVALID)
         {
-            throw new SkipTestException(
+            Assert.Skip(
                 "Token advertises 3DES but its operation path rejects CKM_DES3_* (FIPS build).");
+            throw; // Assert.Skip always throws; xunit.v3.assert 4.0.1 lacks [DoesNotReturn].
         }
     }
 

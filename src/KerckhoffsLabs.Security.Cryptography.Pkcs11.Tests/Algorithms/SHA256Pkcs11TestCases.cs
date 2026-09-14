@@ -3,7 +3,6 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -25,7 +24,7 @@ internal static class SHA256Pkcs11TestCases
     private static void RequireSha256(IPkcs11Backend backend)
     {
         if (!backend.Supports(CKM.CKM_SHA256))
-            throw new SkipTestException("Backend does not advertise CKM_SHA256.");
+            Assert.Skip("Backend does not advertise CKM_SHA256.");
     }
 
     internal static void Assert_ComputeHash_KnownAnswer_MatchesFips180Vector(IPkcs11Backend backend)

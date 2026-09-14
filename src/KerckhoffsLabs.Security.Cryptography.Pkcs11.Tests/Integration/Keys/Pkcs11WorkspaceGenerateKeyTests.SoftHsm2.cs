@@ -15,7 +15,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_SoftHsm(SoftHsmBackendFixtur
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void GenerateKey_Symmetric_ReturnsKeyWithLabelAndType()
     {
         using var workspace = OpenWorkspace();
@@ -38,7 +38,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_SoftHsm(SoftHsmBackendFixtur
         }
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void GenerateKey_Asymmetric_ReturnsKeyWithBothHandles()
     {
         using var workspace = OpenWorkspace();

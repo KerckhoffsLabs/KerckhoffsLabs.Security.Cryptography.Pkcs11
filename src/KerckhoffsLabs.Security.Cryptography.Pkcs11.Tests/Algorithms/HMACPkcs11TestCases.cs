@@ -4,7 +4,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 // These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
@@ -37,7 +36,7 @@ internal static class HMACPkcs11TestCases
     private static void Require(IPkcs11Backend backend, CKM mechanism)
     {
         if (!backend.Supports(mechanism))
-            throw new SkipTestException($"Backend does not advertise {mechanism}.");
+            Assert.Skip($"Backend does not advertise {mechanism}.");
     }
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)

@@ -19,7 +19,7 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
 {
     private readonly KryopticBackendFixture _backend = f;
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
         using var workspace = _backend.Library.OpenWorkspace(
@@ -48,9 +48,9 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
             using var objs = workspace.FindObjects(filter);
-            Assert.Single(objs);
-            Assert.Equal(CKO.CKO_CERTIFICATE, objs[0].ObjectClass);
-            Assert.Equal(der, objs[0].GetValue());
+            var obj = Assert.Single(objs);
+            Assert.Equal(CKO.CKO_CERTIFICATE, obj.ObjectClass);
+            Assert.Equal(der, obj.GetValue());
         }
 
         // Delete via the view; confirm it's gone.
@@ -64,7 +64,7 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
             Assert.Empty(workspace.FindObjects(filter));
     }
 
-    [ConditionalFact(typeof(KryopticBackendFixture), nameof(KryopticBackendFixture.KryopticAvailable))]
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
         using var workspace = _backend.Library.OpenWorkspace(

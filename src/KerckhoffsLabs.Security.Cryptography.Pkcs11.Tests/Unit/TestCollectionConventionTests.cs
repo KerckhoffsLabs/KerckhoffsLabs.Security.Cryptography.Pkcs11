@@ -163,7 +163,7 @@ public sealed class TestCollectionConventionTests
     /// <summary>
     /// Anti-vacuity guard for the four rules above: they are only worth anything if the reflection
     /// underneath them actually sees the suite. Every rule iterates <see cref="TestClasses"/> and
-    /// most of the backend classes declare nothing but <c>[ConditionalFact]</c>, so a change that
+    /// most of the backend classes declare nothing but <c>[Fact(SkipUnless = ...)]</c>, so a change that
     /// stopped resolving Fact-derived attributes — or an empty fixture map — would turn all four
     /// green while guarding nothing.
     /// </summary>
@@ -172,7 +172,7 @@ public sealed class TestCollectionConventionTests
     {
         List<Type> classes = [.. TestClasses()];
 
-        Assert.Contains(typeof(Integration.Digest.DigestMd5Sha1Tests_SoftHsm), classes); // [ConditionalFact] only
+        Assert.Contains(typeof(Integration.Digest.DigestMd5Sha1Tests_SoftHsm), classes); // [Fact(SkipUnless = ...)] only
         Assert.Contains(typeof(Integration.Smoke.SoftHsmAvailabilityTests), classes);    // [Fact] only
         Assert.True(classes.Count > 100, $"Only {classes.Count} test classes discovered — the suite is far larger.");
 

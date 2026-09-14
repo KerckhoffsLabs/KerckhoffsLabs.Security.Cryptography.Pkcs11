@@ -14,14 +14,14 @@ public sealed class Pkcs11WorkspaceFindKeysTests_SoftHsm(SoftHsmBackendFixture b
         _backend.Library.OpenWorkspace(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void OpenKey_NotFound_Throws()
     {
         using var workspace = OpenWorkspace();
         WorkspaceKeyTestCases.Assert_OpenKey_NotFound_Throws(workspace);
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void OpenKey_AfterGenerate_FindsKey()
     {
         using var workspace = OpenWorkspace();
@@ -48,7 +48,7 @@ public sealed class Pkcs11WorkspaceFindKeysTests_SoftHsm(SoftHsmBackendFixture b
         }
     }
 
-    [ConditionalFact(typeof(SoftHsmBackendFixture), nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ImportKey_AesValue_RoundTrips()
     {
         using var workspace = OpenWorkspace();

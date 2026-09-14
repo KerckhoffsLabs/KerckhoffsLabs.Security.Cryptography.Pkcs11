@@ -15,14 +15,14 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Nss(NssBackendFixture backend)
     private Pkcs11Workspace OpenWorkspace() =>
         _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void OpenKey_NotFound_Throws()
     {
         using var workspace = OpenWorkspace();
         WorkspaceKeyTestCases.Assert_OpenKey_NotFound_Throws(workspace);
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.TokenObjectsAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void OpenKey_AfterGenerate_FindsKey()
     {
         using var workspace = OpenWorkspace();
@@ -49,7 +49,7 @@ public sealed class Pkcs11WorkspaceFindKeysTests_Nss(NssBackendFixture backend)
         }
     }
 
-    [ConditionalFact(typeof(NssBackendFixture), nameof(NssBackendFixture.NssAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void ImportKey_AesValue_RoundTrips()
     {
         using var workspace = OpenWorkspace();

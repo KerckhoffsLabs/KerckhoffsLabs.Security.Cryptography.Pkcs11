@@ -5,7 +5,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
-using Microsoft.DotNet.XUnitExtensions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
@@ -43,7 +42,7 @@ internal static class DESPkcs11TestCases
     private static void WithImportedDes(IPkcs11Backend backend, Action<Pkcs11Workspace, DESPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DES_CBC))
-            throw new SkipTestException("Backend does not advertise CKM_DES_CBC.");
+            Assert.Skip("Backend does not advertise CKM_DES_CBC.");
 
         using var workspace = OpenWorkspace(backend);
         string label = $"des-{Guid.NewGuid():N}";
@@ -69,8 +68,9 @@ internal static class DESPkcs11TestCases
         }
         catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_MECHANISM_INVALID)
         {
-            throw new SkipTestException(
+            Assert.Skip(
                 "Token advertises single DES but its operation path rejects CKM_DES_* (FIPS build).");
+            throw; // Assert.Skip always throws; xunit.v3.assert 4.0.1 lacks [DoesNotReturn].
         }
     }
 

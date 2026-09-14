@@ -29,7 +29,7 @@ public sealed class SHA1Pkcs11_Managed
 
     // === Secure-defaults gate: SHA-1 is blocked unless explicitly allowed =================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_GatedByDefault_Throws()
     {
         using var library = ManagedToken.NewLibrary();
@@ -41,7 +41,7 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_OutsideScope_Throws()
     {
         using var library = ManagedToken.NewLibrary();
@@ -59,7 +59,7 @@ public sealed class SHA1Pkcs11_Managed
 
     // === Real crypto under the insecure opt-in: cross-checked against the BCL ==============
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_WithAllowInsecure_KnownAnswer_MatchesFips180Vector()
     {
         using var library = ManagedToken.NewLibrary();
@@ -77,7 +77,7 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal(SHA1.HashData(data), digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_WithAllowInsecureScope_KnownAnswer_MatchesFips180Vector()
     {
         using var library = ManagedToken.NewLibrary();
@@ -96,7 +96,7 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal(SHA1.HashData(data), digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_EmptyInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -112,7 +112,7 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal(SHA1.HashData([]), digest);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_MatchesBclSha1()
     {
         using var library = ManagedToken.NewLibrary();
@@ -124,7 +124,7 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal(SHA1.HashData(data), sha1.ComputeHash(data));
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
@@ -138,7 +138,7 @@ public sealed class SHA1Pkcs11_Managed
 
     // === Streaming / reuse ===============================================================
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
@@ -156,7 +156,7 @@ public sealed class SHA1Pkcs11_Managed
         Assert.Equal(SHA1.HashData(Encoding.UTF8.GetBytes("hello world")), streamed);
     }
 
-    [ConditionalFact(nameof(Supported))]
+    [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
