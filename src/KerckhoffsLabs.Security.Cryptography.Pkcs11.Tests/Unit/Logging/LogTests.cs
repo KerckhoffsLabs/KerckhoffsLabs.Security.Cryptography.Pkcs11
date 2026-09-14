@@ -7,11 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
 // level. Pass a CapturingLogger directly (the methods take ILogger), so no global state is touched.
 public sealed class LogTests
 {
-    private static CapturingLogger.Entry Only(CapturingLogger log)
-    {
-        Assert.Single(log.Entries);
-        return log.Entries[0];
-    }
+    private static CapturingLogger.Entry Only(CapturingLogger log) => Assert.Single(log.Entries);
 
     [Fact]
     public void SessionTrace_RendersOperation()

@@ -48,8 +48,7 @@ public sealed class DeriveKeyAdditionalKeysTests
         try
         {
             var siblings = kdfParams.AdditionalDerivedKeys;
-            Assert.Single(siblings);
-            Pkcs11Key? sibling = siblings[0];
+            Pkcs11Key? sibling = Assert.Single(siblings);
             Assert.NotNull(sibling);
 
             try

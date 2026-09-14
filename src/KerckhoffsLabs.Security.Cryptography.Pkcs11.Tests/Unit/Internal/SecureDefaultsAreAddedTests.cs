@@ -63,8 +63,8 @@ public sealed class SecureDefaultsAreAddedTests
     private static bool BoolAttribute(List<(ulong Type, byte[] Value)> template, CKA type)
     {
         (ulong Type, byte[] Value) match = Assert.Single(template, a => a.Type == (ulong)type);
-        Assert.Single(match.Value); // CK_BBOOL is one byte
-        return match.Value[0] != 0;
+        byte value = Assert.Single(match.Value); // CK_BBOOL is one byte
+        return value != 0;
     }
 
     [Fact]

@@ -194,8 +194,8 @@ public sealed class Pkcs11SessionObjectsTests
 
         using ReadOnlyDisposableList<ObjectAttribute> result = s.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE]);
 
-        Assert.Single(result);
-        Assert.True(result[0].CannotBeRead);
+        ObjectAttribute attribute = Assert.Single(result);
+        Assert.True(attribute.CannotBeRead);
     }
 
     [Fact]
