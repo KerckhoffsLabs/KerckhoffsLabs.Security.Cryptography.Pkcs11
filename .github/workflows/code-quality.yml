@@ -7,9 +7,11 @@ name: code-quality
 # sees the MSBuild graph and imports test coverage.
 #
 # Unlike a pure-managed project, the build/tests here need the native PKCS#11 backends
-# present, so this job builds the pkcs11-mock and SoftHSM2 submodules from source and
-# links SoftHSM against OpenSSL 3.5+ (for ML-DSA). Without them the scan and upload
-# would report near-empty coverage.
+# present, so this job builds the pkcs11-mock, SoftHSM2, and Kryoptic submodules from source
+# and links SoftHSM/Kryoptic against OpenSSL 3.5+ (for ML-DSA and Kryoptic's "pqc" feature).
+# Without them the scan and upload would report near-empty coverage — Kryoptic in particular
+# is opt-in and easy to leave un-built, silently reporting 0% coverage on any change to its
+# own fixture/tests and failing Sonar's new-code coverage gate.
 
 on:
   push:
@@ -89,6 +91,22 @@ jobs:
           echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
+      # Fourth real backend, so its coverage counts toward the Sonar/Codecov numbers too (a
+      # KryopticBackendFixture-only line change previously showed as 0% covered new code and
+      # failed the Sonar quality gate, since Kryoptic is opt-in and wasn't built here). Same
+      # OpenSSL 3.5 as SoftHSM/opencryptoki above (ossl-sys locates it via pkg-config, which
+      # build-kryoptic.sh points at OPENSSL_PREFIX, already exported by the step above).
+      - name: Kryoptic submodule revision
+        id: kryopticrev
+        run: echo "sha=$(git -C vendor/kryoptic rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Kryoptic build
+        id: kryoptic-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor/kryoptic/target
+          key: kryoptic-${{ runner.arch }}-${{ steps.kryopticrev.outputs.sha }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
+
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
@@ -119,17 +137,31 @@ jobs:
 
       # -p:UseMicrosoftTestingPlatformRunner=true: only this (Linux-only) job needs the full MTP
       # entry point, for coverlet.MTP's extension hook to register at all -- see the test csproj
-      # for why every other leg deliberately builds without it.
+      # for why every other leg deliberately builds without it. BuildKryoptic=true opts the Tests
+      # project's BeforeTargets into building the vendored Kryoptic submodule (opt-in, off by
+      # default) as part of this same solution build.
       - name: Build
+        env:
+          BuildKryoptic: 'true'
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release -p:UseMicrosoftTestingPlatformRunner=true
 
-      # Both backends present on Linux → coverage spans the mock and SoftHSM2 paths. A single
-      # pass emits BOTH coverage formats — OpenCover (Sonar's first-class .NET format, imported
-      # by the begin-step glob) and Cobertura (uploaded to Codecov below) — so the suite is built
-      # and run once instead of duplicated across a separate workflow. Only the wide (nuint)
-      # NativeCULong layout exists on Linux; the narrow (Windows uint) build is resolved per-RID
-      # and can't be selected here.
+      - name: Report Kryoptic build
+        run: |
+          lib=$(find . -path '*runtimes*native*' -name 'libkryoptic_pkcs11.so' | head -1)
+          if [ -n "$lib" ]; then echo "Built Kryoptic: $lib"; \
+          else echo "::warning::built libkryoptic_pkcs11.so not found under runtimes/*/native"; fi
+
+      # Three backends present on Linux → coverage spans the mock, SoftHSM2, and Kryoptic paths. A
+      # single pass emits BOTH coverage formats — OpenCover (Sonar's first-class .NET format,
+      # imported by the begin-step glob) and Cobertura (uploaded to Codecov below) — so the suite
+      # is built and run once instead of duplicated across a separate workflow. Only the wide
+      # (nuint) NativeCULong layout exists on Linux; the narrow (Windows uint) build is resolved
+      # per-RID and can't be selected here. PKCS11_TEST_EXPECT_KRYOPTIC=1 makes
+      # KryopticAvailabilityTests fail loudly if the build above silently didn't produce a working
+      # library, instead of quietly recreating the 0%-new-code-coverage gap this step exists to close.
       - name: Test with coverage
+        env:
+          PKCS11_TEST_EXPECT_KRYOPTIC: '1'
         run: >
           dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release
           --results-directory ./coverage --output Detailed
