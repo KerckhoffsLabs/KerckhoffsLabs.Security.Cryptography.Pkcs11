@@ -102,7 +102,7 @@ public sealed class AesGcmPkcs11 : IDisposable
                 msgParams.CopyTagTo(tag);
                 return;
             }
-            catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_FUNCTION_NOT_SUPPORTED)
+            catch (Pkcs11Exception ex) when (Pkcs11MessageApiFallback.IsUnsupported(ex))
             {
                 // Some modules export the v3.0 message-API entry points but do not implement AES-GCM
                 // through them (e.g. opencryptoki). C_MessageEncryptInit is the first call, so nothing
@@ -160,7 +160,7 @@ public sealed class AesGcmPkcs11 : IDisposable
                 }
                 return;
             }
-            catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_FUNCTION_NOT_SUPPORTED)
+            catch (Pkcs11Exception ex) when (Pkcs11MessageApiFallback.IsUnsupported(ex))
             {
                 // Module advertises but does not implement AES-GCM via the message API (e.g.
                 // opencryptoki). C_MessageDecryptInit is the first call — fall through to v2.40. A

@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -92,15 +93,24 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(nonce);
-            var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
-            byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
-            if (ct.Length != plaintext.Length)
-                throw new InvalidOperationException(
-                    $"ChaCha20-Poly1305 message encrypt returned {ct.Length} bytes; expected {plaintext.Length}.");
-            ct.CopyTo(ciphertext);
-            msgParams.CopyTagTo(tag);
-            return;
+            try
+            {
+                var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(nonce);
+                var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
+                byte[] ct = _key.MessageEncrypt(mech, msgParams, associatedData, plaintext);
+                if (ct.Length != plaintext.Length)
+                    throw new InvalidOperationException(
+                        $"ChaCha20-Poly1305 message encrypt returned {ct.Length} bytes; expected {plaintext.Length}.");
+                ct.CopyTo(ciphertext);
+                msgParams.CopyTagTo(tag);
+                return;
+            }
+            catch (Pkcs11Exception ex) when (Pkcs11MessageApiFallback.IsUnsupported(ex))
+            {
+                // Some modules export the v3.0 message-API entry points but do not implement
+                // ChaCha20-Poly1305 through them (e.g. opencryptoki). C_MessageEncryptInit is the
+                // first call, so nothing was written yet — fall through to the v2.40 single-part path.
+            }
         }
 
         // v2.40 fallback: ciphertext || tag concatenated.
@@ -135,21 +145,30 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
 
         if (_key.SupportsMessageApi)
         {
-            var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
-            var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
-            byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
             try
             {
-                if (pt.Length != plaintext.Length)
-                    throw new InvalidOperationException(
-                        $"ChaCha20-Poly1305 message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
-                pt.CopyTo(plaintext);
+                var msgParams = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
+                var mech = new Mechanism(CKM.CKM_CHACHA20_POLY1305);
+                byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
+                try
+                {
+                    if (pt.Length != plaintext.Length)
+                        throw new InvalidOperationException(
+                            $"ChaCha20-Poly1305 message decrypt returned {pt.Length} bytes; expected {plaintext.Length}.");
+                    pt.CopyTo(plaintext);
+                }
+                finally
+                {
+                    System.Security.Cryptography.CryptographicOperations.ZeroMemory(pt);
+                }
+                return;
             }
-            finally
+            catch (Pkcs11Exception ex) when (Pkcs11MessageApiFallback.IsUnsupported(ex))
             {
-                System.Security.Cryptography.CryptographicOperations.ZeroMemory(pt);
+                // Module advertises but does not implement ChaCha20-Poly1305 via the message API
+                // (e.g. opencryptoki). C_MessageDecryptInit is the first call — fall through to
+                // v2.40. A genuine tag failure surfaces a different return code and still propagates.
             }
-            return;
         }
 
         // v2.40 fallback: PKCS#11 expects ciphertext || tag concatenated.
