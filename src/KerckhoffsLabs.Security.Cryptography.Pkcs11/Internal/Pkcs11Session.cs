@@ -645,9 +645,29 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_DES3_CBC_ENCRYPT_DATA:
                 throw new InsecureOperationException(mechanismType,
                     "DES3 key-derive mechanisms are weak; use CKM_SP800_108-family KDFs or CKM_AES_CBC_ENCRYPT_DATA on a strong base key instead.");
+            case CKM.CKM_EXTRACT_KEY_FROM_KEY:
+            case CKM.CKM_XOR_BASE_AND_DATA:
+            case CKM.CKM_CONCATENATE_BASE_AND_KEY:
+            case CKM.CKM_CONCATENATE_BASE_AND_DATA:
+            case CKM.CKM_CONCATENATE_DATA_AND_BASE:
+                throw new InsecureOperationException(mechanismType,
+                    "This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks.");
             case CKM.CKM_AES_ECB:
+            case CKM.CKM_CAMELLIA_ECB:
+            case CKM.CKM_ARIA_ECB:
                 throw new InsecureOperationException(mechanismType,
                     "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CCM instead.");
+            case CKM.CKM_IDEA_ECB:
+            case CKM.CKM_GOST28147_ECB:
+                throw new InsecureOperationException(mechanismType,
+                    "This is a legacy 64-bit-block cipher in ECB mode, both leaking structural information from the plaintext and vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM instead.");
+            case CKM.CKM_CHACHA20:
+            case CKM.CKM_SALSA20:
+                throw new InsecureOperationException(mechanismType,
+                    "Raw ChaCha20/Salsa20 provide no integrity protection and are malleable; use CKM_CHACHA20_POLY1305 or CKM_AES_GCM instead.");
+            case CKM.CKM_AES_XTS:
+                throw new InsecureOperationException(mechanismType,
+                    "AES-XTS provides no integrity protection and is designed for disk-sector encryption, not general-purpose use; use CKM_AES_GCM or CKM_AES_CCM instead.");
             case CKM.CKM_AES_CBC:
             case CKM.CKM_AES_CBC_PAD:
             case CKM.CKM_AES_CTR:
@@ -703,9 +723,22 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_ECDSA_SHA1:
                 throw new InsecureOperationException(mechanismType,
                     "SHA-1 is collision-broken and deprecated in signature/MAC contexts; use CKM_SHA256_HMAC or CKM_ECDSA_SHA256.");
+            case CKM.CKM_MD5_HMAC:
+            case CKM.CKM_MD5_HMAC_GENERAL:
+            case CKM.CKM_MD5_KEY_DERIVATION:
+            case CKM.CKM_SHA1_KEY_DERIVATION:
+                throw new InsecureOperationException(mechanismType,
+                    "MD5/SHA-1-based HMAC and key derivation rely on broken hash functions; use CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger instead.");
+            case CKM.CKM_SSL3_MD5_MAC:
+            case CKM.CKM_SSL3_SHA1_MAC:
+                throw new InsecureOperationException(mechanismType,
+                    "SSLv3 MAC mechanisms are tied to a protocol version prohibited by RFC 7568; use TLS 1.2+ with CKM_SHA256_HMAC instead.");
             case CKM.CKM_RSA_X_509:
                 throw new InsecureOperationException(mechanismType,
                     "Raw RSA (X.509, no padding) is malleable and forgeable; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
+            case CKM.CKM_RSA_9796:
+                throw new InsecureOperationException(mechanismType,
+                    "ISO 9796-2 RSA signing is forgeable (Coron-Naccache-Stern); use CKM_RSA_PKCS_PSS instead.");
             case CKM.CKM_DSA:
             case CKM.CKM_DSA_SHA1:
             case CKM.CKM_DSA_SHA224:
