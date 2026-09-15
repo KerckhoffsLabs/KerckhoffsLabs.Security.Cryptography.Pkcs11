@@ -11,8 +11,17 @@ public sealed class SlhDsaPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture ba
 
     [Theory(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S)]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_256S)]
     [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_256F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F)]
     public void SignVerifyData_RoundTrips(CkpSlhDsa parameterSet) => SlhDsaPkcs11TestCases.Assert_SignVerifyData_RoundTrips(_backend, parameterSet);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

@@ -15,7 +15,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// Backend-agnostic SlhDsaPkcs11 (FIPS 205) tests: sign/verify across parameter sets and with context,
 /// and key-material export (public encoding; private export refused). The non-SLH-DSA-key constructor
 /// check runs anywhere; the real-crypto cases skip where the backend cannot operate SLH-DSA
-/// (<see cref="IPkcs11Backend.SupportsSlhDsa"/>) — no shipping software token implements it today.
+/// (<see cref="IPkcs11Backend.SupportsSlhDsa"/>) — of this project's test matrix, only Kryoptic
+/// implements it; SoftHSM2, OpenCryptoki, and NSS carry only the PKCS#11 header constant.
 /// </summary>
 internal static class SlhDsaPkcs11TestCases
 {
