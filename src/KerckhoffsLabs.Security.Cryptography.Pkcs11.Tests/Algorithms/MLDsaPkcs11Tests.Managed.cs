@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
@@ -189,5 +190,60 @@ public sealed class MLDsaPkcs11Tests_Managed
 
         var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
         Assert.Equal("key", ex.ParamName);
+    }
+
+    // === ResolveAlgorithm / attribute-read edge cases ======================
+    //
+    // A real token can't be coaxed into reporting CKA_PARAMETER_SET as sensitive, or into
+    // returning a value it never advertises, on a well-formed ML-DSA key object — these are
+    // fallback paths a fake library must drive.
+
+    private static byte[] UlongAttr(ulong value) =>
+        BitConverter.GetBytes(value).AsSpan(0, UnmanagedMemory.NativeULongSize).ToArray();
+
+    [Fact]
+    public void Ctor_ParameterSetAttributeSensitive_ThrowsArgumentException()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+        Assert.Contains("not readable", ex.Message);
+    }
+
+    [Fact]
+    public void Ctor_UnrecognizedParameterSet_ThrowsArgumentException()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, _ => (CKR.CKR_OK, UlongAttr(0xFFFF)));
+
+        var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
+        Assert.Equal("key", ex.ParamName);
+        Assert.Contains("Unrecognized ML-DSA parameter set", ex.Message);
+    }
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportMLDsaPublicKey_ValueAttributeSensitive_ThrowsPkcs11Exception()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
+            ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
+            : (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+        using var mldsa = new MLDsaPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
+        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+    }
+
+    [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
+    public void ExportMLDsaPublicKey_TokenReturnsWrongLength_ThrowsPkcs11Exception()
+    {
+        // MLDsa44's public key is 1312 bytes; a well-formed token could never return a different
+        // length for its own advertised parameter set, so this drives CopyExact's mismatch guard.
+        using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
+            ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
+            : (CKR.CKR_OK, new byte[1]));
+        using var mldsa = new MLDsaPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
+        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
     }
 }
