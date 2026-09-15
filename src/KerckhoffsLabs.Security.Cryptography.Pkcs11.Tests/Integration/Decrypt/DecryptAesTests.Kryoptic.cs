@@ -10,10 +10,10 @@ public sealed class DecryptAesTests_Kryoptic(KryopticBackendFixture f)
 
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault_Kryoptic()
+    public void AesEcb_ThrowsInsecureOperationException_ByDefault()
         => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void AesEcb_AllowedWhenAllowInsecureTrue_Kryoptic()
+    public void AesEcb_AllowedWhenAllowInsecureTrue()
         => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);
 }

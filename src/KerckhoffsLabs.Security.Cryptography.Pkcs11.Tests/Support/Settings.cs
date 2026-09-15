@@ -81,19 +81,23 @@ public static class Settings
     private static string DefaultMockPath()
     {
         string baseDir = AppContext.BaseDirectory;
+
+        // Every platform keys off the PROCESS architecture (the testhost), not the OS: a 32-bit
+        // run on a 64-bit Windows OS (WOW64) or an x64 process under Rosetta on Arm64 macOS would
+        // otherwise resolve the wrong-architecture mock and fail to load it (BadImageFormat).
+        // Matches SoftHsmBackendFixture.GetRid, reused by the other real-backend fixtures.
+        Architecture arch = RuntimeInformation.ProcessArchitecture;
         string rid =
-            // Windows keys off the PROCESS architecture (the testhost), so a 32-bit run finds the
-            // x86 mock — an x64 mock can't load into an x86 process (BadImageFormat).
             RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? RuntimeInformation.ProcessArchitecture switch
+                ? arch switch
                 {
                     Architecture.X86 => "win-x86",
                     Architecture.Arm64 => "win-arm64",
                     _ => "win-x64",
                 }
             : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
-                ? (RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "osx-arm64" : "osx-x64")
-            : RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "linux-arm64"
+                ? (arch == Architecture.Arm64 ? "osx-arm64" : "osx-x64")
+            : arch == Architecture.Arm64 ? "linux-arm64"
             : "linux-x64";
 
         string fileName =

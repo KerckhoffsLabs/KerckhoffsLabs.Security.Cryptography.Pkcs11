@@ -8,9 +8,9 @@ using Xunit.Sdk;
 // [Collection(...)] gets a private collection of its own and runs CONCURRENTLY with every other
 // collection. That is the right default for the hermetic Unit/ tests, but it is also the failure
 // mode for the backend suites: pkcs11-mock is single-session and process-global, and the SoftHSM /
-// NSS / opencryptoki fixtures own one C_Initialize'd module each. A backend test class that
-// forgets its [Collection] therefore does not fail loudly — it races the collection that owns the
-// module and corrupts shared native state intermittently.
+// NSS / opencryptoki / Kryoptic fixtures own one C_Initialize'd module each. A backend test class
+// that forgets its [Collection] therefore does not fail loudly — it races the collection that owns
+// the module and corrupts shared native state intermittently.
 //
 // Two things keep that from happening, and neither is the runner configuration:
 //   * the per-backend [CollectionDefinition]s in Support/Fixtures, which serialize each backend's

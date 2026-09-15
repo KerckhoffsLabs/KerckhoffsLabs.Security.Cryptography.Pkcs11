@@ -16,11 +16,11 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
-    public void Encrypt_InsecureMechanismThrows_Kryoptic(ulong mech)
+    public void Encrypt_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Encrypt_InsecureMechanismThrows(_backend, mech);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void Encrypt_AllowInsecure_BypassesGate_Kryoptic()
+    public void Encrypt_AllowInsecure_BypassesGate()
         => InsecureOperationGateTestCases.Assert_Encrypt_AllowInsecureBypassesGate(_backend);
 
     // --- Decrypt gate ---
@@ -30,11 +30,11 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
     [InlineData((ulong)CKM.CKM_DES_CBC)]
     [InlineData((ulong)CKM.CKM_DES3_CBC)]
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
-    public void Decrypt_InsecureMechanismThrows_Kryoptic(ulong mech)
+    public void Decrypt_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Decrypt_InsecureMechanismThrows(_backend, mech);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void Decrypt_AllowInsecure_BypassesGate_Kryoptic()
+    public void Decrypt_AllowInsecure_BypassesGate()
         => InsecureOperationGateTestCases.Assert_Decrypt_AllowInsecureBypassesGate(_backend);
 
     // --- Sign gate ---
@@ -45,7 +45,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_DES_MAC)]
     [InlineData((ulong)CKM.CKM_DES3_MAC)]
-    public void Sign_InsecureMechanismThrows_Kryoptic(ulong mech)
+    public void Sign_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Sign_InsecureMechanismThrows(_backend, mech);
 
     // --- Verify gate ---
@@ -54,7 +54,7 @@ public sealed class InsecureOperationGateTests_Kryoptic(KryopticBackendFixture f
     [InlineData((ulong)CKM.CKM_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_MD5_RSA_PKCS)]
     [InlineData((ulong)CKM.CKM_SHA1_RSA_PKCS)]
-    public void Verify_InsecureMechanismThrows_Kryoptic(ulong mech)
+    public void Verify_InsecureMechanismThrows(ulong mech)
         => InsecureOperationGateTestCases.Assert_Verify_InsecureMechanismThrows(_backend, mech);
 
     // --- Digest gate ---
