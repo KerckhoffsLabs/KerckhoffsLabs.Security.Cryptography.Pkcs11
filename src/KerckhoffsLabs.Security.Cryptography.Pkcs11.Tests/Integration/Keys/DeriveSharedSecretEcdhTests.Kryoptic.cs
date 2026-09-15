@@ -30,6 +30,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
+        workspace.AllowInsecure = true; // CKD_NULL is gated by default (BL-108) — it's what's under test here
         using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 
@@ -75,6 +76,7 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
     public void TwoParties_DeriveMatchingAesKey_ViaECParametersOverload()
     {
         using var workspace = OpenWorkspace();
+        workspace.AllowInsecure = true; // CKD_NULL is gated by default (BL-108) — it's what's under test here
         using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 

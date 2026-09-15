@@ -598,13 +598,17 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
     /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value). Caller-validated — see remarks.</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
-    /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
-    /// pass <see cref="CKD.CKD_NULL"/> to take the raw shared secret as the key material (do your own KDF off-token).
-    /// Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
+    /// <param name="kdf">KDF applied to the raw ECDH shared secret before it becomes the derived AES
+    /// key's material. Default <see cref="CKD.CKD_SHA256_KDF"/>. <see cref="CKD.CKD_NULL"/> applies no
+    /// KDF at all — the token's own truncation/expansion of the raw x-coordinate becomes the AES key
+    /// material directly, which NIST SP 800-56A forbids; this method never returns the raw secret for
+    /// an off-token KDF step, since the result is always an on-token, non-extractable key. Requires
+    /// <see cref="AllowInsecure"/>. Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="kdf"/> is <see cref="CKD.CKD_NULL"/> and <see cref="AllowInsecure"/> is <c>false</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
@@ -616,6 +620,11 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
         if (aesBitLength is not 128 and not 192 and not 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
+        if (kdf == CKD.CKD_NULL && !AllowInsecure)
+            throw new InsecureOperationException(CKM.CKM_ECDH1_DERIVE,
+                "CKD_NULL applies no KDF to the ECDH shared secret: the derived AES key becomes the " +
+                "raw x-coordinate (or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 " +
+                "§5.8 forbids. Use the default CKD_SHA256_KDF unless the token supports only CKD_NULL.");
 
         var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
@@ -645,14 +654,18 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
     /// <param name="peerPublicKey">The peer's public key. <see cref="ECParameters.Curve"/> and both coordinates of <see cref="ECParameters.Q"/> are required.</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
-    /// <param name="kdf">KDF applied to the raw ECDH shared secret. Default <see cref="CKD.CKD_SHA256_KDF"/>;
-    /// pass <see cref="CKD.CKD_NULL"/> to take the raw shared secret as the key material (do your own KDF off-token).
-    /// Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
+    /// <param name="kdf">KDF applied to the raw ECDH shared secret before it becomes the derived AES
+    /// key's material. Default <see cref="CKD.CKD_SHA256_KDF"/>. <see cref="CKD.CKD_NULL"/> applies no
+    /// KDF at all — the token's own truncation/expansion of the raw x-coordinate becomes the AES key
+    /// material directly, which NIST SP 800-56A forbids; this method never returns the raw secret for
+    /// an off-token KDF step, since the result is always an on-token, non-extractable key. Requires
+    /// <see cref="AllowInsecure"/>. Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
+    /// <exception cref="InsecureOperationException">Thrown if <paramref name="kdf"/> is <see cref="CKD.CKD_NULL"/> and <see cref="AllowInsecure"/> is <c>false</c>.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="peerPublicKey"/>'s curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown if <paramref name="ecPrivateKey"/>'s <c>CKA_EC_PARAMS</c> cannot be read.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
