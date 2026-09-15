@@ -1,11 +1,11 @@
 # Library Review Backlog
 
-_Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist deep review (cryptography ×2, PKCS#11 v3.2 conformance ×2, .NET library design + P/Invoke ×2, QA & release engineering ×3). Both rounds deduplicated overlapping findings and re-verified every Critical/High citation against the source; the 2026-08-11 round added BL-063 – BL-156, corrected three coverage-matrix rows, and repaired this file's missing `## Low` heading._
+_Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist deep review (cryptography ×2, PKCS#11 v3.2 conformance ×2, .NET library design + P/Invoke ×2, QA & release engineering ×3). Both rounds deduplicated overlapping findings and re-verified every Critical/High citation against the source; the 2026-08-11 round added BL-063 – BL-156, corrected three coverage-matrix rows, and repaired this file's missing `## Low` heading. A 2026-09-15 staleness pass re-verified every open item's Problem claim against current source (no new findings raised): BL-028, BL-115 and BL-159 were closed out by independent feature work (Kryoptic backend coverage, a `SetPin` rewrite, and third-backend encapsulate/decapsulate coverage, respectively) that nobody had circled back to mark; BL-030, BL-034, BL-108 and BL-126 were rescoped to their narrower remaining gap after partial fixes (a README quickstart, a `CONTRIBUTING.md` stub, a safer ECDH KDF default, and real-backend `CKM_EDDSA` coverage). This pass also found the item counts below had drifted from the file's actual contents (160 `### [BL-*]` headers exist, not 157 — the Low section alone has 41, not 38 — evidently from additions after BL-160 was appended without the tally being re-run); the counts are now a direct recount of the current file rather than carried forward._
 
 ## Summary
 
-- Total items: 157 (43 resolved, 114 open)
-- Critical: 0 | High: 32 (16 open, 16 resolved) | Medium: 87 (70 open, 17 resolved) | Low: 38 (28 open, 10 resolved)
+- Total items: 160 (49 resolved, 111 open)
+- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (68 open, 19 resolved) | Low: 41 (30 open, 11 resolved)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — seven of them now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked workspaces/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). Only BL-065 (`Verify` throwing instead of returning `false`) remains open. The set is BL-063 – BL-071.
@@ -651,13 +651,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** QA B
 
-### [BL-028] AES-CCM, ChaCha20-Poly1305, SP800-108 KDF, and SLH-DSA have zero real-backend coverage
+### [BL-028] ✅ RESOLVED — AES-CCM, ChaCha20-Poly1305, SP800-108 KDF, and SLH-DSA have zero real-backend coverage
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** M
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Support/Fixtures/SoftHsmBackendFixture.cs:59-88`; the four `*.Managed.cs` suites under `Tests/Algorithms/`
 - **Problem:** Neither CI real backend implements these four mechanism families, so their `CK_*_PARAMS` are validated on the wire only by the in-process `ManagedSoftToken` — a strict real token rejecting a field the fake tolerates would never surface. (Managed KATs and struct-size pins do exist.)
-- **Proposed action:** Add a third soft-token backend that implements them (e.g. Kryoptic covers AES-CCM, ChaCha20-Poly1305, ML-KEM, SLH-DSA), at least as a nightly/optional CI leg, and light up the existing capability-gated cases.
+- **Resolution:** Kryoptic was added as a third soft-token backend and now covers all four families: `AesCcmPkcs11Tests.Kryoptic.cs`, `ChaCha20Poly1305Pkcs11Tests.Kryoptic.cs`, `SP800108HmacCounterKdfPkcs11Tests.Kryoptic.cs`, and `SlhDsaPkcs11Tests.Kryoptic.cs` all exist and exercise these mechanisms against a real, independent implementation.
 - **Breaks public API?** No
 - **Raised by:** QA B
 
@@ -671,13 +671,14 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** QA B, Cryptographer B
 
-### [BL-030] Docs site is API-reference-only; README fails the 60-second use-case test
+### [BL-030] ⚠️ PARTIALLY RESOLVED — Docs site has no getting-started article; README now has a quickstart
 - **Area:** Release Eng
 - **Severity:** Medium
 - **Effort:** M
 - **Location:** `docs/toc.yml`, `docs/index.md`, `README.md`
 - **Problem:** `toc.yml` has only Home + API; there is no getting-started or end-to-end flow (load → initialize → session → login → operate → dispose) anywhere, and the README contains no usage code at all.
-- **Proposed action:** Add a `docs/articles/` getting-started walkthrough wired into `toc.yml`, and a minimal end-to-end snippet at the top of the README.
+- **Remaining scope:** The README now has a full end-to-end quickstart snippet (load → session → generate → sign → verify), so that half is resolved. `docs/toc.yml` still lists only Home/Diagnostics/API — there is still no getting-started walkthrough article on the docs site itself.
+- **Proposed action:** Add a `docs/articles/` getting-started walkthrough wired into `toc.yml` (the README snippet can be reused as its basis).
 - **Breaks public API?** No
 - **Raised by:** QA C
 
@@ -711,13 +712,14 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** QA C
 
-### [BL-034] No CONTRIBUTING.md, CODE_OF_CONDUCT.md, or issue/PR templates
+### [BL-034] ⚠️ PARTIALLY RESOLVED — `CONTRIBUTING.md` now exists but is content-free; CODE_OF_CONDUCT.md and issue/PR templates still missing
 - **Area:** Release Eng
 - **Severity:** Medium
 - **Effort:** S
-- **Location:** MISSING: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` (all verified absent)
+- **Location:** `CONTRIBUTING.md` (exists, but documents none of the build — see BL-140); MISSING: `CODE_OF_CONDUCT.md`, `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` (still all verified absent)
 - **Problem:** Contribution prerequisites here are non-trivial (submodules, from-source OpenSSL 3.5, format/warnings gates) and entirely undocumented; no triage structure exists.
-- **Proposed action:** Add the standard community-health files, with CONTRIBUTING covering submodule init, native prerequisites, and the formatting/warnings expectations.
+- **Remaining scope:** `CONTRIBUTING.md` was added, closing the "doesn't exist at all" gap, but it covers none of the submodule/native-toolchain/formatting prerequisites (tracked in full under BL-140). `CODE_OF_CONDUCT.md` and the `.github/` issue/PR templates are still absent.
+- **Proposed action:** Add `CODE_OF_CONDUCT.md` and issue/PR templates; fill in `CONTRIBUTING.md`'s build instructions per BL-140.
 - **Breaks public API?** No
 - **Raised by:** QA C
 
@@ -986,12 +988,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** Cryptographer A, Cryptographer B
 - **Spec / References:** PKCS#11 v3.0 §2.3.5–2.3.6; RFC 8032
 
-### [BL-108] `DeriveSharedSecretEcdh` accepts `CKD_NULL` with no gate, silently making the raw ECDH x-coordinate the AES key — and its own doc describes the opposite behaviour
+### [BL-108] ⚠️ PARTIALLY RESOLVED — `DeriveSharedSecretEcdh`'s default KDF is now safe, but `CKD_NULL` is still accepted with no gate and the doc is still wrong
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Pkcs11Workspace.cs:486-488` (doc) and `:494-515` (implementation)
 - **Problem:** The `kdf` parameter doc says "pass `CKD.CKD_NULL` to take the raw shared secret as the key material (do your own KDF off-token)", but the method does not return the secret — it derives an on-token AES key from it — so there is no off-token KDF step for the caller to perform. With `CKD_NULL` the resulting AES key *is* the raw x-coordinate, or a token-chosen truncation of it when the field is larger than the requested key length, which SP 800-56A forbids. `GuardMechanism` has no case for `CKM_ECDH1_DERIVE`, so nothing warns or refuses.
+- **Remaining scope:** The `kdf` parameter's default changed from `CKD_NULL` to `CKD_SHA256_KDF`, so a caller who doesn't specify a KDF now gets a safe default. `CKD_NULL` is still accepted with no gate for a caller who passes it explicitly, and the doc comment's inaccurate description of what it produces is unchanged.
 - **Proposed action:** Correct the doc to state what `CKD_NULL` actually produces here, and either refuse `CKD_NULL` on this helper unless `AllowInsecure` is set — consistent with the project's established gate pattern — or drop `CKD_NULL` from this convenience overload and point those callers at the lower-level derive.
 - **Breaks public API?** No — the gate is a behavioural addition, cheap pre-1.0
 - **Raised by:** Cryptographer B
@@ -1062,13 +1065,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** PKCS#11 Specialist B
 - **Spec / References:** PKCS#11 v3.2 §5.6.11 (`C_SessionCancel`), §5.16.10–11. Extends BL-049, which names only streaming `DecryptVerify`
 
-### [BL-115] `SetPin` leaks the old PIN unzeroized if the second `ToPinnedArray()` throws
+### [BL-115] ✅ RESOLVED — `SetPin` leaks the old PIN unzeroized if the second `ToPinnedArray()` throws
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** S
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:341-355`
 - **Problem:** `oldTmp = oldPin.ToPinnedArray()` runs, then `newTmp = newPin.ToPinnedArray()` runs — both *outside* the `try`. If the second call throws (for example `ObjectDisposedException` from `SecurePin.ToPinnedArray`), the `finally` never executes and `oldTmp` — a pinned-object-heap array holding the PIN in cleartext, which by construction never moves and is never overwritten — survives until GC with the PIN intact. `Login`, `LoginUser` and `InitPin` are unaffected because each allocates a single transient.
-- **Proposed action:** Declare both arrays as null, then acquire and use them inside one `try`, zeroizing whichever are non-null in the `finally`.
+- **Resolution:** `SetPin` no longer calls `ToPinnedArray()` at all — it passes `oldPin.Pin`/`newPin.Pin` (`ReadOnlySpan<byte>` views into the already-pinned `SecurePin` buffer) directly to `C_SetPIN`. There are zero `ToPinnedArray` call sites left in `Pkcs11Session.cs`, so the two-allocation race this item describes no longer exists.
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist B
 - **Spec / References:** Extends BL-017, which made the copies pinned but did not cover this error-path escape
@@ -1180,12 +1183,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** QA B
 - **Spec / References:** BL-049 is the missing cancel call on one method and BL-052 is token removal; neither covers session recoverability on modules where `C_SessionCancel` does not exist
 
-### [BL-126] 24 of 32 public mechanism-parameter types, and the public HashML-DSA / HashSLH-DSA / hedge surface, never reach a real module
+### [BL-126] ⚠️ PARTIALLY RESOLVED — Most of the 24 untouched mechanism-parameter types, and the public HashML-DSA / HashSLH-DSA / hedge surface, still never reach a real module
 - **Area:** QA
 - **Severity:** Medium
 - **Effort:** L
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Algorithms/Pkcs11MechanismMap.cs:104-107`, `:133-136`, `:154-173`; `MechanismParams/CkmEddsaParams.cs`; tested only at `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Unit/Internal/Pkcs11MechanismMapTests.cs:120-150`
 - **Problem:** Cross-referencing `MechanismParams/*.cs` against everything under `Integration/` and `Algorithms/`, only `CkmAesGcmParams`, `CkmAesCcmParams`, `CkmEcdh1DeriveParams`, `CkmRsaPkcsOaepParams`, `CkmRsaPkcsPssParams`, `CkmSalsa20ChaCha20Poly1305Params`, `CkmSp800108KdfParams` and the PQC sign params are ever used in a real call. `CkmEddsaParams` (Ed25519ph and context signing), `CkmHkdfParams`, `CkmChaCha20Params`, the IKE-derive family, X3DH/X2Ratchet and XEdDSA are unit-marshalling-only. Notably `Pkcs11MechanismMap.MlDsaHashSign` and `SlhDsaHashSign` — public v3.2 entry points that build `CK_HASH_SIGN_ADDITIONAL_CONTEXT` — and every non-default `CkhHedge` value are tested only by asserting the returned `Mechanism`'s fields, never by a token that would reject a malformed block. RSA-OAEP with a label (`CKZ_DATA_SPECIFIED` + `pSourceData`) is likewise verified only structurally.
+- **Remaining scope:** Plain `CKM_EDDSA` sign/verify (empty mechanism parameter) now has real-backend coverage on SoftHSM2 (`SignEdDsaTestCases`). `CkmEddsaParams` itself — needed for context-bound and prehash (Ed25519ph) signing — is still exercised only at the unit-marshalling level, along with the rest of the types and the HashML-DSA/HashSLH-DSA/hedge surface named above.
 - **Proposed action:** Rank the untouched param types by likelihood of consumer use and add one real-module acceptance test each, following the pattern already established by `Integration/Sign/SignIbmMlDsaContextTests.OpenCryptoki.cs` — a token that returns `CKR_MECHANISM_PARAM_INVALID` for a wrong-sized block is a genuine oracle. Prioritise `MlDsaHashSign`/`SlhDsaHashSign`, the deterministic hedge variant, OAEP-with-label and `CkmEddsaParams`. Record anything no available backend implements in a coverage matrix rather than leaving it silently untested.
 - **Breaks public API?** No
 - **Raised by:** QA B
@@ -1813,14 +1817,14 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No (adds `Rfc2898DeriveBytesPkcs11` and `CkmPkcs5Pbkd2Params`, purely additive)
 - **Raised by:** Cross-referencing kryoptic#277 against this wrapper's own test coverage
 
-### [BL-159] `C_[En|De]capsulateKey` with RSA-OAEP/ECDH1 only exercised against opencryptoki
+### [BL-159] ✅ RESOLVED — `C_[En|De]capsulateKey` with RSA-OAEP/ECDH1 was only exercised against opencryptoki
 - **Area:** Interop / Test coverage
 - **Severity:** Info
 - **Effort:** — (documented; opencryptoki is the only vendored backend implementing this today)
 - **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/MechanismParams/CkmEcdh1DeriveParams.cs` (`ForEncapsulation` factory); `src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/Integration/Keys/EncapsulateKeyTest*.cs`
 - **Problem:** Prompted by [latchset/kryoptic#432](https://github.com/latchset/kryoptic/issues/432) ("Add support to use C_[En|De]capsulateKey with ECC and RSA as well"), a source audit of all four vendored backends found `Pkcs11Key.EncapsulateKey`/`DecapsulateKey` (already mechanism-agnostic, unlike the ML-KEM-specific `MLKemPkcs11` façade) had zero coverage with a classical mechanism. Backend audit: Kryoptic's `encapsulate`/`decapsulate` trait methods are implemented only by `mlkem.rs` — confirming kryoptic#432's premise. NSS's softoken KEM code (`lib/softoken/kem.c`) dispatches only on `CKM_ML_KEM`/`CKM_NSS_ML_KEM`/`CKM_NSS_KYBER`. SoftHSM2's dispatch only recognizes `CKM_ML_KEM_KEY_PAIR_GEN`/`CKM_ML_KEM`. opencryptoki, however, already implements this generically: `soft_specific.c`'s mechanism table advertises `CKF_ENCAPSULATE`/`CKF_DECAPSULATE` for `CKM_RSA_PKCS_OAEP`, `CKM_RSA_PKCS`, `CKM_ECDH1_DERIVE`, `CKM_ECDH1_COFACTOR_DERIVE`, and `CKM_DH_PKCS_DERIVE`; `key_mgr.c` dispatches to `mech_rsa.c`/`mech_ec.c`, both with fallback paths (`key_mgr_generate_key` + `key_mgr_wrap_key`/`unwrap_key`) that need no token-specific hook, so it works on the plain soft token, not just hardware-backed types. One real spec subtlety found along the way: for `C_EncapsulateKey`/`DecapsulateKey` with `CKM_ECDH1_DERIVE`, `CK_ECDH1_DERIVE_PARAMS.pPublicData` must be empty (the token generates its own ephemeral EC key pair internally) — the opposite of the normal derive call shape, which is why the existing `CkmEcdh1DeriveParams` constructor's non-empty-peer-point guard couldn't be reused directly; added a `ForEncapsulation` static factory for this shape instead of loosening that guard.
-- **Proposed action:** None — this is a real capability gap in Kryoptic (which the linked issue already tracks upstream), NSS, and SoftHSM2, not a wrapper bug. The new tests (`EncapsulateKeyTestCases.cs`, driven directly through `Pkcs11Key.EncapsulateKey`/`DecapsulateKey` — no new façade needed) cover RSA-OAEP and ECDH1 round-trips against opencryptoki; the other three backends' test files exist for symmetry but skip everything via a hardcoded capability gate (a live mechanism-list check would not catch this gap, since these mechanisms exist on every backend for ordinary encrypt/derive — it is specifically the `CKF_ENCAPSULATE`/`CKF_DECAPSULATE` flag that is missing). Revisit if Kryoptic lands kryoptic#432, or if NSS/SoftHSM2 add classical-mechanism support.
-- **Breaks public API?** No (adds `CkmEcdh1DeriveParams.ForEncapsulation`, purely additive)
+- **Resolution:** `EncapsulateKeyTests.Kryoptic.cs` and `EncapsulateKeyTests.SoftHsm2.cs` now both have `RsaOaep_EncapsulateDecapsulate_RoundTrips` and `Ecdh1_EncapsulateDecapsulate_RoundTrips` running for real — three backends exercise this now, not one. Revisit again only if the remaining gap (NSS) changes.
+- **Breaks public API?** No (added `CkmEcdh1DeriveParams.ForEncapsulation`, purely additive)
 - **Raised by:** Cross-referencing kryoptic#432 against this wrapper's own test coverage
 
 ## PKCS#11 v3.2 Coverage Matrix
