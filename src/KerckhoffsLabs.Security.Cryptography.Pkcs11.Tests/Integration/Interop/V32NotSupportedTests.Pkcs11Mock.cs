@@ -26,10 +26,8 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
     private readonly MockBackendFixture _backend = f;
 
     [Fact]
-    public void IsV32ApiSupported_FalseForMock()
-    {
+    public void IsV32ApiSupported_FalseForMock() =>
         Assert.False(_backend.Library.LowLevelLibrary!.IsV32ApiSupported);
-    }
 
     [Fact]
     public void EncapsulateKey_ReportsFunctionNotSupported()
