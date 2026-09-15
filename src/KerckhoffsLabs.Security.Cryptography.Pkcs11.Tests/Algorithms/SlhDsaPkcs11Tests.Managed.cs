@@ -60,9 +60,16 @@ public sealed class SlhDsaPkcs11Tests_Managed
     private static SlhDsaAlgorithm BclAlgorithm(CkpSlhDsa p) => p switch
     {
         CkpSlhDsa.CKP_SLH_DSA_SHA2_128S => SlhDsaAlgorithm.SlhDsaSha2_128s,
+        CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S => SlhDsaAlgorithm.SlhDsaShake128s,
         CkpSlhDsa.CKP_SLH_DSA_SHA2_128F => SlhDsaAlgorithm.SlhDsaSha2_128f,
-        CkpSlhDsa.CKP_SLH_DSA_SHA2_192F => SlhDsaAlgorithm.SlhDsaSha2_192f,
         CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F => SlhDsaAlgorithm.SlhDsaShake128f,
+        CkpSlhDsa.CKP_SLH_DSA_SHA2_192S => SlhDsaAlgorithm.SlhDsaSha2_192s,
+        CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S => SlhDsaAlgorithm.SlhDsaShake192s,
+        CkpSlhDsa.CKP_SLH_DSA_SHA2_192F => SlhDsaAlgorithm.SlhDsaSha2_192f,
+        CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F => SlhDsaAlgorithm.SlhDsaShake192f,
+        CkpSlhDsa.CKP_SLH_DSA_SHA2_256S => SlhDsaAlgorithm.SlhDsaSha2_256s,
+        CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S => SlhDsaAlgorithm.SlhDsaShake256s,
+        CkpSlhDsa.CKP_SLH_DSA_SHA2_256F => SlhDsaAlgorithm.SlhDsaSha2_256f,
         CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F => SlhDsaAlgorithm.SlhDsaShake256f,
         _ => throw new InvalidOperationException($"unmapped parameter set {p}"),
     };
@@ -234,6 +241,31 @@ public sealed class SlhDsaPkcs11Tests_Managed
         var ex = Assert.Throws<ArgumentException>(() => new SlhDsaPkcs11(key));
         Assert.Equal("key", ex.ParamName);
         Assert.Contains("Unrecognized SLH-DSA parameter set", ex.Message);
+    }
+
+    // Drives all twelve CKP_SLH_DSA_* arms of ResolveAlgorithm's switch via a fake key instead of a
+    // real token: real key-gen + sign/verify round trips are reserved above for a handful of fast
+    // variants (SLH-DSA "s"-variant signing is slow), so most of the twelve arms are otherwise never
+    // exercised. This only needs the base SlhDsa constructor to succeed, not an actual signature.
+    [Theory(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_128F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_192S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_192F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_192F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_256S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_256S)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHA2_256F)]
+    [InlineData(CkpSlhDsa.CKP_SLH_DSA_SHAKE_256F)]
+    public void Ctor_ResolvesAlgorithm_ForEveryParameterSet(CkpSlhDsa parameterSet)
+    {
+        using var key = FakeKeys.Create(CKK.CKK_SLH_DSA, _ => (CKR.CKR_OK, UlongAttr((ulong)parameterSet)));
+        using var slhdsa = new SlhDsaPkcs11(key);
+
+        Assert.Equal(BclAlgorithm(parameterSet), slhdsa.Algorithm);
     }
 
     [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
