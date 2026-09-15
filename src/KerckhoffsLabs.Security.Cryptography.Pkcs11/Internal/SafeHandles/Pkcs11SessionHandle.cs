@@ -11,14 +11,29 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 /// while any session is still open.
 /// </summary>
 /// <remarks>
-/// The library reference enforces a GC reachability invariant: as long as this
-/// SafeHandle is alive, the <see cref="LowLevelPkcs11Library"/> and its
-/// <see cref="Pkcs11ModuleHandle"/> remain reachable. This guarantees that
-/// <c>C_CloseSession</c> can still be called when this handle is finally released.
+/// Mere GC reachability does not order this: <see cref="SafeHandle"/> is a
+/// <c>CriticalFinalizerObject</c>, and the CLR gives no relative ordering guarantee between two
+/// independent critical finalizers — a strong reference to the library only stops it from being
+/// *collected*, not from having its own module handle finalized (and the native module unmapped)
+/// first if both this handle and the library become unreachable in the same GC. When the backing
+/// library is a real, natively-loaded <see cref="LowLevelPkcs11Library"/>, this handle instead takes
+/// an explicit <c>DangerousAddRef</c> on its <see cref="Pkcs11ModuleHandle"/> for its own lifetime and
+/// releases it in <see cref="ReleaseHandle"/> — SafeHandle's own ref-counting is what actually defers
+/// the module's release until this handle's <c>C_CloseSession</c> has run.
 /// </remarks>
 internal sealed class Pkcs11SessionHandle : SafeHandle
 {
     private readonly ILowLevelPkcs11Library _library;
+
+    /// <summary>
+    /// The real library's module handle, ref-counted for this session's lifetime — <c>null</c> when
+    /// <see cref="_library"/> is not a natively-loaded <see cref="LowLevelPkcs11Library"/> (a test
+    /// double has no native module to protect).
+    /// </summary>
+    private readonly Pkcs11ModuleHandle? _moduleHandle;
+
+    /// <summary>Whether <see cref="_moduleHandle"/>'s <c>DangerousAddRef</c> succeeded and must be released.</summary>
+    private readonly bool _moduleHandleRefAdded;
 
     /// <summary>
     /// The session id, held here rather than in the base handle field. <c>CK_SESSION_HANDLE</c> is
@@ -40,6 +55,13 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         ArgumentNullException.ThrowIfNull(library);
         _library = library;
         _sessionId = sessionId;
+
+        if (!IsInvalid && library is LowLevelPkcs11Library real)
+        {
+            _moduleHandle = real.ModuleHandle;
+            _moduleHandle.DangerousAddRef(ref _moduleHandleRefAdded);
+        }
+
         // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
         // unloads the function table.
         _library.RegisterSession(this);
@@ -54,21 +76,30 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
     /// <inheritdoc/>
     protected override bool ReleaseHandle()
     {
-        if (IsInvalid) return true;
         try
         {
-            CKR rv = _library.C_CloseSession(SessionId);
-            return rv == CKR.CKR_OK;
-        }
-        catch
-        {
-            return false;
+            if (IsInvalid) return true;
+            try
+            {
+                CKR rv = _library.C_CloseSession(SessionId);
+                return rv == CKR.CKR_OK;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                // Best-effort: prune our tracker entry so the library's tracker doesn't grow
+                // unbounded for long-running consumers that open/close many sessions.
+                try { _library.UnregisterSession(this); } catch { /* tracker may already be torn down */ }
+            }
         }
         finally
         {
-            // Best-effort: prune our tracker entry so the library's tracker doesn't grow
-            // unbounded for long-running consumers that open/close many sessions.
-            try { _library.UnregisterSession(this); } catch { /* tracker may already be torn down */ }
+            // Release last: only after C_CloseSession has had its chance to run does the module
+            // become eligible for its own SafeHandle release.
+            if (_moduleHandleRefAdded) _moduleHandle!.DangerousRelease();
         }
     }
 }

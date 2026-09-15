@@ -15,6 +15,15 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     private readonly Pkcs11ModuleHandle _library = new();
 
     /// <summary>
+    /// The module handle, exposed so <see cref="Internal.SafeHandles.Pkcs11SessionHandle"/> can take
+    /// a <c>DangerousAddRef</c> on it for the session's lifetime — the CLR gives no ordering
+    /// guarantee between two independent <c>CriticalFinalizerObject</c>s, so without an explicit
+    /// SafeHandle ref count this module could be unmapped before an abandoned session's
+    /// <c>C_CloseSession</c> runs.
+    /// </summary>
+    internal Pkcs11ModuleHandle ModuleHandle => _library;
+
+    /// <summary>
     /// Delegates for PKCS#11 functions
     /// </summary>
     private readonly Delegates _delegates;
