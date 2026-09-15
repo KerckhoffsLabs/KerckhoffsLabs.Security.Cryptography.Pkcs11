@@ -150,7 +150,7 @@ public sealed class DSAPkcs11Tests_Managed
         byte[] data = Encoding.UTF8.GetBytes("destination too small");
         using (workspace.AllowInsecureScope())
         {
-            bool ok = dsa.TrySignData(data, Span<byte>.Empty, HashAlgorithmName.SHA256, out int bytesWritten);
+            bool ok = dsa.TrySignData(data, [], HashAlgorithmName.SHA256, out int bytesWritten);
             Assert.False(ok);
             Assert.Equal(0, bytesWritten);
         }
