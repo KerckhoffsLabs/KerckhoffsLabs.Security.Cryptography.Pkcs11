@@ -23,6 +23,7 @@ internal static class HkdfTestCases
     private static readonly byte[] Info = Convert.FromHexString("F0F1F2F3F4F5F6F7F8F9");
 
     // PKCS#11 v3.0 §2.42.1: CKF_HKDF_SALT_NULL = 1, CKF_HKDF_SALT_DATA = 2, CKF_HKDF_SALT_KEY = 4.
+    private const ulong SaltNull = 1UL;
     private const ulong SaltData = 2UL;
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
@@ -93,14 +94,16 @@ internal static class HkdfTestCases
     internal static void Assert_ExpandOnly_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedIkm(backend, (_, ikmKey) =>
         {
-            // Expand-only treats the base key's value directly as the PRK (no Extract step).
+            // Expand-only treats the base key's value directly as the PRK (no Extract step), so the
+            // salt is unused — SaltType must be SALT_NULL here, since SALT_DATA with an empty span
+            // is a mismatch Kryoptic rejects outright (ulSaltLen == 0 with CKF_HKDF_SALT_DATA).
             const int length = 32;
             byte[] expected = new byte[length];
             HKDF.Expand(HashAlgorithmName.SHA256, Ikm, expected, Info);
 
             var mechanism = new Mechanism(CKM.CKM_HKDF_DERIVE,
                 new CkmHkdfParams(extract: false, expand: true, CKM.CKM_SHA256_HMAC,
-                    SaltData, default, saltKey: 0, Info));
+                    SaltNull, default, saltKey: 0, Info));
 
             byte[] actual = DeriveAndReadValue(ikmKey, mechanism, length);
 

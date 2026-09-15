@@ -21,6 +21,25 @@ public sealed class EncryptRsaOaepLabelTests_SoftHsm(SoftHsmBackendFixture backe
 {
     private readonly SoftHsmBackendFixture _backend = backend;
 
+    // SoftHSM 2.5 (the softhsm-v240 CI leg's pinned Debian binary) advertises CKM_RSA_PKCS_OAEP but
+    // only actually accepts CKM_SHA_1 as the hash parameter — SHA-256 fails at C_EncryptInit with
+    // CKR_ARGUMENTS_BAD regardless of the label under test here. Mirrors
+    // RSAPkcs11TestCases.OrSkipIfOaepHashUnsupported's existing convention for this exact limitation.
+    private static byte[] OrSkipIfOaepHashUnsupported(Func<byte[]> op)
+    {
+        try
+        {
+            return op();
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is
+            CKR.CKR_MECHANISM_PARAM_INVALID or CKR.CKR_MECHANISM_INVALID or
+            CKR.CKR_ARGUMENTS_BAD or CKR.CKR_FUNCTION_NOT_SUPPORTED)
+        {
+            Assert.Skip("Token advertises OAEP but rejects this hash parameter.");
+            throw; // Assert.Skip always throws; xunit.v3.assert 4.0.1 lacks [DoesNotReturn].
+        }
+    }
+
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void OaepWithLabel_RoundTrips()
     {
@@ -35,7 +54,7 @@ public sealed class EncryptRsaOaepLabelTests_SoftHsm(SoftHsmBackendFixture backe
 
                 var encryptMech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP,
                     new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, label));
-                byte[] ciphertext = session.Encrypt(encryptMech, pub, plaintext);
+                byte[] ciphertext = OrSkipIfOaepHashUnsupported(() => session.Encrypt(encryptMech, pub, plaintext));
 
                 var decryptMech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP,
                     new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, label));
@@ -69,7 +88,7 @@ public sealed class EncryptRsaOaepLabelTests_SoftHsm(SoftHsmBackendFixture backe
 
                 var encryptMech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP,
                     new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, Encoding.UTF8.GetBytes("label-a")));
-                byte[] ciphertext = session.Encrypt(encryptMech, pub, plaintext);
+                byte[] ciphertext = OrSkipIfOaepHashUnsupported(() => session.Encrypt(encryptMech, pub, plaintext));
 
                 var decryptMech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP,
                     new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, Encoding.UTF8.GetBytes("label-b")));

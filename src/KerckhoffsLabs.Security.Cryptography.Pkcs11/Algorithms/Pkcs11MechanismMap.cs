@@ -143,12 +143,18 @@ public static class Pkcs11MechanismMap
     /// <param name="hedgeVariant">Hedge mode.</param>
     /// <param name="context">Optional context bytes (max 255).</param>
     /// <remarks>
+    /// These combined mechanisms (e.g. <c>CKM_HASH_ML_DSA_SHA256</c>) already encode the hash in the
+    /// mechanism type itself, so the parameter block is the plain <c>CK_SIGN_ADDITIONAL_CONTEXT</c>
+    /// (hedge + context only), not <c>CK_HASH_SIGN_ADDITIONAL_CONTEXT</c>'s extra <c>hash</c> field —
+    /// that field exists only for the bare <c>CKM_HASH_ML_DSA</c> mechanism, where the caller must
+    /// name the prehash explicitly. opencryptoki's <c>ml_dsa_get_digest_mech</c> enforces exactly this
+    /// split: it validates <c>ulParameterLen</c> against <c>sizeof(CK_SIGN_ADDITIONAL_CONTEXT)</c> for
+    /// every combined mechanism and derives the hash from the mechanism type itself.
     /// SHAKE128 / SHAKE256 (FIPS 204 §5.4) are intentionally not mapped here. OASIS PKCS#11
     /// v3.2 defines <c>CKM_HASH_ML_DSA_SHAKE128/256</c> as the combined mechanism but does
     /// not define a standalone <c>CKM_SHAKE_128/256</c> hash mechanism — only the
-    /// <c>_KEY_DERIVATION</c> variants. The <c>hash</c> field of
-    /// <c>CK_HASH_SIGN_ADDITIONAL_CONTEXT</c> has no spec-defined value for the SHAKE-prehash
-    /// case, so adding arms requires a token-by-token compatibility test we do not yet have.
+    /// <c>_KEY_DERIVATION</c> variants — so adding arms requires a token-by-token compatibility
+    /// test we do not yet have.
     /// </remarks>
     /// <exception cref="NotSupportedException">Unsupported hash.</exception>
     public static Mechanism MlDsaHashSign(
@@ -156,20 +162,20 @@ public static class Pkcs11MechanismMap
         CkhHedge hedgeVariant = CkhHedge.CKH_HEDGE_PREFERRED,
         ReadOnlySpan<byte> context = default)
     {
-        var (ckm, innerHash) = hash.Name switch
+        CKM ckm = hash.Name switch
         {
-            "SHA224" => (CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_SHA224),
-            Sha256 => (CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256),
-            Sha384 => (CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384),
-            Sha512 => (CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512),
-            "SHA3-224" => (CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224),
-            "SHA3-256" => (CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256),
-            "SHA3-384" => (CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384),
-            "SHA3-512" => (CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512),
+            "SHA224" => CKM.CKM_HASH_ML_DSA_SHA224,
+            Sha256 => CKM.CKM_HASH_ML_DSA_SHA256,
+            Sha384 => CKM.CKM_HASH_ML_DSA_SHA384,
+            Sha512 => CKM.CKM_HASH_ML_DSA_SHA512,
+            "SHA3-224" => CKM.CKM_HASH_ML_DSA_SHA3_224,
+            "SHA3-256" => CKM.CKM_HASH_ML_DSA_SHA3_256,
+            "SHA3-384" => CKM.CKM_HASH_ML_DSA_SHA3_384,
+            "SHA3-512" => CKM.CKM_HASH_ML_DSA_SHA3_512,
             _ => throw new NotSupportedException(
                 $"HashML-DSA does not support hash {hash.Name}."),
         };
-        return new Mechanism(ckm, new CkmHashPqcSignParams(innerHash, hedgeVariant, context));
+        return new Mechanism(ckm, new CkmPqcSignParams(hedgeVariant, context));
     }
 
     /// <summary>

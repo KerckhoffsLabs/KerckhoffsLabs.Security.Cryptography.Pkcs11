@@ -13,10 +13,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 /// <c>ml_dsa_hash_sign</c> digests the input itself for every combined-hash mechanism except the bare
 /// <c>CKM_HASH_ML_DSA</c> (verified against <c>vendor/opencryptoki/usr/lib/common/mech_pqc.c</c>,
 /// which only treats the input as an already-hashed digest for that one mechanism). The same file's
-/// <c>ml_dsa_translate_sign_mech_param_from_hash</c> validates <c>ulParameterLen</c> against
-/// <c>sizeof(CK_HASH_SIGN_ADDITIONAL_CONTEXT)</c>, so a malformed block cannot pass silently — a real
-/// oracle for this library's marshalling, not just a unit assertion against our own understanding of
-/// the layout.
+/// <c>ml_dsa_get_digest_mech</c> validates <c>ulParameterLen</c> against
+/// <c>sizeof(CK_SIGN_ADDITIONAL_CONTEXT)</c> for every combined mechanism (deriving the hash from the
+/// mechanism type itself, not from a params field), so a malformed block cannot pass silently — a
+/// real oracle for this library's marshalling, not just a unit assertion against our own
+/// understanding of the layout.
 /// </summary>
 [Collection("OpenCryptoki")]
 public sealed class SignHashMlDsaTests_OpenCryptoki(OpenCryptokiBackendFixture backend)

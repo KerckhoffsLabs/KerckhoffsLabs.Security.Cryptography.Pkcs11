@@ -122,7 +122,9 @@ public sealed class Pkcs11MechanismMapTests
     {
         var mech = Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
-        Assert.IsType<CkmHashPqcSignParams>(mech.Parameters);
+        // The hash is encoded in the mechanism type itself (expectedCkm), so the parameter block is
+        // the plain CK_SIGN_ADDITIONAL_CONTEXT shape — no separate hash field (see MlDsaHashSign's remarks).
+        Assert.IsType<CkmPqcSignParams>(mech.Parameters);
         _ = expectedInnerHash; // documented mapping — verified by the absence of NotSupportedException above
     }
 
