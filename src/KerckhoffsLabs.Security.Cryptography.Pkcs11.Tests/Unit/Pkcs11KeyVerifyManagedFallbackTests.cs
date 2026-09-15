@@ -29,24 +29,42 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
 
     // === RSA =================================================================
 
-    public static TheoryData<CKM, HashAlgorithmName, RSASignaturePadding> RsaMechanisms() =>
-        new()
-        {
-            { CKM.CKM_SHA1_RSA_PKCS, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1 },
-            { CKM.CKM_SHA256_RSA_PKCS, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1 },
-            { CKM.CKM_SHA384_RSA_PKCS, HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1 },
-            { CKM.CKM_SHA512_RSA_PKCS, HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1 },
-            { CKM.CKM_SHA1_RSA_PKCS_PSS, HashAlgorithmName.SHA1, RSASignaturePadding.Pss },
-            { CKM.CKM_SHA256_RSA_PKCS_PSS, HashAlgorithmName.SHA256, RSASignaturePadding.Pss },
-            { CKM.CKM_SHA384_RSA_PKCS_PSS, HashAlgorithmName.SHA384, RSASignaturePadding.Pss },
-            { CKM.CKM_SHA512_RSA_PKCS_PSS, HashAlgorithmName.SHA512, RSASignaturePadding.Pss },
-        };
+    // xUnit1044: HashAlgorithmName/RSASignaturePadding aren't serializable, which breaks Test
+    // Explorer's per-row enumeration — carry only the (serializable) CKM and derive the hash/padding
+    // from it in the test body instead, since each mechanism determines them uniquely anyway.
+    // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
+#pragma warning disable CA1825
+    public static TheoryData<CKM> RsaMechanisms() =>
+    [
+        CKM.CKM_SHA1_RSA_PKCS,
+        CKM.CKM_SHA256_RSA_PKCS,
+        CKM.CKM_SHA384_RSA_PKCS,
+        CKM.CKM_SHA512_RSA_PKCS,
+        CKM.CKM_SHA1_RSA_PKCS_PSS,
+        CKM.CKM_SHA256_RSA_PKCS_PSS,
+        CKM.CKM_SHA384_RSA_PKCS_PSS,
+        CKM.CKM_SHA512_RSA_PKCS_PSS,
+    ];
+#pragma warning restore CA1825
+
+    private static (HashAlgorithmName Hash, RSASignaturePadding Padding) HashAndPaddingFor(CKM mechanismType) => mechanismType switch
+    {
+        CKM.CKM_SHA1_RSA_PKCS => (HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA256_RSA_PKCS => (HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA384_RSA_PKCS => (HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA512_RSA_PKCS => (HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1),
+        CKM.CKM_SHA1_RSA_PKCS_PSS => (HashAlgorithmName.SHA1, RSASignaturePadding.Pss),
+        CKM.CKM_SHA256_RSA_PKCS_PSS => (HashAlgorithmName.SHA256, RSASignaturePadding.Pss),
+        CKM.CKM_SHA384_RSA_PKCS_PSS => (HashAlgorithmName.SHA384, RSASignaturePadding.Pss),
+        CKM.CKM_SHA512_RSA_PKCS_PSS => (HashAlgorithmName.SHA512, RSASignaturePadding.Pss),
+        _ => throw new ArgumentOutOfRangeException(nameof(mechanismType)),
+    };
 
     [Theory]
     [MemberData(nameof(RsaMechanisms))]
-    public void Verify_PrivateOnlyRsaKey_SynthesizesPublicKeyAndVerifies(
-        CKM mechanismType, HashAlgorithmName hash, RSASignaturePadding padding)
+    public void Verify_PrivateOnlyRsaKey_SynthesizesPublicKeyAndVerifies(CKM mechanismType)
     {
+        var (hash, padding) = HashAndPaddingFor(mechanismType);
         using var rsa = RSA.Create(2048);
         RSAParameters pub = rsa.ExportParameters(includePrivateParameters: false);
         byte[] signature = rsa.SignData(Data, hash, padding);

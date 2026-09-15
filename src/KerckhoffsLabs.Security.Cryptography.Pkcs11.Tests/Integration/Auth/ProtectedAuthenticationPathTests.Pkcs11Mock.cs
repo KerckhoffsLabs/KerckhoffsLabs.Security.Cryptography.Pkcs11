@@ -99,10 +99,8 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     // === Pkcs11Library / Pkcs11Workspace (public) ===========================
 
     [Fact]
-    public void LibraryOpenWorkspace_NoPin_ReachesNativeCallAsNull()
-    {
+    public void LibraryOpenWorkspace_NoPin_ReachesNativeCallAsNull() =>
         AssertArgumentsBad(() => _backend.Library.OpenWorkspace(_backend.TokenLabel, CKU.CKU_USER));
-    }
 
     [Fact]
     public void WorkspaceSetPin_NoArgs_ReachesNativeCallAsNull()
