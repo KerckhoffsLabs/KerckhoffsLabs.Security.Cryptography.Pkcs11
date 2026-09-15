@@ -19,6 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// token does not enforce a per-mechanism minimum key size, so key material is sized freely.
 /// SHA-1 HMAC is insecure-by-default and runs only under <c>AllowInsecureScope</c>.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class HMACPkcs11Tests_Managed
 {
     private static byte[] H(string hex) => Convert.FromHexString(hex);

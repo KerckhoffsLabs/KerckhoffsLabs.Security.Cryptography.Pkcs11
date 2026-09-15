@@ -20,6 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <c>CKM_SHA_1</c> and every result is cross-checked against the BCL <see cref="SHA1"/> primitive
 /// (FIPS 180-4).
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class SHA1Pkcs11_Managed
 {
     public static bool Supported => true;

@@ -19,6 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// CKM_DSA_SHA*, raw CKM_DSA r‖s), tampering is rejected, exported public material is cross-checked
 /// against the BCL, and parameter export/import follow the adapter's non-extractable contract.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class DSAPkcs11Tests_Managed
 {
     // macOS's BCL (DSASecurityTransforms) can't generate a 2048-bit DSA key — DSA.Create(2048)

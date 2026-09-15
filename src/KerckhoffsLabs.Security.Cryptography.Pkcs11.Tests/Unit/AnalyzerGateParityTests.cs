@@ -41,7 +41,7 @@ public sealed class AnalyzerGateParityTests
     {
         using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1) { AllowInsecure = false };
         MethodInfo guard = typeof(Pkcs11Session)
-            .GetMethod("GuardMechanism", BindingFlags.NonPublic | BindingFlags.Instance)
+            .GetMethod("GuardMechanism", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new InvalidOperationException("Pkcs11Session.GuardMechanism not found — did it move?");
 
         var gated = new HashSet<CKM>();

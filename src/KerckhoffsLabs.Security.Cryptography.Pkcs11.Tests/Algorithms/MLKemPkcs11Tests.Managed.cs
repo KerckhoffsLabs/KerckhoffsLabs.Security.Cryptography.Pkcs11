@@ -19,6 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// (FIPS 203). Crypto cases are gated on <see cref="MLKem.IsSupported"/>; argument/ctor cases that throw
 /// before any native call stay <c>[Fact]</c>.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class MLKemPkcs11Tests_Managed
 {
     private static MLKemAlgorithm BclAlgorithm(CkpMlKem p) => p switch

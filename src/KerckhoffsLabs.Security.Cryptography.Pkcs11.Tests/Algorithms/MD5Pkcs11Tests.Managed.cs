@@ -18,6 +18,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <see cref="MD5"/> primitive (RFC 1321). MD5 is always supported by the BCL, so the
 /// <see cref="Supported"/> gate is harmless but kept for symmetry with the other digest adapters.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class MD5Pkcs11_Managed
 {
     public static bool Supported => true;

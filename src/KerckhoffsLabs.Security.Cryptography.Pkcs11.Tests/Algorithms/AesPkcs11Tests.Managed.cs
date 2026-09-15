@@ -17,6 +17,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// an <c>AllowInsecureScope()</c>. The managed-key / streaming surface is <see cref="NotSupportedException"/>.
 /// (Backend sibling of <c>AesPkcs11Tests.SoftHsm2.cs</c>.)
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class AesPkcs11_Managed
 {
     private static readonly byte[] Key256 =

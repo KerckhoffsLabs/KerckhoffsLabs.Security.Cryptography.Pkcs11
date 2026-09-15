@@ -13,6 +13,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// (ciphertext‖tag) — the path that always runs in CI. Real crypto is cross-checked against the BCL
 /// <see cref="AesGcm"/> primitive. AES-GCM fixes the nonce at 12 bytes and allows 12–16 byte tags.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class AesGcmPkcs11Tests_Managed
 {
     // macOS BCL AesGcm requires a 16-byte tag (TagByteSizes is 16..16), so the 12-15 byte cases in

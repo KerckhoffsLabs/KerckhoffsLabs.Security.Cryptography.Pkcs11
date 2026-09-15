@@ -14,6 +14,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// AES-CCM and its rich behavioral tests skip. Real crypto is cross-checked against the BCL
 /// <see cref="AesCcm"/> primitive (independent NIST SP 800-38C reference).
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class AesCcmPkcs11Tests_Managed
 {
     // macOS BCL has no AES-CCM (AesCcm.IsSupported == false), so the managed token can't run

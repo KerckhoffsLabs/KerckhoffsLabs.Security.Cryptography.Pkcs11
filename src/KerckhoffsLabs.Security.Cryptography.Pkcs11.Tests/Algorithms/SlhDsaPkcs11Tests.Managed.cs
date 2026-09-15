@@ -19,6 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// Crypto cases are gated on <see cref="SlhDsa.IsSupported"/> (OS PQC support — OpenSSL 3.5+ / a
 /// recent Windows). SLH-DSA's fast (f) variants are preferred to keep signing time reasonable.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class SlhDsaPkcs11Tests_Managed
 {
 

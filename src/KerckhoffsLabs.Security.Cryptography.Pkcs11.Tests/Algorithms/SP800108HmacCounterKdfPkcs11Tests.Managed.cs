@@ -20,6 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// Argument, key-type, PRF-validation and dispose cases throw before any token call and run
 /// unconditionally; the derivations are gated on BCL KDF support.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class SP800108HmacCounterKdfPkcs11_Managed
 {
     public static bool Supported => true;

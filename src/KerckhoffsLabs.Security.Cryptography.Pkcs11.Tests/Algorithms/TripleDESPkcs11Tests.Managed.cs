@@ -20,6 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// secure-defaults gate is still in force: each cipher op must run inside <c>AllowInsecureScope()</c> and
 /// throws <see cref="InsecureOperationException"/> without it.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class TripleDESPkcs11Tests_Managed
 {
     // 24-byte three-key 3DES key with three distinct, non-weak DES subkeys, so the BCL TripleDES key

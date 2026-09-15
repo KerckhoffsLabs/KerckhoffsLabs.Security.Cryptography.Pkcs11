@@ -12,6 +12,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// (FIPS 202). The managed token does provide <c>CKM_SHA3_256</c>, so the only gate left is host BCL
 /// SHA-3 availability (OpenSSL 3.x / Windows 11+), expressed via <see cref="SHA3_256.IsSupported"/>.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class SHA3_256Pkcs11Tests_Managed
 {
 

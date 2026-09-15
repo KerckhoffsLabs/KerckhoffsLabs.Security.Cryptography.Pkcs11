@@ -20,6 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// The secure-defaults gate is still in force: each cipher op must run inside
 /// <c>AllowInsecureScope()</c> and throws <see cref="InsecureOperationException"/> without it.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class DESPkcs11Tests_Managed
 {
     // Classic NBS DES test key (0x0123456789ABCDEF) — not weak/semi-weak, so the BCL DES key setter

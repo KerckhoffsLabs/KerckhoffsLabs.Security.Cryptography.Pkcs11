@@ -20,6 +20,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// PQC support — OpenSSL 3.5+ or a recent Windows); construction / argument-validation cases that throw
 /// before any native call stay <c>[Fact]</c>.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class MLDsaPkcs11Tests_Managed
 {
     private static MLDsaAlgorithm MapAlgorithm(CkpMlDsa parameterSet) => parameterSet switch

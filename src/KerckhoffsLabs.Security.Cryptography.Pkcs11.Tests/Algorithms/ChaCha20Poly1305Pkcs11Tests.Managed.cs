@@ -14,6 +14,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// primitive (RFC 8439). ChaCha20-Poly1305 fixes the key at 32 bytes, the nonce at 12, and the tag
 /// at 16. The crypto cases are gated on platform support.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
 {
     private static byte[] H(string hex) => Convert.FromHexString(hex);

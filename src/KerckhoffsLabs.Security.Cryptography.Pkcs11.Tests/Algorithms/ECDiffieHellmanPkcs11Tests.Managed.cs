@@ -16,6 +16,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// SoftHSM test set without needing SoftHSM. Crypto cases are gated on named-curve support;
 /// construction / argument-validation cases that throw before any native call stay <see cref="FactAttribute"/>.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class ECDiffieHellmanPkcs11Tests_Managed
 {
     // The BCL must be able to create an ECDH instance on the curves these tests use. This is true on

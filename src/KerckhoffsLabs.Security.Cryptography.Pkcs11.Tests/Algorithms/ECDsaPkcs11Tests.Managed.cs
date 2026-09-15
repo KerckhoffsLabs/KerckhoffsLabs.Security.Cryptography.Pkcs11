@@ -22,6 +22,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// This exercises the same external behaviour as SoftHSM while driving the adapter's degraded path.
 /// ECDsa is always available on supported platforms, so the crypto cases are plain [Fact]/[Theory].
 /// </remarks>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class ECDsaPkcs11Tests_Managed
 {
     // Curve under test -> (library Pkcs11ECCurve to generate, curve-matched hash, expected exported OID value).

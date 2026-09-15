@@ -22,6 +22,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// token supports OAEP-SHA1/SHA256, so those KATs run here — including decrypting a BCL-produced
 /// ciphertext and verifying a token-produced signature in the BCL from the exported public key.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class RSAPkcs11Tests_Managed
 {
     private static void WithRsa(Action<Pkcs11Workspace, RSAPkcs11> body)

@@ -11,6 +11,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// the FIPS 180-4 known-answer vector. SHA-384 is universally supported, but the crypto cases carry a
 /// harmless <see cref="Supported"/> gate for symmetry with the SHA-3 adapters.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class SHA384Pkcs11_Managed
 {
     public static bool Supported => true;

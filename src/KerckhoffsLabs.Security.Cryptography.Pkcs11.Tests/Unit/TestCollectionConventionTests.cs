@@ -104,6 +104,45 @@ public sealed class TestCollectionConventionTests
     }
 
     /// <summary>
+    /// A class named for the in-process managed fake joins no backend collection — <c>ManagedSoftToken</c>
+    /// loads no native module and holds no static state, so nothing serializes it — but must say so
+    /// explicitly. Neither of the two rules above catches this: the opt-out rule is scoped to
+    /// <c>Integration/</c> and the <c>_Managed</c> classes mostly live under <c>Algorithms/</c>, and the
+    /// backend-suffix rule only has entries for the backends that require a collection.
+    /// </summary>
+    [Fact]
+    public void EveryManagedNamedTestClass_OptsOutOfABackendCollection()
+    {
+        var offenders = new List<string>();
+
+        foreach (Type type in TestClasses().Where(t => t.Name.EndsWith("_Managed", StringComparison.Ordinal)))
+        {
+            string? collection = CollectionOf(type);
+            var optOut = type.GetCustomAttribute<NoBackendCollectionAttribute>();
+
+            if (collection is not null)
+            {
+                offenders.Add(
+                    $"{type.FullName}: named for the in-process managed fake but joins " +
+                    $"[Collection(\"{collection}\")]. It drives no native module, so it must carry " +
+                    "[NoBackendCollection(reason)] instead.");
+            }
+            else if (optOut is null)
+            {
+                offenders.Add(
+                    $"{type.FullName}: named for the in-process managed fake but has no " +
+                    "[NoBackendCollection(reason)]. State why it needs no backend collection.");
+            }
+            else if (string.IsNullOrWhiteSpace(optOut.Reason))
+            {
+                offenders.Add($"{type.FullName}: [NoBackendCollection] with an empty reason.");
+            }
+        }
+
+        AssertNoOffenders(offenders);
+    }
+
+    /// <summary>
     /// A class that injects a collection fixture must be in a collection that supplies it. xUnit
     /// reports the mismatch at run time as an unresolved constructor parameter, but only for the
     /// classes that happen to execute; this reports it for all of them, always.

@@ -11,6 +11,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <see cref="SHA256"/> primitive (FIPS 180-4). SHA-256 is always supported, so the
 /// <see cref="Supported"/> gate is harmless but kept for symmetry with the SHA-3 adapters.
 /// </summary>
+[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
+                     "the token holds no static state, so this is safe alongside every backend collection.")]
 public sealed class SHA256Pkcs11_Managed
 {
     public static bool Supported => true;
