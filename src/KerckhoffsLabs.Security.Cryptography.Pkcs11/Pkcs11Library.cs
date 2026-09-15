@@ -430,6 +430,39 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
+    /// Opens an authenticated workspace against the slot whose token label matches
+    /// <paramref name="slotLabel"/>, logging in via the token's own pinpad rather than an
+    /// application-supplied PIN. For tokens advertising <see cref="TokenFlags.ProtectedAuthenticationPath"/>
+    /// — the PIN is entered on the device itself, and PKCS#11 signals this to the token by calling
+    /// <c>C_Login</c> with <c>pPin = NULL_PTR</c>. Calling this on a token without that flag typically
+    /// fails with <see cref="CKR.CKR_ARGUMENTS_BAD"/> or <see cref="CKR.CKR_PIN_INCORRECT"/>.
+    /// </summary>
+    /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
+    /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
+    /// <param name="userType">The PKCS#11 user type to log in as.</param>
+    /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
+    public Pkcs11Workspace OpenWorkspace(string slotLabel, CKU userType)
+    {
+        ArgumentNullException.ThrowIfNull(slotLabel);
+
+        Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
+        var session = matched.OpenSession();
+        try
+        {
+            session.Login(userType);
+            return new Pkcs11Workspace(this, matched, session);
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Opens a workspace against the slot whose token label matches <paramref name="slotLabel"/>
     /// <em>without</em> logging in. For tokens that do not require authentication — the token's
     /// <c>CKF_LOGIN_REQUIRED</c> flag is clear (e.g. a software token's public crypto services) —

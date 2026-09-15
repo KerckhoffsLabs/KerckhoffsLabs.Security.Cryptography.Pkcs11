@@ -736,6 +736,20 @@ public sealed class Pkcs11Workspace : IDisposable
     }
 
     /// <summary>
+    /// Changes the logged-in user's PIN via the token's own pinpad, for tokens advertising
+    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Both the old and new PIN are entered on
+    /// the device; PKCS#11 signals this by calling <c>C_SetPIN</c> with both PIN pointers
+    /// <c>NULL_PTR</c>.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">The token rejected the change.</exception>
+    public void SetPin()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _session.SetPin();
+    }
+
+    /// <summary>
     /// Initializes the normal user's PIN via <c>C_InitPIN</c>. Requires a session authenticated as
     /// the Security Officer (SO).
     /// </summary>
@@ -748,6 +762,20 @@ public sealed class Pkcs11Workspace : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(userPin);
         _session.InitPin(userPin);
+    }
+
+    /// <summary>
+    /// Initializes the normal user's PIN via the token's own pinpad, for tokens advertising
+    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Requires a session authenticated as the
+    /// Security Officer (SO); PKCS#11 signals on-device entry by calling <c>C_InitPIN</c> with
+    /// <c>pPin = NULL_PTR</c>.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
+    public void InitPin()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _session.InitPin();
     }
 
     /// <summary>

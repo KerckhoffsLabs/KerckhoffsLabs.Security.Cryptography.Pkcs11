@@ -322,6 +322,22 @@ internal sealed class Pkcs11Session : IDisposable
         Pkcs11Exception.ThrowIfError(rv, OpInitPIN);
     }
 
+    /// <summary>
+    /// Initializes the normal user's PIN via the token's own pinpad, for tokens advertising
+    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals this by calling
+    /// <c>C_InitPIN</c> with <c>pPin = NULL_PTR</c>, <c>ulPinLen = 0</c> — this overload passes an
+    /// empty span, which the interop layer marshals to a null pointer.
+    /// </summary>
+    public void InitPin()
+    {
+        using var _ = AcquireExclusive();
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "InitPin (protected authentication path)");
+
+        CKR rv = _pkcs11Library.C_InitPIN(_sessionId, default);
+        Pkcs11Exception.ThrowIfError(rv, OpInitPIN);
+    }
+
     // -----------------------------------------------------------------------
     // SetPin
     // -----------------------------------------------------------------------
@@ -341,6 +357,23 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin");
 
         CKR rv = _pkcs11Library.C_SetPIN(_sessionId, oldPin.Pin, newPin.Pin);
+        Pkcs11Exception.ThrowIfError(rv, OpSetPIN);
+    }
+
+    /// <summary>
+    /// Modifies the PIN via the token's own pinpad, for tokens advertising
+    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. Both the old and new PIN are entered on
+    /// the device; PKCS#11 signals this by calling <c>C_SetPIN</c> with <c>pOldPin</c> and
+    /// <c>pNewPin</c> both <c>NULL_PTR</c> — this overload passes empty spans for both, which the
+    /// interop layer marshals to null pointers.
+    /// </summary>
+    public void SetPin()
+    {
+        using var _ = AcquireExclusive();
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "SetPin (protected authentication path)");
+
+        CKR rv = _pkcs11Library.C_SetPIN(_sessionId, default, default);
         Pkcs11Exception.ThrowIfError(rv, OpSetPIN);
     }
 
@@ -416,6 +449,28 @@ internal sealed class Pkcs11Session : IDisposable
             _logger.LogInformation("Logging as {UserType} into session {SessionId}", Pkcs11LogUtils.ToString(userType), _sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
+        Pkcs11Exception.ThrowIfError(rv, OpLogin);
+    }
+
+    /// <summary>
+    /// Logs a user into a token via the token's own pinpad, for tokens advertising
+    /// <see cref="TokenFlags.ProtectedAuthenticationPath"/>. PKCS#11 signals this by calling
+    /// <c>C_Login</c> with <c>pPin = NULL_PTR</c>, <c>ulPinLen = 0</c> — this overload passes an
+    /// empty span, which the interop layer marshals to a null pointer.
+    /// </summary>
+    /// <param name="userType">Type of user.</param>
+    public void Login(CKU userType)
+    {
+        using var _ = AcquireExclusive();
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Login (protected authentication path)");
+
+        if (_logger.IsEnabled(LogLevel.Information))
+            _logger.LogInformation(
+                "Logging as {UserType} into session {SessionId} via protected authentication path",
+                Pkcs11LogUtils.ToString(userType), _sessionId);
+
+        CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
         Pkcs11Exception.ThrowIfError(rv, OpLogin);
     }
 

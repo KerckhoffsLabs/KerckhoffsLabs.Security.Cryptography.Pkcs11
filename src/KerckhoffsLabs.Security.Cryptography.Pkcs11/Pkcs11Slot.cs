@@ -176,6 +176,40 @@ public sealed class Pkcs11Slot
     }
 
     /// <summary>
+    /// Initializes the token in this slot with the Security Officer PIN entered on the token's own
+    /// pinpad, for tokens advertising <see cref="TokenFlags.ProtectedAuthenticationPath"/>. After
+    /// this call the token is in its factory state — any prior keys, certificates, or user PIN are
+    /// destroyed. PKCS#11 signals on-device PIN entry by calling <c>C_InitToken</c> with
+    /// <c>pPin = NULL_PTR</c>.
+    /// </summary>
+    /// <param name="label">Token label. Encoded as UTF-8; must encode to 32
+    /// bytes or fewer. PKCS#11 pads the label with ASCII spaces (0x20) to fill
+    /// the on-token 32-byte field; it must NOT be null-terminated.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="label"/>
+    /// encodes to more than 32 bytes of UTF-8.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying
+    /// <c>C_InitToken</c> call.</exception>
+    public void InitToken(string label)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+
+        Log.SlotTrace(_logger, (ulong)_slotId, "InitToken (protected authentication path)");
+
+        byte[] labelBytes = Encoding.UTF8.GetBytes(label);
+        if (labelBytes.Length > 32)
+            throw new ArgumentException(
+                $"Token label must encode to 32 UTF-8 bytes or fewer (got {labelBytes.Length}).",
+                nameof(label));
+        byte[] tokenLabel = new byte[32];
+        Array.Fill(tokenLabel, (byte)0x20);
+        Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
+
+        CKR rv = _pkcs11Library.C_InitToken(_slotId, default, tokenLabel);
+        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
+    }
+
+    /// <summary>
     /// Opens a session between an application and a token in a particular slot.
     /// </summary>
     /// <param name="readWrite">
