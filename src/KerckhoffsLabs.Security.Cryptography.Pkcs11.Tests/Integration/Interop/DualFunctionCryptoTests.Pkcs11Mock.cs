@@ -49,7 +49,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -65,7 +65,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -91,7 +91,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -117,7 +117,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -149,7 +149,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

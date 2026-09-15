@@ -36,7 +36,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -62,7 +62,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -88,7 +88,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -114,7 +114,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -137,7 +137,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

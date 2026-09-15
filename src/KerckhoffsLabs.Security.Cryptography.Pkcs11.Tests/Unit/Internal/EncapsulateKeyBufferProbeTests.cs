@@ -61,7 +61,7 @@ public sealed class EncapsulateKeyBufferProbeTests
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -116,7 +116,7 @@ public sealed class EncapsulateKeyBufferProbeTests
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -138,7 +138,7 @@ public sealed class EncapsulateKeyBufferProbeTests
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

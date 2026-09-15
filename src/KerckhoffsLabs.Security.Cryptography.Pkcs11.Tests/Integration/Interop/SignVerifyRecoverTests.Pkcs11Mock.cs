@@ -80,7 +80,7 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

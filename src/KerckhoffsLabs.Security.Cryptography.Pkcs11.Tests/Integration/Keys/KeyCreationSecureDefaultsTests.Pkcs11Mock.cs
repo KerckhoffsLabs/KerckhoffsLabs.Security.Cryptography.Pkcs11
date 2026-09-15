@@ -98,7 +98,7 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     {
         var session = TestKeys.OpenLoggedInSession(_backend);
         try { body(session); }
-        finally { session.Logout(); session.CloseSession(); }
+        finally { session.Logout(); session.Dispose(); }
     }
 
     private static List<ObjectAttribute> SecretKeyTemplate(ObjectAttribute insecure) =>

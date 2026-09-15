@@ -30,7 +30,7 @@ internal static class VerifyRsaPkcsTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

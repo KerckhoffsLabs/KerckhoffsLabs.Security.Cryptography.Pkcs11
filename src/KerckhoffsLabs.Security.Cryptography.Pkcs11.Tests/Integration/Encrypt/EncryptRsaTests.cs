@@ -45,7 +45,7 @@ internal static class EncryptRsaTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

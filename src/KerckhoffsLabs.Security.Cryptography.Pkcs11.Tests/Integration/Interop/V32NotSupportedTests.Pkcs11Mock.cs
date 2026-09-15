@@ -45,7 +45,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -65,7 +65,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -85,7 +85,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -105,7 +105,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -125,7 +125,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -142,7 +142,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -162,7 +162,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -180,7 +180,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -197,7 +197,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

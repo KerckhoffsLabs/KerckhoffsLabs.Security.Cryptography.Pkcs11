@@ -42,7 +42,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -58,7 +58,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -79,7 +79,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 

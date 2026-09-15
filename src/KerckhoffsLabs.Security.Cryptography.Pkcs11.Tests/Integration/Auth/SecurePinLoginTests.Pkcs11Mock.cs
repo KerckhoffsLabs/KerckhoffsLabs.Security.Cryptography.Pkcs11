@@ -23,7 +23,7 @@ internal static class SecurePinLoginTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -38,7 +38,7 @@ internal static class SecurePinLoginTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

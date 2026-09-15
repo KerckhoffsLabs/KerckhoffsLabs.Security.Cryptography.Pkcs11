@@ -57,7 +57,7 @@ public sealed class SessionParallelTests(MockBackendFixture f)
                     finally
                     {
                         session.Logout();
-                        session.CloseSession();
+                        session.Dispose();
                     }
                 }
                 catch (Exception ex)

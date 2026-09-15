@@ -53,7 +53,7 @@ internal static class ObjectLifecycleTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

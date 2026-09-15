@@ -46,7 +46,7 @@ internal static class DecryptRsaTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

@@ -15,7 +15,7 @@ internal static class RandomTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -31,7 +31,7 @@ internal static class RandomTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -51,7 +51,7 @@ internal static class RandomTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

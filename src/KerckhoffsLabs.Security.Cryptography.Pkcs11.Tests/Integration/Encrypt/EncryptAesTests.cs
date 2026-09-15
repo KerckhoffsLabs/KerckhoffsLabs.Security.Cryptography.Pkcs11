@@ -55,7 +55,7 @@ internal static class EncryptAesTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -88,7 +88,7 @@ internal static class EncryptAesTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -116,7 +116,7 @@ internal static class EncryptAesTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 
@@ -149,7 +149,7 @@ internal static class EncryptAesTestCases
         }
         finally
         {
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

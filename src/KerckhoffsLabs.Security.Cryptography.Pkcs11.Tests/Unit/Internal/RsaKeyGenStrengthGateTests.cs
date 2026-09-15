@@ -47,7 +47,7 @@ public sealed class RsaKeyGenStrengthGateTests
             Assert.Throws<InsecureOperationException>(() => GenerateRsa(session, 1024));
             Assert.Equal(0, fake.Calls); // refused before reaching the token
         }
-        finally { session.CloseSession(); }
+        finally { session.Dispose(); }
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class RsaKeyGenStrengthGateTests
             GenerateRsa(session, 1024);
             Assert.Equal(1, fake.Calls);
         }
-        finally { session.CloseSession(); }
+        finally { session.Dispose(); }
     }
 
     [Fact]
@@ -73,6 +73,6 @@ public sealed class RsaKeyGenStrengthGateTests
             GenerateRsa(session, 2048);
             Assert.Equal(1, fake.Calls);
         }
-        finally { session.CloseSession(); }
+        finally { session.Dispose(); }
     }
 }

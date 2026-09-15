@@ -27,7 +27,7 @@ internal static class VerifyEdDsaTestCases
             session.DestroyObject(priv);
             session.DestroyObject(pub);
             TestKeys.LogoutIfRequired(backend, session);
-            session.CloseSession();
+            session.Dispose();
         }
     }
 }

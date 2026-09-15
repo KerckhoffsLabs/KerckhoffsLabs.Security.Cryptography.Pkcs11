@@ -283,25 +283,6 @@ internal sealed class Pkcs11Session : IDisposable
         _sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, (NativeCULong)sessionId);
     }
 
-    /// <summary>
-    /// Closes a session between an application and a token
-    /// </summary>
-    public void CloseSession()
-    {
-        using var _ = AcquireExclusive();
-
-        if (_sessionHandle is null || _sessionHandle.IsInvalid)
-            return;
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "CloseSession");
-
-        Log.ClosingSession(_logger, (ulong)_sessionId);
-
-        // SafeHandle.Dispose() calls ReleaseHandle, which invokes C_CloseSession on the library.
-        _sessionHandle.Dispose();
-        _sessionHandle = null!;
-    }
-
     // -----------------------------------------------------------------------
     // InitPin — SecurePin overload (canonical) + obsolete legacy overloads
     // -----------------------------------------------------------------------

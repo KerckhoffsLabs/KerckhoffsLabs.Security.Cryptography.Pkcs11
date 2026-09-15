@@ -55,7 +55,6 @@ public sealed class Pkcs11SessionTests
             ("GetSessionInfo", s => s.GetSessionInfo()),
             ("GetOperationState", s => s.GetOperationState()),
             ("Logout", s => s.Logout()),
-            ("CloseSession", s => s.CloseSession()),
             ("CancelOperations", s => s.CancelOperations(0)),
             ("CancelFunction", s => s.CancelFunction()),
             ("GetFunctionStatus", s => s.GetFunctionStatus()),
