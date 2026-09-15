@@ -2842,22 +2842,32 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
         Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
 
-        rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
+        bool finalized = false;
+        try
+        {
+            rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
+            Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
 
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
-        byte[] digest = new byte[(int)digestLen];
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+            byte[] digest = new byte[(int)digestLen];
+            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
+            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+            finalized = true;
 
-        mechanism.AbsorbOutput(mechParams);
+            mechanism.AbsorbOutput(mechParams);
 
-        if (digest.Length != (int)(digestLen))
-            Array.Resize(ref digest, (int)(digestLen));
+            if (digest.Length != (int)(digestLen))
+                Array.Resize(ref digest, (int)(digestLen));
 
-        return digest;
+            return digest;
+        }
+        finally
+        {
+            if (!finalized)
+                TryCancelOperation(CKF.CKF_DIGEST, "DigestKey");
+        }
     }
 
     /// <summary>
@@ -3678,21 +3688,33 @@ internal sealed class Pkcs11Session : IDisposable
             sig);
         Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
 
-        byte[] buffer = new byte[bufferLength];
-        int read;
-        while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
+        bool finalized = false;
+        try
         {
-            rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer.AsSpan(0, read));
-            Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureUpdate);
+            byte[] buffer = new byte[bufferLength];
+            int read;
+            while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer.AsSpan(0, read));
+                Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureUpdate);
+            }
+
+            rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
+            // C_VerifySignatureFinal always finalizes — whether the signature was valid, invalid, or
+            // the call failed with any other CKR — the verify operation is consumed.
+            finalized = true;
+            bool verified = IsVerified(rv, OpVerifySignatureFinal);
+
+            // Absorbed before returning, so the scope that owns the parameter block is still alive.
+            mechanism.AbsorbOutput(mechParams);
+
+            return verified;
         }
-
-        rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
-        bool verified = IsVerified(rv, OpVerifySignatureFinal);
-
-        // Absorbed before returning, so the scope that owns the parameter block is still alive.
-        mechanism.AbsorbOutput(mechParams);
-
-        return verified;
+        finally
+        {
+            if (!finalized)
+                TryCancelOperation(CKF.CKF_VERIFY, "VerifySignature");
+        }
     }
 
     // === Validation flags ==================================================

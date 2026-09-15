@@ -4,8 +4,8 @@ _Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist d
 
 ## Summary
 
-- Total items: 160 (52 resolved, 108 open)
-- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (65 open, 22 resolved) | Low: 41 (30 open, 11 resolved)
+- Total items: 160 (53 resolved, 107 open)
+- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (64 open, 23 resolved) | Low: 41 (30 open, 11 resolved)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — seven of them now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked workspaces/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). Only BL-065 (`Verify` throwing instead of returning `false`) remains open. The set is BL-063 – BL-071.
@@ -1053,13 +1053,13 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Breaks public API?** No
 - **Raised by:** .NET Engineer B
 
-### [BL-114] The multi-part unwind-cancel is applied inconsistently — `VerifySignature(Stream)` and `DigestKey` have none
+### [BL-114] ✅ RESOLVED — The multi-part unwind-cancel was applied inconsistently — `VerifySignature(Stream)` and `DigestKey` had none
 - **Area:** PKCS#11 Conformance
 - **Severity:** Medium
 - **Effort:** S
-- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs:3671-3713` (`VerifySignature` streaming) and `:2686-2721` (`DigestKey`); the pattern they omit is at `:1936-1940`, `:2200-2204`, `:2461-2465`, `:2855-2859`, `:3030-3039`
-- **Problem:** `VerifySignature(Stream)` runs `C_VerifySignatureInit` and then loops `C_VerifySignatureUpdate` with no `try`/`finally`, so a mid-stream throw — from `inputStream.Read` or an `Update` error — leaves the verify-signature operation active, wedging the next unrelated operation on the session with `CKR_OPERATION_ACTIVE`. `DigestKey` has the same shape across `C_DigestInit` → `C_DigestKey` → `C_DigestFinal`. Every sibling multi-part method carries a `finalized` flag plus `TryCancelOperation`, so this is a gap in an otherwise uniform pattern, and one of the two is on the new v3.2 path.
-- **Proposed action:** Wrap both bodies in the same `bool finalized` + `finally { if (!finalized) TryCancelOperation(...); }` shape, using `CKF_VERIFY` and `CKF_DIGEST` respectively.
+- **Location:** `src/KerckhoffsLabs.Security.Cryptography.Pkcs11/Internal/Pkcs11Session.cs` (`VerifySignature(Stream)`, `DigestKey`); pattern matched from the sibling streaming methods (`Verify`, `Digest(Stream)`, `Encrypt`/`Decrypt`)
+- **Problem:** `VerifySignature(Stream)` ran `C_VerifySignatureInit` and then looped `C_VerifySignatureUpdate` with no `try`/`finally`, so a mid-stream throw — from `inputStream.Read` or an `Update` error — left the verify-signature operation active, wedging the next unrelated operation on the session with `CKR_OPERATION_ACTIVE`. `DigestKey` had the same shape across `C_DigestInit` → `C_DigestKey` → `C_DigestFinal`. Every sibling multi-part method carries a `finalized` flag plus `TryCancelOperation`, so this was a gap in an otherwise uniform pattern, and one of the two is on the v3.2 path.
+- **Resolution:** Both bodies now use the same `bool finalized` + `finally { if (!finalized) TryCancelOperation(...); }` shape as every sibling multi-part method, using `CKF_VERIFY` for `VerifySignature(Stream)` and `CKF_DIGEST` for `DigestKey`. Added hermetic coverage in `Pkcs11SessionStreamTests.cs` extending the existing `StreamFake` (the same fake the sibling `Encrypt_Stream_UpdateError_ThrowsAndCancels` test already uses) with `C_DigestKey`/`C_VerifySignatureInit`/`C_VerifySignatureUpdate`/`C_VerifySignatureFinal` overrides, asserting a forced mid-operation error both throws and calls `C_SessionCancel`.
 - **Breaks public API?** No
 - **Raised by:** PKCS#11 Specialist B
 - **Spec / References:** PKCS#11 v3.2 §5.6.11 (`C_SessionCancel`), §5.16.10–11. Extends BL-049, which names only streaming `DecryptVerify`

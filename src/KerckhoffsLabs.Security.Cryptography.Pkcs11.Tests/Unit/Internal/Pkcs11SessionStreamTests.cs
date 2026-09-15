@@ -33,6 +33,10 @@ public sealed class Pkcs11SessionStreamTests
         public CKR VerifyFinalRv = CKR.CKR_OK;
         public byte[] RecoveredData = [0xAB, 0xCD, 0xEF];
         public CKR VerifyRecoverRv = CKR.CKR_OK;
+        public CKR DigestKeyRv = CKR.CKR_OK;
+        public CKR VerifySignatureInitRv = CKR.CKR_OK;
+        public CKR VerifySignatureUpdateRv = CKR.CKR_OK;
+        public CKR VerifySignatureFinalRv = CKR.CKR_OK;
 
         public int UpdateCalls { get; private set; }
         public bool Canceled { get; private set; }
@@ -95,6 +99,12 @@ public sealed class Pkcs11SessionStreamTests
             dataLen = (NativeCULong)RecoveredData.Length;
             return VerifyRecoverRv;
         }
+
+        public override CKR C_DigestKey(NativeCULong session, NativeCULong key) => DigestKeyRv;
+
+        public override CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature) => VerifySignatureInitRv;
+        public override CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return VerifySignatureUpdateRv; }
+        public override CKR C_VerifySignatureFinal(NativeCULong session) => VerifySignatureFinalRv;
 
         public override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) { Canceled = true; return CKR.CKR_OK; }
     }
@@ -327,5 +337,93 @@ public sealed class Pkcs11SessionStreamTests
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out _));
+    }
+
+    // === DigestKey ===========================================================
+
+    [Fact]
+    public void DigestKey_Ok_ReturnsDigest()
+    {
+        var s = NewSession(new StreamFake { DigestOutput = [0xAA, 0xBB] });
+        var mech = new Mechanism(CKM.CKM_SHA256);
+
+        Assert.Equal(new byte[] { 0xAA, 0xBB }, s.DigestKey(mech, new ObjectHandle(1)));
+    }
+
+    // A C_DigestKey error must still leave the digest operation cleanly canceled rather than active
+    // on the session, matching every sibling multi-part method's finalized/TryCancelOperation shape.
+    [Fact]
+    public void DigestKey_Error_ThrowsAndCancels()
+    {
+        var fake = new StreamFake { DigestKeyRv = CKR.CKR_KEY_HANDLE_INVALID };
+        var s = NewSession(fake);
+        var mech = new Mechanism(CKM.CKM_SHA256);
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.DigestKey(mech, new ObjectHandle(1)));
+        Assert.True(fake.Canceled); // unwind cancels the active operation
+    }
+
+    // === VerifySignature (stream) ============================================
+
+    [Fact]
+    public void VerifySignature_Stream_Ok_SetsValidTrue()
+    {
+        var s = NewSession(new StreamFake { VerifySignatureFinalRv = CKR.CKR_OK });
+        var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
+        using var input = new MemoryStream([1, 2, 3]);
+
+        bool verified = s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input);
+
+        Assert.True(verified);
+    }
+
+    [Fact]
+    public void VerifySignature_Stream_SignatureInvalid_SetsValidFalse()
+    {
+        var s = NewSession(new StreamFake { VerifySignatureFinalRv = CKR.CKR_SIGNATURE_INVALID });
+        var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
+        using var input = new MemoryStream([1, 2, 3]);
+
+        bool verified = s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input);
+
+        Assert.False(verified);
+    }
+
+    [Fact]
+    public void VerifySignature_Stream_OtherError_Throws()
+    {
+        var s = NewSession(new StreamFake { VerifySignatureFinalRv = CKR.CKR_DEVICE_ERROR });
+        var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
+        using var input = new MemoryStream([1, 2, 3]);
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input));
+    }
+
+    [Fact]
+    public void VerifySignature_Stream_MultiChunk_FeedsEveryChunk()
+    {
+        var fake = new StreamFake();
+        var s = NewSession(fake);
+        var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
+        using var input = new MemoryStream([1, 2, 3, 4, 5]);
+
+        s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input, bufferLength: 2);
+
+        Assert.Equal(3, fake.UpdateCalls);
+    }
+
+    // A C_VerifySignatureUpdate error must still leave the verify-signature operation cleanly
+    // canceled rather than active on the session (which would otherwise wedge the next unrelated
+    // operation with CKR_OPERATION_ACTIVE), matching every sibling multi-part method.
+    [Fact]
+    public void VerifySignature_Stream_UpdateError_ThrowsAndCancels()
+    {
+        var fake = new StreamFake { VerifySignatureUpdateRv = CKR.CKR_DEVICE_ERROR };
+        var s = NewSession(fake);
+        var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
+        using var input = new MemoryStream([1, 2, 3]);
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input));
+        Assert.True(fake.Canceled); // unwind cancels the active operation
     }
 }
