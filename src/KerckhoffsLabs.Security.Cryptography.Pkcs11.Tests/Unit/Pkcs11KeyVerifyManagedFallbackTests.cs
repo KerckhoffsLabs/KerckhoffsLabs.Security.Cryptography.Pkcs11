@@ -29,17 +29,18 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
 
     // === RSA =================================================================
 
-    public static IEnumerable<object[]> RsaMechanisms()
-    {
-        yield return [CKM.CKM_SHA1_RSA_PKCS, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1];
-        yield return [CKM.CKM_SHA256_RSA_PKCS, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1];
-        yield return [CKM.CKM_SHA384_RSA_PKCS, HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1];
-        yield return [CKM.CKM_SHA512_RSA_PKCS, HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1];
-        yield return [CKM.CKM_SHA1_RSA_PKCS_PSS, HashAlgorithmName.SHA1, RSASignaturePadding.Pss];
-        yield return [CKM.CKM_SHA256_RSA_PKCS_PSS, HashAlgorithmName.SHA256, RSASignaturePadding.Pss];
-        yield return [CKM.CKM_SHA384_RSA_PKCS_PSS, HashAlgorithmName.SHA384, RSASignaturePadding.Pss];
-        yield return [CKM.CKM_SHA512_RSA_PKCS_PSS, HashAlgorithmName.SHA512, RSASignaturePadding.Pss];
-    }
+    public static TheoryData<CKM, HashAlgorithmName, RSASignaturePadding> RsaMechanisms() =>
+        new()
+        {
+            { CKM.CKM_SHA1_RSA_PKCS, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1 },
+            { CKM.CKM_SHA256_RSA_PKCS, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1 },
+            { CKM.CKM_SHA384_RSA_PKCS, HashAlgorithmName.SHA384, RSASignaturePadding.Pkcs1 },
+            { CKM.CKM_SHA512_RSA_PKCS, HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1 },
+            { CKM.CKM_SHA1_RSA_PKCS_PSS, HashAlgorithmName.SHA1, RSASignaturePadding.Pss },
+            { CKM.CKM_SHA256_RSA_PKCS_PSS, HashAlgorithmName.SHA256, RSASignaturePadding.Pss },
+            { CKM.CKM_SHA384_RSA_PKCS_PSS, HashAlgorithmName.SHA384, RSASignaturePadding.Pss },
+            { CKM.CKM_SHA512_RSA_PKCS_PSS, HashAlgorithmName.SHA512, RSASignaturePadding.Pss },
+        };
 
     [Theory]
     [MemberData(nameof(RsaMechanisms))]
