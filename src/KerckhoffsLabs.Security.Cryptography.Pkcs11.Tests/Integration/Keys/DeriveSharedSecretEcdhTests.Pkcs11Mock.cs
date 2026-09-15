@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
 /// Hermetic coverage for <see cref="Pkcs11Workspace.DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/>'s
-/// <c>CKD_NULL</c> secure-defaults gate (BACKLOG BL-108): <c>CKD_NULL</c> applies no KDF to the raw
+/// <c>CKD_NULL</c> secure-defaults gate: <c>CKD_NULL</c> applies no KDF to the raw
 /// ECDH shared secret, so the derived AES key becomes the raw x-coordinate (or a token-chosen
 /// truncation of it) — NIST SP 800-56A forbids this. The gate runs before any native call (before
 /// even constructing <c>CkmEcdh1DeriveParams</c>), so it's exercised here with a dummy handle and

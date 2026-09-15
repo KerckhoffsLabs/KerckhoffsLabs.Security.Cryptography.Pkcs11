@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 
 /// <summary>
 /// Real-backend coverage for <see cref="CkmHkdfParams"/> (<c>CKM_HKDF_DERIVE</c>, PKCS#11 v3.0):
-/// previously exercised only at the unit-marshalling level (BACKLOG BL-126). Cross-checks the
+/// previously exercised only at the unit-marshalling level. Cross-checks the
 /// token's derived output byte-for-byte against the independent BCL <see cref="HKDF"/>
 /// implementation (RFC 5869) — a genuine known-answer test, not just "the call didn't throw". NSS's
 /// softoken and Kryoptic both implement all three <c>SaltType</c> variants and both the combined
