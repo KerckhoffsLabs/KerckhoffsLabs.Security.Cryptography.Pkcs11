@@ -14,6 +14,12 @@ public sealed class DSAPkcs11Tests_Kryoptic(KryopticBackendFixture f)
     [InlineData("SHA512")]
     public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => DSAPkcs11TestCases.Assert_SignVerifyData_AcrossHashAlgorithms_RoundTrips(_backend, hashName);
 
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(string hashName) => DSAPkcs11TestCases.Assert_TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(_backend, hashName);
+
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ctor_NonDsaKey_Throws() => DSAPkcs11TestCases.Assert_Ctor_NonDsaKey_Throws(_backend);
 

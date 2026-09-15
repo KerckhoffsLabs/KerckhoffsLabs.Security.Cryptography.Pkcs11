@@ -103,6 +103,74 @@ public sealed class DSAPkcs11Tests_Managed
         }
     });
 
+    // === Sign / verify via the Span-based combined path (TrySignData / VerifyData override) ==========
+    //
+    // DSA.SignData(byte[], HashAlgorithmName) is a NON-virtual convenience overload with no Span-input
+    // counterpart returning byte[] (verified by reflection) — it never calls TrySignData. Calling it
+    // with byte[] arguments, as every test above does, exercises the base class's generic hash +
+    // CreateSignature(hash) path, not DSAPkcs11's own TrySignData/VerifyData override/SignDataInternal/
+    // HashData. The only way to reach those is TrySignData(...) directly and VerifyData with arguments
+    // typed as ReadOnlySpan<byte> (forcing the compiler to pick the virtual span overload instead of the
+    // non-virtual byte[] one). ManagedSoftToken doesn't advertise the combined CKM_DSA_SHA* mechanisms
+    // (see C_GetMechanismList), so SupportsMechanism is always false here and these always take the
+    // "hash managed-side, sign/verify raw CKM_DSA" fallback branch — the SupportsMechanism==true branch
+    // needs a real backend that advertises CKM_DSA_SHA*.
+
+    [Theory(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    [InlineData("SHA1")]
+    [InlineData("SHA256")]
+    [InlineData("SHA384")]
+    [InlineData("SHA512")]
+    public void TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _, workspace) =>
+    {
+        var hash = new HashAlgorithmName(hashName);
+        byte[] data = Encoding.UTF8.GetBytes($"span-based dsa round trip over {hashName}");
+        Span<byte> destination = new byte[256];
+
+        using (workspace.AllowInsecureScope())
+        {
+            Assert.True(dsa.TrySignData(data, destination, hash, out int bytesWritten));
+            byte[] sig = destination[..bytesWritten].ToArray();
+
+            Assert.True(dsa.VerifyData((ReadOnlySpan<byte>)data, (ReadOnlySpan<byte>)sig, hash));
+
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData((ReadOnlySpan<byte>)tampered, (ReadOnlySpan<byte>)sig, hash));
+
+            byte[] badSig = [.. sig];
+            badSig[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData((ReadOnlySpan<byte>)data, (ReadOnlySpan<byte>)badSig, hash));
+        }
+    });
+
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void TrySignData_DestinationTooSmall_ReturnsFalse() => WithDsa((dsa, _, workspace) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("destination too small");
+        using (workspace.AllowInsecureScope())
+        {
+            bool ok = dsa.TrySignData(data, Span<byte>.Empty, HashAlgorithmName.SHA256, out int bytesWritten);
+            Assert.False(ok);
+            Assert.Equal(0, bytesWritten);
+        }
+    });
+
+    // Pkcs11MechanismMap.DsaSign accepts SHA224 (CKM_DSA_SHA224 exists in the spec), but this
+    // adapter's own managed-fallback HashData helper has no SHA224 case — a real gap, surfaced only
+    // via the fallback branch a backend without CKM_DSA_SHA224 support takes.
+    [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
+    public void TrySignData_Sha224_ThrowsNotSupported_ViaManagedFallbackHasher() => WithDsa((dsa, _, workspace) =>
+    {
+        byte[] data = Encoding.UTF8.GetBytes("sha224 is not in HashData's switch");
+        using (workspace.AllowInsecureScope())
+        {
+            var ex = Assert.Throws<NotSupportedException>(
+                () => dsa.TrySignData(data, new byte[256], new HashAlgorithmName("SHA224"), out int unused));
+            Assert.Contains("SHA224", ex.Message);
+        }
+    });
+
     // === Secure-defaults gate: DSA is insecure as an algorithm, so every sign/verify is refused =====
     // unless AllowInsecure (GuardMechanism gates all CKM_DSA* — raw and combined, every hash).
 
@@ -271,5 +339,70 @@ public sealed class DSAPkcs11Tests_Managed
         using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_DEVICE_ERROR, null));
         using var dsa = new DSAPkcs11(key);
         Assert.Equal(0, dsa.KeySize);
+    }
+
+    // The non-fatal sibling of the test above: CKA_PRIME reads back with the CannotBeRead sentinel
+    // (CKR_ATTRIBUTE_SENSITIVE) instead of throwing. Same fallback-to-default outcome, different branch
+    // (the `attrs[0].CannotBeRead` check in TryReadKeySizeBits, not its surrounding try/catch).
+    [Fact]
+    public void KeySize_PrimeAttributeSensitive_StaysAtBclDefault()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+        using var dsa = new DSAPkcs11(key);
+        Assert.Equal(0, dsa.KeySize);
+    }
+
+    // A real token can't be coaxed into reporting its domain parameters / public value as sensitive on
+    // a well-formed DSA key object, so this drives ExportParameters' fallback error path via a fake.
+    [Fact]
+    public void ExportParameters_AttributesSensitive_ThrowsPkcs11Exception()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
+        using var dsa = new DSAPkcs11(key);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(includePrivateParameters: false));
+        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+    }
+
+    // === LeftPad edge cases (G / Y shorter or longer than P after trimming leading zeros) ============
+    //
+    // A randomly-generated real key's G/Y only occasionally need padding (roughly 1-in-256 chance of a
+    // leading zero byte for a 2048-bit prime), so these drive both branches deterministically with
+    // fabricated attribute values a real backend would never actually return.
+
+    [Fact]
+    public void ExportParameters_BaseAndValueShorterThanPrime_AreLeftPadded()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, ca => ca switch
+        {
+            CKA.CKA_PRIME => (CKR.CKR_OK, (byte[])[0x01, 0x02, 0x03, 0x04]),
+            CKA.CKA_SUBPRIME => (CKR.CKR_OK, (byte[])[0x05, 0x06]),
+            CKA.CKA_BASE => (CKR.CKR_OK, (byte[])[0x07]),
+            CKA.CKA_VALUE => (CKR.CKR_OK, (byte[])[0x08]),
+            _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+        });
+        using var dsa = new DSAPkcs11(key);
+
+        DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
+        Assert.Equal(new byte[] { 0x00, 0x00, 0x00, 0x07 }, pub.G);
+        Assert.Equal(new byte[] { 0x00, 0x00, 0x00, 0x08 }, pub.Y);
+    }
+
+    [Fact]
+    public void ExportParameters_BaseAndValueLongerThanPrime_AreTruncatedFromTheLeft()
+    {
+        using var key = FakeKeys.Create(CKK.CKK_DSA, ca => ca switch
+        {
+            CKA.CKA_PRIME => (CKR.CKR_OK, (byte[])[0x01, 0x02]),
+            CKA.CKA_SUBPRIME => (CKR.CKR_OK, (byte[])[0x05]),
+            CKA.CKA_BASE => (CKR.CKR_OK, (byte[])[0x01, 0x02, 0x03]),
+            CKA.CKA_VALUE => (CKR.CKR_OK, (byte[])[0x04, 0x05, 0x06]),
+            _ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null),
+        });
+        using var dsa = new DSAPkcs11(key);
+
+        DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
+        Assert.Equal(new byte[] { 0x02, 0x03 }, pub.G);
+        Assert.Equal(new byte[] { 0x05, 0x06 }, pub.Y);
     }
 }

@@ -158,6 +158,14 @@ public sealed class DSAPkcs11 : DSA
     // No SHA-1-specific gate here: DSA is insecure as an algorithm (FIPS 186-5 disallows it), so every
     // CKM_DSA* mechanism — raw and combined, all hashes — is gated at the session layer (GuardMechanism)
     // and requires Pkcs11Workspace.AllowInsecure. A per-hash guard would be redundant.
+    //
+    // SHA-224 is deliberately absent: Pkcs11MechanismMap.DsaSign accepts it (CKM_DSA_SHA224 is a real
+    // PKCS#11 mechanism), but .NET has no SHA-224 implementation through any API — no concrete type,
+    // and IncrementalHash.CreateHash(new HashAlgorithmName("SHA224")) throws CryptographicException
+    // ("not a known hash algorithm"). If the token doesn't support the combined CKM_DSA_SHA224
+    // mechanism itself, this managed-side fallback has no way to compute the hash, so SHA-224 falls
+    // through to the NotSupportedException below rather than a hand-rolled SHA-224 (same compression
+    // function as SHA-256, different IV, truncated output) that this adapter has no business owning.
     private static byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data) =>
         hashAlgorithm.Name switch
         {

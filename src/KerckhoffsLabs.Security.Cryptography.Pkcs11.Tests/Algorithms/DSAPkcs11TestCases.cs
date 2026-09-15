@@ -147,6 +147,35 @@ internal static class DSAPkcs11TestCases
             Assert.False(dsa.VerifyData(tampered, sig, hash));
         });
 
+    // DSA.SignData(byte[], HashAlgorithmName) is a NON-virtual convenience overload with no Span-input
+    // counterpart returning byte[] — it never calls TrySignData, and passing byte[] arguments to
+    // VerifyData picks the non-virtual byte[] overload over the virtual span one DSAPkcs11 overrides.
+    // Assert_SignVerifyData_AcrossHashAlgorithms_RoundTrips above (byte[] arguments throughout) never
+    // exercises DSAPkcs11's own TrySignData / VerifyData override / SignDataInternal — only the base
+    // class's generic-hash-then-CreateSignature(hash) path. This drives the actual combined-mechanism
+    // code this adapter exists for, via TrySignData directly and VerifyData with arguments explicitly
+    // typed as ReadOnlySpan<byte> so the compiler picks the virtual overload.
+    internal static void Assert_TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(IPkcs11Backend backend, string hashName) =>
+        WithDsa(backend, dsa =>
+        {
+            var hash = new HashAlgorithmName(hashName);
+            byte[] data = Encoding.UTF8.GetBytes($"span-based dsa round trip over {hashName}");
+            Span<byte> destination = new byte[256];
+
+            Assert.True(dsa.TrySignData(data, destination, hash, out int bytesWritten));
+            byte[] sig = destination[..bytesWritten].ToArray();
+
+            Assert.True(dsa.VerifyData((ReadOnlySpan<byte>)data, (ReadOnlySpan<byte>)sig, hash));
+
+            byte[] tampered = [.. data];
+            tampered[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData((ReadOnlySpan<byte>)tampered, (ReadOnlySpan<byte>)sig, hash));
+
+            byte[] badSig = [.. sig];
+            badSig[0] ^= 0xFF;
+            Assert.False(dsa.VerifyData((ReadOnlySpan<byte>)data, (ReadOnlySpan<byte>)badSig, hash));
+        });
+
     internal static void Assert_SignData_VerifiesUnderBclWithExportedPublicKey(IPkcs11Backend backend)
     {
         if (!DsaSupported)
