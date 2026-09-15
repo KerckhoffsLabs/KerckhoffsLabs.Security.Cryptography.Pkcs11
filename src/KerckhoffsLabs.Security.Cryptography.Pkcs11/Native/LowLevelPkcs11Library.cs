@@ -186,6 +186,17 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
         // use the blittable layout. NativeCULong wraps a single primitive so the two sizes agree, but
         // this guard should measure the layout that actually crosses the boundary.
         int actual = Unsafe.SizeOf<NativeCULong>();
+        ThrowIfWidthMismatch(actual, expected);
+    }
+
+    /// <summary>
+    /// The actual throw condition behind <see cref="EnsureCkUlongWidthMatchesPlatform"/>, split out
+    /// as a pure function so the mismatch branch is testable without an actually-mismatched build:
+    /// a correctly-built test run can never observe <paramref name="actual"/> != <paramref name="expected"/>
+    /// from <see cref="EnsureCkUlongWidthMatchesPlatform"/> itself.
+    /// </summary>
+    internal static void ThrowIfWidthMismatch(int actual, int expected)
+    {
         if (actual != expected)
         {
             throw new PlatformNotSupportedException(
