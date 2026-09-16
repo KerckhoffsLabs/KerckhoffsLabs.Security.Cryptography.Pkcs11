@@ -32,10 +32,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// the same limitation that permanently gates <c>HkdfTests.Nss.cs</c>'s read-back cases), so these
 /// cases are gated on <see cref="NssBackendFixture.ExtractableDeriveAvailable"/> rather than plain
 /// <see cref="NssBackendFixture.NssAvailable"/>.
+///
+/// The <c>*_MatchesBclViaSignProbe</c> cases below prove the same thing without ever reading the
+/// derived key back: derive it non-extractable (granting <c>CKA_SIGN</c> instead of
+/// <c>CKA_EXTRACTABLE</c>), then HMAC-sign a fixed probe message with it on the token and compare
+/// against the MAC the independent BCL reference bytes would produce for that same message. A
+/// mismatch in even one derived bit changes the MAC with overwhelming probability, so this is a
+/// genuine cross-check, not merely "the call didn't throw" — and unlike the read-back cases above,
+/// it runs on every backend that derives at all, including NSS. Mirrors how
+/// <c>DeriveSharedSecretEcdhTests</c> proves ECDH-derived AES keys match via a cross-party AES-GCM
+/// round trip instead of reading the raw key.
 /// </summary>
 internal static class IkeDeriveTestCases
 {
     private const int Sha256Size = 32;
+    private static readonly byte[] ProbeMessage = "ike-derive-sign-probe"u8.ToArray();
 
     private static void RequireIke(IPkcs11Backend backend, CKM mechanism)
     {
@@ -72,6 +83,29 @@ internal static class IkeDeriveTestCases
         derived.Destroy();
         return value;
     }
+
+    private static void RequireHmacProbe(IPkcs11Backend backend)
+    {
+        if (!backend.Supports(CKM.CKM_SHA256_HMAC))
+            Assert.Skip("Backend does not advertise CKM_SHA256_HMAC.");
+    }
+
+    // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
+    // triggers the AllowInsecure gate) and immediately signs ProbeMessage with it, never reading
+    // CKA_VALUE at all.
+    private static byte[] DeriveAndProbe(Pkcs11Key baseKey, Mechanism mechanism, int outputLength)
+    {
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(outputLength).Sign().Build();
+
+        using Pkcs11Key derived = baseKey.Derive(mechanism, template);
+        byte[] mac = derived.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), ProbeMessage);
+        derived.Destroy();
+        return mac;
+    }
+
+    private static byte[] ExpectedProbeMac(byte[] expectedDerivedBytes) =>
+        HMACSHA256.HashData(expectedDerivedBytes, ProbeMessage);
 
     internal static void Assert_IkePrf_MatchesReference(IPkcs11Backend backend)
     {
@@ -201,6 +235,126 @@ internal static class IkeDeriveTestCases
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, outputLength);
             Assert.Equal(expected, actual);
+        }
+        finally { DestroyByLabel(workspace, label); }
+    }
+
+    // === Sign-probe variants: prove the same derivations without ever reading CKA_VALUE ==========
+
+    internal static void Assert_IkePrf_MatchesBclViaSignProbe(IPkcs11Backend backend)
+    {
+        RequireIke(backend, CKM.CKM_IKE_PRF_DERIVE);
+        RequireHmacProbe(backend);
+        using var workspace = backend.OpenWorkspace();
+        byte[] inKey = RandomNumberGenerator.GetBytes(32);
+        byte[] ni = RandomNumberGenerator.GetBytes(16);
+        byte[] nr = RandomNumberGenerator.GetBytes(16);
+
+        byte[] niNr = [.. ni, .. nr];
+        byte[] expectedDerived = HMACSHA256.HashData(inKey, niNr);
+        byte[] expectedMac = ExpectedProbeMac(expectedDerived);
+
+        string label = $"ike-prf-probe-{Guid.NewGuid():N}";
+        try
+        {
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
+                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
+
+            byte[] actualMac = DeriveAndProbe(baseKey, mechanism, Sha256Size);
+            Assert.Equal(expectedMac, actualMac);
+        }
+        finally { DestroyByLabel(workspace, label); }
+    }
+
+    internal static void Assert_Ike1Prf_MatchesBclViaSignProbe(IPkcs11Backend backend)
+    {
+        RequireIke(backend, CKM.CKM_IKE1_PRF_DERIVE);
+        RequireHmacProbe(backend);
+        using var workspace = backend.OpenWorkspace();
+        byte[] inKey = RandomNumberGenerator.GetBytes(32);
+        byte[] gxy = RandomNumberGenerator.GetBytes(24);
+        byte[] ckyI = RandomNumberGenerator.GetBytes(8);
+        byte[] ckyR = RandomNumberGenerator.GetBytes(8);
+        const byte keyNumber = 0;
+
+        byte[] gxyCkyICkyRNum = [.. gxy, .. ckyI, .. ckyR, keyNumber];
+        byte[] expectedDerived = HMACSHA256.HashData(inKey, gxyCkyICkyRNum);
+        byte[] expectedMac = ExpectedProbeMac(expectedDerived);
+
+        string baseLabel = $"ike1-prf-probe-base-{Guid.NewGuid():N}";
+        string gxyLabel = $"ike1-prf-probe-gxy-{Guid.NewGuid():N}";
+        try
+        {
+            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true);
+            using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
+            var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
+                new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: false,
+                    gxyKey.PrivateHandle.ObjectId, prevKey: 0, ckyI, ckyR, keyNumber));
+
+            byte[] actualMac = DeriveAndProbe(baseKey, mechanism, Sha256Size);
+            Assert.Equal(expectedMac, actualMac);
+        }
+        finally
+        {
+            DestroyByLabel(workspace, baseLabel);
+            DestroyByLabel(workspace, gxyLabel);
+        }
+    }
+
+    internal static void Assert_Ike1ExtendedDerive_MatchesBclViaSignProbe(IPkcs11Backend backend)
+    {
+        RequireIke(backend, CKM.CKM_IKE1_EXTENDED_DERIVE);
+        RequireHmacProbe(backend);
+        using var workspace = backend.OpenWorkspace();
+        byte[] inKey = RandomNumberGenerator.GetBytes(32);
+        byte[] extraData = RandomNumberGenerator.GetBytes(20);
+
+        byte[] k1 = HMACSHA256.HashData(inKey, extraData);
+        byte[] k1ExtraData = [.. k1, .. extraData];
+        byte[] k2 = HMACSHA256.HashData(inKey, k1ExtraData);
+        byte[] expectedDerived = [.. k1, .. k2];
+        byte[] expectedMac = ExpectedProbeMac(expectedDerived);
+
+        string label = $"ike1-ext-probe-{Guid.NewGuid():N}";
+        try
+        {
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
+                new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: false, keygxy: 0, extraData));
+
+            byte[] actualMac = DeriveAndProbe(baseKey, mechanism, expectedDerived.Length);
+            Assert.Equal(expectedMac, actualMac);
+        }
+        finally { DestroyByLabel(workspace, label); }
+    }
+
+    internal static void Assert_Ike2PrfPlusDerive_MatchesBclViaSignProbe(IPkcs11Backend backend)
+    {
+        RequireIke(backend, CKM.CKM_IKE2_PRF_PLUS_DERIVE);
+        RequireHmacProbe(backend);
+        using var workspace = backend.OpenWorkspace();
+        byte[] inKey = RandomNumberGenerator.GetBytes(32);
+        byte[] seedData = RandomNumberGenerator.GetBytes(24);
+        const int outputLength = Sha256Size + 16;
+
+        byte[] seedData1 = [.. seedData, 0x01];
+        byte[] t1 = HMACSHA256.HashData(inKey, seedData1);
+        byte[] t1SeedData2 = [.. t1, .. seedData, 0x02];
+        byte[] t2 = HMACSHA256.HashData(inKey, t1SeedData2);
+        byte[] fullOutput = [.. t1, .. t2];
+        byte[] expectedDerived = fullOutput[..outputLength];
+        byte[] expectedMac = ExpectedProbeMac(expectedDerived);
+
+        string label = $"ike2-prfplus-probe-{Guid.NewGuid():N}";
+        try
+        {
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
+                new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, seedData));
+
+            byte[] actualMac = DeriveAndProbe(baseKey, mechanism, outputLength);
+            Assert.Equal(expectedMac, actualMac);
         }
         finally { DestroyByLabel(workspace, label); }
     }
