@@ -31,4 +31,7 @@ public sealed class SP800108HmacCounterKdfPkcs11Tests_Kryoptic(KryopticBackendFi
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void DeriveKey_OnToken_ReturnsNonExtractableKey() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_OnToken_ReturnsNonExtractableKey(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void DeriveKey_MatchesBclViaSignProbe() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_MatchesBclViaSignProbe(_backend);
 }

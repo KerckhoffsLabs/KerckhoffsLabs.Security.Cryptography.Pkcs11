@@ -16,6 +16,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// cases run on any backend (they throw before any token call); the known-answer derivations require
 /// the token to implement <c>CKM_SP800_108_COUNTER_KDF</c> and skip where it does not (neither SoftHSM
 /// nor opencryptoki do today — ready for a capable HSM).
+///
+/// The <c>*_MatchesBclViaSignProbe</c> case proves the same thing without reading the derived key
+/// back: derive it non-extractable (via <see cref="SP800108HmacCounterKdfPkcs11.DeriveKey(ReadOnlySpan{byte}, ReadOnlySpan{byte}, ObjectTemplate)"/>,
+/// granting <c>CKA_SIGN</c> instead of <c>CKA_EXTRACTABLE</c>), HMAC-sign a fixed probe message with
+/// it on the token, and compare against the MAC the independent BCL-derived bytes would produce for
+/// that same message. Same technique <c>HkdfTestCases</c>/<c>IkeDeriveTestCases</c> use.
 /// </summary>
 internal static class SP800108HmacCounterKdfPkcs11TestCases
 {
@@ -23,6 +29,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         Convert.FromHexString("000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F");
     private static readonly byte[] Label = Encoding.UTF8.GetBytes("kdf-label");
     private static readonly byte[] Context = Encoding.UTF8.GetBytes("kdf-context");
+    private static readonly byte[] ProbeMessage = "sp800-108-sign-probe"u8.ToArray();
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
@@ -150,6 +157,41 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
             kdf.DeriveKey(Label, Context, actual);
 
             Assert.Equal(expected, actual);
+        });
+
+    private static void RequireHmacProbe(IPkcs11Backend backend)
+    {
+        if (!backend.Supports(CKM.CKM_SHA256_HMAC))
+            Assert.Skip("Backend does not advertise CKM_SHA256_HMAC.");
+    }
+
+    // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
+    // needs AllowInsecure for this part) and immediately signs ProbeMessage with it, never reading
+    // CKA_VALUE.
+    private static byte[] DeriveAndProbe(SP800108HmacCounterKdfPkcs11 kdf, int outputLength)
+    {
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+            .ValueLen(outputLength).Sign().Build();
+
+        using Pkcs11Key derived = kdf.DeriveKey(Label, Context, template);
+        byte[] mac = derived.Sign(new Mechanism(CKM.CKM_SHA256_HMAC), ProbeMessage);
+        derived.Destroy();
+        return mac;
+    }
+
+    internal static void Assert_DeriveKey_MatchesBclViaSignProbe(IPkcs11Backend backend) =>
+        WithImportedKdf(backend, (_, kdf) =>
+        {
+            RequireKdf(backend);
+            RequireHmacProbe(backend);
+            const int length = 40; // spans two HMAC-SHA256 PRF blocks (32 bytes each)
+            byte[] expectedDerived = SP800108HmacCounterKdf.DeriveBytes(
+                KeyBytes, HashAlgorithmName.SHA256, Label, Context, length);
+            byte[] expectedMac = HMACSHA256.HashData(expectedDerived, ProbeMessage);
+
+            byte[] actualMac = DeriveAndProbe(kdf, length);
+
+            Assert.Equal(expectedMac, actualMac);
         });
 
     internal static void Assert_DeriveKey_OnToken_ReturnsNonExtractableKey(IPkcs11Backend backend) =>

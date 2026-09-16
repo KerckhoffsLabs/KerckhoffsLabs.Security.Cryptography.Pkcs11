@@ -33,4 +33,10 @@ public sealed class SP800108HmacCounterKdfPkcs11Tests_Nss(NssBackendFixture back
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void DeriveKey_OnToken_ReturnsNonExtractableKey() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_OnToken_ReturnsNonExtractableKey(_backend);
+
+    // Sign-probe variant: proves the same derivation without reading CKA_VALUE, so it runs on NSS
+    // today instead of waiting on ExtractableDeriveAvailable.
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void DeriveKey_MatchesBclViaSignProbe() => SP800108HmacCounterKdfPkcs11TestCases.Assert_DeriveKey_MatchesBclViaSignProbe(_backend);
 }
