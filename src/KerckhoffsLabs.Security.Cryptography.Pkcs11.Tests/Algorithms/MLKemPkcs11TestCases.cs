@@ -20,6 +20,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 internal static class MLKemPkcs11TestCases
 {
+    // CA1825 false-positives on the xUnit TheoryData collection expression (it is not a zero-length
+    // array); the collection expression is the form IDE0028 and the repo .editorconfig prefer.
+#pragma warning disable CA1825
+    internal static TheoryData<CkpMlKem> ParameterSets =>
+    [
+        CkpMlKem.CKP_ML_KEM_512,
+        CkpMlKem.CKP_ML_KEM_768,
+        CkpMlKem.CKP_ML_KEM_1024,
+    ];
+#pragma warning restore CA1825
+
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
@@ -34,11 +45,11 @@ internal static class MLKemPkcs11TestCases
     }
 
     // Generates an ML-KEM key pair for the parameter set, wraps it, runs the body, then cleans up.
-    // Skips where the backend cannot operate ML-KEM.
+    // Skips where the backend cannot operate ML-KEM, or where its CKM_ML_KEM_KEY_PAIR_GEN key-size
+    // range does not cover this specific parameter set (e.g. NSS only added ML-KEM-512 in 3.129).
     private static void WithMlKem(IPkcs11Backend backend, CkpMlKem parameterSet, Action<Pkcs11Workspace, MLKemPkcs11> body)
     {
-        if (!backend.SupportsMlKem)
-            Assert.Skip("Backend cannot operate ML-KEM (CKM_ML_KEM unavailable).");
+        backend.RequireMlKemParameterSet(BclAlgorithm(parameterSet).EncapsulationKeySizeInBytes);
 
         using var workspace = OpenWorkspace(backend);
         string label = $"mlkem-{Guid.NewGuid():N}";
@@ -82,8 +93,8 @@ internal static class MLKemPkcs11TestCases
         finally { DestroyByLabel(workspace, label); }
     }
 
-    internal static void Assert_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend) =>
-        WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (workspace, mlkem) =>
+    internal static void Assert_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend, CkpMlKem parameterSet) =>
+        WithMlKem(backend, parameterSet, (workspace, mlkem) =>
         {
             // Reading the shared secret is the extract-and-destroy path, gated by the secure-defaults policy.
             workspace.AllowInsecure = true;
@@ -133,8 +144,8 @@ internal static class MLKemPkcs11TestCases
             // Without AllowInsecure, extracting the shared secret is refused.
             Assert.Throws<InsecureOperationException>(() => mlkem.Encapsulate(out byte[] _, out byte[] _)));
 
-    internal static void Assert_ExportEncapsulationKey_ReturnsStandardEncoding(IPkcs11Backend backend) =>
-        WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>
+    internal static void Assert_ExportEncapsulationKey_ReturnsStandardEncoding(IPkcs11Backend backend, CkpMlKem parameterSet) =>
+        WithMlKem(backend, parameterSet, (_, mlkem) =>
         {
             byte[] ek = mlkem.ExportEncapsulationKey();
             Assert.Equal(mlkem.Algorithm.EncapsulationKeySizeInBytes, ek.Length);
