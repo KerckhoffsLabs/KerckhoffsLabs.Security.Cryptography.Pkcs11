@@ -355,7 +355,7 @@ jobs:
           NSSDIR="$RUNNER_TEMP/nss/runtimes/linux-x64/native/nss"
           if [ ! -f "$NSSDIR/libsoftokn3.so" ]; then
             sudo apt-get install -y ninja-build libnspr4-dev patchelf clang
-            python3 -m pip install --user 'gyp-next==0.22.2'
+            python3 -m pip install --user --only-binary :all: 'gyp-next==0.22.2'
             PATH="$HOME/.local/bin:$PATH" bash build/build-nss.sh "$RUNNER_TEMP/nss"
           fi
           {
