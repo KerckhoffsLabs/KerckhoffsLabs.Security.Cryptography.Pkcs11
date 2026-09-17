@@ -90,15 +90,26 @@ if [[ -n "${NSS_WITH_NSPR:-}" ]]; then
   NSPR_ARGS=(--with-nspr="${NSS_WITH_NSPR}")
 fi
 
+build_status=0
 (
   cd "${SRC_DIR}"
   ./build.sh --opt "${NSPR_ARGS[@]}" --disable-tests
-) >&2
+) >&2 || build_status=$?
+
+# NSS 3.129 (Bug 2065423) generates nss.pc/nss-config as build.sh's last step by reading
+# nspr.pc out of the dist tree; that file is only ever placed there when NSS builds NSPR
+# itself in-tree, never for --system-nspr or --with-nspr, so that cosmetic step now fails
+# (exit 2) even on an otherwise-successful build. We don't consume nss.pc/nss-config, so
+# treat build.sh's exit status as advisory and fall through to the real signal: whether it
+# actually produced libsoftokn3.so.
+if (( build_status != 0 )); then
+  echo "build.sh exited ${build_status} (see NSS 3.129 nss.pc/nspr.pc note above); checking for libsoftokn3.so anyway" >&2
+fi
 
 # build.sh writes to <nss>/../dist, i.e. vendor/dist.
 DIST_LIB_DIR="${REPO_ROOT}/vendor/dist/Release/lib"
 if [[ ! -f "${DIST_LIB_DIR}/libsoftokn3.so" ]]; then
-  echo "build succeeded but libsoftokn3.so not found under ${DIST_LIB_DIR}" >&2
+  echo "build failed (exit ${build_status}) and libsoftokn3.so not found under ${DIST_LIB_DIR}" >&2
   exit 1
 fi
 
