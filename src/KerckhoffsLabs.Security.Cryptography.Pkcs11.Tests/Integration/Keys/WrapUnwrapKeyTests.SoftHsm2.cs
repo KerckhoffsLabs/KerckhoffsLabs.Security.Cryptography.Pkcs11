@@ -8,7 +8,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 internal static class WrapUnwrapKeyTestCases
 {
-    internal static void Assert_AesKeyWrapPad_RoundTrip(IPkcs11Backend backend)
+    internal static void Assert_AesKeyWrapPad_RoundTrip(IPkcs11Backend backend) =>
+        Assert_AesKeyWrap_RoundTrip(backend, CKM.CKM_AES_KEY_WRAP_PAD);
+
+    internal static void Assert_AesKeyWrapPkcs7_RoundTrip(IPkcs11Backend backend) =>
+        Assert_AesKeyWrap_RoundTrip(backend, CKM.CKM_AES_KEY_WRAP_PKCS7);
+
+    private static void Assert_AesKeyWrap_RoundTrip(IPkcs11Backend backend, CKM wrapMechanism)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -42,7 +48,7 @@ internal static class WrapUnwrapKeyTestCases
                 byte[] plaintext = Encoding.UTF8.GetBytes("phase-4a wrap round-trip plaintext");
                 byte[] ciphertext = TestAesGcm.Encrypt(session, dataKey, iv, plaintext);
 
-                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+                var wrapMech = new Mechanism(wrapMechanism);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
                 Assert.NotEmpty(wrapped);
 

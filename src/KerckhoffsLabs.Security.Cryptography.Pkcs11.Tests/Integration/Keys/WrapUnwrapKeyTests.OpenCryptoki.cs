@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -10,6 +11,13 @@ public sealed class WrapUnwrapKeyTests_OpenCryptoki(OpenCryptokiBackendFixture b
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void AesKeyWrapPad_RoundTrip() => WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
+
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void AesKeyWrapPkcs7_RoundTrip()
+    {
+        _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PKCS7);
+        WrapUnwrapKeyTestCases.Assert_AesKeyWrapPkcs7_RoundTrip(_backend);
+    }
 
     // The secure-defaults unwrap cases (Unwrap_AppliesSecureDefaults /
     // Unwrap_ExplicitExtractable_RequiresAllowInsecure) are not ported here: opencryptoki's C_UnwrapKey

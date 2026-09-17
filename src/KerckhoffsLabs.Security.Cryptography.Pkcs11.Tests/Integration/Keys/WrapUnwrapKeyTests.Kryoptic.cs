@@ -6,7 +6,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// <summary>Cross-backend port of the SoftHSM2 key wrap/unwrap integration tests, run against Kryoptic.
 /// The shared <see cref="WrapUnwrapKeyTestCases"/> assertions use <see cref="CKM.CKM_AES_KEY_WRAP_PAD"/>
 /// unconditionally (no internal skip); Kryoptic 1.5.2 implements the modern NIST SP800-38F
-/// <see cref="CKM.CKM_AES_KEY_WRAP_KWP"/> but not the legacy PAD variant, so this wrapper gates on it.</summary>
+/// <see cref="CKM.CKM_AES_KEY_WRAP_KWP"/> but not the legacy PAD variant, so this wrapper gates on it.
+/// The latest Kryoptic commit (368008a, picked up after 1.5.2) adds <see cref="CKM.CKM_AES_KEY_WRAP_PKCS7"/>,
+/// covered separately below.</summary>
 [Collection("Kryoptic")]
 public sealed class WrapUnwrapKeyTests_Kryoptic(KryopticBackendFixture backend)
 {
@@ -14,11 +16,20 @@ public sealed class WrapUnwrapKeyTests_Kryoptic(KryopticBackendFixture backend)
 
     private void RequireAesKeyWrapPad() => _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PAD);
 
+    private void RequireAesKeyWrapPkcs7() => _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PKCS7);
+
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void AesKeyWrapPad_RoundTrip()
     {
         RequireAesKeyWrapPad();
         WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
+    }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void AesKeyWrapPkcs7_RoundTrip()
+    {
+        RequireAesKeyWrapPkcs7();
+        WrapUnwrapKeyTestCases.Assert_AesKeyWrapPkcs7_RoundTrip(_backend);
     }
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
