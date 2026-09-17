@@ -4,45 +4,46 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>Cross-backend port of the SoftHSM2 key wrap/unwrap integration tests, run against Kryoptic.
-/// The shared <see cref="WrapUnwrapKeyTestCases"/> assertions use <see cref="CKM.CKM_AES_KEY_WRAP_PAD"/>
-/// unconditionally (no internal skip); Kryoptic 1.5.2 implements the modern NIST SP800-38F
-/// <see cref="CKM.CKM_AES_KEY_WRAP_KWP"/> but not the legacy PAD variant, so this wrapper gates on it.
-/// The latest Kryoptic commit (368008a, picked up after 1.5.2) adds <see cref="CKM.CKM_AES_KEY_WRAP_PKCS7"/>,
-/// covered separately below.</summary>
+/// Each case runs across every <see cref="CKM"/> AES key-wrap variant and skips the ones Kryoptic
+/// doesn't advertise: Kryoptic implements <see cref="CKM.CKM_AES_KEY_WRAP"/>,
+/// <see cref="CKM.CKM_AES_KEY_WRAP_KWP"/> (NIST SP800-38F), and <see cref="CKM.CKM_AES_KEY_WRAP_PKCS7"/>
+/// (added in the commit range picked up after 1.5.2), but never the legacy
+/// <see cref="CKM.CKM_AES_KEY_WRAP_PAD"/>.</summary>
 [Collection("Kryoptic")]
 public sealed class WrapUnwrapKeyTests_Kryoptic(KryopticBackendFixture backend)
 {
     private readonly KryopticBackendFixture _backend = backend;
 
-    private void RequireAesKeyWrapPad() => _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PAD);
-
-    private void RequireAesKeyWrapPkcs7() => _backend.RequireMechanism(CKM.CKM_AES_KEY_WRAP_PKCS7);
-
-    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void AesKeyWrapPad_RoundTrip()
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void AesKeyWrap_RoundTrip(CKM wrapMechanism)
     {
-        RequireAesKeyWrapPad();
-        WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_AesKeyWrap_RoundTrip(_backend, wrapMechanism);
     }
 
-    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void AesKeyWrapPkcs7_RoundTrip()
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void Unwrap_AppliesSecureDefaults(CKM wrapMechanism)
     {
-        RequireAesKeyWrapPkcs7();
-        WrapUnwrapKeyTestCases.Assert_AesKeyWrapPkcs7_RoundTrip(_backend);
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism);
     }
 
-    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void Unwrap_AppliesSecureDefaults()
+    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void Unwrap_ExplicitExtractable_IsAllowed(CKM wrapMechanism)
     {
-        RequireAesKeyWrapPad();
-        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend);
-    }
-
-    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void Unwrap_ExplicitExtractable_IsAllowed()
-    {
-        RequireAesKeyWrapPad();
-        WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend);
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend, wrapMechanism);
     }
 }

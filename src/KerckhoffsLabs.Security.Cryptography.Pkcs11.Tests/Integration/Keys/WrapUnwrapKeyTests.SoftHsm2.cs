@@ -8,13 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 internal static class WrapUnwrapKeyTestCases
 {
-    internal static void Assert_AesKeyWrapPad_RoundTrip(IPkcs11Backend backend) =>
-        Assert_AesKeyWrap_RoundTrip(backend, CKM.CKM_AES_KEY_WRAP_PAD);
-
-    internal static void Assert_AesKeyWrapPkcs7_RoundTrip(IPkcs11Backend backend) =>
-        Assert_AesKeyWrap_RoundTrip(backend, CKM.CKM_AES_KEY_WRAP_PKCS7);
-
-    private static void Assert_AesKeyWrap_RoundTrip(IPkcs11Backend backend, CKM wrapMechanism)
+    internal static void Assert_AesKeyWrap_RoundTrip(IPkcs11Backend backend, CKM wrapMechanism)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -89,7 +83,7 @@ internal static class WrapUnwrapKeyTestCases
 
     // Sets up a logged-in session with a 256-bit KEK and an extractable AES data key wrapped under
     // it, runs <paramref name="body"/> with (session, kek, wrappedBytes), then tears everything down.
-    private static void WithWrappedAesKey(IPkcs11Backend backend, Action<Pkcs11Session, ObjectHandle, byte[]> body)
+    private static void WithWrappedAesKey(IPkcs11Backend backend, CKM wrapMechanism, Action<Pkcs11Session, ObjectHandle, byte[]> body)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -111,7 +105,7 @@ internal static class WrapUnwrapKeyTestCases
                 dataKey = session.GenerateKey(keyGenMech, dkTemplate);
             try
             {
-                var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+                var wrapMech = new Mechanism(wrapMechanism);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
                 body(session, kek, wrapped);
             }
@@ -130,16 +124,16 @@ internal static class WrapUnwrapKeyTestCases
 
     /// <summary>unwrapping without CKA_SENSITIVE / CKA_EXTRACTABLE must yield a sensitive,
     /// non-extractable key.</summary>
-    internal static void Assert_Unwrap_AppliesSecureDefaults(IPkcs11Backend backend)
+    internal static void Assert_Unwrap_AppliesSecureDefaults(IPkcs11Backend backend, CKM wrapMechanism)
     {
-        WithWrappedAesKey(backend, (session, kek, wrapped) =>
+        WithWrappedAesKey(backend, wrapMechanism, (session, kek, wrapped) =>
         {
             using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
             using var attrToken = new ObjectAttribute(CKA.CKA_TOKEN, false);
             // Deliberately omit CKA_SENSITIVE / CKA_EXTRACTABLE — the library must supply them.
             var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrToken };
-            var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+            var wrapMech = new Mechanism(wrapMechanism);
 
             ObjectHandle unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
             try
@@ -163,11 +157,11 @@ internal static class WrapUnwrapKeyTestCases
     /// a safe operation as a dangerous one — the value never leaves the token in the clear, which is
     /// what <c>CKA_SENSITIVE</c> governs and what the gate still refuses.
     /// </remarks>
-    internal static void Assert_Unwrap_ExplicitExtractable_IsAllowed(IPkcs11Backend backend)
+    internal static void Assert_Unwrap_ExplicitExtractable_IsAllowed(IPkcs11Backend backend, CKM wrapMechanism)
     {
-        WithWrappedAesKey(backend, (session, kek, wrapped) =>
+        WithWrappedAesKey(backend, wrapMechanism, (session, kek, wrapped) =>
         {
-            var wrapMech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
+            var wrapMech = new Mechanism(wrapMechanism);
 
             using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             using var k = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
@@ -192,12 +186,36 @@ public sealed class WrapUnwrapKeyTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
-    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void AesKeyWrapPad_RoundTrip() => WrapUnwrapKeyTestCases.Assert_AesKeyWrapPad_RoundTrip(_backend);
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void AesKeyWrap_RoundTrip(CKM wrapMechanism)
+    {
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_AesKeyWrap_RoundTrip(_backend, wrapMechanism);
+    }
 
-    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void Unwrap_AppliesSecureDefaults() => WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend);
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void Unwrap_AppliesSecureDefaults(CKM wrapMechanism)
+    {
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_AppliesSecureDefaults(_backend, wrapMechanism);
+    }
 
-    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void Unwrap_ExplicitExtractable_IsAllowed() => WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend);
+    [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData(CKM.CKM_AES_KEY_WRAP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PAD)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_KWP)]
+    [InlineData(CKM.CKM_AES_KEY_WRAP_PKCS7)]
+    public void Unwrap_ExplicitExtractable_IsAllowed(CKM wrapMechanism)
+    {
+        _backend.RequireMechanism(wrapMechanism);
+        WrapUnwrapKeyTestCases.Assert_Unwrap_ExplicitExtractable_IsAllowed(_backend, wrapMechanism);
+    }
 }
