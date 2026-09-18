@@ -16,13 +16,7 @@ public sealed class GenerateAesKeyTests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void GeneratedKey_HasNoWrapCapability() => GenerateAesKeyTestCases.Assert_GeneratedKey_HasNoWrapCapability(_backend);
 
-    // Kryoptic denies CKA_WRAP_TEMPLATE/CKA_UNWRAP_TEMPLATE outright at template-validation time
-    // (CKR_ATTRIBUTE_TYPE_INVALID) -- it doesn't just mishandle them, there's no equivalent call that
-    // would succeed. Upstream is already tracking this as a real feature, not a bug: issue
-    // https://github.com/latchset/kryoptic/issues/434 ("Implement template attributes"), with an open
-    // PR implementing it at https://github.com/latchset/kryoptic/pull/500. Flip this back on (and drop
-    // the comment) once that lands and a submodule bump picks it up.
-    public static bool SupportsWrapUnwrapTemplate => false;
+    public static bool SupportsWrapUnwrapTemplate => true;
 
     [Fact(SkipUnless = nameof(SupportsWrapUnwrapTemplate), Skip = "Requires " + nameof(SupportsWrapUnwrapTemplate))]
     public void GeneratesKeyEncryptionKey_WrapUnwrapOnly() => GenerateAesKeyTestCases.Assert_GeneratesKeyEncryptionKey_WrapUnwrapOnly(_backend);
