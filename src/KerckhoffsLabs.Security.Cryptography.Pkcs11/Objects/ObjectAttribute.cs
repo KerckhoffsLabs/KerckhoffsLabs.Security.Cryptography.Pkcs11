@@ -180,7 +180,7 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Creates a vendor-defined-id attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, List<ObjectAttribute> value)
+    public ObjectAttribute(ulong type, IReadOnlyList<ObjectAttribute> value)
     {
         ArgumentNullException.ThrowIfNull(value);
         int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
@@ -214,11 +214,11 @@ public sealed class ObjectAttribute : IDisposable
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, List<ObjectAttribute> value) : this((ulong)type, value) { }
+    public ObjectAttribute(CKA type, IReadOnlyList<ObjectAttribute> value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, List<ulong> value)
+    public ObjectAttribute(ulong type, IReadOnlyList<ulong> value)
     {
         ArgumentNullException.ThrowIfNull(value);
         int stride = UnmanagedMemory.NativeULongSize;
@@ -237,33 +237,30 @@ public sealed class ObjectAttribute : IDisposable
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, List<ulong> value) : this((ulong)type, value) { }
+    public ObjectAttribute(CKA type, IReadOnlyList<ulong> value) : this((ulong)type, value) { }
 
     /// <summary>Creates a vendor-defined-id attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, List<CKM> value)
+    public ObjectAttribute(ulong type, IReadOnlyList<CKM> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        // Reuse the List<ulong> path after converting each CKM.
-        List<ulong> ulist = new(value.Count);
-        for (int i = 0; i < value.Count; i++)
-            ulist.Add((ulong)value[i]);
-        // Inline rather than `this(type, ulist)` so we only allocate the native buffer once.
+        // Writes directly from value[i] — no intermediate List<ulong> conversion pass needed.
         int stride = UnmanagedMemory.NativeULongSize;
-        byte[] flat = new byte[stride * ulist.Count];
+        byte[] flat = new byte[stride * value.Count];
         Span<byte> dest = flat;
-        for (int i = 0; i < ulist.Count; i++)
+        for (int i = 0; i < value.Count; i++)
         {
+            ulong u = (ulong)value[i];
             if (stride == 4)
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(i * stride, 4), checked((uint)ulist[i]));
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(i * stride, 4), checked((uint)u));
             else
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), ulist[i]);
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), u);
         }
         _ckAttribute = CreateAttribute((NativeCULong)type, flat);
     }
     /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, List<CKM> value) : this((ulong)type, value) { }
+    public ObjectAttribute(CKA type, IReadOnlyList<CKM> value) : this((ulong)type, value) { }
 
     // --- Read-back -----------------------------------------------------------
 
