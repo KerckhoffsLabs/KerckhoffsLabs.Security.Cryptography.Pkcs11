@@ -10,7 +10,7 @@ public sealed class Pkcs11KeyMechanismTests_Kryoptic(KryopticBackendFixture back
     private readonly KryopticBackendFixture _backend = backend;
 
     private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspace(
+        _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]

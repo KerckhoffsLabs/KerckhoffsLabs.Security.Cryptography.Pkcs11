@@ -147,7 +147,7 @@ public sealed class Pkcs11KeyMechanismTests_SoftHsm(SoftHsmBackendFixture backen
 
 
     private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspace(
+        _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]

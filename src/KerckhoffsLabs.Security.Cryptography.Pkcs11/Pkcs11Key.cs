@@ -235,7 +235,7 @@ public sealed class Pkcs11Key : IDisposable
         try
         {
             library = new Pkcs11Library(libraryPath);
-            workspace = library.OpenWorkspace(slotLabel, userType, pin);
+            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin);
             return OpenKeyInternal(workspace, keyLabel, ownedLibrary: library, ownsWorkspace: true);
         }
         catch
@@ -273,7 +273,7 @@ public sealed class Pkcs11Key : IDisposable
         Pkcs11Workspace? workspace = null;
         try
         {
-            workspace = library.OpenWorkspace(slotLabel, userType, pin);
+            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin);
             return OpenKeyInternal(workspace, keyLabel, ownedLibrary: null, ownsWorkspace: true);
         }
         catch

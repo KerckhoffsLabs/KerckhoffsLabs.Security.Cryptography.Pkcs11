@@ -54,7 +54,7 @@ public interface IPkcs11Backend
     /// backend-agnostic test cases call this instead of hard-coding the login path.</summary>
     Pkcs11Workspace OpenWorkspace() =>
         RequiresUserLogin
-            ? Library.OpenWorkspace(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span))
+            ? Library.OpenWorkspaceWithPin(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span))
             : Library.OpenWorkspaceWithoutLogin(TokenLabel);
 
     /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the

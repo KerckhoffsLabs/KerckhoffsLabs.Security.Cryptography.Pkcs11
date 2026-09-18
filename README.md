@@ -60,7 +60,7 @@ using var library = new Pkcs11Library("/usr/lib/softhsm/libsofthsm2.so");
 // 2. Open a logged-in session on a token, selected by label. The PIN is held in a pinned,
 //    zeroized buffer — never a string. Read it from a secret manager, not source.
 using var pin = new SecurePin(Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("TOKEN_PIN")!));
-using var workspace = library.OpenWorkspace(slotLabel: "my-token", CKU.CKU_USER, pin);
+using var workspace = library.OpenWorkspaceWithPin(slotLabel: "my-token", CKU.CKU_USER, pin);
 
 // 3. Generate a token-resident RSA signing key pair. The private key is non-extractable by default.
 using var key = workspace.GenerateRsaSigningKeyPair(modulusBits: 3072, label: "signing-key");

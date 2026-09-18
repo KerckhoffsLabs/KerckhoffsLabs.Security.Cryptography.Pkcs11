@@ -19,7 +19,7 @@ public sealed class PinManagementTests_Kryoptic(KryopticBackendFixture f)
         byte[] original = _backend.UserPin.ToArray();
         byte[] temp = Encoding.UTF8.GetBytes("87654321");
 
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));
 
         bool atTemp = false;

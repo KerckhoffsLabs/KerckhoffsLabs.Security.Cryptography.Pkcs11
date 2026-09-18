@@ -16,7 +16,7 @@ public sealed class DeleteKeyTests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         string label = $"del-{Guid.NewGuid():N}";

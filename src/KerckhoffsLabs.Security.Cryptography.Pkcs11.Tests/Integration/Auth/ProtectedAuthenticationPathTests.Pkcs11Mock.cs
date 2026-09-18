@@ -99,13 +99,13 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     // === Pkcs11Library / Pkcs11Workspace (public) ===========================
 
     [Fact]
-    public void LibraryOpenWorkspace_NoPin_ReachesNativeCallAsNull() =>
-        AssertArgumentsBad(() => _backend.Library.OpenWorkspace(_backend.TokenLabel, CKU.CKU_USER));
+    public void LibraryOpenWorkspaceWithPinpad_NoPin_ReachesNativeCallAsNull() =>
+        AssertArgumentsBad(() => _backend.Library.OpenWorkspaceWithPinpad(_backend.TokenLabel, CKU.CKU_USER));
 
     [Fact]
     public void WorkspaceSetPin_NoArgs_ReachesNativeCallAsNull()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         AssertArgumentsBad(workspace.SetPin);
@@ -114,7 +114,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     [Fact]
     public void WorkspaceInitPin_NoArgs_ReachesNativeCallAsNull()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_SO, new SecurePin(_backend.SoPin.Span));
 
         AssertArgumentsBad(workspace.InitPin);

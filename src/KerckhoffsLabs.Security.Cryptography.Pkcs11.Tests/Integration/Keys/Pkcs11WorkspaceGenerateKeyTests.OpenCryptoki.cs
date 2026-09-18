@@ -10,7 +10,7 @@ public sealed class Pkcs11WorkspaceGenerateKeyTests_OpenCryptoki(OpenCryptokiBac
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
     private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspace(
+        _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]

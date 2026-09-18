@@ -23,7 +23,7 @@ public sealed class WorkspaceDigestTests(MockBackendFixture backend)
     [Fact]
     public void Digest_Sha1_ThrowsInsecureOperationException()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         var mechanism = new Mechanism(CKM.CKM_SHA_1);
@@ -38,7 +38,7 @@ public sealed class WorkspaceDigestTests(MockBackendFixture backend)
     [Fact]
     public void Digest_NullMechanism_Throws()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         Assert.Throws<ArgumentNullException>(() =>

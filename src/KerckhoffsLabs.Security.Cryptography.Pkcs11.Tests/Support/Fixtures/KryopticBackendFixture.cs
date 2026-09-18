@@ -102,7 +102,7 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
 
             slot.InitToken(new SecurePin(SoPin.Span), TokenLabel);
 
-            using (Pkcs11Workspace so = Library.OpenWorkspace(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
+            using (Pkcs11Workspace so = Library.OpenWorkspaceWithPin(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
             {
                 so.InitPin(new SecurePin(UserPin.Span));
             }

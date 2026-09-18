@@ -16,7 +16,7 @@ public sealed class WorkspaceRandomTests(MockBackendFixture backend)
     [Fact]
     public void GenerateRandom_ReturnsRequestedLength()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         byte[] bytes = workspace.GenerateRandom(32);
@@ -27,7 +27,7 @@ public sealed class WorkspaceRandomTests(MockBackendFixture backend)
     [Fact]
     public void GenerateRandom_ZeroLength_ThrowsArgumentOutOfRange()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateRandom(0));

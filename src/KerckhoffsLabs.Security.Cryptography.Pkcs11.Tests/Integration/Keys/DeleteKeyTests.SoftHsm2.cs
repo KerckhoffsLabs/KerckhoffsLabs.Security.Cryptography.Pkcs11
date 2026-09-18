@@ -16,7 +16,7 @@ public sealed class DeleteKeyTests_SoftHsm(SoftHsmBackendFixture f)
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         string label = $"del-{Guid.NewGuid():N}";

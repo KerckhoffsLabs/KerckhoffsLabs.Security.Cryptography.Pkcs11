@@ -24,7 +24,7 @@ public sealed class WorkspaceDisposeTests
         var (library, token) = NewLibrary();
         using (library)
         {
-            var workspace = library.OpenWorkspace(
+            var workspace = library.OpenWorkspaceWithPin(
                 ManagedSoftToken.TokenLabel, CKU.CKU_USER, new SecurePin("1234"));
 
             Assert.Equal(0, token.LogoutCallCount);
@@ -41,7 +41,7 @@ public sealed class WorkspaceDisposeTests
         var (library, token) = NewLibrary();
         using (library)
         {
-            var workspace = library.OpenWorkspace(
+            var workspace = library.OpenWorkspaceWithPin(
                 ManagedSoftToken.TokenLabel, CKU.CKU_USER, new SecurePin("1234"));
 
             // Simulate "already logged out" — the canonical benign C_Logout failure.
@@ -62,7 +62,7 @@ public sealed class WorkspaceDisposeTests
         var (library, token) = NewLibrary();
         using (library)
         {
-            var workspace = library.OpenWorkspace(
+            var workspace = library.OpenWorkspaceWithPin(
                 ManagedSoftToken.TokenLabel, CKU.CKU_USER, new SecurePin("1234"));
 
             workspace.Dispose();

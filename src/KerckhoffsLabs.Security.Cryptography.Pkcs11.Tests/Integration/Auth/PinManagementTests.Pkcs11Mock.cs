@@ -13,7 +13,7 @@ public sealed class PinManagementGuardTests_Mock(MockBackendFixture f)
 {
     private readonly MockBackendFixture _backend = f;
 
-    private Pkcs11Workspace OpenWorkspace() => _backend.Library.OpenWorkspace(
+    private Pkcs11Workspace OpenWorkspace() => _backend.Library.OpenWorkspaceWithPin(
         _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact]

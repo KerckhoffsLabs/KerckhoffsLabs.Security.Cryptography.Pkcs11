@@ -403,7 +403,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Workspace OpenWorkspace(string slotLabel, CKU userType, SecurePin pin)
+    public Pkcs11Workspace OpenWorkspaceWithPin(string slotLabel, CKU userType, SecurePin pin)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
         ArgumentNullException.ThrowIfNull(pin);
@@ -437,7 +437,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Workspace OpenWorkspace(string slotLabel, CKU userType)
+    public Pkcs11Workspace OpenWorkspaceWithPinpad(string slotLabel, CKU userType)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
 

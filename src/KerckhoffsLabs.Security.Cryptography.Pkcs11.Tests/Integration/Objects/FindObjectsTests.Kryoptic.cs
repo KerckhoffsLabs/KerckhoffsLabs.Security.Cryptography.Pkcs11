@@ -22,7 +22,7 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         // A self-signed X.509 cert to store on the token.
@@ -67,7 +67,7 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
-        using var workspace = _backend.Library.OpenWorkspace(
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         string baseLabel = $"certkey-{Guid.NewGuid():N}";

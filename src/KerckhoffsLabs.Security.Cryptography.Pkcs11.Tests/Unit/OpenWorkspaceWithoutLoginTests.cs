@@ -79,7 +79,7 @@ public sealed class OpenWorkspaceWithoutLoginTests
 
         // The token rejects login (CKR_USER_TYPE_INVALID), which is exactly why the no-login path
         // exists — but it proves the login overload does attempt C_Login where this one does not.
-        Assert.ThrowsAny<Pkcs11Exception>(() => lib.OpenWorkspace(TokenLabel, CKU.CKU_USER, pin));
+        Assert.ThrowsAny<Pkcs11Exception>(() => lib.OpenWorkspaceWithPin(TokenLabel, CKU.CKU_USER, pin));
         Assert.Equal(1, fake.LoginCalls);
     }
 

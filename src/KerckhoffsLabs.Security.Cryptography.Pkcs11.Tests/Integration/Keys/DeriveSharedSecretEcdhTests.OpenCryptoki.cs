@@ -12,7 +12,7 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
     private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspace(
+        _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     private static byte[] ReadEcPoint(Pkcs11Workspace workspace, ObjectHandle publicHandle)

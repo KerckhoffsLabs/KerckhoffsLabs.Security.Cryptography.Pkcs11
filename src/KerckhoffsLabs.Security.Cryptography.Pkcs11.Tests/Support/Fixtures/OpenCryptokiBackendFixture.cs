@@ -78,7 +78,7 @@ public sealed class OpenCryptokiBackendFixture : IPkcs11Backend, IDisposable
         {
             try
             {
-                return Library.OpenWorkspace(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span));
+                return Library.OpenWorkspaceWithPin(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span));
             }
             catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_GENERAL_ERROR && attempt < maxAttempts)
             {

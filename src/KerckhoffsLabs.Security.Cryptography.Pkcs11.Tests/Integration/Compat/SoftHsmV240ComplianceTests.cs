@@ -28,7 +28,7 @@ public sealed class SoftHsmV240ComplianceTests(SoftHsmBackendFixture backend)
     public void Module_ExposesNoV3xSurface()
     {
         using var pin = new SecurePin(_backend.UserPin.Span);
-        using var workspace = _backend.Library.OpenWorkspace(_backend.TokenLabel, CKU.CKU_USER, pin);
+        using var workspace = _backend.Library.OpenWorkspaceWithPin(_backend.TokenLabel, CKU.CKU_USER, pin);
 
         // A v2.40 module negotiates neither the v3.0 message API nor the v3.2 additions.
         Assert.False(workspace.Session.SupportsMessageApi);
