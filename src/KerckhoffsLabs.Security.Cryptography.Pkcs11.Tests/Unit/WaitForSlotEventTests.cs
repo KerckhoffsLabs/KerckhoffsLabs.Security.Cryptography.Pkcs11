@@ -38,9 +38,8 @@ public sealed class WaitForSlotEventTests
         var fake = new SlotEventFake { Rv = CKR.CKR_OK, SlotIdToReport = 5 };
         using var library = new Pkcs11Library(fake);
 
-        library.WaitForSlotEvent(nonBlocking: false, out bool occurred, out ulong slotId);
+        ulong? slotId = library.WaitForSlotEvent(nonBlocking: false);
 
-        Assert.True(occurred);
         Assert.Equal(5UL, slotId);
         Assert.Equal((NativeCULong)0, fake.CapturedFlags); // blocking call: no CKF_DONT_BLOCK
     }
@@ -51,7 +50,7 @@ public sealed class WaitForSlotEventTests
         var fake = new SlotEventFake();
         using var library = new Pkcs11Library(fake);
 
-        library.WaitForSlotEvent(nonBlocking: true, out _, out _);
+        library.WaitForSlotEvent(nonBlocking: true);
 
         Assert.Equal((NativeCULong)CKF.CKF_DONT_BLOCK, fake.CapturedFlags);
     }
@@ -62,10 +61,9 @@ public sealed class WaitForSlotEventTests
         var fake = new SlotEventFake { Rv = CKR.CKR_NO_EVENT };
         using var library = new Pkcs11Library(fake);
 
-        library.WaitForSlotEvent(nonBlocking: true, out bool occurred, out ulong slotId);
+        ulong? slotId = library.WaitForSlotEvent(nonBlocking: true);
 
-        Assert.False(occurred);
-        Assert.Equal(0UL, slotId);
+        Assert.Null(slotId);
     }
 
     [Fact]
@@ -75,7 +73,7 @@ public sealed class WaitForSlotEventTests
         using var library = new Pkcs11Library(fake);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
-            () => library.WaitForSlotEvent(nonBlocking: false, out _, out _));
+            () => library.WaitForSlotEvent(nonBlocking: false));
         Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
     }
 
@@ -86,6 +84,6 @@ public sealed class WaitForSlotEventTests
         var library = new Pkcs11Library(fake);
         library.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => library.WaitForSlotEvent(nonBlocking: false, out _, out _));
+        Assert.Throws<ObjectDisposedException>(() => library.WaitForSlotEvent(nonBlocking: false));
     }
 }

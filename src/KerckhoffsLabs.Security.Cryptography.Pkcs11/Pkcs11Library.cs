@@ -364,15 +364,16 @@ public sealed class Pkcs11Library : IDisposable
     /// Waits for a slot event, such as token insertion or token removal, to occur.
     /// </summary>
     /// <param name="nonBlocking">
-    /// When <c>true</c>, returns immediately even if no event is pending
-    /// (<paramref name="eventOccurred"/> will be <c>false</c>). When <c>false</c>,
-    /// blocks until an event occurs.
+    /// When <c>true</c>, returns immediately even if no event is pending (the result will be
+    /// <see langword="null"/>). When <c>false</c>, blocks until an event occurs.
     /// </param>
-    /// <param name="eventOccurred">True when a slot event was reported.</param>
-    /// <param name="slotId">PKCS#11 handle of the slot the event occurred in. Zero when no event.</param>
+    /// <returns>
+    /// The PKCS#11 handle of the slot the event occurred in, or <see langword="null"/> if no event
+    /// occurred — only possible when <paramref name="nonBlocking"/> is <see langword="true"/>.
+    /// </returns>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
-    public void WaitForSlotEvent(bool nonBlocking, out bool eventOccurred, out ulong slotId)
+    public ulong? WaitForSlotEvent(bool nonBlocking)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -382,20 +383,12 @@ public sealed class Pkcs11Library : IDisposable
         NativeCULong slotIdOut = new(0);
         CKR rv = LowLevel.C_WaitForSlotEvent(flags, ref slotIdOut, IntPtr.Zero);
 
-        if (rv == CKR.CKR_OK)
-        {
-            eventOccurred = true;
-            slotId = (ulong)slotIdOut;
-            return;
-        }
-
-        eventOccurred = false;
-        slotId = 0;
+        if (rv == CKR.CKR_OK) return (ulong)slotIdOut;
 
         // CKR_NO_EVENT is expected in non-blocking mode when nothing's pending.
-        if (nonBlocking && rv == CKR.CKR_NO_EVENT) return;
+        if (nonBlocking && rv == CKR.CKR_NO_EVENT) return null;
 
-        Pkcs11Exception.ThrowIfError(rv, "C_WaitForSlotEvent");
+        throw Pkcs11Exception.Create(rv, "C_WaitForSlotEvent");
     }
 
     /// <summary>
