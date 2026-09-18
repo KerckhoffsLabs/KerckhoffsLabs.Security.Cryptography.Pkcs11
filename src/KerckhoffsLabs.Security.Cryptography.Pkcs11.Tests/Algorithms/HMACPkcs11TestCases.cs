@@ -33,12 +33,6 @@ internal static class HMACPkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
-    private static void Require(IPkcs11Backend backend, CKM mechanism)
-    {
-        if (!backend.Supports(mechanism))
-            Assert.Skip($"Backend does not advertise {mechanism}.");
-    }
-
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
@@ -84,7 +78,7 @@ internal static class HMACPkcs11TestCases
 
     internal static void Assert_ComputeHash_DeterministicForSameKeyAndInput(IPkcs11Backend backend, string hashName, int expectedLen)
     {
-        Require(backend, HmacMechanism(hashName));
+        backend.RequireMechanism(HmacMechanism(hashName));
         WithHmacKey(backend, expectedLen, (_, key) =>
         {
             using var hmac = new HMACPkcs11(key, new HashAlgorithmName(hashName));
@@ -102,7 +96,7 @@ internal static class HMACPkcs11TestCases
     // covers the SHA1 branch of the internal hash-size mapping.
     internal static void Assert_ComputeHash_Sha1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA_1_HMAC);
+        backend.RequireMechanism(CKM.CKM_SHA_1_HMAC);
         WithHmacKey(backend, 20, (workspace, key) =>
         {
             using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA1);
@@ -119,7 +113,7 @@ internal static class HMACPkcs11TestCases
 
     internal static void Assert_ComputeHash_DifferentInputs_DifferDespiteReuse(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_HMAC);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         WithHmacKey(backend, 32, (_, key) =>
         {
             using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA256);
@@ -141,7 +135,7 @@ internal static class HMACPkcs11TestCases
     // also clears SoftHSM's per-mechanism minimum key size).
     internal static void Assert_ComputeHash_HmacSha256_KnownAnswer(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_HMAC);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         byte[] key = new byte[131];
         Array.Fill(key, (byte)0xaa);
         byte[] data = Encoding.ASCII.GetBytes("Test Using Larger Than Block-Size Key - Hash Key First");

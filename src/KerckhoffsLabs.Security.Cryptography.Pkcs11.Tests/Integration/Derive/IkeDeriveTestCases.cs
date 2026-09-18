@@ -48,12 +48,6 @@ internal static class IkeDeriveTestCases
     private const int Sha256Size = 32;
     private static readonly byte[] ProbeMessage = "ike-derive-sign-probe"u8.ToArray();
 
-    private static void RequireIke(IPkcs11Backend backend, CKM mechanism)
-    {
-        if (!backend.Supports(mechanism))
-            Assert.Skip($"Backend does not advertise {mechanism}.");
-    }
-
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
@@ -84,12 +78,6 @@ internal static class IkeDeriveTestCases
         return value;
     }
 
-    private static void RequireHmacProbe(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_SHA256_HMAC))
-            Assert.Skip("Backend does not advertise CKM_SHA256_HMAC.");
-    }
-
     // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
     // triggers the AllowInsecure gate) and immediately signs ProbeMessage with it, never reading
     // CKA_VALUE at all.
@@ -109,7 +97,7 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_IkePrf_MatchesReference(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE_PRF_DERIVE);
+        backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
@@ -139,7 +127,7 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_Ike1Prf_MatchesReference(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE1_PRF_DERIVE);
+        backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
@@ -176,7 +164,7 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_Ike1ExtendedDerive_MatchesReference(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE1_EXTENDED_DERIVE);
+        backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
@@ -208,7 +196,7 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_Ike2PrfPlusDerive_MatchesReference(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE2_PRF_PLUS_DERIVE);
+        backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
@@ -243,8 +231,8 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_IkePrf_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE_PRF_DERIVE);
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
@@ -269,8 +257,8 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_Ike1Prf_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE1_PRF_DERIVE);
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] gxy = RandomNumberGenerator.GetBytes(24);
@@ -304,8 +292,8 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_Ike1ExtendedDerive_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE1_EXTENDED_DERIVE);
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] extraData = RandomNumberGenerator.GetBytes(20);
@@ -331,8 +319,8 @@ internal static class IkeDeriveTestCases
 
     internal static void Assert_Ike2PrfPlusDerive_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireIke(backend, CKM.CKM_IKE2_PRF_PLUS_DERIVE);
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] seedData = RandomNumberGenerator.GetBytes(24);

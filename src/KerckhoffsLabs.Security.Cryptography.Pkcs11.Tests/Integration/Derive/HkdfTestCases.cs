@@ -49,18 +49,12 @@ internal static class HkdfTestCases
         }
     }
 
-    private static void RequireHkdf(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_HKDF_DERIVE))
-            Assert.Skip("Backend does not advertise CKM_HKDF_DERIVE.");
-    }
-
     // Imports Ikm as a derive-capable generic-secret base key and hands it (plus the open workspace)
     // to the body. AllowInsecure is required because the cross-check needs to read the derived
     // key's raw value back off the token.
     private static void WithImportedIkm(IPkcs11Backend backend, Action<Pkcs11Workspace, Pkcs11Key> body)
     {
-        RequireHkdf(backend);
+        backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
         using var workspace = OpenWorkspace(backend);
         workspace.AllowInsecure = true;
         string label = $"hkdf-ikm-{Guid.NewGuid():N}";
@@ -85,12 +79,6 @@ internal static class HkdfTestCases
         byte[] value = attrs[0].GetValueAsByteArray();
         derived.Destroy();
         return value;
-    }
-
-    private static void RequireHmacProbe(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_SHA256_HMAC))
-            Assert.Skip("Backend does not advertise CKM_SHA256_HMAC.");
     }
 
     // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
@@ -163,7 +151,7 @@ internal static class HkdfTestCases
 
     internal static void Assert_ExtractAndExpand_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         WithImportedIkm(backend, (_, ikmKey) =>
         {
             const int length = 42; // the RFC 5869 test-vector length
@@ -182,7 +170,7 @@ internal static class HkdfTestCases
 
     internal static void Assert_ExpandOnly_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         WithImportedIkm(backend, (_, ikmKey) =>
         {
             const int length = 32;
@@ -202,7 +190,7 @@ internal static class HkdfTestCases
 
     internal static void Assert_ExtractOnly_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
-        RequireHmacProbe(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         WithImportedIkm(backend, (_, ikmKey) =>
         {
             byte[] expectedDerived = HKDF.Extract(HashAlgorithmName.SHA256, Ikm, Salt);

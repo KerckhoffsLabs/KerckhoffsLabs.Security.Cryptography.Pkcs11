@@ -20,15 +20,9 @@ internal static class SHA3_384Pkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
-    private static void Require(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_SHA3_384))
-            Assert.Skip("Backend does not advertise CKM_SHA3_384.");
-    }
-
     internal static void Assert_ComputeHash_KnownAnswer(IPkcs11Backend backend)
     {
-        Require(backend);
+        backend.RequireMechanism(CKM.CKM_SHA3_384);
         using var workspace = OpenWorkspace(backend);
         using var hash = new SHA3_384Pkcs11(workspace);
 
@@ -39,7 +33,7 @@ internal static class SHA3_384Pkcs11TestCases
 
     internal static void Assert_ComputeHash_MatchesBcl(IPkcs11Backend backend)
     {
-        Require(backend);
+        backend.RequireMechanism(CKM.CKM_SHA3_384);
         if (!SHA3_384.IsSupported)
             Assert.Skip("Host BCL does not support SHA3-384 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
@@ -51,7 +45,7 @@ internal static class SHA3_384Pkcs11TestCases
 
     internal static void Assert_ComputeHash_Streamed_MatchesOneShot(IPkcs11Backend backend)
     {
-        Require(backend);
+        backend.RequireMechanism(CKM.CKM_SHA3_384);
         if (!SHA3_384.IsSupported)
             Assert.Skip("Host BCL does not support SHA3-384 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);
@@ -67,7 +61,7 @@ internal static class SHA3_384Pkcs11TestCases
 
     internal static void Assert_Reuse_AfterInitialize_ProducesFreshHash(IPkcs11Backend backend)
     {
-        Require(backend);
+        backend.RequireMechanism(CKM.CKM_SHA3_384);
         if (!SHA3_384.IsSupported)
             Assert.Skip("Host BCL does not support SHA3-384 (needs OpenSSL 3.x or Windows 11+).");
         using var workspace = OpenWorkspace(backend);

@@ -25,12 +25,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 /// </summary>
 internal static class RawChaCha20TestCases
 {
-    private static void RequireChaCha20(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_CHACHA20))
-            Assert.Skip("Backend does not advertise CKM_CHACHA20.");
-    }
-
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
@@ -46,7 +40,7 @@ internal static class RawChaCha20TestCases
     // AllowInsecure is required.
     private static void WithImportedKey(IPkcs11Backend backend, byte[] rawKey, Action<Pkcs11Key> body)
     {
-        RequireChaCha20(backend);
+        backend.RequireMechanism(CKM.CKM_CHACHA20);
         using var workspace = backend.OpenWorkspace();
         workspace.AllowInsecure = true;
         string label = $"chacha20-raw-{Guid.NewGuid():N}";

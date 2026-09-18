@@ -21,15 +21,9 @@ internal static class SHA256Pkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
-    private static void RequireSha256(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_SHA256))
-            Assert.Skip("Backend does not advertise CKM_SHA256.");
-    }
-
     internal static void Assert_ComputeHash_KnownAnswer_MatchesFips180Vector(IPkcs11Backend backend)
     {
-        RequireSha256(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256);
         using var workspace = OpenWorkspace(backend);
         using var sha = new SHA256Pkcs11(workspace);
 
@@ -40,7 +34,7 @@ internal static class SHA256Pkcs11TestCases
 
     internal static void Assert_ComputeHash_MatchesBcl(IPkcs11Backend backend)
     {
-        RequireSha256(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256);
         using var workspace = OpenWorkspace(backend);
         using var sha = new SHA256Pkcs11(workspace);
 
@@ -50,7 +44,7 @@ internal static class SHA256Pkcs11TestCases
 
     internal static void Assert_ComputeHash_Streamed_MatchesOneShot(IPkcs11Backend backend)
     {
-        RequireSha256(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256);
         using var workspace = OpenWorkspace(backend);
         using var sha = new SHA256Pkcs11(workspace);
 
@@ -65,7 +59,7 @@ internal static class SHA256Pkcs11TestCases
 
     internal static void Assert_Reuse_AfterInitialize_ProducesFreshHash(IPkcs11Backend backend)
     {
-        RequireSha256(backend);
+        backend.RequireMechanism(CKM.CKM_SHA256);
         using var workspace = OpenWorkspace(backend);
         using var sha = new SHA256Pkcs11(workspace);
 

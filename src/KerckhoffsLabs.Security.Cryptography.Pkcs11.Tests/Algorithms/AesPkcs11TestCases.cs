@@ -25,12 +25,6 @@ internal static class AesPkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
-    private static void Require(IPkcs11Backend backend, CKM mechanism)
-    {
-        if (!backend.Supports(mechanism))
-            Assert.Skip($"Backend does not advertise {mechanism}.");
-    }
-
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
@@ -85,7 +79,7 @@ internal static class AesPkcs11TestCases
     internal static void Assert_EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
         WithImportedAes(backend, (workspace, aes) =>
         {
-            Require(backend, CKM.CKM_AES_CBC);
+            backend.RequireMechanism(CKM.CKM_AES_CBC);
             byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a token key — variable length.");
 
             // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
@@ -101,7 +95,7 @@ internal static class AesPkcs11TestCases
     internal static void Assert_EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
         WithImportedAes(backend, (workspace, aes) =>
         {
-            Require(backend, CKM.CKM_AES_CBC);
+            backend.RequireMechanism(CKM.CKM_AES_CBC);
             byte[] plaintext = new byte[32]; // exactly two blocks
             RandomNumberGenerator.Fill(plaintext);
 
@@ -147,7 +141,7 @@ internal static class AesPkcs11TestCases
     internal static void Assert_EncryptEcb_WithAllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedAes(backend, (workspace, aes) =>
         {
-            Require(backend, CKM.CKM_AES_ECB);
+            backend.RequireMechanism(CKM.CKM_AES_ECB);
             workspace.AllowInsecure = true;
             byte[] plaintext = new byte[16];
             RandomNumberGenerator.Fill(plaintext);

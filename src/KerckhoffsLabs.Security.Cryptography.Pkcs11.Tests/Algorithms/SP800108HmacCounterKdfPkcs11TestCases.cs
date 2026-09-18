@@ -44,12 +44,6 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         }
     }
 
-    private static void RequireKdf(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_SP800_108_COUNTER_KDF))
-            Assert.Skip("Backend does not advertise CKM_SP800_108_COUNTER_KDF.");
-    }
-
     // Imports KeyBytes as a derive-capable generic-secret base key and hands the KDF to the body.
     private static void WithImportedKdf(IPkcs11Backend backend, Action<Pkcs11Workspace, SP800108HmacCounterKdfPkcs11> body)
     {
@@ -135,7 +129,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     internal static void Assert_DeriveKey_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedKdf(backend, (_, kdf) =>
         {
-            RequireKdf(backend);
+            backend.RequireMechanism(CKM.CKM_SP800_108_COUNTER_KDF);
             const int length = 40; // spans two HMAC-SHA256 PRF blocks (32 bytes each)
             byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
                 KeyBytes, HashAlgorithmName.SHA256, Label, Context, length);
@@ -148,7 +142,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     internal static void Assert_DeriveKey_DestinationSpan_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedKdf(backend, (_, kdf) =>
         {
-            RequireKdf(backend);
+            backend.RequireMechanism(CKM.CKM_SP800_108_COUNTER_KDF);
             const int length = 32;
             byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
                 KeyBytes, HashAlgorithmName.SHA256, Label, Context, length);
@@ -158,12 +152,6 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
 
             Assert.Equal(expected, actual);
         });
-
-    private static void RequireHmacProbe(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_SHA256_HMAC))
-            Assert.Skip("Backend does not advertise CKM_SHA256_HMAC.");
-    }
 
     // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
     // needs AllowInsecure for this part) and immediately signs ProbeMessage with it, never reading
@@ -182,8 +170,8 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     internal static void Assert_DeriveKey_MatchesBclViaSignProbe(IPkcs11Backend backend) =>
         WithImportedKdf(backend, (_, kdf) =>
         {
-            RequireKdf(backend);
-            RequireHmacProbe(backend);
+            backend.RequireMechanism(CKM.CKM_SP800_108_COUNTER_KDF);
+            backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
             const int length = 40; // spans two HMAC-SHA256 PRF blocks (32 bytes each)
             byte[] expectedDerived = SP800108HmacCounterKdf.DeriveBytes(
                 KeyBytes, HashAlgorithmName.SHA256, Label, Context, length);
@@ -197,7 +185,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     internal static void Assert_DeriveKey_OnToken_ReturnsNonExtractableKey(IPkcs11Backend backend) =>
         WithImportedKdf(backend, (_, kdf) =>
         {
-            RequireKdf(backend);
+            backend.RequireMechanism(CKM.CKM_SP800_108_COUNTER_KDF);
             using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
                 .ValueLen(32).Derive().NonExtractable().Sensitive().Build();
 
