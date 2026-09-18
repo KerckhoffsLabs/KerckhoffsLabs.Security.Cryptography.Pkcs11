@@ -27,12 +27,6 @@ internal static class AesCcmPkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
-    private static void RequireCcm(IPkcs11Backend backend)
-    {
-        if (!backend.Supports(CKM.CKM_AES_CCM))
-            Assert.Skip("Backend does not advertise CKM_AES_CCM.");
-    }
-
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
@@ -168,7 +162,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_EncryptDecrypt_RoundTrips_WithAad(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -188,7 +182,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_EncryptDecrypt_RoundTrips_NoAad(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -206,7 +200,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_EncryptDecrypt_RoundTrips_VariousNonceAndTagSizes(IPkcs11Backend backend, int nonceLen, int tagLen)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(nonceLen);
@@ -225,7 +219,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_EncryptDecrypt_EmptyPlaintext_RoundTrips(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -240,7 +234,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_Decrypt_TamperedTag_Throws(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -258,7 +252,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_Decrypt_TamperedCiphertext_Throws(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -276,7 +270,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_Decrypt_WrongAad_Throws(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -294,7 +288,7 @@ internal static class AesCcmPkcs11TestCases
 
     internal static void Assert_Decrypt_WrongNonce_Throws(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         WithCcm(backend, ccm =>
         {
             byte[] nonce = Iota(12);
@@ -315,7 +309,7 @@ internal static class AesCcmPkcs11TestCases
     // for a fixed AES-256 key / 96-bit nonce / AAD.
     internal static void Assert_Encrypt_KnownAnswer_MatchesReferenceVector(IPkcs11Backend backend)
     {
-        RequireCcm(backend);
+        backend.RequireMechanism(CKM.CKM_AES_CCM);
         byte[] key = H("404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f");
         byte[] nonce = H("101112131415161718191a1b");
         byte[] aad = H("000102030405060708090a0b0c0d0e0f10111213");
