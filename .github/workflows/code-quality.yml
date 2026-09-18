@@ -55,7 +55,7 @@ jobs:
 
       # The Sonar analysis engine is JVM-based; the .NET scanner shells out to it.
       - name: Setup Java
-        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
@@ -180,7 +180,7 @@ jobs:
       # Runs before End analysis so a Codecov hiccup is independent of the Sonar import.
       - name: Upload coverage
         if: github.event_name == 'push'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage/**/coverage.cobertura.*.xml
           fail_ci_if_error: true
