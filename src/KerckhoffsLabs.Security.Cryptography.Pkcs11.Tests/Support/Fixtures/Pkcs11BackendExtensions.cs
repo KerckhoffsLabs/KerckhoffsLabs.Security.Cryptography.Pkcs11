@@ -17,6 +17,18 @@ internal static class Pkcs11BackendExtensions
     }
 
     /// <summary>
+    /// Skips the test when the backend does not advertise every mechanism in <paramref name="mechanisms"/>,
+    /// reporting all missing ones in one message rather than stopping at the first. For a case that needs
+    /// several mechanisms together (e.g. key generation plus a signing mechanism).
+    /// </summary>
+    internal static void RequireMechanisms(this IPkcs11Backend backend, params CKM[] mechanisms)
+    {
+        CKM[] missing = [.. mechanisms.Where(m => !backend.Supports(m))];
+        if (missing.Length > 0)
+            Assert.Skip($"Backend does not advertise {string.Join(", ", missing)}.");
+    }
+
+    /// <summary>
     /// Skips the test unless the backend's <c>CKM_ML_KEM_KEY_PAIR_GEN</c> mechanism info reports a
     /// min/max key-size range (in encapsulation-key bytes) covering <paramref name="encapsulationKeySizeInBytes"/>.
     /// ML-KEM has exactly three discrete parameter sets, so this range doubles as a per-parameter-set

@@ -25,13 +25,6 @@ internal static class RSAPkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
         backend.OpenWorkspace();
 
-    private static void Require(IPkcs11Backend backend, params CKM[] mechanisms)
-    {
-        CKM[] missing = [.. mechanisms.Where(m => !backend.Supports(m))];
-        if (missing.Length > 0)
-            Assert.Skip($"Backend does not advertise {string.Join(", ", missing)}.");
-    }
-
     private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace, int modulusBits = 2048)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
@@ -94,7 +87,7 @@ internal static class RSAPkcs11TestCases
     // (some tests need AllowInsecureScope) and the adapter, then destroys both objects.
     private static void WithRsa(IPkcs11Backend backend, Action<Pkcs11Workspace, RSAPkcs11> body)
     {
-        Require(backend, CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
         using var workspace = OpenWorkspace(backend);
         using var key = GenerateRsaKey(workspace);
         try
@@ -144,7 +137,7 @@ internal static class RSAPkcs11TestCases
         if (modulusBits >= 8192 && !LargeRsaKeysEnabled)
             Assert.Skip($"RSA-{modulusBits} keygen is restricted to the Linux x64 CI leg (too slow elsewhere).");
 
-        Require(backend, CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
         using var workspace = OpenWorkspace(backend);
         using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
         using var key = GenerateRsaKey(workspace, modulusBits);
@@ -181,7 +174,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_SignVerifyData_Pkcs1_RoundTrips(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_RSA_PKCS);
+        backend.RequireMechanisms(CKM.CKM_SHA256_RSA_PKCS);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("test");
@@ -194,7 +187,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_SignVerifyData_Pss_RoundTrips(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        backend.RequireMechanisms(CKM.CKM_SHA256_RSA_PKCS_PSS);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("test");
@@ -244,7 +237,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_TrySignData_Span_VerifyData_Span_RoundTrips(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        backend.RequireMechanisms(CKM.CKM_SHA256_RSA_PKCS_PSS);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("span hash+sign on token");
@@ -284,7 +277,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_EncryptDecrypt_OaepSha1_RoundTrips(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_RSA_PKCS_OAEP);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha1 payload");
@@ -297,7 +290,7 @@ internal static class RSAPkcs11TestCases
     // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires AllowInsecure.
     internal static void Assert_EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_RSA_PKCS);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS);
         WithRsa(backend, (workspace, rsa) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
@@ -328,7 +321,7 @@ internal static class RSAPkcs11TestCases
     // parameter, which is turned into a skip.
     internal static void Assert_EncryptDecrypt_OaepModernHash_RoundTrips(IPkcs11Backend backend, string hash)
     {
-        Require(backend, CKM.CKM_RSA_PKCS_OAEP);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
         WithRsa(backend, (_, rsa) =>
         {
             RSAEncryptionPadding padding = hash switch
@@ -346,7 +339,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_Decrypt_TamperedOaepCiphertext_Throws(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_RSA_PKCS_OAEP);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] ct = rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1);
@@ -358,7 +351,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_Decrypt_OaepCiphertextFromDifferentKey_Throws(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_RSA_PKCS_OAEP);
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
         WithRsa(backend, (workspace, rsa) =>
         {
             using Pkcs11Key other = GenerateRsaKey(workspace);
@@ -400,7 +393,7 @@ internal static class RSAPkcs11TestCases
     // PKCS#11-produced signature — catches a DER/parameter-export bug or wrong PSS salt.
     internal static void Assert_SignData_Pkcs1_VerifiesUnderBclFromExportedPublicKey(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_RSA_PKCS);
+        backend.RequireMechanisms(CKM.CKM_SHA256_RSA_PKCS);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("cross-library verify");
@@ -414,7 +407,7 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_SignData_Pss_VerifiesUnderBclFromExportedPublicKey(IPkcs11Backend backend)
     {
-        Require(backend, CKM.CKM_SHA256_RSA_PKCS_PSS);
+        backend.RequireMechanisms(CKM.CKM_SHA256_RSA_PKCS_PSS);
         WithRsa(backend, (_, rsa) =>
         {
             byte[] data = Encoding.UTF8.GetBytes("cross-library verify");
