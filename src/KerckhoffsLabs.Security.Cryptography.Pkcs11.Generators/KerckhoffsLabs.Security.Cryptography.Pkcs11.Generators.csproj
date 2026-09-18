@@ -17,7 +17,13 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.6.0" PrivateAssets="all" />
+    <!-- CSharp is capped below Analyzers' latest: CS9057 rejects an analyzer assembly that
+         references a newer compiler AssemblyVersion than the one actually running the build.
+         The .NET 10 SDK's bundled compiler currently reports AssemblyVersion 5.0.0.0, so
+         Microsoft.CodeAnalysis.CSharp 5.3.0+ (AssemblyVersion 5.3.0.0+) fails CS9057 on every
+         consumer, not just docfx's own metadata step — raise this only once the SDK's bundled
+         compiler catches up. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
   </ItemGroup>
 </Project>
