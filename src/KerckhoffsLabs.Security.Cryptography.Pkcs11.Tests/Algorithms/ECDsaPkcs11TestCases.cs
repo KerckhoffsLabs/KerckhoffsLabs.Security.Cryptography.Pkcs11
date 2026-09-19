@@ -164,10 +164,19 @@ internal static class ECDsaPkcs11TestCases
         });
     }
 
-    internal static void Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(IPkcs11Backend backend) =>
+    // Requires CKM_ECDSA_SHA224 for the same reason the round-trip case above does: SignDataInternal
+    // checks _key.SupportsMechanism first and only reaches the GuardMechanism-guarded combined-mechanism
+    // path when the token advertises it. Without that check here, a build that doesn't advertise it
+    // (confirmed in CI: SoftHSM 2.5 / PKCS11 v2.40 does not, unlike the SoftHSM2 build used elsewhere in
+    // this suite) takes the managed HashData fallback instead, which throws NotSupportedException, not
+    // InsecureOperationException — a real failure this exact gap caused, not a hypothetical one.
+    internal static void Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_ECDSA_SHA224);
         WithEcDsa(backend, "P-256", (_, ec) =>
             Assert.Throws<InsecureOperationException>(() =>
                 ec.TrySignData(Encoding.UTF8.GetBytes("x"), new byte[256], new HashAlgorithmName("SHA224"), out int _)));
+    }
 
     internal static void Assert_TrySignData_DestinationTooSmall_ReturnsFalse(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, hash) =>
