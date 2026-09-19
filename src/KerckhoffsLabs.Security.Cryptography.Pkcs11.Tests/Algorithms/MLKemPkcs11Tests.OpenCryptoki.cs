@@ -38,4 +38,10 @@ public sealed class MLKemPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture bac
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() => MLKemPkcs11TestCases.Assert_ExportPkcs8PrivateKey_ThrowsInsecure(_backend);
+
+    // opencryptoki requires CKA_VALUE_LEN on the unwrap-created decapsulation key (CKR_TEMPLATE_INCONSISTENT
+    // without it), so the conventional first-try form succeeds and nothing is omitted.
+    [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
+    public void Decapsulate_CachesValueLenQuirkPerLibrary() =>
+        MLKemPkcs11TestCases.Assert_Decapsulate_CachesValueLenQuirkPerLibrary(_backend, expectedOmitsValueLen: false);
 }

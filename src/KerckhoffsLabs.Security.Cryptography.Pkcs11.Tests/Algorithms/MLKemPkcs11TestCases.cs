@@ -162,4 +162,29 @@ internal static class MLKemPkcs11TestCases
     internal static void Assert_ExportPkcs8PrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>
             Assert.Throws<InsecureOperationException>(() => mlkem.ExportPkcs8PrivateKey()));
+
+    // Regression guard for MLKemPkcs11's per-library CKA_VALUE_LEN quirk cache
+    // (Pkcs11Library.MlKemDecapsulateOmitsValueLen): every other case above decapsulates at most once
+    // per key/workspace, so none of them exercises the *cached* branch of DecapsulateCore's switch
+    // (`bool omit => DecapsulateWith(...)`) at all -- only DecapsulateProbing's first-call path. A bug
+    // that swapped the two outcomes in DecapsulateProbing (recording `true` where SoftHSM's rejection
+    // should record `false`, or vice versa) would still pass every round-trip test above, because the
+    // first call always tries the same order regardless of what gets cached; only a second call reading
+    // the wrong cached value back would fail, and would fail loudly with a token-level error rather than
+    // a wrong shared secret. Decapsulating twice against the same key forces both branches and pins the
+    // exact per-backend value, per the divergence documented on MlKemDecapsulateOmitsValueLen itself.
+    internal static void Assert_Decapsulate_CachesValueLenQuirkPerLibrary(IPkcs11Backend backend, bool expectedOmitsValueLen) =>
+        WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (workspace, mlkem) =>
+        {
+            workspace.AllowInsecure = true;
+            mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecretEnc);
+
+            byte[] first = mlkem.Decapsulate(ciphertext);
+            Assert.Equal(sharedSecretEnc, first);
+            Assert.Equal(expectedOmitsValueLen, workspace.Library.MlKemDecapsulateOmitsValueLen);
+
+            byte[] second = mlkem.Decapsulate(ciphertext);
+            Assert.Equal(sharedSecretEnc, second);
+            Assert.Equal(expectedOmitsValueLen, workspace.Library.MlKemDecapsulateOmitsValueLen);
+        });
 }

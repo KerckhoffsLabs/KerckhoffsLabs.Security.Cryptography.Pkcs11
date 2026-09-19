@@ -38,4 +38,8 @@ public sealed class MLKemPkcs11Tests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() => MLKemPkcs11TestCases.Assert_ExportPkcs8PrivateKey_ThrowsInsecure(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void Decapsulate_CachesValueLenQuirkPerLibrary() =>
+        MLKemPkcs11TestCases.Assert_Decapsulate_CachesValueLenQuirkPerLibrary(_backend, expectedOmitsValueLen: false);
 }

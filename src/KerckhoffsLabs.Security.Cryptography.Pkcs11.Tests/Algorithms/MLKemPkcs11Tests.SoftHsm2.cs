@@ -38,4 +38,10 @@ public sealed class MLKemPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() => MLKemPkcs11TestCases.Assert_ExportPkcs8PrivateKey_ThrowsInsecure(_backend);
+
+    // SoftHSM treats CKA_VALUE_LEN as read-only on the unwrap-created decapsulation key, so the probe
+    // falls back to omitting it.
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void Decapsulate_CachesValueLenQuirkPerLibrary() =>
+        MLKemPkcs11TestCases.Assert_Decapsulate_CachesValueLenQuirkPerLibrary(_backend, expectedOmitsValueLen: true);
 }
