@@ -9,13 +9,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 /// <summary>
 /// Real-backend coverage for the IKE-derive family (<c>CKM_IKE_PRF_DERIVE</c>,
 /// <c>CKM_IKE1_PRF_DERIVE</c>, <c>CKM_IKE1_EXTENDED_DERIVE</c>, <c>CKM_IKE2_PRF_PLUS_DERIVE</c> —
-/// PKCS#11 v3.0) — previously unit-marshalling-only. NSS's <c>sftkike.c</c> is the only vendored
-/// implementation (Kryoptic, SoftHSM2, opencryptoki and pkcs11-mock all lack one — Kryoptic's
-/// apparent match is a debug name-lookup table only, verified against <c>pkcs11/mod.rs</c>); every
-/// one of its four functions is a plain HMAC construction over a documented concatenation of inputs
-/// (RFC 2409/7296), so each case here reproduces that exact construction with the BCL's
-/// <see cref="HMACSHA256"/> as an independent reference — a genuine known-answer cross-check, not
-/// just "the call didn't throw":
+/// PKCS#11 v3.0). NSS's <c>sftkike.c</c> and Kryoptic's <c>ike.rs</c> (since kryoptic v1.5.2+52,
+/// which added a real implementation — SoftHSM2, opencryptoki, and pkcs11-mock still lack one) are
+/// the two vendored implementations; every one of the four functions is a plain HMAC construction
+/// over a documented concatenation of inputs (RFC 2409/7296), so each case here reproduces that
+/// exact construction with the BCL's <see cref="HMACSHA256"/> as an independent reference — a
+/// genuine known-answer cross-check, not just "the call didn't throw". The base key passed to
+/// <see cref="Pkcs11Key.Derive(Mechanism, ObjectTemplate)"/> is imported as
+/// <see cref="CKK.CKK_SHA256_HMAC"/>, not <see cref="CKK.CKK_GENERIC_SECRET"/>: PKCS#11 v3.0
+/// §6.64.3/.4/.6/.7 require the base key's <c>CKA_KEY_TYPE</c> to match the mechanism's
+/// <c>prfMechanism</c> parameter exactly (generic secret is explicitly not admitted) whenever
+/// <c>bDataAsKey</c> is false, and Kryoptic enforces this strictly — NSS does not check the base
+/// key's type at all, which is why this went unnoticed before Kryoptic grew a real implementation.
+/// The <c>hKeygxy</c>/<c>hPrevKey</c>/<c>hSeedKey</c> ancillary keys are unaffected and stay
+/// <see cref="CKK.CKK_GENERIC_SECRET"/>, matching what both backends expect for those.
 /// <list type="bullet">
 /// <item><c>CKM_IKE_PRF_DERIVE</c> (data-as-key = false, rekey = false):
 /// <c>HMAC(inKey, Ni ‖ Nr)</c>.</item>
@@ -58,9 +65,10 @@ internal static class IkeDeriveTestCases
         }
     }
 
-    private static Pkcs11Key ImportSecret(Pkcs11Workspace workspace, byte[] value, string label, bool derive)
+    private static Pkcs11Key ImportSecret(Pkcs11Workspace workspace, byte[] value, string label, bool derive,
+        CKK keyType = CKK.CKK_GENERIC_SECRET)
     {
-        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Label(label).Value(value);
+        var builder = ObjectTemplate.ForSecretKey(keyType).Label(label).Value(value);
         using var tpl = (derive ? builder.Derive() : builder).Build();
         return workspace.ImportKey(tpl);
     }
@@ -115,7 +123,7 @@ internal static class IkeDeriveTestCases
         string label = $"ike-prf-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
                 new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
 
@@ -146,7 +154,7 @@ internal static class IkeDeriveTestCases
         string gxyLabel = $"ike1-prf-gxy-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
             var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
                 new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: false,
@@ -184,7 +192,7 @@ internal static class IkeDeriveTestCases
         string label = $"ike1-ext-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
                 new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: false, keygxy: 0, extraData));
 
@@ -217,7 +225,7 @@ internal static class IkeDeriveTestCases
         string label = $"ike2-prfplus-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
                 new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, seedData));
 
@@ -245,7 +253,7 @@ internal static class IkeDeriveTestCases
         string label = $"ike-prf-probe-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
                 new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
 
@@ -274,7 +282,7 @@ internal static class IkeDeriveTestCases
         string gxyLabel = $"ike1-prf-probe-gxy-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
             var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
                 new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: false,
@@ -307,7 +315,7 @@ internal static class IkeDeriveTestCases
         string label = $"ike1-ext-probe-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
                 new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: false, keygxy: 0, extraData));
 
@@ -337,7 +345,7 @@ internal static class IkeDeriveTestCases
         string label = $"ike2-prfplus-probe-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
                 new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, seedData));
 
