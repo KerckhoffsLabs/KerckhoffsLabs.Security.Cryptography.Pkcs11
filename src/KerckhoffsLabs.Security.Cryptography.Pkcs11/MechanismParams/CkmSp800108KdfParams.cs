@@ -184,7 +184,6 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    /// <inheritdoc/>
     internal override bool AbsorbsTokenOutput => true;
 
     internal override void AbsorbOutput(object marshalled)
