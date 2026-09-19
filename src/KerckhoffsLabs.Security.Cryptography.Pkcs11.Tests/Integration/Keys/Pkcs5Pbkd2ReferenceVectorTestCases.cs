@@ -39,15 +39,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// unioning it into a second xUnit collection alongside the existing "Kryoptic" collection created a
 /// second, independent fixture instance that could run concurrently with the first (different
 /// collections run in parallel by default), racing on that same file and corrupting shared token
-/// state for the entire "Kryoptic" collection. An earlier version of this file did exactly that and
+/// state for the entire "Kryoptic" collection. An earlier version of this test did exactly that and
 /// caused ~130 unrelated Kryoptic test failures under xUnit's parallel collection scheduling. Comparing
 /// against an independent reference instead of a second live backend avoids the hazard entirely, and
-/// is exactly the same shape already used above for Kryoptic's two NSS-incompatible PRFs.
+/// is exactly the same shape already used for Kryoptic's two NSS-incompatible PRFs.
 /// </para>
 /// </summary>
-public static class Pkcs5Pbkd2ReferenceVectors
+internal static class Pkcs5Pbkd2ReferenceVectorTestCases
 {
-    public const string Password = "correct horse battery staple";
+    private const string Password = "correct horse battery staple";
+    private const ulong Iterations = 10_000;
 
     // (prf, salt, expectedHex, outputLength)
     public static TheoryData<CKP, string, string, int> SharedPrfs =>
@@ -74,9 +75,14 @@ public static class Pkcs5Pbkd2ReferenceVectors
             "b1110ea6ce4eba55d771417cbe5465bc1338c1d52293b63ad338d83352b039c7", 32),
     ];
 
-    public const ulong Iterations = 10_000;
+    internal static void Assert_MatchesIndependentReference(IPkcs11Backend backend, CKP prf, string salt, string expectedHex, int outputLength)
+    {
+        backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
+        byte[] actual = Derive(backend, prf, salt, outputLength);
+        Assert.Equal(Convert.FromHexString(expectedHex), actual);
+    }
 
-    public static byte[] Derive(IPkcs11Backend backend, CKP prf, string salt, int outputLength)
+    private static byte[] Derive(IPkcs11Backend backend, CKP prf, string salt, int outputLength)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -109,44 +115,5 @@ public static class Pkcs5Pbkd2ReferenceVectors
             TestKeys.LogoutIfRequired(backend, session);
             session.Dispose();
         }
-    }
-}
-
-[Collection("Kryoptic")]
-public sealed class Pkcs5Pbkd2ReferenceVectorTests_Kryoptic(KryopticBackendFixture backend)
-{
-    private readonly KryopticBackendFixture _backend = backend;
-
-    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    [MemberData(nameof(Pkcs5Pbkd2ReferenceVectors.SharedPrfs), MemberType = typeof(Pkcs5Pbkd2ReferenceVectors))]
-    public void SharedPrf_MatchesIndependentReference(CKP prf, string salt, string expectedHex, int outputLength)
-    {
-        _backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        byte[] actual = Pkcs5Pbkd2ReferenceVectors.Derive(_backend, prf, salt, outputLength);
-        Assert.Equal(Convert.FromHexString(expectedHex), actual);
-    }
-
-    [Theory(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    [MemberData(nameof(Pkcs5Pbkd2ReferenceVectors.KryopticOnlyPrfs), MemberType = typeof(Pkcs5Pbkd2ReferenceVectors))]
-    public void KryopticOnlyPrf_MatchesIndependentReference(CKP prf, string salt, string expectedHex, int outputLength)
-    {
-        _backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        byte[] actual = Pkcs5Pbkd2ReferenceVectors.Derive(_backend, prf, salt, outputLength);
-        Assert.Equal(Convert.FromHexString(expectedHex), actual);
-    }
-}
-
-[Collection("Nss")]
-public sealed class Pkcs5Pbkd2ReferenceVectorTests_Nss(NssBackendFixture backend)
-{
-    private readonly NssBackendFixture _backend = backend;
-
-    [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    [MemberData(nameof(Pkcs5Pbkd2ReferenceVectors.SharedPrfs), MemberType = typeof(Pkcs5Pbkd2ReferenceVectors))]
-    public void SharedPrf_MatchesIndependentReference(CKP prf, string salt, string expectedHex, int outputLength)
-    {
-        _backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        byte[] actual = Pkcs5Pbkd2ReferenceVectors.Derive(_backend, prf, salt, outputLength);
-        Assert.Equal(Convert.FromHexString(expectedHex), actual);
     }
 }
