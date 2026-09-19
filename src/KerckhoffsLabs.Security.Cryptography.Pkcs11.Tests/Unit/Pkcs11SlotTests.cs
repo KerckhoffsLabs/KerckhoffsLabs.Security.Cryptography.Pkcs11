@@ -194,37 +194,37 @@ public sealed class Pkcs11SlotTests
         Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).GetMechanismList());
     }
 
-    // === InitToken ========================================================
+    // === InitTokenWithPin ========================================================
 
     [Fact]
-    public void InitToken_NullPin_Throws()
+    public void InitTokenWithPin_NullPin_Throws()
     {
-        var ex = Assert.Throws<ArgumentNullException>(() => NewSlot(new SlotFake()).InitToken(null!, "label"));
+        var ex = Assert.Throws<ArgumentNullException>(() => NewSlot(new SlotFake()).InitTokenWithPin(null!, "label"));
         Assert.Equal("soPin", ex.ParamName);
     }
 
     [Fact]
-    public void InitToken_NullLabel_Throws()
+    public void InitTokenWithPin_NullLabel_Throws()
     {
         using var pin = new SecurePin("1234");
-        var ex = Assert.Throws<ArgumentNullException>(() => NewSlot(new SlotFake()).InitToken(pin, null!));
+        var ex = Assert.Throws<ArgumentNullException>(() => NewSlot(new SlotFake()).InitTokenWithPin(pin, null!));
         Assert.Equal("label", ex.ParamName);
     }
 
     [Fact]
-    public void InitToken_LabelTooLong_Throws()
+    public void InitTokenWithPin_LabelTooLong_Throws()
     {
         using var pin = new SecurePin("1234");
-        var ex = Assert.Throws<ArgumentException>(() => NewSlot(new SlotFake()).InitToken(pin, new string('a', 33)));
+        var ex = Assert.Throws<ArgumentException>(() => NewSlot(new SlotFake()).InitTokenWithPin(pin, new string('a', 33)));
         Assert.Equal("label", ex.ParamName);
     }
 
     [Fact]
-    public void InitToken_Ok_PadsLabelToThirtyTwoSpacesAndPassesPin()
+    public void InitTokenWithPin_Ok_PadsLabelToThirtyTwoSpacesAndPassesPin()
     {
         var fake = new SlotFake();
         using var pin = new SecurePin([1, 2, 3, 4]);
-        NewSlot(fake).InitToken(pin, "tok");
+        NewSlot(fake).InitTokenWithPin(pin, "tok");
 
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, fake.CapturedPin);
         Assert.Equal(4UL, (ulong)fake.CapturedPinLen);
@@ -235,11 +235,11 @@ public sealed class Pkcs11SlotTests
     }
 
     [Fact]
-    public void InitToken_Error_Throws()
+    public void InitTokenWithPin_Error_Throws()
     {
         var fake = new SlotFake { InitTokenRv = CKR.CKR_PIN_INCORRECT };
         using var pin = new SecurePin("1234");
-        Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).InitToken(pin, "label"));
+        Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).InitTokenWithPin(pin, "label"));
     }
 
     // === OpenSession ======================================================

@@ -86,14 +86,14 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     // === Pkcs11Slot (public) =================================================
 
     [Fact]
-    public void SlotInitToken_NoPin_ReachesNativeCallAsNull()
+    public void SlotInitTokenWithPinpad_NoPin_ReachesNativeCallAsNull()
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
 
         // pkcs11-mock returns CKR_ARGUMENTS_BAD before touching any token state, so this is safe to
         // run against the collection-shared mock instance.
-        AssertArgumentsBad(() => slot.InitToken(_backend.TokenLabel));
+        AssertArgumentsBad(() => slot.InitTokenWithPinpad(_backend.TokenLabel));
     }
 
     // === Pkcs11Library / Pkcs11Workspace (public) ===========================
@@ -103,20 +103,20 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         AssertArgumentsBad(() => _backend.Library.OpenWorkspaceWithPinpad(_backend.TokenLabel, CKU.CKU_USER));
 
     [Fact]
-    public void WorkspaceSetPin_NoArgs_ReachesNativeCallAsNull()
+    public void WorkspaceSetPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
     {
         using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-        AssertArgumentsBad(workspace.SetPin);
+        AssertArgumentsBad(workspace.SetPinWithPinpad);
     }
 
     [Fact]
-    public void WorkspaceInitPin_NoArgs_ReachesNativeCallAsNull()
+    public void WorkspaceInitPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
     {
         using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_SO, new SecurePin(_backend.SoPin.Span));
 
-        AssertArgumentsBad(workspace.InitPin);
+        AssertArgumentsBad(workspace.InitPinWithPinpad);
     }
 }

@@ -100,11 +100,11 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
             Pkcs11Slot slot = Library.GetSlotList().FirstOrDefault(s => s.SlotId.Value == SlotNumber)
                 ?? throw new InvalidOperationException($"Kryoptic slot {SlotNumber} did not appear in the slot list.");
 
-            slot.InitToken(new SecurePin(SoPin.Span), TokenLabel);
+            slot.InitTokenWithPin(new SecurePin(SoPin.Span), TokenLabel);
 
             using (Pkcs11Workspace so = Library.OpenWorkspaceWithPin(TokenLabel, CKU.CKU_SO, new SecurePin(SoPin.Span)))
             {
-                so.InitPin(new SecurePin(UserPin.Span));
+                so.InitPinWithPin(new SecurePin(UserPin.Span));
             }
 
             SlotId = (NativeCULong)slot.SlotId.Value;

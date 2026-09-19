@@ -151,7 +151,7 @@ public sealed class Pkcs11Slot
     /// encodes to more than 32 bytes of UTF-8.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying
     /// <c>C_InitToken</c> call.</exception>
-    public void InitToken(SecurePin soPin, string label)
+    public void InitTokenWithPin(SecurePin soPin, string label)
     {
         ArgumentNullException.ThrowIfNull(soPin);
         ArgumentNullException.ThrowIfNull(label);
@@ -190,7 +190,7 @@ public sealed class Pkcs11Slot
     /// encodes to more than 32 bytes of UTF-8.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying
     /// <c>C_InitToken</c> call.</exception>
-    public void InitToken(string label)
+    public void InitTokenWithPinpad(string label)
     {
         ArgumentNullException.ThrowIfNull(label);
 

@@ -729,7 +729,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="oldPin"/> or <paramref name="newPin"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change (e.g. wrong old PIN, policy violation).</exception>
-    public void SetPin(SecurePin oldPin, SecurePin newPin)
+    public void SetPinWithPin(SecurePin oldPin, SecurePin newPin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(oldPin);
@@ -745,7 +745,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the change.</exception>
-    public void SetPin()
+    public void SetPinWithPinpad()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _session.SetPin();
@@ -759,7 +759,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="userPin"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
-    public void InitPin(SecurePin userPin)
+    public void InitPinWithPin(SecurePin userPin)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(userPin);
@@ -774,7 +774,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">The token rejected the operation (e.g. not logged in as SO).</exception>
-    public void InitPin()
+    public void InitPinWithPinpad()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _session.InitPin();
