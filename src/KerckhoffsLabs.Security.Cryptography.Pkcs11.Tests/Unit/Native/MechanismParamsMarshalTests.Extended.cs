@@ -226,15 +226,15 @@ public sealed class MechanismKdfParamsTests
     {
         byte[] salt = [1, 2, 3, 4];
         byte[] info = [9, 8, 7];
-        var p = new CkmHkdfParams(extract: true, expand: true, CKM.CKM_SHA256_HMAC,
-            saltType: 1, salt, saltKey: 0, info);
+        var p = new CkmHkdfParams(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC,
+            HkdfSaltType.Null, salt, saltKey: 0, info);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.True(s.Extract);
         Assert.True(s.Expand);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfHashMechanism);
-        Assert.Equal(1UL, (ulong)s.SaltType);
+        Assert.Equal((ulong)HkdfSaltType.Null, (ulong)s.SaltType);
         Assert.Equal((ulong)salt.Length, (ulong)s.SaltLen);
         Assert.Equal(salt, UnmanagedMemory.Read(s.Salt, salt.Length));
         Assert.Equal((ulong)info.Length, (ulong)s.InfoLen);
@@ -242,15 +242,15 @@ public sealed class MechanismKdfParamsTests
     }
 
     [Fact]
-    public void Hkdf_EmptySaltAndInfo_NullPointersFalseFlags()
+    public void Hkdf_EmptySaltAndInfo_NullPointers()
     {
-        var p = new CkmHkdfParams(extract: false, expand: false, CKM.CKM_SHA256_HMAC,
-            saltType: 0, default, saltKey: 0, default);
+        var p = new CkmHkdfParams(HkdfOperation.ExpandOnly, CKM.CKM_SHA256_HMAC,
+            HkdfSaltType.Null, default, saltKey: 0, default);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
 
         Assert.False(s.Extract);
-        Assert.False(s.Expand);
+        Assert.True(s.Expand);
         Assert.Equal(IntPtr.Zero, s.Salt);
         Assert.Equal(0UL, (ulong)s.SaltLen);
         Assert.Equal(IntPtr.Zero, s.Info);
@@ -353,7 +353,7 @@ public sealed class MechanismPqcSignParamsTests
     [Fact]
     public void Xeddsa_MarshalsHashType()
     {
-        var p = new CkmXeddsaParams(hashType: (ulong)CKM.CKM_SHA512);
+        var p = new CkmXeddsaParams(CKM.CKM_SHA512);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_XEDDSA_PARAMS>(p.BuildMarshalable(scope));
 
@@ -436,11 +436,11 @@ public sealed class MechanismSignalParamsTests
     {
         byte[] sig = [1, 2, 3];
         byte[] otk = [4, 5];
-        var p = new CkmX3dhInitiateParams(kdf: 1, peerIdentity: 2, peerPrekey: 3, sig, otk, ownIdentity: 4, ownEphemeral: 5);
+        var p = new CkmX3dhInitiateParams(kdf: CKM.CKM_SHA256_HMAC, peerIdentity: 2, peerPrekey: 3, sig, otk, ownIdentity: 4, ownEphemeral: 5);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_X3DH_INITIATE_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.Equal(1UL, (ulong)s.Kdf);
+        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.Kdf);
         Assert.Equal(2UL, (ulong)s.PeerIdentity);
         Assert.Equal(3UL, (ulong)s.PeerPrekey);
         Assert.Equal(4UL, (ulong)s.OwnIdentity);
@@ -456,11 +456,11 @@ public sealed class MechanismSignalParamsTests
         byte[] pre = [0x22, 0x23];
         byte[] otp = [0x33];
         byte[] eph = [0x44, 0x45, 0x46];
-        var p = new CkmX3dhRespondParams(kdf: 7, id, pre, otp, initiatorIdentity: 8, eph);
+        var p = new CkmX3dhRespondParams(kdf: CKM.CKM_SHA384_HMAC, id, pre, otp, initiatorIdentity: 8, eph);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_X3DH_RESPOND_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.Equal(7UL, (ulong)s.Kdf);
+        Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.Kdf);
         Assert.Equal(8UL, (ulong)s.InitiatorIdentity);
         Assert.Equal(id, UnmanagedMemory.Read(s.IdentityId, id.Length));
         Assert.Equal(pre, UnmanagedMemory.Read(s.PrekeyId, pre.Length));
@@ -473,7 +473,7 @@ public sealed class MechanismSignalParamsTests
     {
         byte[] sk = [1, 2, 3, 4, 5, 6, 7, 8];
         var p = new CkmX2RatchetInitializeParams(sk, peerPublicPrekey: 1, peerPublicIdentity: 2,
-            ownPublicIdentity: 3, encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 5);
+            ownPublicIdentity: 3, encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_X2RATCHET_INITIALIZE_PARAMS>(p.BuildMarshalable(scope));
 
@@ -484,19 +484,19 @@ public sealed class MechanismSignalParamsTests
         Assert.True(s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
-        Assert.Equal(5UL, (ulong)s.KdfMechanism);
+        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.KdfMechanism);
     }
 
     [Fact]
     public void X2RatchetInitialize_RejectsEmptySharedSecret() =>
-        Assert.Throws<ArgumentException>(() => new CkmX2RatchetInitializeParams(default, 1, 2, 3, false, 4, CKM.CKM_AES_GCM, 5));
+        Assert.Throws<ArgumentException>(() => new CkmX2RatchetInitializeParams(default, 1, 2, 3, false, 4, CKM.CKM_AES_GCM, CKM.CKM_SHA256_HMAC));
 
     [Fact]
     public void X2RatchetRespond_MarshalsSecretFlagsAndMechanisms()
     {
         byte[] sk = [9, 8, 7, 6];
         var p = new CkmX2RatchetRespondParams(sk, ownPrekey: 1, initiatorIdentity: 2,
-            ownPublicIdentity: 3, encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 6);
+            ownPublicIdentity: 3, encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC);
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_X2RATCHET_RESPOND_PARAMS>(p.BuildMarshalable(scope));
 
@@ -507,10 +507,10 @@ public sealed class MechanismSignalParamsTests
         Assert.False(s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
-        Assert.Equal(6UL, (ulong)s.KdfMechanism);
+        Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.KdfMechanism);
     }
 
     [Fact]
     public void X2RatchetRespond_RejectsEmptySharedSecret() =>
-        Assert.Throws<ArgumentException>(() => new CkmX2RatchetRespondParams(default, 1, 2, 3, false, 4, CKM.CKM_AES_GCM, 6));
+        Assert.Throws<ArgumentException>(() => new CkmX2RatchetRespondParams(default, 1, 2, 3, false, 4, CKM.CKM_AES_GCM, CKM.CKM_SHA384_HMAC));
 }

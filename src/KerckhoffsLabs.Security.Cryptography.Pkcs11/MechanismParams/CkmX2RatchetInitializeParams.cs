@@ -16,7 +16,7 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
     private readonly bool _encryptedHeader;
     private readonly ulong _curve;
     private readonly CKM _aeadMechanism;
-    private readonly ulong _kdfMechanism;
+    private readonly CKM _kdfMechanism;
 
     /// <summary>
     /// Initializes X2 Ratchet initiator parameters.
@@ -26,10 +26,14 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
     /// <param name="peerPublicIdentity">Peer's public-identity handle.</param>
     /// <param name="ownPublicIdentity">Our own public-identity handle.</param>
     /// <param name="encryptedHeader">True to enable header encryption.</param>
-    /// <param name="curve">Elliptic curve identifier.</param>
+    /// <param name="curve">Elliptic curve identifier. Left untyped: the spec gives this field no dedicated type at all (plain <c>CK_ULONG</c>), unlike <paramref name="kdfMechanism"/>.</param>
     /// <param name="aeadMechanism">AEAD mechanism for messages.</param>
-    /// <param name="kdfMechanism">KDF mechanism for the ratchet (CK_X2RATCHET_KDF_TYPE).</param>
-    public CkmX2RatchetInitializeParams(ReadOnlySpan<byte> sk, ulong peerPublicPrekey, ulong peerPublicIdentity, ulong ownPublicIdentity, bool encryptedHeader, ulong curve, CKM aeadMechanism, ulong kdfMechanism)
+    /// <param name="kdfMechanism">
+    /// KDF mechanism for the ratchet (CK_X2RATCHET_KDF_TYPE). The spec typedefs this as a bare
+    /// <c>CK_ULONG</c> with no constants of its own, reusing the mechanism-type namespace — the
+    /// same convention as <paramref name="aeadMechanism"/>.
+    /// </param>
+    public CkmX2RatchetInitializeParams(ReadOnlySpan<byte> sk, ulong peerPublicPrekey, ulong peerPublicIdentity, ulong ownPublicIdentity, bool encryptedHeader, ulong curve, CKM aeadMechanism, CKM kdfMechanism)
     {
         if (sk.IsEmpty) throw new ArgumentException("Shared-secret bytes must not be empty.", nameof(sk));
 
@@ -55,7 +59,7 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
             EncryptedHeader = _encryptedHeader,
             Curve = (NativeCULong)_curve,
             AeadMechanism = _aeadMechanism.ToCULong(),
-            KdfMechanism = (NativeCULong)_kdfMechanism,
+            KdfMechanism = _kdfMechanism.ToCULong(),
         };
     }
 }

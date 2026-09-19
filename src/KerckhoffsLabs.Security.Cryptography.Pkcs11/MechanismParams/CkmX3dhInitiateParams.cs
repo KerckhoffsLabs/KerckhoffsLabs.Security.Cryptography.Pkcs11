@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
@@ -10,7 +11,7 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
 {
     private readonly byte[] _prekeySignatureBytes;
     private readonly byte[] _onetimeKeyBytes;
-    private readonly ulong _kdf;
+    private readonly CKM _kdf;
     private readonly ulong _peerIdentity;
     private readonly ulong _peerPrekey;
     private readonly ulong _ownIdentity;
@@ -19,14 +20,17 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     /// <summary>
     /// Initializes X3DH initiator parameters.
     /// </summary>
-    /// <param name="kdf">KDF algorithm tag (CK_X3DH_KDF_TYPE).</param>
+    /// <param name="kdf">
+    /// KDF algorithm tag (CK_X3DH_KDF_TYPE). The spec typedefs this as a bare <c>CK_ULONG</c> with
+    /// no constants of its own, reusing the mechanism-type namespace.
+    /// </param>
     /// <param name="peerIdentity">Peer's identity-key handle.</param>
     /// <param name="peerPrekey">Peer's signed-prekey handle.</param>
     /// <param name="prekeySignature">Peer's prekey signature bytes.</param>
     /// <param name="onetimeKey">Optional peer one-time prekey value.</param>
     /// <param name="ownIdentity">Our own identity-key handle.</param>
     /// <param name="ownEphemeral">Our own ephemeral-key handle.</param>
-    public CkmX3dhInitiateParams(ulong kdf, ulong peerIdentity, ulong peerPrekey, ReadOnlySpan<byte> prekeySignature, ReadOnlySpan<byte> onetimeKey, ulong ownIdentity, ulong ownEphemeral)
+    public CkmX3dhInitiateParams(CKM kdf, ulong peerIdentity, ulong peerPrekey, ReadOnlySpan<byte> prekeySignature, ReadOnlySpan<byte> onetimeKey, ulong ownIdentity, ulong ownEphemeral)
     {
         _prekeySignatureBytes = prekeySignature.IsEmpty ? [] : prekeySignature.ToArray();
         _onetimeKeyBytes = onetimeKey.IsEmpty ? [] : onetimeKey.ToArray();
@@ -42,7 +46,7 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     {
         return new CK_X3DH_INITIATE_PARAMS
         {
-            Kdf = (NativeCULong)_kdf,
+            Kdf = _kdf.ToCULong(),
             PeerIdentity = (NativeCULong)_peerIdentity,
             PeerPrekey = (NativeCULong)_peerPrekey,
             PrekeySignature = scope.Write(_prekeySignatureBytes),

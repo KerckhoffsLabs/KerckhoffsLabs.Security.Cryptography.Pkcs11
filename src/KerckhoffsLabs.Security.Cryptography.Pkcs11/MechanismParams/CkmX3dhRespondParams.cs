@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
@@ -12,19 +13,22 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     private readonly byte[] _prekeyIdBytes;
     private readonly byte[] _onetimeIdBytes;
     private readonly byte[] _initiatorEphemeralBytes;
-    private readonly ulong _kdf;
+    private readonly CKM _kdf;
     private readonly ulong _initiatorIdentity;
 
     /// <summary>
     /// Initializes X3DH responder parameters.
     /// </summary>
-    /// <param name="kdf">KDF algorithm tag (CK_X3DH_KDF_TYPE).</param>
+    /// <param name="kdf">
+    /// KDF algorithm tag (CK_X3DH_KDF_TYPE). The spec typedefs this as a bare <c>CK_ULONG</c> with
+    /// no constants of its own, reusing the mechanism-type namespace.
+    /// </param>
     /// <param name="identityId">Identity-key identifier bytes.</param>
     /// <param name="prekeyId">Prekey identifier bytes.</param>
     /// <param name="onetimeId">One-time prekey identifier bytes.</param>
     /// <param name="initiatorIdentity">Initiator's identity-key handle.</param>
     /// <param name="initiatorEphemeral">Initiator's ephemeral public-key bytes.</param>
-    public CkmX3dhRespondParams(ulong kdf, ReadOnlySpan<byte> identityId, ReadOnlySpan<byte> prekeyId, ReadOnlySpan<byte> onetimeId, ulong initiatorIdentity, ReadOnlySpan<byte> initiatorEphemeral)
+    public CkmX3dhRespondParams(CKM kdf, ReadOnlySpan<byte> identityId, ReadOnlySpan<byte> prekeyId, ReadOnlySpan<byte> onetimeId, ulong initiatorIdentity, ReadOnlySpan<byte> initiatorEphemeral)
     {
         _identityIdBytes = identityId.IsEmpty ? [] : identityId.ToArray();
         _prekeyIdBytes = prekeyId.IsEmpty ? [] : prekeyId.ToArray();
@@ -39,7 +43,7 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     {
         return new CK_X3DH_RESPOND_PARAMS
         {
-            Kdf = (NativeCULong)_kdf,
+            Kdf = _kdf.ToCULong(),
             IdentityId = scope.Write(_identityIdBytes),
             PrekeyId = scope.Write(_prekeyIdBytes),
             OnetimeId = scope.Write(_onetimeIdBytes),

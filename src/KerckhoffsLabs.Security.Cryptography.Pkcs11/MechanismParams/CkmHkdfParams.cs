@@ -20,21 +20,27 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// <summary>
     /// Initializes the HKDF parameters.
     /// </summary>
-    /// <param name="extract">Perform the HKDF-Extract step.</param>
-    /// <param name="expand">Perform the HKDF-Expand step.</param>
+    /// <param name="operation">Which HKDF step(s) to perform.</param>
     /// <param name="prfHashMechanism">PRF mechanism (typically a CKM_*_HMAC variant).</param>
-    /// <param name="saltType">Salt type: 1 = SALT_NULL, 2 = SALT_DATA, 4 = SALT_KEY.</param>
-    /// <param name="salt">Salt bytes when saltType = SALT_DATA; pass <c>default</c> otherwise.</param>
-    /// <param name="saltKey">Salt key handle when saltType = SALT_KEY; pass 0 otherwise.</param>
+    /// <param name="saltType">Salt source.</param>
+    /// <param name="salt">Salt bytes when <paramref name="saltType"/> is <see cref="HkdfSaltType.Data"/>; ignored otherwise.</param>
+    /// <param name="saltKey">Salt key handle when <paramref name="saltType"/> is <see cref="HkdfSaltType.Key"/>; ignored otherwise.</param>
     /// <param name="info">Application-specific context bytes.</param>
-    public CkmHkdfParams(bool extract, bool expand, CKM prfHashMechanism, ulong saltType, ReadOnlySpan<byte> salt, ulong saltKey, ReadOnlySpan<byte> info)
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="operation"/> is not a defined <see cref="HkdfOperation"/> member.</exception>
+    public CkmHkdfParams(HkdfOperation operation, CKM prfHashMechanism, HkdfSaltType saltType,
+        ReadOnlySpan<byte> salt = default, ulong saltKey = 0, ReadOnlySpan<byte> info = default)
     {
         _saltBytes = salt.IsEmpty ? [] : salt.ToArray();
         _infoBytes = info.IsEmpty ? [] : info.ToArray();
-        _extract = extract;
-        _expand = expand;
+        (_extract, _expand) = operation switch
+        {
+            HkdfOperation.ExtractOnly => (true, false),
+            HkdfOperation.ExpandOnly => (false, true),
+            HkdfOperation.ExtractAndExpand => (true, true),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Not a defined HkdfOperation member."),
+        };
         _prfHashMechanism = prfHashMechanism;
-        _saltType = saltType;
+        _saltType = (ulong)saltType;
         _saltKey = saltKey;
     }
 

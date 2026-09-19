@@ -89,12 +89,12 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void XeddsaParams_MarshalsItsFields()
     {
-        var p = new CkmXeddsaParams(hashType: 1);
+        var p = new CkmXeddsaParams(CKM.CKM_SHA512);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_XEDDSA_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.Equal(1UL, (ulong)s.Hash);
+        Assert.Equal((ulong)CKM.CKM_SHA512, (ulong)s.Hash);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -184,7 +184,7 @@ public sealed class BuildMarshalableTests
         byte[] sk = [0x51, 0x52, 0x53, 0x54];
         var p = new CkmX2RatchetInitializeParams(
             sk, peerPublicPrekey: 1, peerPublicIdentity: 2, ownPublicIdentity: 3,
-            encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 5);
+            encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_X2RATCHET_INITIALIZE_PARAMS)p.BuildMarshalable(scope);
@@ -195,7 +195,7 @@ public sealed class BuildMarshalableTests
         Assert.True(s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
-        Assert.Equal(5UL, (ulong)s.KdfMechanism);
+        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.KdfMechanism);
         AssertBlockHolds(s.Sk, sk);
     }
 
@@ -205,7 +205,7 @@ public sealed class BuildMarshalableTests
         byte[] sk = [0x61, 0x62, 0x63, 0x64];
         var p = new CkmX2RatchetRespondParams(
             sk, ownPrekey: 1, initiatorIdentity: 2, ownPublicIdentity: 3,
-            encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: 6);
+            encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_X2RATCHET_RESPOND_PARAMS)p.BuildMarshalable(scope);
@@ -216,7 +216,7 @@ public sealed class BuildMarshalableTests
         Assert.False(s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
-        Assert.Equal(6UL, (ulong)s.KdfMechanism);
+        Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.KdfMechanism);
         AssertBlockHolds(s.Sk, sk);
     }
 
@@ -313,7 +313,7 @@ public sealed class BuildMarshalableTests
         byte[] salt = [0x01, 0x02, 0x03];
         byte[] info = [0xF0, 0xF1, 0xF2, 0xF3];
         var p = new CkmHkdfParams(
-            extract: true, expand: true, CKM.CKM_SHA256_HMAC, saltType: 2, salt, saltKey: 9, info);
+            HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSaltType.Data, salt, saltKey: 9, info);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
@@ -321,7 +321,7 @@ public sealed class BuildMarshalableTests
         Assert.True(s.Extract);
         Assert.True(s.Expand);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfHashMechanism);
-        Assert.Equal(2UL, (ulong)s.SaltType);
+        Assert.Equal((ulong)HkdfSaltType.Data, (ulong)s.SaltType);
         Assert.Equal(3UL, (ulong)s.SaltLen);
         Assert.Equal(9UL, (ulong)s.SaltKey);
         Assert.Equal(4UL, (ulong)s.InfoLen);
@@ -409,12 +409,12 @@ public sealed class BuildMarshalableTests
         byte[] prekeySignature = [0x51, 0x52, 0x53, 0x54, 0x55];
         byte[] onetimeKey = [0x61, 0x62, 0x63];
         var p = new CkmX3dhInitiateParams(
-            kdf: 1, peerIdentity: 2, peerPrekey: 3, prekeySignature, onetimeKey, ownIdentity: 4, ownEphemeral: 5);
+            kdf: CKM.CKM_SHA256_HMAC, peerIdentity: 2, peerPrekey: 3, prekeySignature, onetimeKey, ownIdentity: 4, ownEphemeral: 5);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_X3DH_INITIATE_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.Equal(1UL, (ulong)s.Kdf);
+        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.Kdf);
         Assert.Equal(2UL, (ulong)s.PeerIdentity);
         Assert.Equal(3UL, (ulong)s.PeerPrekey);
         Assert.Equal(4UL, (ulong)s.OwnIdentity);
@@ -431,12 +431,12 @@ public sealed class BuildMarshalableTests
         byte[] onetimeId = [0x91, 0x92, 0x93, 0x94];
         byte[] initiatorEphemeral = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5];
         var p = new CkmX3dhRespondParams(
-            kdf: 6, identityId, prekeyId, onetimeId, initiatorIdentity: 7, initiatorEphemeral);
+            kdf: CKM.CKM_SHA384_HMAC, identityId, prekeyId, onetimeId, initiatorIdentity: 7, initiatorEphemeral);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_X3DH_RESPOND_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.Equal(6UL, (ulong)s.Kdf);
+        Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.Kdf);
         Assert.Equal(7UL, (ulong)s.InitiatorIdentity);
         AssertBlockHolds(s.IdentityId, identityId);
         AssertBlockHolds(s.PrekeyId, prekeyId);
