@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
@@ -351,6 +352,38 @@ internal static class IkeDeriveTestCases
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, outputLength);
             Assert.Equal(expectedMac, actualMac);
+        }
+        finally { DestroyByLabel(workspace, label); }
+    }
+
+    // === Negative case: base-key-type enforcement =================================================
+
+    // NSS's sftkike.c never checks the base key's CKA_KEY_TYPE at all (see the class doc comment),
+    // so this case is Kryoptic-only rather than a shared cross-backend assertion — wiring it into
+    // IkeDeriveTests.Nss.cs would fail there, not because NSS is non-conformant in a way worth
+    // guarding against, but because it simply doesn't perform this particular check.
+    internal static void Assert_IkePrf_RejectsGenericSecretBaseKey(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
+        using var workspace = backend.OpenWorkspace();
+        byte[] inKey = RandomNumberGenerator.GetBytes(32);
+        byte[] ni = RandomNumberGenerator.GetBytes(16);
+        byte[] nr = RandomNumberGenerator.GetBytes(16);
+
+        string label = $"ike-prf-wrongtype-{Guid.NewGuid():N}";
+        try
+        {
+            // Deliberately CKK_GENERIC_SECRET (ImportSecret's default): PKCS#11 v3.0 §6.64.3
+            // requires the base key's CKA_KEY_TYPE to match prfMechanism exactly when bDataAsKey
+            // is false, and does not admit generic secret.
+            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
+                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
+            using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
+                .ValueLen(Sha256Size).Sign().Build();
+
+            var ex = Assert.ThrowsAny<Pkcs11Exception>(() => baseKey.Derive(mechanism, template));
+            Assert.Equal(CKR.CKR_KEY_TYPE_INCONSISTENT, ex.ReturnValue);
         }
         finally { DestroyByLabel(workspace, label); }
     }

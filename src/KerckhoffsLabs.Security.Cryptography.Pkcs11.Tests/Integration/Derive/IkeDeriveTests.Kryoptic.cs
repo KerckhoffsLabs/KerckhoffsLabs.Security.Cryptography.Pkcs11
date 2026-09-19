@@ -34,4 +34,9 @@ public sealed class IkeDeriveTests_Kryoptic(KryopticBackendFixture backend)
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ike2PrfPlusDerive_MatchesBclViaSignProbe() => IkeDeriveTestCases.Assert_Ike2PrfPlusDerive_MatchesBclViaSignProbe(_backend);
+
+    // Kryoptic-only: NSS's sftkike.c never checks the base key's CKA_KEY_TYPE at all, so this
+    // negative case isn't a shared cross-backend assertion — see IkeDeriveTestCases's doc comment.
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void IkePrf_RejectsGenericSecretBaseKey() => IkeDeriveTestCases.Assert_IkePrf_RejectsGenericSecretBaseKey(_backend);
 }
