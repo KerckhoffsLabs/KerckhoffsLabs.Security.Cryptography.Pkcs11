@@ -22,7 +22,16 @@ public sealed class Pkcs11Library : IDisposable
 {
     private bool _disposed;
 
-    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Library>();
+    private readonly ILogger _logger;
+
+    /// <summary>
+    /// The factory this instance was constructed with, or <see langword="null"/> if it relies on
+    /// the shared <see cref="Pkcs11Logging"/> factory instead. Handed down to every
+    /// <see cref="Pkcs11Slot"/> and <c>Pkcs11Session</c> this library produces, so a whole
+    /// library/slot/session chain shares one independently-configurable logging setup instead of
+    /// every instance in the process sharing <see cref="Pkcs11Logging"/>'s single global factory.
+    /// </summary>
+    private readonly ILoggerFactory? _loggerFactory;
 
     private readonly string? _libraryPath;
 
@@ -66,10 +75,17 @@ public sealed class Pkcs11Library : IDisposable
     /// v2.20+ recommended path).
     /// </summary>
     /// <param name="libraryPath">Library name or path.</param>
+    /// <param name="loggerFactory">
+    /// Logger factory for this instance and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
+    /// produces. Pass <see langword="null"/> (the default) to fall back to the shared
+    /// <see cref="Pkcs11Logging"/> factory — the same behavior as before this parameter existed.
+    /// Passing an explicit factory lets independent consumers in the same process configure
+    /// logging per <see cref="Pkcs11Library"/> instance instead of sharing one process-wide setting.
+    /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    public static Pkcs11Library Load(string libraryPath)
-        => new(libraryPath, useStaticLink: false);
+    public static Pkcs11Library Load(string libraryPath, ILoggerFactory? loggerFactory = null)
+        => new(libraryPath, useStaticLink: false, loggerFactory);
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -113,19 +129,26 @@ public sealed class Pkcs11Library : IDisposable
     /// library's, and the platforms differ. A dynamically loaded module's symbols stay private to it
     /// on Linux, but macOS resolves more permissively: in a process that has already loaded a PKCS#11
     /// module by path, this method can bind <i>that</i> module rather than failing. Use
-    /// <see cref="Load(string)"/> when you mean a specific module.
+    /// <see cref="Load(string, ILoggerFactory?)"/> when you mean a specific module.
     /// </para>
     /// </remarks>
+    /// <param name="loggerFactory">
+    /// Logger factory for this instance and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
+    /// produces. Pass <see langword="null"/> (the default) to fall back to the shared
+    /// <see cref="Pkcs11Logging"/> factory.
+    /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
     /// <exception cref="EntryPointNotFoundException">
     /// The host executable does not export <c>C_GetFunctionList</c>.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    public static Pkcs11Library LoadStaticallyLinked()
-        => new(libraryPath: "<statically-linked>", useStaticLink: true);
+    public static Pkcs11Library LoadStaticallyLinked(ILoggerFactory? loggerFactory = null)
+        => new(libraryPath: "<statically-linked>", useStaticLink: true, loggerFactory);
 
-    private Pkcs11Library(string libraryPath, bool useStaticLink)
+    private Pkcs11Library(string libraryPath, bool useStaticLink, ILoggerFactory? loggerFactory)
     {
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory?.CreateLogger<Pkcs11Library>() ?? Pkcs11Logging.CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
 
         _libraryPath = libraryPath;
@@ -157,9 +180,11 @@ public sealed class Pkcs11Library : IDisposable
     /// <c>C_Initialize</c> exactly as the production ctor does. Lets the high-level API and the
     /// <c>Algorithms</c> adapters be exercised end-to-end without a native PKCS#11 library.
     /// </summary>
-    internal Pkcs11Library(ILowLevelPkcs11Library lowLevel)
+    internal Pkcs11Library(ILowLevelPkcs11Library lowLevel, ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(lowLevel);
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory?.CreateLogger<Pkcs11Library>() ?? Pkcs11Logging.CreateLogger<Pkcs11Library>();
         _libraryPath = "<in-process>";
         _pkcs11Library = lowLevel;
 
@@ -286,7 +311,7 @@ public sealed class Pkcs11Library : IDisposable
 
         List<Pkcs11Slot> list = [];
         foreach (NativeCULong slot in slotList)
-            list.Add(new Pkcs11Slot(LowLevel, (ulong)slot));
+            list.Add(new Pkcs11Slot(LowLevel, (ulong)slot, _loggerFactory));
 
         return list;
     }

@@ -18,7 +18,15 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Slot>();
+    private readonly ILogger _logger;
+
+    /// <summary>
+    /// The factory this instance was constructed with (inherited from the owning
+    /// <see cref="Pkcs11Library"/>), or <see langword="null"/> if it relies on the shared
+    /// <see cref="Pkcs11Logging"/> factory instead. Handed down to every <c>Pkcs11Session</c>
+    /// this slot opens.
+    /// </summary>
+    private readonly ILoggerFactory? _loggerFactory;
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -40,8 +48,14 @@ public sealed class Pkcs11Slot
     /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="slotId">PKCS#11 handle of slot</param>
-    internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId)
+    /// <param name="loggerFactory">
+    /// Logger factory inherited from the owning <see cref="Pkcs11Library"/>; <see langword="null"/>
+    /// falls back to the shared <see cref="Pkcs11Logging"/> factory.
+    /// </param>
+    internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId, ILoggerFactory? loggerFactory = null)
     {
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory?.CreateLogger<Pkcs11Slot>() ?? Pkcs11Logging.CreateLogger<Pkcs11Slot>();
         Log.SlotTrace(_logger, slotId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
@@ -235,6 +249,6 @@ public sealed class Pkcs11Slot
                 "Opened {SessionType} session {SessionId} with token in slot {SlotId}",
                 readWrite ? "read-write" : "read-only", sessionId, _slotId);
 
-        return new Pkcs11Session(_pkcs11Library, (ulong)sessionId);
+        return new Pkcs11Session(_pkcs11Library, (ulong)sessionId, _loggerFactory);
     }
 }

@@ -29,7 +29,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// <summary>
     /// Logger responsible for message logging
     /// </summary>
-    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger<Pkcs11Session>();
+    private readonly ILogger _logger;
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -270,8 +270,13 @@ internal sealed class Pkcs11Session : IDisposable
     /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
     /// <param name="sessionId">PKCS#11 handle of session</param>
-    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)
+    /// <param name="loggerFactory">
+    /// Logger factory inherited from the owning <see cref="Pkcs11Slot"/>/<see cref="Pkcs11Library"/>;
+    /// <see langword="null"/> falls back to the shared <see cref="Pkcs11Logging"/> factory.
+    /// </param>
+    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null)
     {
+        _logger = loggerFactory?.CreateLogger<Pkcs11Session>() ?? Pkcs11Logging.CreateLogger<Pkcs11Session>();
         Log.SessionTrace(_logger, sessionId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);
