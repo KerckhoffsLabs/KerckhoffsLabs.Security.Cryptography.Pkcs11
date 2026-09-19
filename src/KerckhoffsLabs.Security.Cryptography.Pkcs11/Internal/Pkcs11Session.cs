@@ -1551,7 +1551,20 @@ internal sealed class Pkcs11Session : IDisposable
 
         NativeCULong publicKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
         NativeCULong privateKeyId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, privateKeyTemplate, ref publicKeyId, ref privateKeyId);
+
+        // NSS bug 1012786: C_GenerateKeyPair (RSA in particular) can fail with CKR_FUNCTION_FAILED
+        // under a transient RNG hiccup (e.g. an interrupted read()/getentropy() syscall). PKCS#11
+        // v3.2 §11.1.1 explicitly distinguishes this from CKR_GENERAL_ERROR as retry-safe: "it is
+        // possible that an attempt to make the exact same function call again would succeed."
+        // Matches SunPKCS11's own workaround (p11_keymgmt.c, MAX_ATTEMPTS = 3) — no delay between
+        // attempts, since the failure mode is a syscall interruption, not a slow-to-clear condition.
+        const int maxAttempts = 3;
+        CKR rv;
+        int attempt = 0;
+        do
+        {
+            rv = _pkcs11Library.C_GenerateKeyPair(_sessionId, ref ckMechanism, publicKeyTemplate, privateKeyTemplate, ref publicKeyId, ref privateKeyId);
+        } while (rv == CKR.CKR_FUNCTION_FAILED && ++attempt < maxAttempts);
         Pkcs11Exception.ThrowIfError(rv, OpGenerateKeyPair);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once BuildTemplate returns.
