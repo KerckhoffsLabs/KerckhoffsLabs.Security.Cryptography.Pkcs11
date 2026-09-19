@@ -1640,8 +1640,7 @@ internal sealed class Pkcs11Session : IDisposable
         ulong wrappedLen = 8 + ((valueLen + 7) / 8 * 8);
 
         byte[] buffer = new byte[wrappedLen];
-        NativeCULong len = (NativeCULong)wrappedLen;
-        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, out len);
+        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, out NativeCULong len);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKey);
 
         if (buffer.Length != (int)len)
