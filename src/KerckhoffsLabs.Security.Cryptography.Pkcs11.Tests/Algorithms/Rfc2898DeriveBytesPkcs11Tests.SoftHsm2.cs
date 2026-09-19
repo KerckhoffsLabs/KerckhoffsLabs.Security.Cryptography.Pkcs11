@@ -5,8 +5,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <summary>
 /// CKM_PKCS5_PBKD2 tests over SoftHsm -- thin wrapper over <see cref="Rfc2898DeriveBytesPkcs11TestCases"/>.
 /// SoftHSM2 never registers this mechanism (CKM_PKCS5_PBKD2 appears only as a header constant, with
-/// no dispatch anywhere in its crypto backend), so every case here skips via the shared assertions'
-/// <c>RequireMechanism</c> check.
+/// no dispatch anywhere in its crypto backend). Only the cases that actually invoke the mechanism
+/// skip via the shared assertions' <c>RequireMechanism</c> check; the constructor/argument-validation
+/// cases (null checks, <c>GetBytes(0)</c>, <c>ObjectDisposedException</c>, the zero-length
+/// short-circuit, etc.) never touch the token and genuinely pass here.
 /// </summary>
 [Collection("SoftHsm")]
 public sealed class Rfc2898DeriveBytesPkcs11Tests_SoftHsm(SoftHsmBackendFixture backend)

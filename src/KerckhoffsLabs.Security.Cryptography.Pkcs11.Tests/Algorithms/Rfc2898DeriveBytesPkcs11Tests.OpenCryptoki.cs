@@ -6,7 +6,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// CKM_PKCS5_PBKD2 tests over OpenCryptoki -- thin wrapper over <see cref="Rfc2898DeriveBytesPkcs11TestCases"/>.
 /// The soft token's PBKDF2 (<c>compute_PKCS5_PBKDF2_HMAC</c>) is an internal helper used only to
 /// derive its own master key from the SO/user PIN -- it is never registered as an application-facing
-/// mechanism, so every case here skips via the shared assertions' <c>RequireMechanism</c> check.
+/// mechanism. Only the cases that actually invoke the mechanism skip via the shared assertions'
+/// <c>RequireMechanism</c> check; the constructor/argument-validation cases (null checks,
+/// <c>GetBytes(0)</c>, <c>ObjectDisposedException</c>, the zero-length short-circuit, etc.) never
+/// touch the token and genuinely pass here.
 /// </summary>
 [Collection("OpenCryptoki")]
 public sealed class Rfc2898DeriveBytesPkcs11Tests_OpenCryptoki(OpenCryptokiBackendFixture backend)
