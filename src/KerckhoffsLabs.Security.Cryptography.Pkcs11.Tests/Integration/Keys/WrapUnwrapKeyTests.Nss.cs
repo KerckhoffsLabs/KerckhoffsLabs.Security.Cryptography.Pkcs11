@@ -40,7 +40,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
     // which sets it to 8), so NSC_Encrypt's NULL-probe formula (ulDataLen + 2*blockSize) silently
     // omits RFC 5649's ~8-byte overhead and every real KWP wrap fails with CKR_BUFFER_TOO_SMALL --
     // unrecoverably, since NSS only updates the reported length on success, never on failure.
-    // Pkcs11Session.WrapKeyKwp works around this by computing the wrapped length itself instead of
+    // Pkcs11Session.TryWrapKeyKwp works around this by computing the wrapped length itself instead of
     // trusting the token's probe, so this needs its own real-backend proof rather than reusing
     // AesKeyWrap_RoundTrip's shared case (which also isn't reachable here anyway --
     // ClassicAesGcmAvailable gates it off NSS-wide for an unrelated GCM-verification reason).
@@ -115,7 +115,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
     // compute around: NSS's buffer really is only 256 bytes). This pins the exact behavior so a future
     // NSS version silently changing it doesn't go unnoticed. The wrap step uses KWP specifically
     // because it's already proven to succeed at this size by AesKeyWrapKwp_RoundTrip_GenericSecret
-    // above (Pkcs11Session.WrapKeyKwp computes the wrapped length itself) -- the failure under test is
+    // above (Pkcs11Session.TryWrapKeyKwp computes the wrapped length itself) -- the failure under test is
     // in C_UnwrapKey, not in wrapping.
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Unwrap_SecretOver256Bytes_ThrowsTemplateInconsistent()

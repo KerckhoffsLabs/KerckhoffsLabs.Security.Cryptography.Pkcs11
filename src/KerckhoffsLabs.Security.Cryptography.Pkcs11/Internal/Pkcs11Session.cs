@@ -1598,11 +1598,13 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope();
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        byte[] wrappedKey = (CKM)mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
-            ? WrapKeyKwp(ref ckMechanism, wrappingKeyHandle, keyHandle)
-            : CallWithLengthProbe(
-                (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
-                OpWrapKey);
+        byte[]? wrappedKey = (CKM)mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
+            ? TryWrapKeyKwp(ref ckMechanism, wrappingKeyHandle, keyHandle)
+            : null;
+
+        wrappedKey ??= CallWithLengthProbe(
+            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
+            OpWrapKey);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
         mechanism.AbsorbOutput(mechParams);
@@ -1620,8 +1622,19 @@ internal sealed class Pkcs11Session : IDisposable
     // one case, untrustworthy) length probe entirely and computes the buffer size directly --
     // the same reasoning as MLKemPkcs11.EncapsulateCore handing ML-KEM a pre-sized buffer instead
     // of a NULL-buffer probe SoftHSM doesn't honour. Safe to remove once a fixed NSS is vendored.
-    private byte[] WrapKeyKwp(ref CK_MECHANISM ckMechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
+    //
+    // Only secret keys carry CKA_VALUE_LEN. A CKO_PRIVATE_KEY wraps as a PKCS#8-packaged byte
+    // string whose length isn't derivable from any client-visible attribute, so this workaround
+    // cannot apply there -- returns null ("not applicable") and WrapKey falls back to the normal
+    // probing path. That path still hits the underlying NSS bug for a private key wrapped via
+    // KWP, same as before this workaround existed, but at least fails with the token's own
+    // CKR_BUFFER_TOO_SMALL rather than an unrelated "CKA_VALUE_LEN could not be read" from here.
+    private byte[]? TryWrapKeyKwp(ref CK_MECHANISM ckMechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
     {
+        using ReadOnlyDisposableList<ObjectAttribute> classAttrs = GetAttributeValue(keyHandle, [CKA.CKA_CLASS]);
+        if (classAttrs[0].GetValueAsUlong() != (ulong)CKO.CKO_SECRET_KEY)
+            return null;
+
         using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(keyHandle, [CKA.CKA_VALUE_LEN]);
         ulong valueLen = attrs[0].GetValueAsUlong();
         ulong wrappedLen = 8 + ((valueLen + 7) / 8 * 8);
