@@ -18,10 +18,24 @@ public static class InsecureMechanismData
     /// <summary>
     /// Mechanisms rejected by the runtime gate, minus the RSA-encryption pair covered by KLPKCS11008.
     /// </summary>
+    /// <remarks>
+    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>GuardMechanism</c> only rejects it for a
+    /// SHA-1 or SHA-224 <c>CkmRsaPkcsOaepParams.HashAlg</c>, a mechanism-*parameter* condition no
+    /// static analyzer here can evaluate (the type alone, <c>CKM_RSA_PKCS_OAEP</c>, is used just as
+    /// often with a safe hash and must not be flagged). The runtime gate is the sole enforcement
+    /// point for that case.
+    /// </remarks>
     public static readonly ImmutableHashSet<string> GatedMechanisms = ImmutableHashSet.Create(
         "CKM_MD5_RSA_PKCS",
         "CKM_SHA1_RSA_PKCS",
         "CKM_SHA1_RSA_PKCS_PSS",
+        // Not cryptographically broken (FIPS 180-4-approved, just a truncated SHA-256), but gated
+        // like SHA-1: no HashAlgorithmName constant in the BCL, no benefit over SHA-256 on
+        // equal-cost hardware. See Pkcs11Session.GuardMechanism's "SHA-224 policy" remark.
+        "CKM_SHA224_RSA_PKCS",
+        "CKM_SHA224_RSA_PKCS_PSS",
+        "CKM_ECDSA_SHA224",
+        "CKM_SHA224_HMAC",
         "CKM_MD5",
         "CKM_SHA_1",
         "CKM_DES_ECB",

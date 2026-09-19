@@ -111,6 +111,12 @@ broken hashes (MD2/MD5/SHA-1/RIPEMD), PKCS#1 v1.5 *encryption* and raw RSA (`CKM
 [analyzers](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html)
 (`KLPKCS11001`–`KLPKCS11010`) surface it as a build warning too.
 
+**SHA-224 is gated for a different reason than the broken hashes above: it isn't cryptographically
+weak.** It's FIPS 180-4-approved — just a truncated SHA-256 with no `HashAlgorithmName` constant in
+the BCL and no practical benefit over SHA-256 on equal-cost hardware. RSA PKCS#1/PSS signing,
+RSA-OAEP, ECDSA signing, and HMAC all accept it behind the same `AllowInsecure` opt-in, for interop
+with a token or protocol that specifically requires it.
+
 **RSA PKCS#1 v1.5 signatures are a deliberate exception.** Strong-hash v1.5 *signatures*
 (`CKM_SHA256_RSA_PKCS` and up) are allowed by default: RSASSA-PKCS1-v1_5 with a strong hash is
 FIPS 186-5-approved and mandated by ubiquitous interop — JWT `RS256`, TLS 1.2 `CertificateVerify`,

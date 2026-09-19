@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -110,6 +111,32 @@ internal static class HMACPkcs11TestCases
             }
         });
     }
+
+    // SHA-224 HMAC maps to CKM_SHA224_HMAC, gated like SHA-1 (no BCL HashAlgorithmName constant, no
+    // benefit over SHA-256), so it requires AllowInsecure.
+    internal static void Assert_ComputeHash_Sha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_SHA224_HMAC);
+        WithHmacKey(backend, 28, (workspace, key) =>
+        {
+            using var hmac = new HMACPkcs11(key, new HashAlgorithmName("SHA224"));
+            Assert.Equal(224, hmac.HashSize); // 28-byte digest reported in bits
+
+            byte[] data = Encoding.UTF8.GetBytes("sha224 hmac");
+            using (workspace.AllowInsecureScope())
+            {
+                byte[] mac = hmac.ComputeHash(data);
+                Assert.Equal(28, mac.Length);
+            }
+        });
+    }
+
+    internal static void Assert_ComputeHash_Sha224_WithoutAllowInsecure_Throws(IPkcs11Backend backend) =>
+        WithHmacKey(backend, 28, (_, key) =>
+        {
+            using var hmac = new HMACPkcs11(key, new HashAlgorithmName("SHA224"));
+            Assert.Throws<InsecureOperationException>(() => hmac.ComputeHash(Encoding.UTF8.GetBytes("x")));
+        });
 
     internal static void Assert_ComputeHash_DifferentInputs_DifferDespiteReuse(IPkcs11Backend backend)
     {

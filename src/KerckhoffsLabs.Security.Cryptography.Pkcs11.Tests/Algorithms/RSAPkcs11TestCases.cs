@@ -200,6 +200,59 @@ internal static class RSAPkcs11TestCases
         });
     }
 
+    // SHA-224 RSA PKCS#1 v1.5 signing maps to CKM_SHA224_RSA_PKCS, gated like SHA-1 (no BCL
+    // HashAlgorithmName constant, no benefit over SHA-256), so it requires AllowInsecure. Unlike
+    // DSAPkcs11/ECDsaPkcs11, RSAPkcs11 overrides RSA's own byte[] SignData(byte[], int, int, …)
+    // overload directly (see the class remarks), so the BCL's non-virtual SignData(byte[],
+    // HashAlgorithmName) convenience overload reaches it without any internal BCL pre-hashing —
+    // there is no non-virtual-vs-virtual split to work around here.
+    internal static void Assert_SignVerifyData_Sha224Pkcs1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_SHA224_RSA_PKCS);
+        WithRsa(backend, (workspace, rsa) =>
+        {
+            using (workspace.AllowInsecureScope())
+            {
+                var hash = new HashAlgorithmName("SHA224");
+                byte[] data = Encoding.UTF8.GetBytes("sha224 pkcs1 payload");
+                byte[] sig = rsa.SignData(data, hash, RSASignaturePadding.Pkcs1);
+                Assert.True(rsa.VerifyData(data, sig, hash, RSASignaturePadding.Pkcs1));
+                data[0] ^= 0xFF;
+                Assert.False(rsa.VerifyData(data, sig, hash, RSASignaturePadding.Pkcs1));
+            }
+        });
+    }
+
+    internal static void Assert_SignData_Sha224Pkcs1_WithoutAllowInsecure_Throws(IPkcs11Backend backend) =>
+        WithRsa(backend, (_, rsa) =>
+            Assert.Throws<InsecureOperationException>(() =>
+                rsa.SignData(Encoding.UTF8.GetBytes("x"), new HashAlgorithmName("SHA224"), RSASignaturePadding.Pkcs1)));
+
+    // Same rationale as the PKCS#1 case above, for CKM_SHA224_RSA_PKCS_PSS.
+    internal static void Assert_SignVerifyData_Sha224Pss_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_SHA224_RSA_PKCS_PSS);
+        WithRsa(backend, (workspace, rsa) =>
+        {
+            using (workspace.AllowInsecureScope())
+            {
+                var hash = new HashAlgorithmName("SHA224");
+                byte[] data = Encoding.UTF8.GetBytes("sha224 pss payload");
+                byte[] sig = rsa.SignData(data, hash, RSASignaturePadding.Pss);
+                Assert.True(rsa.VerifyData(data, sig, hash, RSASignaturePadding.Pss));
+
+                byte[] tamperedSig = [.. sig];
+                tamperedSig[0] ^= 0xFF;
+                Assert.False(rsa.VerifyData(data, tamperedSig, hash, RSASignaturePadding.Pss));
+            }
+        });
+    }
+
+    internal static void Assert_SignData_Sha224Pss_WithoutAllowInsecure_Throws(IPkcs11Backend backend) =>
+        WithRsa(backend, (_, rsa) =>
+            Assert.Throws<InsecureOperationException>(() =>
+                rsa.SignData(Encoding.UTF8.GetBytes("x"), new HashAlgorithmName("SHA224"), RSASignaturePadding.Pss)));
+
     internal static void Assert_SignData_NullArguments_Throw(IPkcs11Backend backend) =>
         WithRsa(backend, (_, rsa) =>
         {
@@ -275,17 +328,48 @@ internal static class RSAPkcs11TestCases
 
     // === Encryption / decryption ===========================================
 
+    // OAEP with SHA-1 maps to a SHA-1-parameterized CKM_RSA_PKCS_OAEP, gated the same as any other
+    // SHA-1 use, so it requires AllowInsecure.
     internal static void Assert_EncryptDecrypt_OaepSha1_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (_, rsa) =>
+        WithRsa(backend, (workspace, rsa) =>
         {
-            byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha1 payload");
-            byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA1);
-            byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1);
-            Assert.Equal(plaintext, recovered);
+            using (workspace.AllowInsecureScope())
+            {
+                byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha1 payload");
+                byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA1);
+                byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1);
+                Assert.Equal(plaintext, recovered);
+            }
         });
     }
+
+    // OAEP with SHA-224 maps to a SHA-224-parameterized CKM_RSA_PKCS_OAEP; GuardMechanism inspects
+    // CkmRsaPkcsOaepParams.HashAlg for this one (CKM_RSA_PKCS_OAEP is a single mechanism type for
+    // every hash choice), so it requires AllowInsecure the same as the SHA-1 case above.
+    // RSAEncryptionPadding has no OaepSHA224 convenience property (the BCL has no SHA-224
+    // HashAlgorithmName constant either), so this uses the general CreateOaep(HashAlgorithmName) factory.
+    internal static void Assert_EncryptDecrypt_OaepSha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
+        WithRsa(backend, (workspace, rsa) =>
+        {
+            using (workspace.AllowInsecureScope())
+            {
+                var padding = RSAEncryptionPadding.CreateOaep(new HashAlgorithmName("SHA224"));
+                byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha224 payload");
+                byte[] ct = OrSkipIfOaepHashUnsupported(() => rsa.Encrypt(plaintext, padding));
+                byte[] recovered = rsa.Decrypt(ct, padding);
+                Assert.Equal(plaintext, recovered);
+            }
+        });
+    }
+
+    internal static void Assert_Encrypt_OaepSha224_WithoutAllowInsecure_Throws(IPkcs11Backend backend) =>
+        WithRsa(backend, (_, rsa) =>
+            Assert.Throws<InsecureOperationException>(() =>
+                rsa.Encrypt(Encoding.UTF8.GetBytes("x"), RSAEncryptionPadding.CreateOaep(new HashAlgorithmName("SHA224")))));
 
     // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires AllowInsecure.
     internal static void Assert_EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
@@ -340,12 +424,15 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_Decrypt_TamperedOaepCiphertext_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (_, rsa) =>
+        WithRsa(backend, (workspace, rsa) =>
         {
-            byte[] ct = rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1);
-            ct[ct.Length / 2] ^= 0xFF; // flip one ciphertext byte
+            using (workspace.AllowInsecureScope())
+            {
+                byte[] ct = rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1);
+                ct[ct.Length / 2] ^= 0xFF; // flip one ciphertext byte
 
-            Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+                Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+            }
         });
     }
 
@@ -357,10 +444,13 @@ internal static class RSAPkcs11TestCases
             using Pkcs11Key other = GenerateRsaKey(workspace);
             try
             {
-                using var otherRsa = new RSAPkcs11(other);
-                byte[] ct = otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1);
+                using (workspace.AllowInsecureScope())
+                {
+                    using var otherRsa = new RSAPkcs11(other);
+                    byte[] ct = otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1);
 
-                Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+                    Assert.ThrowsAny<Pkcs11Exception>(() => rsa.Decrypt(ct, RSAEncryptionPadding.OaepSHA1));
+                }
             }
             finally
             {

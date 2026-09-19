@@ -36,6 +36,18 @@ public sealed class RSAPkcs11Tests_Nss(NssBackendFixture backend)
     public void SignVerifyData_Pss_RoundTrips() => RSAPkcs11TestCases.Assert_SignVerifyData_Pss_RoundTrips(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SignVerifyData_Sha224Pkcs1_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_SignVerifyData_Sha224Pkcs1_UnderAllowInsecure_RoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SignData_Sha224Pkcs1_WithoutAllowInsecure_Throws() => RSAPkcs11TestCases.Assert_SignData_Sha224Pkcs1_WithoutAllowInsecure_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SignVerifyData_Sha224Pss_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_SignVerifyData_Sha224Pss_UnderAllowInsecure_RoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void SignData_Sha224Pss_WithoutAllowInsecure_Throws() => RSAPkcs11TestCases.Assert_SignData_Sha224Pss_WithoutAllowInsecure_Throws(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void SignData_NullArguments_Throw() => RSAPkcs11TestCases.Assert_SignData_NullArguments_Throw(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
@@ -61,6 +73,12 @@ public sealed class RSAPkcs11Tests_Nss(NssBackendFixture backend)
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void EncryptDecrypt_OaepSha1_RoundTrips() => RSAPkcs11TestCases.Assert_EncryptDecrypt_OaepSha1_RoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void EncryptDecrypt_OaepSha224_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_EncryptDecrypt_OaepSha224_UnderAllowInsecure_RoundTrips(_backend);
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void Encrypt_OaepSha224_WithoutAllowInsecure_Throws() => RSAPkcs11TestCases.Assert_Encrypt_OaepSha224_WithoutAllowInsecure_Throws(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.RsaPkcs1EncryptAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.RsaPkcs1EncryptAvailable))]
     public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => RSAPkcs11TestCases.Assert_EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips(_backend);

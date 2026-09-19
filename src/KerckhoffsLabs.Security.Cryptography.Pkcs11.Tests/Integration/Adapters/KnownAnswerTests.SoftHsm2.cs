@@ -208,6 +208,7 @@ internal static class KnownAnswerTestCases
             {
                 var oaep = new CkmRsaPkcsOaepParams(CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1);
                 var mech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, oaep);
+                using var insecure = session.AllowInsecureScope();
                 Assert.Equal(expectedPt, session.Decrypt(mech, priv, ct));
             }
             finally { session.DestroyObject(priv); }

@@ -202,12 +202,15 @@ public sealed class RSAPkcs11Tests_Managed
     // BCL-produced ciphertext, and confirming the BCL can decrypt a token-produced ciphertext from the
     // exported public key. SoftHSM now also covers OAEP-SHA256 (since the de25233 bump); this remains
     // the managed-backend coverage and the BCL-interop check.
+    // SHA-1-OAEP maps to a SHA-1-parameterized CKM_RSA_PKCS_OAEP, gated like any other SHA-1 use, so
+    // it requires AllowInsecure.
     [Theory]
     [MemberData(nameof(OaepHashes))]
-    public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithTransportRsa((_, rsa) =>
+    public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithTransportRsa((workspace, rsa) =>
     {
         var oaep = oaepHash == "SHA256" ? RSAEncryptionPadding.OaepSHA256 : RSAEncryptionPadding.OaepSHA1;
         byte[] plaintext = RandomNumberGenerator.GetBytes(32);
+        using IDisposable? insecure = oaepHash == "SHA1" ? workspace.AllowInsecureScope() : null;
 
         // Encrypt + decrypt on the token.
         byte[] ciphertext = rsa.Encrypt(plaintext, oaep);

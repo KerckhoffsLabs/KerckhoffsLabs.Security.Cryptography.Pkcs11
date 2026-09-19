@@ -14,6 +14,7 @@ public sealed class Pkcs11MechanismMapTests
 {
     [Theory]
     [InlineData("SHA1", (ulong)CKM.CKM_SHA1_RSA_PKCS)]
+    [InlineData("SHA224", (ulong)CKM.CKM_SHA224_RSA_PKCS)]
     [InlineData("SHA256", (ulong)CKM.CKM_SHA256_RSA_PKCS)]
     [InlineData("SHA384", (ulong)CKM.CKM_SHA384_RSA_PKCS)]
     [InlineData("SHA512", (ulong)CKM.CKM_SHA512_RSA_PKCS)]
@@ -25,6 +26,7 @@ public sealed class Pkcs11MechanismMapTests
 
     [Theory]
     [InlineData("SHA1", (ulong)CKM.CKM_SHA1_RSA_PKCS_PSS)]
+    [InlineData("SHA224", (ulong)CKM.CKM_SHA224_RSA_PKCS_PSS)]
     [InlineData("SHA256", (ulong)CKM.CKM_SHA256_RSA_PKCS_PSS)]
     [InlineData("SHA384", (ulong)CKM.CKM_SHA384_RSA_PKCS_PSS)]
     [InlineData("SHA512", (ulong)CKM.CKM_SHA512_RSA_PKCS_PSS)]
@@ -36,6 +38,7 @@ public sealed class Pkcs11MechanismMapTests
 
     [Theory]
     [InlineData("SHA1", CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1, 20)]
+    [InlineData("SHA224", CKM.CKM_SHA224, CKG.CKG_MGF1_SHA224, 28)]
     [InlineData("SHA256", CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32)]
     [InlineData("SHA384", CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384, 48)]
     [InlineData("SHA512", CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512, 64)]
@@ -51,6 +54,7 @@ public sealed class Pkcs11MechanismMapTests
 
     [Theory]
     [InlineData("SHA1", CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1)]
+    [InlineData("SHA224", CKM.CKM_SHA224, CKG.CKG_MGF1_SHA224)]
     [InlineData("SHA256", CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256)]
     [InlineData("SHA384", CKM.CKM_SHA384, CKG.CKG_MGF1_SHA384)]
     [InlineData("SHA512", CKM.CKM_SHA512, CKG.CKG_MGF1_SHA512)]
@@ -66,6 +70,7 @@ public sealed class Pkcs11MechanismMapTests
 
     [Theory]
     [InlineData("SHA1", (ulong)CKM.CKM_ECDSA_SHA1)]
+    [InlineData("SHA224", (ulong)CKM.CKM_ECDSA_SHA224)]
     [InlineData("SHA256", (ulong)CKM.CKM_ECDSA_SHA256)]
     [InlineData("SHA384", (ulong)CKM.CKM_ECDSA_SHA384)]
     [InlineData("SHA512", (ulong)CKM.CKM_ECDSA_SHA512)]
@@ -101,11 +106,16 @@ public sealed class Pkcs11MechanismMapTests
             Pkcs11MechanismMap.RsaPkcs1Sign(HashAlgorithmName.MD5));
     }
 
-    [Fact]
-    public void HmacHash_HashToCkm_ReturnsExpected()
+    [Theory]
+    [InlineData("SHA1", (ulong)CKM.CKM_SHA_1_HMAC)]
+    [InlineData("SHA224", (ulong)CKM.CKM_SHA224_HMAC)]
+    [InlineData("SHA256", (ulong)CKM.CKM_SHA256_HMAC)]
+    [InlineData("SHA384", (ulong)CKM.CKM_SHA384_HMAC)]
+    [InlineData("SHA512", (ulong)CKM.CKM_SHA512_HMAC)]
+    public void HmacHash_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
     {
-        var mech = Pkcs11MechanismMap.Hmac(HashAlgorithmName.SHA256);
-        Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, mech.Type);
+        var mech = Pkcs11MechanismMap.Hmac(new HashAlgorithmName(hashName));
+        Assert.Equal(expectedCkm, mech.Type);
     }
 
     [Theory]

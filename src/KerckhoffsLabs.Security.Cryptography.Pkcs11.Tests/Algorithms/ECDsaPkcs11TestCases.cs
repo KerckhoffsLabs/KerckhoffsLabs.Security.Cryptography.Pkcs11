@@ -57,7 +57,11 @@ internal static class ECDsaPkcs11TestCases
     private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<ECDsaPkcs11, HashAlgorithmName> body) =>
         WithEcDsa(backend, curve, ec => body(ec, Spec(curve).hash));
 
-    private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<ECDsaPkcs11> body)
+    private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<ECDsaPkcs11> body) =>
+        WithEcDsa(backend, curve, (_, ec) => body(ec));
+
+    // Overload exposing the workspace for tests that need AllowInsecureScope (e.g. SHA-224/SHA-1).
+    private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDSA))
             Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDSA.");
@@ -68,7 +72,7 @@ internal static class ECDsaPkcs11TestCases
         try
         {
             using var ec = new ECDsaPkcs11(key);
-            body(ec);
+            body(workspace, ec);
         }
         finally
         {
@@ -128,6 +132,42 @@ internal static class ECDsaPkcs11TestCases
             tampered[0] ^= 0xFF;
             Assert.False(ec.VerifyData(tampered.AsSpan(), sig, hash));
         });
+
+    // SHA-224 ECDSA signing maps to CKM_ECDSA_SHA224, gated like SHA-1 (no BCL HashAlgorithmName
+    // constant, no benefit over SHA-256), so it requires AllowInsecure. Uses the span TrySignData /
+    // VerifyData(ReadOnlySpan, …) overloads deliberately: the byte[] SignData(HashAlgorithmName) /
+    // VerifyData(byte[],...) convenience overloads do NOT reach ECDsaPkcs11's own overrides at all —
+    // confirmed empirically (not assumed): the BCL's ECDsa base class pre-hashes via the protected
+    // HashData hook, which throws CryptographicException("'SHA224' is not a known hash algorithm")
+    // before this class's code ever runs, on every backend. See the class remarks on ECDsaPkcs11.
+    internal static void Assert_TrySignData_Sha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend, string curve)
+    {
+        backend.RequireMechanisms(CKM.CKM_ECDSA_SHA224);
+        WithEcDsa(backend, curve, (workspace, ec) =>
+        {
+            using (workspace.AllowInsecureScope())
+            {
+                var hash = new HashAlgorithmName("SHA224");
+                byte[] data = Encoding.UTF8.GetBytes("sha224 combined hash+sign on token");
+                byte[] dest = new byte[256];
+
+                Assert.True(ec.TrySignData(data, dest, hash, out int written));
+                Assert.True(written > 0);
+
+                var sig = dest.AsSpan(0, written);
+                Assert.True(ec.VerifyData(data.AsSpan(), sig, hash));
+
+                byte[] tampered = [.. data];
+                tampered[0] ^= 0xFF;
+                Assert.False(ec.VerifyData(tampered.AsSpan(), sig, hash));
+            }
+        });
+    }
+
+    internal static void Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(IPkcs11Backend backend) =>
+        WithEcDsa(backend, "P-256", (_, ec) =>
+            Assert.Throws<InsecureOperationException>(() =>
+                ec.TrySignData(Encoding.UTF8.GetBytes("x"), new byte[256], new HashAlgorithmName("SHA224"), out int _)));
 
     internal static void Assert_TrySignData_DestinationTooSmall_ReturnsFalse(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, hash) =>

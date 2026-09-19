@@ -595,7 +595,16 @@ internal sealed class Pkcs11Session : IDisposable
     /// <para>
     /// This is the single, mechanism-level secure-defaults gate; it fires identically for sign,
     /// verify, encrypt, decrypt, derive, digest, and key generation (it has no notion of operation
-    /// direction).
+    /// direction). Every case dispatches on <c>mechanismType</c> alone except
+    /// <c>CKM_RSA_PKCS_OAEP</c>, which is one mechanism type for every hash choice — that case
+    /// additionally inspects <see cref="CkmRsaPkcsOaepParams.HashAlg"/>.
+    /// </para>
+    /// <para><b>SHA-224 policy.</b> SHA-224 (<c>CKM_SHA224_RSA_PKCS</c>, <c>_RSA_PKCS_PSS</c>,
+    /// <c>CKM_ECDSA_SHA224</c>, <c>CKM_SHA224_HMAC</c>, and OAEP's <c>CKM_SHA224</c> hash) is gated
+    /// the same way as SHA-1, but for a different reason: it isn't cryptographically broken (it's
+    /// FIPS 180-4-approved, just a truncated SHA-256), but it has no <see cref="HashAlgorithmName"/>
+    /// constant in the BCL and no practical benefit over SHA-256 on equal-cost hardware, so exposing
+    /// it by default would be a deviation from the BCL-aligned hash set this API otherwise mirrors.
     /// </para>
     /// <para><b>RSA PKCS#1 v1.5 policy.</b> The split is deliberate and along two axes —
     /// broken hash vs. dangerous padding-use — not "v1.5 vs. PSS":
@@ -659,6 +668,27 @@ internal sealed class Pkcs11Session : IDisposable
             case CKM.CKM_SHA1_RSA_PKCS_PSS:
                 throw new InsecureOperationException(mechanismType,
                     "MD5/SHA-1 in RSA signature contexts is broken (SHAttered breaks PSS-SHA-1 too); use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256 instead.");
+            case CKM.CKM_SHA224_RSA_PKCS:
+            case CKM.CKM_SHA224_RSA_PKCS_PSS:
+            case CKM.CKM_ECDSA_SHA224:
+            case CKM.CKM_SHA224_HMAC:
+                throw new InsecureOperationException(mechanismType,
+                    "SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over " +
+                    "SHA-256 on equal-cost hardware; use CKM_SHA256 or stronger, or set AllowInsecure to opt in " +
+                    "for interop with a token/protocol that specifically requires it.");
+            case CKM.CKM_RSA_PKCS_OAEP:
+                // CKM_RSA_PKCS_OAEP is one mechanism type for every hash choice — the hash lives in
+                // CkmRsaPkcsOaepParams, not the type, so this is the one case in this switch that
+                // inspects parameters rather than dispatching on mechanismType alone.
+                if (mechanism.Parameters is CkmRsaPkcsOaepParams { HashAlg: CKM.CKM_SHA_1 })
+                    throw new InsecureOperationException(mechanismType,
+                        "SHA-1 is collision-broken; use CKM_SHA256 or stronger as the OAEP hash.");
+                if (mechanism.Parameters is CkmRsaPkcsOaepParams { HashAlg: CKM.CKM_SHA224 })
+                    throw new InsecureOperationException(mechanismType,
+                        "SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit " +
+                        "over SHA-256 on equal-cost hardware; use CKM_SHA256 or stronger as the OAEP hash, or " +
+                        "set AllowInsecure to opt in.");
+                return;
             case CKM.CKM_MD5:
             case CKM.CKM_SHA_1:
                 throw new InsecureOperationException(mechanismType,

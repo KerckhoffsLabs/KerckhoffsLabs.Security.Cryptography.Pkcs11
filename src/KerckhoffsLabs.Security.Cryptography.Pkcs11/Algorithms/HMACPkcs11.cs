@@ -39,20 +39,26 @@ public sealed class HMACPkcs11 : HMAC
     /// This instance does NOT take ownership.
     /// </param>
     /// <param name="hashAlgorithm">
-    /// The hash algorithm (SHA1, SHA256, SHA384, or SHA512). The corresponding
+    /// The hash algorithm (SHA1, SHA224, SHA256, SHA384, or SHA512). The corresponding
     /// <c>CKM_*_HMAC</c> mechanism will be selected automatically.
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <c>null</c>.</exception>
     /// <exception cref="NotSupportedException">
-    /// Thrown when <paramref name="hashAlgorithm"/> is not one of the four supported algorithms.
+    /// Thrown when <paramref name="hashAlgorithm"/> is not one of the five supported algorithms.
     /// </exception>
+    /// <remarks>
+    /// SHA-224 is accepted here (it merely determines the HMAC output size); the
+    /// <c>Pkcs11Workspace.AllowInsecure</c> gate for it fires later, at the actual
+    /// <c>CKM_SHA224_HMAC</c> sign call inside <see cref="HashFinal"/> — see
+    /// <c>Pkcs11Session.GuardMechanism</c>.
+    /// </remarks>
     public HMACPkcs11(Pkcs11Key key, HashAlgorithmName hashAlgorithm)
     {
         ArgumentNullException.ThrowIfNull(key);
         _key = key;
         _hashAlgorithm = hashAlgorithm;
         HashName = hashAlgorithm.Name
-            ?? throw new NotSupportedException("HMAC requires a named hash algorithm (SHA1, SHA256, SHA384, or SHA512).");
+            ?? throw new NotSupportedException("HMAC requires a named hash algorithm (SHA1, SHA224, SHA256, SHA384, or SHA512).");
         HashSizeValue = HashSizeFromName(hashAlgorithm) * 8;
     }
 
@@ -90,6 +96,7 @@ public sealed class HMACPkcs11 : HMAC
     private static int HashSizeFromName(HashAlgorithmName hash) => hash.Name switch
     {
         "SHA1" => 20,
+        "SHA224" => 28,
         "SHA256" => 32,
         "SHA384" => 48,
         "SHA512" => 64,

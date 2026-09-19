@@ -13,13 +13,18 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <c>ECDsa</c> is accepted (e.g. <c>ECDsaCertificateExtensions</c>, ASP.NET Core signing).
 /// </para>
 /// <para>
-/// The BCL dispatch chain for the non-virtual <c>SignData(byte[], HashAlgorithmName)</c> and
-/// <c>VerifyData(byte[], byte[], HashAlgorithmName)</c> overloads ultimately calls the virtual
-/// <c>TrySignData</c> and <c>VerifyData(ReadOnlySpan, ...)</c> overloads, which
-/// this class overrides. The full data bytes are therefore forwarded to PKCS#11 intact,
-/// allowing the token to perform hashing + signing in a single <c>C_Sign</c> call using
-/// the combined mechanism (e.g. <c>CKM_ECDSA_SHA256</c>). This avoids pre-hashing on the
-/// managed side.
+/// Only the span overloads (<c>TrySignData</c>, <c>VerifyData(ReadOnlySpan, ReadOnlySpan, ...)</c>),
+/// which this class overrides directly, forward the full un-hashed data to PKCS#11 for on-token
+/// hashing + signing/verification via the combined mechanism (e.g. <c>CKM_ECDSA_SHA256</c>). The
+/// non-virtual <c>byte[]</c> convenience overloads (<c>SignData(byte[], HashAlgorithmName)</c>,
+/// <c>VerifyData(byte[], byte[], HashAlgorithmName)</c>) do NOT dispatch through them — verified
+/// empirically, not assumed: the BCL's own <see cref="ECDsa"/> base-class implementation pre-hashes
+/// via the protected <c>HashData</c> override below, then signs/verifies that hash directly through
+/// <c>SignHash</c>/<c>VerifyHash</c> (raw <c>CKM_ECDSA</c>, no combined mechanism). One consequence:
+/// a hash algorithm the BCL cannot compute itself (e.g. SHA-224, which has no
+/// <see cref="HashAlgorithmName"/> constant) throws inside the BCL's own pre-hash step before this
+/// class's code ever runs, on every backend — see <c>ECDsaPkcs11TestCases</c>'s SHA-224 coverage,
+/// which exercises only the span path for this reason.
 /// </para>
 /// </remarks>
 public sealed class ECDsaPkcs11 : ECDsa
@@ -82,13 +87,14 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Overrides the virtual span entry-point so the BCL non-virtual
-    /// <c>SignData(byte[], HashAlgorithmName)</c> dispatches here with the complete,
-    /// un-hashed data. The PKCS#11 mechanism performs hashing on-token
-    /// (e.g. <c>CKM_ECDSA_SHA256</c> for SHA-256).
+    /// The virtual span entry-point: callers who invoke this directly (or through
+    /// <c>TrySignData(ReadOnlySpan, ...)</c> generically) get the complete, un-hashed data forwarded
+    /// to PKCS#11, which hashes on-token (e.g. <c>CKM_ECDSA_SHA256</c> for SHA-256). The BCL's
+    /// non-virtual <c>SignData(byte[], HashAlgorithmName)</c> convenience overload does NOT reach
+    /// this method — see the class remarks.
     /// </remarks>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data,
@@ -109,12 +115,12 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Overrides the virtual span entry-point so the BCL non-virtual
-    /// <c>VerifyData(byte[], byte[], HashAlgorithmName)</c> dispatches here with the
-    /// complete, un-hashed data.
+    /// The virtual span entry-point: callers who invoke this directly get the complete, un-hashed
+    /// data forwarded to PKCS#11. The BCL's non-virtual <c>VerifyData(byte[], byte[],
+    /// HashAlgorithmName)</c> convenience overload does NOT reach this method — see the class remarks.
     /// </remarks>
-    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/256/384/512.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
+    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data,
