@@ -29,7 +29,7 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
                 $"pkcs11-mock not found at '{LibraryPath}'. " +
                 $"Run build/build-pkcs11-mock.sh to produce it.");
 
-        Library = new Pkcs11Library(LibraryPath);
+        Library = Pkcs11Library.Load(LibraryPath);
         try
         {
             var slots = Library.GetSlotList();

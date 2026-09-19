@@ -21,7 +21,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     [Fact]
     public void OpeningSession_RegistersWithLibraryTracker()
     {
-        using Pkcs11Library library = new(_backend.LibraryPath);
+        using Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
         int before = library.LowLevelLibrary!.TrackedSessionCount;
 
         var slot = library.GetSlotList()[0];
@@ -34,7 +34,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     [Fact]
     public void DisposingSession_RemovesItFromLibraryTracker()
     {
-        using Pkcs11Library library = new(_backend.LibraryPath);
+        using Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
         int before = library.LowLevelLibrary!.TrackedSessionCount;
         var slot = library.GetSlotList()[0];
 
@@ -49,7 +49,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     [Fact]
     public void DisposingLibrary_WithOpenSession_DoesNotThrow_AndClosesSession()
     {
-        Pkcs11Library library = new(_backend.LibraryPath);
+        Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
         var slot = library.GetSlotList()[0];
         var session = slot.OpenSession();
 
@@ -75,7 +75,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     [Fact]
     public void DisposingLibrary_WithSessionAlreadyDisposed_NoOps()
     {
-        Pkcs11Library library = new(_backend.LibraryPath);
+        Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
         var slot = library.GetSlotList()[0];
         var session = slot.OpenSession();
         session.Dispose();

@@ -154,7 +154,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         Environment.SetEnvironmentVariable("SOFTHSM2_CONF", _configPath);
         SetNativeEnv("SOFTHSM2_CONF", _configPath);
 
-        Library = new Pkcs11Library(LibraryPath);
+        Library = Pkcs11Library.Load(LibraryPath);
         try
         {
             var slots = Library.GetSlotList();

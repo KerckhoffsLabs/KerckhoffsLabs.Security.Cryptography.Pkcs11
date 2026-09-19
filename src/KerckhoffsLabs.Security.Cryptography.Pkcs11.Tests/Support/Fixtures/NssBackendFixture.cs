@@ -127,7 +127,7 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
         }
 
         LibraryPath = libPath;
-        Library = new Pkcs11Library(libPath);
+        Library = Pkcs11Library.Load(libPath);
         try
         {
             Pkcs11Slot found = Library.GetSlotList()

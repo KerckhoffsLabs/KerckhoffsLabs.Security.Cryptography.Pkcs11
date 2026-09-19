@@ -32,7 +32,7 @@ try
 #endif
     }
 
-    using var dynamicLib = new Pkcs11Library(args[0]);
+    using var dynamicLib = Pkcs11Library.Load(args[0]);
     Report("dynamic", dynamicLib.GetInfo());
     return 0;
 }

@@ -96,7 +96,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
         Environment.SetEnvironmentVariable(targetEnvVar, _targetCopyPath);
         SoftHsmBackendFixture.SetNativeEnv(targetEnvVar, _targetCopyPath);
 
-        Library = new Pkcs11Library(gatePath);
+        Library = Pkcs11Library.Load(gatePath);
         try
         {
             var slots = Library.GetSlotList();

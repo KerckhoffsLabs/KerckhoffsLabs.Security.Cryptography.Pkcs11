@@ -94,7 +94,7 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
         Environment.SetEnvironmentVariable("KRYOPTIC_CONF", _configPath);
         SetNativeEnv("KRYOPTIC_CONF", _configPath);
 
-        Library = new Pkcs11Library(LibraryPath);
+        Library = Pkcs11Library.Load(LibraryPath);
         try
         {
             Pkcs11Slot slot = Library.GetSlotList().FirstOrDefault(s => s.SlotId.Value == SlotNumber)

@@ -55,7 +55,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 // 1. Load the native module (initialization and finalization are tied to the object's lifetime).
-using var library = new Pkcs11Library("/usr/lib/softhsm/libsofthsm2.so");
+using var library = Pkcs11Library.Load("/usr/lib/softhsm/libsofthsm2.so");
 
 // 2. Open a logged-in session on a token, selected by label. The PIN is held in a pinned,
 //    zeroized buffer — never a string. Read it from a secret manager, not source.

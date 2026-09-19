@@ -234,7 +234,7 @@ public sealed class Pkcs11Key : IDisposable
         Pkcs11Workspace? workspace = null;
         try
         {
-            library = new Pkcs11Library(libraryPath);
+            library = Pkcs11Library.Load(libraryPath);
             workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin);
             return OpenKeyInternal(workspace, keyLabel, ownedLibrary: library, ownsWorkspace: true);
         }

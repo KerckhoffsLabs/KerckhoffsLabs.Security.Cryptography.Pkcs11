@@ -20,7 +20,7 @@ public sealed class Pkcs11LibraryAlreadyInitializedTests(MockBackendFixture f)
         // The collection fixture already holds an open library (instance A) against
         // _backend.LibraryPath. Open a second instance against the same path — pkcs11-mock
         // sees C_Initialize a second time and returns CKR_CRYPTOKI_ALREADY_INITIALIZED.
-        Pkcs11Library b = new(_backend.LibraryPath);
+        Pkcs11Library b = Pkcs11Library.Load(_backend.LibraryPath);
 
         // Both instances must be usable while live — the second instance must not have
         // failed initialization.

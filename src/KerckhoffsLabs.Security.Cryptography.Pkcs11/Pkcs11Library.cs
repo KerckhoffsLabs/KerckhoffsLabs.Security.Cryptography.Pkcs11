@@ -66,9 +66,10 @@ public sealed class Pkcs11Library : IDisposable
     /// v2.20+ recommended path).
     /// </summary>
     /// <param name="libraryPath">Library name or path.</param>
+    /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    public Pkcs11Library(string libraryPath)
-        : this(libraryPath, useStaticLink: false) { }
+    public static Pkcs11Library Load(string libraryPath)
+        => new(libraryPath, useStaticLink: false);
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -112,7 +113,7 @@ public sealed class Pkcs11Library : IDisposable
     /// library's, and the platforms differ. A dynamically loaded module's symbols stay private to it
     /// on Linux, but macOS resolves more permissively: in a process that has already loaded a PKCS#11
     /// module by path, this method can bind <i>that</i> module rather than failing. Use
-    /// <see cref="Pkcs11Library(string)"/> when you mean a specific module.
+    /// <see cref="Load(string)"/> when you mean a specific module.
     /// </para>
     /// </remarks>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
