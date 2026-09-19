@@ -8,6 +8,15 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
+    // SHA-224 is deliberately absent here: DSA.SignData(byte[], HashAlgorithmName) is a non-virtual
+    // BCL convenience overload that hashes internally via CryptographicOperations.HashData before ever
+    // reaching DSAPkcs11's override, and the BCL itself has no SHA-224 support -- so this entry point
+    // can never work with SHA224 on any backend, regardless of what the token supports. See
+    // TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering below, which calls DSAPkcs11's own
+    // virtual TrySignData/VerifyData overrides directly and does exercise SHA224 (SoftHSM's
+    // SoftHSM.cpp dispatches CKM_DSA_SHA224 to a real AsymMech::DSA_SHA224 sign/verify implementation,
+    // so DSAPkcs11.SignDataInternal/VerifyData's SupportsMechanism check takes the combined on-token
+    // path here, never reaching the managed-fallback HashData that has no SHA224 case).
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
@@ -15,6 +24,7 @@ public sealed class DSAPkcs11Tests_SoftHsm(SoftHsmBackendFixture f)
     public void SignVerifyData_AcrossHashAlgorithms_RoundTrips(string hashName) => DSAPkcs11TestCases.Assert_SignVerifyData_AcrossHashAlgorithms_RoundTrips(_backend, hashName);
 
     [Theory(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    [InlineData("SHA224")]
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
