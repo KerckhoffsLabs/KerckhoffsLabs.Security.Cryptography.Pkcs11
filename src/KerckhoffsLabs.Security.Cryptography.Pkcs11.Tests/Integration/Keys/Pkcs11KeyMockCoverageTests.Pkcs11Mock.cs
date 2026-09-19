@@ -224,7 +224,46 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     // CKA_VALUE; verified against vendor/pkcs11-mock/src/pkcs11-mock.c and empirically, where it
     // throws AttributeValueException). The same applies to EncapsulateKey/DecapsulateKey's result
     // hydration and Derive's, though those two are moot anyway since v3.2 is absent from the mock's
-    // function table before hydration would ever be reached.
+    // function table before hydration would ever be reached. The handle-availability guard itself
+    // (below) fires before any native call, so it is covered regardless.
+
+    [Fact]
+    public void Unwrap_NoPrivateHandle_Throws()
+    {
+        using var workspace = OpenWorkspace();
+        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+
+        // Unwrapping is a decrypt-shaped operation: it must use the private handle exactly like
+        // Decrypt does, never fall back to the public one. A public-only key has none available.
+        using var key = new Pkcs11Key(
+            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => key.Unwrap(new Mechanism(CKM.CKM_RSA_PKCS), "wrapped"u8, template));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+    }
+
+    // === Derive ==============================================================
+
+    [Fact]
+    public void Derive_NoPrivateHandle_Throws()
+    {
+        using var workspace = OpenWorkspace();
+        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+
+        // ECDH derives from the local private key; the peer's public point travels as a mechanism
+        // parameter, never as the base-key handle. A public-only key has no usable base handle.
+        using var key = new Pkcs11Key(
+            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            keyType: CKK.CKK_EC, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(
+            () => key.Derive(new Mechanism(CKM.CKM_ECDH1_DERIVE), template));
+        Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
+    }
 
     // === EncapsulateKey / DecapsulateKey =====================================
     //

@@ -529,26 +529,26 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>
     /// Unwraps the byte blob <paramref name="wrappedBytes"/> using this key as the
     /// unwrapping key, into a new on-token object described by
-    /// <paramref name="template"/>.
+    /// <paramref name="template"/>. Symmetric uses the single handle; asymmetric
+    /// uses the private handle (unwrapping is a decrypt-shaped operation).
     /// </summary>
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the unwrapped object.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
     /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's unwrapping handle is unavailable; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        ObjectHandle unwrapHandle = _privateHandle.IsInvalid ? _publicHandle : _privateHandle;
-        if (unwrapHandle.IsInvalid)
+        if (_privateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.Unwrap (unwrapping-key handle unavailable)");
+                "Pkcs11Key.Unwrap (no private handle)");
 
         ObjectHandle resulting = _workspace.Session.UnwrapKey(
-            mechanism, unwrapHandle, wrappedBytes, [.. template.Attributes]);
+            mechanism, _privateHandle, wrappedBytes, [.. template.Attributes]);
 
         return _workspace.HydrateExistingHandleAsKey(resulting);
     }
@@ -621,12 +621,14 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires opting in via the workspace's <c>AllowInsecure</c> gate.
+    /// non-sensitive key requires opting in via the workspace's <c>AllowInsecure</c> gate. Symmetric
+    /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
+    /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
     /// <exception cref="InsecureOperationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the <see cref="AllowInsecure"/> flag is set.</exception>
-    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key exposes no usable base handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
+    /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
         => DeriveCore(mechanism, template);
 
@@ -636,13 +638,12 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        ObjectHandle baseHandle = _privateHandle.IsInvalid ? _publicHandle : _privateHandle;
-        if (baseHandle.IsInvalid)
+        if (_privateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
-                "Pkcs11Key.Derive (base-key handle unavailable)");
+                "Pkcs11Key.Derive (no private handle)");
 
         ObjectHandle resulting = _workspace.Session.DeriveKey(
-            mechanism, baseHandle, [.. template.Attributes]);
+            mechanism, _privateHandle, [.. template.Attributes]);
 
         // SP800-108 sibling keys: the params object absorbed their raw handles during the call
         // above; turn them into usable Pkcs11Key instances now, while the workspace is at hand.
