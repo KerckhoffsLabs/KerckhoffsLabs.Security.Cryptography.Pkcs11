@@ -1598,14 +1598,42 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope();
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        byte[] wrappedKey = CallWithLengthProbe(
-            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
-            OpWrapKey);
+        byte[] wrappedKey = (CKM)mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
+            ? WrapKeyKwp(ref ckMechanism, wrappingKeyHandle, keyHandle)
+            : CallWithLengthProbe(
+                (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
+                OpWrapKey);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
         mechanism.AbsorbOutput(mechParams);
 
         return wrappedKey;
+    }
+
+    // NSS bug: sftk_CryptInit's CKM_AES_KEY_WRAP_KWP case (softoken/pkcs11c.c) never sets
+    // context->blockSize, unlike the sibling CKM_AES_KEY_WRAP/_PAD case (which sets it to 8).
+    // NSC_Encrypt's NULL-probe formula (ulDataLen + 2*blockSize) therefore collapses to exactly
+    // ulDataLen for KWP, silently omitting RFC 5649's ~8-byte overhead from the reported required
+    // length -- and the follow-up too-small-buffer call doesn't correct it either, since NSS only
+    // updates the output length parameter when the call succeeds. RFC 5649's wrapped length is
+    // fully determined by the input length alone, so this mechanism skips the token's (for this
+    // one case, untrustworthy) length probe entirely and computes the buffer size directly --
+    // the same reasoning as MLKemPkcs11.EncapsulateCore handing ML-KEM a pre-sized buffer instead
+    // of a NULL-buffer probe SoftHSM doesn't honour. Safe to remove once a fixed NSS is vendored.
+    private byte[] WrapKeyKwp(ref CK_MECHANISM ckMechanism, ObjectHandle wrappingKeyHandle, ObjectHandle keyHandle)
+    {
+        using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(keyHandle, [CKA.CKA_VALUE_LEN]);
+        ulong valueLen = attrs[0].GetValueAsUlong();
+        ulong wrappedLen = 8 + ((valueLen + 7) / 8 * 8);
+
+        byte[] buffer = new byte[wrappedLen];
+        NativeCULong len = (NativeCULong)wrappedLen;
+        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, out len);
+        Pkcs11Exception.ThrowIfError(rv, OpWrapKey);
+
+        if (buffer.Length != (int)len)
+            Array.Resize(ref buffer, (int)len);
+        return buffer;
     }
 
     /// <summary>
