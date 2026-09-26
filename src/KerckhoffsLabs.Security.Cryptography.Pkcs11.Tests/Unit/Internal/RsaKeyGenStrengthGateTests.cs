@@ -41,38 +41,26 @@ public sealed class RsaKeyGenStrengthGateTests
     public void GenerateKeyPair_Rsa1024_GatedByDefault_Throws()
     {
         var fake = new RecordingFake();
-        var session = new Pkcs11Session(fake, sessionId: 1);
-        try
-        {
-            Assert.Throws<CryptoPolicyViolationException>(() => GenerateRsa(session, 1024));
-            Assert.Equal(0, fake.Calls); // refused before reaching the token
-        }
-        finally { session.Dispose(); }
+        using var session = new Pkcs11Session(fake, sessionId: 1);
+        Assert.Throws<CryptoPolicyViolationException>(() => GenerateRsa(session, 1024));
+        Assert.Equal(0, fake.Calls); // refused before reaching the token
     }
 
     [Fact]
     public void GenerateKeyPair_Rsa1024_AllowInsecure_Proceeds()
     {
         var fake = new RecordingFake();
-        var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.AllowInsecure);
-        try
-        {
-            GenerateRsa(session, 1024);
-            Assert.Equal(1, fake.Calls);
-        }
-        finally { session.Dispose(); }
+        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.AllowInsecure);
+        GenerateRsa(session, 1024);
+        Assert.Equal(1, fake.Calls);
     }
 
     [Fact]
     public void GenerateKeyPair_Rsa2048_Proceeds_WithoutAllowInsecure()
     {
         var fake = new RecordingFake();
-        var session = new Pkcs11Session(fake, sessionId: 1);
-        try
-        {
-            GenerateRsa(session, 2048);
-            Assert.Equal(1, fake.Calls);
-        }
-        finally { session.Dispose(); }
+        using var session = new Pkcs11Session(fake, sessionId: 1);
+        GenerateRsa(session, 2048);
+        Assert.Equal(1, fake.Calls);
     }
 }
