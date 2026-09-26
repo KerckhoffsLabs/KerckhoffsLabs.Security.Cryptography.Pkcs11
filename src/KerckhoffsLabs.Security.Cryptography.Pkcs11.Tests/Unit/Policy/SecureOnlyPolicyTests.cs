@@ -107,4 +107,10 @@ public sealed class SecureOnlyPolicyTests
                 Assert.DoesNotContain("AllowInsecure", d.Reason, StringComparison.Ordinal);
         }
     }
+
+    // The RSA size floor judges RSA key-pair generation only; a request naming another mechanism is not
+    // this rule's business and must not be refused by it.
+    [Fact]
+    public void RsaKeyGeneration_ForANonRsaMechanism_IsNotJudgedOnSize()
+        => Assert.True(Allowed(new RsaKeyGenerationRequest(CKM.CKM_EC_KEY_PAIR_GEN, 512)));
 }

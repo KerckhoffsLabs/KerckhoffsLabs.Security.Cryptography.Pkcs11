@@ -163,6 +163,13 @@ public sealed class ECDsaPkcs11Tests_Managed
             () => ec.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1)));
 
     [Fact]
+    public void SignData_Stream_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (_, ec) =>
+    {
+        using var data = new MemoryStream(Encoding.UTF8.GetBytes("legacy"));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(data, HashAlgorithmName.SHA1));
+    });
+
+    [Fact]
     public void VerifyData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (workspace, ec) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");

@@ -265,4 +265,34 @@ public sealed class FipsOnlyPolicyTests
     [InlineData(KeyMaterialExportKind.KdfOutput)]
     public void KeyMaterialExport_Refused(KeyMaterialExportKind kind)
         => Assert.False(Policy.Evaluate(new KeyMaterialExportRequest(kind)).IsAllowed);
+
+    // A hash-bound PSS mechanism fixes the message hash, but the MGF/parameter hash it is given must
+    // still be approved — otherwise a caller could smuggle MD5 into the MGF of an "approved" mechanism.
+    [Theory]
+    [InlineData(CKM.CKM_SHA256_RSA_PKCS_PSS, CryptoOperation.Sign)]
+    [InlineData(CKM.CKM_SHA256_RSA_PKCS_PSS, CryptoOperation.Verify)]
+    [InlineData(CKM.CKM_SHA384_RSA_PKCS_PSS, CryptoOperation.Sign)]
+    public void HashedPss_WithAnUnapprovedParameterHash_IsRefused(CKM mech, CryptoOperation op)
+    {
+        var pss = new Mechanism(mech, new CkmRsaPkcsPssParams(CKM.CKM_MD5, CKG.CKG_MGF1_SHA256, 16));
+        PolicyDecision decision = Policy.Evaluate(new MechanismUseRequest(pss, op));
+        Assert.False(decision.IsAllowed);
+        Assert.Contains("not an approved hash for RSA-PSS", decision.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HashedPss_WithTheWrongParameterType_IsRefused()
+    {
+        var pss = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
+        Assert.False(Allowed(pss, CryptoOperation.Sign));
+        Assert.False(Allowed(pss, CryptoOperation.Verify));
+    }
+
+    [Fact]
+    public void HashedPss_WithoutParameters_IsAllowed()
+        => Assert.True(Allowed(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS), CryptoOperation.Sign));
+
+    [Fact]
+    public void EcKeyGeneration_OnACurveWithNoOid_IsRefused()
+        => Assert.False(Policy.Evaluate(new EcKeyGenerationRequest(default)).IsAllowed);
 }
