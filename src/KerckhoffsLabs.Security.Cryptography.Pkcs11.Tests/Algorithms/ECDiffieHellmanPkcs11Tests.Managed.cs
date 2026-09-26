@@ -69,7 +69,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        if (allowExtraction) workspace.AllowInsecure = true;
+        using IDisposable? insecure = allowExtraction ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         using var key = workspace.GenerateEcKeyPair(Curves(curve).token);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         body(ecdh);
@@ -143,7 +143,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobZ, aliceZ);
     });
 
-    // === The AllowInsecure gate ============================================================
+    // === The AllowInsecure policy ============================================================
 
     /// <summary>
     /// Every method on this adapter returns key bytes read off the token, so all of them are refused
@@ -164,7 +164,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
 
-        Assert.Throws<InsecureOperationException>(() => _ = method switch
+        Assert.Throws<CryptoPolicyViolationException>(() => _ = method switch
         {
             "raw" => alice.DeriveRawSecretAgreement(bob.PublicKey),
             "hash" => alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null),
@@ -189,7 +189,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        workspace.AllowInsecure = true; // reads Z back on both sides
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // reads Z back on both sides
 
         using var aliceKey = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bobKey = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
@@ -283,7 +283,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ExportParameters_Private_ThrowsInsecure() => WithEcdh("P-256", alice =>
-        Assert.Throws<InsecureOperationException>(() => alice.ExportParameters(includePrivateParameters: true)));
+        Assert.Throws<CryptoPolicyViolationException>(() => alice.ExportParameters(includePrivateParameters: true)));
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     public void ExportExplicitParameters_NotSupported() => WithEcdh("P-256", alice =>

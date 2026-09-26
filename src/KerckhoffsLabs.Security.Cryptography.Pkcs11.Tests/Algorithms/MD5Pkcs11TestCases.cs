@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
 /// Backend-agnostic MD5 digest tests. MD5 is gated by the secure-defaults policy (<c>CKM_MD5</c>):
-/// blocked by default, computed only under AllowInsecure. The gate fires in managed code before the
+/// blocked by default, computed only under the AllowInsecure policy. The check fires in managed code before the
 /// token, so the gated-by-default case runs on any backend; the AllowInsecure case skips where the
 /// token does not advertise <c>CKM_MD5</c>.
 /// </summary>
@@ -29,7 +29,7 @@ internal static class MD5Pkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         using var hash = new MD5Pkcs11(workspace);
 
-        var ex = Assert.Throws<InsecureOperationException>(
+        var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => hash.ComputeHash(Encoding.UTF8.GetBytes("abc")));
         Assert.Equal(CKM.CKM_MD5, ex.Mechanism);
     }
@@ -40,7 +40,7 @@ internal static class MD5Pkcs11TestCases
             Assert.Skip("Backend does not advertise CKM_MD5.");
 
         using var workspace = OpenWorkspace(backend);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var hash = new MD5Pkcs11(workspace);
 
         byte[] data = Encoding.UTF8.GetBytes("abc");

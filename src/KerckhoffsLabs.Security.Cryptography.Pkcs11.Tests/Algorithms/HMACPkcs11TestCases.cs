@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11010
 
@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
 /// Backend-agnostic HMACPkcs11 tests: deterministic MACs across hash algorithms, the SHA-1-HMAC gate
-/// (CKM_SHA_1_HMAC requires AllowInsecure), constructor validation, and the RFC 4231 known-answer
+/// (CKM_SHA_1_HMAC requires the AllowInsecure policy), constructor validation, and the RFC 4231 known-answer
 /// vector. Cases that compute a MAC skip where the backend does not advertise the corresponding
 /// CKM_*_HMAC; the constructor cases run on any backend (they throw before any token call).
 /// </summary>
@@ -93,7 +93,7 @@ internal static class HMACPkcs11TestCases
         });
     }
 
-    // SHA-1 HMAC is gated by default (CKM_SHA_1_HMAC is disallowed); it requires AllowInsecure. Also
+    // SHA-1 HMAC is gated by default (CKM_SHA_1_HMAC is disallowed); it requires the AllowInsecure policy. Also
     // covers the SHA1 branch of the internal hash-size mapping.
     internal static void Assert_ComputeHash_Sha1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
@@ -104,7 +104,7 @@ internal static class HMACPkcs11TestCases
             Assert.Equal(160, hmac.HashSize); // 20-byte digest reported in bits
 
             byte[] data = Encoding.UTF8.GetBytes("sha1 hmac");
-            using (workspace.AllowInsecureScope())
+            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] mac = hmac.ComputeHash(data);
                 Assert.Equal(20, mac.Length);
@@ -113,7 +113,7 @@ internal static class HMACPkcs11TestCases
     }
 
     // SHA-224 HMAC maps to CKM_SHA224_HMAC, gated like SHA-1 (no BCL HashAlgorithmName constant, no
-    // benefit over SHA-256), so it requires AllowInsecure.
+    // benefit over SHA-256), so it requires the AllowInsecure policy.
     internal static void Assert_ComputeHash_Sha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA224_HMAC);
@@ -123,7 +123,7 @@ internal static class HMACPkcs11TestCases
             Assert.Equal(224, hmac.HashSize); // 28-byte digest reported in bits
 
             byte[] data = Encoding.UTF8.GetBytes("sha224 hmac");
-            using (workspace.AllowInsecureScope())
+            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] mac = hmac.ComputeHash(data);
                 Assert.Equal(28, mac.Length);
@@ -135,7 +135,7 @@ internal static class HMACPkcs11TestCases
         WithHmacKey(backend, 28, (_, key) =>
         {
             using var hmac = new HMACPkcs11(key, new HashAlgorithmName("SHA224"));
-            Assert.Throws<InsecureOperationException>(() => hmac.ComputeHash(Encoding.UTF8.GetBytes("x")));
+            Assert.Throws<CryptoPolicyViolationException>(() => hmac.ComputeHash(Encoding.UTF8.GetBytes("x")));
         });
 
     internal static void Assert_ComputeHash_DifferentInputs_DifferDespiteReuse(IPkcs11Backend backend)

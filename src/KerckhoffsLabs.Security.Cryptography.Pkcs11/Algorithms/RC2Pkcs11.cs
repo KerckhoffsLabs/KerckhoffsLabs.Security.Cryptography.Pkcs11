@@ -4,8 +4,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
-// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
-// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -19,8 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// RC2 (RFC 2268) is a weak legacy 64-bit block cipher with a variable, often-reduced effective key
 /// length; it is provided only for legacy/interop. Every operation throws
-/// <c>InsecureOperationException</c> unless <see cref="Pkcs11Workspace.AllowInsecure"/> is set on the
-/// wrapped key's workspace, and there is no authenticated RC2 mode to fall back to. Prefer
+/// <c>CryptoPolicyViolationException</c> unless the wrapped key's workspace's
+/// <see cref="Pkcs11Workspace.Policy"/> permits it, and there is no authenticated RC2 mode to fall back to. Prefer
 /// <see cref="AesGcmPkcs11"/> or <see cref="AesCcmPkcs11"/>.
 /// </para>
 /// <para>
@@ -31,7 +31,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// in <c>CK_RC2_PARAMS</c>.
 /// </para>
 /// <para>
-/// Supported modes (on the token, once AllowInsecure is set):
+/// Supported modes (on the token, once permitted by the workspace's policy):
 /// <list type="bullet">
 /// <item>CBC — PKCS7 (→ <c>CKM_RC2_CBC_PAD</c>) or None (→ <c>CKM_RC2_CBC</c>, block-aligned input).</item>
 /// <item>ECB — None (→ <c>CKM_RC2_ECB</c>).</item>
@@ -46,7 +46,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("RC2 (RFC 2268) is a weak legacy cipher with a reduced effective key length. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "RC2Pkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+          "RC2Pkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.Rc2,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class RC2Pkcs11 : RC2
@@ -116,11 +116,13 @@ public sealed class RC2Pkcs11 : RC2
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
         // Empty input is a no-op (0 bytes in → 0 bytes out): skip the token (some reject an empty
-        // buffer) — but ONLY when AllowInsecure is set. With AllowInsecure off we fall through so
-        // GuardMechanism throws InsecureOperationException as documented (the gate runs before the
-        // empty buffer reaches the token). Padded encryption (CKM_RC2_CBC_PAD) must emit a full
-        // padding block, so that path always goes to the token.
-        if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
+        // buffer) — but ONLY when the policy permits this mechanism (i.e. the gate would pass).
+        // Otherwise fall through so the session's policy check throws as documented (the gate runs
+        // before the empty buffer reaches the token). Padded encryption (CKM_RC2_CBC_PAD) must emit
+        // a full padding block, so that path always goes to the token.
+        if (input.IsEmpty
+            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
         {
             bytesWritten = 0;
             return true;

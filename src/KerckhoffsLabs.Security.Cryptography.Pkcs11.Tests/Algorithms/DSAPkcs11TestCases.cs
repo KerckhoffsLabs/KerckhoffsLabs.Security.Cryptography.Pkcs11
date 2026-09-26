@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// Backend-agnostic DSAPkcs11 tests. A keypair is generated on the token from a fixed FIPS 186-3
 /// 2048/256 domain (p, q, g); sign/verify and parameter export run, with signatures cross-checked
 /// against the BCL <see cref="DSA"/> from the exported public key. Every CKM_DSA* operation is gated at
-/// the mechanism layer (DSA is disallowed), so the functional cases opt into AllowInsecure. Cases skip
+/// the mechanism layer (DSA is disallowed), so the functional cases opt into the AllowInsecure policy. Cases skip
 /// where the backend does not implement DSA (e.g. opencryptoki, built -DNODSA).
 /// </summary>
 internal static class DSAPkcs11TestCases
@@ -60,7 +60,7 @@ internal static class DSAPkcs11TestCases
 
     // Generates a DSA key pair on the token from the fixed domain parameters and hands DSAPkcs11 to the
     // body. DSA is FIPS-186-5-disallowed and every CKM_DSA* sign/verify is gated at the mechanism layer,
-    // so the functional overload opts into AllowInsecure; the gated-by-default test passes false. Skips
+    // so the functional overload opts into the AllowInsecure policy; the gated-by-default test passes false. Skips
     // where the backend does not implement DSA.
     private static void WithDsa(IPkcs11Backend backend, Action<DSAPkcs11> body)
         => WithDsa(backend, allowInsecure: true, (_, dsa) => body(dsa));
@@ -71,7 +71,7 @@ internal static class DSAPkcs11TestCases
             Assert.Skip("Backend does not advertise CKM_DSA.");
 
         using var workspace = OpenWorkspace(backend);
-        if (allowInsecure) workspace.AllowInsecure = true;
+        using IDisposable? insecure = allowInsecure ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         string label = $"dsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -126,11 +126,11 @@ internal static class DSAPkcs11TestCases
             Assert.False(dsa.VerifyData(tampered, sig, HashAlgorithmName.SHA256));
         });
 
-    // DSA is gated at the mechanism layer: signing is refused without AllowInsecure, even though
+    // DSA is gated at the mechanism layer: signing is refused without the AllowInsecure policy, even though
     // SoftHSM advertises CKM_DSA_SHA256. (Key generation is not gated, so this still sets up.)
     internal static void Assert_SignData_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithDsa(backend, allowInsecure: false, (_, dsa) =>
-            Assert.Throws<InsecureOperationException>(
+            Assert.Throws<CryptoPolicyViolationException>(
                 () => dsa.SignData(Encoding.UTF8.GetBytes("x"), HashAlgorithmName.SHA256)));
 
     // Vary the hash on the token key (CKM_DSA_SHA* combined, or managed hash + raw CKM_DSA fallback).
@@ -217,7 +217,7 @@ internal static class DSAPkcs11TestCases
 
     internal static void Assert_ExportParameters_Private_ThrowsInsecure(IPkcs11Backend backend) =>
         WithDsa(backend, dsa =>
-            Assert.Throws<InsecureOperationException>(() => dsa.ExportParameters(includePrivateParameters: true)));
+            Assert.Throws<CryptoPolicyViolationException>(() => dsa.ExportParameters(includePrivateParameters: true)));
 
     internal static void Assert_ImportParameters_NotSupported(IPkcs11Backend backend) =>
         WithDsa(backend, dsa =>

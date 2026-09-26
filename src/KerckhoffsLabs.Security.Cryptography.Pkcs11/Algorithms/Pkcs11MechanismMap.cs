@@ -3,8 +3,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
-// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
-// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -29,9 +29,9 @@ public static class Pkcs11MechanismMap
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_RSA_PKCS</c>) has no <see cref="HashAlgorithmName"/> constant in the
-    /// BCL and is gated behind <c>Pkcs11Workspace.AllowInsecure</c> — same opt-in as SHA-1 — since
+    /// BCL and is gated behind the workspace's crypto policy — same opt-in as SHA-1 — since
     /// it is a deviation from the BCL-aligned hash set rather than a mechanism this API otherwise
-    /// exposes by default. See <c>Pkcs11Session.GuardMechanism</c>.
+    /// exposes by default. See <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism RsaPkcs1Sign(HashAlgorithmName hash) => hash.Name switch
@@ -55,8 +55,8 @@ public static class Pkcs11MechanismMap
     /// </param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_RSA_PKCS_PSS</c>) has no <see cref="HashAlgorithmName"/> constant in
-    /// the BCL and is gated behind <c>Pkcs11Workspace.AllowInsecure</c> — same opt-in as SHA-1. See
-    /// <c>Pkcs11Session.GuardMechanism</c>.
+    /// the BCL and is gated behind the workspace's crypto policy — same opt-in as SHA-1. See
+    /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism RsaPssSign(HashAlgorithmName hash, int saltLength)
@@ -79,8 +79,8 @@ public static class Pkcs11MechanismMap
     /// </summary>
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
-    /// SHA-1 and SHA-224 inner hashes are gated behind <c>Pkcs11Workspace.AllowInsecure</c> by
-    /// <c>Pkcs11Session.GuardMechanism</c>, which inspects <see cref="CkmRsaPkcsOaepParams.HashAlg"/>
+    /// SHA-1 and SHA-224 inner hashes are gated behind the workspace's crypto policy by
+    /// <c>SecureOnlyPolicy</c>, which inspects <see cref="CkmRsaPkcsOaepParams.HashAlg"/>
     /// since <c>CKM_RSA_PKCS_OAEP</c> is a single mechanism type for every hash choice.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
@@ -105,8 +105,8 @@ public static class Pkcs11MechanismMap
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_ECDSA_SHA224</c>) has no <see cref="HashAlgorithmName"/> constant in the BCL
-    /// and is gated behind <c>Pkcs11Workspace.AllowInsecure</c> — same opt-in as SHA-1. See
-    /// <c>Pkcs11Session.GuardMechanism</c>.
+    /// and is gated behind the workspace's crypto policy — same opt-in as SHA-1. See
+    /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism EcdsaSign(HashAlgorithmName hash) => hash.Name switch
@@ -214,8 +214,8 @@ public static class Pkcs11MechanismMap
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_HMAC</c>) has no <see cref="HashAlgorithmName"/> constant in the BCL
-    /// and is gated behind <c>Pkcs11Workspace.AllowInsecure</c> — same opt-in as SHA-1. See
-    /// <c>Pkcs11Session.GuardMechanism</c>.
+    /// and is gated behind the workspace's crypto policy — same opt-in as SHA-1. See
+    /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
     public static Mechanism Hmac(HashAlgorithmName hash) => hash.Name switch

@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
+// secure-defaults policy check is the behaviour under test), so the compile-time warning is suppressed
 // for this file only — the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// RSAPkcs11 over the in-process <c>ManagedSoftToken</c> (a BCL-backed PKCS#11 fake). Generates an
 /// RSA-2048 key pair on the token via C_GenerateKeyPair, then exercises the adapter at the same depth
 /// as the SoftHSM suite: PKCS#1 v1.5 and PSS sign/verify (byte[] and span overloads, on-token verify),
-/// RSA-OAEP encrypt/decrypt, PKCS#1 v1.5 encrypt under AllowInsecure, public-parameter export, and the
+/// RSA-OAEP encrypt/decrypt, PKCS#1 v1.5 encrypt under the AllowInsecure policy, public-parameter export, and the
 /// argument-validation / negative cases. Unlike SoftHSM (which gates OAEP-SHA256 off), the managed
 /// token supports OAEP-SHA1/SHA256, so those KATs run here — including decrypting a BCL-produced
 /// ciphertext and verifying a token-produced signature in the BCL from the exported public key.
@@ -60,7 +60,7 @@ public sealed class RSAPkcs11Tests_Managed
     }
 
     // === Key sizes: sign/verify round-trips scale with the modulus =========
-    // RSA < 2048 is gated behind AllowInsecure (NIST SP 800-131A), so the 1024 case generates under an
+    // RSA < 2048 is refused under SecureOnly (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
 
     [Theory]
@@ -73,7 +73,7 @@ public sealed class RSAPkcs11Tests_Managed
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
 
-        using IDisposable? insecure = modulusBits < 2048 ? workspace.AllowInsecureScope() : null;
+        using IDisposable? insecure = modulusBits < 2048 ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         using var key = workspace.GenerateRsaSigningKeyPair(modulusBits);
         using var rsa = new RSAPkcs11(key);
 
@@ -203,14 +203,14 @@ public sealed class RSAPkcs11Tests_Managed
     // exported public key. SoftHSM now also covers OAEP-SHA256 (since the de25233 bump); this remains
     // the managed-backend coverage and the BCL-interop check.
     // SHA-1-OAEP maps to a SHA-1-parameterized CKM_RSA_PKCS_OAEP, gated like any other SHA-1 use, so
-    // it requires AllowInsecure.
+    // it requires the AllowInsecure policy.
     [Theory]
     [MemberData(nameof(OaepHashes))]
     public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithTransportRsa((workspace, rsa) =>
     {
         var oaep = oaepHash == "SHA256" ? RSAEncryptionPadding.OaepSHA256 : RSAEncryptionPadding.OaepSHA1;
         byte[] plaintext = RandomNumberGenerator.GetBytes(32);
-        using IDisposable? insecure = oaepHash == "SHA1" ? workspace.AllowInsecureScope() : null;
+        using IDisposable? insecure = oaepHash == "SHA1" ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
 
         // Encrypt + decrypt on the token.
         byte[] ciphertext = rsa.Encrypt(plaintext, oaep);
@@ -225,12 +225,12 @@ public sealed class RSAPkcs11Tests_Managed
         Assert.Equal(plaintext, rsa.Decrypt(bclCiphertext, oaep));
     });
 
-    // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires AllowInsecure.
+    // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires the AllowInsecure policy.
     [Fact]
     public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => WithTransportRsa((workspace, rsa) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.Pkcs1);
             Assert.Equal(plaintext, rsa.Decrypt(ct, RSAEncryptionPadding.Pkcs1));
@@ -239,7 +239,7 @@ public sealed class RSAPkcs11Tests_Managed
 
     [Fact]
     public void Encrypt_Pkcs1_WithoutAllowInsecure_Throws() => WithTransportRsa((_, rsa) =>
-        Assert.Throws<InsecureOperationException>(() =>
+        Assert.Throws<CryptoPolicyViolationException>(() =>
             rsa.Encrypt(Encoding.UTF8.GetBytes("nope"), RSAEncryptionPadding.Pkcs1)));
 
     // A ciphertext whose padding is corrupted must fail decryption — the token surfaces this as
@@ -284,7 +284,7 @@ public sealed class RSAPkcs11Tests_Managed
 
     [Fact]
     public void ExportParameters_Private_ThrowsInsecureOperation() => WithRsa((_, rsa) =>
-        Assert.Throws<InsecureOperationException>(() => rsa.ExportParameters(includePrivateParameters: true)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rsa.ExportParameters(includePrivateParameters: true)));
 
     [Fact]
     public void ImportParameters_Throws() => WithRsa((_, rsa) =>

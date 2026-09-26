@@ -1,8 +1,8 @@
 # Obsoletion diagnostics
 
 Weak and legacy cryptography stays available for interoperability, but it is never silent: each
-such API is `[Obsolete]` with its own **diagnostic id**, and is additionally gated at runtime by
-`Pkcs11Workspace.AllowInsecure` (which throws `InsecureOperationException` unless you opt in).
+such API is `[Obsolete]` with its own **diagnostic id**, and is additionally refused at runtime by
+the default `SecureOnly` crypto policy (which throws `CryptoPolicyViolationException`).
 
 The per-API ids exist so that a deliberate, documented use of one legacy primitive does not blind
 you to every other obsoletion in your codebase. Suppress the specific id — never the blanket
@@ -21,9 +21,9 @@ or, project-wide when an entire component is a legacy bridge, in the `.csproj`:
 <NoWarn>$(NoWarn);KLPKCS11004</NoWarn>
 ```
 
-Suppressing the compiler diagnostic does **not** disable the runtime gate: the operation still
-requires `AllowInsecure`. The two are independent on purpose — one is a review signal, the other
-is an explicit runtime acknowledgement.
+Suppressing the compiler diagnostic does **not** disable the runtime policy check: the operation still
+requires a policy that permits it. The two are independent on purpose — one is a review signal, the
+other is an explicit runtime acknowledgement.
 
 ## Diagnostics
 
@@ -74,8 +74,8 @@ Reported by an analyzer rather than `[Obsolete]`, because the insecure choice he
 a symbol: there is nothing to mark obsolete when a consumer writes
 `rsa.Encrypt(data, RSAEncryptionPadding.Pkcs1)` (a BCL padding singleton passed to a BCL override) or
 `new Mechanism(CKM.CKM_RSA_PKCS)`. Both routes select RSAES-PKCS#1 v1.5 or raw RSA, where the
-Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `AllowInsecure`
-gate. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
+Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `SecureOnly`
+policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 
 > **RSA *signatures* are a different story.** RSASSA-PKCS#1 v1.5 with a strong hash
 > (`CKM_SHA256_RSA_PKCS` and friends) is **allowed by default** and is *not* reported: it is
@@ -109,8 +109,9 @@ token as a *value*: `rsa.SignData(data, HashAlgorithmName.SHA1, …)`,
 `HashAlgorithmName.SHA1` is a BCL value this library cannot obsolete, so an analyzer reports it. Use
 SHA-256 or stronger.
 
-Note that **verifying** an existing SHA-1 signature is gated too — the mechanism guard is
-direction-agnostic, so legacy verification needs `AllowInsecure` as well.
+Note that **verifying** an existing SHA-1 signature is refused too — the mechanism check is
+direction-agnostic, so legacy verification under `SecureOnly` needs an override as well; `FipsOnly`
+permits SP 800-131A legacy verification.
 
 <a id="KLPKCS11011"></a>
 ### KLPKCS11011 — Rfc2898DeriveBytesPkcs11 constructors
@@ -124,11 +125,17 @@ constructors are all `[Obsolete]` in favor of its static `Pbkdf2` method. Use th
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early
-warning layered on top of the gate — **the gate, not the diagnostic, is the enforcement point.**
+warning layered on top of the runtime policy check — **the policy, not the diagnostic, is the
+enforcement point.**
 
 The analyzers see only what is written literally in the source. A mechanism chosen dynamically — from
 configuration, a `CKM` variable, or a hash name computed at run time — cannot be traced, and is
-rejected only when the operation executes, with an `InsecureOperationException` naming the mechanism.
+rejected only when the operation executes, with a `CryptoPolicyViolationException` naming the
+mechanism.
+
+The analyzers above mirror the default `SecureOnly` policy only. Under `FipsOnly`, a mechanism can be
+refused — or permitted, for example SP 800-131A legacy-use verification — without a matching
+diagnostic: `FipsOnly` is a separate allow-list the analyzers do not model.
 
 These policies are inherently runtime-only, because they depend on values rather than symbols:
 

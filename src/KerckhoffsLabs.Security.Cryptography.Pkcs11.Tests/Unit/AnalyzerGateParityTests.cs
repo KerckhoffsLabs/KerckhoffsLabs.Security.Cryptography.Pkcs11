@@ -1,19 +1,15 @@
-using System.Reflection;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// The compile-time diagnostics are only useful if they warn about exactly what the runtime rejects.
 /// The analyzer cannot reference the library (it targets netstandard2.0 and would be a cycle), so its
-/// mechanism list is a transcription of <c>Pkcs11Session.GuardMechanism</c>'s switch — and a
-/// transcription can drift. These tests derive the gate's *actual* behaviour by driving it over every
-/// <see cref="CKM"/> value, and pin the two together in both directions: a mechanism the gate rejects
-/// but the analyzer stays silent on is a missed warning; the reverse is a false alarm.
+/// mechanism list is a transcription of <c>SecureOnlyPolicy</c>'s mechanism switch — and a
+/// transcription can drift. These tests derive the policy's *actual* behaviour by evaluating it over
+/// every <see cref="CKM"/> value, and pin the two together in both directions: a mechanism the policy
+/// rejects but the analyzer stays silent on is a missed warning; the reverse is a false alarm.
 /// </summary>
 public sealed class AnalyzerGateParityTests
 {
@@ -36,28 +32,15 @@ public sealed class AnalyzerGateParityTests
         return values;
     }
 
-    /// <summary>Mechanisms the runtime gate actually throws on, obtained by invoking it directly.</summary>
+    /// <summary>Mechanisms the default policy refuses, obtained by evaluating it directly.</summary>
     private static HashSet<CKM> RuntimeGatedMechanisms()
     {
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1) { AllowInsecure = false };
-        MethodInfo guard = typeof(Pkcs11Session)
-            .GetMethod("GuardMechanism", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            ?? throw new InvalidOperationException("Pkcs11Session.GuardMechanism not found — did it move?");
-
         var gated = new HashSet<CKM>();
         foreach (CKM mechanism in Enum.GetValues<CKM>())
         {
-            try
-            {
-                // The gate takes a Mechanism, not a CKM, so that it converts once rather than at every
-                // call site; wrap the value here rather than reaching for the enum overload that no
-                // longer exists.
-                guard.Invoke(session, [new Mechanism(mechanism)]);
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException is InsecureOperationException)
-            {
+            var request = new MechanismUseRequest(new Mechanism(mechanism), CryptoOperation.Encrypt);
+            if (!CryptoPolicy.SecureOnly.Evaluate(request).IsAllowed)
                 gated.Add(mechanism);
-            }
         }
 
         Assert.NotEmpty(gated); // the harness itself must not silently no-op

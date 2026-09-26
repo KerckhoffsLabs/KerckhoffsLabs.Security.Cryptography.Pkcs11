@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 /// (KLPKCS11002 / KLPKCS11001). But the same broken hashes reach the token as a <em>value</em>:
 /// <c>rsa.SignData(data, HashAlgorithmName.SHA1, …)</c>, <c>new HMACPkcs11(key, HashAlgorithmName.MD5)</c>.
 /// The BCL's <c>HashAlgorithmName.SHA1</c> is not a symbol this library can obsolete, so without this
-/// analyzer those call sites compile clean and fail only at the runtime <c>AllowInsecure</c> gate
+/// analyzer those call sites compile clean and fail only at the runtime <c>SecureOnlyPolicy</c> check
 /// (<c>CKM_SHA1_RSA_PKCS</c>, <c>CKM_ECDSA_SHA1</c>, <c>CKM_SHA_1_HMAC</c> …).
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -36,10 +36,10 @@ public sealed class BrokenHashAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description:
-            "MD5 and SHA-1 are collision-broken (SHAttered), so signing or MACing with them is gated at " +
-            "runtime by Pkcs11Workspace.AllowInsecure. Note that verifying an existing SHA-1 signature is " +
-            "gated too: the mechanism guard is direction-agnostic. Suppress only alongside a documented " +
-            "interop reason.",
+            "MD5 and SHA-1 are collision-broken (SHAttered), so signing or MACing with them is refused at " +
+            "runtime by the default SecureOnly crypto policy (Pkcs11Workspace.Policy). Note that verifying " +
+            "an existing SHA-1 signature is refused too: the mechanism check is direction-agnostic. " +
+            "Suppress only alongside a documented interop reason.",
         helpLinkUri:
             "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11010");
 

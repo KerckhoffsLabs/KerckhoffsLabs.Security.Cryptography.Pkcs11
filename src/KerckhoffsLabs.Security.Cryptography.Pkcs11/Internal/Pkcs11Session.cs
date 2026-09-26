@@ -155,66 +155,130 @@ internal sealed class Pkcs11Session : IDisposable
     // which leaks a live session on the token by design. Nothing in the library or tests ever set
     // it, so there was no behaviour to preserve — only a misleading contract to remove.
 
-    /// <summary>Backing field for <see cref="AllowInsecure"/>.</summary>
-    private bool _allowInsecure = false;
+    /// <summary>The policy the session was opened under. Never changes.</summary>
+    private readonly ICryptoPolicy _basePolicy;
 
     /// <summary>
-    /// When <c>true</c>, this session does not reject operations that use mechanisms flagged as
-    /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, etc.). Default is <c>false</c>.
-    /// Set explicitly per session; never set this globally. Prefer <see cref="AllowInsecureScope"/>
-    /// for a single operation rather than leaving the flag latched on for the session lifetime.
+    /// The policy currently enforced — the policy of the most recent open override lease, or
+    /// <see cref="_basePolicy"/> when none is open. Written under <see cref="_policyLock"/>, but read
+    /// outside it by <see cref="Enforce(PolicyRequest)"/>, so it is <c>volatile</c>.
     /// </summary>
-    public bool AllowInsecure
+    private volatile ICryptoPolicy _effectivePolicy;
+
+    /// <summary>
+    /// Override leases still open, oldest first. Guarded by <see cref="_policyLock"/>.
+    /// </summary>
+    /// <remarks>
+    /// A list rather than a saved "previous policy" per lease: a lease disposed out of order must
+    /// only withdraw itself. Restoring whatever it saw on entry would let an outer permissive lease
+    /// be re-instated by the disposal of a stricter inner one after the outer lease was already
+    /// closed.
+    /// </remarks>
+    private readonly List<PolicyLease> _policyLeases = [];
+
+    /// <summary>Guards <see cref="_policyLeases"/> and writes to <see cref="_effectivePolicy"/>.</summary>
+    private readonly object _policyLock = new();
+
+    /// <summary>The policy currently enforced on this session.</summary>
+    internal ICryptoPolicy Policy
     {
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-
-            return _allowInsecure;
-        }
-        set
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            // Warn on every transition into the insecure state so the relaxation is auditable.
-            if (value && !_allowInsecure)
-                _logger.LogWarning(
-                    "Session({SessionId})::AllowInsecure enabled — insecure-by-default mechanisms " +
-                    "(RSA PKCS#1 v1.5, DES/3DES, AES-ECB, MD5/SHA-1) are no longer gated on this session.",
-                    _sessionId);
-
-            _allowInsecure = value;
+            return _effectivePolicy;
         }
     }
 
     /// <summary>
-    /// Enables <see cref="AllowInsecure"/> for the duration of the returned lease and restores the
-    /// previous value when the lease is disposed. Use this to opt into an insecure mechanism for a
-    /// single operation rather than latching the flag on for the whole session:
-    /// <code>using (session.AllowInsecureScope()) { /* one insecure op */ }</code>
-    /// Nested scopes restore in LIFO order. Logs a warning on entry (via the setter).
+    /// Evaluates <paramref name="request"/> under the effective policy; on denial logs a warning and
+    /// throws. The only place a policy verdict becomes an exception.
     /// </summary>
-    public IDisposable AllowInsecureScope()
+    /// <exception cref="CryptoPolicyViolationException">The policy refused the request.</exception>
+    internal void Enforce(PolicyRequest request)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ICryptoPolicy policy = _effectivePolicy;
+        PolicyDecision decision = policy.Evaluate(request);
+        if (decision.IsAllowed)
+            return;
 
-        bool previous = _allowInsecure;
-        AllowInsecure = true; // routes through the setter so the transition is logged
-        return new AllowInsecureLease(this, previous);
+        Log.PolicyDenied(_logger, (ulong)_sessionId, policy.Name, request.Describe());
+        throw new CryptoPolicyViolationException(policy.Name, request, decision.Reason!);
     }
 
-    /// <summary>Disposable returned by <see cref="AllowInsecureScope"/>. Restores the prior flag value on dispose.</summary>
-    private sealed class AllowInsecureLease(Pkcs11Session session, bool previous) : IDisposable
+    /// <summary>Evaluates without throwing or logging.</summary>
+    internal bool IsPermitted(PolicyRequest request)
     {
-        private bool _released;
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _effectivePolicy.Evaluate(request).IsAllowed;
+    }
+
+    private void Enforce(Mechanism mechanism, CryptoOperation operation)
+        => Enforce(new MechanismUseRequest(mechanism, operation));
+
+    /// <summary>
+    /// Replaces the effective policy until the returned lease is disposed. Logged. Refused when the
+    /// session's base policy does not allow overrides.
+    /// </summary>
+    /// <remarks>
+    /// Leases form a stack: the most recent open lease decides the effective policy. Disposing a
+    /// lease withdraws only that lease, wherever it sits, and the effective policy becomes that of
+    /// the most recent lease still open, or the base policy when none is — so disposing leases out
+    /// of order never re-instates a policy whose lease is already closed.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="policy"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The base policy's <see cref="ICryptoPolicy.AllowsOverride"/> is false.</exception>
+    internal IDisposable UsePolicy(ICryptoPolicy policy)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(policy);
+        if (!_basePolicy.AllowsOverride)
+            throw new InvalidOperationException(
+                $"This session was opened under the {_basePolicy.Name} policy, which does not allow overrides.");
+
+        var lease = new PolicyLease(this, policy);
+        lock (_policyLock)
+        {
+            Log.PolicyOverridden(_logger, (ulong)_sessionId, _effectivePolicy.Name, policy.Name);
+            _policyLeases.Add(lease);
+            _effectivePolicy = policy;
+        }
+        return lease;
+    }
+
+    /// <summary>
+    /// Withdraws <paramref name="lease"/> from the lease stack and recomputes the effective policy.
+    /// A no-op once the session is disposed.
+    /// </summary>
+    private void ReleasePolicyLease(PolicyLease lease)
+    {
+        lock (_policyLock)
+        {
+            if (_disposed)
+                return;
+
+            _policyLeases.Remove(lease);
+            ICryptoPolicy previous = _effectivePolicy;
+            ICryptoPolicy restored = _policyLeases.Count > 0 ? _policyLeases[^1].Policy : _basePolicy;
+            if (ReferenceEquals(previous, restored))
+                return;
+
+            _effectivePolicy = restored;
+            Log.PolicyRestored(_logger, (ulong)_sessionId, previous.Name, restored.Name);
+        }
+    }
+
+    /// <summary>An open policy override. Disposing it withdraws it from the session's lease stack.</summary>
+    private sealed class PolicyLease(Pkcs11Session session, ICryptoPolicy policy) : IDisposable
+    {
+        private int _released;
+
+        /// <summary>The policy this lease puts in force.</summary>
+        public ICryptoPolicy Policy { get; } = policy;
 
         public void Dispose()
         {
-            if (_released) return;
-            _released = true;
-            // Restore directly (not via the setter) so unwinding never re-logs a "now insecure" warning.
-            if (!session._disposed)
-                session._allowInsecure = previous;
+            if (Interlocked.Exchange(ref _released, 1) != 0) return;
+            session.ReleasePolicyLease(this);
         }
     }
 
@@ -274,7 +338,10 @@ internal sealed class Pkcs11Session : IDisposable
     /// Logger factory inherited from the owning <see cref="Pkcs11Slot"/>/<see cref="Pkcs11Library"/>;
     /// <see langword="null"/> falls back to the shared <see cref="Pkcs11Logging"/> factory.
     /// </param>
-    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null)
+    /// <param name="policy">
+    /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.SecureOnly"/>.
+    /// </param>
+    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
     {
         _logger = loggerFactory?.CreateLogger<Pkcs11Session>() ?? Pkcs11Logging.CreateLogger<Pkcs11Session>();
         Log.SessionTrace(_logger, sessionId, "ctor");
@@ -284,6 +351,8 @@ internal sealed class Pkcs11Session : IDisposable
         if (sessionId == CK.CK_INVALID_HANDLE)
             throw new ArgumentException("Invalid handle specified", nameof(sessionId));
 
+        _basePolicy = policy ?? CryptoPolicy.SecureOnly;
+        _effectivePolicy = _basePolicy;
         _pkcs11Library = pkcs11Library;
         _sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, (NativeCULong)sessionId);
     }
@@ -587,43 +656,6 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Checks the given mechanism against the insecure-mechanism set and throws
-    /// <see cref="InsecureOperationException"/> if it is insecure and <see cref="AllowInsecure"/>
-    /// is false.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// This is the single, mechanism-level secure-defaults gate; it fires identically for sign,
-    /// verify, encrypt, decrypt, derive, digest, and key generation (it has no notion of operation
-    /// direction). Every case dispatches on <c>mechanismType</c> alone except
-    /// <c>CKM_RSA_PKCS_OAEP</c>, which is one mechanism type for every hash choice — that case
-    /// additionally inspects <see cref="CkmRsaPkcsOaepParams.HashAlg"/>.
-    /// </para>
-    /// <para><b>SHA-224 policy.</b> SHA-224 (<c>CKM_SHA224_RSA_PKCS</c>, <c>_RSA_PKCS_PSS</c>,
-    /// <c>CKM_ECDSA_SHA224</c>, <c>CKM_SHA224_HMAC</c>, and OAEP's <c>CKM_SHA224</c> hash) is gated
-    /// the same way as SHA-1, but for a different reason: it isn't cryptographically broken (it's
-    /// FIPS 180-4-approved, just a truncated SHA-256), but it has no <see cref="HashAlgorithmName"/>
-    /// constant in the BCL and no practical benefit over SHA-256 on equal-cost hardware, so exposing
-    /// it by default would be a deviation from the BCL-aligned hash set this API otherwise mirrors.
-    /// </para>
-    /// <para><b>RSA PKCS#1 v1.5 policy.</b> The split is deliberate and along two axes —
-    /// broken hash vs. dangerous padding-use — not "v1.5 vs. PSS":
-    /// <list type="bullet">
-    /// <item>Gated: any <em>broken hash</em> in an RSA signature mechanism
-    /// (<c>CKM_MD2/MD5/SHA1/RIPEMD128/RIPEMD160_RSA_PKCS</c>, <c>CKM_SHA1_RSA_PKCS_PSS</c>).</item>
-    /// <item>Gated: PKCS#1 v1.5 <em>encryption</em> / raw RSA (<c>CKM_RSA_PKCS</c>, <c>CKM_RSA_X_509</c>)
-    /// — this is where Bleichenbacher/ROBOT padding-oracle attacks live.</item>
-    /// <item><b>Allowed:</b> strong-hash (SHA-2/SHA-3) v1.5 <em>signatures</em>
-    /// (<c>CKM_SHA256_RSA_PKCS</c> etc.). RSASSA-PKCS1-v1_5 with a strong hash is FIPS 186-5-approved
-    /// and mandated by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing. Because this
-    /// guard is direction-agnostic, gating it would also block <em>verifying</em> third-party
-    /// signatures — so gating a secure, ubiquitous scheme would both break interop and dilute the
-    /// meaning of <see cref="AllowInsecure"/>. PSS is preferred for new code but not required.</item>
-    /// </list>
-    /// Mirrored in <c>RSAPkcs11.SignMechanismFor</c> and the README "Security model" section.
-    /// </para>
-    /// </remarks>
-    /// <summary>
     /// Rejects one descriptor driving both halves of a dual-mechanism operation when the token writes
     /// into it.
     /// </summary>
@@ -646,259 +678,6 @@ internal sealed class Pkcs11Session : IDisposable
             + "of the two results would be silently discarded. Use a separate parameter object for "
             + "each mechanism.",
             secondParamName);
-    }
-
-    // Takes the Mechanism rather than a CKM so the conversion happens once, here, instead of at all
-    // ~50 call sites. The cast is meaningful only for mechanisms this enum names: a vendor-defined
-    // value lands in `default` and is not gated, which is correct — the policy encodes verdicts about
-    // known-weak algorithms, and it has none to offer about a mechanism it has never heard of.
-    private void GuardMechanism(Mechanism mechanism)
-    {
-        if (AllowInsecure) return;
-
-        CKM mechanismType = (CKM)mechanism.Type;
-
-        // Cases are ordered alphabetically by CKM member name (each block's labels are also sorted
-        // alphabetically internally), purely to make a given mechanism's gate easy to locate; it
-        // carries no semantic meaning.
-        switch (mechanismType)
-        {
-            case CKM.CKM_AES_CBC:
-            case CKM.CKM_AES_CBC_PAD:
-            case CKM.CKM_AES_CFB1:
-            case CKM.CKM_AES_CFB128:
-            case CKM.CKM_AES_CFB64:
-            case CKM.CKM_AES_CFB8:
-            case CKM.CKM_AES_CTR:
-            case CKM.CKM_AES_CTS:
-            case CKM.CKM_AES_OFB:
-                throw new InsecureOperationException(mechanismType,
-                    "Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. To use these for legacy interop, set Pkcs11Workspace.AllowInsecure = true.");
-            case CKM.CKM_AES_ECB:
-            case CKM.CKM_ARIA_ECB:
-            case CKM.CKM_CAMELLIA_ECB:
-                throw new InsecureOperationException(mechanismType,
-                    "ECB mode leaks structural information from the plaintext; use CKM_AES_GCM or CKM_AES_CCM instead.");
-            case CKM.CKM_AES_XTS:
-                throw new InsecureOperationException(mechanismType,
-                    "AES-XTS provides no integrity protection and is designed for disk-sector encryption, not general-purpose use; use CKM_AES_GCM or CKM_AES_CCM instead.");
-            case CKM.CKM_BLOWFISH_CBC:
-            case CKM.CKM_BLOWFISH_CBC_PAD:
-            case CKM.CKM_BLOWFISH_KEY_GEN:
-                throw new InsecureOperationException(mechanismType,
-                    "Blowfish is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
-            // CKM_CAST5_* are the old names for CKM_CAST128_* (identical enum values), so the
-            // CAST128 labels below also match CAST5 calls.
-            case CKM.CKM_CAST128_CBC:
-            case CKM.CKM_CAST128_CBC_PAD:
-            case CKM.CKM_CAST128_ECB:
-            case CKM.CKM_CAST128_KEY_GEN:
-            case CKM.CKM_CAST128_MAC:
-            case CKM.CKM_CAST128_MAC_GENERAL:
-            case CKM.CKM_CAST3_CBC:
-            case CKM.CKM_CAST3_CBC_PAD:
-            case CKM.CKM_CAST3_ECB:
-            case CKM.CKM_CAST3_KEY_GEN:
-            case CKM.CKM_CAST3_MAC:
-            case CKM.CKM_CAST3_MAC_GENERAL:
-            case CKM.CKM_CAST_CBC:
-            case CKM.CKM_CAST_CBC_PAD:
-            case CKM.CKM_CAST_ECB:
-            case CKM.CKM_CAST_KEY_GEN:
-            case CKM.CKM_CAST_MAC:
-            case CKM.CKM_CAST_MAC_GENERAL:
-                throw new InsecureOperationException(mechanismType,
-                    "CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
-            case CKM.CKM_CHACHA20:
-            case CKM.CKM_SALSA20:
-                throw new InsecureOperationException(mechanismType,
-                    "Raw ChaCha20/Salsa20 provide no integrity protection and are malleable; use CKM_CHACHA20_POLY1305 or CKM_AES_GCM instead.");
-            case CKM.CKM_CONCATENATE_BASE_AND_DATA:
-            case CKM.CKM_CONCATENATE_BASE_AND_KEY:
-            case CKM.CKM_CONCATENATE_DATA_AND_BASE:
-            case CKM.CKM_EXTRACT_KEY_FROM_KEY:
-            case CKM.CKM_XOR_BASE_AND_DATA:
-                throw new InsecureOperationException(mechanismType,
-                    "This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks.");
-            case CKM.CKM_DES2_KEY_GEN:
-            case CKM.CKM_DES3_KEY_GEN:
-            case CKM.CKM_DES_KEY_GEN:
-                throw new InsecureOperationException(mechanismType,
-                    "DES and 3DES key generation produces deprecated keys; use CKM_AES_KEY_GEN instead.");
-            case CKM.CKM_DES3_CBC:
-            case CKM.CKM_DES3_CBC_PAD:
-            case CKM.CKM_DES3_ECB:
-            case CKM.CKM_DES_CBC:
-            case CKM.CKM_DES_CBC_PAD:
-            case CKM.CKM_DES_ECB:
-                throw new InsecureOperationException(mechanismType,
-                    "DES and 3DES are deprecated; use AES (CKM_AES_GCM or CKM_AES_CCM) instead.");
-            case CKM.CKM_DES3_CBC_ENCRYPT_DATA:
-            case CKM.CKM_DES3_ECB_ENCRYPT_DATA:
-                throw new InsecureOperationException(mechanismType,
-                    "DES3 key-derive mechanisms are weak; use CKM_SP800_108-family KDFs or CKM_AES_CBC_ENCRYPT_DATA on a strong base key instead.");
-            case CKM.CKM_DES3_MAC:
-            case CKM.CKM_DES3_MAC_GENERAL:
-            case CKM.CKM_DES_MAC:
-            case CKM.CKM_DES_MAC_GENERAL:
-                throw new InsecureOperationException(mechanismType,
-                    "DES/3DES MAC is weak; use CKM_AES_CMAC or CKM_SHA256_HMAC instead.");
-            case CKM.CKM_DSA:
-            case CKM.CKM_DSA_SHA1:
-            case CKM.CKM_DSA_SHA224:
-            case CKM.CKM_DSA_SHA256:
-            case CKM.CKM_DSA_SHA384:
-            case CKM.CKM_DSA_SHA512:
-                throw new InsecureOperationException(mechanismType,
-                    "DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys; use CKM_ECDSA_SHA256 or CKM_ML_DSA.");
-            case CKM.CKM_ECDSA_SHA1:
-            case CKM.CKM_SHA_1_HMAC:
-            case CKM.CKM_SHA_1_HMAC_GENERAL:
-                throw new InsecureOperationException(mechanismType,
-                    "SHA-1 is collision-broken and deprecated in signature/MAC contexts; use CKM_SHA256_HMAC or CKM_ECDSA_SHA256.");
-            case CKM.CKM_ECDSA_SHA224:
-            case CKM.CKM_SHA224_HMAC:
-            case CKM.CKM_SHA224_RSA_PKCS:
-            case CKM.CKM_SHA224_RSA_PKCS_PSS:
-                throw new InsecureOperationException(mechanismType,
-                    "SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over " +
-                    "SHA-256 on equal-cost hardware; use CKM_SHA256 or stronger, or set AllowInsecure to opt in " +
-                    "for interop with a token/protocol that specifically requires it.");
-            case CKM.CKM_GOST28147_ECB:
-            case CKM.CKM_IDEA_ECB:
-                throw new InsecureOperationException(mechanismType,
-                    "This is a legacy 64-bit-block cipher in ECB mode, both leaking structural information from the plaintext and vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM instead.");
-            case CKM.CKM_MD2:
-            case CKM.CKM_MD2_HMAC:
-            case CKM.CKM_MD2_HMAC_GENERAL:
-            case CKM.CKM_MD2_KEY_DERIVATION:
-            case CKM.CKM_MD2_RSA_PKCS:
-                throw new InsecureOperationException(mechanismType,
-                    "MD2 is a broken hash function; use CKM_SHA256 or stronger.");
-            case CKM.CKM_MD5:
-            case CKM.CKM_SHA_1:
-                throw new InsecureOperationException(mechanismType,
-                    "MD5 and SHA-1 are broken hash functions; use CKM_SHA256 or stronger.");
-            case CKM.CKM_MD5_HMAC:
-            case CKM.CKM_MD5_HMAC_GENERAL:
-            case CKM.CKM_MD5_KEY_DERIVATION:
-            case CKM.CKM_SHA1_KEY_DERIVATION:
-                throw new InsecureOperationException(mechanismType,
-                    "MD5/SHA-1-based HMAC and key derivation rely on broken hash functions; use CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger instead.");
-            case CKM.CKM_MD5_RSA_PKCS:
-            case CKM.CKM_SHA1_RSA_PKCS:
-            case CKM.CKM_SHA1_RSA_PKCS_PSS:
-                throw new InsecureOperationException(mechanismType,
-                    "MD5/SHA-1 in RSA signature contexts is broken (SHAttered breaks PSS-SHA-1 too); use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256 instead.");
-            case CKM.CKM_RC2_CBC:
-            case CKM.CKM_RC2_CBC_PAD:
-            case CKM.CKM_RC2_ECB:
-            case CKM.CKM_RC2_KEY_GEN:
-            case CKM.CKM_RC2_MAC:
-            case CKM.CKM_RC2_MAC_GENERAL:
-                throw new InsecureOperationException(mechanismType,
-                    "RC2 is a deprecated 40/64-bit-key cipher with known weaknesses; use CKM_AES_GCM.");
-            case CKM.CKM_RC4:
-            case CKM.CKM_RC4_KEY_GEN:
-                throw new InsecureOperationException(mechanismType,
-                    "RC4 is a broken stream cipher with a biased keystream (prohibited in TLS by RFC 7465); use CKM_AES_GCM.");
-            case CKM.CKM_RC5_CBC:
-            case CKM.CKM_RC5_CBC_PAD:
-            case CKM.CKM_RC5_ECB:
-            case CKM.CKM_RC5_KEY_GEN:
-            case CKM.CKM_RC5_MAC:
-            case CKM.CKM_RC5_MAC_GENERAL:
-                throw new InsecureOperationException(mechanismType,
-                    "RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks; use CKM_AES_GCM.");
-            case CKM.CKM_RIPEMD128:
-            case CKM.CKM_RIPEMD128_HMAC:
-            case CKM.CKM_RIPEMD128_HMAC_GENERAL:
-            case CKM.CKM_RIPEMD128_RSA_PKCS:
-            case CKM.CKM_RIPEMD160:
-            case CKM.CKM_RIPEMD160_HMAC:
-            case CKM.CKM_RIPEMD160_HMAC_GENERAL:
-            case CKM.CKM_RIPEMD160_RSA_PKCS:
-                throw new InsecureOperationException(mechanismType,
-                    "RIPEMD-128/160 are deprecated hash functions; use CKM_SHA256 or stronger.");
-            case CKM.CKM_RSA_9796:
-                throw new InsecureOperationException(mechanismType,
-                    "ISO 9796-2 RSA signing is forgeable (Coron-Naccache-Stern); use CKM_RSA_PKCS_PSS instead.");
-            case CKM.CKM_RSA_PKCS:
-                throw new InsecureOperationException(mechanismType,
-                    "RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks and fault attacks; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
-            case CKM.CKM_RSA_PKCS_OAEP:
-                // CKM_RSA_PKCS_OAEP is one mechanism type for every hash choice — the hash lives in
-                // CkmRsaPkcsOaepParams, not the type, so this is the one case in this switch that
-                // inspects parameters rather than dispatching on mechanismType alone.
-                if (mechanism.Parameters is CkmRsaPkcsOaepParams { HashAlg: CKM.CKM_SHA_1 })
-                    throw new InsecureOperationException(mechanismType,
-                        "SHA-1 is collision-broken; use CKM_SHA256 or stronger as the OAEP hash.");
-                if (mechanism.Parameters is CkmRsaPkcsOaepParams { HashAlg: CKM.CKM_SHA224 })
-                    throw new InsecureOperationException(mechanismType,
-                        "SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit " +
-                        "over SHA-256 on equal-cost hardware; use CKM_SHA256 or stronger as the OAEP hash, or " +
-                        "set AllowInsecure to opt in.");
-                return;
-            case CKM.CKM_RSA_X_509:
-                throw new InsecureOperationException(mechanismType,
-                    "Raw RSA (X.509, no padding) is malleable and forgeable; use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing.");
-            case CKM.CKM_SEED_CBC:
-            case CKM.CKM_SEED_CBC_ENCRYPT_DATA:
-            case CKM.CKM_SEED_CBC_PAD:
-            case CKM.CKM_SEED_ECB:
-            case CKM.CKM_SEED_ECB_ENCRYPT_DATA:
-            case CKM.CKM_SEED_KEY_GEN:
-            case CKM.CKM_SEED_MAC:
-            case CKM.CKM_SEED_MAC_GENERAL:
-                throw new InsecureOperationException(mechanismType,
-                    "SEED is a legacy regional cipher retained only for Korean-standard interop; use CKM_AES_GCM.");
-            case CKM.CKM_SKIPJACK_CBC64:
-            case CKM.CKM_SKIPJACK_CFB16:
-            case CKM.CKM_SKIPJACK_CFB32:
-            case CKM.CKM_SKIPJACK_CFB64:
-            case CKM.CKM_SKIPJACK_CFB8:
-            case CKM.CKM_SKIPJACK_ECB64:
-            case CKM.CKM_SKIPJACK_KEY_GEN:
-            case CKM.CKM_SKIPJACK_OFB64:
-            case CKM.CKM_SKIPJACK_PRIVATE_WRAP:
-            case CKM.CKM_SKIPJACK_RELAYX:
-            case CKM.CKM_SKIPJACK_WRAP:
-                throw new InsecureOperationException(mechanismType,
-                    "SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses; use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping).");
-            case CKM.CKM_SSL3_MD5_MAC:
-            case CKM.CKM_SSL3_SHA1_MAC:
-                throw new InsecureOperationException(mechanismType,
-                    "SSLv3 MAC mechanisms are tied to a protocol version prohibited by RFC 7568; use TLS 1.2+ with CKM_SHA256_HMAC instead.");
-            default:
-                return;
-        }
-    }
-
-    /// <summary>
-    /// Secure-defaults gate for key-pair generation strength. RSA moduli below 2048 bits are under the
-    /// NIST SP 800-131A floor and are refused unless <see cref="AllowInsecure"/> is set — the same
-    /// opt-in model as the weak-mechanism gate, so a sub-2048 RSA key is a deliberate, audited choice
-    /// (e.g. legacy interop) rather than a silent default. Reads <c>CKA_MODULUS_BITS</c> from the public
-    /// template; non-RSA mechanisms and templates without the attribute are not affected.
-    /// </summary>
-    private void GuardKeyPairStrength(CKM mechanism, List<ObjectAttribute> publicKeyAttributes)
-    {
-        if (AllowInsecure) return;
-        if (mechanism is not (CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or CKM.CKM_RSA_X9_31_KEY_PAIR_GEN))
-            return;
-
-        // Only the first CKA_MODULUS_BITS is consulted, as before: a template carrying two is
-        // malformed, and which one the token would honour is not ours to decide.
-        ObjectAttribute? modulusBits =
-            publicKeyAttributes.FirstOrDefault(a => (CKA)a.Type == CKA.CKA_MODULUS_BITS);
-        if (modulusBits is null)
-            return;
-
-        ulong bits = modulusBits.GetValueAsUlong();
-        if (bits < 2048)
-            throw new InsecureOperationException(
-                $"RSA-{bits} is below the NIST SP 800-131A 2048-bit minimum. Set Pkcs11Workspace.AllowInsecure " +
-                "to opt in (e.g. legacy interop), or generate a key of at least 2048 bits.");
     }
 
     #region IDisposable
@@ -983,7 +762,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "CreateObject");
 
         // Any object class may arrive here, so the refusal applies but key defaults do not.
-        GuardInsecureKeyAttributes(attributes);
+        EnforceKeyTemplate(attributes, null);
 
         NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
 
@@ -1011,7 +790,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "CopyObject");
 
         // A copy can weaken the original's protection, so the same refusal applies.
-        GuardInsecureKeyAttributes(attributes);
+        EnforceKeyTemplate(attributes, null);
 
 
         NativeCULong objectId = (NativeCULong)CK.CK_INVALID_HANDLE;
@@ -1518,13 +1297,13 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.GenerateKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKey");
 
         // A secret key: refuse a deliberately weakened template, and supply the secure defaults when
         // the caller stated nothing — the same treatment DeriveKey and UnwrapKey already gave.
-        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes);
+        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes, CKO.CKO_SECRET_KEY);
         if (generatedDefaults.Count > 0)
         {
             attributes = attributes is null ? [] : [.. attributes];
@@ -1562,14 +1341,23 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
-        GuardKeyPairStrength((CKM)mechanism.Type, publicKeyAttributes);
+        Enforce(mechanism, CryptoOperation.GenerateKeyPair);
+
+        if ((CKM)mechanism.Type is CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or CKM.CKM_RSA_X9_31_KEY_PAIR_GEN)
+        {
+            // Only the first CKA_MODULUS_BITS is consulted: a template carrying two is malformed, and
+            // which one the token would honour is not ours to decide.
+            ObjectAttribute? modulusBits =
+                publicKeyAttributes.FirstOrDefault(a => (CKA)a.Type == CKA.CKA_MODULUS_BITS);
+            if (modulusBits is not null)
+                Enforce(new RsaKeyGenerationRequest((CKM)mechanism.Type, modulusBits.GetValueAsUlong()));
+        }
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKeyPair");
 
         // The private half only. CKA_SENSITIVE / CKA_EXTRACTABLE do not belong on a public key, so
         // seeding them there would be rejected by the token; the refusal alone is enough.
-        using ReadOnlyDisposableList<ObjectAttribute> privateDefaults = BuildSecureKeyDefaults(privateKeyAttributes);
+        using ReadOnlyDisposableList<ObjectAttribute> privateDefaults = BuildSecureKeyDefaults(privateKeyAttributes, CKO.CKO_PRIVATE_KEY);
         if (privateDefaults.Count > 0)
         {
             privateKeyAttributes = [.. privateKeyAttributes];
@@ -1624,7 +1412,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Wrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
@@ -1683,8 +1471,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Unwraps a wrapped key using the given unwrapping key and mechanism. Throws
-    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
-    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// <see cref="CryptoPolicyViolationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and the session's policy refuses the mechanism.
     /// </summary>
     /// <param name="mechanism">Key-unwrap mechanism.</param>
     /// <param name="unwrappingKeyHandle">Handle of the unwrapping key (private RSA, AES-WRAP key, etc.).</param>
@@ -1719,7 +1507,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(wrappedKey);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Unwrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
@@ -1729,8 +1517,8 @@ internal sealed class Pkcs11Session : IDisposable
         // Unwrapping decrypts a key blob into a new token object. Without secure defaults a caller
         // could land an extractable, non-sensitive key — silently downgrading the posture the key
         // template builders establish. Append CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the
-        // caller omitted them; an explicit insecure value requires AllowInsecure (throws otherwise).
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
+        // caller omitted them; an explicit insecure value requires a policy that permits it (throws otherwise).
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         NativeCULong unwrappedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
@@ -1747,46 +1535,18 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Refuses a template that would make key material readable in plaintext, unless the caller has
-    /// opted in.
+    /// Submits a creation template to the policy. <paramref name="objectClass"/> is the class the
+    /// creating path knows for certain; paths that take an arbitrary template pass null rather than
+    /// parse the caller's CKA_CLASS.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Only <c>CKA_SENSITIVE=false</c> is refused. <c>CKA_EXTRACTABLE=true</c> is not: an extractable
-    /// key can be <i>wrapped</i> — exported encrypted under a KEK — which is the standard way to back
-    /// up and transport keys, and PKCS#11 requires the attribute for it. Demanding an "insecure"
-    /// opt-in to use key wrapping at all would misdescribe a safe operation. The value still never
-    /// leaves in the clear, which is what <c>CKA_SENSITIVE</c> governs and what this refuses.
-    /// </para>
-    /// <para>
-    /// Non-extractable remains the <i>default</i> — <see cref="BuildSecureKeyDefaults"/> still supplies
-    /// <c>CKA_EXTRACTABLE=false</c> when the caller says nothing. Asking for extractable is allowed;
-    /// getting it by omission is not.
-    /// </para>
-    /// Check only — it adds nothing — so it is safe on any object class, including public keys and
-    /// non-key objects where <c>CKA_SENSITIVE</c>/<c>CKA_EXTRACTABLE</c> defaults would be wrong or
-    /// rejected outright. Every path that creates a token object runs this; the ones that create a
-    /// secret or private key additionally run <see cref="BuildSecureKeyDefaults"/> to supply the
-    /// defaults when the caller stated nothing.
-    /// </remarks>
-    private void GuardInsecureKeyAttributes(List<ObjectAttribute>? attributes)
+    private void EnforceKeyTemplate(List<ObjectAttribute>? attributes, CKO? objectClass)
     {
         if (attributes is null) return;
-
-        // The opt-in is checked up front rather than per-attribute, matching GuardMechanism and
-        // GuardKeyPairStrength. It also stops the guard from reading a value it has already decided not
-        // to police: with AllowInsecure set there is no verdict to reach, so there is no reason to
-        // parse a caller's CKA_SENSITIVE and risk throwing over its encoding instead.
-        if (AllowInsecure) return;
-
-        if (attributes.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE && !a.GetValueAsBool()))
-            throw new InsecureOperationException(
-                "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
-                "Pass AllowInsecure (or use AllowInsecureScope) to override.");
+        Enforce(new KeyTemplateRequest(objectClass, attributes));
     }
 
     /// <summary>
-    /// Runs <see cref="GuardInsecureKeyAttributes"/>, then returns the secure-default attributes to
+    /// Runs <see cref="EnforceKeyTemplate"/>, then returns the secure-default attributes to
     /// append for any the caller omitted — <c>CKA_SENSITIVE=true</c> and <c>CKA_EXTRACTABLE=false</c>.
     /// </summary>
     /// <remarks>
@@ -1796,9 +1556,9 @@ internal sealed class Pkcs11Session : IDisposable
     /// default here, but an explicit <c>CKA_EXTRACTABLE=true</c> is not refused — only
     /// <c>CKA_SENSITIVE=false</c> is.
     /// </remarks>
-    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes)
+    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes, CKO? objectClass)
     {
-        GuardInsecureKeyAttributes(attributes);
+        EnforceKeyTemplate(attributes, objectClass);
 
         bool hasSensitive = attributes?.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE) ?? false;
         bool hasExtractable = attributes?.Any(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE) ?? false;
@@ -2034,8 +1794,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Encrypts <paramref name="data"/> using the given mechanism and key. Throws
-    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
-    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// <see cref="CryptoPolicyViolationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and the session's policy refuses the mechanism.
     /// </summary>
     /// <param name="mechanism">The encryption mechanism to use.</param>
     /// <param name="keyHandle">Handle of the key to encrypt with.</param>
@@ -2065,7 +1825,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
 
@@ -2137,7 +1897,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt2");
 
@@ -2163,7 +1923,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt3");
 
@@ -2244,7 +2004,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageEncrypt");
 
@@ -2301,8 +2061,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Decrypts <paramref name="encryptedData"/> using the given mechanism and key. Throws
-    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
-    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// <see cref="CryptoPolicyViolationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and the session's policy refuses the mechanism.
     /// </summary>
     /// <param name="mechanism">The decryption mechanism to use.</param>
     /// <param name="keyHandle">Handle of the key to decrypt with.</param>
@@ -2329,7 +2089,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 
@@ -2377,7 +2137,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt2");
 
@@ -2402,7 +2162,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt3");
 
@@ -2473,7 +2233,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
 
@@ -2528,8 +2288,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Signs <paramref name="data"/> using the given mechanism and key. Throws
-    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
-    /// insecure-by-default list and <see cref="AllowInsecure"/> is false.
+    /// <see cref="CryptoPolicyViolationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list and the session's policy refuses the mechanism.
     /// </summary>
     /// <param name="mechanism">Signing mechanism.</param>
     /// <param name="keyHandle">Handle of the private/MAC key.</param>
@@ -2540,7 +2300,7 @@ internal sealed class Pkcs11Session : IDisposable
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Sign);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
@@ -2565,8 +2325,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Verifies <paramref name="signature"/> over <paramref name="data"/> using the given
-    /// mechanism and key. Throws <see cref="InsecureOperationException"/> if
-    /// <paramref name="mechanism"/> is insecure-by-default and <see cref="AllowInsecure"/> is false.
+    /// mechanism and key. Throws <see cref="CryptoPolicyViolationException"/> if
+    /// <paramref name="mechanism"/> is insecure-by-default and the session's policy refuses the mechanism.
     /// </summary>
     /// <param name="mechanism">Verification mechanism.</param>
     /// <param name="keyHandle">Handle of the public/MAC key.</param>
@@ -2597,7 +2357,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
 
@@ -2632,7 +2392,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify2");
 
@@ -2659,7 +2419,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify3");
 
@@ -2718,7 +2478,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifyRecover");
 
@@ -2766,8 +2526,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism(verificationMechanism);
-        GuardMechanism(decryptionMechanism);
+        Enforce(verificationMechanism, CryptoOperation.Verify);
+        Enforce(decryptionMechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify1");
 
@@ -2801,8 +2561,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism(verificationMechanism);
-        GuardMechanism(decryptionMechanism);
+        Enforce(verificationMechanism, CryptoOperation.Verify);
+        Enforce(decryptionMechanism, CryptoOperation.Decrypt);
 
         ThrowIfOneDescriptorDrivesBothHalves(verificationMechanism, decryptionMechanism, nameof(decryptionMechanism));
 
@@ -2839,8 +2599,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism(verificationMechanism);
-        GuardMechanism(decryptionMechanism);
+        Enforce(verificationMechanism, CryptoOperation.Verify);
+        Enforce(decryptionMechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptVerify3");
 
@@ -2904,7 +2664,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Digest);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
@@ -2944,8 +2704,8 @@ internal sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Computes a digest over <paramref name="data"/> using the given mechanism. Throws
-    /// <see cref="InsecureOperationException"/> if <paramref name="mechanism"/> is on the
-    /// insecure-by-default list (raw MD5 / SHA-1) and <see cref="AllowInsecure"/> is false.
+    /// <see cref="CryptoPolicyViolationException"/> if <paramref name="mechanism"/> is on the
+    /// insecure-by-default list (raw MD5 / SHA-1) and the session's policy refuses the mechanism.
     /// </summary>
     /// <param name="mechanism">The digest mechanism (typically <see cref="CKM.CKM_SHA256"/> or stronger).</param>
     /// <param name="data">Data to digest.</param>
@@ -2972,7 +2732,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Digest);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
 
@@ -3006,7 +2766,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Digest);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest2");
 
@@ -3028,7 +2788,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Digest);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest3");
 
@@ -3095,8 +2855,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
 
-        GuardMechanism(digestingMechanism);
-        GuardMechanism(encryptionMechanism);
+        Enforce(digestingMechanism, CryptoOperation.Digest);
+        Enforce(encryptionMechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt1");
 
@@ -3125,8 +2885,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
 
-        GuardMechanism(digestingMechanism);
-        GuardMechanism(encryptionMechanism);
+        Enforce(digestingMechanism, CryptoOperation.Digest);
+        Enforce(encryptionMechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestEncrypt2");
 
@@ -3156,8 +2916,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(encryptionMechanism);
 
 
-        GuardMechanism(digestingMechanism);
-        GuardMechanism(encryptionMechanism);
+        Enforce(digestingMechanism, CryptoOperation.Digest);
+        Enforce(encryptionMechanism, CryptoOperation.Encrypt);
 
         ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, encryptionMechanism, nameof(encryptionMechanism));
 
@@ -3204,8 +2964,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism(digestingMechanism);
-        GuardMechanism(decryptionMechanism);
+        Enforce(digestingMechanism, CryptoOperation.Digest);
+        Enforce(decryptionMechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest1");
 
@@ -3234,8 +2994,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism(digestingMechanism);
-        GuardMechanism(decryptionMechanism);
+        Enforce(digestingMechanism, CryptoOperation.Digest);
+        Enforce(decryptionMechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecryptDigest2");
 
@@ -3265,8 +3025,8 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(decryptionMechanism);
 
 
-        GuardMechanism(digestingMechanism);
-        GuardMechanism(decryptionMechanism);
+        Enforce(digestingMechanism, CryptoOperation.Digest);
+        Enforce(decryptionMechanism, CryptoOperation.Decrypt);
 
         ThrowIfOneDescriptorDrivesBothHalves(digestingMechanism, decryptionMechanism, nameof(decryptionMechanism));
 
@@ -3298,7 +3058,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// <summary>
     /// Derives a key from a base key, creating a new key object. Secure defaults
     /// (<c>CKA_SENSITIVE=true</c> / <c>CKA_EXTRACTABLE=false</c>) are applied to the result template;
-    /// an explicit insecure value requires <see cref="AllowInsecure"/>.
+    /// an explicit insecure value requires a policy that permits it (see <see cref="ICryptoPolicy"/>).
     /// </summary>
     /// <param name="mechanism">Derivation mechanism</param>
     /// <param name="baseKeyHandle">Handle of base key</param>
@@ -3311,7 +3071,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Derive);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
@@ -3320,8 +3080,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
-        // value requires AllowInsecure (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes);
+        // value requires a policy that permits it (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
@@ -3455,7 +3215,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Encapsulate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
@@ -3464,8 +3224,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
-        // insecure value requires AllowInsecure. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate);
+        // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < sharedKeyTemplate.Count; i++)
@@ -3551,7 +3311,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
 
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Decapsulate);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
@@ -3560,8 +3320,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
-        // insecure value requires AllowInsecure. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate);
+        // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < sharedKeyTemplate.Count; i++)
@@ -3603,7 +3363,7 @@ internal sealed class Pkcs11Session : IDisposable
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Wrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
@@ -3650,7 +3410,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(unwrappedKeyTemplate);
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Unwrap);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
@@ -3661,8 +3421,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         // Authenticated unwrap lands a new key object on the token, exactly as UnwrapKey does. Apply the
         // same secure defaults (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
-        // insecure value requires AllowInsecure. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(unwrappedKeyTemplate);
+        // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(unwrappedKeyTemplate, null);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[unwrappedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < unwrappedKeyTemplate.Count; i++)
@@ -3705,7 +3465,7 @@ internal sealed class Pkcs11Session : IDisposable
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
@@ -3747,7 +3507,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(inputStream);
         if (bufferLength < 1)
             throw new ArgumentException("Value has to be a positive number.", nameof(bufferLength));
-        GuardMechanism(mechanism);
+        Enforce(mechanism, CryptoOperation.Verify);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 

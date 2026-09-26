@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
 /// Backend-agnostic AesPkcs11 tests: token AES-CBC/ECB must match the BCL for the same imported key,
-/// CBC/ECB/CFB are gated by the secure-defaults policy (require AllowInsecure), and the managed-key /
+/// CBC/ECB/CFB are gated by the secure-defaults policy (require the AllowInsecure policy), and the managed-key /
 /// streaming surface is NotSupported. Cases that perform a real cipher op skip where the backend does
 /// not advertise the mechanism; the gate and NotSupported cases run on any backend (they fire in
 /// managed code before the token).
@@ -83,9 +83,9 @@ internal static class AesPkcs11TestCases
             byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a token key — variable length.");
 
             // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
-            Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16));
+            Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16));
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv16), ct);
@@ -99,9 +99,9 @@ internal static class AesPkcs11TestCases
             byte[] plaintext = new byte[32]; // exactly two blocks
             RandomNumberGenerator.Fill(plaintext);
 
-            Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
+            Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16, PaddingMode.None);
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv16, PaddingMode.None), ct);
@@ -110,18 +110,18 @@ internal static class AesPkcs11TestCases
 
     internal static void Assert_Cfb_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedAes(backend, (_, aes) =>
-            Assert.Throws<InsecureOperationException>(
+            Assert.Throws<CryptoPolicyViolationException>(
                 () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128)));
 
     internal static void Assert_Cfb_WithAllowInsecure_GateBypassed(IPkcs11Backend backend) =>
         WithImportedAes(backend, (workspace, aes) =>
         {
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             // The token may not implement CFB, so the call may fail — but the secure-defaults gate must
-            // NOT fire once AllowInsecure is set.
+            // NOT fire once the AllowInsecure policy is used.
             Exception? ex = Record.Exception(
                 () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128));
-            Assert.False(ex is InsecureOperationException,
+            Assert.False(ex is CryptoPolicyViolationException,
                 $"Gate should be bypassed; got {ex?.GetType().Name ?? "no exception"}.");
         });
 
@@ -136,13 +136,13 @@ internal static class AesPkcs11TestCases
 
     internal static void Assert_EncryptEcb_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedAes(backend, (_, aes) =>
-            Assert.Throws<InsecureOperationException>(() => aes.EncryptEcb(new byte[16], PaddingMode.None)));
+            Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptEcb(new byte[16], PaddingMode.None)));
 
     internal static void Assert_EncryptEcb_WithAllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedAes(backend, (workspace, aes) =>
         {
             backend.RequireMechanism(CKM.CKM_AES_ECB);
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] plaintext = new byte[16];
             RandomNumberGenerator.Fill(plaintext);
             using var bcl = BclAes();
@@ -179,12 +179,12 @@ internal static class AesPkcs11TestCases
     internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
         WithImportedAes(backend, (workspace, aes) =>
         {
-            // The empty-input fast path still honors the gate: without AllowInsecure the gated mechanism
+            // The empty-input fast path still honors the gate: without the AllowInsecure policy the gated mechanism
             // throws before the (empty) buffer reaches the token.
-            Assert.Throws<InsecureOperationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+            Assert.Throws<CryptoPolicyViolationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
 
-            // With AllowInsecure, empty input is a no-op returned without touching the token.
-            workspace.AllowInsecure = true;
+            // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
         });
 

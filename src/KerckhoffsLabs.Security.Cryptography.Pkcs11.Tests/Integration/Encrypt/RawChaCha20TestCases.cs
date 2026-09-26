@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated raw CKM_CHACHA20 mechanism on purpose (the AllowInsecure gate is the
+// These tests drive the gated raw CKM_CHACHA20 mechanism on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -36,13 +36,13 @@ internal static class RawChaCha20TestCases
     }
 
     // Raw CKM_CHACHA20 is gated by default (no integrity protection — see Pkcs11Session's
-    // InsecureOperationException for this mechanism), which is exactly what these tests exercise, so
-    // AllowInsecure is required.
+    // CryptoPolicyViolationException for this mechanism), which is exactly what these tests exercise, so
+    // The AllowInsecure policy is required.
     private static void WithImportedKey(IPkcs11Backend backend, byte[] rawKey, Action<Pkcs11Key> body)
     {
         backend.RequireMechanism(CKM.CKM_CHACHA20);
         using var workspace = backend.OpenWorkspace();
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"chacha20-raw-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();

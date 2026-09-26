@@ -23,7 +23,7 @@ public sealed class DeriveKeyAdditionalKeysTests
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        workspace.AllowInsecure = true; // sibling templates below request extractable material
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // sibling templates below request extractable material
 
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("sp800108-base").Value(BaseKeyBytes).Derive().Build();

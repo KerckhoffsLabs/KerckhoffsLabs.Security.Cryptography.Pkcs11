@@ -425,17 +425,19 @@ public sealed class Pkcs11Library : IDisposable
     /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
     /// <param name="pin">The PIN. The workspace does not retain the PIN past construction.</param>
+    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Workspace OpenWorkspaceWithPin(string slotLabel, CKU userType, SecurePin pin)
+    public Pkcs11Workspace OpenWorkspaceWithPin(string slotLabel, CKU userType, SecurePin pin, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
         ArgumentNullException.ThrowIfNull(pin);
 
         Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSession();
+        var session = matched.OpenSession(policy: policy);
         try
         {
             session.Login(userType, pin);
@@ -459,16 +461,18 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
     /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
+    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Workspace OpenWorkspaceWithPinpad(string slotLabel, CKU userType)
+    public Pkcs11Workspace OpenWorkspaceWithPinpad(string slotLabel, CKU userType, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
 
         Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSession();
+        var session = matched.OpenSession(policy: policy);
         try
         {
             session.Login(userType);
@@ -490,16 +494,18 @@ public sealed class Pkcs11Library : IDisposable
     /// (hashing, and operations on session-lifetime keys).
     /// </summary>
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing spaces).</param>
+    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_OpenSession</c> call.</exception>
-    public Pkcs11Workspace OpenWorkspaceWithoutLogin(string slotLabel)
+    public Pkcs11Workspace OpenWorkspaceWithoutLogin(string slotLabel, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
 
         Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSession();
+        var session = matched.OpenSession(policy: policy);
         try
         {
             return new Pkcs11Workspace(this, matched, session);

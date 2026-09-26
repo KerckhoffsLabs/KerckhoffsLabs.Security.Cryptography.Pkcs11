@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
+// SecureOnly policy check is the behaviour under test), so the compile-time warning is suppressed
 // for this file only — the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -19,7 +19,7 @@ internal static class SignRsaPkcsTestCases
 {
     /// <summary>
     /// Asserts that RSA PKCS#1 v1.5 signing (CKM_RSA_PKCS) throws
-    /// <see cref="InsecureOperationException"/> by default (AllowInsecure = false).
+    /// <see cref="CryptoPolicyViolationException"/> by default (the SecureOnly policy).
     /// </summary>
     internal static void Assert_SignRsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {
@@ -28,7 +28,7 @@ internal static class SignRsaPkcsTestCases
         {
             var fakeKey = new ObjectHandle(0);
             var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-            var ex = Assert.Throws<InsecureOperationException>(() =>
+            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
                 session.Sign(mech, fakeKey, []));
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }
@@ -40,15 +40,15 @@ internal static class SignRsaPkcsTestCases
     }
 
     /// <summary>
-    /// Asserts that setting <c>AllowInsecure = true</c> suppresses the
-    /// <see cref="InsecureOperationException"/> gate. Any subsequent PKCS#11
+    /// Asserts that <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> suppresses the
+    /// <see cref="CryptoPolicyViolationException"/> gate. Any subsequent PKCS#11
     /// error (bad key handle, etc.) is acceptable — we only verify the gate
     /// did not fire.
     /// </summary>
     internal static void Assert_SignRsaPkcs1V15_AllowInsecureBypassesGate(IPkcs11Backend backend)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
-        session.AllowInsecure = true;
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
             var fakeKey = new ObjectHandle(0);
@@ -57,9 +57,9 @@ internal static class SignRsaPkcsTestCases
                 var mech = new Mechanism(CKM.CKM_RSA_PKCS);
                 session.Sign(mech, fakeKey, []);
             }
-            catch (InsecureOperationException)
+            catch (CryptoPolicyViolationException)
             {
-                Assert.Fail("AllowInsecure=true should have suppressed the gate.");
+                Assert.Fail("The AllowInsecure policy should have suppressed the gate.");
             }
             catch
             {

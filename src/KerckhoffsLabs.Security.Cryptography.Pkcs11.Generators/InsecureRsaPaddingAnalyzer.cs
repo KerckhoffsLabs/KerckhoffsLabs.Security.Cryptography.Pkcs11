@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 /// symbol to mark: the choice is a <em>value</em> — <c>RSAEncryptionPadding.Pkcs1</c> handed to a BCL
 /// override, or <c>CKM_RSA_PKCS</c> / <c>CKM_RSA_X_509</c> handed to a <c>Mechanism</c> — so an
 /// analyzer is the only way to give them the same compile-time signal. Both routes end at the same
-/// runtime <c>AllowInsecure</c> gate.
+/// runtime <c>SecureOnlyPolicy</c> check.
 /// <para>
 /// Signatures are deliberately NOT reported: RSASSA-PKCS#1 v1.5 with a strong hash
 /// (<c>CKM_SHA256_RSA_PKCS</c> …) is FIPS 186-5-approved and required by JWT RS256, TLS 1.2 and
@@ -42,9 +42,10 @@ public sealed class InsecureRsaPaddingAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description:
-            "RSAES-PKCS#1 v1.5 and raw RSA encryption are gated at runtime by Pkcs11Workspace.AllowInsecure. " +
-            "Suppress this diagnostic only alongside a documented reason to keep the legacy padding; " +
-            "RSASSA-PKCS#1 v1.5 signatures with a strong hash are unaffected and remain allowed.",
+            "RSAES-PKCS#1 v1.5 and raw RSA encryption are refused at runtime by the default SecureOnly " +
+            "crypto policy (Pkcs11Workspace.Policy). Suppress this diagnostic only alongside a documented " +
+            "reason to keep the legacy padding; RSASSA-PKCS#1 v1.5 signatures with a strong hash are " +
+            "unaffected and remain allowed.",
         helpLinkUri:
             "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11008");
 

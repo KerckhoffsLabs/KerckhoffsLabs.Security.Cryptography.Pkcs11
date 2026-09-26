@@ -18,7 +18,7 @@ public sealed class EncryptAesTests_Kryoptic(KryopticBackendFixture f)
         => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault()
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault()
         => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]

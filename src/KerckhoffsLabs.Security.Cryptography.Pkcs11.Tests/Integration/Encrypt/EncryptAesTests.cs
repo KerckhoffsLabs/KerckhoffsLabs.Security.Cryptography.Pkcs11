@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -41,7 +41,7 @@ internal static class EncryptAesTestCases
             {
                 byte[] plaintext = Encoding.UTF8.GetBytes("Hello, PKCS#11 AES-CBC-PAD!");
 
-                session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
+                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_CBC_PAD is unauthenticated and gated by default.
                 var mechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] ciphertext = session.Encrypt(mechanism, keyHandle, plaintext);
 
@@ -69,7 +69,7 @@ internal static class EncryptAesTestCases
             {
                 byte[] plaintext = Encoding.UTF8.GetBytes("Round-trip test for AES-CBC-PAD.");
 
-                session.AllowInsecure = true; // CKM_AES_CBC_PAD is unauthenticated and gated by default.
+                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_CBC_PAD is unauthenticated and gated by default.
                 var encMechanism = new Mechanism(CKM.CKM_AES_CBC_PAD, Iv16);
                 byte[] ciphertext = session.Encrypt(encMechanism, keyHandle, plaintext);
 
@@ -94,7 +94,7 @@ internal static class EncryptAesTestCases
 
     internal static void Assert_AesEcb_GatedByDefault(IPkcs11Backend backend)
     {
-        // The InsecureOperationException guard fires before any P/Invoke call to C_Encrypt,
+        // The CryptoPolicyViolationException guard fires before any P/Invoke call to C_Encrypt,
         // but a session must still be opened first.
         var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -105,7 +105,7 @@ internal static class EncryptAesTestCases
                 byte[] plaintext = new byte[16]; // must be block-aligned for ECB
                 var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                var ex = Assert.Throws<InsecureOperationException>(() =>
+                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
                     session.Encrypt(mechanism, keyHandle, plaintext));
                 Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
             }
@@ -122,9 +122,9 @@ internal static class EncryptAesTestCases
 
     internal static void Assert_AesEcb_AllowedWithOptIn(IPkcs11Backend backend)
     {
-        // With AllowInsecure = true the gate is bypassed; the backend accepts the call.
+        // With the AllowInsecure policy the gate is bypassed; the backend accepts the call.
         var session = TestKeys.OpenLoggedInSession(backend);
-        session.AllowInsecure = true;
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
             var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
@@ -133,14 +133,14 @@ internal static class EncryptAesTestCases
                 byte[] plaintext = new byte[16];
                 var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                // Must not throw InsecureOperationException.
+                // Must not throw CryptoPolicyViolationException.
                 var ex = Record.Exception(() =>
                     session.Encrypt(mechanism, keyHandle, plaintext));
 
                 // The backend may throw a Pkcs11Exception for other reasons, but must NOT
-                // throw InsecureOperationException.
-                Assert.False(ex is InsecureOperationException,
-                    "Expected gate to be bypassed, but InsecureOperationException was still thrown.");
+                // throw CryptoPolicyViolationException.
+                Assert.False(ex is CryptoPolicyViolationException,
+                    "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
             }
             finally
             {

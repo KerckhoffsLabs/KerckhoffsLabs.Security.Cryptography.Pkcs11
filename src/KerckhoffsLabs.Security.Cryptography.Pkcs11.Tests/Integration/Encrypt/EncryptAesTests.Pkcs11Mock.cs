@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 
 /// <summary>
 /// AES test class for pkcs11-mock. Gate-enforcement tests run unconditionally:
-/// <c>InsecureOperationException</c> is thrown in managed code before any P/Invoke call, so no real
+/// <c>CryptoPolicyViolationException</c> is thrown in managed code before any P/Invoke call, so no real
 /// crypto is required. Crypto-correctness tests (round-trip, ciphertext-produces) are SoftHsm-only:
 /// the mock only recognises CKM_AES_CBC (not CKM_AES_CBC_PAD) and returns handle 1 (DATA) from
 /// CreateObject, whereas its C_EncryptInit requires handle 2 (SECRET_KEY).
@@ -31,9 +31,9 @@ public sealed class EncryptAesTests_Mock(MockBackendFixture f)
     public void AesCbcPad_RoundTrip_Mock()
         => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
-    // Gate-enforcement: InsecureOperationException fires in C# before C_EncryptInit.
+    // Gate-enforcement: CryptoPolicyViolationException fires in C# before C_EncryptInit.
     [Fact]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault_Mock()
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault_Mock()
         => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact]

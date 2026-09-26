@@ -21,7 +21,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// cross-checked against the BCL primitive for the same key, IV and effective key size.
 /// <para>
 /// RC2 is gated on two fronts. The secure-defaults policy means each cipher op must run inside
-/// <c>AllowInsecureScope()</c> and throws <see cref="InsecureOperationException"/> without it. The BCL
+/// <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> and throws <see cref="CryptoPolicyViolationException"/> without it. The BCL
 /// <see cref="RC2"/> implementation is cross-platform today (confirmed on Linux and Windows) but is
 /// still probed via <see cref="Rc2Supported"/> rather than assumed, matching how this suite probes
 /// other host-BCL-dependent capabilities (ML-DSA/ML-KEM/SLH-DSA); the construction and
@@ -105,19 +105,19 @@ public sealed class RC2Pkcs11Tests_Managed
 
     [Fact]
     public void EncryptCbc_Pkcs7_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
-        Assert.Throws<InsecureOperationException>(() => rc2.EncryptCbc(new byte[8], Iv8)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptCbc(new byte[8], Iv8)));
 
     [Fact]
     public void EncryptCbc_NonePadding_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
-        Assert.Throws<InsecureOperationException>(() => rc2.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
 
     [Fact]
     public void DecryptCbc_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
-        Assert.Throws<InsecureOperationException>(() => rc2.DecryptCbc(new byte[8], Iv8)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.DecryptCbc(new byte[8], Iv8)));
 
     [Fact]
     public void EncryptEcb_GatedByDefault_Throws() => WithImportedRc2((ws, rc2) =>
-        Assert.Throws<InsecureOperationException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.None)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.None)));
 
     // === Known-answer round-trips vs the BCL (the managed token implements RC2 wherever the host does) ==
 
@@ -128,7 +128,7 @@ public sealed class RC2Pkcs11Tests_Managed
 
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8); // default PaddingMode.PKCS7
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptCbc(plaintext, Iv8);
             Assert.Equal(expected, ct);
@@ -144,7 +144,7 @@ public sealed class RC2Pkcs11Tests_Managed
 
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptCbc(plaintext, Iv8, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -160,7 +160,7 @@ public sealed class RC2Pkcs11Tests_Managed
 
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptEcb(plaintext, PaddingMode.None);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptEcb(plaintext, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -196,7 +196,7 @@ public sealed class RC2Pkcs11Tests_Managed
         using var bcl = BclRc2();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8);
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(plaintext, rc2.DecryptCbc(ct, Iv8));
     });
 
@@ -211,7 +211,7 @@ public sealed class RC2Pkcs11Tests_Managed
 
         byte[] wrongIv = [.. Iv8];
         wrongIv[0] ^= 0xFF;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] dec = rc2.DecryptCbc(ct, wrongIv, PaddingMode.None);
             Assert.NotEqual(plaintext, dec);
@@ -222,15 +222,15 @@ public sealed class RC2Pkcs11Tests_Managed
 
     [Fact]
     public void Cbc_EmptyInput_Gated_Throws() => WithImportedRc2((ws, rc2) =>
-        // Even the empty-input fast path honours the secure-defaults gate: without AllowInsecure the
+        // Even the empty-input fast path honours the secure-defaults gate: without the AllowInsecure policy the
         // gated mechanism throws before the (empty) buffer reaches the token.
-        Assert.Throws<InsecureOperationException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
+        Assert.Throws<CryptoPolicyViolationException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
     public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedRc2((workspace, rc2) =>
     {
-        // With AllowInsecure, empty decrypt is a no-op returned without touching the token.
-        using (workspace.AllowInsecureScope())
+        // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Empty(rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
     });
 
@@ -241,7 +241,7 @@ public sealed class RC2Pkcs11Tests_Managed
         // token rather than the empty-input fast path. Cross-check against the BCL.
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
             Assert.Equal(8, ct.Length);

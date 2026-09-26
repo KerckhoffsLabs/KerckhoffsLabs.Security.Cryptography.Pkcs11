@@ -163,15 +163,15 @@ public sealed class MLDsaPkcs11Tests_Managed
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
     public void ExportMLDsaPrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-        Assert.Throws<InsecureOperationException>(() => mldsa.ExportMLDsaPrivateKey()));
+        Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportMLDsaPrivateKey()));
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
     public void ExportMLDsaPrivateSeed_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-        Assert.Throws<InsecureOperationException>(() => mldsa.ExportMLDsaPrivateSeed()));
+        Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportMLDsaPrivateSeed()));
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() => WithMlDsa(CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-        Assert.Throws<InsecureOperationException>(() => mldsa.ExportPkcs8PrivateKey()));
+        Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportPkcs8PrivateKey()));
 
     // === Construction / argument validation (run before any native call) ==
 

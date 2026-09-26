@@ -130,7 +130,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
 
-        using var scope = workspace.AllowInsecureScope();
+        using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
             key.MessageEncrypt(new Mechanism(CKM.CKM_AES_GCM), messageParams, [], "plaintext"u8.ToArray()));
@@ -163,7 +163,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
 
-        using var scope = workspace.AllowInsecureScope();
+        using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
             key.MessageDecrypt(new Mechanism(CKM.CKM_AES_GCM), messageParams, [], "ciphertext-ish"u8.ToArray()));
@@ -211,7 +211,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
 
-        using var scope = workspace.AllowInsecureScope();
+        using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] wrapped = wrapper.Wrap(new Mechanism(CKM.CKM_RSA_PKCS), target);
 
         Assert.NotEmpty(wrapped);

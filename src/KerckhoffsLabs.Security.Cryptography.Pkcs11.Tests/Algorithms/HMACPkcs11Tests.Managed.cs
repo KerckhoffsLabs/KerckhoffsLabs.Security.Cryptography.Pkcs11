@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11010
 
@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// cross-checked against <see cref="HMACSHA256"/>/<see cref="HMACSHA384"/>/<see cref="HMACSHA512"/>
 /// and an RFC 4231 known-answer vector. Mirrors <c>HMACPkcs11Tests.SoftHsm2.cs</c>; the managed
 /// token does not enforce a per-mechanism minimum key size, so key material is sized freely.
-/// SHA-1 HMAC is insecure-by-default and runs only under <c>AllowInsecureScope</c>.
+/// SHA-1 HMAC is insecure-by-default and runs only under <c>UsePolicy(CryptoPolicy.AllowInsecure)</c>.
 /// </summary>
 [NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
                      "the token holds no static state, so this is safe alongside every backend collection.")]
@@ -145,7 +145,7 @@ public sealed class HMACPkcs11Tests_Managed
         });
     }
 
-    // SHA-1 HMAC is insecure-by-default (CKM_SHA_1_HMAC); it requires AllowInsecure. This also
+    // SHA-1 HMAC is insecure-by-default (CKM_SHA_1_HMAC); it requires the AllowInsecure policy. This also
     // covers the SHA1 branch of the internal hash-size mapping.
     [Fact]
     public void ComputeHash_Sha1_UnderAllowInsecure_MatchesBcl()
@@ -158,7 +158,7 @@ public sealed class HMACPkcs11Tests_Managed
             using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA1);
             Assert.Equal(160, hmac.HashSize); // 20-byte digest reported in bits
 
-            using (workspace.AllowInsecureScope())
+            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] mac = hmac.ComputeHash(data);
                 Assert.Equal(20, mac.Length);

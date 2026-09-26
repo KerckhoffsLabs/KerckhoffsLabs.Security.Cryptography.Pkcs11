@@ -39,4 +39,13 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Freeing {Size} bytes at {Address}. Allocations: {AllocationCount}")]
     public static partial void FreeingMemory(ILogger logger, int size, nint address, int allocationCount);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): {PolicyName} policy refused {Request}")]
+    public static partial void PolicyDenied(ILogger logger, ulong sessionId, string policyName, string request);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy override {FromPolicy} -> {ToPolicy}")]
+    public static partial void PolicyOverridden(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): policy restored {FromPolicy} -> {ToPolicy}")]
+    public static partial void PolicyRestored(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 }

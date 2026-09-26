@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11010
 
@@ -50,7 +50,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         using var workspace = OpenWorkspace(backend);
         // The byte-returning DeriveKey overloads read the derived value off the token, so the gate in
         // BuildSecureKeyDefaults refuses them under the default posture. Opt in here.
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"kdf-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(KeyBytes).Derive().Sign().OnToken(backend.SupportsTokenObjects).Build();
@@ -154,7 +154,7 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
         });
 
     // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
-    // needs AllowInsecure for this part) and immediately signs ProbeMessage with it, never reading
+    // needs the AllowInsecure policy for this part) and immediately signs ProbeMessage with it, never reading
     // CKA_VALUE.
     private static byte[] DeriveAndProbe(SP800108HmacCounterKdfPkcs11 kdf, int outputLength)
     {

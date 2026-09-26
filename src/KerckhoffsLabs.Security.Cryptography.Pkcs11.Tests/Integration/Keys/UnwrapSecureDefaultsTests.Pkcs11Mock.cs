@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
 /// UnwrapKey must reject an explicitly insecure result template (CKA_EXTRACTABLE=true or
-/// CKA_SENSITIVE=false) unless AllowInsecure is set. The gate runs before the native C_UnwrapKey,
+/// CKA_SENSITIVE=false) unless the AllowInsecure policy is used. The check runs before the native C_UnwrapKey,
 /// so it is exercised on pkcs11-mock with a dummy handle/blob and a secure (ungated) wrap mechanism
 /// — no real key material needed.
 /// </summary>
@@ -42,7 +42,7 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
-            Assert.IsNotType<InsecureOperationException>(Record.Exception(
+            Assert.IsNotType<CryptoPolicyViolationException>(Record.Exception(
                 () => session.UnwrapKey(mech, new ObjectHandle(1UL), new byte[16], template)));
         }
         finally { foreach (var a in template) a.Dispose(); }
@@ -55,26 +55,26 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_SENSITIVE, false));
         try
         {
-            Assert.Throws<InsecureOperationException>(
+            Assert.Throws<CryptoPolicyViolationException>(
                 () => session.UnwrapKey(mech, new ObjectHandle(1UL), new byte[16], template));
         }
         finally { foreach (var a in template) a.Dispose(); }
     });
 
     [Fact]
-    public void Unwrap_InsecureTemplate_AllowInsecureScope_BypassesGate() => WithSession(session =>
+    public void Unwrap_InsecureTemplate_UsePolicyAllowInsecure_BypassesGate() => WithSession(session =>
     {
         var mech = new Mechanism(CKM.CKM_AES_KEY_WRAP_PAD);
         var template = InsecureTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 // The gate is bypassed; the call reaches the mock's C_UnwrapKey, which rejects the
                 // non-RSA mechanism with a Pkcs11Exception — the point is it is NOT the insecure gate.
                 Exception? ex = Record.Exception(
                     () => session.UnwrapKey(mech, new ObjectHandle(1UL), new byte[16], template));
-                Assert.False(ex is InsecureOperationException, "AllowInsecure should bypass the unwrap secure-default gate.");
+                Assert.False(ex is CryptoPolicyViolationException, "The AllowInsecure policy should bypass the unwrap secure-default gate.");
             }
         }
         finally { foreach (var a in template) a.Dispose(); }

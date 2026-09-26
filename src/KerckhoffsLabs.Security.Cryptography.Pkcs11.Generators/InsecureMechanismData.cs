@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 /// </summary>
 /// <remarks>
 /// Deliberately free of any Roslyn type: the library's test project reads these sets to pin them
-/// against what <c>Pkcs11Session.GuardMechanism</c> actually rejects at run time, and touching a type
+/// against what <c>SecureOnlyPolicy</c> actually rejects at run time, and touching a type
 /// that derived from <c>DiagnosticAnalyzer</c> would drag the compiler assemblies into the test host.
 /// The analyzer cannot simply reference the library's <c>CKM</c> enum — it targets netstandard2.0 and
 /// referencing the library would be a cycle — so this list is a transcription, and the parity tests
@@ -19,11 +19,11 @@ public static class InsecureMechanismData
     /// Mechanisms rejected by the runtime gate, minus the RSA-encryption pair covered by KLPKCS11008.
     /// </summary>
     /// <remarks>
-    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>GuardMechanism</c> only rejects it for a
+    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>SecureOnlyPolicy</c> only rejects it for a
     /// SHA-1 or SHA-224 <c>CkmRsaPkcsOaepParams.HashAlg</c>, a mechanism-*parameter* condition no
     /// static analyzer here can evaluate (the type alone, <c>CKM_RSA_PKCS_OAEP</c>, is used just as
-    /// often with a safe hash and must not be flagged). The runtime gate is the sole enforcement
-    /// point for that case.
+    /// often with a safe hash and must not be flagged). The runtime policy check is the sole
+    /// enforcement point for that case.
     /// </remarks>
     public static readonly ImmutableHashSet<string> GatedMechanisms = ImmutableHashSet.Create(
         "CKM_MD5_RSA_PKCS",
@@ -31,7 +31,7 @@ public static class InsecureMechanismData
         "CKM_SHA1_RSA_PKCS_PSS",
         // Not cryptographically broken (FIPS 180-4-approved, just a truncated SHA-256), but gated
         // like SHA-1: no HashAlgorithmName constant in the BCL, no benefit over SHA-256 on
-        // equal-cost hardware. See Pkcs11Session.GuardMechanism's "SHA-224 policy" remark.
+        // equal-cost hardware. See SecureOnlyPolicy's "SHA-224 policy" remark.
         "CKM_SHA224_RSA_PKCS",
         "CKM_SHA224_RSA_PKCS_PSS",
         "CKM_ECDSA_SHA224",

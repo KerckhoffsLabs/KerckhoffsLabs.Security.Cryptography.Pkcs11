@@ -15,7 +15,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// SoftHSM is not built WITH_ML_KEM, so the SoftHsm KAT skips; the managed token generates the key pair
 /// and runs <c>C_EncapsulateKey</c>/<c>C_DecapsulateKey</c>, with both sides recovering the same shared
 /// secret. Reading the shared secret is the extract-and-destroy path, gated by the secure-defaults policy
-/// (→ <c>AllowInsecure</c>). The real crypto is cross-checked against the BCL <see cref="MLKem"/> primitive
+/// (via <c>UsePolicy(CryptoPolicy.AllowInsecure)</c>). The real crypto is cross-checked against the BCL
+/// <see cref="MLKem"/> primitive
 /// (FIPS 203). Crypto cases are gated on <see cref="MLKem.IsSupported"/>; argument/ctor cases that throw
 /// before any native call stay <c>[Fact]</c>.
 /// </summary>
@@ -37,7 +38,7 @@ public sealed class MLKemPkcs11Tests_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        workspace.AllowInsecure = allowInsecure;
+        using IDisposable? insecure = allowInsecure ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
 
         string label = $"mlkem-{Guid.NewGuid():N}";
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
@@ -126,7 +127,7 @@ public sealed class MLKemPkcs11Tests_Managed
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void Encapsulate_GatedByDefault_Throws() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (ws, mlkem) =>
-            Assert.Throws<InsecureOperationException>(() => mlkem.Encapsulate(out _, out _)));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Encapsulate(out _, out _)));
 
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void Decapsulate_GatedByDefault_Throws() =>
@@ -138,18 +139,18 @@ public sealed class MLKemPkcs11Tests_Managed
             using var bcl = MLKem.ImportEncapsulationKey(MLKemAlgorithm.MLKem768, ek);
             bcl.Encapsulate(out byte[] ciphertext, out _);
 
-            Assert.Throws<InsecureOperationException>(() => mlkem.Decapsulate(ciphertext));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Decapsulate(ciphertext));
         });
 
-    // AllowInsecureScope() opts in only for its lifetime; outside it the gate re-engages.
+    // UsePolicy(CryptoPolicy.AllowInsecure) opts in only for its lifetime; outside it the gate re-engages.
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
-    public void Encapsulate_AllowInsecureScope_OptsInThenReengages() =>
+    public void Encapsulate_UsePolicyAllowInsecure_OptsInThenReengages() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (workspace, mlkem) =>
         {
-            using (workspace.AllowInsecureScope())
+            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
                 mlkem.Encapsulate(out _, out _); // must not throw inside the scope
 
-            Assert.Throws<InsecureOperationException>(() => mlkem.Encapsulate(out _, out _));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Encapsulate(out _, out _));
         });
 
     // === Extract-and-destroy cleanup failures =============================
@@ -164,7 +165,7 @@ public sealed class MLKemPkcs11Tests_Managed
         var token = new ManagedSoftToken();
         using var library = new Pkcs11Library(token);
         using var workspace = ManagedToken.OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"mlkem-{Guid.NewGuid():N}";
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
@@ -213,18 +214,18 @@ public sealed class MLKemPkcs11Tests_Managed
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void ExportDecapsulationKey_ThrowsInsecure() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
-            // Refused even with AllowInsecure: PKCS#11 keys are non-extractable by design.
-            Assert.Throws<InsecureOperationException>(() => mlkem.ExportDecapsulationKey()));
+            // Refused even under the AllowInsecure policy: PKCS#11 keys are non-extractable by design.
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.ExportDecapsulationKey()));
 
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void ExportPrivateSeed_ThrowsInsecure() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
-            Assert.Throws<InsecureOperationException>(() => mlkem.ExportPrivateSeed()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.ExportPrivateSeed()));
 
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() =>
         WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: true, (ws, mlkem) =>
-            Assert.Throws<InsecureOperationException>(() => mlkem.ExportPkcs8PrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.ExportPkcs8PrivateKey()));
 
     // === Construction and argument validation (run before any native crypto) ==============
 

@@ -110,8 +110,8 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <see cref="CKR.CKR_DEVICE_ERROR"/>) when the output buffer is smaller than the modulus, instead
     /// of <see cref="CKR.CKR_BUFFER_TOO_SMALL"/>, so the wrapper's grow-on-buffer-too-small sizing
     /// cannot drive it. RSA-OAEP encryption (length-checked differently by softoken) and every RSA
-    /// sign/verify operation work; PKCS#1 v1.5 encryption is insecure (Bleichenbacher) and gated
-    /// behind AllowInsecure anyway.</summary>
+    /// sign/verify operation work; PKCS#1 v1.5 encryption is insecure (Bleichenbacher) and refused
+    /// under SecureOnly anyway (available only via the AllowInsecure policy).</summary>
     public static bool SupportsRsaPkcs1Encrypt => false;
 
     /// <summary>Gate for the RSA PKCS#1 v1.5 encryption round-trip case.</summary>

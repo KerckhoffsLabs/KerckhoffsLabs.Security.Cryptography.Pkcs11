@@ -60,7 +60,7 @@ internal static class KekTemplateEnforcementTestCases
     // test exercises, just a prerequisite for constructing the mismatching key at all.
     private static Pkcs11Key GenerateNonWrappableTargetKey(Pkcs11Workspace workspace)
     {
-        using var insecure = workspace.AllowInsecureScope();
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         return workspace.GenerateKey(
             new Mechanism(CKM.CKM_AES_KEY_GEN),
             ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Sensitive(false).Extractable().Build());

@@ -10,7 +10,7 @@ public sealed class DecryptAesTests_SoftHsm(SoftHsmBackendFixture f)
 
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault_SoftHsm()
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault_SoftHsm()
         => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]

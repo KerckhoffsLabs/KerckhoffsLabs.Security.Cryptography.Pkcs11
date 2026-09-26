@@ -56,7 +56,7 @@ internal static class EncapsulateKeyTestCases
         using var workspace = OpenWorkspace(backend);
         // Reading the shared secret back to compare is the extract-and-destroy path, gated by the
         // secure-defaults policy.
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"encap-rsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -89,7 +89,7 @@ internal static class EncapsulateKeyTestCases
         using var workspace = OpenWorkspace(backend);
         // Reading the shared secret back to compare is the extract-and-destroy path, gated by the
         // secure-defaults policy.
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"encap-ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);

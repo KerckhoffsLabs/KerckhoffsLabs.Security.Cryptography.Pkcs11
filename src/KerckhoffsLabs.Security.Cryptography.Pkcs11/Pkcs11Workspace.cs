@@ -15,9 +15,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Construction is exclusively via <see cref="Pkcs11Library.OpenWorkspaceWithPin(string, CKU, SecurePin)"/>,
-/// <see cref="Pkcs11Library.OpenWorkspaceWithPinpad(string, CKU)"/>, or
-/// <see cref="Pkcs11Library.OpenWorkspaceWithoutLogin(string)"/>.
+/// Construction is exclusively via <see cref="Pkcs11Library.OpenWorkspaceWithPin(string, CKU, SecurePin, ICryptoPolicy?)"/>,
+/// <see cref="Pkcs11Library.OpenWorkspaceWithPinpad(string, CKU, ICryptoPolicy?)"/>, or
+/// <see cref="Pkcs11Library.OpenWorkspaceWithoutLogin(string, ICryptoPolicy?)"/>.
 /// The workspace does not own the library — callers continue to own and dispose the
 /// <see cref="Pkcs11Library"/>. The workspace owns the session it opened. On
 /// <see cref="Dispose"/> it logs the user out (<c>C_Logout</c>, best-effort — a token-wide
@@ -51,26 +51,45 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <summary>Internal accessor for the underlying session. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11Session Session => _session;
 
+    /// <summary>Submits <paramref name="request"/> to the workspace's effective policy; throws on denial.</summary>
+    internal void Enforce(PolicyRequest request) => _session.Enforce(request);
+
+    /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
+    internal bool IsPermitted(PolicyRequest request) => _session.IsPermitted(request);
+
     /// <summary>
-    /// When <c>true</c>, operations on this workspace that use mechanisms the library considers
-    /// insecure by default (RSA PKCS#1 v1.5, DES/3DES, AES-ECB, raw MD5/SHA-1, and the ML-KEM
-    /// extract-and-destroy path) are no longer rejected with <see cref="InsecureOperationException"/>.
-    /// Default is <c>false</c>. Enabling it logs a warning. Prefer <see cref="AllowInsecureScope"/>
-    /// to opt in for a single operation rather than latching the flag on for the workspace lifetime.
+    /// The crypto policy currently enforced by this workspace: the one it was opened with, unless a
+    /// <see cref="UsePolicy"/> lease is active.
     /// </summary>
-    public bool AllowInsecure
+    /// <exception cref="ObjectDisposedException">The workspace has been disposed.</exception>
+    public ICryptoPolicy Policy
     {
-        get => _session.AllowInsecure;
-        set => _session.AllowInsecure = value;
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _session.Policy;
+        }
     }
 
     /// <summary>
-    /// Enables <see cref="AllowInsecure"/> for the duration of the returned lease and restores the
-    /// previous value on dispose. Scopes the insecure opt-in to a single operation:
-    /// <code>using (workspace.AllowInsecureScope()) { /* one insecure op */ }</code>
-    /// Nested scopes restore in LIFO order.
+    /// Enforces <paramref name="policy"/> until the returned lease is disposed. Logged as a warning. Scope it to the operation that needs it:
+    /// <code>using (workspace.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }</code>
+    /// Open leases form a stack: the most recently opened lease still open decides the policy, and the
+    /// workspace's own policy applies once none is open. Disposing a lease withdraws only that lease, so
+    /// disposing them out of order never re-instates a policy whose lease is already closed. The override
+    /// applies to the whole workspace, not per thread.
     /// </summary>
-    public IDisposable AllowInsecureScope() => _session.AllowInsecureScope();
+    /// <param name="policy">The policy to enforce within the lease.</param>
+    /// <returns>A lease that withdraws this override when disposed (idempotent).</returns>
+    /// <exception cref="ObjectDisposedException">The workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="policy"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The workspace was opened under a policy whose
+    /// <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.FipsOnly</c>).</exception>
+    public IDisposable UsePolicy(ICryptoPolicy policy)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _session.UsePolicy(policy);
+    }
 
     /// <summary>
     /// Returns a snapshot of the underlying session's state (slot, session state, flags, and the
@@ -273,7 +292,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_CreateObject</c> call.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when the template sets <c>CKA_SENSITIVE=false</c> and <see cref="AllowInsecure"/> is <c>false</c>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the template sets <c>CKA_SENSITIVE=false</c> and the workspace's <see cref="Policy"/> refuses it.</exception>
     public Pkcs11Key ImportKey(ObjectTemplate template)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -290,7 +309,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is on the library's insecure-mechanism list and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
     public Pkcs11Key GenerateKey(Mechanism mechanism, ObjectTemplate template)
     {
@@ -311,7 +330,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <param name="publicTemplate">Template for the public key half.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="privateTemplate"/>, or <paramref name="publicTemplate"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateKey(
         Mechanism mechanism,
@@ -445,19 +464,19 @@ public sealed class Pkcs11Workspace : IDisposable
     /// combining signing and encryption roles on one RSA key pair is unsafe.
     /// </remarks>
     /// <param name="modulusBits">RSA modulus size in bits. Default 4096. Sizes below 2048 (NIST SP
-    /// 800-131A) are refused unless <see cref="AllowInsecure"/> is set.</param>
+    /// 800-131A) are refused unless the workspace's <see cref="Policy"/> permits it.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated RSA key pair.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is not positive.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateRsaSigningKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(modulusBits);
-        // The sub-2048 secure-defaults gate is enforced once in the session layer (GuardKeyPairStrength),
+        // The sub-2048 secure-defaults gate is enforced once in the session layer's crypto policy check,
         // so it applies uniformly to this helper and to direct low-level GenerateKey callers.
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
@@ -496,19 +515,19 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <see cref="GenerateKey(Mechanism, ObjectTemplate, ObjectTemplate)"/>.
     /// </remarks>
     /// <param name="modulusBits">RSA modulus size in bits. Default 4096. Sizes below 2048 (NIST SP
-    /// 800-131A) are refused unless <see cref="AllowInsecure"/> is set.</param>
+    /// 800-131A) are refused unless the workspace's <see cref="Policy"/> permits it.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>
     /// <returns>The generated RSA key pair.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="modulusBits"/> is not positive.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="modulusBits"/> is &lt; 2048 and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateRsaKeyTransportKeyPair(int modulusBits = 4096, string? label = null, bool persistOnToken = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(modulusBits);
-        // The sub-2048 secure-defaults gate is enforced once in the session layer (GuardKeyPairStrength),
+        // The sub-2048 secure-defaults gate is enforced once in the session layer's crypto policy check,
         // so it applies uniformly to this helper and to direct low-level GenerateKey callers.
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
@@ -545,8 +564,8 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The generated EC key pair.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="curve"/> is the default (uninitialized) <see cref="Pkcs11ECCurve"/>.</exception>
-    /// <exception cref="InsecureOperationException">The curve provides less than 128-bit
-    /// security (the 160/192/224-bit NIST and Brainpool curves) and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The curve provides less than 128-bit
+    /// security (the 160/192/224-bit NIST and Brainpool curves) and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
     public Pkcs11Key GenerateEcKeyPair(Pkcs11ECCurve? curve = null, string? label = null, bool persistOnToken = false)
     {
@@ -555,10 +574,7 @@ public sealed class Pkcs11Workspace : IDisposable
         Pkcs11ECCurve resolved = curve ?? Pkcs11ECCurve.NamedCurves.NistP256;
         if (resolved.IsDefault)
             throw new ArgumentException("An EC curve must be specified.", nameof(curve));
-        if (resolved.IsBelowSecurityBaseline && !AllowInsecure)
-            throw new InsecureOperationException(
-                $"EC curve {resolved} provides less than 128-bit security. Use NistP256 or stronger, " +
-                "or set Pkcs11Workspace.AllowInsecure = true for legacy interop.");
+        Enforce(new EcKeyGenerationRequest(resolved));
 
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .EcParams(resolved.GetEcParams())
@@ -605,12 +621,12 @@ public sealed class Pkcs11Workspace : IDisposable
     /// KDF at all — the token's own truncation/expansion of the raw x-coordinate becomes the AES key
     /// material directly, which NIST SP 800-56A forbids; this method never returns the raw secret for
     /// an off-token KDF step, since the result is always an on-token, non-extractable key. Requires
-    /// <see cref="AllowInsecure"/>. Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
+    /// a policy that permits it (see <see cref="Policy"/>). Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="kdf"/> is <see cref="CKD.CKD_NULL"/> and <see cref="AllowInsecure"/> is <c>false</c>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is <see cref="CKD.CKD_NULL"/> and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
@@ -622,11 +638,7 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
         if (aesBitLength is not 128 and not 192 and not 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
-        if (kdf == CKD.CKD_NULL && !AllowInsecure)
-            throw new InsecureOperationException(CKM.CKM_ECDH1_DERIVE,
-                "CKD_NULL applies no KDF to the ECDH shared secret: the derived AES key becomes the " +
-                "raw x-coordinate (or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 " +
-                "§5.8 forbids. Use the default CKD_SHA256_KDF unless the token supports only CKD_NULL.");
+        Enforce(new KeyAgreementKdfRequest(CKM.CKM_ECDH1_DERIVE, kdf));
 
         var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
@@ -661,13 +673,13 @@ public sealed class Pkcs11Workspace : IDisposable
     /// KDF at all — the token's own truncation/expansion of the raw x-coordinate becomes the AES key
     /// material directly, which NIST SP 800-56A forbids; this method never returns the raw secret for
     /// an off-token KDF step, since the result is always an on-token, non-extractable key. Requires
-    /// <see cref="AllowInsecure"/>. Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
+    /// a policy that permits it (see <see cref="Policy"/>). Some tokens (e.g. SoftHSM 2.x) implement only <c>CKD_NULL</c>.</param>
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="kdf"/> is <see cref="CKD.CKD_NULL"/> and <see cref="AllowInsecure"/> is <c>false</c>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is <see cref="CKD.CKD_NULL"/> and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="peerPublicKey"/>'s curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown if <paramref name="ecPrivateKey"/>'s <c>CKA_EC_PARAMS</c> cannot be read.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
@@ -788,7 +800,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The digest bytes.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is a broken digest (e.g. <see cref="CKM.CKM_MD5"/> or <see cref="CKM.CKM_SHA_1"/>) and <see cref="AllowInsecure"/> is false.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is a broken digest (e.g. <see cref="CKM.CKM_MD5"/> or <see cref="CKM.CKM_SHA_1"/>) and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Digest</c> call.</exception>
     public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
