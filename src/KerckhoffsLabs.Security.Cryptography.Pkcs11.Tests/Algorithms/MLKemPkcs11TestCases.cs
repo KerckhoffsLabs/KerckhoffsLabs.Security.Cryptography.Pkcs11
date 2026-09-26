@@ -97,7 +97,7 @@ internal static class MLKemPkcs11TestCases
         WithMlKem(backend, parameterSet, (workspace, mlkem) =>
         {
             // Reading the shared secret is the extract-and-destroy path, gated by the secure-defaults policy.
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
             mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecretEnc);
             Assert.Equal(mlkem.Algorithm.CiphertextSizeInBytes, ciphertext.Length);
@@ -128,7 +128,7 @@ internal static class MLKemPkcs11TestCases
         {
             // Reading the token's decapsulated secret is the extract-and-destroy path, gated by the
             // secure-defaults policy.
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
             byte[] ek = mlkem.ExportEncapsulationKey();
             using var bcl = MLKem.ImportEncapsulationKey(BclAlgorithm(parameterSet), ek);
@@ -141,8 +141,8 @@ internal static class MLKemPkcs11TestCases
 
     internal static void Assert_Encapsulate_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>
-            // Without AllowInsecure, extracting the shared secret is refused.
-            Assert.Throws<InsecureOperationException>(() => mlkem.Encapsulate(out byte[] _, out byte[] _)));
+            // Without the AllowInsecure policy, extracting the shared secret is refused.
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Encapsulate(out byte[] _, out byte[] _)));
 
     internal static void Assert_ExportEncapsulationKey_ReturnsStandardEncoding(IPkcs11Backend backend, CkpMlKem parameterSet) =>
         WithMlKem(backend, parameterSet, (_, mlkem) =>
@@ -153,15 +153,15 @@ internal static class MLKemPkcs11TestCases
 
     internal static void Assert_ExportDecapsulationKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>
-            Assert.Throws<InsecureOperationException>(() => mlkem.ExportDecapsulationKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.ExportDecapsulationKey()));
 
     internal static void Assert_ExportPrivateSeed_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>
-            Assert.Throws<InsecureOperationException>(() => mlkem.ExportPrivateSeed()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.ExportPrivateSeed()));
 
     internal static void Assert_ExportPkcs8PrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (_, mlkem) =>
-            Assert.Throws<InsecureOperationException>(() => mlkem.ExportPkcs8PrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mlkem.ExportPkcs8PrivateKey()));
 
     // Regression guard for MLKemPkcs11's per-library CKA_VALUE_LEN quirk cache
     // (Pkcs11Library.MlKemDecapsulateOmitsValueLen): every other case above decapsulates at most once
@@ -176,7 +176,7 @@ internal static class MLKemPkcs11TestCases
     internal static void Assert_Decapsulate_CachesValueLenQuirkPerLibrary(IPkcs11Backend backend, bool expectedOmitsValueLen) =>
         WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (workspace, mlkem) =>
         {
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecretEnc);
 
             byte[] first = mlkem.Decapsulate(ciphertext);

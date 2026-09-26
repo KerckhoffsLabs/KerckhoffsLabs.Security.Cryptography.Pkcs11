@@ -9,9 +9,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
-/// RSA key sizes below the NIST SP 800-131A 2048-bit floor are gated behind AllowInsecure at the
-/// session layer — generating a sub-2048 RSA key pair must throw <see cref="InsecureOperationException"/>
-/// unless the workspace opts in, mirroring the mechanism-level secure-defaults gate.
+/// RSA key sizes below the NIST SP 800-131A 2048-bit floor are gated behind the session's crypto
+/// policy — generating a sub-2048 RSA key pair must throw <see cref="CryptoPolicyViolationException"/>
+/// unless the policy permits it, mirroring the mechanism-level secure-defaults gate.
 /// </summary>
 public sealed class RsaKeyGenStrengthGateTests
 {
@@ -44,7 +44,7 @@ public sealed class RsaKeyGenStrengthGateTests
         var session = new Pkcs11Session(fake, sessionId: 1);
         try
         {
-            Assert.Throws<InsecureOperationException>(() => GenerateRsa(session, 1024));
+            Assert.Throws<CryptoPolicyViolationException>(() => GenerateRsa(session, 1024));
             Assert.Equal(0, fake.Calls); // refused before reaching the token
         }
         finally { session.Dispose(); }
@@ -54,7 +54,7 @@ public sealed class RsaKeyGenStrengthGateTests
     public void GenerateKeyPair_Rsa1024_AllowInsecure_Proceeds()
     {
         var fake = new RecordingFake();
-        var session = new Pkcs11Session(fake, sessionId: 1) { AllowInsecure = true };
+        var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.AllowInsecure);
         try
         {
             GenerateRsa(session, 1024);

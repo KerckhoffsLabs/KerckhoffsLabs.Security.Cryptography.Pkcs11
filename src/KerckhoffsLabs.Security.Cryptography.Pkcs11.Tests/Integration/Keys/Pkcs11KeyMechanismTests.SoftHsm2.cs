@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -30,7 +30,7 @@ internal static class Pkcs11KeyMechanismCases
             var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
 
             // Raw AES-CBC is gated by default; this test deliberately exercises it.
-            using var _ = workspace.AllowInsecureScope();
+            using var _ = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] ciphertext = key.Encrypt(mech, plaintext);
             byte[] recovered = key.Decrypt(mech, ciphertext);
 

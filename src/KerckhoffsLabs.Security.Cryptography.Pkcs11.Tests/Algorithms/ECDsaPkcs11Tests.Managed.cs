@@ -51,7 +51,7 @@ public sealed class ECDsaPkcs11Tests_Managed
         WithEcDsa(curve, (_, ec) => body(ec, hash));
     }
 
-    // As above, but hands the workspace to the body (for AllowInsecure scoping) and leaves the hash to
+    // As above, but hands the workspace to the body (for scoping to the AllowInsecure policy) and leaves the hash to
     // the caller — so the same key can be exercised across hash algorithms independent of the curve.
     private static void WithEcDsa(string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
     {
@@ -84,7 +84,7 @@ public sealed class ECDsaPkcs11Tests_Managed
     // message-digest algorithm are independent. Exercise the full cross-product (every NIST curve
     // against SHA-256/384/512) rather than only each curve's "matched" hash, and cross-verify each
     // signature under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
-    // SHA-1 requires AllowInsecure and has its own gating tests below.
+    // SHA-1 requires the AllowInsecure policy and has its own gating tests below.
     [Theory]
     [InlineData("P-256", "SHA256")]
     [InlineData("P-256", "SHA384")]
@@ -153,13 +153,13 @@ public sealed class ECDsaPkcs11Tests_Managed
         Assert.False(ec.VerifyData(data, sig, hash));
     });
 
-    // === SHA-1 gating: the managed-side hash fallback is refused unless AllowInsecure ===========
-    // Mirrors GuardMechanism's rejection of the combined CKM_ECDSA_SHA1 mechanism, so SHA-1 signing
-    // is gated the same way regardless of whether the token exposes CKM_ECDSA_SHA1 natively.
+    // === SHA-1 gating: the managed-side hash fallback is refused unless the AllowInsecure policy applies ===========
+    // Mirrors the session's crypto policy check rejecting the combined CKM_ECDSA_SHA1 mechanism, so
+    // SHA-1 signing is gated the same way regardless of whether the token exposes CKM_ECDSA_SHA1 natively.
 
     [Fact]
     public void SignData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (_, ec) =>
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => ec.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1)));
 
     [Fact]
@@ -167,10 +167,10 @@ public sealed class ECDsaPkcs11Tests_Managed
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");
         byte[] sig;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = ec.SignData(data, HashAlgorithmName.SHA1);
 
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
     });
 
@@ -178,7 +178,7 @@ public sealed class ECDsaPkcs11Tests_Managed
     public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithEcDsa("P-256", (workspace, ec) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = ec.SignData(data, HashAlgorithmName.SHA1);
             Assert.True(ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
@@ -262,7 +262,7 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     [Fact]
     public void ExportParameters_Private_ThrowsInsecure() => WithEcDsa("P-256", (ec, _) =>
-        Assert.Throws<InsecureOperationException>(() => ec.ExportParameters(includePrivateParameters: true)));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.ExportParameters(includePrivateParameters: true)));
 
     // === Unsupported BCL surface (PKCS#11 keys are token-resident / non-extractable) ========
 

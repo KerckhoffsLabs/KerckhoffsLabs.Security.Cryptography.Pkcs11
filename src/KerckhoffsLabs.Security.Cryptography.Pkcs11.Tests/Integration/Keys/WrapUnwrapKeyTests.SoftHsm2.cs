@@ -32,7 +32,7 @@ internal static class WrapUnwrapKeyTestCases
             // would still be open inside the test body and would mask an assertion that the gate
             // fires there.
             ObjectHandle dataKey;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 dataKey = session.GenerateKey(keyGenMech, dkTemplate);
 
             try
@@ -101,7 +101,7 @@ internal static class WrapUnwrapKeyTestCases
             // would still be open inside the test body and would mask an assertion that the gate
             // fires there.
             ObjectHandle dataKey;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 dataKey = session.GenerateKey(keyGenMech, dkTemplate);
             try
             {

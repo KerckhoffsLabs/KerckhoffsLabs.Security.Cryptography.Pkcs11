@@ -32,11 +32,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// Does not take ownership of the base key — disposing this provider does not dispose it.
 /// </para>
 /// <para>
-/// <b>Requires <c>Pkcs11Workspace.AllowInsecure</c>.</b> Every method here returns <c>byte[]</c>, so
-/// the derived value must be read off the token — this adapter cannot be implemented without
-/// extracting key material. The refusal comes from the library's single secure-defaults gate, which
-/// declines to create the extractable, non-sensitive key the read-back needs. Use
-/// <c>AllowInsecureScope()</c> to opt in for one operation, or stay on the on-token
+/// <b>Requires a policy that permits reading key material off the token, e.g.
+/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
+/// <c>byte[]</c>, so the derived value must be read off the token — this adapter cannot be
+/// implemented without extracting key material. The refusal comes from the library's single
+/// secure-defaults gate, which declines to create the extractable, non-sensitive key the
+/// read-back needs. Scope the policy override to one operation, or stay on the on-token
 /// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
 /// </para>
 /// </remarks>
@@ -84,7 +85,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(byte[] label, byte[] context, int derivedKeyLengthInBytes)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -99,7 +100,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -116,7 +117,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -145,7 +146,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <param name="template">Template describing the derived key (class, type, length, attributes).</param>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="Exceptions.InsecureOperationException">Thrown if <paramref name="template"/> explicitly requests an extractable or non-sensitive key while the workspace's <c>AllowInsecure</c> gate is off.</exception>
+    /// <exception cref="Exceptions.CryptoPolicyViolationException">Thrown if <paramref name="template"/> explicitly requests an extractable or non-sensitive key while the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, ObjectTemplate template)
     {
@@ -159,6 +160,8 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     private byte[] DeriveExtractable(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int length)
     {
+        _key.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
+
         var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
         var mech = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p);
         // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
@@ -169,9 +172,9 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
             .Build();
 
         // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so Pkcs11Session.BuildSecureKeyDefaults refuses unless the
-        // workspace has opted in. That single check is the whole policy; there is no adapter-local
-        // guard to keep in step with it.
+        // extractable, non-sensitive key, so the policy also judges it as a key template; the export
+        // check above is what a policy that allows such templates but not plaintext KDF output
+        // (a FIPS-style policy) relies on.
         Pkcs11Key derived = _key.Derive(mech, template);
         bool operationFailed = true;
         try

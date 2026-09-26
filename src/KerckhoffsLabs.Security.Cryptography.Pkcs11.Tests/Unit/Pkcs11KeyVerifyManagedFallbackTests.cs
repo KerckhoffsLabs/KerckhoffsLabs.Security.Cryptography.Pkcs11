@@ -184,7 +184,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         });
 
         // CKM_ECDSA_SHA224 is used here only because Pkcs11Key's managed-verify fallback (MapEcdsaMechanism)
-        // has no case for it — unrelated to the runtime AllowInsecure gate this call never reaches (the
+        // has no case for it — unrelated to the runtime AllowInsecure policy check this call never reaches (the
         // managed fallback synthesizes and verifies against a BCL public key, no session involved), so the
         // compile-time warning is suppressed for this one call.
 #pragma warning disable KLPKCS11009

@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
+// secure-defaults policy check is the behaviour under test), so the compile-time warning is suppressed
 // for this file only — the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -23,7 +23,7 @@ internal static class VerifyRsaPkcsTestCases
         {
             var fakeKey = new ObjectHandle(0);
             var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-            var ex = Assert.Throws<InsecureOperationException>(() =>
+            var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
                 session.Verify(mech, fakeKey, Array.Empty<byte>(), Array.Empty<byte>(), out _));
             Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
         }

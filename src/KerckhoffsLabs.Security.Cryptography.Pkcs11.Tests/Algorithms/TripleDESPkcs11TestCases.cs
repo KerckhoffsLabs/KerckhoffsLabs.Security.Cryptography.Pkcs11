@@ -143,9 +143,9 @@ internal static class TripleDESPkcs11TestCases
         WithImportedDes3(backend, (workspace, des3) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("3DES-CBC PKCS7 over a token key — variable length.");
-            Assert.Throws<InsecureOperationException>(() => des3.EncryptCbc(plaintext, Iv8));
+            Assert.Throws<CryptoPolicyViolationException>(() => des3.EncryptCbc(plaintext, Iv8));
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclDes3();
             byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8)); // default PaddingMode.PKCS7
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv8), ct);
@@ -157,9 +157,9 @@ internal static class TripleDESPkcs11TestCases
         {
             byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
             RandomNumberGenerator.Fill(plaintext);
-            Assert.Throws<InsecureOperationException>(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
+            Assert.Throws<CryptoPolicyViolationException>(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclDes3();
             byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None), ct);
@@ -168,12 +168,12 @@ internal static class TripleDESPkcs11TestCases
 
     internal static void Assert_EncryptEcb_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedDes3(backend, (_, des3) =>
-            Assert.Throws<InsecureOperationException>(() => des3.EncryptEcb(new byte[8], PaddingMode.None)));
+            Assert.Throws<CryptoPolicyViolationException>(() => des3.EncryptEcb(new byte[8], PaddingMode.None)));
 
     internal static void Assert_EncryptEcb_WithAllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedDes3(backend, (workspace, des3) =>
         {
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] plaintext = new byte[8];
             RandomNumberGenerator.Fill(plaintext);
             using var bcl = BclDes3();
@@ -194,8 +194,8 @@ internal static class TripleDESPkcs11TestCases
         WithImportedDes3(backend, (workspace, des3) =>
         {
             // TripleDESPkcs11 does not override the CFB cores: PKCS#11 defines no CKM_DES3_CFB mechanism,
-            // so the base SymmetricAlgorithm surfaces NotSupportedException — even with AllowInsecure set.
-            workspace.AllowInsecure = true;
+            // so the base SymmetricAlgorithm surfaces NotSupportedException — even under the AllowInsecure policy.
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Throws<NotSupportedException>(
                 () => des3.EncryptCfb(new byte[8], Iv8, PaddingMode.None, feedbackSizeInBits: 8));
         });
@@ -210,9 +210,9 @@ internal static class TripleDESPkcs11TestCases
     internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
         WithImportedDes3(backend, (workspace, des3) =>
         {
-            Assert.Throws<InsecureOperationException>(() => des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+            Assert.Throws<CryptoPolicyViolationException>(() => des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Empty(des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
         });
 
@@ -243,7 +243,7 @@ internal static class TripleDESPkcs11TestCases
         {
             byte[] plaintext = Convert.FromHexString("4E6F7720697320740000000000000000");
             byte[] expectedCt = Convert.FromHexString("8DC1D44886D99D3004C55BEE813BEC9F");
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
             byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
             Assert.Equal(expectedCt, ct);

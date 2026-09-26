@@ -60,7 +60,7 @@ internal static class ECDsaPkcs11TestCases
     private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<ECDsaPkcs11> body) =>
         WithEcDsa(backend, curve, (_, ec) => body(ec));
 
-    // Overload exposing the workspace for tests that need AllowInsecureScope (e.g. SHA-224/SHA-1).
+    // Overload exposing the workspace for tests that need UsePolicy(CryptoPolicy.AllowInsecure) (e.g. SHA-224/SHA-1).
     private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDSA))
@@ -134,7 +134,7 @@ internal static class ECDsaPkcs11TestCases
         });
 
     // SHA-224 ECDSA signing maps to CKM_ECDSA_SHA224, gated like SHA-1 (no BCL HashAlgorithmName
-    // constant, no benefit over SHA-256), so it requires AllowInsecure. Uses the span TrySignData /
+    // constant, no benefit over SHA-256), so it requires the AllowInsecure policy. Uses the span TrySignData /
     // VerifyData(ReadOnlySpan, …) overloads deliberately: the byte[] SignData(HashAlgorithmName) /
     // VerifyData(byte[],...) convenience overloads do NOT reach ECDsaPkcs11's own overrides at all —
     // confirmed empirically (not assumed): the BCL's ECDsa base class pre-hashes via the protected
@@ -145,7 +145,7 @@ internal static class ECDsaPkcs11TestCases
         backend.RequireMechanisms(CKM.CKM_ECDSA_SHA224);
         WithEcDsa(backend, curve, (workspace, ec) =>
         {
-            using (workspace.AllowInsecureScope())
+            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 var hash = new HashAlgorithmName("SHA224");
                 byte[] data = Encoding.UTF8.GetBytes("sha224 combined hash+sign on token");
@@ -165,16 +165,16 @@ internal static class ECDsaPkcs11TestCases
     }
 
     // Requires CKM_ECDSA_SHA224 for the same reason the round-trip case above does: SignDataInternal
-    // checks _key.SupportsMechanism first and only reaches the GuardMechanism-guarded combined-mechanism
-    // path when the token advertises it. Without that check here, a build that doesn't advertise it
+    // checks _key.SupportsMechanism first and only reaches the combined-mechanism path guarded by the
+    // session's crypto policy check when the token advertises it. Without that check here, a build that doesn't advertise it
     // (confirmed in CI: SoftHSM 2.5 / PKCS11 v2.40 does not, unlike the SoftHSM2 build used elsewhere in
     // this suite) takes the managed HashData fallback instead, which throws NotSupportedException, not
-    // InsecureOperationException — a real failure this exact gap caused, not a hypothetical one.
+    // CryptoPolicyViolationException — a real failure this exact gap caused, not a hypothetical one.
     internal static void Assert_TrySignData_Sha224_WithoutAllowInsecure_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_ECDSA_SHA224);
         WithEcDsa(backend, "P-256", (_, ec) =>
-            Assert.Throws<InsecureOperationException>(() =>
+            Assert.Throws<CryptoPolicyViolationException>(() =>
                 ec.TrySignData(Encoding.UTF8.GetBytes("x"), new byte[256], new HashAlgorithmName("SHA224"), out int _)));
     }
 
@@ -236,7 +236,7 @@ internal static class ECDsaPkcs11TestCases
 
     internal static void Assert_ExportParameters_Private_ThrowsInsecure(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, _) =>
-            Assert.Throws<InsecureOperationException>(() => ec.ExportParameters(includePrivateParameters: true)));
+            Assert.Throws<CryptoPolicyViolationException>(() => ec.ExportParameters(includePrivateParameters: true)));
 
     internal static void Assert_ExportExplicitParameters_Throws(IPkcs11Backend backend) =>
         WithEcDsa(backend, "P-256", (ec, _) =>

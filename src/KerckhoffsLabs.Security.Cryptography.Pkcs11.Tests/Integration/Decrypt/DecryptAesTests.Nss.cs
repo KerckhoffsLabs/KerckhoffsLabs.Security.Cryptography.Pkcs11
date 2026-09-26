@@ -9,7 +9,7 @@ public sealed class DecryptAesTests_Nss(NssBackendFixture backend)
     private readonly NssBackendFixture _backend = backend;
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault() => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault() => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue() => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);

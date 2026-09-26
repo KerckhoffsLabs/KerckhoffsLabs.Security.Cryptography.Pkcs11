@@ -32,18 +32,18 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
 
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
 
+    // Constructing the instance makes no token call, so it needs no opt-in. Every GetBytes does: it
+    // reads the derived value back off the token, which the default SecureOnly policy refuses. The
+    // opt-in therefore has to span the calls to GetBytes, not just construction — callers that derive
+    // hold a UsePolicy(CryptoPolicy.AllowInsecure) lease for the instance's whole use.
     private static Rfc2898DeriveBytesPkcs11 NewKdf(Pkcs11Workspace workspace, HashAlgorithmName hash, byte[]? password = null, byte[]? salt = null, int iterations = Iterations)
-    {
-        // Every derivation reads CKA_VALUE back off the token, so the gate in BuildSecureKeyDefaults
-        // refuses the extractable, non-sensitive key it needs. Opt in here.
-        workspace.AllowInsecure = true;
-        return new Rfc2898DeriveBytesPkcs11(workspace, password ?? Password, salt ?? Salt, iterations, hash);
-    }
+        => new(workspace, password ?? Password, salt ?? Salt, iterations, hash);
 
     private static byte[] GetBytes(IPkcs11Backend backend, HashAlgorithmName hash, int count, byte[]? password = null, byte[]? salt = null, int iterations = Iterations)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using var workspace = OpenWorkspace(backend);
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var kdf = NewKdf(workspace, hash, password, salt, iterations);
         return kdf.GetBytes(count);
     }
@@ -110,6 +110,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using var workspace = OpenWorkspace(backend);
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
 
         using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
@@ -125,6 +126,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using var workspace = OpenWorkspace(backend);
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
 
         byte[] first = kdf.GetBytes(16);
@@ -139,6 +141,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using var workspace = OpenWorkspace(backend);
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
 
         byte[] first = kdf.GetBytes(16);
@@ -205,7 +208,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using var workspace = OpenWorkspace(backend);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
         byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
         byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
@@ -216,7 +219,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
         using var workspace = OpenWorkspace(backend);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
         byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
         byte[] actual = new byte[32];
@@ -227,7 +230,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
-        // No RequireMechanism/AllowInsecure: a zero-length request must short-circuit before any
+        // No mechanism check or crypto-policy check: a zero-length request must short-circuit before any
         // token call, so this must pass even on backends that do not implement CKM_PKCS5_PBKD2.
         byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, 0);
         Assert.Empty(actual);

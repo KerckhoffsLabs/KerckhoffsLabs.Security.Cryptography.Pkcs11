@@ -3,8 +3,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
-// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
-// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -30,7 +30,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 [Obsolete("DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern " +
           "deployments. Use ECDsaPkcs11 (ECDSA) or MLDsaPkcs11 (ML-DSA). DSAPkcs11 remains only for interop " +
-          "with existing DSA keys; SHA-1 hashing additionally requires the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+          "with existing DSA keys; SHA-1 hashing additionally requires a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.Dsa,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DSAPkcs11 : DSA
@@ -89,7 +89,7 @@ public sealed class DSAPkcs11 : DSA
 
     /// <inheritdoc/>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated because FIPS 186-5 disallows DSA signature generation.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated because FIPS 186-5 disallows DSA signature generation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] CreateSignature(byte[] rgbHash)
     {
@@ -100,7 +100,7 @@ public sealed class DSAPkcs11 : DSA
 
     /// <inheritdoc/>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> or <paramref name="rgbSignature"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifySignature(byte[] rgbHash, byte[] rgbSignature)
     {
@@ -116,7 +116,7 @@ public sealed class DSAPkcs11 : DSA
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
-    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data, Span<byte> destination, HashAlgorithmName hashAlgorithm, out int bytesWritten)
@@ -130,7 +130,7 @@ public sealed class DSAPkcs11 : DSA
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
-    /// <exception cref="InsecureOperationException">Thrown unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set: every <c>CKM_DSA</c> mechanism is gated.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm)
@@ -156,8 +156,8 @@ public sealed class DSAPkcs11 : DSA
     }
 
     // No SHA-1-specific gate here: DSA is insecure as an algorithm (FIPS 186-5 disallows it), so every
-    // CKM_DSA* mechanism — raw and combined, all hashes — is gated at the session layer (GuardMechanism)
-    // and requires Pkcs11Workspace.AllowInsecure. A per-hash guard would be redundant.
+    // CKM_DSA* mechanism — raw and combined, all hashes — is gated at the session layer's crypto policy
+    // check and requires a policy that permits it. A per-hash guard would be redundant.
     //
     // SHA-224 is deliberately absent: Pkcs11MechanismMap.DsaSign accepts it (CKM_DSA_SHA224 is a real
     // PKCS#11 mechanism), but .NET has no SHA-224 implementation through any API — no concrete type,
@@ -181,7 +181,7 @@ public sealed class DSAPkcs11 : DSA
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">
+    /// <exception cref="CryptoPolicyViolationException">
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
@@ -189,7 +189,7 @@ public sealed class DSAPkcs11 : DSA
     public override DSAParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
-            throw new InsecureOperationException(
+            throw new CryptoPolicyViolationException(
                 "Refusing to export DSA private key (X). PKCS#11 keys are non-extractable by design; " +
                 "export only public material via ExportParameters(false).");
 

@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 // CKM_AES_CBC appears here only as a realistic mechanism whose parameter is a raw IV block, which is
 // what the byte[] constructors marshal. Nothing is encrypted and no token is involved, so the
-// AllowInsecure gate never runs; the compile-time warning is suppressed for this file only.
+// crypto-policy check never runs; the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;

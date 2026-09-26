@@ -13,12 +13,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 /// The weak primitives that have a façade type (MD5, DES, RC2 …) are <c>[Obsolete]</c>, but the same
 /// mechanisms are reachable directly as <em>values</em> — <c>new Mechanism(CKM.CKM_AES_CBC)</c>, or
 /// <c>AesPkcs11.Mode = CipherMode.CBC</c> — where there is no symbol to mark. Those routes reach the
-/// same runtime <c>AllowInsecure</c> gate (<c>Pkcs11Session.GuardMechanism</c>) with no compile-time
-/// warning at all; this analyzer supplies one. Unauthenticated AES modes are the common case: AES
-/// itself is fine, so <c>AesPkcs11</c> is deliberately not obsolete.
+/// same runtime crypto policy (<c>SecureOnlyPolicy</c>) with no compile-time warning at all; this
+/// analyzer supplies one. Unauthenticated AES modes are the common case: AES itself is fine, so
+/// <c>AesPkcs11</c> is deliberately not obsolete.
 /// <para>
 /// RSA encryption without OAEP has its own id (KLPKCS11008) and is excluded here.
-/// <see cref="InsecureMechanismData.GatedMechanisms"/> mirrors <c>GuardMechanism</c>'s set exactly; a test pins the two
+/// <see cref="InsecureMechanismData.GatedMechanisms"/> mirrors <c>SecureOnlyPolicy</c>'s set exactly; a test pins the two
 /// together so they cannot drift.
 /// </para>
 /// </remarks>
@@ -36,15 +36,15 @@ public sealed class InsecureMechanismAnalyzer : DiagnosticAnalyzer
         title: "Broken, deprecated, or unauthenticated mechanism",
         messageFormat:
             "'{0}' is rejected by the secure-by-default policy ({1}); it throws " +
-            "InsecureOperationException unless Pkcs11Workspace.AllowInsecure is set",
+            "CryptoPolicyViolationException under the default SecureOnly policy",
         category: "Security",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description:
             "Broken primitives (MD2/MD5/SHA-1, RC2/RC4, DES/3DES, SEED, CAST, RC5, Blowfish, Skipjack, " +
-            "RIPEMD, DSA) and unauthenticated AES modes (ECB/CBC/CTR/CTS/OFB/CFB) are gated at runtime by " +
-            "Pkcs11Workspace.AllowInsecure. Prefer authenticated AES (GCM/CCM) and SHA-2/SHA-3. Suppress " +
-            "this diagnostic only alongside a documented interop reason.",
+            "RIPEMD, DSA) and unauthenticated AES modes (ECB/CBC/CTR/CTS/OFB/CFB) are refused at runtime " +
+            "by the default SecureOnly crypto policy (Pkcs11Workspace.Policy). Prefer authenticated AES " +
+            "(GCM/CCM) and SHA-2/SHA-3. Suppress this diagnostic only alongside a documented interop reason.",
         helpLinkUri:
             "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11009");
 

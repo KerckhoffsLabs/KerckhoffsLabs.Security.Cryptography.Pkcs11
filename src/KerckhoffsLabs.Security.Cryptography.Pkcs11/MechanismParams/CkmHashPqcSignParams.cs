@@ -33,6 +33,9 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
         _hedgeVariant = hedgeVariant;
     }
 
+    /// <summary>The pre-hash mechanism, for policy evaluation.</summary>
+    internal CKM Hash => _hash;
+
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {

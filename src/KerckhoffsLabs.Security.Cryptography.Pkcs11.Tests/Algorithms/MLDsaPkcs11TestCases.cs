@@ -169,13 +169,13 @@ internal static class MLDsaPkcs11TestCases
 
     internal static void Assert_ExportMLDsaPrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlDsa(backend, CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-            Assert.Throws<InsecureOperationException>(() => mldsa.ExportMLDsaPrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportMLDsaPrivateKey()));
 
     internal static void Assert_ExportMLDsaPrivateSeed_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlDsa(backend, CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-            Assert.Throws<InsecureOperationException>(() => mldsa.ExportMLDsaPrivateSeed()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportMLDsaPrivateSeed()));
 
     internal static void Assert_ExportPkcs8PrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithMlDsa(backend, CkpMlDsa.CKP_ML_DSA_65, mldsa =>
-            Assert.Throws<InsecureOperationException>(() => mldsa.ExportPkcs8PrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => mldsa.ExportPkcs8PrivateKey()));
 }

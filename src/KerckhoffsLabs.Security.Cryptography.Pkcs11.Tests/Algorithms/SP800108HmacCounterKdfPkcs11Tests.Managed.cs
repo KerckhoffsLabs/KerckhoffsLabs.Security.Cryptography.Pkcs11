@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11010
 
@@ -39,7 +39,7 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
         // Every byte-returning DeriveKey overload reads the derived value off the token, so the gate
         // in BuildSecureKeyDefaults refuses them under the default posture. Opt in here; the refusal
         // itself is covered by its own test.
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf").Value(KeyBytes).Derive().Build();
         using var key = workspace.ImportKey(tpl);

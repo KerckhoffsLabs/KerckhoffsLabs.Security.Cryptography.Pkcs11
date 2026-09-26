@@ -50,6 +50,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy" />
   </ItemGroup>
 
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">

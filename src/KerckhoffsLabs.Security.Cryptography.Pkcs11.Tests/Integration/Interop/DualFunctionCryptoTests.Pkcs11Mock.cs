@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // These tests drive gated legacy mechanisms (CKM_SHA_1, CKM_AES_CBC) on purpose — pkcs11-mock's
-// dual-function transform is what's under test, not mechanism security — under AllowInsecure, so
+// dual-function transform is what's under test, not mechanism security — under the AllowInsecure policy, so
 // the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -78,7 +78,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
             using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            session.AllowInsecure = true; // CKM_SHA_1 and CKM_AES_CBC are both gated by default
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_SHA_1 and CKM_AES_CBC are both gated by default
             var digestMechanism = new Mechanism(CKM.CKM_SHA_1);
             var encryptMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
             byte[] plaintext = "dual-function encrypt"u8.ToArray();
@@ -104,7 +104,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
             using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            session.AllowInsecure = true;
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             var digestMechanism = new Mechanism(CKM.CKM_SHA_1);
             var decryptMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);
             byte[] ciphertext = "dual-function decrypt"u8.ToArray();
@@ -132,7 +132,7 @@ public sealed class DualFunctionCryptoTests(MockBackendFixture f)
             using var findPublic = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
             ObjectHandle publicKey = Assert.Single(session.FindAllObjects([findPublic]));
 
-            session.AllowInsecure = true;
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             // pkcs11-mock's C_VerifyInit only recognizes CKM_RSA_PKCS/CKM_SHA1_RSA_PKCS.
             var verificationMechanism = new Mechanism(CKM.CKM_SHA1_RSA_PKCS);
             var decryptionMechanism = new Mechanism(CKM.CKM_AES_CBC, new byte[16]);

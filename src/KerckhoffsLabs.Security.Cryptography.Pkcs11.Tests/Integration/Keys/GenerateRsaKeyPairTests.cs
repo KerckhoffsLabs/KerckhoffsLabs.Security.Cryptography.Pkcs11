@@ -18,8 +18,8 @@ internal static class GenerateRsaKeyPairTestCases
         using var workspace = OpenWorkspace(backend);
         // A non-positive size is always an argument error.
         Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateRsaSigningKeyPair(modulusBits: 0));
-        // Sub-2048 (NIST SP 800-131A) is gated behind AllowInsecure, not silently produced.
-        Assert.Throws<InsecureOperationException>(() => workspace.GenerateRsaSigningKeyPair(modulusBits: 1024));
+        // Sub-2048 (NIST SP 800-131A) is refused under SecureOnly and requires the AllowInsecure policy, not silently produced.
+        Assert.Throws<CryptoPolicyViolationException>(() => workspace.GenerateRsaSigningKeyPair(modulusBits: 1024));
     }
 
     internal static void Assert_GeneratesRsa2048KeyPair(IPkcs11Backend backend)

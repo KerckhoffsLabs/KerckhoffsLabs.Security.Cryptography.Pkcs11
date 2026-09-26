@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -190,7 +190,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
         var s = NewSession(new CombinedFake());
         Mechanism digestMech = Sha256(), insecure = new(CKM.CKM_AES_ECB);
 
-        Assert.Throws<InsecureOperationException>(() =>
+        Assert.Throws<CryptoPolicyViolationException>(() =>
             s.DigestEncrypt(digestMech, insecure, new ObjectHandle(1), [1], out _, out _));
     }
 }

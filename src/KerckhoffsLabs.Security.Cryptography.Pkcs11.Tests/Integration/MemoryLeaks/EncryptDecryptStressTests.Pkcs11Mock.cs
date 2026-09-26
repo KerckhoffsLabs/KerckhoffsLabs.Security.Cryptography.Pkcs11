@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -70,7 +70,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
             var session = TestKeys.OpenLoggedInSession(_backend);
             // Raw AES-CBC is gated by default; opt in since this stress test only
             // cares about unmanaged-allocation discipline, not the choice of mechanism.
-            session.AllowInsecure = true;
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             try
             {
                 // Build the Mechanism and attempt a realistic create+encrypt+destroy cycle.

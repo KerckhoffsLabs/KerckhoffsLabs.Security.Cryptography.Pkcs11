@@ -133,15 +133,15 @@ public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))
     }
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">Always thrown. PKCS#11 keys are non-extractable.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Always thrown. PKCS#11 keys are non-extractable.</exception>
     protected override void ExportSlhDsaPrivateKeyCore(Span<byte> destination)
-        => throw new InsecureOperationException(
+        => throw new CryptoPolicyViolationException(
             "Refusing to export SLH-DSA private key bytes. PKCS#11 keys are non-extractable by design.");
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">Always thrown.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Always thrown.</exception>
     protected override bool TryExportPkcs8PrivateKeyCore(Span<byte> destination, out int bytesWritten)
-        => throw new InsecureOperationException(
+        => throw new CryptoPolicyViolationException(
             "Refusing to export SLH-DSA private key as PKCS#8. PKCS#11 keys are non-extractable by design.");
 
     // -----------------------------------------------------------------------

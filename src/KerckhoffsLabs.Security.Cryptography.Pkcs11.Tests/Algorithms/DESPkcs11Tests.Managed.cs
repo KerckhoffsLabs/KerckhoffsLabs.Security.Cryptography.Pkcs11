@@ -18,7 +18,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// the managed token genuinely implements <c>CKM_DES_CBC/CBC_PAD/ECB</c> on top of the BCL
 /// <see cref="DES"/>, so every known-answer round-trip runs here and is cross-checked against the BCL.
 /// The secure-defaults gate is still in force: each cipher op must run inside
-/// <c>AllowInsecureScope()</c> and throws <see cref="InsecureOperationException"/> without it.
+/// <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> and throws <see cref="CryptoPolicyViolationException"/> without it.
 /// </summary>
 [NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
                      "the token holds no static state, so this is safe alongside every backend collection.")]
@@ -79,19 +79,19 @@ public sealed class DESPkcs11Tests_Managed
 
     [Fact]
     public void EncryptCbc_Pkcs7_GatedByDefault_Throws() => WithImportedDes((ws, des) =>
-        Assert.Throws<InsecureOperationException>(() => des.EncryptCbc(new byte[8], Iv8)));
+        Assert.Throws<CryptoPolicyViolationException>(() => des.EncryptCbc(new byte[8], Iv8)));
 
     [Fact]
     public void EncryptCbc_NonePadding_GatedByDefault_Throws() => WithImportedDes((ws, des) =>
-        Assert.Throws<InsecureOperationException>(() => des.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
+        Assert.Throws<CryptoPolicyViolationException>(() => des.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
 
     [Fact]
     public void EncryptEcb_GatedByDefault_Throws() => WithImportedDes((ws, des) =>
-        Assert.Throws<InsecureOperationException>(() => des.EncryptEcb(new byte[8], PaddingMode.None)));
+        Assert.Throws<CryptoPolicyViolationException>(() => des.EncryptEcb(new byte[8], PaddingMode.None)));
 
     [Fact]
     public void DecryptCbc_GatedByDefault_Throws() => WithImportedDes((ws, des) =>
-        Assert.Throws<InsecureOperationException>(() => des.DecryptCbc(new byte[8], Iv8)));
+        Assert.Throws<CryptoPolicyViolationException>(() => des.DecryptCbc(new byte[8], Iv8)));
 
     // === Known-answer round-trips vs the BCL (the managed token implements single DES) ==============
 
@@ -102,7 +102,7 @@ public sealed class DESPkcs11Tests_Managed
 
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8); // default PaddingMode.PKCS7
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptCbc(plaintext, Iv8);
             Assert.Equal(expected, ct);
@@ -118,7 +118,7 @@ public sealed class DESPkcs11Tests_Managed
 
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptCbc(plaintext, Iv8, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -134,7 +134,7 @@ public sealed class DESPkcs11Tests_Managed
 
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptEcb(plaintext, PaddingMode.None);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptEcb(plaintext, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -150,7 +150,7 @@ public sealed class DESPkcs11Tests_Managed
         byte[] plaintext = H("4E6F772069732074");
         byte[] expectedCt = H("3FA40E8A984D4815");
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptEcb(plaintext, PaddingMode.None);
             Assert.Equal(expectedCt, ct);
@@ -170,7 +170,7 @@ public sealed class DESPkcs11Tests_Managed
         using var bcl = BclDes();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8);
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(plaintext, des.DecryptCbc(ct, Iv8));
     });
 
@@ -185,7 +185,7 @@ public sealed class DESPkcs11Tests_Managed
 
         byte[] wrongIv = [.. Iv8];
         wrongIv[0] ^= 0xFF;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] dec = des.DecryptCbc(ct, wrongIv, PaddingMode.None);
             Assert.NotEqual(plaintext, dec);
@@ -196,15 +196,15 @@ public sealed class DESPkcs11Tests_Managed
 
     [Fact]
     public void Cbc_EmptyInput_Gated_Throws() => WithImportedDes((ws, des) =>
-        // Even the empty-input fast path honors the secure-defaults gate: without AllowInsecure the
+        // Even the empty-input fast path honors the secure-defaults gate: without the AllowInsecure policy the
         // gated mechanism throws before the (empty) buffer reaches the token.
-        Assert.Throws<InsecureOperationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
+        Assert.Throws<CryptoPolicyViolationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
     [Fact]
     public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedDes((workspace, des) =>
     {
-        // With AllowInsecure, empty decrypt is a no-op returned without touching the token.
-        using (workspace.AllowInsecureScope())
+        // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
     });
 
@@ -215,7 +215,7 @@ public sealed class DESPkcs11Tests_Managed
         // token rather than the empty-input fast path. Cross-check against the BCL.
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
             Assert.Equal(8, ct.Length);
@@ -238,9 +238,9 @@ public sealed class DESPkcs11Tests_Managed
     public void Cfb_NotSupported() => WithImportedDes((workspace, des) =>
     {
         // DESPkcs11 does not override the CFB cores: the secure-defaults gate in Pkcs11Session does
-        // not cover single-DES CKM_DES_CFB*, so wiring it would bypass AllowInsecure. The base
-        // SymmetricAlgorithm therefore surfaces NotSupportedException — even with AllowInsecure set.
-        using (workspace.AllowInsecureScope())
+        // not cover single-DES CKM_DES_CFB*, so wiring it would bypass the AllowInsecure policy. The base
+        // SymmetricAlgorithm therefore surfaces NotSupportedException — even under the AllowInsecure policy.
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Throws<NotSupportedException>(
                 () => des.EncryptCfb(new byte[8], Iv8, PaddingMode.None, feedbackSizeInBits: 8));
     });

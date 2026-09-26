@@ -3,8 +3,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
-// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
-// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -19,12 +19,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// CBC, ECB and CFB provide confidentiality only, not integrity — they are malleable and (for CBC)
 /// padding-oracle prone. <b>All of them are gated by the secure-defaults policy</b>: every operation
-/// throws <c>InsecureOperationException</c> unless <see cref="Pkcs11Workspace.AllowInsecure"/> is set
-/// on the wrapped key's workspace. Prefer authenticated encryption — <see cref="AesGcmPkcs11"/> or
+/// throws <c>CryptoPolicyViolationException</c> unless the wrapped key's workspace's
+/// <see cref="Pkcs11Workspace.Policy"/> permits it. Prefer authenticated encryption — <see cref="AesGcmPkcs11"/> or
 /// <see cref="AesCcmPkcs11"/>; this type exists only for legacy/interop scenarios.
 /// </para>
 /// <para>
-/// Supported modes (on the token, once AllowInsecure is set):
+/// Supported modes (on the token, once permitted by the workspace's policy):
 /// <list type="bullet">
 /// <item>CBC — <see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> / <c>DecryptCbc</c>
 /// with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_AES_CBC_PAD</c>) or <see cref="PaddingMode.None"/>
@@ -124,12 +124,14 @@ public sealed class AesPkcs11 : Aes
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
         // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens (e.g. SoftHSM) reject an
-        // empty C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when AllowInsecure is
-        // set (i.e. once the secure-defaults gate would pass). With AllowInsecure off we fall
-        // through so GuardMechanism throws InsecureOperationException as documented (the gate runs
-        // before the empty buffer reaches the token). Padded encryption (CKM_AES_CBC_PAD) must emit
-        // a full padding block, so that path always goes to the token.
-        if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_AES_CBC_PAD))
+        // empty C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when the policy permits
+        // this mechanism (i.e. the gate would pass). Otherwise fall through so the session's policy
+        // check throws as documented (the gate runs before the empty buffer reaches the token).
+        // Padded encryption (CKM_AES_CBC_PAD) must emit a full padding block, so that path always
+        // goes to the token.
+        if (input.IsEmpty
+            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && !(encrypt && mechanism.Type == (ulong)CKM.CKM_AES_CBC_PAD))
         {
             bytesWritten = 0;
             return true;

@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// <summary>
 /// Every key-producing operation must apply the same secure-default gate as
 /// <c>UnwrapKey</c> — reject an explicitly insecure result template (CKA_EXTRACTABLE=true or
-/// CKA_SENSITIVE=false) unless AllowInsecure is set. This covers <c>DeriveKey</c> and the v3.2
+/// CKA_SENSITIVE=false) unless the AllowInsecure policy is used. This covers <c>DeriveKey</c> and the v3.2
 /// <c>EncapsulateKey</c> / <c>DecapsulateKey</c> / <c>UnwrapKeyAuthenticated</c> paths. The gate
 /// runs before the native call, so it is exercised on pkcs11-mock with dummy handles/blobs and a
 /// secure (ungated) mechanism — no real key material needed.
@@ -20,8 +20,8 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     private readonly MockBackendFixture _backend = f;
 
     // The four key-producing operations under test. Keyed by name so the [Theory] signature need not
-    // expose the internal Pkcs11Session type. The gate fires before the native call; under
-    // AllowInsecure the call proceeds to the mock, which fails the dummy/unsupported call with a
+    // expose the internal Pkcs11Session type. The check fires before the native call; under the
+    // AllowInsecure policy the call proceeds to the mock, which fails the dummy/unsupported call with a
     // (non-insecure) Pkcs11Exception.
     // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
 #pragma warning disable CA1825
@@ -121,7 +121,7 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
         var template = SecretKeyTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
-            Assert.IsNotType<InsecureOperationException>(
+            Assert.IsNotType<CryptoPolicyViolationException>(
                 Record.Exception(() => Invoke(operation, session, template)));
         }
         finally { foreach (var a in template) a.Dispose(); }
@@ -134,24 +134,24 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
         var template = SecretKeyTemplate(new ObjectAttribute(CKA.CKA_SENSITIVE, false));
         try
         {
-            Assert.Throws<InsecureOperationException>(() => Invoke(operation, session, template));
+            Assert.Throws<CryptoPolicyViolationException>(() => Invoke(operation, session, template));
         }
         finally { foreach (var a in template) a.Dispose(); }
     });
 
     [Theory]
     [MemberData(nameof(Operations))]
-    public void InsecureTemplate_AllowInsecureScope_BypassesGate(string operation) => WithSession(session =>
+    public void InsecureTemplate_UsePolicyAllowInsecure_BypassesGate(string operation) => WithSession(session =>
     {
         var template = SecretKeyTemplate(new ObjectAttribute(CKA.CKA_EXTRACTABLE, true));
         try
         {
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 // The gate is bypassed; the call reaches the mock, which rejects the dummy/unsupported
                 // call with a Pkcs11Exception — the point is it is NOT the insecure gate.
                 Exception? ex = Record.Exception(() => Invoke(operation, session, template));
-                Assert.False(ex is InsecureOperationException, "AllowInsecure should bypass the secure-default gate.");
+                Assert.False(ex is CryptoPolicyViolationException, "The AllowInsecure policy should bypass the secure-default gate.");
             }
         }
         finally { foreach (var a in template) a.Dispose(); }

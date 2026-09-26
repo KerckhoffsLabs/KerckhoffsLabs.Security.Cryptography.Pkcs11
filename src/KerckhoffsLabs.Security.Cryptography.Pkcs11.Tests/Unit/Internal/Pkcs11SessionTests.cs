@@ -187,9 +187,9 @@ public sealed class Pkcs11SessionTests
         }));
     }
 
-    // === Secure-defaults gate (GuardMechanism) ==============================================
-    // GuardMechanism is mechanism-based, not operation-based, so routing every insecure mechanism
-    // through Digest exercises each rejection arm.
+    // === Secure-defaults gate (the session's crypto policy check) ============================
+    // SecureOnlyPolicy's evaluation is mechanism-based, not operation-based, so routing every
+    // insecure mechanism through Digest exercises each rejection arm.
 
     [Theory]
     [InlineData(CKM.CKM_RSA_PKCS)]
@@ -225,7 +225,7 @@ public sealed class Pkcs11SessionTests
     {
         var s = NewSession();
         var mech = new Mechanism(insecure);
-        Assert.Throws<InsecureOperationException>(() => s.Digest(mech, new byte[1]));
+        Assert.Throws<CryptoPolicyViolationException>(() => s.Digest(mech, new byte[1]));
     }
 
     // === Two-call buffer-probe paths (hermetic: the fake supplies size then bytes) ===========

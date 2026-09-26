@@ -32,10 +32,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// library has no PKCS#11 equivalent for.
 /// </para>
 /// <para>
-/// <b>Requires <see cref="Pkcs11Workspace.AllowInsecure"/>.</b> Every derivation here returns
+/// <b>Requires a policy that permits reading key material off the token, e.g.
+/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every derivation here returns
 /// <c>byte[]</c> (or fills a caller-supplied buffer), so the value must be read back off the token —
 /// the library's single secure-defaults gate declines to create the extractable, non-sensitive key
-/// that read-back needs. Use <c>AllowInsecureScope()</c> to opt in for one operation.
+/// that read-back needs. Scope the policy override to one operation.
 /// </para>
 /// </remarks>
 public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
@@ -157,7 +158,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="count"/> is not positive.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if this instance has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] GetBytes(int count)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -186,7 +187,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive, or <paramref name="outputLength"/> is negative.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public static byte[] Pbkdf2(Pkcs11Workspace workspace, byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(password);
@@ -229,7 +230,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public static void Pbkdf2(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, Span<byte> destination, int iterations, HashAlgorithmName hashAlgorithm)
     {
         ArgumentNullException.ThrowIfNull(workspace);
@@ -250,6 +251,8 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 
     private static byte[] DeriveExtractable(Pkcs11Workspace workspace, byte[] password, byte[] salt, int iterations, CKP prf, int length)
     {
+        workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
+
         var mechanism = new Mechanism(CKM.CKM_PKCS5_PBKD2, new CkmPkcs5Pbkd2Params(salt, (ulong)iterations, prf, password));
         // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
@@ -259,9 +262,9 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
             .Build();
 
         // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so Pkcs11Session.BuildSecureKeyDefaults refuses unless the
-        // workspace has opted in. That single check is the whole policy; there is no adapter-local
-        // guard to keep in step with it.
+        // extractable, non-sensitive key, so the policy also judges it as a key template; the export
+        // check above is what a policy that allows such templates but not plaintext KDF output
+        // (a FIPS-style policy) relies on.
         Pkcs11Key derived = workspace.GenerateKey(mechanism, template);
         bool operationFailed = true;
         try

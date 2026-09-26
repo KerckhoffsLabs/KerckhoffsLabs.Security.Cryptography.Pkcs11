@@ -10,6 +10,6 @@ public sealed class DecryptRsaTests_SoftHsm(SoftHsmBackendFixture f)
 
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_SoftHsm()
+    public void RsaPkcs1V15_ThrowsCryptoPolicyViolationException_ByDefault_SoftHsm()
         => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

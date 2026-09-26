@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
+// secure-defaults policy check is the behaviour under test), so the compile-time warning is suppressed
 // for this file only — the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -20,7 +20,7 @@ internal static class EncryptRsaTestCases
 {
     internal static void Assert_RsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {
-        // The InsecureOperationException guard fires before any P/Invoke call to C_Encrypt,
+        // The CryptoPolicyViolationException guard fires before any P/Invoke call to C_Encrypt,
         // but a session must still be opened and a key pair generated first.
         var session = TestKeys.OpenLoggedInSession(backend);
         try
@@ -30,10 +30,10 @@ internal static class EncryptRsaTestCases
             {
                 byte[] plaintext = Encoding.UTF8.GetBytes("RSA v1.5 test");
 
-                // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by Session.GuardMechanism; the same gate the
-                // RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.
+                // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by the session's crypto policy check; the same
+                // gate the RSAPkcs11.Encrypt(RSAEncryptionPadding.Pkcs1) path relies on.
                 var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-                var ex = Assert.Throws<InsecureOperationException>(() =>
+                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
                     session.Encrypt(mech, pub, plaintext));
                 Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
             }
