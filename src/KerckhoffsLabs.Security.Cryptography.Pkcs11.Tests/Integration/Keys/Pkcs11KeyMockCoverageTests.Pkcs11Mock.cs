@@ -52,7 +52,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
         // handle at all from GetAttributeValue's point of view.
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_AES, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.GetAttributeValue(CKA.CKA_VALUE));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
@@ -68,7 +68,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Sign(new Mechanism(CKM.CKM_RSA_PKCS), "data"u8));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
@@ -82,7 +82,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Encrypt(new Mechanism(CKM.CKM_RSA_PKCS), "data"u8));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
@@ -96,7 +96,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Decrypt(new Mechanism(CKM.CKM_RSA_PKCS), "data"u8));
         Assert.Equal(CKR.CKR_OBJECT_HANDLE_INVALID, ex.ReturnValue);
@@ -112,7 +112,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
@@ -128,7 +128,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_AES, label: null, id: []);
 
         using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
@@ -145,7 +145,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
@@ -161,7 +161,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_AES, label: null, id: []);
 
         using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
@@ -187,10 +187,10 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var wrapper = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
         using var target = new Pkcs11Key(
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_AES, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
             () => wrapper.Wrap(new Mechanism(CKM.CKM_RSA_PKCS), target));
@@ -206,10 +206,10 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var wrapper = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
         using var target = new Pkcs11Key(
             workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_AES, label: null, id: []);
 
         using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] wrapped = wrapper.Wrap(new Mechanism(CKM.CKM_RSA_PKCS), target);
@@ -237,7 +237,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
         // Decrypt does, never fall back to the public one. A public-only key has none available.
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -257,7 +257,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
         // parameter, never as the base-key handle. A public-only key has no usable base handle.
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_EC, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_EC, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -280,7 +280,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -296,7 +296,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_ML_KEM, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_ML_KEM, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -312,7 +312,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
-            keyType: CKK.CKK_ML_KEM, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_ML_KEM, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -328,7 +328,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_ML_KEM, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_ML_KEM, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -346,7 +346,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_AES, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_AES, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedRsaParameters());
     }
@@ -360,7 +360,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: publicSentinel,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedRsaParameters());
     }
@@ -373,7 +373,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_RSA, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_RSA, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedEcParameters());
     }
@@ -387,7 +387,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
         using var key = new Pkcs11Key(
             workspace, privateHandle: privateSentinel, publicHandle: publicSentinel,
-            keyType: CKK.CKK_EC, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_EC, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedEcParameters());
     }

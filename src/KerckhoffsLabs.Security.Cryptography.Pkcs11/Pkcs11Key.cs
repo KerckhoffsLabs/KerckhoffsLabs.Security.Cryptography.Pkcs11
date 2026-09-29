@@ -15,9 +15,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <remarks>
 /// <para>
 /// Instances are produced by <see cref="Pkcs11Workspace"/> factory methods
-/// (<c>OpenKey</c>, <c>GenerateKey</c>, <c>ImportKey</c>) or by the static
-/// <c>Open</c> one-shot factories. The <c>internal</c> constructor remains visible to
-/// the test assembly via <c>InternalsVisibleTo</c>.
+/// (<c>OpenKey</c>, <c>GenerateKey</c>, <c>ImportKey</c>). A key never owns its workspace or
+/// library: their lifetimes stay with whoever opened them. The <c>internal</c> constructor
+/// remains visible to the test assembly via <c>InternalsVisibleTo</c>.
 /// </para>
 /// <para>
 /// Asymmetric keys may carry both a private and a public handle (paired automatically
@@ -27,8 +27,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <c>publicHandle == ObjectHandle.Invalid</c>.
 /// </para>
 /// <para>
-/// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper (and any
-/// workspace or library this instance owns); <c>Destroy</c> is the only member that calls
+/// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper only;
+/// <c>Destroy</c> is the only member that calls
 /// <c>C_DestroyObject</c>. The two are kept apart deliberately: whether a handle refers to a
 /// short-lived session object or to a persistent key is decided at creation by <c>CKA_TOKEN</c> —
 /// a runtime template attribute, or the <c>persistOnToken</c> argument of the workspace factories —
@@ -41,8 +41,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public sealed class Pkcs11Key : IDisposable
 {
     private readonly Pkcs11Workspace _workspace;
-    private readonly Pkcs11Library? _ownedLibrary;
-    private readonly bool _ownsWorkspace;
     private readonly ObjectHandle _privateHandle;
     private readonly ObjectHandle _publicHandle;
     private readonly CKK _keyType;
@@ -55,9 +53,7 @@ public sealed class Pkcs11Key : IDisposable
         ObjectHandle publicHandle,
         CKK keyType,
         string? label,
-        byte[] id,
-        Pkcs11Library? ownedLibrary,
-        bool ownsWorkspace)
+        byte[] id)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         if (privateHandle.IsInvalid && publicHandle.IsInvalid)
@@ -71,8 +67,6 @@ public sealed class Pkcs11Key : IDisposable
         _keyType = keyType;
         Label = label;
         _id = id ?? [];
-        _ownedLibrary = ownedLibrary;
-        _ownsWorkspace = ownsWorkspace;
     }
 
     /// <summary>The PKCS#11 key type (e.g. <see cref="CKK.CKK_AES"/>, <see cref="CKK.CKK_RSA"/>).</summary>
@@ -242,7 +236,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <remarks>
     /// This is distinct from <see cref="Dispose"/>: <c>Dispose</c> only releases this wrapper
-    /// (and any workspace/library it owns) and leaves the token object intact, whereas
+    /// and leaves the token object intact, whereas
     /// <c>Destroy</c> erases the key material from the token. The token enforces its own
     /// permissions — destroying a read-only object, or one created with
     /// <c>CKA_DESTROYABLE = false</c>, fails with a <see cref="Exceptions.Pkcs11Exception"/>
@@ -262,123 +256,8 @@ public sealed class Pkcs11Key : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        if (_ownsWorkspace) _workspace.Dispose();
-        _ownedLibrary?.Dispose();
         _disposed = true;
         GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// One-shot factory: loads the PKCS#11 library at <paramref name="libraryPath"/>,
-    /// opens an authenticated workspace, looks up the key by label, and returns it. The
-    /// returned key owns the library and the workspace — disposing it tears down all
-    /// three.
-    /// </summary>
-    /// <param name="libraryPath">Path to the PKCS#11 native library.</param>
-    /// <param name="slotLabel">CKA_LABEL of the slot's token.</param>
-    /// <param name="userType">User type to log in as.</param>
-    /// <param name="pin">The PIN.</param>
-    /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
-    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="libraryPath"/>, <paramref name="slotLabel"/>, <paramref name="pin"/>, or <paramref name="keyLabel"/> is <c>null</c>.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from opening the authenticated workspace (login via <c>C_Login</c>) or from the key lookup (<c>C_FindObjects</c>).</exception>
-    public static Pkcs11Key Open(
-        string libraryPath,
-        string slotLabel,
-        CKU userType,
-        SecurePin pin,
-        string keyLabel,
-        ICryptoPolicy? policy = null)
-    {
-        ArgumentNullException.ThrowIfNull(libraryPath);
-        ArgumentNullException.ThrowIfNull(slotLabel);
-        ArgumentNullException.ThrowIfNull(pin);
-        ArgumentNullException.ThrowIfNull(keyLabel);
-
-        Pkcs11Library? library = null;
-        Pkcs11Workspace? workspace = null;
-        try
-        {
-            library = Pkcs11Library.Load(libraryPath);
-            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin, policy);
-            return OpenKeyInternal(workspace, keyLabel, ownedLibrary: library, ownsWorkspace: true);
-        }
-        catch
-        {
-            workspace?.Dispose();
-            library?.Dispose();
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// One-shot factory taking a pre-loaded library: opens an authenticated workspace,
-    /// looks up the key, and returns it. The returned key owns the workspace but NOT the
-    /// library — the caller continues to own and dispose <paramref name="library"/>.
-    /// </summary>
-    /// <param name="library">A pre-loaded library. Caller retains ownership.</param>
-    /// <param name="slotLabel">CKA_LABEL of the slot's token.</param>
-    /// <param name="userType">User type to log in as.</param>
-    /// <param name="pin">The PIN.</param>
-    /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
-    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="library"/>, <paramref name="slotLabel"/>, <paramref name="pin"/>, or <paramref name="keyLabel"/> is <c>null</c>.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from opening the authenticated workspace (login via <c>C_Login</c>) or from the key lookup (<c>C_FindObjects</c>).</exception>
-    public static Pkcs11Key Open(
-        Pkcs11Library library,
-        string slotLabel,
-        CKU userType,
-        SecurePin pin,
-        string keyLabel,
-        ICryptoPolicy? policy = null)
-    {
-        ArgumentNullException.ThrowIfNull(library);
-        ArgumentNullException.ThrowIfNull(slotLabel);
-        ArgumentNullException.ThrowIfNull(pin);
-        ArgumentNullException.ThrowIfNull(keyLabel);
-
-        Pkcs11Workspace? workspace = null;
-        try
-        {
-            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin, policy);
-            return OpenKeyInternal(workspace, keyLabel, ownedLibrary: null, ownsWorkspace: true);
-        }
-        catch
-        {
-            workspace?.Dispose();
-            throw;
-        }
-    }
-
-    private static Pkcs11Key OpenKeyInternal(
-        Pkcs11Workspace workspace,
-        string keyLabel,
-        Pkcs11Library? ownedLibrary,
-        bool ownsWorkspace)
-    {
-        // Open the key through the workspace, then re-wrap with the ownership flags
-        // appropriate for the one-shot path. We can't rebind a Pkcs11Key in place, so
-        // pull the handles + metadata out of the workspace-owned key, dispose it, and
-        // build a new wrapper with the ownership cascade.
-        using var transient = workspace.OpenKey(keyLabel);
-
-        var label = transient.Label;
-        var idBytes = transient.Id.ToArray();
-        var keyType = transient.KeyType;
-        var privateHandle = transient.PrivateHandle;
-        var publicHandle = transient.PublicHandle;
-
-        return new Pkcs11Key(
-            workspace,
-            privateHandle,
-            publicHandle,
-            keyType,
-            label,
-            idBytes,
-            ownedLibrary,
-            ownsWorkspace);
     }
 
     /// <summary>

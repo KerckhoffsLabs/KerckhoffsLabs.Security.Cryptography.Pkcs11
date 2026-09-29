@@ -23,9 +23,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
                 publicHandle: ObjectHandle.Invalid,
                 keyType: CKK.CKK_AES,
                 label: null,
-                id: [],
-                ownedLibrary: null,
-                ownsWorkspace: false));
+                id: []));
     }
 
     [Fact]
@@ -40,9 +38,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
                 publicHandle: ObjectHandle.Invalid,
                 keyType: CKK.CKK_AES,
                 label: null,
-                id: [],
-                ownedLibrary: null,
-                ownsWorkspace: false));
+                id: []));
     }
 
     [Fact]
@@ -57,9 +53,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
             publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA,
             label: "my-key",
-            id: id,
-            ownedLibrary: null,
-            ownsWorkspace: false);
+            id: id);
 
         Assert.Equal(CKK.CKK_RSA, key.KeyType);
         Assert.Equal("my-key", key.Label);
@@ -79,9 +73,7 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
             publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES,
             label: null,
-            id: [],
-            ownedLibrary: null,
-            ownsWorkspace: false);
+            id: []);
 
         key.Dispose();
         // Re-dispose is a no-op.
@@ -91,41 +83,5 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
         // Just check that workspace.GenerateRandom doesn't throw — sanity check.
         byte[] bytes = workspace.GenerateRandom(8);
         Assert.Equal(8, bytes.Length);
-    }
-
-    [Fact]
-    public void Open_PathBased_NullPath_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            Pkcs11Key.Open(
-                libraryPath: null!,
-                slotLabel: "x",
-                userType: CKU.CKU_USER,
-                pin: new SecurePin("12345"u8),
-                keyLabel: "x"));
-    }
-
-    [Fact]
-    public void Open_PathBased_NullKeyLabel_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            Pkcs11Key.Open(
-                libraryPath: "x",
-                slotLabel: "x",
-                userType: CKU.CKU_USER,
-                pin: new SecurePin("12345"u8),
-                keyLabel: null!));
-    }
-
-    [Fact]
-    public void Open_LibraryBased_NullLibrary_Throws()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            Pkcs11Key.Open(
-                library: null!,
-                slotLabel: "x",
-                userType: CKU.CKU_USER,
-                pin: new SecurePin("12345"u8),
-                keyLabel: "x"));
     }
 }

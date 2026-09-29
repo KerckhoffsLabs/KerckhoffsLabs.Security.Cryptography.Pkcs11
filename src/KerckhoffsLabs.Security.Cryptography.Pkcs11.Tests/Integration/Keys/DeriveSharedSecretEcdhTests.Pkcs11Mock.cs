@@ -24,7 +24,7 @@ public sealed class DeriveSharedSecretEcdhTests_Mock(MockBackendFixture backend)
 
     private static Pkcs11Key DummyEcKey(Pkcs11Workspace workspace) =>
         new(workspace, privateHandle: new ObjectHandle(1), publicHandle: ObjectHandle.Invalid,
-            keyType: CKK.CKK_EC, label: null, id: [], ownedLibrary: null, ownsWorkspace: false);
+            keyType: CKK.CKK_EC, label: null, id: []);
 
     [Fact]
     public void CkdNull_GatedByDefault_Throws()
