@@ -55,7 +55,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
             Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
 
         using var workspace = OpenWorkspace(backend);
-        if (allowExtraction) workspace.AllowInsecure = true;
+        using IDisposable? insecure = allowExtraction ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         string label = $"ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -184,7 +184,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
 
     internal static void Assert_ExportParameters_Private_ThrowsInsecure(IPkcs11Backend backend) =>
         WithEcdh(backend, alice =>
-            Assert.Throws<InsecureOperationException>(() => alice.ExportParameters(includePrivateParameters: true)));
+            Assert.Throws<CryptoPolicyViolationException>(() => alice.ExportParameters(includePrivateParameters: true)));
 
     internal static void Assert_ImportParameters_NotSupported(IPkcs11Backend backend) =>
         WithEcdh(backend, alice =>

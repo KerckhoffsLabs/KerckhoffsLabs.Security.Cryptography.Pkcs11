@@ -28,7 +28,8 @@
       {
         "files": [
           "*.md",
-          "toc.yml"
+          "toc.yml",
+          "policies/*.md"
         ]
       }
     ],

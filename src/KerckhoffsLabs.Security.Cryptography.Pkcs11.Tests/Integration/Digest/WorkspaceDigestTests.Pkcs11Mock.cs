@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -21,7 +21,7 @@ public sealed class WorkspaceDigestTests(MockBackendFixture backend)
     private readonly MockBackendFixture _backend = backend;
 
     [Fact]
-    public void Digest_Sha1_ThrowsInsecureOperationException()
+    public void Digest_Sha1_ThrowsCryptoPolicyViolationException()
     {
         using var workspace = _backend.Library.OpenWorkspaceWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
@@ -29,9 +29,9 @@ public sealed class WorkspaceDigestTests(MockBackendFixture backend)
         var mechanism = new Mechanism(CKM.CKM_SHA_1);
         byte[] data = Encoding.UTF8.GetBytes("hello");
 
-        // InsecureOperationException fires in managed code before C_DigestInit,
+        // CryptoPolicyViolationException fires in managed code before C_DigestInit,
         // which proves workspace.Digest delegates correctly to _session.Digest.
-        Assert.Throws<InsecureOperationException>(() =>
+        Assert.Throws<CryptoPolicyViolationException>(() =>
             workspace.Digest(mechanism, data));
     }
 

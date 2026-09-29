@@ -102,8 +102,9 @@ public sealed class Pkcs11Slot
     /// <remarks>
     /// Every mechanism the token reports is returned, including vendor-defined ones
     /// (<c>≥ CKM_VENDOR_DEFINED = 0x80000000</c>) and any standard mechanism newer than this enum.
-    /// Nothing is filtered: the interop layer casts each value without validating it, precisely so
-    /// those survive. Such an entry is a <see cref="CKM"/> value with no declared member, so it
+    /// They are not filtered: the interop layer casts each value without validating it, precisely so
+    /// those survive. The one exception is a value wider than 32 bits (legal where <c>CK_ULONG</c> is
+    /// 64 bits), which <see cref="CKM"/> cannot hold and which is therefore left out of this list. Such an entry is a <see cref="CKM"/> value with no declared member, so it
     /// compares and round-trips correctly but has no name — <c>ToString()</c> renders the number, and
     /// <c>Enum.IsDefined</c> is what distinguishes it. Pass one to <see cref="Mechanism"/>'s
     /// <c>ulong</c> constructors to use it.
@@ -231,8 +232,10 @@ public sealed class Pkcs11Slot
     /// (<c>CKF_SERIAL_SESSION | CKF_RW_SESSION</c>). When <c>false</c>, opens a
     /// read-only session — token-object creation will fail per PKCS#11 spec.
     /// </param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>The opened session.</returns>
-    internal Pkcs11Session OpenSession(bool readWrite = true)
+    internal Pkcs11Session OpenSession(bool readWrite = true, ICryptoPolicy? policy = null)
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "OpenSession");
 
@@ -246,9 +249,9 @@ public sealed class Pkcs11Slot
 
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation(
-                "Opened {SessionType} session {SessionId} with token in slot {SlotId}",
-                readWrite ? "read-write" : "read-only", sessionId, _slotId);
+                "Opened {SessionType} session {SessionId} with token in slot {SlotId} under {PolicyName} policy",
+                readWrite ? "read-write" : "read-only", sessionId, _slotId, (policy ?? CryptoPolicy.SecureOnly).Name);
 
-        return new Pkcs11Session(_pkcs11Library, (ulong)sessionId, _loggerFactory);
+        return new Pkcs11Session(_pkcs11Library, (ulong)sessionId, _loggerFactory, policy);
     }
 }

@@ -103,15 +103,15 @@ internal static class DESPkcs11TestCases
 
     internal static void Assert_EncryptCbc_Pkcs7_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedDes(backend, (_, des) =>
-            Assert.Throws<InsecureOperationException>(() => des.EncryptCbc(new byte[8], Iv8)));
+            Assert.Throws<CryptoPolicyViolationException>(() => des.EncryptCbc(new byte[8], Iv8)));
 
     internal static void Assert_EncryptCbc_NonePadding_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedDes(backend, (_, des) =>
-            Assert.Throws<InsecureOperationException>(() => des.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
+            Assert.Throws<CryptoPolicyViolationException>(() => des.EncryptCbc(new byte[8], Iv8, PaddingMode.None)));
 
     internal static void Assert_EncryptEcb_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedDes(backend, (_, des) =>
-            Assert.Throws<InsecureOperationException>(() => des.EncryptEcb(new byte[8], PaddingMode.None)));
+            Assert.Throws<CryptoPolicyViolationException>(() => des.EncryptEcb(new byte[8], PaddingMode.None)));
 
     // === Known-answer round-trips vs the BCL (require token single-DES support) =====================
 
@@ -120,7 +120,7 @@ internal static class DESPkcs11TestCases
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("DES-CBC PKCS7 over a token key — variable length.");
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclDes();
             byte[] ct = OrSkipIfTokenLacksDes(() => des.EncryptCbc(plaintext, Iv8)); // default PaddingMode.PKCS7
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv8), ct);
@@ -133,7 +133,7 @@ internal static class DESPkcs11TestCases
             byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
             RandomNumberGenerator.Fill(plaintext);
 
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclDes();
             byte[] ct = OrSkipIfTokenLacksDes(() => des.EncryptCbc(plaintext, Iv8, PaddingMode.None));
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None), ct);
@@ -143,7 +143,7 @@ internal static class DESPkcs11TestCases
     internal static void Assert_EncryptEcb_AllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedDes(backend, (workspace, des) =>
         {
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] plaintext = new byte[8];
             RandomNumberGenerator.Fill(plaintext);
             using var bcl = BclDes();
@@ -163,9 +163,9 @@ internal static class DESPkcs11TestCases
         WithImportedDes(backend, (workspace, des) =>
         {
             // DESPkcs11 does not override the CFB cores: the secure-defaults gate does not cover single-DES
-            // CKM_DES_CFB*, so wiring it would bypass AllowInsecure. The base SymmetricAlgorithm surfaces
-            // NotSupportedException — even with AllowInsecure set.
-            workspace.AllowInsecure = true;
+            // CKM_DES_CFB*, so wiring it would bypass the AllowInsecure policy. The base SymmetricAlgorithm surfaces
+            // NotSupportedException — even under the AllowInsecure policy.
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Throws<NotSupportedException>(
                 () => des.EncryptCfb(new byte[8], Iv8, PaddingMode.None, feedbackSizeInBits: 8));
         });
@@ -180,12 +180,12 @@ internal static class DESPkcs11TestCases
     internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
         WithImportedDes(backend, (workspace, des) =>
         {
-            // The empty-input fast path honors the gate: without AllowInsecure the gated mechanism throws
+            // The empty-input fast path honors the gate: without the AllowInsecure policy the gated mechanism throws
             // before the (empty) buffer reaches the token (so no single-DES support is needed).
-            Assert.Throws<InsecureOperationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
+            Assert.Throws<CryptoPolicyViolationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
 
-            // With AllowInsecure, empty input is a no-op returned without touching the token.
-            workspace.AllowInsecure = true;
+            // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
         });
 

@@ -11,6 +11,6 @@ internal static class ManagedToken
 {
     public static Pkcs11Library NewLibrary() => new(new ManagedSoftToken());
 
-    public static Pkcs11Workspace OpenWorkspace(Pkcs11Library library) =>
-        library.OpenWorkspaceWithPin(ManagedSoftToken.TokenLabel, CKU.CKU_USER, new SecurePin("1234"));
+    public static Pkcs11Workspace OpenWorkspace(Pkcs11Library library, ICryptoPolicy? policy = null) =>
+        library.OpenWorkspaceWithPin(ManagedSoftToken.TokenLabel, CKU.CKU_USER, new SecurePin("1234"), policy);
 }

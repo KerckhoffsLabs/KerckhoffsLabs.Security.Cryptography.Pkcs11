@@ -105,7 +105,7 @@ internal static class KeyCapabilityEnforcementTestCases
     {
         backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD);
         var session = TestKeys.OpenLoggedInSession(backend);
-        session.AllowInsecure = true;
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
             byte[] rawKey = new byte[32];
@@ -128,7 +128,7 @@ internal static class KeyCapabilityEnforcementTestCases
     {
         backend.RequireMechanisms(CKM.CKM_AES_CBC_PAD);
         var session = TestKeys.OpenLoggedInSession(backend);
-        session.AllowInsecure = true;
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
             byte[] rawKey = new byte[32];

@@ -68,15 +68,16 @@ internal sealed partial class LowLevelPkcs11Library
             return _delegates.C_GetMechanismList(slotId, null, ref count).ToCKR();
 
         NativeCULong[] CULongList = new NativeCULong[mechanismList.Length];
-        NativeCULong rv = _delegates.C_GetMechanismList(slotId, CULongList, ref count);
+        CKR rv = _delegates.C_GetMechanismList(slotId, CULongList, ref count).ToCKR();
 
-        for (int i = 0; i < mechanismList.Length; i++)
-            // Deliberately an unvalidated cast, not ToCKM(): a token may report vendor-defined
-            // mechanisms (>= CKM_VENDOR_DEFINED) that are not declared CKM members, and the
-            // validating conversion would throw mid-enumeration.
-            mechanismList[i] = (CKM)(ulong)CULongList[i];
+        // Vendor-defined and not-yet-named mechanisms survive as unnamed CKM values; a value too wide
+        // for CKM (possible where CK_ULONG is 64 bits) is left out, and count then reports only the
+        // entries actually handed back.
+        int kept = MechanismList.CopyRepresentable(CULongList, (ulong)count, mechanismList);
+        if (rv == CKR.CKR_OK)
+            count = (NativeCULong)(ulong)kept;
 
-        return rv.ToCKR();
+        return rv;
     }
 
     /// <summary>

@@ -5,6 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
+// The IKE PRFs are documented refusals under SecureOnly (protocol-specific; opt in after review), so every
+// case here opts in with UsePolicy(CryptoPolicy.AllowInsecure) and the analyzer warning is expected.
+#pragma warning disable KLPKCS11009
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Derive;
 
 /// <summary>
@@ -87,9 +91,9 @@ internal static class IkeDeriveTestCases
         return value;
     }
 
-    // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
-    // triggers the AllowInsecure gate) and immediately signs ProbeMessage with it, never reading
-    // CKA_VALUE at all.
+    // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — nothing the
+    // key-template rule refuses) and immediately signs ProbeMessage with it, never reading CKA_VALUE at
+    // all. The IKE mechanism itself still needs the caller's AllowInsecure lease.
     private static byte[] DeriveAndProbe(Pkcs11Key baseKey, Mechanism mechanism, int outputLength)
     {
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
@@ -109,8 +113,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
-        // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
-        workspace.AllowInsecure = true;
+        // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
         byte[] nr = RandomNumberGenerator.GetBytes(16);
@@ -139,8 +143,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
-        // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
-        workspace.AllowInsecure = true;
+        // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] gxy = RandomNumberGenerator.GetBytes(24);
         byte[] ckyI = RandomNumberGenerator.GetBytes(8);
@@ -176,8 +180,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
-        // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
-        workspace.AllowInsecure = true;
+        // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] extraData = RandomNumberGenerator.GetBytes(20);
 
@@ -208,8 +212,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
         using var workspace = backend.OpenWorkspace();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
-        // cross-check itself, so AllowInsecure is required — same reasoning as HkdfTestCases.
-        workspace.AllowInsecure = true;
+        // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] seedData = RandomNumberGenerator.GetBytes(24);
         const int outputLength = Sha256Size + 16; // between one and two PRF blocks: exercises truncation
@@ -243,6 +247,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
+        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
         byte[] nr = RandomNumberGenerator.GetBytes(16);
@@ -269,6 +275,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
+        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] gxy = RandomNumberGenerator.GetBytes(24);
         byte[] ckyI = RandomNumberGenerator.GetBytes(8);
@@ -304,6 +312,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
+        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] extraData = RandomNumberGenerator.GetBytes(20);
 
@@ -331,6 +341,8 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
+        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] seedData = RandomNumberGenerator.GetBytes(24);
         const int outputLength = Sha256Size + 16;
@@ -366,6 +378,8 @@ internal static class IkeDeriveTestCases
     {
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         using var workspace = backend.OpenWorkspace();
+        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
         byte[] nr = RandomNumberGenerator.GetBytes(16);

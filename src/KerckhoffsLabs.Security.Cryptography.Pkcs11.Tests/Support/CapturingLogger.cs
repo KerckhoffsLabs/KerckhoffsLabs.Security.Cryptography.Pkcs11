@@ -39,14 +39,22 @@ internal sealed class CapturingLogger : ILogger
         => _entries.Enqueue(new Entry(logLevel, eventId, formatter(state, exception)));
 }
 
-/// <summary>Test <see cref="ILoggerFactory"/> that always returns <paramref name="logger"/> and records the last category.</summary>
+/// <summary>Test <see cref="ILoggerFactory"/> that always returns <paramref name="logger"/> and records every category it is asked for.</summary>
+/// <remarks>
+/// Records all categories rather than the last one: once installed through
+/// <c>Pkcs11Logging.SetLoggerFactory</c> the factory is process-wide, so library objects built by tests
+/// running in parallel ask it for their own categories too. A single "last category" slot could be
+/// overwritten between a test's call and its assertion; a test should check that its category is present.
+/// </remarks>
 internal sealed class CapturingLoggerFactory(ILogger logger) : ILoggerFactory
 {
-    public string? LastCategory { get; private set; }
+    private readonly ConcurrentQueue<string> _categories = new();
+
+    public IReadOnlyCollection<string> Categories => [.. _categories];
 
     public ILogger CreateLogger(string categoryName)
     {
-        LastCategory = categoryName;
+        _categories.Enqueue(categoryName);
         return logger;
     }
 

@@ -208,7 +208,7 @@ internal static class KnownAnswerTestCases
             {
                 var oaep = new CkmRsaPkcsOaepParams(CKM.CKM_SHA_1, CKG.CKG_MGF1_SHA1);
                 var mech = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, oaep);
-                using var insecure = session.AllowInsecureScope();
+                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
                 Assert.Equal(expectedPt, session.Decrypt(mech, priv, ct));
             }
             finally { session.DestroyObject(priv); }
@@ -303,7 +303,7 @@ internal static class KnownAnswerTestCases
                 // Deliberately derives an ephemeral extractable secret to read CKA_VALUE for the KAT,
                 // then destroys it — the same thing the library's ECDH helper does. Extraction is
                 // opted into here rather than bypassed: there is no longer a way to skip the gate.
-                using var insecure = session.AllowInsecureScope();
+                using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
                 ObjectHandle derived = session.DeriveKey(mech, priv, [dc, dt, dvl, dtok, dext, dsens]);
                 try
                 {

@@ -116,6 +116,9 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// </summary>
     internal IReadOnlyList<ulong> RawAdditionalDerivedKeyHandles => [.. _derivedHandles];
 
+    /// <summary>The PRF underlying this derivation, for policy evaluation.</summary>
+    internal CKM PrfType => _prfType;
+
     /// <summary>
     /// Turns the raw handles <see cref="AbsorbOutput"/> collected into <see cref="Pkcs11Key"/>
     /// instances, populating <see cref="AdditionalDerivedKeys"/>. Called by

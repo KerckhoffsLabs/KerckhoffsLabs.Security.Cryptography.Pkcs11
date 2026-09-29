@@ -9,7 +9,7 @@ public sealed class DecryptAesTests_OpenCryptoki(OpenCryptokiBackendFixture back
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault() => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault() => DecryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue() => DecryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);

@@ -15,7 +15,7 @@ public sealed class EncryptAesTests_Nss(NssBackendFixture backend)
     public void AesCbcPad_RoundTrips() => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault() => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault() => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void AesEcb_AllowedWhenAllowInsecureTrue() => EncryptAesTestCases.Assert_AesEcb_AllowedWithOptIn(_backend);

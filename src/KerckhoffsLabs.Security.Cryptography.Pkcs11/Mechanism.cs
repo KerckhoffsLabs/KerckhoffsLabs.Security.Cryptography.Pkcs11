@@ -156,7 +156,11 @@ public sealed class Mechanism
     /// This departs from the usual <c>Try</c> convention on purpose: <c>default(CKM)</c> is
     /// <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c>, a real mechanism, so defaulting on failure would hand a
     /// caller who ignored the result a plausible but entirely different mechanism. Returning the true
-    /// value costs nothing and cannot mislead.
+    /// value costs nothing and cannot mislead. The one value it cannot carry is a vendor mechanism
+    /// wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits), which <see cref="CKM"/> cannot
+    /// hold: that receives <see cref="CKM.CKM_VENDOR_DEFINED"/> — the vendor marker, never a truncated
+    /// value that would name some other mechanism — and the method returns <see langword="false"/>.
+    /// Read <see cref="Type"/> for the exact value.
     /// </param>
     /// <returns>
     /// <see langword="true"/> if <see cref="CKM"/> declares a member with this value; otherwise
@@ -164,7 +168,13 @@ public sealed class Mechanism
     /// </returns>
     public bool TryGetMechanism(out CKM mechanism)
     {
-        mechanism = _type.ToCKM();
+        if (Type > uint.MaxValue)
+        {
+            mechanism = CKM.CKM_VENDOR_DEFINED;
+            return false;
+        }
+
+        mechanism = (CKM)Type;
         return Enum.IsDefined(mechanism);
     }
 

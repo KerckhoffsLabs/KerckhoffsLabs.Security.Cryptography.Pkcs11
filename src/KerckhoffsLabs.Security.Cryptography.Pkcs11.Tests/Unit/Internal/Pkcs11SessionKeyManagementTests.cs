@@ -2,6 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
@@ -42,6 +43,10 @@ public sealed class Pkcs11SessionKeyManagementTests
 
         public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         { key = (NativeCULong)DerivedId; return DeriveRv; }
+
+        // The session reads the base key's type before an ECDH derivation.
+        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+            => KeyTypeAttribute.Answer(template, CKK.CKK_EC);
     }
 
     private static Pkcs11Session NewSession(KeyFake fake) => new(fake, SessionId);
@@ -120,7 +125,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void DeriveKey_Ok_ReturnsHandle()
     {
         var s = NewSession(new KeyFake { DerivedId = 0x55 });
-        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
+        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, [0x04, 0x01, 0x04]));
         Assert.Equal(0x55UL, s.DeriveKey(mech, new ObjectHandle(1), []).ObjectId);
     }
 
@@ -128,7 +133,7 @@ public sealed class Pkcs11SessionKeyManagementTests
     public void DeriveKey_Error_Throws()
     {
         var s = NewSession(new KeyFake { DeriveRv = CKR.CKR_MECHANISM_INVALID });
-        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE);
+        var mech = new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, [0x04, 0x01, 0x04]));
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DeriveKey(mech, new ObjectHandle(1), []));
     }
 }

@@ -86,7 +86,7 @@ public sealed class DSAPkcs11Tests_Managed
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes($"dsa round trip over {hashName}");
         // DSA is FIPS-186-5-disallowed and gated at the mechanism layer; opt in to exercise it.
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = dsa.SignData(data, hash);
             Assert.True(dsa.VerifyData(data, sig, hash));
@@ -127,7 +127,7 @@ public sealed class DSAPkcs11Tests_Managed
         byte[] data = Encoding.UTF8.GetBytes($"span-based dsa round trip over {hashName}");
         Span<byte> destination = new byte[256];
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             Assert.True(dsa.TrySignData(data, destination, hash, out int bytesWritten));
             byte[] sig = destination[..bytesWritten].ToArray();
@@ -148,7 +148,7 @@ public sealed class DSAPkcs11Tests_Managed
     public void TrySignData_DestinationTooSmall_ReturnsFalse() => WithDsa((dsa, _, workspace) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("destination too small");
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             bool ok = dsa.TrySignData(data, [], HashAlgorithmName.SHA256, out int bytesWritten);
             Assert.False(ok);
@@ -163,7 +163,7 @@ public sealed class DSAPkcs11Tests_Managed
     public void TrySignData_Sha224_ThrowsNotSupported_ViaManagedFallbackHasher() => WithDsa((dsa, _, workspace) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("sha224 is not in HashData's switch");
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             var ex = Assert.Throws<NotSupportedException>(
                 () => dsa.TrySignData(data, new byte[256], new HashAlgorithmName("SHA224"), out int unused));
@@ -172,16 +172,16 @@ public sealed class DSAPkcs11Tests_Managed
     });
 
     // === Secure-defaults gate: DSA is insecure as an algorithm, so every sign/verify is refused =====
-    // unless AllowInsecure (GuardMechanism gates all CKM_DSA* — raw and combined, every hash).
+    // unless the session's crypto policy permits it (the check gates all CKM_DSA* — raw and combined, every hash).
 
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void SignData_GatedByDefault_Throws() => WithDsa((dsa, _) =>
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => dsa.SignData(Encoding.UTF8.GetBytes("x"), HashAlgorithmName.SHA256)));
 
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void CreateSignature_GatedByDefault_Throws() => WithDsa((dsa, _) =>
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => dsa.CreateSignature(SHA256.HashData("x"u8.ToArray()))));
 
     // === BCL cross-check: token signature verifies under the exported public key ==========
@@ -195,7 +195,7 @@ public sealed class DSAPkcs11Tests_Managed
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes("interop with the BCL");
         byte[] sig;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = dsa.SignData(data, hash);
 
         // Export the token's public parameters and verify the token signature with the BCL.
@@ -211,7 +211,7 @@ public sealed class DSAPkcs11Tests_Managed
     {
         byte[] data = Encoding.UTF8.GetBytes("signed by the BCL, verified on the token");
         byte[] sig = bcl.SignData(data, HashAlgorithmName.SHA256);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
     });
 
@@ -221,7 +221,7 @@ public sealed class DSAPkcs11Tests_Managed
     public void CreateSignature_VerifySignature_OverHash_RoundTrips() => WithDsa((dsa, _, workspace) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("hash to sign"));
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = dsa.CreateSignature(hash);
             Assert.True(dsa.VerifySignature(hash, sig));
@@ -242,7 +242,7 @@ public sealed class DSAPkcs11Tests_Managed
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("raw hash interop"));
         byte[] sig;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = dsa.CreateSignature(hash);
 
         DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
@@ -271,7 +271,7 @@ public sealed class DSAPkcs11Tests_Managed
 
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void ExportParameters_Private_ThrowsInsecure() => WithDsa((dsa, _) =>
-        Assert.Throws<InsecureOperationException>(() => dsa.ExportParameters(includePrivateParameters: true)));
+        Assert.Throws<CryptoPolicyViolationException>(() => dsa.ExportParameters(includePrivateParameters: true)));
 
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
     public void ImportParameters_NotSupported() => WithDsa((dsa, bcl) =>

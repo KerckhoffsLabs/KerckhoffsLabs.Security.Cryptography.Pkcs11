@@ -46,13 +46,13 @@ internal static class HkdfTestCases
     }
 
     // Imports Ikm as a derive-capable generic-secret base key and hands it (plus the open workspace)
-    // to the body. AllowInsecure is required because the cross-check needs to read the derived
+    // to the body. the AllowInsecure policy is required because the cross-check needs to read the derived
     // key's raw value back off the token.
     private static void WithImportedIkm(IPkcs11Backend backend, Action<Pkcs11Workspace, Pkcs11Key> body)
     {
         backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
         using var workspace = OpenWorkspace(backend);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"hkdf-ikm-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(Ikm).Derive().OnToken(backend.SupportsTokenObjects).Build();
@@ -78,7 +78,7 @@ internal static class HkdfTestCases
     }
 
     // Derives a non-extractable CKA_SIGN key (no CKA_EXTRACTABLE, default CKA_SENSITIVE — never
-    // needs AllowInsecure) and immediately signs ProbeMessage with it, never reading CKA_VALUE.
+    // needs the AllowInsecure policy) and immediately signs ProbeMessage with it, never reading CKA_VALUE.
     private static byte[] DeriveAndProbe(Pkcs11Key baseKey, Mechanism mechanism, int outputLength)
     {
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)

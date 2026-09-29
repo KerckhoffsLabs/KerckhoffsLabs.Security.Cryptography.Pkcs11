@@ -32,24 +32,24 @@ public sealed class DeriveSharedSecretEcdhTests_Mock(MockBackendFixture backend)
         using var workspace = OpenWorkspace();
         using var key = DummyEcKey(workspace);
 
-        var ex = Assert.Throws<InsecureOperationException>(
+        var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => workspace.DeriveSharedSecretEcdh(key, new byte[4], kdf: CKD.CKD_NULL));
         Assert.Equal(CKM.CKM_ECDH1_DERIVE, ex.Mechanism);
     }
 
     [Fact]
-    public void CkdNull_AllowInsecureScope_BypassesGate()
+    public void CkdNull_UsePolicyAllowInsecure_BypassesGate()
     {
         using var workspace = OpenWorkspace();
         using var key = DummyEcKey(workspace);
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             // The gate is bypassed; the call reaches CkmEcdh1DeriveParams / the native derive, which
             // fails on the dummy handle and malformed peer point — the point is it is NOT the gate.
             Exception? ex = Record.Exception(
                 () => workspace.DeriveSharedSecretEcdh(key, new byte[4], kdf: CKD.CKD_NULL));
-            Assert.False(ex is InsecureOperationException, "AllowInsecure should bypass the CKD_NULL gate.");
+            Assert.False(ex is CryptoPolicyViolationException, "The AllowInsecure policy should bypass the CKD_NULL gate.");
         }
     }
 
@@ -59,8 +59,8 @@ public sealed class DeriveSharedSecretEcdhTests_Mock(MockBackendFixture backend)
         using var workspace = OpenWorkspace();
         using var key = DummyEcKey(workspace);
 
-        // Default CKD_SHA256_KDF must never trip the CKD_NULL gate, regardless of AllowInsecure.
+        // Default CKD_SHA256_KDF must never trip the CKD_NULL gate, regardless of the crypto policy.
         Exception? ex = Record.Exception(() => workspace.DeriveSharedSecretEcdh(key, new byte[4]));
-        Assert.False(ex is InsecureOperationException, "The default KDF must not trigger the CKD_NULL gate.");
+        Assert.False(ex is CryptoPolicyViolationException, "The default KDF must not trigger the CKD_NULL gate.");
     }
 }

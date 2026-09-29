@@ -85,12 +85,6 @@ public sealed class Pkcs11Key : IDisposable
     public ReadOnlySpan<byte> Id => _id;
 
     /// <summary>
-    /// Returns the workspace's <see cref="Pkcs11Workspace.AllowInsecure"/> flag. Convenience accessor
-    /// so consumers don't need a direct workspace reference to check the policy.
-    /// </summary>
-    public bool AllowInsecure => _workspace.AllowInsecure;
-
-    /// <summary>
     /// Returns <c>true</c> when the token backing this key advertises support for the given
     /// mechanism. Convenience for adapter logic that picks between a combined-hash mechanism and a
     /// hash-then-sign fallback. The answer is probed from the token once and cached on the session.
@@ -104,6 +98,14 @@ public sealed class Pkcs11Key : IDisposable
     /// cached, since a cached capability describes a session that no longer exists.
     /// </exception>
     public bool SupportsMechanism(CKM mechanism) => _workspace.Session.SupportsMechanism(mechanism);
+
+    /// <summary>
+    /// <see cref="SupportsMechanism(CKM)"/> for a <see cref="Mechanism"/>, without casting its type to
+    /// <see cref="CKM"/>: a value wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits) cannot be
+    /// in the enum-typed mechanism list, so it is reported as unsupported rather than overflowing.
+    /// </summary>
+    internal bool SupportsMechanism(Mechanism mechanism) =>
+        mechanism.Type <= uint.MaxValue && SupportsMechanism((CKM)mechanism.Type);
 
     /// <summary>
     /// Reads the requested attribute values from this key. Uses the public-key handle for
@@ -216,6 +218,8 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="userType">User type to log in as.</param>
     /// <param name="pin">The PIN.</param>
     /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
+    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="libraryPath"/>, <paramref name="slotLabel"/>, <paramref name="pin"/>, or <paramref name="keyLabel"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from opening the authenticated workspace (login via <c>C_Login</c>) or from the key lookup (<c>C_FindObjects</c>).</exception>
     public static Pkcs11Key Open(
@@ -223,7 +227,8 @@ public sealed class Pkcs11Key : IDisposable
         string slotLabel,
         CKU userType,
         SecurePin pin,
-        string keyLabel)
+        string keyLabel,
+        ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(libraryPath);
         ArgumentNullException.ThrowIfNull(slotLabel);
@@ -235,7 +240,7 @@ public sealed class Pkcs11Key : IDisposable
         try
         {
             library = Pkcs11Library.Load(libraryPath);
-            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin);
+            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin, policy);
             return OpenKeyInternal(workspace, keyLabel, ownedLibrary: library, ownsWorkspace: true);
         }
         catch
@@ -256,6 +261,8 @@ public sealed class Pkcs11Key : IDisposable
     /// <param name="userType">User type to log in as.</param>
     /// <param name="pin">The PIN.</param>
     /// <param name="keyLabel">CKA_LABEL of the key to open.</param>
+    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="library"/>, <paramref name="slotLabel"/>, <paramref name="pin"/>, or <paramref name="keyLabel"/> is <c>null</c>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from opening the authenticated workspace (login via <c>C_Login</c>) or from the key lookup (<c>C_FindObjects</c>).</exception>
     public static Pkcs11Key Open(
@@ -263,7 +270,8 @@ public sealed class Pkcs11Key : IDisposable
         string slotLabel,
         CKU userType,
         SecurePin pin,
-        string keyLabel)
+        string keyLabel,
+        ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(slotLabel);
@@ -273,7 +281,7 @@ public sealed class Pkcs11Key : IDisposable
         Pkcs11Workspace? workspace = null;
         try
         {
-            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin);
+            workspace = library.OpenWorkspaceWithPin(slotLabel, userType, pin, policy);
             return OpenKeyInternal(workspace, keyLabel, ownedLibrary: null, ownsWorkspace: true);
         }
         catch
@@ -321,7 +329,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>The signature bytes.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Sign</c> call.</exception>
     public byte[] Sign(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
@@ -344,7 +352,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns><c>true</c> if the signature is valid, <c>false</c> if not.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="NotSupportedException">Thrown when the managed verification fallback is taken (no public handle on the token) and <paramref name="mechanism"/> has no managed RSA/ECDSA equivalent.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
@@ -359,7 +367,11 @@ public sealed class Pkcs11Key : IDisposable
             return isValid;
         }
 
-        // Fall back to managed verify via synthesized public parameters.
+        // Fall back to managed verify via synthesized public parameters. No session call happens on this
+        // path, so the workspace policy is consulted here — the same verdict the token path gets from
+        // the session's own check.
+        _workspace.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+
         if (_keyType == CKK.CKK_RSA)
         {
             var rsaParams = GetSynthesizedRsaParameters();
@@ -384,7 +396,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public byte[] Encrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext)
     {
@@ -408,7 +420,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
     {
@@ -449,7 +461,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>Ciphertext (tag is in <paramref name="messageParams"/>).</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="messageParams"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_EncryptMessage</c> call.</exception>
     public byte[] MessageEncrypt(
         Mechanism mechanism,
@@ -475,7 +487,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="messageParams"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DecryptMessage</c> call — notably <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> when authentication fails.</exception>
     public byte[] MessageDecrypt(
         Mechanism mechanism,
@@ -503,7 +515,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>The wrapped key bytes — opaque blob to be transported / stored.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="targetKey"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the <see cref="AllowInsecure"/> flag is not set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's wrapping handle or <paramref name="targetKey"/>'s handle is unavailable; otherwise propagated from the underlying <c>C_WrapKey</c> call.</exception>
     public byte[] Wrap(Mechanism mechanism, Pkcs11Key targetKey)
     {
@@ -535,7 +547,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the unwrapped object.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
@@ -571,7 +583,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="sharedSecretTemplate"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable, or <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> from the underlying <c>C_EncapsulateKey</c> call on pre-v3.2 libraries.</exception>
     public EncapsulationResult EncapsulateKey(
         Mechanism mechanism,
@@ -598,7 +610,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>An on-token <see cref="Pkcs11Key"/> wrapping the recovered shared secret.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="sharedSecretTemplate"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no private handle is reachable, or <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> from the underlying <c>C_DecapsulateKey</c> call on pre-v3.2 libraries.</exception>
     public Pkcs11Key DecapsulateKey(
         Mechanism mechanism,
@@ -621,13 +633,13 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires opting in via the workspace's <c>AllowInsecure</c> gate. Symmetric
+    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
     /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
     /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="InsecureOperationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the <see cref="AllowInsecure"/> flag is set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
         => DeriveCore(mechanism, template);
@@ -684,7 +696,7 @@ public sealed class Pkcs11Key : IDisposable
 
         // Raw CKM_ECDSA signs a pre-computed digest, so the input IS the hash — verify it directly.
         // The token emits an IEEE P1363 (r‖s) signature, which is ECDsa.VerifyHash's default format.
-        if ((CKM)mechanism.Type == CKM.CKM_ECDSA)
+        if (mechanism.Type == (ulong)CKM.CKM_ECDSA)
             return ec.VerifyHash(data, signature);
 
         var hashName = MapEcdsaMechanism(mechanism);
@@ -692,18 +704,18 @@ public sealed class Pkcs11Key : IDisposable
     }
 
     private static (System.Security.Cryptography.HashAlgorithmName, System.Security.Cryptography.RSASignaturePadding)
-        MapRsaSignMechanism(Mechanism mechanism) => (CKM)mechanism.Type switch
+        MapRsaSignMechanism(Mechanism mechanism) => mechanism.Type switch
         {
-            CKM.CKM_SHA1_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
-            CKM.CKM_SHA256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
-            CKM.CKM_SHA384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
-            CKM.CKM_SHA512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            (ulong)CKM.CKM_SHA1_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            (ulong)CKM.CKM_SHA256_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            (ulong)CKM.CKM_SHA384_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
+            (ulong)CKM.CKM_SHA512_RSA_PKCS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pkcs1),
             // PSS: RSASignaturePadding.Pss uses a digest-length salt, matching the salt the
             // RSA-PSS sign path (Pkcs11MechanismMap.RsaPssSign) defaults to.
-            CKM.CKM_SHA1_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pss),
-            CKM.CKM_SHA512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pss),
+            (ulong)CKM.CKM_SHA1_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA1, System.Security.Cryptography.RSASignaturePadding.Pss),
+            (ulong)CKM.CKM_SHA256_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pss),
+            (ulong)CKM.CKM_SHA384_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA384, System.Security.Cryptography.RSASignaturePadding.Pss),
+            (ulong)CKM.CKM_SHA512_RSA_PKCS_PSS => (System.Security.Cryptography.HashAlgorithmName.SHA512, System.Security.Cryptography.RSASignaturePadding.Pss),
             // Raw CKM_RSA_PKCS / CKM_RSA_X_509 carry the hash inside a DigestInfo, so there is no
             // mechanism-level hash to map to a managed VerifyData call. Use a CKO_PUBLIC_KEY companion.
             _ => throw new NotSupportedException(
@@ -712,12 +724,12 @@ public sealed class Pkcs11Key : IDisposable
         };
 
     private static System.Security.Cryptography.HashAlgorithmName MapEcdsaMechanism(Mechanism mechanism)
-        => (CKM)mechanism.Type switch
+        => mechanism.Type switch
         {
-            CKM.CKM_ECDSA_SHA1 => System.Security.Cryptography.HashAlgorithmName.SHA1,
-            CKM.CKM_ECDSA_SHA256 => System.Security.Cryptography.HashAlgorithmName.SHA256,
-            CKM.CKM_ECDSA_SHA384 => System.Security.Cryptography.HashAlgorithmName.SHA384,
-            CKM.CKM_ECDSA_SHA512 => System.Security.Cryptography.HashAlgorithmName.SHA512,
+            (ulong)CKM.CKM_ECDSA_SHA1 => System.Security.Cryptography.HashAlgorithmName.SHA1,
+            (ulong)CKM.CKM_ECDSA_SHA256 => System.Security.Cryptography.HashAlgorithmName.SHA256,
+            (ulong)CKM.CKM_ECDSA_SHA384 => System.Security.Cryptography.HashAlgorithmName.SHA384,
+            (ulong)CKM.CKM_ECDSA_SHA512 => System.Security.Cryptography.HashAlgorithmName.SHA512,
             _ => throw new NotSupportedException(
                 $"Managed ECDSA verify is not implemented for mechanism {mechanism.Type}. " +
                 "Provide a CKO_PUBLIC_KEY companion on the token to use the native verify path."),

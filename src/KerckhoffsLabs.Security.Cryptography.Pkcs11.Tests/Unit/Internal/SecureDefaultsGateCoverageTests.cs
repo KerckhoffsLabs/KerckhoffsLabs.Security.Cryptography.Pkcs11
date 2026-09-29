@@ -47,7 +47,7 @@ public sealed class SecureDefaultsGateCoverageTests
         using (library)
         using (workspace)
         {
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
             using var tpl = WeakSecretKey(viaExtractable: true);
             using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);

@@ -27,11 +27,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <c>false</c> reads the public point from the token.
 /// </para>
 /// <para>
-/// <b>Requires <c>Pkcs11Workspace.AllowInsecure</c>.</b> Every method here returns <c>byte[]</c>, so
-/// the derived value must be read off the token — this adapter cannot be implemented without
-/// extracting key material. The refusal comes from the library's single secure-defaults gate, which
-/// declines to create the extractable, non-sensitive key the read-back needs. Use
-/// <c>AllowInsecureScope()</c> to opt in for one operation, or stay on the on-token
+/// <b>Requires a policy that permits reading key material off the token, e.g.
+/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
+/// <c>byte[]</c>, so the derived value must be read off the token — this adapter cannot be
+/// implemented without extracting key material. The refusal comes from the library's single
+/// secure-defaults gate, which declines to create the extractable, non-sensitive key the
+/// read-back needs. Scope the policy override to one operation, or stay on the on-token
 /// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
 /// </para>
 /// </remarks>
@@ -109,7 +110,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyMaterial(ECDiffieHellmanPublicKey otherPartyPublicKey)
         => DeriveKeyFromHash(otherPartyPublicKey, HashAlgorithmName.SHA256, null, null);
 
@@ -120,7 +121,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
@@ -170,7 +171,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <see cref="Pkcs11Workspace.AllowInsecure"/> is <c>false</c>: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyFromHmac(
         ECDiffieHellmanPublicKey otherPartyPublicKey,
         HashAlgorithmName hashAlgorithm,
@@ -211,6 +212,8 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     private byte[] DeriveRawSecret(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
+        _key.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret));
+
         ECParameters peer = otherPartyPublicKey.ExportParameters();
         byte[] x = peer.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(otherPartyPublicKey));
         byte[] y = peer.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(otherPartyPublicKey));
@@ -323,7 +326,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">
+    /// <exception cref="CryptoPolicyViolationException">
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
@@ -331,7 +334,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     public override ECParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
-            throw new InsecureOperationException(
+            throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
         using var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);

@@ -34,6 +34,9 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
         _prfData = prfData.IsEmpty ? [] : prfData.ToArray();
     }
 
+    /// <summary>The PRF, for policy evaluation.</summary>
+    internal CKP Prf => _prf;
+
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {

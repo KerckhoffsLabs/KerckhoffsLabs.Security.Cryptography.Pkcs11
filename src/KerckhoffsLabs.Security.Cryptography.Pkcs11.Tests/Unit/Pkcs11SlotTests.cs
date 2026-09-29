@@ -269,4 +269,19 @@ public sealed class Pkcs11SlotTests
         var fake = new SlotFake { OpenRv = CKR.CKR_SESSION_COUNT };
         Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).OpenSession());
     }
+
+    [Fact]
+    public void OpenSession_LogsThePolicyTheSessionEnforces()
+    {
+        var logger = new CapturingLogger();
+        var slot = new Pkcs11Slot(new SlotFake(), SlotId, new CapturingLoggerFactory(logger));
+
+        using (slot.OpenSession(policy: CryptoPolicy.FipsOnly)) { }
+        using (slot.OpenSession()) { }
+
+        var opened = logger.Entries.Where(e => e.Level == Microsoft.Extensions.Logging.LogLevel.Information).ToList();
+        Assert.Equal(2, opened.Count);
+        Assert.Contains("under FipsOnly policy", opened[0].Message, StringComparison.Ordinal);
+        Assert.Contains("under SecureOnly policy", opened[1].Message, StringComparison.Ordinal);
+    }
 }

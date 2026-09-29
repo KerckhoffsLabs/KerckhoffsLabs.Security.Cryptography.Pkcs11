@@ -14,12 +14,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 /// </summary>
 internal static class FakeKeys
 {
-    public static Pkcs11Key Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond)
+    public static Pkcs11Key Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond, ICryptoPolicy? policy = null)
     {
         var lowLevel = new AttributeResponseFakeLibrary(respond);
         var library = new Pkcs11Library(lowLevel);
         var slot = new Pkcs11Slot(lowLevel, slotId: 1);
-        var session = new Pkcs11Session(lowLevel, sessionId: 1);
+        var session = new Pkcs11Session(lowLevel, sessionId: 1, policy: policy);
         var workspace = new Pkcs11Workspace(library, slot, session);
         return new Pkcs11Key(
             workspace,

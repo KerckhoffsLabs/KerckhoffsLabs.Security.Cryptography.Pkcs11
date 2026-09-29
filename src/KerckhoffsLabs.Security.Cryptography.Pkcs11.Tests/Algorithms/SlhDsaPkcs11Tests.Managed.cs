@@ -187,12 +187,12 @@ public sealed class SlhDsaPkcs11Tests_Managed
     [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void ExportSlhDsaPrivateKey_ThrowsInsecure() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
-            Assert.Throws<InsecureOperationException>(() => slhdsa.ExportSlhDsaPrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => slhdsa.ExportSlhDsaPrivateKey()));
 
     [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
     public void ExportPkcs8PrivateKey_ThrowsInsecure() =>
         WithSlhDsa(CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
-            Assert.Throws<InsecureOperationException>(() => slhdsa.ExportPkcs8PrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => slhdsa.ExportPkcs8PrivateKey()));
 
     // === Construction / argument validation (throws before any native call) ===
 

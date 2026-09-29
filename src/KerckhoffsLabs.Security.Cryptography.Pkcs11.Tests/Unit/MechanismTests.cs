@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 // CKM_AES_CBC appears here only as a realistic mechanism whose parameter is a raw IV block, which is
 // what the byte[] constructors marshal. Nothing is encrypted and no token is involved, so the
-// AllowInsecure gate never runs; the compile-time warning is suppressed for this file only.
+// crypto-policy check never runs; the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -288,5 +288,20 @@ public sealed class MechanismTests
         // than throw, because every converted session site absorbs unconditionally.
         Assert.Null(mechParams);
         Assert.Null(Record.Exception(() => mech.AbsorbOutput(mechParams)));
+    }
+
+    public static bool NativeULongIs64Bit => UnmanagedMemory.NativeULongSize == sizeof(ulong);
+
+    // Where CK_ULONG is 64 bits a vendor value can exceed what CKM (a uint enum) holds. There is no CKM
+    // value to hand back, and truncating would name a different mechanism, so the method reports false
+    // and yields the vendor marker — never an overflow, never a stranger's mechanism.
+    [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
+    public void TryGetMechanism_ValueWiderThanCkm_ReportsFalseWithTheVendorMarker()
+    {
+        var mech = new Mechanism(0x1_8000_0001UL);
+
+        Assert.False(mech.TryGetMechanism(out CKM mechanism));
+        Assert.Equal(CKM.CKM_VENDOR_DEFINED, mechanism);
+        Assert.True(mech.IsVendorDefined);
     }
 }

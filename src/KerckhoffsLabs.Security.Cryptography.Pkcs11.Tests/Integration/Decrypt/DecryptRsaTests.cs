@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// AllowInsecure gate is the behaviour under test), so the compile-time warning is suppressed
+// secure-defaults policy check is the behaviour under test), so the compile-time warning is suppressed
 // for this file only — the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -18,7 +18,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Decrypt;
 internal static class DecryptRsaTestCases
 {
     /// <summary>
-    /// RSA PKCS#1 v1.5 decryption (CKM_RSA_PKCS) must throw <see cref="InsecureOperationException"/>
+    /// RSA PKCS#1 v1.5 decryption (CKM_RSA_PKCS) must throw <see cref="CryptoPolicyViolationException"/>
     /// by default. The gate fires before C_DecryptInit, so only a session (no real key) is needed.
     /// </summary>
     internal static void Assert_RsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
@@ -31,10 +31,10 @@ internal static class DecryptRsaTestCases
             {
                 byte[] fakeCiphertext = new byte[256]; // RSA-2048 output size
 
-                // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by Session.GuardMechanism; the same gate the
-                // RSAPkcs11.Decrypt(RSAEncryptionPadding.Pkcs1) path relies on.
+                // CKM_RSA_PKCS (PKCS#1 v1.5) is gated by the session's crypto policy check; the same
+                // gate the RSAPkcs11.Decrypt(RSAEncryptionPadding.Pkcs1) path relies on.
                 var mech = new Mechanism(CKM.CKM_RSA_PKCS);
-                var ex = Assert.Throws<InsecureOperationException>(() =>
+                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
                     session.Decrypt(mech, priv, fakeCiphertext));
                 Assert.Equal(CKM.CKM_RSA_PKCS, ex.Mechanism);
             }

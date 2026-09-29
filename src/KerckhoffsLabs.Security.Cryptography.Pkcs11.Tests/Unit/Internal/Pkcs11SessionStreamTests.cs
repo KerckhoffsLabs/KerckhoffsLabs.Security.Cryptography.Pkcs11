@@ -2,6 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
@@ -111,6 +112,9 @@ public sealed class Pkcs11SessionStreamTests
 
     private static Pkcs11Session NewSession(StreamFake fake) => new(fake, SessionId);
     private static Mechanism AesGcm() => new(CKM.CKM_AES_GCM);
+
+    // Raw PSS is allowed by the default policy only with explicit parameters.
+    private static Mechanism Pss() => new(CKM.CKM_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, 32));
 
     // === Encrypt (stream) ===================================================
 
@@ -310,7 +314,7 @@ public sealed class Pkcs11SessionStreamTests
     public void VerifyRecover_Ok_ReturnsDataAndValidTrue()
     {
         var s = NewSession(new StreamFake { RecoveredData = [1, 2, 3], VerifyRecoverRv = CKR.CKR_OK });
-        var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
+        var mech = Pss();
 
         byte[] recovered = s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
 
@@ -322,7 +326,7 @@ public sealed class Pkcs11SessionStreamTests
     public void VerifyRecover_SignatureInvalid_SetsValidFalse()
     {
         var s = NewSession(new StreamFake { VerifyRecoverRv = CKR.CKR_SIGNATURE_INVALID });
-        var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
+        var mech = Pss();
 
         s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
 
@@ -333,7 +337,7 @@ public sealed class Pkcs11SessionStreamTests
     public void VerifyRecover_OtherError_Throws()
     {
         var s = NewSession(new StreamFake { VerifyRecoverRv = CKR.CKR_DEVICE_ERROR });
-        var mech = new Mechanism(CKM.CKM_RSA_PKCS_PSS);
+        var mech = Pss();
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
             s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out _));

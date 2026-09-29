@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
-// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
-// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -18,13 +18,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// Single DES has a 56-bit effective key and is exhaustively breakable; it is provided only for
 /// interop with legacy systems. Like <see cref="AesPkcs11"/>, every operation throws
-/// <c>InsecureOperationException</c> unless <see cref="Pkcs11Workspace.AllowInsecure"/> is set on the
-/// wrapped key's workspace — and unlike AES there is no authenticated DES mode to fall back to.
+/// <c>CryptoPolicyViolationException</c> unless the wrapped key's workspace's
+/// <see cref="Pkcs11Workspace.Policy"/> permits it — and unlike AES there is no authenticated DES mode to fall back to.
 /// Prefer <see cref="AesGcmPkcs11"/> or <see cref="AesCcmPkcs11"/>; this type exists only for legacy
 /// decrypt/interop scenarios.
 /// </para>
 /// <para>
-/// Supported modes (on the token, once AllowInsecure is set):
+/// Supported modes (on the token, once permitted by the workspace's policy):
 /// <list type="bullet">
 /// <item>CBC — <see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> / <c>DecryptCbc</c>
 /// with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_DES_CBC_PAD</c>) or <see cref="PaddingMode.None"/>
@@ -37,7 +37,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// <para>
 /// NOT supported: CFB/OFB stream modes (the secure-defaults gate in <c>Pkcs11Session</c> does not
-/// cover single-DES <c>CKM_DES_CFB*/OFB*</c>, so enabling them here would bypass <c>AllowInsecure</c>);
+/// cover single-DES <c>CKM_DES_CFB*/OFB*</c>, so enabling them here would bypass the crypto policy check);
 /// <see cref="CreateEncryptor(byte[], byte[])"/> / <see cref="CreateDecryptor(byte[], byte[])"/> (no
 /// <see cref="ICryptoTransform"/> over a non-extractable token key); <see cref="GenerateKey"/>
 /// (generate via <c>Pkcs11Workspace</c> instead); the <see cref="Key"/> property; and any padding
@@ -45,7 +45,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Single DES has a 56-bit key and is exhaustively breakable. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "DESPkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+          "DESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.Des,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DESPkcs11 : DES
@@ -93,12 +93,14 @@ public sealed class DESPkcs11 : DES
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
         // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens reject an empty
-        // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when AllowInsecure is set
-        // (i.e. once the secure-defaults gate would pass). With AllowInsecure off we fall through
-        // so GuardMechanism throws InsecureOperationException as documented (the empty buffer
-        // never reaches the token — the gate runs first). Padded encryption (CKM_DES_CBC_PAD)
-        // must emit a full padding block, so that path always goes to the token.
-        if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES_CBC_PAD))
+        // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when the policy permits this
+        // mechanism (i.e. the gate would pass). Otherwise fall through so the session's policy check
+        // throws as documented (the empty buffer never reaches the token — the gate runs first).
+        // Padded encryption (CKM_DES_CBC_PAD) must emit a full padding block, so that path always
+        // goes to the token.
+        if (input.IsEmpty
+            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES_CBC_PAD))
         {
             bytesWritten = 0;
             return true;

@@ -261,13 +261,36 @@ internal static class OperationStateMixingTestCases
             finally { session.DestroyObject(key); }
         });
 
+    // Fixed, not random. Data1 encrypts to a single CBC-PAD block C1. A module that does not refuse the
+    // single-part C_Decrypt after C_DecryptUpdate treats it as a continuation instead: it releases the
+    // buffered block and decrypts C1 again, chained from C1, so its final block is AES-Dec(C1) XOR C1.
+    // With random key material that block has valid PKCS#7 padding about 1 time in 256, the call then
+    // returns CKR_OK, and the test failed intermittently on such a module. For this key and IV that block
+    // ends in 0xBD — never valid padding — which PaddingOfAContinuationIsInvalid checks up front.
+    private static readonly byte[] DecryptMixingKey = [.. Enumerable.Range(0x00, 32).Select(i => (byte)i)];
+    private static readonly byte[] DecryptMixingIv = [.. Enumerable.Range(0xF0, 16).Select(i => (byte)i)];
+
+    private static bool PaddingOfAContinuationIsInvalid(byte[] key, byte[] iv, byte[] data)
+    {
+        byte[] c1 = CbcPadEncrypt(key, iv, data);
+        if (c1.Length != 16)
+            return false; // the reasoning above assumes a single ciphertext block
+        using var aes = System.Security.Cryptography.Aes.Create();
+        aes.Key = key;
+        byte[] block = aes.DecryptEcb(c1, System.Security.Cryptography.PaddingMode.None);
+        for (int i = 0; i < block.Length; i++)
+            block[i] ^= c1[i];
+        int n = block[^1];
+        return n is < 1 or > 16 || block.AsSpan(16 - n).ContainsAnyExcept((byte)n);
+    }
+
     internal static void Assert_Decrypt_SinglePartAfterUpdate_Throws(IPkcs11Backend backend) =>
         WithRawSession(backend, (lowLevel, sid, session) =>
         {
-            byte[] rawKey = new byte[32];
-            System.Security.Cryptography.RandomNumberGenerator.Fill(rawKey);
-            byte[] iv = new byte[16];
-            System.Security.Cryptography.RandomNumberGenerator.Fill(iv);
+            byte[] rawKey = DecryptMixingKey;
+            byte[] iv = DecryptMixingIv;
+            Assert.True(PaddingOfAContinuationIsInvalid(rawKey, iv, Data1),
+                "The fixed key/IV no longer make a continuation's final block invalid padding; pick others.");
             ObjectHandle key = CreateAes(session, rawKey);
             try
             {

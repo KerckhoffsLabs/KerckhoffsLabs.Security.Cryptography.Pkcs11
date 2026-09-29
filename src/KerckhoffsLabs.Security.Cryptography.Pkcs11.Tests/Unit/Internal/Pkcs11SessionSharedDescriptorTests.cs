@@ -25,7 +25,9 @@ public sealed class Pkcs11SessionSharedDescriptorTests
 {
     private const ulong SessionId = 42;
 
-    private static Pkcs11Session NewSession() => new(new FakeLowLevelPkcs11Library(), SessionId);
+    // CKM_AES_GCM stands in for every half (digest and verify included) purely to carry a descriptor;
+    // the policy is not under test, so it must not refuse that placeholder before the guard runs.
+    private static Pkcs11Session NewSession() => new(new FakeLowLevelPkcs11Library(), SessionId, policy: CryptoPolicy.AllowInsecure);
 
     private static CkmGcmMessageParams OutputBearing() =>
         CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);

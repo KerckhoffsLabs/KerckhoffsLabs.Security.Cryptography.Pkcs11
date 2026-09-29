@@ -29,12 +29,24 @@ public sealed class DerivedKeyMaterialLeakTests
     private static readonly byte[] KeyBytes =
         [.. Enumerable.Range(0, 32).Select(i => (byte)(i + 1))];
 
+    // The allocation count is process-wide, so undisposed objects left by earlier tests are in it too,
+    // and their finalizers free them whenever the GC gets round to it — mid-loop included, which drags
+    // the count below the baseline. Settle them before taking the snapshot, as MechanismParamsLeakTests
+    // does.
+    private static int SettledAllocationCount()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        return UnmanagedMemory.OutstandingAllocationCount;
+    }
+
     [Fact]
     public void Sp800108Derive_LeavesNothingInUnmanagedMemory()
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        workspace.AllowInsecure = true; // reading derived bytes back is gated
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // reading derived bytes back is gated
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf-leak").Value(KeyBytes).Derive().Build();
         using var key = workspace.ImportKey(tpl);
@@ -44,7 +56,7 @@ public sealed class DerivedKeyMaterialLeakTests
         // otherwise read as a leak.
         _ = kdf.DeriveKey("label"u8.ToArray(), "context"u8.ToArray(), 32);
 
-        int before = UnmanagedMemory.OutstandingAllocationCount;
+        int before = SettledAllocationCount();
 
         for (int i = 0; i < 8; i++)
             _ = kdf.DeriveKey("label"u8.ToArray(), "context"u8.ToArray(), 32);
@@ -61,14 +73,14 @@ public sealed class DerivedKeyMaterialLeakTests
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        workspace.AllowInsecure = true; // DeriveRawSecretAgreement hands Z to the caller and is gated
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // DeriveRawSecretAgreement hands Z to the caller and is gated
         using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         using var peer = ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
 
         _ = ecdh.DeriveRawSecretAgreement(peer.PublicKey);
 
-        int before = UnmanagedMemory.OutstandingAllocationCount;
+        int before = SettledAllocationCount();
 
         for (int i = 0; i < 8; i++)
             _ = ecdh.DeriveRawSecretAgreement(peer.PublicKey);

@@ -87,17 +87,17 @@ internal static class RC2Pkcs11TestCases
 
     internal static void Assert_EncryptCbc_Pkcs7_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedRc2(backend, (_, rc2) =>
-            Assert.Throws<InsecureOperationException>(() => rc2.EncryptCbc(new byte[8], Iv8)));
+            Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptCbc(new byte[8], Iv8)));
 
     internal static void Assert_EncryptEcb_GatedByDefault_Throws(IPkcs11Backend backend) =>
         WithImportedRc2(backend, (_, rc2) =>
-            Assert.Throws<InsecureOperationException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.None)));
+            Assert.Throws<CryptoPolicyViolationException>(() => rc2.EncryptEcb(new byte[8], PaddingMode.None)));
 
     internal static void Assert_EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedRc2(backend, (workspace, rc2) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("RC2-CBC PKCS7 over a token key.");
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclRc2();
 
             byte[] ct = rc2.EncryptCbc(plaintext, Iv8); // default PaddingMode.PKCS7
@@ -110,7 +110,7 @@ internal static class RC2Pkcs11TestCases
         {
             byte[] plaintext = new byte[16]; // two 8-byte blocks
             RandomNumberGenerator.Fill(plaintext);
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclRc2();
 
             byte[] ct = rc2.EncryptCbc(plaintext, Iv8, PaddingMode.None);
@@ -121,7 +121,7 @@ internal static class RC2Pkcs11TestCases
     internal static void Assert_EncryptEcb_AllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
         WithImportedRc2(backend, (workspace, rc2) =>
         {
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] plaintext = new byte[8];
             RandomNumberGenerator.Fill(plaintext);
             using var bcl = BclRc2();
@@ -148,7 +148,7 @@ internal static class RC2Pkcs11TestCases
         WithImportedRc2(backend, (workspace, rc2) =>
         {
             rc2.EffectiveKeySize = 64; // narrower than the 128-bit token key
-            workspace.AllowInsecure = true;
+            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 
             byte[] ct = rc2.EncryptCbc(ReducedEffectiveBitsPlaintext, Iv8, PaddingMode.None);
             Assert.Equal(ReducedEffectiveBitsCiphertext, ct);
