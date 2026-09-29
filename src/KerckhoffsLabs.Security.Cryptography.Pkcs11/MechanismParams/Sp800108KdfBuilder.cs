@@ -23,7 +23,7 @@ internal enum Sp800108SegmentKind
     OptionalCounter,    // CK_SP800_108_OPTIONAL_COUNTER
     ByteArray,          // CK_SP800_108_BYTE_ARRAY
     DkmLength,          // CK_SP800_108_DKM_LENGTH
-    KeyHandle,          // CK_SP800_108_KEY_HANDLE
+    Key,                // CK_SP800_108_KEY_HANDLE
 }
 
 /// <summary>One described (not-yet-marshalled) SP800-108 PRF data segment.</summary>
@@ -34,12 +34,12 @@ internal readonly struct Sp800108Segment
     public uint WidthInBits { get; init; }
     public bool LittleEndian { get; init; }
     public Sp800108DkmLengthMethod DkmMethod { get; init; }
-    public ulong KeyHandle { get; init; }
+    public Pkcs11Key? Key { get; init; }
 }
 
 /// <summary>
 /// Fluent builder for the PKCS#11 v3.0 SP800-108 KDFs. Assembles the PRF data sequence
-/// (iteration/optional counters, byte arrays, DKM-length encoding, and key-handle splices),
+/// (iteration/optional counters, byte arrays, DKM-length encoding, and on-token key splices),
 /// the feedback IV, and any additional sibling keys to derive in the same call, then produces a
 /// <see cref="CkmSp800108KdfParams"/> — a managed descriptor, rebuilt into each call's own scope.
 /// </summary>
@@ -98,13 +98,23 @@ public sealed class Sp800108KdfBuilder
     }
 
     /// <summary>
-    /// Splices another on-token key's value into the PRF input by its object handle
-    /// (<c>CK_SP800_108_KEY_HANDLE</c>). Handles are raw <c>CK_OBJECT_HANDLE</c> values, matching the
-    /// other handle-valued mechanism parameters in this namespace.
+    /// Splices another on-token secret key's value into the PRF input
+    /// (<c>CK_SP800_108_KEY_HANDLE</c>), without the value ever leaving the token.
     /// </summary>
-    public Sp800108KdfBuilder KeyHandle(ulong key)
+    /// <remarks>
+    /// <paramref name="key"/> must come from the workspace that performs the derive; it is resolved to
+    /// its object handle when the operation runs, and a disposed key or one from another workspace is
+    /// refused there.
+    /// </remarks>
+    /// <param name="key">The key whose value is spliced in.</param>
+    /// <returns>This builder, for chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> has no secret-key object.</exception>
+    public Sp800108KdfBuilder Key(Pkcs11Key key)
     {
-        _segments.Add(new Sp800108Segment { Kind = Sp800108SegmentKind.KeyHandle, KeyHandle = key });
+        ArgumentNullException.ThrowIfNull(key);
+        key.EnsureHasParameterHandle(KeyHandlePart.Private, nameof(key));
+        _segments.Add(new Sp800108Segment { Kind = Sp800108SegmentKind.Key, Key = key });
         return this;
     }
 

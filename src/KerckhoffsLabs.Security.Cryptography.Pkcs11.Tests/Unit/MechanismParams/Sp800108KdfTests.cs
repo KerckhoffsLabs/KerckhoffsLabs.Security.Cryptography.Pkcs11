@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -40,16 +41,17 @@ public sealed class Sp800108KdfTests
     {
         const ulong spliceKey = 0xABCD;
         byte[] label = [0x6C, 0x62, 0x6C];
+        using var keys = new ParameterKeys();
 
         var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
             .IterationCounter(widthInBits: 16, littleEndian: true)
             .OptionalCounter(widthInBits: 8, littleEndian: false)
             .ByteArray(label)
             .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
-            .KeyHandle(spliceKey)
+            .Key(keys.Secret(spliceKey))
             .Build();
 
-        using var scope = new MechanismParameterScope();
+        using var scope = keys.NewScope();
         var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
         Assert.Equal((ulong)CKM.CKM_AES_CMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);

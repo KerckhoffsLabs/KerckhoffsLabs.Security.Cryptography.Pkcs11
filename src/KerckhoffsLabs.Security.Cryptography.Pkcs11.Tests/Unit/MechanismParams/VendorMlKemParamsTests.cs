@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -50,7 +51,7 @@ public sealed class VendorMlKemParamsTests
 
     private sealed class CkmIbmMlKemParams(
         ulong version, ulong mode, ulong kdf, bool prepend,
-        byte[] cipher, byte[] sharedData, ulong secretHandle)
+        byte[] cipher, byte[] sharedData, Pkcs11Key secretKey)
         : VendorMechanismParameters
     {
         protected override void Describe(Pkcs11ParameterWriter writer) => writer
@@ -62,7 +63,7 @@ public sealed class VendorMlKemParamsTests
             .CkULong((ulong)cipher.Length)
             .Buffer(sharedData)
             .CkULong((ulong)sharedData.Length)
-            .CkObjectHandle(secretHandle);
+            .Key(secretKey);
     }
 
     /// <summary>
@@ -101,11 +102,12 @@ public sealed class VendorMlKemParamsTests
     {
         byte[] cipher = [.. Enumerable.Range(0, 24).Select(i => (byte)(0x40 + i))];
         byte[] shared = [0x11, 0x22, 0x33];
+        using var keys = new ParameterKeys();
         var parameters = new CkmIbmMlKemParams(
             version: 0, mode: ModeDecapsulate, kdf: 1, prepend: true,
-            cipher, shared, secretHandle: 0x2BAD);
+            cipher, shared, secretKey: keys.Secret(0x2BAD));
 
-        using var scope = new MechanismParameterScope();
+        using var scope = keys.NewScope();
         byte[] block = Marshal(parameters, scope);
 
         var expected = Expected;
@@ -144,9 +146,10 @@ public sealed class VendorMlKemParamsTests
     [Fact]
     public void PrependFalse_KeepsTheSameLayout()
     {
-        using var scope = new MechanismParameterScope();
+        using var keys = new ParameterKeys();
+        using var scope = keys.NewScope();
         byte[] block = Marshal(
-            new CkmIbmMlKemParams(0, ModeDecapsulate, 1, prepend: false, [9, 9], [8], 1),
+            new CkmIbmMlKemParams(0, ModeDecapsulate, 1, prepend: false, [9, 9], [8], keys.Secret(1)),
             scope);
 
         Assert.Equal(Expected.Total, block.Length);
@@ -157,11 +160,12 @@ public sealed class VendorMlKemParamsTests
     [Fact]
     public void MlKemParams_ReachCkMechanismUnderTheVendorType()
     {
+        using var keys = new ParameterKeys();
         var mech = new Mechanism(
             CkmIbmMlKem,
-            new CkmIbmMlKemParams(0, ModeDecapsulate, 1, true, [1, 2, 3], [4], 5));
+            new CkmIbmMlKemParams(0, ModeDecapsulate, 1, true, [1, 2, 3], [4], keys.Secret(5)));
 
-        using var scope = new MechanismParameterScope();
+        using var scope = keys.NewScope();
         CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
 
         Assert.Equal(CkmIbmMlKem, (ulong)marshalled.Mechanism);

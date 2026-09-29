@@ -308,8 +308,10 @@ public static class HkdfPkcs11
     {
         // CKF_HKDF_SALT_NULL is RFC 5869's default salt (HashLen zero bytes), which is what HKDF uses for
         // a null or empty salt. Sending an empty CKF_HKDF_SALT_DATA instead is refused by some tokens.
-        HkdfSaltType saltType = salt.IsEmpty ? HkdfSaltType.Null : HkdfSaltType.Data;
-        return new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmHkdfParams(operation, prf.Mechanism, saltType, salt, saltKey: 0, info));
+        CkmHkdfParams parameters = salt.IsEmpty
+            ? CkmHkdfParams.WithoutSalt(operation, prf.Mechanism, info)
+            : CkmHkdfParams.WithSalt(operation, prf.Mechanism, salt, info);
+        return new Mechanism(CKM.CKM_HKDF_DERIVE, parameters);
     }
 
     private static void RequireHkdfKey(Pkcs11Key key, string paramName)

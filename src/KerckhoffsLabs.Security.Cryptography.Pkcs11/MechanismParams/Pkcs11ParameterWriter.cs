@@ -43,12 +43,26 @@ public sealed class Pkcs11ParameterWriter
     }
 
     /// <summary>
-    /// Appends a <c>CK_OBJECT_HANDLE</c> field. Identical to <see cref="CkULong"/> on the wire; a
-    /// separate method so the field list reads like the vendor's header.
+    /// Appends a <c>CK_OBJECT_HANDLE</c> field holding the handle of one of <paramref name="key"/>'s
+    /// token objects.
     /// </summary>
-    /// <param name="handle">Object handle to write.</param>
+    /// <remarks>
+    /// <paramref name="key"/> must come from the workspace performing the call; a handle only means
+    /// something to the session it came from.
+    /// </remarks>
+    /// <param name="key">The key the field refers to.</param>
+    /// <param name="part">Which of the key's objects to use: its private-key or secret-key object (the
+    /// default), or the public-key object of a key pair.</param>
     /// <returns>This writer, for chaining.</returns>
-    public Pkcs11ParameterWriter CkObjectHandle(ulong handle) => CkULong(handle);
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if <paramref name="key"/> has been disposed.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> belongs to another workspace, or has no object of the requested kind.</exception>
+    public Pkcs11ParameterWriter Key(Pkcs11Key key, KeyHandlePart part = KeyHandlePart.Private)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        _fields.Add(new Field(Kind.CkULong, (ulong)_scope.KeyHandle(key, part, nameof(key)), IntPtr.Zero, null));
+        return this;
+    }
 
     /// <summary>Appends a <c>CK_BBOOL</c> field (one byte, <c>0</c> or <c>1</c>).</summary>
     /// <param name="value">Value to write.</param>

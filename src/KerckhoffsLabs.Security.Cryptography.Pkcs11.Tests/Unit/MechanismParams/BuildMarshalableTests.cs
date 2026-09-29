@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -119,9 +120,10 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void Ike1ExtendedDeriveParams_MarshalsItsFields()
     {
+        using var keys = new ParameterKeys();
         var p = new CkmIke1ExtendedDeriveParams(
-            CKM.CKM_SHA256_HMAC, hasKeygxy: true, keygxy: 5, [0xE1, 0xE2]);
-        using var scope = new MechanismParameterScope();
+            CKM.CKM_SHA256_HMAC, keygxy: keys.Secret(5), [0xE1, 0xE2]);
+        using var scope = keys.NewScope();
 
         var s = (CK_IKE1_EXTENDED_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
@@ -135,9 +137,10 @@ public sealed class BuildMarshalableTests
     [Fact]
     public void Ike2PrfPlusDeriveParams_MarshalsItsFields()
     {
+        using var keys = new ParameterKeys();
         var p = new CkmIke2PrfPlusDeriveParams(
-            CKM.CKM_SHA256_HMAC, hasSeedKey: true, seedKey: 7, [0x5E, 0x5D, 0x5C]);
-        using var scope = new MechanismParameterScope();
+            CKM.CKM_SHA256_HMAC, seedKey: keys.Secret(7), [0x5E, 0x5D, 0x5C]);
+        using var scope = keys.NewScope();
 
         var s = (CK_IKE2_PRF_PLUS_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
@@ -182,10 +185,12 @@ public sealed class BuildMarshalableTests
     public void X2RatchetInitializeParams_MarshalsItsFields()
     {
         byte[] sk = [0x51, 0x52, 0x53, 0x54];
+        using var keys = new ParameterKeys();
+        // ownPublicIdentity is a full pair with a distinct private handle, so reading the wrong half fails.
         var p = new CkmX2RatchetInitializeParams(
-            sk, peerPublicPrekey: 1, peerPublicIdentity: 2, ownPublicIdentity: 3,
+            sk, peerPublicPrekey: keys.PublicOnly(1), peerPublicIdentity: keys.PublicOnly(2), ownPublicIdentity: keys.Pair(0x30, 3),
             encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC);
-        using var scope = new MechanismParameterScope();
+        using var scope = keys.NewScope();
 
         var s = (CK_X2RATCHET_INITIALIZE_PARAMS)p.BuildMarshalable(scope);
 
@@ -203,10 +208,12 @@ public sealed class BuildMarshalableTests
     public void X2RatchetRespondParams_MarshalsItsFields()
     {
         byte[] sk = [0x61, 0x62, 0x63, 0x64];
+        using var keys = new ParameterKeys();
+        // Both own keys are full pairs with distinct handles, so reading the wrong half fails.
         var p = new CkmX2RatchetRespondParams(
-            sk, ownPrekey: 1, initiatorIdentity: 2, ownPublicIdentity: 3,
+            sk, ownPrekey: keys.Pair(1, 0x10), initiatorIdentity: keys.PublicOnly(2), ownPublicIdentity: keys.Pair(0x30, 3),
             encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC);
-        using var scope = new MechanismParameterScope();
+        using var scope = keys.NewScope();
 
         var s = (CK_X2RATCHET_RESPOND_PARAMS)p.BuildMarshalable(scope);
 
@@ -312,8 +319,7 @@ public sealed class BuildMarshalableTests
     {
         byte[] salt = [0x01, 0x02, 0x03];
         byte[] info = [0xF0, 0xF1, 0xF2, 0xF3];
-        var p = new CkmHkdfParams(
-            HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSaltType.Data, salt, saltKey: 9, info);
+        var p = CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, salt, info);
         using var scope = new MechanismParameterScope();
 
         var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
@@ -323,9 +329,28 @@ public sealed class BuildMarshalableTests
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfHashMechanism);
         Assert.Equal((ulong)HkdfSaltType.Data, (ulong)s.SaltType);
         Assert.Equal(3UL, (ulong)s.SaltLen);
-        Assert.Equal(9UL, (ulong)s.SaltKey);
+        Assert.Equal(0UL, (ulong)s.SaltKey);
         Assert.Equal(4UL, (ulong)s.InfoLen);
         AssertBlockHolds(s.Salt, salt);
+        AssertBlockHolds(s.Info, info);
+    }
+
+    [Fact]
+    public void HkdfParams_WithSaltKey_MarshalsTheKeyHandleAndNoSaltBytes()
+    {
+        byte[] info = [0xF0, 0xF1];
+        using var keys = new ParameterKeys();
+        var p = CkmHkdfParams.WithSaltKey(HkdfOperation.ExtractOnly, CKM.CKM_SHA384_HMAC, keys.Secret(9), info);
+        using var scope = keys.NewScope();
+
+        var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
+
+        Assert.True(s.Extract);
+        Assert.False(s.Expand);
+        Assert.Equal((ulong)HkdfSaltType.Key, (ulong)s.SaltType);
+        Assert.Equal(9UL, (ulong)s.SaltKey);
+        Assert.Equal(0UL, (ulong)s.SaltLen);
+        Assert.Equal(IntPtr.Zero, s.Salt);
         AssertBlockHolds(s.Info, info);
     }
 
@@ -334,9 +359,10 @@ public sealed class BuildMarshalableTests
     {
         byte[] ckyI = [0x01, 0x02, 0x03, 0x04];
         byte[] ckyR = [0x05, 0x06, 0x07, 0x08];
+        using var keys = new ParameterKeys();
         var p = new CkmIke1PrfDeriveParams(
-            CKM.CKM_SHA256_HMAC, hasPrevKey: true, keygxy: 11, prevKey: 22, ckyI, ckyR, keyNumber: 3);
-        using var scope = new MechanismParameterScope();
+            CKM.CKM_SHA256_HMAC, keygxy: keys.Secret(11), prevKey: keys.Secret(22), ckyI, ckyR, keyNumber: 3);
+        using var scope = keys.NewScope();
 
         var s = (CK_IKE1_PRF_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
@@ -356,9 +382,10 @@ public sealed class BuildMarshalableTests
     {
         byte[] ni = [0x21, 0x22, 0x23];
         byte[] nr = [0x31, 0x32, 0x33, 0x34];
+        using var keys = new ParameterKeys();
         var p = new CkmIkePrfDeriveParams(
-            CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: true, ni, nr, newKey: 42);
-        using var scope = new MechanismParameterScope();
+            CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: true, ni, nr, newKey: keys.Secret(42));
+        using var scope = keys.NewScope();
 
         var s = (CK_IKE_PRF_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
@@ -408,9 +435,12 @@ public sealed class BuildMarshalableTests
     {
         byte[] prekeySignature = [0x51, 0x52, 0x53, 0x54, 0x55];
         byte[] onetimeKey = [0x61, 0x62, 0x63];
+        using var keys = new ParameterKeys();
+        // Every key is a full pair with distinct handles, so reading the wrong half of any of them fails.
         var p = new CkmX3dhInitiateParams(
-            kdf: CKM.CKM_SHA256_HMAC, peerIdentity: 2, peerPrekey: 3, prekeySignature, onetimeKey, ownIdentity: 4, ownEphemeral: 5);
-        using var scope = new MechanismParameterScope();
+            kdf: CKM.CKM_SHA256_HMAC, peerIdentity: keys.Pair(0x20, 2), peerPrekey: keys.Pair(0x30, 3), prekeySignature, onetimeKey,
+            ownIdentity: keys.Pair(4, 0x40), ownEphemeral: keys.Pair(5, 0x50));
+        using var scope = keys.NewScope();
 
         var s = (CK_X3DH_INITIATE_PARAMS)p.BuildMarshalable(scope);
 
@@ -430,9 +460,10 @@ public sealed class BuildMarshalableTests
         byte[] prekeyId = [0x81, 0x82, 0x83];
         byte[] onetimeId = [0x91, 0x92, 0x93, 0x94];
         byte[] initiatorEphemeral = [0xA1, 0xA2, 0xA3, 0xA4, 0xA5];
+        using var keys = new ParameterKeys();
         var p = new CkmX3dhRespondParams(
-            kdf: CKM.CKM_SHA384_HMAC, identityId, prekeyId, onetimeId, initiatorIdentity: 7, initiatorEphemeral);
-        using var scope = new MechanismParameterScope();
+            kdf: CKM.CKM_SHA384_HMAC, identityId, prekeyId, onetimeId, initiatorIdentity: keys.Pair(0x70, 7), initiatorEphemeral);
+        using var scope = keys.NewScope();
 
         var s = (CK_X3DH_RESPOND_PARAMS)p.BuildMarshalable(scope);
 
@@ -519,15 +550,16 @@ public sealed class BuildMarshalableTests
         var template = new List<ObjectAttribute> { new(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY), new(CKA.CKA_KEY_TYPE, CKK.CKK_AES) };
         try
         {
+            using var keys = new ParameterKeys();
             var p = CkmSp800108KdfParams.Counter(CKM.CKM_AES_CMAC)
                 .IterationCounter(widthInBits: 16, littleEndian: true)
                 .OptionalCounter(widthInBits: 8, littleEndian: false)
                 .ByteArray(label)
                 .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
-                .KeyHandle(0xABCD)
+                .Key(keys.Secret(0xABCD))
                 .AddDerivedKey(template)
                 .Build();
-            using var scope = new MechanismParameterScope();
+            using var scope = keys.NewScope();
 
             var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
 
@@ -549,15 +581,16 @@ public sealed class BuildMarshalableTests
     {
         byte[] label = [0x66, 0x62, 0x6B];
         byte[] iv = [0xD1, 0xD2, 0xD3, 0xD4];
+        using var keys = new ParameterKeys();
         var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA384_HMAC)
             .IterationCounter(widthInBits: 16, littleEndian: true)
             .OptionalCounter(widthInBits: 8, littleEndian: true)
             .ByteArray(label)
             .DkmLength(Sp800108DkmLengthMethod.SumOfSegments, widthInBits: 64, littleEndian: true)
-            .KeyHandle(0xABCD)
+            .Key(keys.Secret(0xABCD))
             .WithIV(iv)
             .Build();
-        using var scope = new MechanismParameterScope();
+        using var scope = keys.NewScope();
 
         var s = (CK_SP800_108_FEEDBACK_KDF_PARAMS)p.BuildMarshalable(scope);
 

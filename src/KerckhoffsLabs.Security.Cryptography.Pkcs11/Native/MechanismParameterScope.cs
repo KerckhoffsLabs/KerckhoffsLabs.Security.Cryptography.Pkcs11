@@ -1,3 +1,6 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
@@ -14,7 +17,33 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal sealed class MechanismParameterScope : IDisposable
 {
     private readonly List<IntPtr> _owned = [];
+    private readonly Pkcs11Session? _session;
     private bool _disposed;
+
+    /// <summary>Creates a scope for a call made on <paramref name="session"/>.</summary>
+    /// <param name="session">
+    /// The session performing the call. Needed only to resolve key-valued parameters; a scope without
+    /// one can marshal everything else.
+    /// </param>
+    public MechanismParameterScope(Pkcs11Session? session = null) => _session = session;
+
+    /// <summary>
+    /// The handle <paramref name="key"/> contributes to a parameter field, checked against the session
+    /// performing this call.
+    /// </summary>
+    /// <param name="key">The key the caller put in the parameter.</param>
+    /// <param name="part">Which of the key's objects the field refers to.</param>
+    /// <param name="paramName">The parameter-type argument the key was passed as, for the exception.</param>
+    /// <exception cref="ObjectDisposedException">The key has been disposed.</exception>
+    /// <exception cref="ArgumentException">The key belongs to another workspace, or lacks the requested object.</exception>
+    /// <exception cref="InvalidOperationException">The scope was created without a session.</exception>
+    public NativeCULong KeyHandle(Pkcs11Key key, KeyHandlePart part, string paramName)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_session is null)
+            throw new InvalidOperationException("Key-valued mechanism parameters can only be marshalled for a session.");
+        return (NativeCULong)key.ResolveParameterHandle(_session, part, paramName).ObjectId;
+    }
 
     /// <summary>Allocates <paramref name="size"/> zeroed bytes owned by this scope.</summary>
     public IntPtr Allocate(int size)
