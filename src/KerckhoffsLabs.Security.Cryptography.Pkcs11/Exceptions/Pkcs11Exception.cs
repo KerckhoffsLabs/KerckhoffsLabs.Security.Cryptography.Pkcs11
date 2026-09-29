@@ -22,13 +22,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 /// outside that hierarchy would bypass the caller's error handling entirely.
 /// Catching <see cref="Pkcs11Exception"/> remains available for callers that want the CKR.
 ///
-/// Use the appropriate static at each call site:
-/// <list type="bullet">
-///   <item><see cref="ThrowIfError(CKR, string)"/> — the normal guard-clause path; no-op on <c>CKR_OK</c>.</item>
-///   <item><see cref="Throw(CKR, string)"/> — unconditional throw, marked <c>[DoesNotReturn]</c> for nullability flow analysis.</item>
-///   <item><c>throw <see cref="Create(CKR, string)"/></c> — literal-throw form required where definite-assignment analysis (CS0177) needs the throw to be visible syntactically.</item>
-/// </list>
-/// Never construct instances directly.
+/// The library raises these from its PKCS#11 call sites; the CKR-to-subclass routing is not part
+/// of the public surface, so which subclass a code maps to can be refined without a breaking change
+/// to any caller other than a <c>catch</c>.
 /// </remarks>
 /// <remarks>
 /// Initializes a new instance carrying the CKR and method name. Used by
@@ -69,7 +65,8 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// </summary>
     /// <param name="returnValue">The PKCS#11 return value to inspect.</param>
     /// <param name="method">Name of the PKCS#11 method that produced the value.</param>
-    public static void ThrowIfError(CKR returnValue, string method)
+    /// <remarks>The normal guard-clause path at a PKCS#11 call site.</remarks>
+    internal static void ThrowIfError(CKR returnValue, string method)
     {
         if (returnValue != CKR.CKR_OK) Throw(returnValue, method);
     }
@@ -86,7 +83,7 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// <param name="returnValue">The PKCS#11 return value to dispatch.</param>
     /// <param name="method">Name of the PKCS#11 method that produced the value.</param>
     [DoesNotReturn]
-    public static void Throw(CKR returnValue, string method)
+    internal static void Throw(CKR returnValue, string method)
         => throw ExceptionMapper.Map(returnValue, method);
 
     /// <summary>
@@ -99,6 +96,6 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     /// <param name="returnValue">The PKCS#11 return value to dispatch.</param>
     /// <param name="method">Name of the PKCS#11 method that produced the value.</param>
     /// <returns>The typed exception to throw.</returns>
-    public static Pkcs11Exception Create(CKR returnValue, string method)
+    internal static Pkcs11Exception Create(CKR returnValue, string method)
         => ExceptionMapper.Map(returnValue, method);
 }
