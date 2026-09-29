@@ -383,16 +383,17 @@ public sealed class Pkcs11Workspace : IDisposable
 
     private static void RequireClassIfSet(ObjectTemplate template, CKO expected, string paramName)
     {
-        foreach (var attribute in template.Attributes)
-        {
-            if (attribute.Type != (ulong)CKA.CKA_CLASS || attribute.CannotBeRead) continue;
-            ulong actual = attribute.GetValueAsUlong();
-            if (actual != (ulong)expected)
-                throw new ArgumentException(
-                    $"The template sets CKA_CLASS to {(Enum.IsDefined((CKO)actual) ? ((CKO)actual).ToString() : $"0x{actual:X}")}, " +
-                    $"but this position takes the {expected} template. The key-pair templates are public first, then private.",
-                    paramName);
-        }
+        ObjectAttribute? contradicting = template.Attributes.FirstOrDefault(attribute =>
+            attribute.Type == (ulong)CKA.CKA_CLASS
+            && !attribute.CannotBeRead
+            && attribute.GetValueAsUlong() != (ulong)expected);
+        if (contradicting is null) return;
+
+        ulong actual = contradicting.GetValueAsUlong();
+        throw new ArgumentException(
+            $"The template sets CKA_CLASS to {(Enum.IsDefined((CKO)actual) ? ((CKO)actual).ToString() : $"0x{actual:X}")}, " +
+            $"but this position takes the {expected} template. The key-pair templates are public first, then private.",
+            paramName);
     }
 
     // === Secure-default key-generation helpers =============================
