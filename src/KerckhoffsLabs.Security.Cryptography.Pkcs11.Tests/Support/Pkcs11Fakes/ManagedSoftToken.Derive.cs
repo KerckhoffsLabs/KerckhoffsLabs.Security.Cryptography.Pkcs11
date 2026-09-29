@@ -7,8 +7,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-// Key derivation: C_DeriveKey for ECDH1 (CKD_NULL — raw shared secret Z) and SP800-108 counter-mode
-// HMAC KDF. Produces a new secret-key object whose CKA_VALUE is the derived material.
+// Key derivation: C_DeriveKey for ECDH1 (CKD_NULL — raw shared secret Z), SP800-108 counter-mode
+// HMAC KDF and HKDF. Produces a new secret-key object whose CKA_VALUE is the derived material.
 internal sealed partial class ManagedSoftToken
 {
     public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
@@ -31,6 +31,13 @@ internal sealed partial class ManagedSoftToken
                 if (!_objects.TryGetValue((ulong)baseKey, out var obj) || !obj.TryGetValue((ulong)CKA.CKA_VALUE, out var keyVal))
                     return CKR.CKR_KEY_HANDLE_INVALID;
                 derived = DeriveSp800108(keyVal, ref mechanism, valueLen);
+                break;
+
+            case CKM.CKM_HKDF_DERIVE:
+                if (!_objects.TryGetValue((ulong)baseKey, out var hkdfObj) || !hkdfObj.TryGetValue((ulong)CKA.CKA_VALUE, out var hkdfKey))
+                    return CKR.CKR_KEY_HANDLE_INVALID;
+                if (!TryDeriveHkdf(hkdfKey, ref mechanism, valueLen, out derived))
+                    return CKR.CKR_MECHANISM_PARAM_INVALID;
                 break;
 
             default:
@@ -107,6 +114,50 @@ internal sealed partial class ManagedSoftToken
         }
 
         return stream.AsSpan(0, valueLen).ToArray();
+    }
+
+    // CKM_HKDF_DERIVE (RFC 5869) over the BCL HKDF. Extract-only yields the PRK (one hash length, as
+    // PKCS#11 specifies); expand-only treats the base key's value as the PRK. SALT_NULL is the RFC
+    // default salt, SALT_KEY reads the salt from another key object.
+    private bool TryDeriveHkdf(byte[] baseKey, ref CK_MECHANISM mech, int valueLen, out byte[] derived)
+    {
+        derived = [];
+        var p = UnmanagedMemory.Read<CK_HKDF_PARAMS>(mech.Parameter);
+        HashAlgorithmName hash;
+        switch ((CKM)(ulong)p.PrfHashMechanism)
+        {
+            case CKM.CKM_SHA256_HMAC or CKM.CKM_SHA256: hash = HashAlgorithmName.SHA256; break;
+            case CKM.CKM_SHA384_HMAC or CKM.CKM_SHA384: hash = HashAlgorithmName.SHA384; break;
+            case CKM.CKM_SHA512_HMAC or CKM.CKM_SHA512: hash = HashAlgorithmName.SHA512; break;
+            case CKM.CKM_SHA3_256_HMAC or CKM.CKM_SHA3_256: hash = HashAlgorithmName.SHA3_256; break;
+            case CKM.CKM_SHA3_384_HMAC or CKM.CKM_SHA3_384: hash = HashAlgorithmName.SHA3_384; break;
+            case CKM.CKM_SHA3_512_HMAC or CKM.CKM_SHA3_512: hash = HashAlgorithmName.SHA3_512; break;
+            default: return false;
+        }
+
+        byte[] salt;
+        switch ((ulong)p.SaltType)
+        {
+            case 1: salt = []; break; // CKF_HKDF_SALT_NULL
+            case 2: salt = UnmanagedMemory.Read(p.Salt, (int)p.SaltLen); break; // CKF_HKDF_SALT_DATA
+            case 4: // CKF_HKDF_SALT_KEY
+                if (!_objects.TryGetValue((ulong)p.SaltKey, out var saltObj) || !saltObj.TryGetValue((ulong)CKA.CKA_VALUE, out var saltValue))
+                    return false;
+                salt = saltValue;
+                break;
+            default: return false;
+        }
+        byte[] info = p.Info != IntPtr.Zero && (int)p.InfoLen > 0 ? UnmanagedMemory.Read(p.Info, (int)p.InfoLen) : [];
+
+        if (p.Extract && p.Expand)
+            derived = HKDF.DeriveKey(hash, baseKey, valueLen, salt, info);
+        else if (p.Extract)
+            derived = HKDF.Extract(hash, baseKey, salt);
+        else if (p.Expand)
+            derived = HKDF.Expand(hash, baseKey, valueLen, info);
+        else
+            return false;
+        return true;
     }
 
     private static CK_ATTRIBUTE[] ReadAttributeArray(IntPtr array, int count)
