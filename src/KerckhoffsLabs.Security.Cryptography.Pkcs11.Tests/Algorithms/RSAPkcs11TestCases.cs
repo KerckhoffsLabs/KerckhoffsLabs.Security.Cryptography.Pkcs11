@@ -36,7 +36,7 @@ internal static class RSAPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Decrypt().Build();
 
-        return workspace.GenerateKey(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
+        return workspace.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
     }
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)

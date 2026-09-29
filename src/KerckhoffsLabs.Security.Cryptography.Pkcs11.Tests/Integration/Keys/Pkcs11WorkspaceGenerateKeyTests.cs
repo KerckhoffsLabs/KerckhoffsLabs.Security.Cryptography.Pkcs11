@@ -42,10 +42,10 @@ internal static class WorkspaceGenerateKeyTestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKey(
+        using var key = workspace.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
-            privTpl,
-            pubTpl);
+            pubTpl,
+            privTpl);
 
         try
         {

@@ -325,27 +325,38 @@ public sealed class Pkcs11Workspace : IDisposable
     /// Generates a new asymmetric key pair using <c>C_GenerateKeyPair</c> and returns
     /// it as a single <see cref="Pkcs11Key"/> carrying both handles.
     /// </summary>
+    /// <remarks>
+    /// The templates come in the order <c>C_GenerateKeyPair</c> takes them: public, then private.
+    /// Both are <see cref="ObjectTemplate"/>, so swapping them would compile — and the secure
+    /// defaults meant for the private key would land on the public one. A template whose
+    /// <c>CKA_CLASS</c> names the other half (as the <c>ForPublicKey</c>/<c>ForPrivateKey</c>
+    /// builders always set it) is therefore refused.
+    /// </remarks>
     /// <param name="mechanism">Key-pair generation mechanism (e.g. <see cref="CKM.CKM_RSA_PKCS_KEY_PAIR_GEN"/>).</param>
-    /// <param name="privateTemplate">Template for the private key half.</param>
-    /// <param name="publicTemplate">Template for the public key half.</param>
+    /// <param name="publicKeyTemplate">Template for the public key half.</param>
+    /// <param name="privateKeyTemplate">Template for the private key half.</param>
+    /// <returns>The new key pair, carrying both handles.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="privateTemplate"/>, or <paramref name="publicTemplate"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/>, <paramref name="publicKeyTemplate"/>, or <paramref name="privateKeyTemplate"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="publicKeyTemplate"/> sets a <c>CKA_CLASS</c> other than <see cref="CKO.CKO_PUBLIC_KEY"/>, or <paramref name="privateKeyTemplate"/> one other than <see cref="CKO.CKO_PRIVATE_KEY"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure, or the requested key strength is below the secure-defaults baseline, and the workspace's <see cref="Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKeyPair</c> call.</exception>
-    public Pkcs11Key GenerateKey(
+    public Pkcs11Key GenerateKeyPair(
         Mechanism mechanism,
-        ObjectTemplate privateTemplate,
-        ObjectTemplate publicTemplate)
+        ObjectTemplate publicKeyTemplate,
+        ObjectTemplate privateKeyTemplate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(privateTemplate);
-        ArgumentNullException.ThrowIfNull(publicTemplate);
+        ArgumentNullException.ThrowIfNull(publicKeyTemplate);
+        ArgumentNullException.ThrowIfNull(privateKeyTemplate);
+        RequireClassIfSet(publicKeyTemplate, CKO.CKO_PUBLIC_KEY, nameof(publicKeyTemplate));
+        RequireClassIfSet(privateKeyTemplate, CKO.CKO_PRIVATE_KEY, nameof(privateKeyTemplate));
 
         _session.GenerateKeyPair(
             mechanism,
-            [.. publicTemplate.Attributes],
-            [.. privateTemplate.Attributes],
+            [.. publicKeyTemplate.Attributes],
+            [.. privateKeyTemplate.Attributes],
             out var publicHandle,
             out var privateHandle);
 
@@ -368,6 +379,21 @@ public sealed class Pkcs11Workspace : IDisposable
             keyType: keyType,
             label: label,
             id: id);
+    }
+
+    private static void RequireClassIfSet(ObjectTemplate template, CKO expected, string paramName)
+    {
+        ObjectAttribute? contradicting = template.Attributes.FirstOrDefault(attribute =>
+            attribute.Type == (ulong)CKA.CKA_CLASS
+            && !attribute.CannotBeRead
+            && attribute.GetValueAsUlong() != (ulong)expected);
+        if (contradicting is null) return;
+
+        ulong actual = contradicting.GetValueAsUlong();
+        throw new ArgumentException(
+            $"The template sets CKA_CLASS to {(Enum.IsDefined((CKO)actual) ? ((CKO)actual).ToString() : $"0x{actual:X}")}, " +
+            $"but this position takes the {expected} template. The key-pair templates are public first, then private.",
+            paramName);
     }
 
     // === Secure-default key-generation helpers =============================
@@ -497,7 +523,7 @@ public sealed class Pkcs11Workspace : IDisposable
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
         var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
-        return GenerateKey(mechanism, privTemplate, pubTemplate);
+        return GenerateKeyPair(mechanism, pubTemplate, privTemplate);
     }
 
     /// <summary>
@@ -510,7 +536,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// — see <see cref="GenerateRsaSigningKeyPair"/> for the signing counterpart. A caller who
     /// specifically needs RSA <c>C_WrapKey</c>/<c>C_UnwrapKey</c> semantics (rather than encrypting
     /// data directly) should build that template explicitly via
-    /// <see cref="GenerateKey(Mechanism, ObjectTemplate, ObjectTemplate)"/>.
+    /// <see cref="GenerateKeyPair(Mechanism, ObjectTemplate, ObjectTemplate)"/>.
     /// </remarks>
     /// <param name="modulusBits">RSA modulus size in bits. Default 4096. Sizes below 2048 (NIST SP
     /// 800-131A) are refused unless the workspace's <see cref="Policy"/> permits it.</param>
@@ -548,7 +574,7 @@ public sealed class Pkcs11Workspace : IDisposable
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
         var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
-        return GenerateKey(mechanism, privTemplate, pubTemplate);
+        return GenerateKeyPair(mechanism, pubTemplate, privTemplate);
     }
 
     /// <summary>
@@ -595,7 +621,7 @@ public sealed class Pkcs11Workspace : IDisposable
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
         var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
-        return GenerateKey(mechanism, privTemplate, pubTemplate);
+        return GenerateKeyPair(mechanism, pubTemplate, privTemplate);
     }
 
     /// <summary>

@@ -47,8 +47,8 @@ public sealed class MLDsaPkcs11Tests_Managed
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Sign().Build();
 
-        using var key = workspace.GenerateKey(
-            new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(
+            new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mldsa = new MLDsaPkcs11(key);

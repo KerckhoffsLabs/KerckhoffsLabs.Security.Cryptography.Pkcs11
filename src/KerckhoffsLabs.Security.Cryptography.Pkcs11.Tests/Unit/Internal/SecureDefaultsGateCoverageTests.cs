@@ -72,7 +72,7 @@ public sealed class SecureDefaultsGateCoverageTests
             using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Label("pubdefaults").Derive().Build();
 
             Assert.Null(Record.Exception(
-                () => workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl).Dispose()));
+                () => workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl).Dispose()));
         }
     }
 }

@@ -67,7 +67,7 @@ internal static class EncapsulateKeyTestCases
             .Label(label).Id(id)
             .Attribute(CKA.CKA_DECAPSULATE, true).OnToken(backend.SupportsTokenObjects).Build();
 
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
@@ -100,7 +100,7 @@ internal static class EncapsulateKeyTestCases
             .Label(label).Id(id)
             .Attribute(CKA.CKA_DECAPSULATE, true).OnToken(backend.SupportsTokenObjects).Build();
 
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             // pPublicData must be empty for this call shape (PKCS#11 v3.2 §5.18.10/.11): the token

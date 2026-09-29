@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// The EC curve is judged on every key-pair generation, not only through
-/// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/>: the generic <c>GenerateKey(mechanism, private, public)</c>
+/// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/>: the generic <c>GenerateKeyPair(mechanism, public, private)</c>
 /// path reaches the same session call and must meet the same curve allow-list.
 /// </summary>
 public sealed class EcKeyGenCurveGateTests
@@ -119,6 +119,6 @@ public sealed class EcKeyGenCurveGateTests
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Sign().Build();
 
         Assert.Throws<CryptoPolicyViolationException>(
-            () => workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl));
+            () => workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl));
     }
 }

@@ -49,7 +49,7 @@ public sealed class MLKemPkcs11Tests_Managed
             .Label(label)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
 
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
@@ -176,7 +176,7 @@ public sealed class MLKemPkcs11Tests_Managed
             .Label(label)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
 
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mlkem = new MLKemPkcs11(key);

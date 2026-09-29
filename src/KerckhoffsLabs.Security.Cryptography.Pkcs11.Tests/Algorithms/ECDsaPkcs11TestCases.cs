@@ -39,7 +39,7 @@ internal static class ECDsaPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Sign().Build();
 
-        return workspace.GenerateKey(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), privTpl, pubTpl);
+        return workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
     }
 
     private static void DestroyByLabel(Pkcs11Workspace workspace, string label)

@@ -42,8 +42,8 @@ public sealed class SlhDsaPkcs11Tests_Managed
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_SLH_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKey(
-            new Mechanism(CKM.CKM_SLH_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(
+            new Mechanism(CKM.CKM_SLH_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var slhdsa = new SlhDsaPkcs11(key);

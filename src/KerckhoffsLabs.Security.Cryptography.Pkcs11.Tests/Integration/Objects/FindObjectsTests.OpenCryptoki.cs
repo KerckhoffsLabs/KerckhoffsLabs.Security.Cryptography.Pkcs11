@@ -70,8 +70,8 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
             .Label(baseLabel).Id(id).Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]).OnToken().Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(baseLabel).Id(id).Sign().OnToken().Build();
-        using var keypair = workspace.GenerateKey(
-            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var keypair = workspace.GenerateKeyPair(
+            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
 
         byte[] der;
         byte[] subject;

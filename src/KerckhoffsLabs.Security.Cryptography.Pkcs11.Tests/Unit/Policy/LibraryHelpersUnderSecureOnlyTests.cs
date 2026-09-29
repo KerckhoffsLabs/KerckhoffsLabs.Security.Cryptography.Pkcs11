@@ -133,7 +133,7 @@ public sealed class LibraryHelpersUnderSecureOnlyTests
             .Attribute(CKA.CKA_PARAMETER_SET, (ulong)CkpMlDsa.CKP_ML_DSA_65).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA).Label(label).Sign().Build();
 
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         using var mldsa = new MLDsaPkcs11(key);
 
         byte[] signature = mldsa.SignData(Message);
@@ -155,7 +155,7 @@ public sealed class LibraryHelpersUnderSecureOnlyTests
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_KEM)
             .Label(label)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
-        using var kemKey = workspace.GenerateKey(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var kemKey = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
 
         using var secretTpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
         using EncapsulationResult encapsulated = kemKey.EncapsulateKey(new Mechanism(CKM.CKM_ML_KEM), secretTpl);
