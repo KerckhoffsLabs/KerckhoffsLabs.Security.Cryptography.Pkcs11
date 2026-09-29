@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // The obsolete instance constructors are the subject under test, and MD5 drives their
@@ -27,6 +28,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     private sealed class PasswordCapturingPolicy : ICryptoPolicy
     {
         public List<byte[]> Passwords { get; } = [];
+        public List<CkmPkcs5Pbkd2Params> Parameters { get; } = [];
         public string Name => "PasswordCapturing";
         public bool AllowsOverride => true;
 
@@ -34,6 +36,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         {
             if (request is MechanismUseRequest { Mechanism.Parameters: CkmPkcs5Pbkd2Params p })
             {
+                Parameters.Add(p);
                 using var scope = new MechanismParameterScope();
                 var s = (CK_PKCS5_PBKD2_PARAMS2)p.BuildMarshalable(scope);
                 // An empty password marshals as a NULL pointer, the PKCS#11 encoding of an empty buffer.
@@ -109,5 +112,53 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         kdf.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => kdf.GetBytes(16));
+    }
+
+    // === The password is borrowed, not copied ================================
+
+    private static bool StillMarshals(CkmPkcs5Pbkd2Params p)
+    {
+        using var scope = new MechanismParameterScope();
+        try
+        {
+            p.BuildMarshalable(scope);
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    [Fact]
+    public void Instance_LendsItsPinUntilDisposed()
+    {
+        var policy = new PasswordCapturingPolicy();
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library, policy);
+        var kdf = new Rfc2898DeriveBytesPkcs11(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256);
+        Assert.ThrowsAny<Pkcs11Exception>(() => kdf.GetBytes(16));
+        CkmPkcs5Pbkd2Params borrowed = Assert.Single(policy.Parameters);
+
+        Assert.True(StillMarshals(borrowed));
+        kdf.Dispose();
+        Assert.False(StillMarshals(borrowed));
+    }
+
+    [Fact]
+    public void OneShots_ReleaseTheirPinBeforeReturning()
+    {
+        var policy = new PasswordCapturingPolicy();
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library, policy);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256, 16));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template));
+
+        Assert.Equal(3, policy.Parameters.Count);
+        Assert.All(policy.Parameters, p => Assert.False(StillMarshals(p)));
+        Assert.All(policy.Passwords, p => Assert.Equal("password"u8.ToArray(), p));
     }
 }

@@ -39,8 +39,7 @@ public sealed class MechanismParamsFinalizerTests
     /// </summary>
     /// <remarks>
     /// This is the assertion the sibling allocation census cannot make: a finalizer with nothing to
-    /// free allocates nothing, so it would pass there unnoticed. The one exception is a type that holds
-    /// a secret: its finalizer zeroes that secret, not unmanaged memory, and the type is disposable.
+    /// free allocates nothing, so it would pass there unnoticed.
     /// </remarks>
     [Fact]
     public void NoParameterType_DeclaresAFinalizer()
@@ -52,27 +51,12 @@ public sealed class MechanismParamsFinalizerTests
         Assert.True(all.Length >= 27, $"expected the full parameter surface, found {all.Length}");
 
         string[] withFinalizers =
-            [.. all.Where(static t => !SecretHoldingTypes.Contains(t))
-                .Where(static t => t.GetMethod(
+            [.. all.Where(static t => t.GetMethod(
                     "Finalize",
                     BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) is not null)
                 .Select(static t => t.Name)];
 
         Assert.Empty(withFinalizers);
-    }
-
-    /// <summary>The parameter types whose finalizer zeroes a secret they hold.</summary>
-    private static readonly Type[] SecretHoldingTypes = [typeof(CkmPkcs5Pbkd2Params)];
-
-    /// <summary>
-    /// A secret-holding type is disposable, so its secret can be zeroed deterministically; its
-    /// finalizer is only the safety net.
-    /// </summary>
-    [Fact]
-    public void SecretHoldingTypes_AreDisposable()
-    {
-        foreach (Type t in SecretHoldingTypes)
-            Assert.True(typeof(IDisposable).IsAssignableFrom(t), t.Name);
     }
 
     /// <summary>

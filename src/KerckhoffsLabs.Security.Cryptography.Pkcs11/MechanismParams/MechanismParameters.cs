@@ -12,9 +12,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <para>
 /// Instances are pure managed descriptors: they hold the caller's values and build the interop
 /// struct on demand into the per-call scope the session owns. Nothing unmanaged outlives the call,
-/// so sharing one instance across two mechanisms is safe — each marshals into its own scope. The
-/// types that hold a secret (<see cref="CkmPkcs5Pbkd2Params"/>'s password) are
-/// <see cref="IDisposable"/> so their copy is zeroed; the rest need no releasing.
+/// so nothing needs releasing and sharing one instance across two mechanisms is safe — each
+/// marshals into its own scope.
 /// </para>
 /// The marshalling contract (<see cref="BuildMarshalable"/>) is <c>internal</c>: callers select from
 /// the library-provided <c>Ckm*Params</c> types and cannot define their own through this path, which
