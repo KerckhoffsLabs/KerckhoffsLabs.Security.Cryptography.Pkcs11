@@ -5,12 +5,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 
 /// <summary>Test <see cref="ILogger"/> that records each emitted entry (level, id, rendered text).</summary>
 /// <remarks>
-/// Backed by a <see cref="ConcurrentQueue{T}"/>, not a plain <c>List&lt;T&gt;</c>: a
-/// <see cref="CapturingLogger"/> installed via <c>Pkcs11Logging.SetLoggerFactory</c> is process-wide
-/// state, so it can receive concurrent <see cref="Log"/> calls from unrelated tests running in
-/// parallel elsewhere in the suite for as long as it stays installed. A plain list would throw
-/// "Collection was modified" the moment a test enumerates <see cref="Entries"/> while another
-/// thread's call is still adding to it.
+/// Backed by a <see cref="ConcurrentQueue{T}"/>, not a plain <c>List&lt;T&gt;</c>: a library, its
+/// slots and its sessions can log from more than one thread (a finalizer, a parallel operation), and a
+/// plain list would throw "Collection was modified" the moment a test enumerates
+/// <see cref="Entries"/> while another thread's call is still adding to it.
 /// </remarks>
 internal sealed class CapturingLogger : ILogger
 {
@@ -41,10 +39,9 @@ internal sealed class CapturingLogger : ILogger
 
 /// <summary>Test <see cref="ILoggerFactory"/> that always returns <paramref name="logger"/> and records every category it is asked for.</summary>
 /// <remarks>
-/// Records all categories rather than the last one: once installed through
-/// <c>Pkcs11Logging.SetLoggerFactory</c> the factory is process-wide, so library objects built by tests
-/// running in parallel ask it for their own categories too. A single "last category" slot could be
-/// overwritten between a test's call and its assertion; a test should check that its category is present.
+/// Records all categories rather than the last one: a library hands its factory down to every slot and
+/// session it produces, so one factory is asked for several categories. A test should check that its
+/// category is present rather than that it was the last one asked for.
 /// </remarks>
 internal sealed class CapturingLoggerFactory(ILogger logger) : ILoggerFactory
 {
