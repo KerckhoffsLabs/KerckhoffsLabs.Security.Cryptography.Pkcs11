@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <remarks>
 /// The certificate and its private key are two distinct token objects (PKCS#11 models them
 /// separately, and a non-extractable key cannot be fused into a single <see cref="X509Certificate2"/>
-/// on the OpenSSL backend). Operations on a key returned by <see cref="TryOpenPrivateKey"/> run on
+/// on the OpenSSL backend). Operations on a key returned by <see cref="GetPrivateKey"/> run on
 /// the token and are valid only while the owning <see cref="Pkcs11Workspace"/> is open. Disposing
 /// this instance disposes the wrapped <see cref="X509Certificate2"/> but does not destroy the token
 /// object — use <see cref="Destroy"/>.
@@ -53,16 +53,21 @@ public sealed class Pkcs11Certificate : IDisposable
     /// <c>CKA_ID</c> exists on the token. The caller owns the returned key.
     /// </summary>
     /// <remarks>
+    /// Named like <c>X509Certificate2.GetRSAPrivateKey()</c>, which likewise returns <c>null</c> when
+    /// there is no private key.
+    /// </remarks>
+    /// <remarks>
     /// BCL-shaped convenience wrappers <c>GetRSAPrivateKey()</c> / <c>GetECDsaPrivateKey()</c>
     /// (mirroring <c>X509Certificate2</c>) live in the
     /// <c>KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms</c> namespace as extension methods.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The certificate has been disposed.</exception>
+    /// <exception cref="Exceptions.Pkcs11AmbiguousObjectException">More than one private key on the token has this certificate's <c>CKA_ID</c>.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_FindObjects</c> call that locates the private key.</exception>
-    public Pkcs11Key? TryOpenPrivateKey()
+    public Pkcs11Key? GetPrivateKey()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _workspace.TryOpenPrivateKey(_id);
+        return _workspace.OpenPrivateKeyById(_id);
     }
 
     /// <summary>

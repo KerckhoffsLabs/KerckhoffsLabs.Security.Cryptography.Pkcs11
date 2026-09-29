@@ -26,7 +26,7 @@ public static class Pkcs11CertificateExtensions
     {
         ArgumentNullException.ThrowIfNull(certificate);
         if (certificate.Certificate.GetKeyAlgorithm() is not (RsaOid or RsaPssOid)) return null;
-        var key = certificate.TryOpenPrivateKey();
+        var key = certificate.GetPrivateKey();
         return key is null ? null : new RSAPkcs11(key);
     }
 
@@ -42,7 +42,7 @@ public static class Pkcs11CertificateExtensions
     {
         ArgumentNullException.ThrowIfNull(certificate);
         if (certificate.Certificate.GetKeyAlgorithm() != EcOid) return null;
-        var key = certificate.TryOpenPrivateKey();
+        var key = certificate.GetPrivateKey();
         return key is null ? null : new ECDsaPkcs11(key);
     }
 }

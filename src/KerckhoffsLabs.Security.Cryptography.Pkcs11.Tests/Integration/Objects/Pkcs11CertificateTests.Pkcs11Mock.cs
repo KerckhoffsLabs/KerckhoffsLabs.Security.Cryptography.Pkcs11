@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 /// pkcs11-mock's fixed sentinel handles — the CKO_SECRET_KEY handle stands in for a certificate
 /// object here since the mock has no certificate class of its own (CKO_DATA would also work but
 /// returns its handle twice from C_FindObjects, a pkcs11-mock quirk unrelated to what's under test).
-/// Every member under test (properties, disposal, Destroy's C_DestroyObject call, TryOpenPrivateKey's
+/// Every member under test (properties, disposal, Destroy's C_DestroyObject call, GetPrivateKey's
 /// dispatch) only cares that the handle is one of the mock's four accepted values, not which token
 /// object class it nominally represents.
 /// </summary>
@@ -73,18 +73,18 @@ public sealed class Pkcs11CertificateTests(MockBackendFixture backend)
     }
 
     [Fact]
-    public void TryOpenPrivateKey_EmptyId_ReturnsNull()
+    public void GetPrivateKey_EmptyId_ReturnsNull()
     {
         using var workspace = OpenWorkspace();
         ObjectHandle handle = FindByClass(workspace, CKO.CKO_SECRET_KEY);
         using var certificate = CreateSelfSignedCertificate();
         using var pkcs11Cert = new Pkcs11Certificate(workspace, handle, null, [], certificate);
 
-        Assert.Null(pkcs11Cert.TryOpenPrivateKey());
+        Assert.Null(pkcs11Cert.GetPrivateKey());
     }
 
     [Fact]
-    public void TryOpenPrivateKey_AfterDispose_Throws()
+    public void GetPrivateKey_AfterDispose_Throws()
     {
         using var workspace = OpenWorkspace();
         ObjectHandle handle = FindByClass(workspace, CKO.CKO_SECRET_KEY);
@@ -92,7 +92,7 @@ public sealed class Pkcs11CertificateTests(MockBackendFixture backend)
         var pkcs11Cert = new Pkcs11Certificate(workspace, handle, null, [], certificate);
         pkcs11Cert.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => pkcs11Cert.TryOpenPrivateKey());
+        Assert.Throws<ObjectDisposedException>(() => pkcs11Cert.GetPrivateKey());
     }
 
     [Fact]
