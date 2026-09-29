@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -54,7 +55,10 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         "The constructors on Rfc2898DeriveBytesPkcs11 are obsolete. Use the static Pbkdf2 method instead.";
 
     private readonly Pkcs11Workspace _workspace;
-    private readonly byte[] _password;
+    // Pinned for the instance's lifetime so the GC cannot move it and leave stale copies of the
+    // password behind; zeroed by Dispose, or by the finalizer if the instance is never disposed.
+    private byte[] _password;
+    private GCHandle _passwordPin;
     private byte[] _salt;
     private int _iterationCount;
     private readonly CKP _prf;
@@ -82,41 +86,36 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <inheritdoc cref="Rfc2898DeriveBytesPkcs11(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName)"/>
     [Obsolete(ConstructorsObsoleteMessage, DiagnosticId = DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors, UrlFormat = DiagnosticIds.UrlFormat)]
     public Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm)
-        : this(workspace, password.ToArray(), salt, iterations, hashAlgorithm, ownsPassword: true)
+        : this(workspace, salt, iterations, hashAlgorithm, password.Length)
     {
+        password.CopyTo(_password);
     }
 
     /// <summary>Initializes the PBKDF2 wrapper from a UTF-8 password and salt.</summary>
     /// <inheritdoc cref="Rfc2898DeriveBytesPkcs11(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName)"/>
     [Obsolete(ConstructorsObsoleteMessage, DiagnosticId = DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors, UrlFormat = DiagnosticIds.UrlFormat)]
     public Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm)
-        : this(workspace, Encoding.UTF8.GetBytes(password ?? throw new ArgumentNullException(nameof(password))),
-              salt ?? throw new ArgumentNullException(nameof(salt)), iterations, hashAlgorithm, ownsPassword: true)
+        : this(workspace, salt ?? throw new ArgumentNullException(nameof(salt)), iterations, hashAlgorithm,
+              Encoding.UTF8.GetByteCount(password ?? throw new ArgumentNullException(nameof(password))))
     {
+        // Encoded straight into the pinned buffer: no intermediate array ever holds the password.
+        Encoding.UTF8.GetBytes(password, _password);
     }
 
-    // Takes ownership of ownedPassword rather than copying it, so the only managed copy of the
-    // password is the one Dispose zeroes. The flag only makes this overload distinct from the public
-    // byte[] constructor.
-    private Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, byte[] ownedPassword, ReadOnlySpan<byte> salt, int iterations,
-        HashAlgorithmName hashAlgorithm, bool ownsPassword)
+    // Validates the arguments and allocates the pinned password buffer, which the public
+    // constructors then fill, so the buffer Dispose zeroes is the only managed copy of the password.
+    private Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, ReadOnlySpan<byte> salt, int iterations,
+        HashAlgorithmName hashAlgorithm, int passwordLength)
     {
-        try
-        {
-            ArgumentNullException.ThrowIfNull(workspace);
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
-            _prf = PrfForHash(hashAlgorithm);
-        }
-        catch when (ownsPassword)
-        {
-            CryptographicOperations.ZeroMemory(ownedPassword);
-            throw;
-        }
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
+        _prf = PrfForHash(hashAlgorithm);
         _hashAlgorithm = hashAlgorithm;
         _workspace = workspace;
-        _password = ownedPassword;
         _salt = salt.ToArray();
         _iterationCount = iterations;
+        _password = new byte[passwordLength];
+        _passwordPin = GCHandle.Alloc(_password, GCHandleType.Pinned);
     }
 
     private static CKP PrfForHash(HashAlgorithmName hash) => hash.Name switch
@@ -389,8 +388,20 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        CryptographicOperations.ZeroMemory(_password);
+        ReleasePassword();
         CryptographicOperations.ZeroMemory(_salt);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Finalizer safety net: zeroes the password even if <see cref="Dispose"/> was not called.</summary>
+    ~Rfc2898DeriveBytesPkcs11() => ReleasePassword();
+
+    // Also reached from the finalizer, including for an instance whose constructor threw before the
+    // buffer was allocated: a null array zeroes as an empty span and an unallocated handle is skipped.
+    private void ReleasePassword()
+    {
+        CryptographicOperations.ZeroMemory(_password);
+        if (_passwordPin.IsAllocated) _passwordPin.Free();
+        _password = [];
     }
 }
