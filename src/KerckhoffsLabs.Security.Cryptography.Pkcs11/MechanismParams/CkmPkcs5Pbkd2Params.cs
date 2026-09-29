@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -36,6 +37,12 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 
     /// <summary>The PRF, for policy evaluation.</summary>
     internal CKP Prf => _prf;
+
+    /// <summary>
+    /// Zeroes this instance's copy of the password. For the library's own one-shot callers, which
+    /// build the parameters for a single call and must not leave the password on the managed heap.
+    /// </summary>
+    internal void ZeroPassword() => CryptographicOperations.ZeroMemory(_password);
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)

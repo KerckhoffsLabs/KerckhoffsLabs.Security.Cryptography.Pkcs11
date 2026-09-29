@@ -248,4 +248,36 @@ public sealed class Pkcs11SessionPolicyTests
         var tokenError = Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
         Assert.Equal(CKR.CKR_MECHANISM_INVALID, tokenError.ReturnValue);
     }
+
+    [Fact]
+    public void Pbkdf2Key_RaisesNoExportCheck_AndReachesTheTokenUnderSecureOnly()
+    {
+        var policy = new RecordingPolicy(CryptoPolicy.SecureOnly.Evaluate);
+        using var library = Support.Pkcs11Fakes.ManagedToken.NewLibrary();
+        using var workspace = Support.Pkcs11Fakes.ManagedToken.OpenWorkspace(library, policy);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
+
+        // The managed soft token does not implement CKM_PKCS5_PBKD2, so a token error (not a policy
+        // refusal) is the proof that every SecureOnly check passed and the call reached C_GenerateKey.
+        var ex = Record.Exception(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(
+            workspace, "placeholder-password"u8, new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, template));
+
+        var tokenError = Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
+        Assert.Equal(CKR.CKR_MECHANISM_INVALID, tokenError.ReturnValue);
+        Assert.Empty(policy.Seen.OfType<KeyMaterialExportRequest>());
+        Assert.Contains(policy.Seen.OfType<MechanismUseRequest>(), r => r.Mechanism.Type == (ulong)CKM.CKM_PKCS5_PBKD2);
+    }
+
+    [Fact]
+    public void Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly()
+    {
+        using var library = Support.Pkcs11Fakes.ManagedToken.NewLibrary();
+        using var workspace = Support.Pkcs11Fakes.ManagedToken.OpenWorkspace(library);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+#pragma warning disable KLPKCS11010 // the SHA-1 PRF is the refusal under test
+        Assert.Throws<CryptoPolicyViolationException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(
+            workspace, "placeholder-password"u8, new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA1, template));
+#pragma warning restore KLPKCS11010
+    }
 }
