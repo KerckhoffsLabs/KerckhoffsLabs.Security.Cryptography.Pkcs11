@@ -43,7 +43,7 @@ internal static class UnmanagedMemory
     /// default: this is a diagnostic for the library's own tests, not a consumer logging channel —
     /// this class has no library instance to take an <see cref="ILoggerFactory"/> from.
     /// </summary>
-    internal static ILogger AllocationLogger { get; set; } = NullLogger.Instance;
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
     /// <summary>
     /// Every allocation performed by this class, by pointer and size.
@@ -104,7 +104,7 @@ internal static class UnmanagedMemory
         }
 
         if (DebugModeEnabled)
-            Log.AllocatedMemory(AllocationLogger, size, memory, _allocations.Count);
+            Log.AllocatedMemory(Logger, size, memory, _allocations.Count);
 
         return memory;
     }
@@ -131,7 +131,7 @@ internal static class UnmanagedMemory
         }
 
         if (DebugModeEnabled)
-            Log.FreeingMemory(AllocationLogger, size, memory, _allocations.Count);
+            Log.FreeingMemory(Logger, size, memory, _allocations.Count);
 
         Zeroize(memory, size);
         Marshal.FreeHGlobal(memory);
