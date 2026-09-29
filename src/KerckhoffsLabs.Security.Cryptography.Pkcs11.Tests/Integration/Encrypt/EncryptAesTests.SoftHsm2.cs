@@ -18,7 +18,7 @@ public sealed class EncryptAesTests_SoftHsm(SoftHsmBackendFixture f)
         => EncryptAesTestCases.Assert_AesCbcPad_RoundTrips(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void AesEcb_ThrowsInsecureOperationException_ByDefault_SoftHsm()
+    public void AesEcb_ThrowsCryptoPolicyViolationException_ByDefault_SoftHsm()
         => EncryptAesTestCases.Assert_AesEcb_GatedByDefault(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]

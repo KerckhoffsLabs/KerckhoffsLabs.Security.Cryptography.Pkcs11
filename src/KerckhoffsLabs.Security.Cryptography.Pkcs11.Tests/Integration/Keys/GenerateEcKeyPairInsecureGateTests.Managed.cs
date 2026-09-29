@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
-// GenerateEcKeyPair refuses sub-128-bit curves unless AllowInsecure is set, mirroring the
+// GenerateEcKeyPair refuses sub-128-bit curves unless the AllowInsecure policy is used, mirroring the
 // SHA-1/DES secure-defaults gate. Runs on the in-process managed token (real keygen). P-224 is the
 // weak curve used here; the throws-path needs no keygen, but actually generating it needs BCL P-224
 // support — macOS's SecurityFramework lacks it, so the generate case is gated on a probe.
@@ -35,18 +35,18 @@ public sealed class GenerateEcKeyPairInsecureGateTests
         using var workspace = ManagedToken.OpenWorkspace(library);
 
 #pragma warning disable KLPKCS11007 // exercising the gate with an intentionally-obsolete weak curve
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224));
 #pragma warning restore KLPKCS11007
     }
 
     [Fact(SkipUnless = nameof(P224Supported), Skip = "Requires " + nameof(P224Supported))]
-    public void WeakCurve_Generates_UnderAllowInsecureScope()
+    public void WeakCurve_Generates_UnderUsePolicyAllowInsecure()
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11007
             using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224);

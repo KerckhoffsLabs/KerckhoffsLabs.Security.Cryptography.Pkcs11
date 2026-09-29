@@ -95,27 +95,84 @@ category.
 ## Security model
 
 The high-level API is **secure by default**. A cryptographic operation whose mechanism is considered
-insecure is rejected with an `InsecureOperationException` before any call reaches the token. To use
-one for legacy interop you opt in explicitly, per workspace:
+insecure is rejected before any call reaches the token.
+
+Every workspace enforces a **crypto policy**, chosen when it is opened:
 
 ```csharp
-workspace.AllowInsecure = true;               // latched for the workspace lifetime, or
-using (workspace.AllowInsecureScope()) { … }  // scoped to a single operation (preferred)
+// Default: SecureOnly — refuses broken algorithms, weak keys, and plaintext key export.
+using var workspace = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin);
+
+// FIPS: only NIST-approved functions; overrides are refused for the workspace's lifetime.
+using var fips = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin, CryptoPolicy.FipsOnly);
+
+// Legacy interop for one operation (not available on a FipsOnly workspace):
+using (workspace.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
 ```
 
-The gate is mechanism-level and direction-agnostic — it fires the same way for sign, verify, encrypt,
-decrypt, derive, digest, and key generation. Gated families include unauthenticated symmetric modes
-(ECB, CBC, CTR, …), broken/legacy ciphers (DES/3DES, RC2, RC4, SEED, CAST, Blowfish, SKIPJACK),
-broken hashes (MD2/MD5/SHA-1/RIPEMD), PKCS#1 v1.5 *encryption* and raw RSA (`CKM_RSA_PKCS`,
-`CKM_RSA_X_509`), and sub-128-bit EC curves. Where the insecure choice is visible at compile time,
+Refusals throw `CryptoPolicyViolationException` (a `CryptographicException`) naming the policy and the
+reason. You can supply your own `ICryptoPolicy`; end any `switch` over `PolicyRequest` with a deny arm so
+request kinds added in later versions fail closed.
+
+Both restrictive policies are **allow-lists that deny by default**: every mechanism, hash, curve,
+key-agreement KDF and KDF PRF they permit — with its rationale — plus the documented, non-enforcing deny
+list (reason and alternative), is generated straight from the policy source into
+[`docs/policies/secure-only.md`](docs/policies/secure-only.md) and
+[`docs/policies/fips-only.md`](docs/policies/fips-only.md). Anything not listed on those pages is refused.
+
+> **`FipsOnly` is not FIPS certification.** It restricts what this library sends to the token. FIPS 140-3
+> compliance also requires a validated cryptographic module operating in its approved mode. Under
+> `FipsOnly`, AES key wrapping is approved only via KW/KWP (`CKM_AES_KEY_WRAP`, `CKM_AES_KEY_WRAP_KWP`)
+> or the GCM/CCM modes; other AES modes encrypt and decrypt data but may not wrap or unwrap keys.
+> `CKM_AES_KEY_WRAP_PAD` is refused: its padding is vendor-defined (RFC 5649 on some tokens, KW over
+> PKCS#7 — not an SP 800-38F method — on others), so its approval cannot be established.
+
+**Known limits.** Both restrictive policies judge requests, not what is already on the token:
+
+- They check mechanisms, parameters and *requested* key sizes/curves. They do not inspect the size or curve
+  of existing keys — using an RSA-1024 or Brainpool key already on the token is not refused. (For ECDH, the
+  existing key's *type* is checked: `FipsOnly` refuses an X25519/X448 key.)
+- Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the policy cannot
+  see which hash produced it.
+- `SecureOnly` allows `CKM_AES_KEY_WRAP_PAD`, but its meaning is vendor-dependent: RFC 5649 (KWP) on some
+  tokens, KW over PKCS#7-padded input on others, so wrapped keys may not move between tokens. Prefer
+  `CKM_AES_KEY_WRAP_KWP` where the token supports it.
+
+The default `SecureOnly` policy allows each mechanism only for the operations it is meant for —
+`CKM_AES_GCM` encrypts, decrypts, wraps and unwraps but does not sign; `CKM_SHA256` digests but does not
+sign — and **denies every vendor-defined or unreviewed mechanism by default**, including ones it has no
+specific objection to. Refusals it documents include unauthenticated symmetric modes (ECB, CBC, CTR, …),
+broken/legacy ciphers (DES/3DES, RC2, RC4, SEED, CAST, Blowfish, SKIPJACK), broken hashes
+(MD2/MD5/SHA-1/RIPEMD), PKCS#1 v1.5 *encryption* and raw RSA (`CKM_RSA_PKCS`, `CKM_RSA_X_509`),
+sub-128-bit EC curves, and SHA-1 KDF PRFs. Where the insecure choice is visible at compile time,
 [analyzers](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html)
 (`KLPKCS11001`–`KLPKCS11010`) surface it as a build warning too.
 
-**SHA-224 is gated for a different reason than the broken hashes above: it isn't cryptographically
+When `SecureOnly` refuses something you need, there are two remedies:
+
+```csharp
+// A mechanism you have reviewed (here a vendor-defined one): a new, wider policy named
+// "SecureOnly+custom". It only adds; CryptoPolicy.SecureOnly itself is unchanged.
+SecureOnlyPolicy reviewed = CryptoPolicy.SecureOnly.WithAllowedMechanism(
+    0x8000_1001UL,                                    // your vendor's CK_MECHANISM_TYPE
+    [CryptoOperation.Sign, CryptoOperation.Verify],
+    "Vendor HSM signature scheme, reviewed for our release signing.");
+using var workspace = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin, reviewed);
+
+// One-off legacy interop: lift the policy for a single, scoped operation.
+using (workspace.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }
+```
+
+Hashes, curves and key-agreement KDFs cannot be added this way. The generated
+[`secure-only.md`](docs/policies/secure-only.md) and [`fips-only.md`](docs/policies/fips-only.md) pages
+list exactly what each policy allows, for which operations, and why.
+
+**SHA-224 is refused for a different reason than the broken hashes above: it isn't cryptographically
 weak.** It's FIPS 180-4-approved — just a truncated SHA-256 with no `HashAlgorithmName` constant in
 the BCL and no practical benefit over SHA-256 on equal-cost hardware. RSA PKCS#1/PSS signing,
-RSA-OAEP, ECDSA signing, and HMAC all accept it behind the same `AllowInsecure` opt-in, for interop
-with a token or protocol that specifically requires it.
+RSA-OAEP, ECDSA signing, and HMAC all accept it behind a policy that permits it (e.g.
+`UsePolicy(CryptoPolicy.AllowInsecure)`), for interop with a token or protocol that specifically
+requires it.
 
 **RSA PKCS#1 v1.5 signatures are a deliberate exception.** Strong-hash v1.5 *signatures*
 (`CKM_SHA256_RSA_PKCS` and up) are allowed by default: RSASSA-PKCS1-v1_5 with a strong hash is

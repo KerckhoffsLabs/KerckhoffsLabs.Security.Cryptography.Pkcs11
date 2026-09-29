@@ -10,6 +10,6 @@ public sealed class DecryptRsaTests_Kryoptic(KryopticBackendFixture f)
 
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault()
+    public void RsaPkcs1V15_ThrowsCryptoPolicyViolationException_ByDefault()
         => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

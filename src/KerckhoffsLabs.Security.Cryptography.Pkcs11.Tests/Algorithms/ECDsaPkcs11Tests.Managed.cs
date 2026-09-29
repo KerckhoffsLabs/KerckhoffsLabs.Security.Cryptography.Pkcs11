@@ -51,7 +51,7 @@ public sealed class ECDsaPkcs11Tests_Managed
         WithEcDsa(curve, (_, ec) => body(ec, hash));
     }
 
-    // As above, but hands the workspace to the body (for AllowInsecure scoping) and leaves the hash to
+    // As above, but hands the workspace to the body (for scoping to the AllowInsecure policy) and leaves the hash to
     // the caller — so the same key can be exercised across hash algorithms independent of the curve.
     private static void WithEcDsa(string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
     {
@@ -84,7 +84,7 @@ public sealed class ECDsaPkcs11Tests_Managed
     // message-digest algorithm are independent. Exercise the full cross-product (every NIST curve
     // against SHA-256/384/512) rather than only each curve's "matched" hash, and cross-verify each
     // signature under the BCL from the exported public key (CKM_ECDSA emits raw r‖s = IEEE P1363).
-    // SHA-1 requires AllowInsecure and has its own gating tests below.
+    // SHA-1 requires the AllowInsecure policy and has its own gating tests below.
     [Theory]
     [InlineData("P-256", "SHA256")]
     [InlineData("P-256", "SHA384")]
@@ -153,24 +153,33 @@ public sealed class ECDsaPkcs11Tests_Managed
         Assert.False(ec.VerifyData(data, sig, hash));
     });
 
-    // === SHA-1 gating: the managed-side hash fallback is refused unless AllowInsecure ===========
-    // Mirrors GuardMechanism's rejection of the combined CKM_ECDSA_SHA1 mechanism, so SHA-1 signing
-    // is gated the same way regardless of whether the token exposes CKM_ECDSA_SHA1 natively.
+    // === SHA-1 gating: the managed-side hash fallback is refused unless the AllowInsecure policy applies ===========
+    // Mirrors the session's crypto policy check rejecting the combined CKM_ECDSA_SHA1 mechanism, so
+    // SHA-1 signing is gated the same way regardless of whether the token exposes CKM_ECDSA_SHA1 natively.
 
     [Fact]
     public void SignData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (_, ec) =>
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => ec.SignData(Encoding.UTF8.GetBytes("legacy"), HashAlgorithmName.SHA1)));
+
+    [Fact]
+    public void SignData_Stream_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (_, ec) =>
+    {
+        using var data = new MemoryStream(Encoding.UTF8.GetBytes("legacy"));
+#pragma warning disable KLPKCS11010 // SHA-1 signing is the refusal under test
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(data, HashAlgorithmName.SHA1));
+#pragma warning restore KLPKCS11010
+    });
 
     [Fact]
     public void VerifyData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (workspace, ec) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");
         byte[] sig;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = ec.SignData(data, HashAlgorithmName.SHA1);
 
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
     });
 
@@ -178,11 +187,120 @@ public sealed class ECDsaPkcs11Tests_Managed
     public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithEcDsa("P-256", (workspace, ec) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = ec.SignData(data, HashAlgorithmName.SHA1);
             Assert.True(ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
         }
+    });
+
+    // === SHA-1 under FipsOnly: legacy verification allowed, signing refused ===
+    // FipsOnly allows the SHA-1 hash only for Verify (SP 800-131A legacy use). Every BCL verification
+    // entry point must report its own direction to the policy, so a legacy signature verifies through
+    // whichever overload the caller picks. The signature is made over a managed SHA-1 digest with
+    // SignHash (raw CKM_ECDSA, which carries no hash choice), because FipsOnly refuses SHA-1 SignData.
+
+    private static void WithFipsOnlyEcDsa(Action<ECDsaPkcs11> body)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library, CryptoPolicy.FipsOnly);
+        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var ec = new ECDsaPkcs11(key);
+        body(ec);
+    }
+
+    private static readonly byte[] LegacyData = Encoding.UTF8.GetBytes("legacy signature, verified under FipsOnly");
+
+    public static TheoryData<string> Sha1VerifyEntryPoints() =>
+    [
+        "byte[]", "byte[] range", "Stream", "span", "byte[] + DER", "span + DER", "Stream + DER",
+    ];
+
+    [Theory]
+    [MemberData(nameof(Sha1VerifyEntryPoints))]
+    public void VerifyData_Sha1_UnderFipsOnly_VerifiesALegacySignature(string entryPoint) => WithFipsOnlyEcDsa(ec =>
+    {
+        byte[] digest = SHA1.HashData(LegacyData);
+        byte[] p1363 = ec.SignHash(digest);
+        byte[] der = ec.SignHash(digest, DSASignatureFormat.Rfc3279DerSequence);
+        HashAlgorithmName sha1 = HashAlgorithmName.SHA1;
+        using var stream = new MemoryStream(LegacyData);
+
+        bool verified = entryPoint switch
+        {
+            "byte[]" => ec.VerifyData(LegacyData, p1363, sha1),
+            "byte[] range" => ec.VerifyData(LegacyData, 0, LegacyData.Length, p1363, sha1),
+            "Stream" => ec.VerifyData(stream, p1363, sha1),
+            "span" => ec.VerifyData(LegacyData.AsSpan(), p1363.AsSpan(), sha1),
+            "byte[] + DER" => ec.VerifyData(LegacyData, der, sha1, DSASignatureFormat.Rfc3279DerSequence),
+            "span + DER" => ec.VerifyData(LegacyData.AsSpan(), der.AsSpan(), sha1, DSASignatureFormat.Rfc3279DerSequence),
+            "Stream + DER" => ec.VerifyData(stream, der, sha1, DSASignatureFormat.Rfc3279DerSequence),
+            _ => throw new ArgumentOutOfRangeException(nameof(entryPoint)),
+        };
+
+        Assert.True(verified);
+    });
+
+    [Theory]
+    [MemberData(nameof(Sha1VerifyEntryPoints))]
+    public void VerifyData_Sha1_UnderSecureOnly_IsStillRefused(string entryPoint) => WithEcDsa("P-256", (_, ec) =>
+    {
+        byte[] signature = new byte[64];
+        HashAlgorithmName sha1 = HashAlgorithmName.SHA1;
+        using var stream = new MemoryStream(LegacyData);
+        Action verify = entryPoint switch
+        {
+            "byte[]" => () => ec.VerifyData(LegacyData, signature, sha1),
+            "byte[] range" => () => ec.VerifyData(LegacyData, 0, LegacyData.Length, signature, sha1),
+            "Stream" => () => ec.VerifyData(stream, signature, sha1),
+            "span" => () => ec.VerifyData(LegacyData.AsSpan(), signature.AsSpan(), sha1),
+            "byte[] + DER" => () => ec.VerifyData(LegacyData, signature, sha1, DSASignatureFormat.Rfc3279DerSequence),
+            "span + DER" => () => ec.VerifyData(LegacyData.AsSpan(), signature.AsSpan(), sha1, DSASignatureFormat.Rfc3279DerSequence),
+            "Stream + DER" => () => ec.VerifyData(stream, signature, sha1, DSASignatureFormat.Rfc3279DerSequence),
+            _ => throw new ArgumentOutOfRangeException(nameof(entryPoint)),
+        };
+
+        Assert.Throws<CryptoPolicyViolationException>(verify);
+    });
+
+    [Fact]
+    public void SignData_Sha1_UnderFipsOnly_IsRefusedOnEveryEntryPoint() => WithFipsOnlyEcDsa(ec =>
+    {
+        HashAlgorithmName sha1 = HashAlgorithmName.SHA1;
+        using var stream = new MemoryStream(LegacyData);
+        using var derStream = new MemoryStream(LegacyData);
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(LegacyData, sha1));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(stream, sha1));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(LegacyData.AsSpan(), sha1));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(LegacyData, sha1, DSASignatureFormat.Rfc3279DerSequence));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.SignData(derStream, sha1, DSASignatureFormat.Rfc3279DerSequence));
+    });
+
+    // The Stream signing overloads now hash for themselves; they must still produce signatures that verify.
+    [Fact]
+    public void SignData_Stream_Sha256_RoundTripsInBothFormats() => WithFipsOnlyEcDsa(ec =>
+    {
+        HashAlgorithmName sha256 = HashAlgorithmName.SHA256;
+        using var stream = new MemoryStream(LegacyData);
+        using var derStream = new MemoryStream(LegacyData);
+        byte[] p1363 = ec.SignData(stream, sha256);
+        byte[] der = ec.SignData(derStream, sha256, DSASignatureFormat.Rfc3279DerSequence);
+        Assert.True(ec.VerifyData(LegacyData, p1363, sha256));
+        Assert.True(ec.VerifyData(LegacyData, der, sha256, DSASignatureFormat.Rfc3279DerSequence));
+    });
+
+    // The overloads this class overrides validate the hash name the way the BCL does, naming the parameter.
+    [Fact]
+    public void OverriddenOverloads_EmptyHashName_ThrowArgumentExceptionNamingHashAlgorithm() => WithFipsOnlyEcDsa(ec =>
+    {
+        var empty = new HashAlgorithmName("");
+
+        var verify = Assert.Throws<ArgumentException>(() => ec.VerifyData(LegacyData, 0, LegacyData.Length, new byte[64], empty));
+        Assert.Equal("hashAlgorithm", verify.ParamName);
+
+        using var stream = new MemoryStream(LegacyData);
+        var sign = Assert.Throws<ArgumentException>(() => ec.SignData(stream, empty));
+        Assert.Equal("hashAlgorithm", sign.ParamName);
     });
 
     // === Sign/verify hash — raw ECDSA, no on-token hashing ==================
@@ -262,7 +380,7 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     [Fact]
     public void ExportParameters_Private_ThrowsInsecure() => WithEcDsa("P-256", (ec, _) =>
-        Assert.Throws<InsecureOperationException>(() => ec.ExportParameters(includePrivateParameters: true)));
+        Assert.Throws<CryptoPolicyViolationException>(() => ec.ExportParameters(includePrivateParameters: true)));
 
     // === Unsupported BCL surface (PKCS#11 keys are token-resident / non-extractable) ========
 

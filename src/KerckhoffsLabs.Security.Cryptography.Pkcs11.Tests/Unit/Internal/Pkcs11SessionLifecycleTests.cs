@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// Hermetic coverage for session lifecycle (login/PIN/operation-state/random) success and
-/// error-mapping paths, plus the security-critical <see cref="Pkcs11Session.AllowInsecureScope"/>
+/// error-mapping paths, plus the security-critical <see cref="Pkcs11Session.UsePolicy"/>
 /// gate. The fake captures the marshalled arguments so the tests assert both the CKR-&gt;exception
 /// mapping and that PIN/username/seed bytes are passed through correctly — neither of which the
 /// Integration suite can observe.
@@ -261,67 +261,67 @@ public sealed class Pkcs11SessionLifecycleTests
         Assert.ThrowsAny<Pkcs11Exception>(() => s.CancelFunction());
     }
 
-    // === AllowInsecure / AllowInsecureScope =================================
+    // === Policy / UsePolicy ==================================================
 
     [Fact]
-    public void AllowInsecure_Setter_RoundTrips()
+    public void UsePolicy_RoundTrips()
     {
         var s = NewSession();
-        Assert.False(s.AllowInsecure);
-        s.AllowInsecure = true;
-        Assert.True(s.AllowInsecure);
-        s.AllowInsecure = false;
-        Assert.False(s.AllowInsecure);
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        var insecure = s.UsePolicy(CryptoPolicy.AllowInsecure);
+        Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+        insecure.Dispose();
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
     }
 
     [Fact]
-    public void AllowInsecureScope_PermitsInsecureMechanism_ThenRestores()
+    public void UsePolicy_PermitsInsecureMechanism_ThenRestores()
     {
         var fake = new LifecycleFake { GeneratedKeyId = 7 };
         var s = NewSession(fake);
 
         // Gated by default.
         var gated = new Mechanism(CKM.CKM_DES_KEY_GEN);
-        Assert.Throws<InsecureOperationException>(() => s.GenerateKey(gated, []));
+        Assert.Throws<CryptoPolicyViolationException>(() => s.GenerateKey(gated, []));
 
         // Permitted inside the scope.
-        using (s.AllowInsecureScope())
+        using (s.UsePolicy(CryptoPolicy.AllowInsecure))
         {
-            Assert.True(s.AllowInsecure);
+            Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
             var mech = new Mechanism(CKM.CKM_DES_KEY_GEN);
             Assert.Equal(7UL, s.GenerateKey(mech, []).ObjectId);
         }
 
         // Restored to gated after the scope.
-        Assert.False(s.AllowInsecure);
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
         var gatedAgain = new Mechanism(CKM.CKM_DES_KEY_GEN);
-        Assert.Throws<InsecureOperationException>(() => s.GenerateKey(gatedAgain, []));
+        Assert.Throws<CryptoPolicyViolationException>(() => s.GenerateKey(gatedAgain, []));
     }
 
     [Fact]
-    public void AllowInsecureScope_NestsLifo()
+    public void UsePolicy_NestsLifo()
     {
         var s = NewSession();
-        Assert.False(s.AllowInsecure);
-        using (s.AllowInsecureScope())
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        using (s.UsePolicy(CryptoPolicy.AllowInsecure))
         {
-            Assert.True(s.AllowInsecure);
-            using (s.AllowInsecureScope())
-                Assert.True(s.AllowInsecure);
-            // Inner lease restores to its captured "previous" (true), not to false.
-            Assert.True(s.AllowInsecure);
+            Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+            using (s.UsePolicy(CryptoPolicy.AllowInsecure))
+                Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
+            // Inner lease restores to its captured "previous" (CryptoPolicy.AllowInsecure), not to
+            // CryptoPolicy.SecureOnly.
+            Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
         }
-        Assert.False(s.AllowInsecure);
+        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
     }
 
     [Fact]
-    public void AllowInsecure_AfterDispose_Throws()
+    public void PolicyAccess_AfterDispose_Throws()
     {
         var s = NewSession();
         s.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => _ = s.AllowInsecure);
-        Assert.Throws<ObjectDisposedException>(() => s.AllowInsecure = true);
-        Assert.Throws<ObjectDisposedException>(() => s.AllowInsecureScope());
+        Assert.Throws<ObjectDisposedException>(() => _ = s.Policy);
+        Assert.Throws<ObjectDisposedException>(() => s.UsePolicy(CryptoPolicy.AllowInsecure));
     }
 
     /// <summary>

@@ -44,6 +44,9 @@ public sealed class CkmHkdfParams : MechanismParameters
         _saltKey = saltKey;
     }
 
+    /// <summary>The PRF hash mechanism (typically a <c>CKM_*_HMAC</c> variant, or the bare hash), for policy evaluation.</summary>
+    internal CKM PrfHashMechanism => _prfHashMechanism;
+
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {

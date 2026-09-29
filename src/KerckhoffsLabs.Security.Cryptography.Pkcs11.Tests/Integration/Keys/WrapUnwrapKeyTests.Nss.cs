@@ -67,7 +67,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
             using var c5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
             using var c6 = new ObjectAttribute(CKA.CKA_VALUE, secret);
             ObjectHandle dataKey;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 dataKey = session.CreateObject([c1, c2, c3, c4, c5, c6]);
 
             try
@@ -83,7 +83,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
                 var template = new List<ObjectAttribute> { u1, u2, u3, u4, u5 };
 
                 ObjectHandle unwrapped;
-                using (session.AllowInsecureScope())
+                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                     unwrapped = session.UnwrapKey(wrapMech, kek, wrapped, template);
                 try
                 {
@@ -134,7 +134,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
             using var c5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
             using var c6 = new ObjectAttribute(CKA.CKA_VALUE, secret);
             ObjectHandle dataKey;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 dataKey = session.CreateObject([c1, c2, c3, c4, c5, c6]);
 
             try
@@ -149,7 +149,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
                 using var u5 = new ObjectAttribute(CKA.CKA_EXTRACTABLE, true);
                 var template = new List<ObjectAttribute> { u1, u2, u3, u4, u5 };
 
-                using (session.AllowInsecureScope())
+                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 {
                     var ex = Assert.ThrowsAny<Pkcs11Exception>(() => session.UnwrapKey(wrapMech, kek, wrapped, template));
                     Assert.Equal(CKR.CKR_TEMPLATE_INCONSISTENT, ex.ReturnValue);

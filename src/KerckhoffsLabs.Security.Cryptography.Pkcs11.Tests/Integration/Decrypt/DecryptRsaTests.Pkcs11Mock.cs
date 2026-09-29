@@ -9,6 +9,6 @@ public sealed class DecryptRsaTests_Mock(MockBackendFixture f)
     private readonly MockBackendFixture _backend = f;
 
     [Fact]
-    public void RsaPkcs1V15_ThrowsInsecureOperationException_ByDefault_Mock()
+    public void RsaPkcs1V15_ThrowsCryptoPolicyViolationException_ByDefault_Mock()
         => DecryptRsaTestCases.Assert_RsaPkcs1V15_GatedByDefault(_backend);
 }

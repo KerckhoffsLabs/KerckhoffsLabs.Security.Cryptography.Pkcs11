@@ -14,9 +14,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <summary>
 /// SHA1Pkcs11 over the in-process <c>ManagedSoftToken</c> — runs without SoftHSM. SHA-1 is broken and
 /// the adapter is gated by the library's secure-defaults policy (analogous to <c>SHA1Cng</c> under
-/// FIPS): computing a digest throws <see cref="InsecureOperationException"/> unless the workspace
-/// opts in via <see cref="Pkcs11Workspace.AllowInsecure"/> /
-/// <see cref="Pkcs11Workspace.AllowInsecureScope"/>. When unlocked, the token computes the digest via
+/// FIPS): computing a digest throws <see cref="CryptoPolicyViolationException"/> unless the workspace's
+/// <see cref="Pkcs11Workspace.Policy"/> permits it (see <see cref="Pkcs11Workspace.UsePolicy"/>).
+/// When unlocked, the token computes the digest via
 /// <c>CKM_SHA_1</c> and every result is cross-checked against the BCL <see cref="SHA1"/> primitive
 /// (FIPS 180-4).
 /// </summary>
@@ -38,7 +38,7 @@ public sealed class SHA1Pkcs11_Managed
         using var workspace = OpenWorkspace(library);
         using var sha1 = new SHA1Pkcs11(workspace);
 
-        var ex = Assert.Throws<InsecureOperationException>(
+        var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => sha1.ComputeHash(Encoding.UTF8.GetBytes("abc")));
         Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
     }
@@ -50,11 +50,11 @@ public sealed class SHA1Pkcs11_Managed
         using var workspace = OpenWorkspace(library);
         using var sha1 = new SHA1Pkcs11(workspace);
 
-        // Enter and leave an AllowInsecure scope, then confirm the gate is restored.
-        using (workspace.AllowInsecureScope())
+        // Enter and leave a scope under the AllowInsecure policy, then confirm the policy is restored.
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             sha1.ComputeHash(Encoding.UTF8.GetBytes("inside"));
 
-        var ex = Assert.Throws<InsecureOperationException>(
+        var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => sha1.ComputeHash(Encoding.UTF8.GetBytes("outside")));
         Assert.Equal(CKM.CKM_SHA_1, ex.Mechanism);
     }
@@ -66,7 +66,7 @@ public sealed class SHA1Pkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var sha1 = new SHA1Pkcs11(workspace);
 
         byte[] data = Encoding.UTF8.GetBytes("abc");
@@ -80,7 +80,7 @@ public sealed class SHA1Pkcs11_Managed
     }
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
-    public void ComputeHash_WithAllowInsecureScope_KnownAnswer_MatchesFips180Vector()
+    public void ComputeHash_WithUsePolicyAllowInsecure_KnownAnswer_MatchesFips180Vector()
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
@@ -90,7 +90,7 @@ public sealed class SHA1Pkcs11_Managed
         byte[] expected = Convert.FromHexString("A9993E364706816ABA3E25717850C26C9CD0D89D");
 
         byte[] digest;
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             digest = sha1.ComputeHash(data);
 
         Assert.Equal(20, digest.Length);
@@ -103,7 +103,7 @@ public sealed class SHA1Pkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var sha1 = new SHA1Pkcs11(workspace);
 
         byte[] digest = sha1.ComputeHash([]);
@@ -119,7 +119,7 @@ public sealed class SHA1Pkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var sha1 = new SHA1Pkcs11(workspace);
 
         byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
@@ -131,7 +131,7 @@ public sealed class SHA1Pkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var sha1 = new SHA1Pkcs11(workspace);
 
         byte[] data = RandomNumberGenerator.GetBytes(517);
@@ -145,7 +145,7 @@ public sealed class SHA1Pkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var sha1 = new SHA1Pkcs11(workspace);
 
         // Feed in chunks via TransformBlock/TransformFinalBlock; result must equal the one-shot hash.
@@ -163,7 +163,7 @@ public sealed class SHA1Pkcs11_Managed
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = OpenWorkspace(library);
-        workspace.AllowInsecure = true;
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         using var sha1 = new SHA1Pkcs11(workspace);
 
         byte[] first = sha1.ComputeHash(Encoding.UTF8.GetBytes("one"));

@@ -4,7 +4,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-// Deliberately drives the AllowInsecure-gated PKCS#1 v1.5 path: the refusal is what is being caught.
+// Deliberately drives the PKCS#1 v1.5 path refused under the default SecureOnly policy: the refusal
+// is what is being caught.
 #pragma warning disable KLPKCS11008
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
@@ -37,7 +38,7 @@ public sealed class CryptographicExceptionContractTests
             () => rsa.Encrypt("nope"u8.ToArray(), RSAEncryptionPadding.Pkcs1));
 
         // Still the specific type, with its detail intact — the base class is added, not substituted.
-        var insecure = Assert.IsType<InsecureOperationException>(ex);
+        var insecure = Assert.IsType<CryptoPolicyViolationException>(ex);
         Assert.Equal(CKM.CKM_RSA_PKCS, insecure.Mechanism);
     }
 

@@ -411,13 +411,25 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Reads the value as an array of <see cref="CKM"/> mechanism types (unvalidated cast from <c>CK_ULONG[]</c>).</summary>
+    /// <remarks>
+    /// Vendor-defined and not-yet-named mechanisms come back as unnamed <see cref="CKM"/> values. A value
+    /// wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits) cannot be held by <see cref="CKM"/>;
+    /// read such a list with <see cref="GetValueAsUlongArray"/>.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ULONG</c> size.</exception>
+    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable), its length is not a whole multiple of the <c>CK_ULONG</c> size, or it holds a mechanism value wider than <see cref="CKM"/> can represent.</exception>
     public CKM[] GetValueAsCkmArray()
     {
         ulong[] raw = GetValueAsUlongArray();
         CKM[] result = new CKM[raw.Length];
-        for (int i = 0; i < raw.Length; i++) result[i] = (CKM)raw[i];
+        for (int i = 0; i < raw.Length; i++)
+        {
+            if (raw[i] > uint.MaxValue)
+                throw new AttributeValueException(Type,
+                    $"Value of attribute {(CKA)Type} holds mechanism 0x{raw[i]:X}, which is wider than CKM can " +
+                    "represent. Read it with GetValueAsUlongArray().");
+            result[i] = (CKM)raw[i];
+        }
         return result;
     }
 

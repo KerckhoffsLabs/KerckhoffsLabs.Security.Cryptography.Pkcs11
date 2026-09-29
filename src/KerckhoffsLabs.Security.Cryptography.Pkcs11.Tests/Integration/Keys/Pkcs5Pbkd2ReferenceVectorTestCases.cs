@@ -101,7 +101,7 @@ internal static class Pkcs5Pbkd2ReferenceVectorTestCases
             var template = new List<ObjectAttribute> { attrClass, attrKeyType, attrToken, attrValueLen, attrExtractable, attrSensitive };
 
             ObjectHandle derived;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 derived = session.GenerateKey(mechanism, template);
             try
             {

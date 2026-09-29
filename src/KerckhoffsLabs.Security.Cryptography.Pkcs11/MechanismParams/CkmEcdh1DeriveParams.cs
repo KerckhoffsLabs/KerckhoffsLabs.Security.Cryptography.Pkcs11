@@ -16,6 +16,9 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     private readonly byte[] _sharedDataBytes;
     private readonly CKD _kdf;
 
+    /// <summary>The key derivation function applied to the shared secret, as the crypto policy sees it.</summary>
+    internal CKD Kdf => _kdf;
+
     /// <summary>
     /// Initializes ECDH1-derive parameters for <c>C_DeriveKey</c>.
     /// </summary>

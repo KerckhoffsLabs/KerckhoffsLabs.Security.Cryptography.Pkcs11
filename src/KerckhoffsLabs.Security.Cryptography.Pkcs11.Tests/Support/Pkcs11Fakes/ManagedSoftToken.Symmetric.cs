@@ -20,9 +20,15 @@ internal sealed partial class ManagedSoftToken
     // RSA encryption (CKM_RSA_PKCS / CKM_RSA_PKCS_OAEP) routes to the asymmetric path in
     // ManagedSoftToken.RsaCipher.cs; everything else is a symmetric cipher.
     public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
-        => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
+    {
+        EncryptInitCallCount++;
+        return IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
             ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
             : InitSym((ulong)session, ref mechanism, (ulong)key);
+    }
+
+    /// <summary>Number of times <c>C_EncryptInit</c> has been invoked. Lets tests prove a path never reached the token.</summary>
+    public int EncryptInitCallCount { get; private set; }
 
     public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
         => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)

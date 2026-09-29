@@ -23,9 +23,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// extraction step.</para>
 /// <para><b>Gating:</b> <see cref="EncapsulateCore(Span{byte}, Span{byte})"/> /
 /// <see cref="DecapsulateCore(ReadOnlySpan{byte}, Span{byte})"/> throw
-/// <see cref="InsecureOperationException"/> unless the owning workspace has set
-/// <c>Pkcs11Workspace.AllowInsecure = true</c> (or <c>AllowInsecureScope()</c>). The gate is
-/// mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
+/// <see cref="CryptoPolicyViolationException"/> unless the owning workspace's
+/// <see cref="Pkcs11Workspace.Policy"/> permits it (e.g. <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>).
+/// The gate is mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
 /// <para><b>Private-key export</b> (<c>ExportDecapsulationKey</c>, seed, PKCS#8) is always
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
 /// public handle.</para>
@@ -46,15 +46,15 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">
-    /// Thrown when the owning workspace has not set <c>Pkcs11Workspace.AllowInsecure = true</c>.
-    /// Set it explicitly (or scope it with <c>AllowInsecureScope()</c>) to acknowledge that the
-    /// shared secret will be extracted from the token, or use <see cref="Pkcs11Key.EncapsulateKey"/>
-    /// for the on-token-only path.
+    /// <exception cref="CryptoPolicyViolationException">
+    /// Thrown unless the owning workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.
+    /// Use <see cref="Pkcs11Workspace.UsePolicy"/> (e.g. with <c>CryptoPolicy.AllowInsecure</c>) to
+    /// acknowledge that the shared secret will be extracted from the token, or use
+    /// <see cref="Pkcs11Key.EncapsulateKey"/> for the on-token-only path.
     /// </exception>
     protected override void EncapsulateCore(Span<byte> ciphertext, Span<byte> sharedSecret)
     {
-        GuardExtraction(encapsulating: true);
+        GuardExtraction();
 
         var mech = new Mechanism(CKM.CKM_ML_KEM);
         using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
@@ -83,10 +83,10 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     }
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">Same gating as <see cref="EncapsulateCore"/>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Same gating as <see cref="EncapsulateCore"/>.</exception>
     protected override void DecapsulateCore(ReadOnlySpan<byte> ciphertext, Span<byte> sharedSecret)
     {
-        GuardExtraction(encapsulating: false);
+        GuardExtraction();
 
         var mech = new Mechanism(CKM.CKM_ML_KEM);
 
@@ -162,38 +162,29 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     }
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">Always thrown. PKCS#11 keys are non-extractable.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Always thrown. PKCS#11 keys are non-extractable.</exception>
     protected override void ExportDecapsulationKeyCore(Span<byte> destination)
-        => throw new InsecureOperationException(
+        => throw new CryptoPolicyViolationException(
             "Refusing to export ML-KEM decapsulation key bytes. PKCS#11 keys are non-extractable by design.");
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">Always thrown.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Always thrown.</exception>
     protected override void ExportPrivateSeedCore(Span<byte> destination)
-        => throw new InsecureOperationException(
+        => throw new CryptoPolicyViolationException(
             "Refusing to export ML-KEM private seed. PKCS#11 keys are non-extractable by design.");
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">Always thrown.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Always thrown.</exception>
     protected override bool TryExportPkcs8PrivateKeyCore(Span<byte> destination, out int bytesWritten)
-        => throw new InsecureOperationException(
+        => throw new CryptoPolicyViolationException(
             "Refusing to export ML-KEM decapsulation key as PKCS#8. PKCS#11 keys are non-extractable by design.");
 
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
-    private void GuardExtraction(bool encapsulating)
-    {
-        if (_key.AllowInsecure) return;
-
-        string verb = encapsulating ? "Encapsulate" : "Decapsulate";
-        throw new InsecureOperationException(
-            $"MLKemPkcs11.{verb} extracts the shared-secret bytes from the token. " +
-            $"This violates the non-extractable-by-default posture. Use Pkcs11Key.{verb}Key " +
-            $"for the on-token-only path, or set Pkcs11Workspace.AllowInsecure = true " +
-            $"(or use Pkcs11Workspace.AllowInsecureScope()) to opt in.");
-    }
+    private void GuardExtraction()
+        => _key.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret));
 
     private static MLKemAlgorithm ResolveAlgorithm(Pkcs11Key key)
     {

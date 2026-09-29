@@ -121,9 +121,9 @@ internal static class SlhDsaPkcs11TestCases
 
     internal static void Assert_ExportSlhDsaPrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
-            Assert.Throws<InsecureOperationException>(() => slhdsa.ExportSlhDsaPrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => slhdsa.ExportSlhDsaPrivateKey()));
 
     internal static void Assert_ExportPkcs8PrivateKey_ThrowsInsecure(IPkcs11Backend backend) =>
         WithSlhDsa(backend, CkpSlhDsa.CKP_SLH_DSA_SHA2_128F, slhdsa =>
-            Assert.Throws<InsecureOperationException>(() => slhdsa.ExportPkcs8PrivateKey()));
+            Assert.Throws<CryptoPolicyViolationException>(() => slhdsa.ExportPkcs8PrivateKey()));
 }

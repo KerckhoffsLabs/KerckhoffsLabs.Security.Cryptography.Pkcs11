@@ -2,7 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// These tests drive the gated legacy mechanisms/hashes on purpose (the AllowInsecure gate is the
+// These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
@@ -24,7 +24,7 @@ internal static class DecryptAesTestCases
     ];
 
     /// <summary>
-    /// Decrypt using CKM_AES_ECB should throw <see cref="InsecureOperationException"/>
+    /// Decrypt using CKM_AES_ECB should throw <see cref="CryptoPolicyViolationException"/>
     /// by default. The gate fires before C_DecryptInit, so no real key or ciphertext is
     /// needed — we only need a session-level key handle.
     /// </summary>
@@ -40,7 +40,7 @@ internal static class DecryptAesTestCases
                 byte[] ciphertext = new byte[16];
                 var mechanism = new Mechanism(CKM.CKM_AES_ECB);
 
-                var ex = Assert.Throws<InsecureOperationException>(() =>
+                var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
                     session.Decrypt(mechanism, keyHandle, ciphertext));
                 Assert.Equal(CKM.CKM_AES_ECB, ex.Mechanism);
             }
@@ -56,14 +56,14 @@ internal static class DecryptAesTestCases
     }
 
     /// <summary>
-    /// With <c>Session.AllowInsecure</c> set to <c>true</c> the gate is bypassed.
+    /// With the session's crypto policy set to <c>CryptoPolicy.AllowInsecure</c> the gate is bypassed.
     /// The backend may still fail for unrelated reasons (wrong ciphertext etc.), but MUST
-    /// NOT throw <see cref="InsecureOperationException"/>.
+    /// NOT throw <see cref="CryptoPolicyViolationException"/>.
     /// </summary>
     internal static void Assert_AesEcb_AllowedWithOptIn(IPkcs11Backend backend)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
-        session.AllowInsecure = true;
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
             var keyHandle = TestKeys.CreateAes256Key(session, AesKey256);
@@ -76,8 +76,8 @@ internal static class DecryptAesTestCases
                     session.Decrypt(mechanism, keyHandle, ciphertext));
 
                 // Gate must NOT be the reason for any exception.
-                Assert.False(ex is InsecureOperationException,
-                    "Expected gate to be bypassed, but InsecureOperationException was still thrown.");
+                Assert.False(ex is CryptoPolicyViolationException,
+                    "Expected gate to be bypassed, but CryptoPolicyViolationException was still thrown.");
             }
             finally
             {

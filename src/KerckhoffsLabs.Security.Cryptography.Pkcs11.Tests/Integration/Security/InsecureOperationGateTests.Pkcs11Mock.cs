@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security
 
 /// <summary>
 /// Insecure-mechanism gate tests against pkcs11-mock.
-/// All tests run unconditionally: <c>InsecureOperationException</c> is thrown (or
+/// All tests run unconditionally: <c>CryptoPolicyViolationException</c> is thrown (or
 /// bypassed) in managed code before any P/Invoke call, so no real hardware or crypto is
 /// required.
 /// </summary>

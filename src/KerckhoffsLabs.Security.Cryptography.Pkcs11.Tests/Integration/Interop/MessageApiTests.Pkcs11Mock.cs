@@ -49,7 +49,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
             using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            session.AllowInsecure = true; // CKM_AES_GCM's IV size is not what's under test here
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKM_AES_GCM's IV size is not what's under test here
             var mechanism = new Mechanism(CKM.CKM_AES_GCM);
             var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
@@ -75,7 +75,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
             using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
             ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            session.AllowInsecure = true;
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             var mechanism = new Mechanism(CKM.CKM_AES_GCM);
             var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
 

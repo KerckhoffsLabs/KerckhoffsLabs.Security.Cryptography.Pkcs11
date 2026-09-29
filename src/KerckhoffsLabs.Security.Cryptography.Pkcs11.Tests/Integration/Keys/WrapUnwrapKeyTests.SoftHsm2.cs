@@ -8,6 +8,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 internal static class WrapUnwrapKeyTestCases
 {
+    // CKM_AES_KEY_WRAP_PKCS7 is a SecureOnly documented refusal (non-standard padding, not RFC 5649), so its
+    // cases opt in for the wrap / unwrap calls; the RFC 3394 / 5649 variants run under the default policy.
+    // Secure key defaults on unwrap do not depend on the policy, so the opt-in does not mask them.
+    private static IDisposable? OptInIfRefusedByDefault(Pkcs11Session session, CKM wrapMechanism)
+        => wrapMechanism == CKM.CKM_AES_KEY_WRAP_PKCS7 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+
     internal static void Assert_AesKeyWrap_RoundTrip(IPkcs11Backend backend, CKM wrapMechanism)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
@@ -32,7 +38,7 @@ internal static class WrapUnwrapKeyTestCases
             // would still be open inside the test body and would mask an assertion that the gate
             // fires there.
             ObjectHandle dataKey;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 dataKey = session.GenerateKey(keyGenMech, dkTemplate);
 
             try
@@ -43,6 +49,7 @@ internal static class WrapUnwrapKeyTestCases
                 byte[] ciphertext = TestAesGcm.Encrypt(session, dataKey, iv, plaintext);
 
                 var wrapMech = new Mechanism(wrapMechanism);
+                using IDisposable? optIn = OptInIfRefusedByDefault(session, wrapMechanism);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
                 Assert.NotEmpty(wrapped);
 
@@ -101,11 +108,12 @@ internal static class WrapUnwrapKeyTestCases
             // would still be open inside the test body and would mask an assertion that the gate
             // fires there.
             ObjectHandle dataKey;
-            using (session.AllowInsecureScope())
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 dataKey = session.GenerateKey(keyGenMech, dkTemplate);
             try
             {
                 var wrapMech = new Mechanism(wrapMechanism);
+                using IDisposable? optIn = OptInIfRefusedByDefault(session, wrapMechanism);
                 byte[] wrapped = session.WrapKey(wrapMech, kek, dataKey);
                 body(session, kek, wrapped);
             }

@@ -48,9 +48,9 @@ public sealed class HMACPkcs11 : HMAC
     /// </exception>
     /// <remarks>
     /// SHA-224 is accepted here (it merely determines the HMAC output size); the
-    /// <c>Pkcs11Workspace.AllowInsecure</c> gate for it fires later, at the actual
+    /// workspace's crypto policy gate for it fires later, at the actual
     /// <c>CKM_SHA224_HMAC</c> sign call inside <see cref="HashFinal"/> — see
-    /// <c>Pkcs11Session.GuardMechanism</c>.
+    /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     public HMACPkcs11(Pkcs11Key key, HashAlgorithmName hashAlgorithm)
     {

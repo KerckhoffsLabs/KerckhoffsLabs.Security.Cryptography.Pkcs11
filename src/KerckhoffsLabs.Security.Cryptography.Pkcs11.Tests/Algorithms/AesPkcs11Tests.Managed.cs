@@ -13,8 +13,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// SoftHSM behavior set without any native module. The token performs CBC / CBC-PAD / ECB via the BCL,
 /// so the adapter's output is cross-checked against <see cref="Aes"/> for the same imported key — a true
 /// known-answer assertion that a non-extractable SoftHSM key cannot give. CBC and ECB are unauthenticated
-/// and gated by the secure-defaults policy: each throws <see cref="InsecureOperationException"/> outside
-/// an <c>AllowInsecureScope()</c>. The managed-key / streaming surface is <see cref="NotSupportedException"/>.
+/// and gated by the secure-defaults policy: each throws <see cref="CryptoPolicyViolationException"/> outside
+/// an <c>UsePolicy(CryptoPolicy.AllowInsecure)</c>. The managed-key / streaming surface is <see cref="NotSupportedException"/>.
 /// (Backend sibling of <c>AesPkcs11Tests.SoftHsm2.cs</c>.)
 /// </summary>
 [NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
@@ -76,9 +76,9 @@ public sealed class AesPkcs11_Managed
         byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a managed-token key — variable length.");
 
         // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
-        Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16));
+        Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16));
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
@@ -93,9 +93,9 @@ public sealed class AesPkcs11_Managed
         byte[] plaintext = new byte[32]; // exactly two blocks
         RandomNumberGenerator.Fill(plaintext);
 
-        Assert.Throws<InsecureOperationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
+        Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16, PaddingMode.None);
@@ -113,7 +113,7 @@ public sealed class AesPkcs11_Managed
         using (var bcl = BclAes())
             ct = bcl.EncryptCbc(plaintext, Iv16);
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16));
     });
 
@@ -124,12 +124,12 @@ public sealed class AesPkcs11_Managed
     [Fact]
     public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((workspace, aes) =>
     {
-        // Even the empty-input fast path honors the secure-defaults gate: without AllowInsecure the
+        // Even the empty-input fast path honors the secure-defaults gate: without the AllowInsecure policy the
         // gated mechanism throws before the (empty) buffer reaches the token.
-        Assert.Throws<InsecureOperationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
+        Assert.Throws<CryptoPolicyViolationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
 
-        // With AllowInsecure, empty input is a no-op returned without touching the token.
-        using (workspace.AllowInsecureScope())
+        // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
     });
 
@@ -137,7 +137,7 @@ public sealed class AesPkcs11_Managed
 
     [Fact]
     public void EncryptEcb_GatedByDefault_Throws() => WithImportedAes((ws, aes) =>
-        Assert.Throws<InsecureOperationException>(() => aes.EncryptEcb(new byte[16], PaddingMode.None)));
+        Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptEcb(new byte[16], PaddingMode.None)));
 
     [Fact]
     public void EncryptEcb_WithAllowInsecure_MatchesBcl() => WithImportedAes((workspace, aes) =>
@@ -145,7 +145,7 @@ public sealed class AesPkcs11_Managed
         byte[] plaintext = new byte[48]; // three blocks
         RandomNumberGenerator.Fill(plaintext);
 
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             using var bcl = BclAes();
             byte[] ct = aes.EncryptEcb(plaintext, PaddingMode.None);
@@ -159,7 +159,7 @@ public sealed class AesPkcs11_Managed
     {
         // The padding switch runs before the token call, so the gate is irrelevant here; assert the
         // NotSupportedException both inside and (by default) outside the insecure scope.
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Throws<NotSupportedException>(() => aes.EncryptEcb(new byte[16], PaddingMode.PKCS7));
     });
 
@@ -167,19 +167,19 @@ public sealed class AesPkcs11_Managed
 
     [Fact]
     public void Cfb_GatedByDefault_Throws() => WithImportedAes((ws, aes) =>
-        Assert.Throws<InsecureOperationException>(
+        Assert.Throws<CryptoPolicyViolationException>(
             () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128)));
 
     [Fact]
     public void Cfb_WithAllowInsecure_GateBypassed() => WithImportedAes((workspace, aes) =>
     {
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             // The managed token does not implement CFB, so the token call may fail — but the
-            // secure-defaults gate must NOT fire once AllowInsecure is set.
+            // secure-defaults gate must NOT fire once the AllowInsecure policy is used.
             Exception? ex = Record.Exception(
                 () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128));
-            Assert.False(ex is InsecureOperationException,
+            Assert.False(ex is CryptoPolicyViolationException,
                 $"Gate should be bypassed; got {ex?.GetType().Name ?? "no exception"}.");
         }
     });
@@ -218,7 +218,7 @@ public sealed class AesPkcs11_Managed
         using var aes = new AesPkcs11(key);
 
         byte[] plaintext = RandomNumberGenerator.GetBytes(40);
-        using (workspace.AllowInsecureScope())
+        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = aes.EncryptCbc(plaintext, Iv16);
             Assert.NotEqual(plaintext, ct);

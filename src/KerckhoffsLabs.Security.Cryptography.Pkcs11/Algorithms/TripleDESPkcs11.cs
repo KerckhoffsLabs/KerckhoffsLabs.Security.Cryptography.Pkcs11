@@ -3,8 +3,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 // This file builds the very mechanisms the secure-by-default policy gates: it sits on the
-// enforcement side of the check (Pkcs11Session.GuardMechanism rejects them at the point of use
-// unless AllowInsecure is set), whereas KLPKCS11009 exists to warn a *caller* who selects one.
+// enforcement side of the check (the session's crypto policy check rejects them at the point of
+// use unless the session's crypto policy permits it), whereas KLPKCS11009 exists to warn a *caller* who selects one.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
@@ -19,8 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// Triple-DES has a 64-bit block, which makes it vulnerable to birthday-bound (Sweet32) collisions
 /// after a few GB under one key, and NIST has deprecated it. Like <see cref="AesPkcs11"/> /
-/// <see cref="DESPkcs11"/>, every operation throws <c>InsecureOperationException</c> unless
-/// <see cref="Pkcs11Workspace.AllowInsecure"/> is set on the wrapped key's workspace. Prefer
+/// <see cref="DESPkcs11"/>, every operation throws <c>CryptoPolicyViolationException</c> unless
+/// the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it. Prefer
 /// <see cref="AesGcmPkcs11"/> or <see cref="AesCcmPkcs11"/>; this type exists only for legacy/interop
 /// scenarios.
 /// </para>
@@ -30,7 +30,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// reflects the token key's real length when it exposes <c>CKA_VALUE_LEN</c> (16 → 128, 24 → 192).
 /// </para>
 /// <para>
-/// Supported modes (on the token, once AllowInsecure is set):
+/// Supported modes (on the token, once permitted by the workspace's policy):
 /// <list type="bullet">
 /// <item>CBC — <see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> / <c>DecryptCbc</c>
 /// with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_DES3_CBC_PAD</c>) or <see cref="PaddingMode.None"/>
@@ -50,7 +50,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Triple-DES has a 64-bit block (Sweet32) and is NIST-deprecated. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "TripleDESPkcs11 throws InsecureOperationException unless the wrapped key's Pkcs11Workspace.AllowInsecure = true.",
+          "TripleDESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.TripleDes,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class TripleDESPkcs11 : TripleDES
@@ -121,12 +121,14 @@ public sealed class TripleDESPkcs11 : TripleDES
     private bool RunBlock(Mechanism mechanism, bool encrypt, ReadOnlySpan<byte> input, Span<byte> destination, out int bytesWritten)
     {
         // Empty input is a no-op (0 bytes in → 0 bytes out): some tokens reject an empty
-        // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when AllowInsecure is set
-        // (i.e. once the secure-defaults gate would pass). With AllowInsecure off we fall through
-        // so GuardMechanism throws InsecureOperationException as documented (the empty buffer
-        // never reaches the token — the gate runs first). Padded encryption (CKM_DES3_CBC_PAD)
-        // must emit a full padding block, so that path always goes to the token.
-        if (input.IsEmpty && _key.AllowInsecure && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES3_CBC_PAD))
+        // C_Encrypt / C_Decrypt buffer, so skip the token — but ONLY when the policy permits this
+        // mechanism (i.e. the gate would pass). Otherwise fall through so the session's policy check
+        // throws as documented (the empty buffer never reaches the token — the gate runs first).
+        // Padded encryption (CKM_DES3_CBC_PAD) must emit a full padding block, so that path always
+        // goes to the token.
+        if (input.IsEmpty
+            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES3_CBC_PAD))
         {
             bytesWritten = 0;
             return true;

@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// The ids are part of the public contract (a consumer's <c>#pragma warning disable</c> or
 /// <c>NoWarn</c> references them by value) and are therefore stable: an id is never reused for a
 /// different API, and an API never changes its id. Suppressing the compiler diagnostic does not
-/// disable the runtime <c>AllowInsecure</c> gate — the two are independent.
+/// change the workspace's runtime crypto policy — the two are independent.
 /// </remarks>
 internal static class DiagnosticIds
 {

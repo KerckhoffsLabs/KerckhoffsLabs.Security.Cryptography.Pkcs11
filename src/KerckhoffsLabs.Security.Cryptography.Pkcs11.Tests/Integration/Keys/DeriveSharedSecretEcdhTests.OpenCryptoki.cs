@@ -26,7 +26,7 @@ public sealed class DeriveSharedSecretEcdhTests_OpenCryptoki(OpenCryptokiBackend
     public void TwoParties_DeriveMatchingAesKey()
     {
         using var workspace = OpenWorkspace();
-        workspace.AllowInsecure = true; // CKD_NULL is gated by default — it's what's under test here
+        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // CKD_NULL is gated by default — it's what's under test here
         using var alice = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var bob = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 

@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 /// </summary>
 /// <remarks>
 /// Deliberately free of any Roslyn type: the library's test project reads these sets to pin them
-/// against what <c>Pkcs11Session.GuardMechanism</c> actually rejects at run time, and touching a type
+/// against <c>SecureOnlyPolicy</c>'s documented refusals, and touching a type
 /// that derived from <c>DiagnosticAnalyzer</c> would drag the compiler assemblies into the test host.
 /// The analyzer cannot simply reference the library's <c>CKM</c> enum — it targets netstandard2.0 and
 /// referencing the library would be a cycle — so this list is a transcription, and the parity tests
@@ -16,14 +16,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 public static class InsecureMechanismData
 {
     /// <summary>
-    /// Mechanisms rejected by the runtime gate, minus the RSA-encryption pair covered by KLPKCS11008.
+    /// The default <c>SecureOnly</c> policy's documented refusals, minus the RSA-encryption pair covered
+    /// by KLPKCS11008.
     /// </summary>
     /// <remarks>
-    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>GuardMechanism</c> only rejects it for a
-    /// SHA-1 or SHA-224 <c>CkmRsaPkcsOaepParams.HashAlg</c>, a mechanism-*parameter* condition no
-    /// static analyzer here can evaluate (the type alone, <c>CKM_RSA_PKCS_OAEP</c>, is used just as
-    /// often with a safe hash and must not be flagged). The runtime gate is the sole enforcement
-    /// point for that case.
+    /// Only the documented refusals — mechanisms reviewed and rejected with a reason — are listed. The
+    /// policy also denies every mechanism it has not reviewed (vendor mechanisms included); those carry
+    /// no warning here, since "not reviewed" is not a finding about the mechanism.
+    /// <para>
+    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>SecureOnlyPolicy</c> denies it only without
+    /// <c>CkmRsaPkcsOaepParams</c> or with a hash outside its allowed set (SHA-256/384/512, SHA-512/256,
+    /// SHA3-256/384/512) — a mechanism-*parameter* condition no static analyzer here can evaluate (the
+    /// type alone is used just as often with a safe hash and must not be flagged). The runtime policy
+    /// check is the sole enforcement point for that case.
+    /// </para>
     /// </remarks>
     public static readonly ImmutableHashSet<string> GatedMechanisms = ImmutableHashSet.Create(
         "CKM_MD5_RSA_PKCS",
@@ -31,7 +37,7 @@ public static class InsecureMechanismData
         "CKM_SHA1_RSA_PKCS_PSS",
         // Not cryptographically broken (FIPS 180-4-approved, just a truncated SHA-256), but gated
         // like SHA-1: no HashAlgorithmName constant in the BCL, no benefit over SHA-256 on
-        // equal-cost hardware. See Pkcs11Session.GuardMechanism's "SHA-224 policy" remark.
+        // equal-cost hardware (SecureOnlyPolicy documents the refusal).
         "CKM_SHA224_RSA_PKCS",
         "CKM_SHA224_RSA_PKCS_PSS",
         "CKM_ECDSA_SHA224",
@@ -165,7 +171,45 @@ public static class InsecureMechanismData
         "CKM_SKIPJACK_CFB8",
         "CKM_SKIPJACK_WRAP",
         "CKM_SKIPJACK_PRIVATE_WRAP",
-        "CKM_SKIPJACK_RELAYX"
+        "CKM_SKIPJACK_RELAYX",
+        // CBC-MAC over AES / TDEA CMAC.
+        "CKM_AES_MAC",
+        "CKM_AES_MAC_GENERAL",
+        "CKM_DES3_CMAC",
+        "CKM_DES3_CMAC_GENERAL",
+        "CKM_AES_KEY_WRAP_PKCS7",
+        // Truncated hashes with no benefit over SHA-256.
+        "CKM_SHA224",
+        "CKM_SHA3_224",
+        "CKM_SHA512_224",
+        "CKM_SHA512_T",
+        "CKM_DSA_KEY_PAIR_GEN",
+        "CKM_RSA_X9_31_KEY_PAIR_GEN",
+        // Hash-of-key derivation. The SHA-3 and SHAKE ones have two spellings sharing a value.
+        "CKM_SHA224_KEY_DERIVATION",
+        "CKM_SHA256_KEY_DERIVATION",
+        "CKM_SHA384_KEY_DERIVATION",
+        "CKM_SHA512_KEY_DERIVATION",
+        "CKM_SHA512_224_KEY_DERIVATION",
+        "CKM_SHA512_256_KEY_DERIVATION",
+        "CKM_SHA512_T_KEY_DERIVATION",
+        "CKM_SHA3_224_KEY_DERIVE",
+        "CKM_SHA3_224_KEY_DERIVATION",
+        "CKM_SHA3_256_KEY_DERIVE",
+        "CKM_SHA3_256_KEY_DERIVATION",
+        "CKM_SHA3_384_KEY_DERIVE",
+        "CKM_SHA3_384_KEY_DERIVATION",
+        "CKM_SHA3_512_KEY_DERIVE",
+        "CKM_SHA3_512_KEY_DERIVATION",
+        "CKM_SHAKE_128_KEY_DERIVE",
+        "CKM_SHAKE_128_KEY_DERIVATION",
+        "CKM_SHAKE_256_KEY_DERIVE",
+        "CKM_SHAKE_256_KEY_DERIVATION",
+        // IKE PRFs: protocol-specific, opt in explicitly after review.
+        "CKM_IKE_PRF_DERIVE",
+        "CKM_IKE1_PRF_DERIVE",
+        "CKM_IKE1_EXTENDED_DERIVE",
+        "CKM_IKE2_PRF_PLUS_DERIVE"
     );
 
     /// <summary>Unauthenticated / malleable AES modes; the authenticated modes are GCM and CCM.</summary>

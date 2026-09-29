@@ -94,7 +94,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// this method — see the class remarks.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data,
@@ -120,7 +120,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// HashAlgorithmName)</c> convenience overload does NOT reach this method — see the class remarks.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
-    /// <exception cref="InsecureOperationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace has <c>Pkcs11Workspace.AllowInsecure</c> set.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data,
@@ -128,13 +128,83 @@ public sealed class ECDsaPkcs11 : ECDsa
         HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism((CKM)combined.Type))
+        if (_key.SupportsMechanism(combined))
         {
             return _key.Verify(combined, data, signature);
         }
-        byte[] hash = HashData(hashAlgorithm, data);
+        byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Verify);
         var raw = new Mechanism(CKM.CKM_ECDSA);
         return _key.Verify(raw, hash, signature);
+    }
+
+    // The BCL routes these verification overloads through the protected HashData overrides, which are
+    // shared with SignData and cannot tell which direction called them. Overriding them here lets the
+    // pre-hash report CryptoOperation.Verify, so a direction-sensitive policy (FipsOnly allows SHA-1
+    // only for legacy verification) sees the same verdict whichever overload the caller picks. The
+    // hashing and the digest verification are otherwise exactly what the base class does.
+
+    /// <inheritdoc/>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses <paramref name="hashAlgorithm"/> for verification.</exception>
+    public override bool VerifyData(byte[] data, int offset, int count, byte[] signature, HashAlgorithmName hashAlgorithm)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, data.Length);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, data.Length - offset);
+        ArgumentNullException.ThrowIfNull(signature);
+        if (string.IsNullOrEmpty(hashAlgorithm.Name))
+            throw new ArgumentException("Hash algorithm must be specified.", nameof(hashAlgorithm));
+
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Verify);
+        return VerifyHash(base.HashData(data, offset, count, hashAlgorithm), signature);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Also reached by the non-virtual <c>VerifyData(Stream, byte[], HashAlgorithmName)</c>.</remarks>
+    protected override bool VerifyDataCore(
+        ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> signature,
+        HashAlgorithmName hashAlgorithm,
+        DSASignatureFormat signatureFormat)
+    {
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Verify);
+        byte[] buffer = data.ToArray();
+        return VerifyHashCore(base.HashData(buffer, 0, buffer.Length, hashAlgorithm), signature, signatureFormat);
+    }
+
+    /// <inheritdoc/>
+    protected override bool VerifyDataCore(
+        Stream data,
+        ReadOnlySpan<byte> signature,
+        HashAlgorithmName hashAlgorithm,
+        DSASignatureFormat signatureFormat)
+    {
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Verify);
+        return VerifyHashCore(base.HashData(data, hashAlgorithm), signature, signatureFormat);
+    }
+
+    // The Stream signing overloads hash here, with Sign, so that the protected HashData(Stream) override
+    // below is reached only by the non-virtual VerifyData(Stream, byte[], HashAlgorithmName), which
+    // cannot be overridden and goes straight to it — that override can then report Verify.
+
+    /// <inheritdoc/>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses <paramref name="hashAlgorithm"/> for signing.</exception>
+    public override byte[] SignData(Stream data, HashAlgorithmName hashAlgorithm)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (string.IsNullOrEmpty(hashAlgorithm.Name))
+            throw new ArgumentException("Hash algorithm must be specified.", nameof(hashAlgorithm));
+
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Sign);
+        return SignHash(base.HashData(data, hashAlgorithm));
+    }
+
+    /// <inheritdoc/>
+    protected override byte[] SignDataCore(Stream data, HashAlgorithmName hashAlgorithm, DSASignatureFormat signatureFormat)
+    {
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Sign);
+        return SignHashCore(base.HashData(data, hashAlgorithm), signatureFormat);
     }
 
     // -----------------------------------------------------------------------
@@ -171,45 +241,46 @@ public sealed class ECDsaPkcs11 : ECDsa
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism((CKM)combined.Type))
+        if (_key.SupportsMechanism(combined))
             return _key.Sign(combined, data);
-        byte[] hash = HashData(hashAlgorithm, data);
+        byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
         var raw = new Mechanism(CKM.CKM_ECDSA);
         return _key.Sign(raw, hash);
     }
 
-    // Refuse SHA-1 unless the workspace opts in via AllowInsecure, mirroring GuardMechanism's rejection
-    // of the combined CKM_ECDSA_SHA1 mechanism. Gating here (the managed-side pre-hash) closes the gap
-    // for tokens that lack the combined mechanism. SHA-1 is gated on every entry point that knows the
-    // hash algorithm — the BCL byte[]/Stream SignData/VerifyData overloads pre-hash through the
-    // protected HashData overrides below, the span overloads through the private hasher. SignHash /
-    // VerifyHash(byte[]) sign caller-supplied digest bytes and cannot know the algorithm, so they are
-    // inherently outside this gate.
-    private void GuardWeakHash(HashAlgorithmName hashAlgorithm)
-    {
-        if (hashAlgorithm.Name == "SHA1" && !_key.Workspace.AllowInsecure)
-            throw new InsecureOperationException(
-                "SHA-1 is collision-broken and deprecated in signature contexts. Set Pkcs11Workspace.AllowInsecure " +
-                "to opt in (e.g. to verify a legacy signature), or use SHA-256 or stronger.");
-    }
+    // Submits the hash choice to the wrapped key's workspace policy, mirroring SecureOnlyPolicy's
+    // rejection of the combined CKM_ECDSA_SHA1 mechanism. Gating here (the managed-side pre-hash)
+    // closes the gap for tokens that lack the combined mechanism. Every entry point that knows the hash
+    // algorithm is gated with its own direction: the verification overloads above hash with Verify, the
+    // span overloads through the private hasher, the byte[] HashData override (reached only by the
+    // signing overloads) with Sign, and the Stream HashData override (reached only by the non-virtual
+    // Stream verification overload) with Verify. SignHash / VerifyHash(byte[]) take
+    // caller-supplied digest bytes and cannot know the algorithm, so they are outside this gate.
+    private void GuardWeakHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
+        => _key.Workspace.Enforce(new HashUseRequest(hashAlgorithm, operation));
 
     /// <inheritdoc/>
     protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
     {
-        GuardWeakHash(hashAlgorithm);
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Sign);
         return base.HashData(data, offset, count, hashAlgorithm);
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Reached only by the non-virtual <c>VerifyData(Stream, byte[], HashAlgorithmName)</c>: the Stream
+    /// signing overloads and <c>VerifyDataCore(Stream, …)</c> are overridden above and hash without
+    /// coming here, so the hash choice is reported as a verification.
+    /// </remarks>
     protected override byte[] HashData(Stream data, HashAlgorithmName hashAlgorithm)
     {
-        GuardWeakHash(hashAlgorithm);
+        GuardWeakHash(hashAlgorithm, CryptoOperation.Verify);
         return base.HashData(data, hashAlgorithm);
     }
 
-    private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data)
+    private byte[] HashData(HashAlgorithmName hashAlgorithm, ReadOnlySpan<byte> data, CryptoOperation operation)
     {
-        GuardWeakHash(hashAlgorithm);
+        GuardWeakHash(hashAlgorithm, operation);
         return hashAlgorithm.Name switch
         {
             "SHA1" => SHA1.HashData(data),
@@ -225,7 +296,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    /// <exception cref="InsecureOperationException">
+    /// <exception cref="CryptoPolicyViolationException">
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
@@ -233,7 +304,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     public override ECParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
-            throw new InsecureOperationException(
+            throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
         // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one

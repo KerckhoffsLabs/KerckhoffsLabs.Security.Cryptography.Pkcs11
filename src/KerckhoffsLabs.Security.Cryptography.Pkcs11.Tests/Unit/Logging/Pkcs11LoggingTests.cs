@@ -55,7 +55,7 @@ public sealed class Pkcs11LoggingTests
         try
         {
             Pkcs11Logging.CreateLogger(typeof(Pkcs11LoggingTests));
-            Assert.Equal(typeof(Pkcs11LoggingTests).FullName, factory.LastCategory);
+            Assert.Contains(typeof(Pkcs11LoggingTests).FullName, factory.Categories);
         }
         finally { Pkcs11Logging.SetLoggerFactory(null); }
     }
@@ -73,7 +73,7 @@ public sealed class Pkcs11LoggingTests
         try
         {
             Pkcs11Logging.CreateLogger(genericParam);
-            Assert.Equal(genericParam.Name, factory.LastCategory);
+            Assert.Contains(genericParam.Name, factory.Categories);
         }
         finally { Pkcs11Logging.SetLoggerFactory(null); }
     }
@@ -89,7 +89,7 @@ public sealed class Pkcs11LoggingTests
             var logger = Pkcs11Logging.CreateLogger<Pkcs11LoggingTests>();
             logger.LogInformation("hello");
 
-            Assert.NotNull(factory.LastCategory); // the Logger<T> queried the factory
+            Assert.Contains(typeof(Pkcs11LoggingTests).FullName, factory.Categories); // the Logger<T> queried the factory
             Assert.Contains(captured.Entries, e => e.Message == "hello" && e.Level == LogLevel.Information);
         }
         finally { Pkcs11Logging.SetLoggerFactory(null); }

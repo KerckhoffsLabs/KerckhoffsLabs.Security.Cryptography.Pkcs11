@@ -2,5 +2,11 @@
   href: index.md
 - name: Diagnostics
   href: diagnostics.md
+- name: Crypto policies
+  items:
+    - name: SecureOnly
+      href: policies/secure-only.md
+    - name: FipsOnly
+      href: policies/fips-only.md
 - name: API
   href: api/
