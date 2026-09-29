@@ -78,8 +78,8 @@ public sealed class FindObjectsTests_Kryoptic(KryopticBackendFixture f)
             .Label(baseLabel).Id(id).Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]).OnToken().Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(baseLabel).Id(id).Sign().OnToken().Build();
-        using var keypair = workspace.GenerateKey(
-            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), privTpl, pubTpl);
+        using var keypair = workspace.GenerateKeyPair(
+            new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
 
         // 2. Mint a cert SIGNED BY THE TOKEN KEY via X509SignatureGenerator (no CopyWithPrivateKey,
         //    so nothing tries to export the non-extractable key).

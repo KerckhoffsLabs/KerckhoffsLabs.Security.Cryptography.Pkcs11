@@ -89,7 +89,7 @@ internal static class DSAPkcs11TestCases
         using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11009 // DSA key generation is the set-up under test
-            generated = workspace.GenerateKey(new Mechanism(CKM.CKM_DSA_KEY_PAIR_GEN), privTpl, pubTpl);
+            generated = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
 #pragma warning restore KLPKCS11009
         }
 
