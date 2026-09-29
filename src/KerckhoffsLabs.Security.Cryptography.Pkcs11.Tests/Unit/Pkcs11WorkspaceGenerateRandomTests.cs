@@ -29,7 +29,7 @@ public sealed class Pkcs11WorkspaceGenerateRandomTests
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
 
-        Assert.Null(Record.Exception(() => workspace.GenerateRandom(Span<byte>.Empty)));
+        Assert.Null(Record.Exception(() => workspace.GenerateRandom([])));
     }
 
     [Fact]
