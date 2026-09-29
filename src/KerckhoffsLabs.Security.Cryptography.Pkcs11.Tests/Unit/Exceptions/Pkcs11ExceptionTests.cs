@@ -1,3 +1,4 @@
+using System.Reflection;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -96,5 +97,21 @@ public sealed class Pkcs11ExceptionTests
             () => Pkcs11Exception.ThrowIfError(CKR.CKR_PIN_INCORRECT, "C_Login"));
 
         Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
+    }
+
+    /// <summary>
+    /// The throw helpers are the library's call-site plumbing. Public, they would let callers raise
+    /// exceptions claiming a module returned a code it never did, and would freeze the CKR-to-subclass
+    /// routing as API.
+    /// </summary>
+    [Fact]
+    public void ThrowHelpers_AreNotPublic()
+    {
+        string[] publicStatics =
+            [.. typeof(Pkcs11Exception)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Select(static m => m.Name)];
+
+        Assert.Empty(publicStatics);
     }
 }
