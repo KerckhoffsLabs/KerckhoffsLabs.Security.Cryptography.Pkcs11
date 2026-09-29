@@ -12,6 +12,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 /// <c>CKA_MODULUS</c>, DSA's <c>CKA_PRIME</c>) can't be made unreadable or fatally erroring on a
 /// well-formed key object, which is what the adapters' key-size fallback paths need to see.
 /// </summary>
+/// <remarks>
+/// A key never owns its workspace or library, so disposing the returned key leaves both to the GC.
+/// That is harmless here: the fake module holds no native resources and no process-wide state.
+/// </remarks>
 internal static class FakeKeys
 {
     public static Pkcs11Key Create(CKK keyType, Func<CKA, (CKR Rv, byte[]? Value)> respond, ICryptoPolicy? policy = null)
@@ -27,8 +31,6 @@ internal static class FakeKeys
             publicHandle: ObjectHandle.Invalid,
             keyType: keyType,
             label: null,
-            id: [],
-            ownedLibrary: library,
-            ownsWorkspace: true);
+            id: []);
     }
 }

@@ -367,9 +367,7 @@ public sealed class Pkcs11Workspace : IDisposable
             publicHandle: publicHandle,
             keyType: keyType,
             label: label,
-            id: id,
-            ownedLibrary: null,
-            ownsWorkspace: false);
+            id: id);
     }
 
     // === Secure-default key-generation helpers =============================
@@ -886,8 +884,6 @@ public sealed class Pkcs11Workspace : IDisposable
             publicHandle: publicHandle,
             keyType: keyType,
             label: label,
-            id: id,
-            ownedLibrary: null,
-            ownsWorkspace: false);
+            id: id);
     }
 }

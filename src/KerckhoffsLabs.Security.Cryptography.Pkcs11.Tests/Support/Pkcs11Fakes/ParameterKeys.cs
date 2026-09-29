@@ -44,9 +44,7 @@ internal sealed class ParameterKeys : IDisposable
         publicHandle: new ObjectHandle(publicHandle),
         keyType: keyType,
         label: null,
-        id: [],
-        ownedLibrary: null,
-        ownsWorkspace: false);
+        id: []);
 
     public void Dispose()
     {
