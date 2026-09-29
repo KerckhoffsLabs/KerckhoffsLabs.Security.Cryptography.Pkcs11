@@ -481,7 +481,10 @@ public sealed class ObjectAttribute : IDisposable
     private string? DescribeNonSecretValue(CKA type, int length)
     {
         if (FlagAttributes.Contains(type))
-            return length == 1 ? (GetValueAsBool() ? "true" : "false") : null;
+        {
+            if (length != 1) return null;
+            return GetValueAsBool() ? "true" : "false";
+        }
 
         if (length != UnmanagedMemory.NativeULongSize) return null;
         return type switch

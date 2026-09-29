@@ -75,7 +75,7 @@ public sealed class ObjectAttributeToStringTests
     [Fact]
     public void VendorAttribute_IsNamedByItsCode()
     {
-        using var vendor = new ObjectAttribute(0x8000_0123UL, new byte[] { 0x01, 0x02 });
+        using var vendor = new ObjectAttribute(0x8000_0123UL, [0x01, 0x02]);
         Assert.Equal("CKA 0x80000123 (2 bytes)", vendor.ToString());
     }
 
@@ -96,7 +96,7 @@ public sealed class ObjectAttributeToStringTests
     [Fact]
     public void DisposedAttribute_DoesNotThrow()
     {
-        var attribute = new ObjectAttribute(CKA.CKA_VALUE, new byte[] { 1, 2, 3 });
+        var attribute = new ObjectAttribute(CKA.CKA_VALUE, [1, 2, 3]);
         attribute.Dispose();
 
         Assert.Equal("ObjectAttribute (disposed)", attribute.ToString());
