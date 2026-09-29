@@ -2,6 +2,7 @@ using System.Reflection;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
@@ -64,15 +65,18 @@ public sealed class MechanismParamsFinalizerTests
     [Fact]
     public void ConstructingParameters_AllocatesNoUnmanagedMemory()
     {
+        // The keys the key-valued types reference are built first: only the parameters are under test.
+        using var keys = new ParameterKeys();
+        Pkcs11Key secret = keys.Secret(1), pair = keys.Pair(2, 3);
         int before = UnmanagedMemory.OutstandingAllocationCount;
 
-        object[] wrappers = CreateOneOfEach();
+        object[] wrappers = CreateOneOfEach(secret, pair);
 
         Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
         Assert.NotEmpty(wrappers);
     }
 
-    private static object[] CreateOneOfEach() =>
+    private static object[] CreateOneOfEach(Pkcs11Key secret, Pkcs11Key pair) =>
     [
         new CkmAesCcmParams(16, new byte[13], default, 16),
         new CkmAesGcmParams(new byte[12], default, 128),
@@ -82,11 +86,11 @@ public sealed class MechanismParamsFinalizerTests
         new CkmEddsaParams(phFlag: false),
         CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16),
         new CkmHashPqcSignParams(CKM.CKM_SHA256, CkhHedge.CKH_HEDGE_REQUIRED, [0xAA]),
-        new CkmHkdfParams(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSaltType.Null, new byte[4], saltKey: 0, new byte[3]),
-        new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: true, keygxy: 5, new byte[2]),
-        new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: true, keygxy: 1, prevKey: 2, new byte[2], new byte[1], keyNumber: 9),
-        new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, new byte[3]),
-        new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: false, new byte[3], new byte[2], newKey: 7),
+        CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, new byte[4], new byte[3]),
+        new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: secret, new byte[2]),
+        new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: secret, prevKey: secret, new byte[2], new byte[1], keyNumber: 9),
+        new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, seedKey: null, new byte[3]),
+        new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: false, new byte[3], new byte[2], newKey: secret),
         new CkmPqcSignParams(CkhHedge.CKH_HEDGE_REQUIRED, [1, 2, 3]),
         new CkmRc2CbcParams(128, new byte[8]),
         new CkmRc2Params(64),
@@ -98,10 +102,10 @@ public sealed class MechanismParamsFinalizerTests
         CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, new byte[2], new byte[2]),
         CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC).IterationCounter().ByteArray([1]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).WithIV(new byte[8]).Build(),
         CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC).IterationCounter().ByteArray([1]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build(),
-        new CkmX2RatchetInitializeParams(new byte[8], peerPublicPrekey: 1, peerPublicIdentity: 2, ownPublicIdentity: 3, encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC),
-        new CkmX2RatchetRespondParams(new byte[4], ownPrekey: 1, initiatorIdentity: 2, ownPublicIdentity: 3, encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC),
-        new CkmX3dhInitiateParams(kdf: CKM.CKM_SHA256_HMAC, peerIdentity: 2, peerPrekey: 3, new byte[3], new byte[2], ownIdentity: 4, ownEphemeral: 5),
-        new CkmX3dhRespondParams(kdf: CKM.CKM_SHA384_HMAC, new byte[1], new byte[2], new byte[1], initiatorIdentity: 8, new byte[3]),
+        new CkmX2RatchetInitializeParams(new byte[8], peerPublicPrekey: pair, peerPublicIdentity: pair, ownPublicIdentity: pair, encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC),
+        new CkmX2RatchetRespondParams(new byte[4], ownPrekey: pair, initiatorIdentity: pair, ownPublicIdentity: pair, encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC),
+        new CkmX3dhInitiateParams(kdf: CKM.CKM_SHA256_HMAC, peerIdentity: pair, peerPrekey: pair, new byte[3], new byte[2], ownIdentity: pair, ownEphemeral: pair),
+        new CkmX3dhRespondParams(kdf: CKM.CKM_SHA384_HMAC, new byte[1], new byte[2], new byte[1], initiatorIdentity: pair, new byte[3]),
         new CkmXeddsaParams(CKM.CKM_SHA512),
     ];
 }

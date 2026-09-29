@@ -130,7 +130,7 @@ internal static class IkeDeriveTestCases
         {
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
-                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
+                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, Sha256Size);
             Assert.Equal(expected, actual);
@@ -162,8 +162,8 @@ internal static class IkeDeriveTestCases
             using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
             var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
-                new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: false,
-                    gxyKey.PrivateHandle.ObjectId, prevKey: 0, ckyI, ckyR, keyNumber));
+                new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC,
+                    gxyKey, prevKey: null, ckyI, ckyR, keyNumber));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, Sha256Size);
             Assert.Equal(expected, actual);
@@ -199,7 +199,7 @@ internal static class IkeDeriveTestCases
         {
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
-                new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: false, keygxy: 0, extraData));
+                new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: null, extraData));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, expected.Length);
             Assert.Equal(expected, actual);
@@ -232,7 +232,7 @@ internal static class IkeDeriveTestCases
         {
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
-                new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, seedData));
+                new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, seedKey: null, seedData));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, outputLength);
             Assert.Equal(expected, actual);
@@ -262,7 +262,7 @@ internal static class IkeDeriveTestCases
         {
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
-                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
+                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, Sha256Size);
             Assert.Equal(expectedMac, actualMac);
@@ -294,8 +294,8 @@ internal static class IkeDeriveTestCases
             using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
             var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
-                new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC, hasPrevKey: false,
-                    gxyKey.PrivateHandle.ObjectId, prevKey: 0, ckyI, ckyR, keyNumber));
+                new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC,
+                    gxyKey, prevKey: null, ckyI, ckyR, keyNumber));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, Sha256Size);
             Assert.Equal(expectedMac, actualMac);
@@ -328,7 +328,7 @@ internal static class IkeDeriveTestCases
         {
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
-                new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, hasKeygxy: false, keygxy: 0, extraData));
+                new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: null, extraData));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, expectedDerived.Length);
             Assert.Equal(expectedMac, actualMac);
@@ -360,7 +360,7 @@ internal static class IkeDeriveTestCases
         {
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
-                new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, hasSeedKey: false, seedKey: 0, seedData));
+                new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, seedKey: null, seedData));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, outputLength);
             Assert.Equal(expectedMac, actualMac);
@@ -392,7 +392,7 @@ internal static class IkeDeriveTestCases
             // is false, and does not admit generic secret.
             using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
-                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr, newKey: 0));
+                new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr));
             using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
                 .ValueLen(Sha256Size).Sign().Build();
 

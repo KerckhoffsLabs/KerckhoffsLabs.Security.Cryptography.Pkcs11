@@ -255,11 +255,11 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
                     break;
                 }
 
-            case Sp800108SegmentKind.KeyHandle:
+            case Sp800108SegmentKind.Key:
                 {
                     valueLen = UnmanagedMemory.NativeULongSize;
                     value = scope.Allocate(valueLen);
-                    WriteHandle(value, seg.KeyHandle);
+                    WriteHandle(value, (ulong)scope.KeyHandle(seg.Key!, KeyHandlePart.Private, "key"));
                     type = CK_SP800_108_KEY_HANDLE;
                     break;
                 }

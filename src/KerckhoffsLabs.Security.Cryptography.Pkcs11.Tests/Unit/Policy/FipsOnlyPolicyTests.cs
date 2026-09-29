@@ -193,7 +193,7 @@ public sealed class FipsOnlyPolicyTests
     [InlineData(CKM.CKM_SHA256_HMAC)]
     public void Hkdf_ApprovedPrf_IsApproved(CKM prf)
     {
-        var mech = new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmHkdfParams(HkdfOperation.ExtractAndExpand, prf, HkdfSaltType.Null));
+        var mech = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf));
         Assert.True(Allowed(mech, CryptoOperation.Derive));
     }
 

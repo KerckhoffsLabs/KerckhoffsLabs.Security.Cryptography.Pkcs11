@@ -80,7 +80,7 @@ public sealed class SecureOnlyPolicyTests
         CKM.CKM_SP800_108_FEEDBACK_KDF => new Mechanism(mech, CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC).IterationCounter().Build()),
         CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF => new Mechanism(mech, CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC).IterationCounter().Build()),
         CKM.CKM_HKDF_DERIVE or CKM.CKM_HKDF_DATA =>
-            new Mechanism(mech, new CkmHkdfParams(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSaltType.Null)),
+            new Mechanism(mech, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC)),
         CKM.CKM_ECDH1_DERIVE or CKM.CKM_ECDH1_COFACTOR_DERIVE =>
             new Mechanism(mech, new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, [0x04, 0x01, 0x04])),
         _ => new Mechanism(mech),
@@ -407,14 +407,14 @@ public sealed class SecureOnlyPolicyTests
     [InlineData(CKM.CKM_SHA3_512_HMAC)]
     public void Hkdf_AllowedPrf_IsAllowed(CKM prf)
     {
-        var mech = new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmHkdfParams(HkdfOperation.ExtractAndExpand, prf, HkdfSaltType.Null));
+        var mech = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf));
         Assert.True(Allowed(mech, CryptoOperation.Derive));
     }
 
     [Fact]
     public void Hkdf_Sha1_IsDenied()
     {
-        var mech = new Mechanism(CKM.CKM_HKDF_DATA, new CkmHkdfParams(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA_1, HkdfSaltType.Null));
+        var mech = new Mechanism(CKM.CKM_HKDF_DATA, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA_1));
         Assert.False(Allowed(mech, CryptoOperation.Derive));
         Assert.Contains("CKM_SHA_1 is not an allowed HKDF PRF; use ", Reason(mech, CryptoOperation.Derive), StringComparison.Ordinal);
     }

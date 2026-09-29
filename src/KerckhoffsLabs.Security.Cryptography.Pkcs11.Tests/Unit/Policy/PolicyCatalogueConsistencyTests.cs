@@ -210,7 +210,7 @@ public sealed class PolicyCatalogueConsistencyTests
             foreach (CKM kdf in new[] { CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF })
                 yield return (new Mechanism(kdf, sp800108), CryptoOperation.Derive, prf.ToString(), "SP 800-108");
 
-            var hkdf = new CkmHkdfParams(HkdfOperation.ExtractAndExpand, prf, HkdfSaltType.Null);
+            var hkdf = CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf);
             foreach (CKM kdf in new[] { CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA })
                 yield return (new Mechanism(kdf, hkdf), CryptoOperation.Derive, prf.ToString(), "HKDF");
         }

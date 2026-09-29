@@ -7,6 +7,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <summary>
 /// High-level wrapper for <see cref="CK_IKE_PRF_DERIVE_PARAMS"/>. Used with CKM_IKE_PRF_DERIVE (PKCS#11 v3.0).
 /// </summary>
+/// <remarks>
+/// A new key must come from the workspace that performs the derive; it is resolved to its object
+/// handle when the operation runs, and a disposed key or one from another workspace is refused there.
+/// </remarks>
 public sealed class CkmIkePrfDeriveParams : MechanismParameters
 {
     private readonly byte[] _niBytes;
@@ -14,7 +18,7 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     private readonly CKM _prfMechanism;
     private readonly bool _dataAsKey;
     private readonly bool _rekey;
-    private readonly ulong _newKey;
+    private readonly Pkcs11Key? _newKey;
 
     /// <summary>
     /// Initializes IKE PRF derive parameters.
@@ -24,9 +28,12 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     /// <param name="rekey">True to perform a rekey-style derivation.</param>
     /// <param name="ni">Initiator nonce (Ni).</param>
     /// <param name="nr">Responder nonce (Nr).</param>
-    /// <param name="newKey">New-key handle used in some rekey flows.</param>
-    public CkmIkePrfDeriveParams(CKM prfMechanism, bool dataAsKey, bool rekey, ReadOnlySpan<byte> ni, ReadOnlySpan<byte> nr, ulong newKey)
+    /// <param name="newKey">New key used in some rekey flows, or <c>null</c> when there is none.</param>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="newKey"/> has no secret-key object.</exception>
+    public CkmIkePrfDeriveParams(CKM prfMechanism, bool dataAsKey, bool rekey, ReadOnlySpan<byte> ni, ReadOnlySpan<byte> nr, Pkcs11Key? newKey = null)
     {
+        newKey?.EnsureHasParameterHandle(KeyHandlePart.Private, nameof(newKey));
+
         _niBytes = ni.IsEmpty ? [] : ni.ToArray();
         _nrBytes = nr.IsEmpty ? [] : nr.ToArray();
         _prfMechanism = prfMechanism;
@@ -47,7 +54,7 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
             NiLen = (NativeCULong)_niBytes.Length,
             Nr = scope.Write(_nrBytes),
             NrLen = (NativeCULong)_nrBytes.Length,
-            NewKey = (NativeCULong)_newKey,
+            NewKey = _newKey is null ? default : scope.KeyHandle(_newKey, KeyHandlePart.Private, "newKey"),
         };
     }
 }

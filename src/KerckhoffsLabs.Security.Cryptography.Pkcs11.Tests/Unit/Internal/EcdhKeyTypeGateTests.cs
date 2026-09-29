@@ -149,7 +149,7 @@ public sealed class EcdhKeyTypeGateTests
         var fake = new KeyTypeFake(CKK.CKK_EC_MONTGOMERY);
         using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.FipsOnly);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
-        var hkdf = new Mechanism(CKM.CKM_HKDF_DERIVE, new CkmHkdfParams(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, HkdfSaltType.Null));
+        var hkdf = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC));
 
         session.DeriveKey(hkdf, new ObjectHandle(5UL), [.. template.Attributes]);
         Assert.Equal(1, fake.Calls);

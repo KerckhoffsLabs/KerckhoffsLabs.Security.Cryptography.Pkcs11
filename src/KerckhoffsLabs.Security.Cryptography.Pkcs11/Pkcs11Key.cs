@@ -146,6 +146,67 @@ public sealed class Pkcs11Key : IDisposable
     internal ObjectHandle PublicHandle => _publicHandle;
 
     /// <summary>
+    /// Checks that this key has the token object a mechanism parameter asks for, so a parameter type
+    /// can reject an unusable key when it is constructed rather than when the operation runs.
+    /// </summary>
+    /// <param name="part">Which object the parameter refers to.</param>
+    /// <param name="paramName">The parameter-type argument the key was passed as, for the exception.</param>
+    /// <exception cref="ArgumentException">The key has no object of that kind — for example a public
+    /// part requested from a secret key, or a private part from a public-only key.</exception>
+    internal void EnsureHasParameterHandle(KeyHandlePart part, string paramName) =>
+        _ = SelectParameterHandle(part, paramName);
+
+    /// <summary>
+    /// Resolves the handle a mechanism parameter carries for this key, at the moment the parameter is
+    /// marshalled for <paramref name="session"/>.
+    /// </summary>
+    /// <remarks>
+    /// A handle only means something to the session and login it came from, so a key from another
+    /// workspace is refused rather than sent: its number could name an unrelated object — or nothing —
+    /// in the calling session.
+    /// </remarks>
+    /// <param name="session">The session performing the call.</param>
+    /// <param name="part">Which object the parameter refers to.</param>
+    /// <param name="paramName">The parameter-type argument the key was passed as, for the exception.</param>
+    /// <exception cref="ObjectDisposedException">The key has been disposed.</exception>
+    /// <exception cref="ArgumentException">The key belongs to a different workspace, or has no object
+    /// of the requested kind.</exception>
+    internal ObjectHandle ResolveParameterHandle(Pkcs11Session session, KeyHandlePart part, string paramName)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!ReferenceEquals(_workspace.Session, session))
+            throw new ArgumentException(
+                "The key belongs to a different workspace than the operation. Mechanism parameters can only " +
+                "reference keys from the workspace that performs the call.",
+                paramName);
+        return SelectParameterHandle(part, paramName);
+    }
+
+    private ObjectHandle SelectParameterHandle(KeyHandlePart part, string paramName)
+    {
+        switch (part)
+        {
+            case KeyHandlePart.Private:
+                if (_privateHandle.IsInvalid)
+                    throw new ArgumentException(
+                        "The key has no private-key or secret-key object on the token; this parameter needs one.",
+                        paramName);
+                return _privateHandle;
+
+            case KeyHandlePart.Public:
+                if (_publicHandle.IsInvalid)
+                    throw new ArgumentException(
+                        "The key has no public-key object on the token (a secret key never has one); this " +
+                        "parameter needs one.",
+                        paramName);
+                return _publicHandle;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(part), part, "Not a defined KeyHandlePart member.");
+        }
+    }
+
+    /// <summary>
     /// Returns the synthesized RSA public parameters for this key when its public side
     /// is reachable via attributes on the private-key object. Returns <c>null</c> if
     /// the key already has a real <see cref="PublicHandle"/> (caller should use that
