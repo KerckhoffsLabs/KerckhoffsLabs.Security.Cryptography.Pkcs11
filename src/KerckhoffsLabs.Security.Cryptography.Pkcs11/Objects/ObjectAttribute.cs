@@ -433,6 +433,83 @@ public sealed class ObjectAttribute : IDisposable
         return result;
     }
 
+    // --- Diagnostics -------------------------------------------------------
+
+    // CK_BBOOL attributes: a flag is never secret, so its value is safe to print.
+    private static readonly HashSet<CKA> FlagAttributes =
+    [
+        CKA.CKA_TOKEN, CKA.CKA_PRIVATE, CKA.CKA_MODIFIABLE, CKA.CKA_COPYABLE, CKA.CKA_DESTROYABLE,
+        CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE, CKA.CKA_ALWAYS_SENSITIVE, CKA.CKA_NEVER_EXTRACTABLE,
+        CKA.CKA_LOCAL, CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP, CKA.CKA_SIGN,
+        CKA.CKA_SIGN_RECOVER, CKA.CKA_VERIFY, CKA.CKA_VERIFY_RECOVER, CKA.CKA_DERIVE,
+        CKA.CKA_ENCAPSULATE, CKA.CKA_DECAPSULATE, CKA.CKA_WRAP_WITH_TRUSTED, CKA.CKA_TRUSTED,
+        CKA.CKA_ALWAYS_AUTHENTICATE,
+    ];
+
+    /// <summary>
+    /// Returns a description that is safe to log: the attribute's name, and its value only when the
+    /// value can never be secret — a flag, an object class, a key or certificate type, a mechanism, or
+    /// a size. Every other value is reported by its length alone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// For example <c>CKA_SENSITIVE = true</c>, <c>CKA_KEY_TYPE = CKK_AES</c>, <c>CKA_VALUE_LEN = 32</c>,
+    /// <c>CKA_VALUE (32 bytes)</c>, <c>CKA_LABEL (9 bytes)</c>, <c>CKA_PRIVATE_EXPONENT (unavailable)</c>.
+    /// Byte-array and string values — key material, labels, identifiers — are never printed, so a
+    /// template or attribute list can be logged or shown in a test failure without leaking a key.
+    /// </para>
+    /// <para>The format is for diagnostics only and may change; do not parse it.</para>
+    /// </remarks>
+    /// <returns>A description of the attribute that never contains a byte or string value.</returns>
+    public override string ToString()
+    {
+        if (_disposed) return "ObjectAttribute (disposed)";
+
+        ulong type = (ulong)_ckAttribute.type;
+        string name = type <= uint.MaxValue && Enum.IsDefined((CKA)(uint)type)
+            ? ((CKA)(uint)type).ToString()
+            : $"CKA 0x{type:X8}";
+
+        if (_ckAttribute.valueLen == NativeCULong.MaxValue) return $"{name} (unavailable)";
+
+        int length = (int)_ckAttribute.valueLen;
+        string? value = type <= uint.MaxValue ? DescribeNonSecretValue((CKA)(uint)type, length) : null;
+        return value is null ? $"{name} ({length} bytes)" : $"{name} = {value}";
+    }
+
+    // The printable value for an allow-listed attribute of the expected width; null for anything else.
+    private string? DescribeNonSecretValue(CKA type, int length)
+    {
+        if (FlagAttributes.Contains(type))
+        {
+            if (length != 1) return null;
+            return GetValueAsBool() ? "true" : "false";
+        }
+
+        if (length != UnmanagedMemory.NativeULongSize) return null;
+        return type switch
+        {
+            CKA.CKA_CLASS => NameOrHex<CKO>(GetValueAsUlong()),
+            CKA.CKA_KEY_TYPE => NameOrHex<CKK>(GetValueAsUlong()),
+            CKA.CKA_CERTIFICATE_TYPE => NameOrHex<CKC>(GetValueAsUlong()),
+            CKA.CKA_KEY_GEN_MECHANISM => NameOrHex<CKM>(GetValueAsUlong()),
+            CKA.CKA_VALUE_LEN or CKA.CKA_MODULUS_BITS or CKA.CKA_PRIME_BITS or CKA.CKA_SUBPRIME_BITS
+                or CKA.CKA_VALUE_BITS or CKA.CKA_CERTIFICATE_CATEGORY or CKA.CKA_PARAMETER_SET
+                => GetValueAsUlong().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            _ => null,
+        };
+    }
+
+    private static string NameOrHex<TEnum>(ulong value) where TEnum : struct, Enum
+    {
+        if (value <= uint.MaxValue)
+        {
+            var named = (TEnum)Enum.ToObject(typeof(TEnum), value);
+            if (Enum.IsDefined(named)) return named.ToString();
+        }
+        return $"0x{value:X}";
+    }
+
     // --- IDisposable ---------------------------------------------------------
 
     /// <summary>Frees the unmanaged buffer backing this attribute's value.</summary>
