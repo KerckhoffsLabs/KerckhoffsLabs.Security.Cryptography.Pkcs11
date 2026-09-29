@@ -27,7 +27,41 @@ public sealed class SecurePinTests
 
     [Fact]
     public void Constructor_FromSpan_RejectsEmpty()
-        => Assert.Throws<ArgumentException>(() => new SecurePin([]));
+        => Assert.Throws<ArgumentException>(() => new SecurePin(ReadOnlySpan<byte>.Empty));
+
+    [Fact]
+    public void Constructor_FromChars_EncodesUtf8()
+    {
+        char[] typed = ['h', 'u', 'n', 't', 'e', 'r', '2', 'é'];
+        using var pin = new SecurePin(typed);
+        Assert.Equal(Encoding.UTF8.GetBytes("hunter2é"), pin.Pin.ToArray());
+    }
+
+    [Fact]
+    public void Constructor_FromChars_RejectsEmpty()
+        => Assert.Throws<ArgumentException>(() => new SecurePin(ReadOnlySpan<char>.Empty));
+
+    /// <summary>
+    /// A lone surrogate has no UTF-8 encoding. A replacing encoder would turn it into U+FFFD and log
+    /// in with bytes the user never typed, so both character-based constructors refuse it.
+    /// </summary>
+    [Fact]
+    public void Constructor_RefusesAnUnpairedSurrogate()
+    {
+        Assert.Throws<ArgumentException>(() => new SecurePin(['1', '\uD800', '2']));
+        Assert.Throws<ArgumentException>(() => new SecurePin("1\uD8002"));
+    }
+
+    /// <summary>A secret container offers no public read-back; only the interop layer sees the bytes.</summary>
+    [Fact]
+    public void PinBytes_AreNotPubliclyReadable()
+    {
+        var pinProperty = typeof(SecurePin).GetProperty(
+            "Pin",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(pinProperty);
+        Assert.False(pinProperty!.GetMethod!.IsPublic);
+    }
 
     [Fact]
     public void Constructor_FromString_RejectsEmpty()
