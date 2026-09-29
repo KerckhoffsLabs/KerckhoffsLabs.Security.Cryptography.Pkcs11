@@ -324,30 +324,16 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
         CKP prf = PrfForHash(hashAlgorithm);
 
-        var parameters = new CkmPkcs5Pbkd2Params(salt, (ulong)iterations, prf, password);
-        try
-        {
-            return workspace.GenerateKey(new Mechanism(CKM.CKM_PKCS5_PBKD2, parameters), template);
-        }
-        finally
-        {
-            parameters.ZeroPassword();
-        }
+        using var parameters = new CkmPkcs5Pbkd2Params(salt, (ulong)iterations, prf, password);
+        return workspace.GenerateKey(new Mechanism(CKM.CKM_PKCS5_PBKD2, parameters), template);
     }
 
     private static byte[] DeriveExtractable(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, CKP prf, int length)
     {
         workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
 
-        var parameters = new CkmPkcs5Pbkd2Params(salt, (ulong)iterations, prf, password);
-        try
-        {
-            return DeriveAndRead(workspace, new Mechanism(CKM.CKM_PKCS5_PBKD2, parameters), length);
-        }
-        finally
-        {
-            parameters.ZeroPassword();
-        }
+        using var parameters = new CkmPkcs5Pbkd2Params(salt, (ulong)iterations, prf, password);
+        return DeriveAndRead(workspace, new Mechanism(CKM.CKM_PKCS5_PBKD2, parameters), length);
     }
 
     private static byte[] DeriveAndRead(Pkcs11Workspace workspace, Mechanism mechanism, int length)

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -10,13 +11,22 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// structure for CKM_PKCS5_PBKD2. Always uses <see cref="CKZ.CKZ_SALT_SPECIFIED"/> as the salt source
 /// -- the only source the spec defines besides applying no salt at all, which PBKDF2 never does.
 /// </summary>
-public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
+/// <remarks>
+/// The password is a secret, so unlike most parameter types this one owns something worth releasing:
+/// its copy of the password is held in a pinned buffer (the garbage collector cannot move it and leave
+/// stale copies behind) and zeroed on <see cref="Dispose"/>, or by the finalizer if the instance is
+/// never disposed. Dispose it once the operation that uses it returns; a disposed instance refuses to
+/// be marshalled.
+/// </remarks>
+public sealed class CkmPkcs5Pbkd2Params : MechanismParameters, IDisposable
 {
     private readonly byte[] _salt;
     private readonly ulong _iterations;
     private readonly CKP _prf;
     private readonly byte[] _prfData;
-    private readonly byte[] _password;
+    private byte[] _password;
+    private GCHandle _passwordPin;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes the PBKDF2 parameters.
@@ -31,22 +41,35 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
         _salt = salt.ToArray();
         _iterations = iterations;
         _prf = prf;
-        _password = password.ToArray();
+        // Pin before copying, so the password is never written into a buffer the GC could relocate.
+        _password = new byte[password.Length];
+        _passwordPin = GCHandle.Alloc(_password, GCHandleType.Pinned);
+        password.CopyTo(_password);
         _prfData = prfData.IsEmpty ? [] : prfData.ToArray();
     }
 
     /// <summary>The PRF, for policy evaluation.</summary>
     internal CKP Prf => _prf;
 
-    /// <summary>
-    /// Zeroes this instance's copy of the password. For the library's own one-shot callers, which
-    /// build the parameters for a single call and must not leave the password on the managed heap.
-    /// </summary>
-    internal void ZeroPassword() => CryptographicOperations.ZeroMemory(_password);
+    /// <summary>Zeroes this instance's copy of the password and releases its GC pin.</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        CryptographicOperations.ZeroMemory(_password);
+        if (_passwordPin.IsAllocated) _passwordPin.Free();
+        _password = [];
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Finalizer safety net: zeroes the password even if <see cref="Dispose"/> was not called.</summary>
+    ~CkmPkcs5Pbkd2Params() => Dispose();
 
     /// <inheritdoc/>
+    /// <exception cref="ObjectDisposedException">This instance has been disposed.</exception>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return new CK_PKCS5_PBKD2_PARAMS2
         {
             SaltSource = (NativeCULong)CKZ.CKZ_SALT_SPECIFIED,

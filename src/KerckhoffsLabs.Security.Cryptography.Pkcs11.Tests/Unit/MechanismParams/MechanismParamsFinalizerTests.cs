@@ -39,7 +39,8 @@ public sealed class MechanismParamsFinalizerTests
     /// </summary>
     /// <remarks>
     /// This is the assertion the sibling allocation census cannot make: a finalizer with nothing to
-    /// free allocates nothing, so it would pass there unnoticed.
+    /// free allocates nothing, so it would pass there unnoticed. The one exception is a type that holds
+    /// a secret: its finalizer zeroes that secret, not unmanaged memory, and the type is disposable.
     /// </remarks>
     [Fact]
     public void NoParameterType_DeclaresAFinalizer()
@@ -51,12 +52,27 @@ public sealed class MechanismParamsFinalizerTests
         Assert.True(all.Length >= 27, $"expected the full parameter surface, found {all.Length}");
 
         string[] withFinalizers =
-            [.. all.Where(static t => t.GetMethod(
+            [.. all.Where(static t => !SecretHoldingTypes.Contains(t))
+                .Where(static t => t.GetMethod(
                     "Finalize",
                     BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly) is not null)
                 .Select(static t => t.Name)];
 
         Assert.Empty(withFinalizers);
+    }
+
+    /// <summary>The parameter types whose finalizer zeroes a secret they hold.</summary>
+    private static readonly Type[] SecretHoldingTypes = [typeof(CkmPkcs5Pbkd2Params)];
+
+    /// <summary>
+    /// A secret-holding type is disposable, so its secret can be zeroed deterministically; its
+    /// finalizer is only the safety net.
+    /// </summary>
+    [Fact]
+    public void SecretHoldingTypes_AreDisposable()
+    {
+        foreach (Type t in SecretHoldingTypes)
+            Assert.True(typeof(IDisposable).IsAssignableFrom(t), t.Name);
     }
 
     /// <summary>
@@ -107,5 +123,6 @@ public sealed class MechanismParamsFinalizerTests
         new CkmX3dhInitiateParams(kdf: CKM.CKM_SHA256_HMAC, peerIdentity: pair, peerPrekey: pair, new byte[3], new byte[2], ownIdentity: pair, ownEphemeral: pair),
         new CkmX3dhRespondParams(kdf: CKM.CKM_SHA384_HMAC, new byte[1], new byte[2], new byte[1], initiatorIdentity: pair, new byte[3]),
         new CkmXeddsaParams(CKM.CKM_SHA512),
+        new CkmPkcs5Pbkd2Params(new byte[16], 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, "pw"u8),
     ];
 }
