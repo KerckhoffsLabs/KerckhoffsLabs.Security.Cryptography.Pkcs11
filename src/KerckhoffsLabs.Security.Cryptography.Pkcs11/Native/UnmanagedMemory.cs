@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -38,9 +39,11 @@ internal static class UnmanagedMemory
     public static int NativeULongSize { get; } = Unsafe.SizeOf<NativeCULong>();
 
     /// <summary>
-    /// Logger responsible for message logging
+    /// Where the allocation trace goes when <see cref="DebugModeEnabled"/> is on. A null logger by
+    /// default: this is a diagnostic for the library's own tests, not a consumer logging channel —
+    /// this class has no library instance to take an <see cref="ILoggerFactory"/> from.
     /// </summary>
-    private static readonly ILogger _logger = Pkcs11Logging.CreateLogger(typeof(UnmanagedMemory));
+    internal static ILogger Logger { get; set; } = NullLogger.Instance;
 
     /// <summary>
     /// Every allocation performed by this class, by pointer and size.
@@ -101,7 +104,7 @@ internal static class UnmanagedMemory
         }
 
         if (DebugModeEnabled)
-            Log.AllocatedMemory(_logger, size, memory, _allocations.Count);
+            Log.AllocatedMemory(Logger, size, memory, _allocations.Count);
 
         return memory;
     }
@@ -128,7 +131,7 @@ internal static class UnmanagedMemory
         }
 
         if (DebugModeEnabled)
-            Log.FreeingMemory(_logger, size, memory, _allocations.Count);
+            Log.FreeingMemory(Logger, size, memory, _allocations.Count);
 
         Zeroize(memory, size);
         Marshal.FreeHGlobal(memory);

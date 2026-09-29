@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -22,9 +23,8 @@ public sealed class Pkcs11Slot
 
     /// <summary>
     /// The factory this instance was constructed with (inherited from the owning
-    /// <see cref="Pkcs11Library"/>), or <see langword="null"/> if it relies on the shared
-    /// <see cref="Pkcs11Logging"/> factory instead. Handed down to every <c>Pkcs11Session</c>
-    /// this slot opens.
+    /// <see cref="Pkcs11Library"/>), or <see langword="null"/> when the library was given none and
+    /// nothing logs. Handed down to every <c>Pkcs11Session</c> this slot opens.
     /// </summary>
     private readonly ILoggerFactory? _loggerFactory;
 
@@ -50,12 +50,12 @@ public sealed class Pkcs11Slot
     /// <param name="slotId">PKCS#11 handle of slot</param>
     /// <param name="loggerFactory">
     /// Logger factory inherited from the owning <see cref="Pkcs11Library"/>; <see langword="null"/>
-    /// falls back to the shared <see cref="Pkcs11Logging"/> factory.
+    /// for no logging.
     /// </param>
     internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId, ILoggerFactory? loggerFactory = null)
     {
         _loggerFactory = loggerFactory;
-        _logger = loggerFactory?.CreateLogger<Pkcs11Slot>() ?? Pkcs11Logging.CreateLogger<Pkcs11Slot>();
+        _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Slot>();
         Log.SlotTrace(_logger, slotId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);

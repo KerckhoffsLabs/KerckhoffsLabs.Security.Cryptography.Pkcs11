@@ -7,6 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
@@ -346,14 +347,14 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="sessionId">PKCS#11 handle of session</param>
     /// <param name="loggerFactory">
     /// Logger factory inherited from the owning <see cref="Pkcs11Slot"/>/<see cref="Pkcs11Library"/>;
-    /// <see langword="null"/> falls back to the shared <see cref="Pkcs11Logging"/> factory.
+    /// <see langword="null"/> for no logging.
     /// </param>
     /// <param name="policy">
     /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.SecureOnly"/>.
     /// </param>
     internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
     {
-        _logger = loggerFactory?.CreateLogger<Pkcs11Session>() ?? Pkcs11Logging.CreateLogger<Pkcs11Session>();
+        _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Session>();
         Log.SessionTrace(_logger, sessionId, "ctor");
 
         ArgumentNullException.ThrowIfNull(pkcs11Library);

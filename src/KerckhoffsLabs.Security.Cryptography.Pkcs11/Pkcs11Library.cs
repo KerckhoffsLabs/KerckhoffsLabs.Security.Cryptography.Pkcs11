@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
@@ -25,11 +26,10 @@ public sealed class Pkcs11Library : IDisposable
     private readonly ILogger _logger;
 
     /// <summary>
-    /// The factory this instance was constructed with, or <see langword="null"/> if it relies on
-    /// the shared <see cref="Pkcs11Logging"/> factory instead. Handed down to every
-    /// <see cref="Pkcs11Slot"/> and <c>Pkcs11Session</c> this library produces, so a whole
-    /// library/slot/session chain shares one independently-configurable logging setup instead of
-    /// every instance in the process sharing <see cref="Pkcs11Logging"/>'s single global factory.
+    /// The factory this instance was constructed with, or <see langword="null"/> when none was
+    /// given and the instance does not log. Handed down to every <see cref="Pkcs11Slot"/> and
+    /// <c>Pkcs11Session</c> this library produces, so a whole library/slot/session chain shares one
+    /// logging setup, configured per instance — there is no process-wide logging state.
     /// </summary>
     private readonly ILoggerFactory? _loggerFactory;
 
@@ -77,10 +77,9 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="libraryPath">Library name or path.</param>
     /// <param name="loggerFactory">
     /// Logger factory for this instance and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
-    /// produces. Pass <see langword="null"/> (the default) to fall back to the shared
-    /// <see cref="Pkcs11Logging"/> factory — the same behavior as before this parameter existed.
-    /// Passing an explicit factory lets independent consumers in the same process configure
-    /// logging per <see cref="Pkcs11Library"/> instance instead of sharing one process-wide setting.
+    /// produces. Pass <see langword="null"/> (the default) for no logging. This is the only way to
+    /// configure the library's logging, so independent consumers in the same process each configure
+    /// their own <see cref="Pkcs11Library"/> instance.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
@@ -134,8 +133,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </remarks>
     /// <param name="loggerFactory">
     /// Logger factory for this instance and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
-    /// produces. Pass <see langword="null"/> (the default) to fall back to the shared
-    /// <see cref="Pkcs11Logging"/> factory.
+    /// produces. Pass <see langword="null"/> (the default) for no logging.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
     /// <exception cref="EntryPointNotFoundException">
@@ -148,7 +146,7 @@ public sealed class Pkcs11Library : IDisposable
     private Pkcs11Library(string libraryPath, bool useStaticLink, ILoggerFactory? loggerFactory)
     {
         _loggerFactory = loggerFactory;
-        _logger = loggerFactory?.CreateLogger<Pkcs11Library>() ?? Pkcs11Logging.CreateLogger<Pkcs11Library>();
+        _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
 
         _libraryPath = libraryPath;
@@ -184,7 +182,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         ArgumentNullException.ThrowIfNull(lowLevel);
         _loggerFactory = loggerFactory;
-        _logger = loggerFactory?.CreateLogger<Pkcs11Library>() ?? Pkcs11Logging.CreateLogger<Pkcs11Library>();
+        _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         _libraryPath = "<in-process>";
         _pkcs11Library = lowLevel;
 

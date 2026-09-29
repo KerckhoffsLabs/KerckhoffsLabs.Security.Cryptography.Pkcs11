@@ -1,6 +1,5 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 using Microsoft.Extensions.Logging;
@@ -8,10 +7,9 @@ using Microsoft.Extensions.Logging;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
 
 /// <summary>
-/// Coverage for the per-instance <see cref="ILoggerFactory"/> a <see cref="Pkcs11Library"/> can be
-/// constructed with, instead of relying solely on the shared, process-wide <see cref="Pkcs11Logging"/>
-/// factory. Resets <see cref="Pkcs11Logging"/> around each test in case another test in the process
-/// left it configured — these tests must observe only the factory passed at construction.
+/// Coverage for the per-instance <see cref="ILoggerFactory"/> a <see cref="Pkcs11Library"/> is
+/// constructed with — the only way the library logs. There is no process-wide logging state, so
+/// these tests can run in parallel with everything else without resetting anything.
 /// </summary>
 public sealed class Pkcs11LibraryInstanceLoggingTests
 {
@@ -30,13 +28,8 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     }
 
     [Fact]
-    public void ExplicitFactory_UsedInsteadOfSharedPkcs11Logging()
+    public void ExplicitFactory_ReceivesTheLibrarysLogging()
     {
-        // Deliberately does not touch Pkcs11Logging's process-global factory: that state is shared
-        // with every other test in the suite, so asserting on its *absence* of an entry is racy under
-        // parallel execution (another test can legitimately log into it at any moment). The claim this
-        // test needs — the explicit factory is used instead of the shared one — is fully provable from
-        // the instance capture alone.
         var instanceCapture = new CapturingLogger();
         using var library = new Pkcs11Library(new SlotFake(), new CapturingLoggerFactory(instanceCapture));
 
@@ -44,19 +37,28 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     }
 
     [Fact]
-    public void NoFactory_FallsBackToSharedPkcs11Logging()
+    public void NoFactory_StillWorks_AndLogsNowhere()
     {
-        Pkcs11Logging.SetLoggerFactory(null);
-        try
-        {
-            var sharedCapture = new CapturingLogger();
-            Pkcs11Logging.SetLoggerFactory(new CapturingLoggerFactory(sharedCapture));
+        // With no factory the library, and the slots it produces, use a null logger. Nothing can
+        // capture that output, which is the point: there is no shared factory for it to fall back to.
+        using var library = new Pkcs11Library(new SlotFake());
 
-            using var library = new Pkcs11Library(new SlotFake());
+        Assert.Single(library.GetSlotList());
+    }
 
-            Assert.Contains(sharedCapture.Entries, e => e.Message.Contains("Initialize"));
-        }
-        finally { Pkcs11Logging.SetLoggerFactory(null); }
+    /// <summary>
+    /// Logging is configured per <see cref="Pkcs11Library"/> only. A public logging type would be a
+    /// process-wide configuration channel — mutable state that every instance, and every test, shares.
+    /// </summary>
+    [Fact]
+    public void Assembly_ExportsNoLoggingConfigurationTypes()
+    {
+        string[] loggingTypes =
+            [.. typeof(Pkcs11Library).Assembly.GetExportedTypes()
+                .Where(static t => t.Namespace == "KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging")
+                .Select(static t => t.FullName!)];
+
+        Assert.Empty(loggingTypes);
     }
 
     [Fact]
@@ -85,8 +87,7 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
 
         Assert.Single(slots);
         // Pkcs11Slot's own constructor logs "Pkcs11Slot({SlotId})::ctor" — this is the slot's log
-        // line, not the library's, proving the factory was actually handed down rather than the
-        // slot falling back to the shared Pkcs11Logging factory.
+        // line, not the library's, proving the factory was actually handed down to the slot.
         Assert.Contains(capture.Entries, e => e.Message.Contains("Pkcs11Slot") && e.Message.Contains("ctor"));
     }
 }
