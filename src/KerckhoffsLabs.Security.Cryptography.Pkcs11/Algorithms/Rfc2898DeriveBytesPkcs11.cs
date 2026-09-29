@@ -290,7 +290,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         }
     }
 
-    // See SP800108HmacCounterKdfPkcs11.DestroyEphemeral for why the destroy failure is swallowed only
+    // See DerivedKeyMaterial.DestroyEphemeral for why the destroy failure is swallowed only
     // when it would otherwise replace the real, in-flight exception.
     private static void DestroyEphemeral(Pkcs11Key derived, bool operationFailed)
     {
