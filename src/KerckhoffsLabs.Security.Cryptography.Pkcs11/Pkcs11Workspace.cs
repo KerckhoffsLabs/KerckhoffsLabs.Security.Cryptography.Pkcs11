@@ -742,6 +742,25 @@ public sealed class Pkcs11Workspace : IDisposable
     }
 
     /// <summary>
+    /// Fills <paramref name="destination"/> with bytes from the token's RNG — the token-backed
+    /// counterpart of <see cref="RandomNumberGenerator.Fill(Span{byte})"/>.
+    /// </summary>
+    /// <remarks>
+    /// The token writes straight into <paramref name="destination"/>, so random bytes meant as key
+    /// material, IVs or nonces can land in a buffer the caller controls — stack memory, or a pinned
+    /// array it zeroes afterwards — with no second copy on the managed heap. An empty span is a no-op,
+    /// as with <see cref="RandomNumberGenerator.Fill(Span{byte})"/>.
+    /// </remarks>
+    /// <param name="destination">The buffer to fill.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateRandom</c> call.</exception>
+    public void GenerateRandom(Span<byte> destination)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _session.GenerateRandom(destination);
+    }
+
+    /// <summary>
     /// Seeds the token's RNG with the supplied bytes. Optional — many tokens ignore seed
     /// data because they use hardware entropy.
     /// </summary>
