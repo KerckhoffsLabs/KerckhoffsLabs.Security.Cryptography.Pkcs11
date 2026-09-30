@@ -122,8 +122,9 @@ for Verify only); `FipsOnly` permits SP 800-131A legacy verification.
 Not a security obsoletion — PBKDF2 through the streaming `GetBytes` path is exactly as secure as
 the static one-shot path below it. This mirrors the BCL's own `Rfc2898DeriveBytes`, whose eight
 constructors are all `[Obsolete]` in favor of its static `Pbkdf2` method. Use the static
-`Rfc2898DeriveBytesPkcs11.Pbkdf2(...)` overloads instead; the constructors remain for streaming
-`GetBytes` calls that continue one PBKDF2 byte stream across several output chunks.
+`Rfc2898DeriveBytesPkcs11.Pbkdf2(...)` overloads instead, or `Rfc2898DeriveBytesPkcs11.Pbkdf2Key(...)` to
+keep the derived key on the token; the constructors remain for streaming `GetBytes` calls that
+continue one PBKDF2 byte stream across several output chunks.
 
 ## Runtime-only gates
 

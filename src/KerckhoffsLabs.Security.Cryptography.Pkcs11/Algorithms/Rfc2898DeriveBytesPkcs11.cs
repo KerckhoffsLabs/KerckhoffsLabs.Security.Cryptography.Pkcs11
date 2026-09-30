@@ -50,7 +50,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 {
     private const string ConstructorsObsoleteMessage =
-        "The constructors on Rfc2898DeriveBytesPkcs11 are obsolete. Use the static Pbkdf2 method instead.";
+        "The constructors on Rfc2898DeriveBytesPkcs11 are obsolete. Use the static Pbkdf2 method instead, " +
+        "or Pbkdf2Key to keep the derived key on the token.";
 
     private readonly Pkcs11Workspace _workspace;
     // The only copy of the password this instance keeps, borrowed by every derivation's parameters.
@@ -227,21 +228,23 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <inheritdoc cref="Pbkdf2(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName, int)"/>
     public static byte[] Pbkdf2(Pkcs11Workspace workspace, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(salt);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
-        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
-        if (outputLength == 0)
-            return [];
-        CKP prf = PrfForHash(hashAlgorithm);
         using var secure = new SecurePassword(password);
-        return DeriveExtractable(workspace, secure, salt, iterations, prf, outputLength);
+        return Pbkdf2Core(workspace, secure, salt, iterations, hashAlgorithm, outputLength);
     }
 
     /// <summary>One-shot PBKDF2. Mirrors <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, int, HashAlgorithmName, int)"/>.</summary>
     /// <inheritdoc cref="Pbkdf2(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName, int)"/>
     public static byte[] Pbkdf2(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    {
+        using var secure = new SecurePassword(password);
+        return Pbkdf2Core(workspace, secure, salt, iterations, hashAlgorithm, outputLength);
+    }
+
+    // The byte[]-returning one-shots once each has its password in a SecurePassword; the one place
+    // their arguments are checked.
+    private static byte[] Pbkdf2Core(Pkcs11Workspace workspace, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
@@ -249,8 +252,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         if (outputLength == 0)
             return [];
         CKP prf = PrfForHash(hashAlgorithm);
-        using var secure = new SecurePassword(password);
-        return DeriveExtractable(workspace, secure, salt, iterations, prf, outputLength);
+        return DeriveExtractable(workspace, password, salt, iterations, prf, outputLength);
     }
 
     /// <summary>
@@ -422,7 +424,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _password?.Dispose();
+        _password.Dispose();
         CryptographicOperations.ZeroMemory(_salt);
         GC.SuppressFinalize(this);
     }
