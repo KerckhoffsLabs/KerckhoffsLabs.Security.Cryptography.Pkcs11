@@ -217,13 +217,8 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     {
         ECParameters peer = otherPartyPublicKey.ExportParameters();
         Pkcs11ECCurve localCurve = _key.GetEcCurve();
-        // The token checks the point against this key's curve; a peer that says it is on another curve
-        // is a caller error worth naming as such.
-        if (peer.Curve.IsNamed && !string.Equals(peer.Curve.Oid.Value, localCurve.Oid, StringComparison.Ordinal))
-            throw new ArgumentException(
-                $"Peer public key is on curve {peer.Curve.Oid.FriendlyName ?? peer.Curve.Oid.Value}, expected {localCurve.FriendlyName ?? localCurve.Oid}.",
-                nameof(otherPartyPublicKey));
-
+        // ForPeer keeps the peer's curve with its point; the derivation refuses a peer on another curve
+        // or off this key's curve before anything reaches the token.
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForPeer(CKD.CKD_NULL, peer));
 
         // Z is one field element. Its size comes from the local key, not the peer's coordinate

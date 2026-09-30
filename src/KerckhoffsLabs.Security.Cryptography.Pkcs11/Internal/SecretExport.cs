@@ -113,8 +113,8 @@ internal static class SecretExport
     /// handle never leaves the library.
     /// </remarks>
     /// <param name="valueLength">The <c>CKA_VALUE_LEN</c> to request, or <see langword="null"/> to omit it.</param>
-    /// <returns>Attributes the caller owns and must dispose.</returns>
-    internal static List<ObjectAttribute> EphemeralTemplate(int? valueLength)
+    /// <returns>Attributes the caller owns; disposing the list releases them.</returns>
+    internal static ReadOnlyDisposableList<ObjectAttribute> EphemeralTemplate(int? valueLength)
     {
         List<ObjectAttribute> template =
         [
@@ -134,14 +134,28 @@ internal static class SecretExport
         ];
         if (valueLength is int length)
             template.Add(new ObjectAttribute(CKA.CKA_VALUE_LEN, (ulong)length));
-        return template;
+        return new ReadOnlyDisposableList<ObjectAttribute>(template);
     }
 
-    /// <summary>Disposes every attribute of a template built by <see cref="EphemeralTemplate"/>.</summary>
-    internal static void Release(List<ObjectAttribute> template)
+    /// <summary>Creates the ephemeral key from the library's template, through one PKCS#11 function.</summary>
+    /// <param name="template">The ephemeral key's template, to hand to the session with the export kind.</param>
+    /// <returns>The handle of the ephemeral key.</returns>
+    internal delegate ObjectHandle EphemeralKeyFactory(List<ObjectAttribute> template);
+
+    /// <summary>
+    /// The part every read-back shares once the export is authorized: build the ephemeral template,
+    /// create the key with <paramref name="create"/>, then copy its value into
+    /// <paramref name="destination"/> and destroy it (<see cref="ReadAndDestroy"/>).
+    /// </summary>
+    /// <param name="session">The session the key is created and destroyed on.</param>
+    /// <param name="valueLength">The <c>CKA_VALUE_LEN</c> to request, or <see langword="null"/> to omit it.</param>
+    /// <param name="create">Creates the ephemeral key from the template.</param>
+    /// <param name="destination">Receives the secret; zeroed if reading or destroying fails.</param>
+    internal static void Export(Pkcs11Session session, int? valueLength, EphemeralKeyFactory create, Span<byte> destination)
     {
-        foreach (ObjectAttribute attribute in template)
-            attribute.Dispose();
+        using ReadOnlyDisposableList<ObjectAttribute> template = EphemeralTemplate(valueLength);
+        ObjectHandle ephemeral = create([.. template]);
+        ReadAndDestroy(session, ephemeral, destination);
     }
 
     /// <summary>

@@ -103,25 +103,18 @@ public sealed class SecretExportTests
     [Fact]
     public void EphemeralTemplate_StatesEveryRestriction_ButNotCkaModifiable()
     {
-        List<ObjectAttribute> template = SecretExport.EphemeralTemplate(32);
-        try
-        {
-            bool Flag(CKA type) => template.Single(a => a.Type == type).GetValueAsBool();
+        using ReadOnlyDisposableList<ObjectAttribute> template = SecretExport.EphemeralTemplate(32);
+        bool Flag(CKA type) => template.Single(a => a.Type == type).GetValueAsBool();
 
-            Assert.False(Flag(CKA.CKA_TOKEN));
-            Assert.False(Flag(CKA.CKA_SENSITIVE));
-            Assert.True(Flag(CKA.CKA_EXTRACTABLE));
-            Assert.False(Flag(CKA.CKA_COPYABLE));
-            Assert.All([CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP, CKA.CKA_DERIVE],
-                usage => Assert.False(Flag(usage)));
-            Assert.Equal(32UL, template.Single(a => a.Type == CKA.CKA_VALUE_LEN).GetValueAsUlong());
-            // SoftHSM refuses every attribute written after CKA_MODIFIABLE=false on C_DeriveKey.
-            Assert.DoesNotContain(template, a => a.Type == CKA.CKA_MODIFIABLE);
-        }
-        finally
-        {
-            SecretExport.Release(template);
-        }
+        Assert.False(Flag(CKA.CKA_TOKEN));
+        Assert.False(Flag(CKA.CKA_SENSITIVE));
+        Assert.True(Flag(CKA.CKA_EXTRACTABLE));
+        Assert.False(Flag(CKA.CKA_COPYABLE));
+        Assert.All([CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP, CKA.CKA_DERIVE],
+            usage => Assert.False(Flag(usage)));
+        Assert.Equal(32UL, template.Single(a => a.Type == CKA.CKA_VALUE_LEN).GetValueAsUlong());
+        // SoftHSM refuses every attribute written after CKA_MODIFIABLE=false on C_DeriveKey.
+        Assert.DoesNotContain(template, a => a.Type == CKA.CKA_MODIFIABLE);
     }
 
     [Fact]
@@ -334,14 +327,8 @@ public sealed class SecretExportTests
         using var workspace = ManagedToken.OpenWorkspace(library,
             CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.EcdhSharedSecret, Reason));
         using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
-        var offCurve = new ECParameters
-        {
-            Curve = BclECCurve.NamedCurves.nistP256,
-            Q = new ECPoint { X = new byte[32], Y = [.. Enumerable.Repeat((byte)1, 32)] },
-        };
-
         var ex = Assert.Throws<ArgumentException>(() => key.DeriveAndExportSecret(
-            new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForPeer(CKD.CKD_NULL, offCurve)), new byte[32]));
+            new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForPeer(CKD.CKD_NULL, OffCurveP256())), new byte[32]));
 
         Assert.Equal("mechanism", ex.ParamName);
     }
@@ -357,6 +344,64 @@ public sealed class SecretExportTests
 
         Assert.Throws<ArgumentException>(() => key.DeriveAndExportSecret(
             new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForPeer(CKD.CKD_NULL, p384.ExportParameters(false))), new byte[32]));
+    }
+
+    private static ECParameters OffCurveP256() => new()
+    {
+        Curve = BclECCurve.NamedCurves.nistP256,
+        Q = new ECPoint { X = new byte[32], Y = [.. Enumerable.Repeat((byte)1, 32)] },
+    };
+
+    [Fact(SkipUnless = nameof(EcSupported), Skip = "Requires " + nameof(EcSupported))]
+    public void Ecdh_RawSecret_RequiresADestinationOfTheFieldSize()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library,
+            CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.EcdhSharedSecret, Reason));
+        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var peer = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForPeer(CKD.CKD_NULL, peer.ExportParameters(false)));
+
+        var ex = Assert.Throws<ArgumentException>(() => key.DeriveAndExportSecret(mechanism, new byte[31]));
+
+        Assert.Equal("destination", ex.ParamName);
+    }
+
+    [Fact(SkipUnless = nameof(EcSupported), Skip = "Requires " + nameof(EcSupported))]
+    public void Ecdh_PeerNamingAnotherCurve_IsRefused_EvenWhenItsPointHasTheRightSize()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var peer = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP256);
+        ECParameters claimed = peer.ExportParameters(false);
+        claimed.Curve = BclECCurve.CreateFromValue("1.3.36.3.3.2.8.1.1.7"); // brainpoolP256r1: same size, other curve
+
+        var ex = Assert.Throws<ArgumentException>(() => workspace.DeriveSharedSecretEcdh(key, claimed));
+
+        Assert.Equal("peerPublicKey", ex.ParamName);
+        Assert.Contains("expected", ex.Message, StringComparison.Ordinal);
+    }
+
+    // Every ECDH derivation checks the peer, not only the read-back: the invalid-curve attack works as
+    // well when the derived key stays on the token.
+    [Fact(SkipUnless = nameof(EcSupported), Skip = "Requires " + nameof(EcSupported))]
+    public void Ecdh_OffCurvePeer_IsRefusedOnEveryDerivationPath()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        byte[] offCurvePoint = CkmEcdh1DeriveParams.ForPeer(CKD.CKD_SHA256_KDF, OffCurveP256()).PublicData.ToArray();
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
+
+        var derive = Assert.Throws<ArgumentException>(() => key.Derive(
+            new Mechanism(CKM.CKM_ECDH1_DERIVE, new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, offCurvePoint)), template));
+        var rawSpan = Assert.Throws<ArgumentException>(() => workspace.DeriveSharedSecretEcdh(key, offCurvePoint));
+        var parameters = Assert.Throws<ArgumentException>(() => workspace.DeriveSharedSecretEcdh(key, OffCurveP256()));
+
+        Assert.Equal("mechanism", derive.ParamName);
+        Assert.Equal("peerPublicPoint", rawSpan.ParamName);
+        Assert.Equal("peerPublicKey", parameters.ParamName);
     }
 
     [Fact]

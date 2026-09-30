@@ -385,16 +385,9 @@ public sealed class Pkcs11Workspace : IDisposable
 
         SecretExport.Authorize(_session, kind, mechanism.Type, baseKeyClass: null, baseKeyType: null);
 
-        List<ObjectAttribute> template = SecretExport.EphemeralTemplate(destination.Length);
-        try
-        {
-            ObjectHandle ephemeral = _session.GenerateKey(mechanism, template, kind);
-            SecretExport.ReadAndDestroy(_session, ephemeral, destination);
-        }
-        finally
-        {
-            SecretExport.Release(template);
-        }
+        SecretExport.Export(_session, destination.Length,
+            template => _session.GenerateKey(mechanism, template, kind),
+            destination);
     }
 
     /// <summary>
@@ -706,17 +699,15 @@ public sealed class Pkcs11Workspace : IDisposable
     /// non-extractable, and non-modifiable — suitable for use with AES-GCM.
     /// </summary>
     /// <remarks>
-    /// <b>The peer's point is not validated here.</b> A raw DER-encoded octet string carries no
-    /// curve identity, so this overload cannot check that <paramref name="peerPublicPoint"/> is on
-    /// the same curve as <paramref name="ecPrivateKey"/> or that it satisfies that curve's equation
-    /// — PKCS#11 does not require the token to check either, and skipping both is the invalid-curve
-    /// / small-subgroup attack (it recovers a token-resident private key one residue at a time).
-    /// The caller is responsible for that validation before calling this overload. Prefer
-    /// <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>, which validates the
-    /// peer automatically because <see cref="ECParameters"/> carries its own curve.
+    /// When <paramref name="ecPrivateKey"/> is on one of the library's catalog curves, the peer point is
+    /// checked against that curve before it reaches the token, as on every ECDH derivation: it must be an uncompressed point of the curve's field size
+    /// that satisfies the curve equation. PKCS#11 does not require the token to check either, and
+    /// skipping both is the invalid-curve / small-subgroup attack, which recovers a token-resident
+    /// private key one residue at a time. The raw point carries no curve name, so a peer that claims
+    /// another curve cannot be told apart here; the <see cref="ECParameters"/> overload also refuses that.
     /// </remarks>
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
-    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value). Caller-validated — see remarks.</param>
+    /// <param name="peerPublicPoint">The peer's uncompressed public EC point, as a DER OCTET STRING (the full <c>CKA_EC_POINT</c> value) or raw.</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
     /// <param name="kdf">KDF applied to the raw ECDH shared secret before it becomes the derived AES
     /// key's material. Default <see cref="CKD.CKD_SHA256_KDF"/>. <see cref="CKD.CKD_NULL"/> applies no
@@ -727,6 +718,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicPoint"/> is empty, is not an uncompressed point of the curve's field size, or does not satisfy the curve equation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is not on the workspace's <see cref="Policy"/> KDF allow-list (under the default policy this includes <see cref="CKD.CKD_NULL"/> and the SHA-1 / SHA-224 KDFs).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
@@ -740,9 +732,14 @@ public sealed class Pkcs11Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
         if (aesBitLength is not 128 and not 192 and not 256)
             throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
-        // The KDF allow-list is enforced by the session on the Derive below, as on every ECDH derivation.
-        var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
-        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
+        return DeriveSharedSecretEcdhCore(ecPrivateKey, new CkmEcdh1DeriveParams(kdf, peerPublicPoint), aesBitLength, nameof(peerPublicPoint));
+    }
+
+    // Both overloads: the session enforces the KDF allow-list and checks the peer against the key's
+    // curve on the derive below, as on every ECDH derivation.
+    private static Pkcs11Key DeriveSharedSecretEcdhCore(Pkcs11Key ecPrivateKey, CkmEcdh1DeriveParams parameters, int aesBitLength, string peerParamName)
+    {
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, parameters);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .ValueLen(aesBitLength / 8)
             .Sensitive().NonExtractable()
@@ -750,7 +747,7 @@ public sealed class Pkcs11Workspace : IDisposable
             .OnToken(false)
             .Attribute(CKA.CKA_MODIFIABLE, false)
             .Build();
-        return ecPrivateKey.Derive(mechanism, template);
+        return ecPrivateKey.DeriveCore(mechanism, template, peerParamName);
     }
 
     /// <summary>
@@ -761,10 +758,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <remarks>
     /// Validates <paramref name="peerPublicKey"/> before it reaches the token: it must be on the
     /// same curve as <paramref name="ecPrivateKey"/>, its coordinates must match that curve's field
-    /// size, and the point must satisfy the curve equation — the validation the raw-span overload
-    /// cannot perform, because a DER-encoded octet string carries no curve identity for it to check
-    /// against. See <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/> for
-    /// why that matters (invalid-curve / small-subgroup recovery of the token-resident private key).
+    /// size, and the point must satisfy the curve equation. See
+    /// <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/> for why that
+    /// matters (invalid-curve / small-subgroup recovery of the token-resident private key).
     /// </remarks>
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
     /// <param name="peerPublicKey">The peer's public key. <see cref="ECParameters.Curve"/> and both coordinates of <see cref="ECParameters.Q"/> are required.</param>
@@ -778,12 +774,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate, its curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is not on the workspace's <see cref="Policy"/> KDF allow-list (under the default policy this includes <see cref="CKD.CKD_NULL"/> and the SHA-1 / SHA-224 KDFs).</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/>'s curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
-    /// <exception cref="InvalidOperationException">Thrown if <paramref name="ecPrivateKey"/> is not an EC key.</exception>
-    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if <paramref name="ecPrivateKey"/>'s <c>CKA_EC_PARAMS</c> cannot be read.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
@@ -793,13 +786,10 @@ public sealed class Pkcs11Workspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
-        if (peerPublicKey.Q.X is null || peerPublicKey.Q.Y is null)
-            throw new ArgumentException("Peer public key has no X or Y coordinate.", nameof(peerPublicKey));
+        if (aesBitLength is not 128 and not 192 and not 256)
+            throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
 
-        Pkcs11PublicKeyView.ValidatePeerEcKey(ecPrivateKey.GetEcCurve(), peerPublicKey, nameof(peerPublicKey));
-
-        byte[] peerPoint = CkmEcdh1DeriveParams.EncodeUncompressedPoint(peerPublicKey.Q.X, peerPublicKey.Q.Y);
-        return DeriveSharedSecretEcdh(ecPrivateKey, peerPoint, aesBitLength, kdf);
+        return DeriveSharedSecretEcdhCore(ecPrivateKey, CkmEcdh1DeriveParams.ForPeer(kdf, peerPublicKey), aesBitLength, nameof(peerPublicKey));
     }
 
     /// <summary>

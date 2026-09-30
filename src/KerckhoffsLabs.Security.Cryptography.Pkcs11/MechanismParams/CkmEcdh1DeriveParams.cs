@@ -16,12 +16,19 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     private readonly byte[] _publicDataBytes;
     private readonly byte[] _sharedDataBytes;
     private readonly CKD _kdf;
+    private readonly Pkcs11ECCurve? _peerCurve;
 
     /// <summary>The key derivation function applied to the shared secret, as the crypto policy sees it.</summary>
     internal CKD Kdf => _kdf;
 
     /// <summary>The peer's public point as passed to the token; empty for <see cref="ForEncapsulation"/>.</summary>
     internal ReadOnlySpan<byte> PublicData => _publicDataBytes;
+
+    /// <summary>
+    /// The curve the peer's key says it is on, when built by <see cref="ForPeer"/> from a key that names
+    /// one; <see langword="null"/> when only the point is known.
+    /// </summary>
+    internal Pkcs11ECCurve? PeerCurve => _peerCurve;
 
     /// <summary>
     /// Initializes ECDH1-derive parameters for <c>C_DeriveKey</c>.
@@ -55,17 +62,15 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     /// uncompressed point <c>04 ‖ X ‖ Y</c>).
     /// </summary>
     /// <remarks>
-    /// Only the point is encoded; the curve is not carried by the mechanism. The operations that take
-    /// these parameters and know the local key —
-    /// <see cref="Pkcs11Workspace.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/> and
-    /// <see cref="Pkcs11Key.DeriveAndExportSecret"/> — check the point against the local key's curve
-    /// before it reaches the token.
+    /// When <paramref name="peerPublicKey"/> names its curve, it is kept with the point, and every
+    /// ECDH derivation refuses a peer whose curve is not the local key's. The point itself is always
+    /// checked against the local key's curve before it reaches the token.
     /// </remarks>
     /// <param name="kdf">Key derivation function applied to the shared secret.</param>
     /// <param name="peerPublicKey">The peer's public key. Both coordinates of <see cref="ECParameters.Q"/> are required and must have the same length.</param>
     /// <param name="sharedData">Optional shared data to mix into the KDF; pass <c>default</c> for none.</param>
     /// <returns>Parameters carrying the encoded peer point.</returns>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate, or the two differ in length.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate, the two differ in length, or its curve OID is not a valid object identifier.</exception>
     public static CkmEcdh1DeriveParams ForPeer(CKD kdf, ECParameters peerPublicKey, ReadOnlySpan<byte> sharedData = default)
     {
         byte[] x = peerPublicKey.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(peerPublicKey));
@@ -74,7 +79,10 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
             throw new ArgumentException(
                 $"Peer public key coordinates must be non-empty and of equal length; got {x.Length} and {y.Length} bytes.",
                 nameof(peerPublicKey));
-        return new(kdf, EncodeUncompressedPoint(x, y), sharedData.IsEmpty ? [] : sharedData.ToArray(), default);
+        Pkcs11ECCurve? peerCurve = peerPublicKey.Curve.IsNamed && peerPublicKey.Curve.Oid.Value is { } oid
+            ? Pkcs11ECCurve.CreateFromValue(oid, peerPublicKey.Curve.Oid.FriendlyName)
+            : null;
+        return new(kdf, EncodeUncompressedPoint(x, y), sharedData.IsEmpty ? [] : sharedData.ToArray(), default, peerCurve);
     }
 
     /// <summary>
@@ -108,11 +116,12 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     // extra parameter the compiler cannot tell this constructor apart from the validating public one.
     private readonly struct RawParams;
 
-    private CkmEcdh1DeriveParams(CKD kdf, byte[] publicDataBytes, byte[] sharedDataBytes, RawParams _)
+    private CkmEcdh1DeriveParams(CKD kdf, byte[] publicDataBytes, byte[] sharedDataBytes, RawParams _, Pkcs11ECCurve? peerCurve = null)
     {
         _kdf = kdf;
         _publicDataBytes = publicDataBytes;
         _sharedDataBytes = sharedDataBytes;
+        _peerCurve = peerCurve;
     }
 
     private static byte[] RequireNonEmptyPeerPoint(ReadOnlySpan<byte> peerPublicPoint)

@@ -1608,6 +1608,71 @@ internal sealed class Pkcs11Session : IDisposable
         Enforce(new KeyAgreementKeyRequest(mechanism.Type, keyType));
     }
 
+    /// <summary>
+    /// Checks the peer point of an ECDH derivation from a Weierstrass (<see cref="CKK.CKK_EC"/>) key against
+    /// that key's curve — see <see cref="EcdhPeerValidation"/>. Runs on every <c>C_DeriveKey</c> carrying a
+    /// peer point, whichever public entry point it came through.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The check needs the key's curve to be one of the library's catalog curves, whose field size it
+    /// knows. When the key type or curve cannot be established — an unreadable attribute, explicit domain
+    /// parameters, a curve outside the catalog, or a Montgomery key (X25519 / X448, whose peer is a bare
+    /// u-coordinate with no off-curve form) — an on-token derivation is left to the token, as PKCS#11
+    /// allows.
+    /// </para>
+    /// <para>
+    /// A read-back (<paramref name="export"/> set) fails closed instead: the raw secret it returns is
+    /// exactly what a malicious peer point would be chosen to extract.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException">The peer is invalid, or an ECDH export is requested from a key that is not <see cref="CKK.CKK_EC"/>.</exception>
+    /// <exception cref="CryptographicException">An ECDH export is requested from a key whose curve cannot be established.</exception>
+    private void ValidateEcdhPeer(Mechanism mechanism, ObjectHandle baseKey, KeyMaterialExportKind? export, string paramName)
+    {
+        if (mechanism.Type is not (CKM.CKM_ECDH1_DERIVE or CKM.CKM_ECDH1_COFACTOR_DERIVE)
+            || mechanism.Parameters is not CkmEcdh1DeriveParams ecdh
+            || ecdh.PublicData.IsEmpty)
+            return;
+
+        (CKK? keyType, Pkcs11ECCurve? curve) = ReadEcCurve(baseKey);
+        if (keyType is { } type && type != CKK.CKK_EC)
+        {
+            if (export is not null)
+                throw new ArgumentException(
+                    $"Exporting an ECDH shared secret requires a CKK_EC key, whose curve the peer point is checked against; this is a {type} key.",
+                    paramName);
+            return;
+        }
+
+        if (curve is not { FieldSizeBits: not null } localCurve)
+        {
+            if (export is not null)
+                throw new CryptographicException(
+                    "The key's curve cannot be established from its CKA_KEY_TYPE and CKA_EC_PARAMS as a catalog curve, " +
+                    "so the ECDH peer point cannot be checked and the shared secret is not exported.");
+            return;
+        }
+
+        EcdhPeerValidation.Validate(localCurve, ecdh, paramName);
+    }
+
+    // Best effort: an attribute the token does not expose, or a curve not named by an OID, comes back null.
+    private (CKK? KeyType, Pkcs11ECCurve? Curve) ReadEcCurve(ObjectHandle key)
+    {
+        try
+        {
+            using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(key, [CKA.CKA_KEY_TYPE, CKA.CKA_EC_PARAMS]);
+            CKK? keyType = attrs[0].CannotBeRead ? null : (CKK)attrs[0].GetValueAsUlong();
+            Pkcs11ECCurve? curve = attrs[1].CannotBeRead ? null : Pkcs11ECCurve.FromEcParams(attrs[1].GetValueAsByteArray());
+            return (keyType, curve);
+        }
+        catch (Exception ex) when (ex is Pkcs11Exception or Pkcs11AttributeException or ArgumentException)
+        {
+            return (null, null);
+        }
+    }
+
     // A modulus length is judged as an int. One beyond int.MaxValue is not a key any token can make; it
     // is reported as int.MaxValue, which every policy's minimum allows, so the token refuses it itself.
     private static int ModulusBitsOf(ObjectAttribute modulusBits)
@@ -3167,8 +3232,14 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="baseKeyHandle">Handle of base key</param>
     /// <param name="attributes">Attributes for the new key</param>
     /// <param name="export">Set only by <see cref="SecretExport"/>: see <see cref="BuildSecureKeyDefaults"/>.</param>
+    /// <param name="peerParamName">The caller's parameter an invalid ECDH peer is reported against.</param>
     /// <returns>Handle of derived key</returns>
-    public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes, KeyMaterialExportKind? export = null)
+    public ObjectHandle DeriveKey(
+        Mechanism mechanism,
+        ObjectHandle baseKeyHandle,
+        List<ObjectAttribute> attributes,
+        KeyMaterialExportKind? export = null,
+        string peerParamName = "mechanism")
     {
         using var _ = AcquireExclusive();
 
@@ -3184,6 +3255,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Enforce(mechanism, CryptoOperation.Derive, export);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
+        ValidateEcdhPeer(mechanism, baseKeyHandle, export, peerParamName);
 
         // SP 800-108 can derive additional sibling keys in the same call, each from its own template.
         // Those are keys this call creates exactly like the primary one, so each template meets the
