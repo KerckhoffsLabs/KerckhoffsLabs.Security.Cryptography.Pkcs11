@@ -517,6 +517,7 @@ public sealed class SecureOnlyPolicyTests
     [InlineData(KeyMaterialExportKind.EcdhSharedSecret)]
     [InlineData(KeyMaterialExportKind.KemSharedSecret)]
     [InlineData(KeyMaterialExportKind.KdfOutput)]
+    [InlineData(KeyMaterialExportKind.PasswordKdfOutput)]
     public void KeyMaterialExport_Refused(KeyMaterialExportKind kind)
         => Assert.False(Allowed(new KeyMaterialExportRequest(kind)));
 

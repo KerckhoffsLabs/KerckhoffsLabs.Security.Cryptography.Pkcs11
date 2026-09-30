@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 
@@ -22,10 +21,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// they return a <see cref="Pkcs11Key"/> wrapping the token-resident secret with no
 /// extraction step.</para>
 /// <para><b>Gating:</b> <see cref="EncapsulateCore(Span{byte}, Span{byte})"/> /
-/// <see cref="DecapsulateCore(ReadOnlySpan{byte}, Span{byte})"/> throw
-/// <see cref="CryptoPolicyViolationException"/> unless the owning workspace's
-/// <see cref="Pkcs11Workspace.Policy"/> permits it (e.g. <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>).
-/// The gate is mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
+/// <see cref="DecapsulateCore(ReadOnlySpan{byte}, Span{byte})"/> go through
+/// <see cref="Pkcs11Key.EncapsulateAndExportSecret"/> / <see cref="Pkcs11Key.DecapsulateAndExportSecret"/>,
+/// which throw <see cref="CryptoPolicyViolationException"/> unless the owning workspace's
+/// <see cref="Pkcs11Workspace.Policy"/> permits the export (e.g.
+/// <c>CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.KemSharedSecret, reason)</c>).</para>
 /// <para><b>Private-key export</b> (<c>ExportDecapsulationKey</c>, seed, PKCS#8) is always
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
 /// public handle.</para>
@@ -48,99 +48,38 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">
     /// Thrown unless the owning workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.
-    /// Use <see cref="Pkcs11Workspace.UsePolicy"/> (e.g. with <c>CryptoPolicy.AllowInsecure</c>) to
-    /// acknowledge that the shared secret will be extracted from the token, or use
+    /// Use a policy such as
+    /// <c>CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.KemSharedSecret, reason)</c>
+    /// to acknowledge that the shared secret will be extracted from the token, or use
     /// <see cref="Pkcs11Key.EncapsulateKey"/> for the on-token-only path.
     /// </exception>
+    /// <exception cref="CryptographicException">The token did not expose the shared secret, or returned a ciphertext or secret of the wrong length.</exception>
     protected override void EncapsulateCore(Span<byte> ciphertext, Span<byte> sharedSecret)
     {
-        GuardExtraction();
-
-        var mech = new Mechanism(CKM.CKM_ML_KEM);
-        using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes);
-        // The ML-KEM ciphertext length is fixed by the parameter set, so hand the token a pre-sized
-        // buffer in one call rather than a NULL-buffer length probe (which SoftHSM does not honour).
-        // Held as the result rather than deconstructed into (ct, key): EncapsulationResult is
-        // IDisposable precisely so the shared-secret key has an owner, and splitting it up discards
-        // that owner and leaves the key to be released by hand.
-        using EncapsulationResult encapsulated =
-            _key.EncapsulateKey(mech, template, Algorithm.CiphertextSizeInBytes);
-
-        try
+        // The ML-KEM ciphertext length is fixed by the parameter set, and the BCL hands over a buffer
+        // of exactly that size, so the token fills it in one call.
+        // The KEM read-back is experimental because its PKCS#11 shape may still move; this adapter's own
+        // shape is the BCL's MLKem, which does not change with it.
+#pragma warning disable KLPKCS11501
+        int written = _key.EncapsulateAndExportSecret(new Mechanism(CKM.CKM_ML_KEM), ciphertext, sharedSecret);
+#pragma warning restore KLPKCS11501
+        if (written != Algorithm.CiphertextSizeInBytes)
         {
-            ReadAndCopySecret(encapsulated.SharedSecret, sharedSecret);
-            CopyExact(encapsulated.Ciphertext, ciphertext, Algorithm.CiphertextSizeInBytes);
-            // Destroy the extracted, extractable shared-secret object now that we hold its bytes.
-            // Surfaced (not swallowed): a failure here would leave the secret lingering on-token.
-            DestroyExtractedSecret(encapsulated.SharedSecret);
-        }
-        catch
-        {
-            // Never hand back a shared secret alongside a failure (copy or cleanup).
+            // Never hand back a shared secret alongside a failure.
             CryptographicOperations.ZeroMemory(sharedSecret);
-            throw;
+            throw new CryptographicException(
+                $"The token returned a {written}-byte ciphertext; this parameter set uses {Algorithm.CiphertextSizeInBytes}.");
         }
     }
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">Same gating as <see cref="EncapsulateCore"/>.</exception>
+    /// <exception cref="CryptographicException">The token did not expose the shared secret, or returned one of the wrong length.</exception>
     protected override void DecapsulateCore(ReadOnlySpan<byte> ciphertext, Span<byte> sharedSecret)
     {
-        GuardExtraction();
-
-        var mech = new Mechanism(CKM.CKM_ML_KEM);
-
-        // Token quirk: the decapsulated shared-secret key is created via unwrap semantics, and tokens
-        // disagree on CKA_VALUE_LEN there. opencryptoki *requires* it (CKR_TEMPLATE_INCONSISTENT
-        // without), while SoftHSM treats it as read-only on unwrap (CKR_ATTRIBUTE_READ_ONLY with).
-        // PKCS#11 has no way to query this, so the first decapsulation against a token probes (try the
-        // conventional form that includes CKA_VALUE_LEN, fall back to omitting it on SoftHSM's
-        // rejection) and the answer is cached on the library — every later call goes straight to the
-        // right form, so the probe's exception is one-time discovery, not steady-state control flow.
-        Pkcs11Library library = _key.Workspace.Library;
-        using Pkcs11Key sharedKey = library.MlKemDecapsulateOmitsValueLen switch
-        {
-            bool omit => DecapsulateWith(mech, ciphertext, includeValueLen: !omit),
-            null => DecapsulateProbing(mech, ciphertext, library),
-        };
-
-        try
-        {
-            ReadAndCopySecret(sharedKey, sharedSecret);
-            // Surfaced (not swallowed): a destroy failure would leave the secret lingering on-token.
-            DestroyExtractedSecret(sharedKey);
-        }
-        catch
-        {
-            CryptographicOperations.ZeroMemory(sharedSecret);
-            throw;
-        }
-    }
-
-    // First decapsulation against a token: try the conventional CKA_VALUE_LEN form, fall back to
-    // omitting it on SoftHSM's read-only rejection, and record the winning form on the library so
-    // subsequent calls skip the probe (and the failed, side-effect-free first attempt).
-    private Pkcs11Key DecapsulateProbing(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, Pkcs11Library library)
-    {
-        try
-        {
-            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: true);
-            library.MlKemDecapsulateOmitsValueLen = false;
-            return sharedKey;
-        }
-        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
-        {
-            Pkcs11Key sharedKey = DecapsulateWith(mechanism, ciphertext, includeValueLen: false);
-            library.MlKemDecapsulateOmitsValueLen = true;
-            return sharedKey;
-        }
-    }
-
-    // Single decapsulation attempt with a shared-secret template that optionally carries CKA_VALUE_LEN.
-    private Pkcs11Key DecapsulateWith(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, bool includeValueLen)
-    {
-        using var template = ExtractableSharedSecretTemplate(Algorithm.SharedSecretSizeInBytes, includeValueLen);
-        return _key.DecapsulateKey(mechanism, ciphertext, template);
+#pragma warning disable KLPKCS11501 // See EncapsulateCore.
+        _key.DecapsulateAndExportSecret(new Mechanism(CKM.CKM_ML_KEM), ciphertext, sharedSecret);
+#pragma warning restore KLPKCS11501
     }
 
     // -----------------------------------------------------------------------
@@ -149,13 +88,12 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
     /// <inheritdoc/>
     /// <remarks>Reads <c>CKA_VALUE</c> from the public handle — the FIPS 203 standard encapsulation-key encoding.</remarks>
-    /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
+    /// <exception cref="CryptographicException">The token does not expose <c>CKA_VALUE</c>, or it has the wrong length.</exception>
     protected override void ExportEncapsulationKeyCore(Span<byte> destination)
     {
         using var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
         if (attrs[0].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "MLKemPkcs11.ExportEncapsulationKey (CKA_VALUE unreadable)");
+            throw new CryptographicException("The token does not expose this key's encapsulation key (CKA_VALUE).");
 
         byte[] value = attrs[0].GetValueAsByteArray();
         CopyExact(value, destination, Algorithm.EncapsulationKeySizeInBytes);
@@ -183,9 +121,6 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     // Helpers
     // -----------------------------------------------------------------------
 
-    private void GuardExtraction()
-        => _key.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret));
-
     private static MLKemAlgorithm ResolveAlgorithm(Pkcs11Key key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -208,74 +143,11 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         };
     }
 
-    // includeValueLen: encapsulate creates the shared secret via C_DeriveKey-style semantics
-    // (CKA_VALUE_LEN is settable), but decapsulate creates it via unwrap semantics, where some tokens
-    // (SoftHSM) treat CKA_VALUE_LEN as read-only and reject it (CKR_ATTRIBUTE_READ_ONLY). The ML-KEM
-    // shared-secret length is fixed by the parameter set, so the token does not need to be told it —
-    // omit CKA_VALUE_LEN on the decapsulate template for portability.
-    private static ObjectTemplate ExtractableSharedSecretTemplate(int sharedSecretLen, bool includeValueLen = true)
-    {
-        var builder = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
-            .OnToken(false)
-            .Sensitive(false)
-            .Extractable();
-        if (includeValueLen)
-            builder = builder.ValueLen(sharedSecretLen);
-        return builder.Build();
-    }
-
-    private static void ReadAndCopySecret(Pkcs11Key sharedKey, Span<byte> destination)
-    {
-        using var attrs = sharedKey.GetAttributeValue(CKA.CKA_VALUE);
-        byte[]? value = null;
-        try
-        {
-            if (attrs[0].CannotBeRead)
-                throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                    "MLKemPkcs11 (shared-secret CKA_VALUE unreadable; token rejected the extractable template)");
-
-            value = attrs[0].GetValueAsByteArray();
-            // Validate the length as strictly as the ciphertext path (CopyExact): a short CKA_VALUE
-            // must not silently leave a partially-filled shared secret.
-            if (value.Length != destination.Length)
-                throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
-                    $"Token returned {value.Length}-byte shared secret; expected {destination.Length} bytes.");
-            value.CopyTo(destination);
-        }
-        finally
-        {
-            // `value` is a managed copy of the secret; the attribute's unmanaged buffer behind it is
-            // released by the using on `attrs`.
-            if (value is not null) CryptographicOperations.ZeroMemory(value);
-        }
-    }
-
-    /// <summary>
-    /// Destroys the extracted, extractable shared-secret object on the token (<c>C_DestroyObject</c>).
-    /// Unlike a fully best-effort cleanup, a destroy failure is surfaced to the caller: if the
-    /// object cannot be destroyed, an extractable copy of the shared secret lingers on-token, which
-    /// the callers must not silently ignore. Disposal of the managed <see cref="Pkcs11Key"/> wrapper
-    /// is handled by the callers' <c>finally</c>.
-    /// </summary>
-    private static void DestroyExtractedSecret(Pkcs11Key sharedKey)
-    {
-        try
-        {
-            sharedKey.Destroy();
-        }
-        catch (Pkcs11Exception ex)
-        {
-            throw Pkcs11Exception.Create(ex.ReturnValue,
-                "MLKemPkcs11: C_DestroyObject failed for the extracted shared-secret object — an " +
-                "extractable copy of the shared secret may remain on-token and must be destroyed manually");
-        }
-    }
-
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)
     {
         if (source.Length != expectedLength)
-            throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
-                $"Token returned {source.Length}-byte buffer; expected {expectedLength} bytes for this parameter set.");
+            throw new CryptographicException(
+                $"The token returned {source.Length} bytes; this parameter set uses {expectedLength}.");
         source.CopyTo(destination);
     }
 }

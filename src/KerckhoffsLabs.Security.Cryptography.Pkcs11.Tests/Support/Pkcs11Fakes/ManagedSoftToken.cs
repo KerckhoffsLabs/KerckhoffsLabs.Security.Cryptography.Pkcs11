@@ -111,7 +111,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         var keyGen = (CKM)(ulong)mechanism.Mechanism;
-        if (keyGen is not (CKM.CKM_AES_KEY_GEN or CKM.CKM_GENERIC_SECRET_KEY_GEN))
+        if (keyGen is not (CKM.CKM_AES_KEY_GEN or CKM.CKM_GENERIC_SECRET_KEY_GEN or CKM.CKM_PKCS5_PBKD2))
             return CKR.CKR_MECHANISM_INVALID;
 
         var attrs = ReadTemplate(template);
@@ -120,7 +120,16 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         if (len <= 0 || (keyGen == CKM.CKM_AES_KEY_GEN && len is not (16 or 24 or 32)))
             return CKR.CKR_ATTRIBUTE_VALUE_INVALID;
 
-        attrs[(ulong)CKA.CKA_VALUE] = RandomNumberGenerator.GetBytes(len);
+        if (keyGen == CKM.CKM_PKCS5_PBKD2)
+        {
+            if (!TryDerivePbkdf2(ref mechanism, len, out byte[] derived))
+                return CKR.CKR_MECHANISM_PARAM_INVALID;
+            attrs[(ulong)CKA.CKA_VALUE] = derived;
+        }
+        else
+        {
+            attrs[(ulong)CKA.CKA_VALUE] = RandomNumberGenerator.GetBytes(len);
+        }
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
     }
@@ -133,6 +142,9 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         objectId = (NativeCULong)handle;
         return CKR.CKR_OK;
     }
+
+    /// <summary>Number of objects the token currently holds — lets tests assert an ephemeral object was destroyed.</summary>
+    public int ObjectCount => _objects.Count;
 
     /// <summary>When set, the next <c>C_DestroyObject</c> reports this code and leaves the object
     /// in place — lets tests exercise the path where a token rejects the destroy.</summary>

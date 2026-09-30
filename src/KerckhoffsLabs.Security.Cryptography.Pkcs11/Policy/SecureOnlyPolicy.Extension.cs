@@ -5,10 +5,11 @@ using S = KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoOperations;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
-// The extension point: SecureOnlyPolicy.WithAllowedMechanism.
+// The extension points: WithAllowedMechanism, and the narrow opt-ins for the rules that are not
+// about a mechanism (key-material export, EC curves, key-agreement KDFs).
 public sealed partial class SecureOnlyPolicy
 {
-    /// <summary>The name every instance returned by <see cref="WithAllowedMechanism(CKM, IEnumerable{CryptoOperation}, string)"/> carries.</summary>
+    /// <summary>The name every instance returned by one of the <c>WithAllowed*</c> methods carries.</summary>
     private const string ExtendedName = "SecureOnly+custom";
 
     /// <summary>
@@ -119,23 +120,7 @@ public sealed partial class SecureOnlyPolicy
             allowedMechanisms = updated.ToFrozenDictionary();
         }
 
-        return new PolicyCatalogue
-        {
-            AllowedMechanisms = allowedMechanisms,
-            AllowedVendorMechanisms = allowedVendorMechanisms,
-            AllowedHashes = _catalogue.AllowedHashes,
-            AllowedCurves = _catalogue.AllowedCurves,
-            AllowedKdfs = _catalogue.AllowedKdfs,
-            AllowedKeyAgreementKeyTypes = _catalogue.AllowedKeyAgreementKeyTypes,
-            AllowedKdfPrfs = _catalogue.AllowedKdfPrfs,
-            Rules = _catalogue.Rules,
-            DocumentedRefusedMechanisms = _catalogue.DocumentedRefusedMechanisms,
-            DocumentedRefusedHashes = _catalogue.DocumentedRefusedHashes,
-            DocumentedRefusedCurves = _catalogue.DocumentedRefusedCurves,
-            DocumentedRefusedKdfs = _catalogue.DocumentedRefusedKdfs,
-            DocumentedRefusedKeyAgreementKeyTypes = _catalogue.DocumentedRefusedKeyAgreementKeyTypes,
-            DocumentedRefusedPrfs = _catalogue.DocumentedRefusedPrfs,
-        };
+        return CopyCatalogue(allowedMechanisms: allowedMechanisms, allowedVendorMechanisms: allowedVendorMechanisms);
     }
 
     /// <summary>
@@ -152,4 +137,169 @@ public sealed partial class SecureOnlyPolicy
             ? new MechanismRule(operations, S.None, null, rationale)
             : existing with { Operations = existing.Operations | operations, Rationale = rationale };
     }
+
+    // --- Narrow opt-ins for the rules that are not about a mechanism ---
+
+    /// <summary>
+    /// Returns a new <see cref="SecureOnlyPolicy"/> — named <c>"SecureOnly+custom"</c> — that also allows
+    /// key material of <paramref name="kind"/> to be read off the token, on top of everything this
+    /// instance already allows. This instance, and <see cref="CryptoPolicy.SecureOnly"/> itself, are
+    /// unaffected.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This widens what SecureOnly permits</b>, but only for the one kind of export named: every other
+    /// kind is still refused, and every other SecureOnly rule — mechanisms, hashes, curves, KDFs, key
+    /// templates — still applies. Exports happen only through the read-back operations
+    /// (<see cref="Pkcs11Key.DeriveAndExportSecret"/>, <see cref="Pkcs11Key.EncapsulateAndExportSecret"/>,
+    /// <see cref="Pkcs11Key.DecapsulateAndExportSecret"/>, <see cref="Pkcs11Workspace.DeriveAndExportSecret"/>),
+    /// which accept a closed list of mechanisms and create, read and destroy their own ephemeral key: that
+    /// key is not refused as a key template, and for a raw ECDH secret the <c>CKD_NULL</c> derivation is
+    /// not refused as a key-agreement KDF. A non-sensitive key created any other way is still refused.
+    /// Prefer this to <see cref="CryptoPolicy.AllowInsecure"/>, which switches all of them off. The
+    /// adapters that hand secret bytes to managed code are built on those operations and need it:
+    /// <see cref="KeyMaterialExportKind.EcdhSharedSecret"/> for <c>ECDiffieHellmanPkcs11.DeriveKey*</c>,
+    /// <see cref="KeyMaterialExportKind.KemSharedSecret"/> for <c>MLKemPkcs11</c>,
+    /// <see cref="KeyMaterialExportKind.KdfOutput"/> for the byte-returning HKDF and SP 800-108
+    /// adapters, and <see cref="KeyMaterialExportKind.PasswordKdfOutput"/> for the PBKDF2 one. The
+    /// alternative that needs no opt-in is to keep the secret on the token — derive or decapsulate to a
+    /// sensitive <see cref="Pkcs11Key"/>.
+    /// </para>
+    /// <para>
+    /// <paramref name="reason"/> is appended to the key-material export rationale shown in the generated
+    /// catalogue documentation for the returned instance. There is no equivalent on <c>FipsOnly</c>.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// SecureOnlyPolicy reviewed = CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(
+    ///     KeyMaterialExportKind.EcdhSharedSecret,
+    ///     "The shared secret feeds our protocol's own KDF in managed code; reviewed with the protocol owners.");
+    /// </code>
+    /// </example>
+    /// <param name="kind">The kind of key material to allow reading off the token.</param>
+    /// <param name="reason">Why the export is approved for your use case. Recorded in the generated documentation.</param>
+    /// <returns>A new, wider <see cref="SecureOnlyPolicy"/> named <c>"SecureOnly+custom"</c>.</returns>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="kind"/> is not a defined <see cref="KeyMaterialExportKind"/>, or
+    /// <paramref name="reason"/> is <see langword="null"/>, empty, or whitespace.
+    /// </exception>
+    public SecureOnlyPolicy WithAllowedKeyMaterialExport(KeyMaterialExportKind kind, string reason)
+    {
+        if (!Enum.IsDefined(kind))
+            throw new ArgumentException($"{(int)kind} is not a defined {nameof(KeyMaterialExportKind)}.", nameof(kind));
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        PolicyRules rules = _catalogue.Rules;
+        Func<KeyMaterialExportRequest, PolicyDecision> previous = rules.KeyMaterialExport;
+        PolicyRules widened = rules with
+        {
+            KeyMaterialExport = r => r.Kind == kind ? PolicyDecision.Allow : previous(r),
+            KeyMaterialExportRationale = $"{rules.KeyMaterialExportRationale} Allowed: {kind} — {reason}",
+        };
+        return new SecureOnlyPolicy(CopyCatalogue(rules: widened), ExtendedName);
+    }
+
+    /// <summary>
+    /// Returns a new <see cref="SecureOnlyPolicy"/> — named <c>"SecureOnly+custom"</c> — that also allows
+    /// generating EC keys on <paramref name="curve"/>, on top of everything this instance already allows.
+    /// This instance, and <see cref="CryptoPolicy.SecureOnly"/> itself, are unaffected.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This widens what SecureOnly permits</b>, but only for the one curve named — typically a curve
+    /// below 128-bit security that an existing protocol or peer still requires. Every other SecureOnly
+    /// rule still applies. Prefer it to <see cref="CryptoPolicy.AllowInsecure"/>, which switches all of
+    /// them off.
+    /// </para>
+    /// <para>
+    /// A curve that is already allowed keeps its entry, and <paramref name="reason"/> is appended to its
+    /// rationale. The rationale appears in the generated catalogue documentation for the returned
+    /// instance. There is no equivalent on <c>FipsOnly</c>.
+    /// </para>
+    /// </remarks>
+    /// <param name="curve">The named curve to allow.</param>
+    /// <param name="reason">Why the curve is approved for your use case. Recorded in the generated documentation.</param>
+    /// <returns>A new, wider <see cref="SecureOnlyPolicy"/> named <c>"SecureOnly+custom"</c>.</returns>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="curve"/> is the default (unnamed) curve, or <paramref name="reason"/> is
+    /// <see langword="null"/>, empty, or whitespace.
+    /// </exception>
+    public SecureOnlyPolicy WithAllowedCurve(Pkcs11ECCurve curve, string reason)
+    {
+        string oid = curve.Oid ?? throw new ArgumentException("The curve must be a named curve.", nameof(curve));
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        FrozenDictionary<string, string> curves = _catalogue.AllowedCurves;
+        var updated = new Dictionary<string, string>(curves, StringComparer.Ordinal)
+        {
+            [oid] = curves.TryGetValue(oid, out string? existing) ? $"{existing} Extended: {reason}" : reason,
+        };
+        return new SecureOnlyPolicy(
+            CopyCatalogue(allowedCurves: updated.ToFrozenDictionary(StringComparer.Ordinal)), ExtendedName);
+    }
+
+    /// <summary>
+    /// Returns a new <see cref="SecureOnlyPolicy"/> — named <c>"SecureOnly+custom"</c> — that also allows
+    /// <paramref name="kdf"/> as the key-derivation function of an ECDH key agreement, on top of
+    /// everything this instance already allows. This instance, and <see cref="CryptoPolicy.SecureOnly"/>
+    /// itself, are unaffected.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This widens what SecureOnly permits</b>, but only for the one KDF named — for example
+    /// <see cref="CKD.CKD_NULL"/> for a token such as SoftHSM2 that only implements the raw shared secret.
+    /// Every other SecureOnly rule still applies. Prefer it to <see cref="CryptoPolicy.AllowInsecure"/>,
+    /// which switches all of them off.
+    /// </para>
+    /// <para>
+    /// A KDF that is already allowed keeps its entry, and <paramref name="reason"/> is appended to its
+    /// rationale. The rationale appears in the generated catalogue documentation for the returned
+    /// instance. There is no equivalent on <c>FipsOnly</c>.
+    /// </para>
+    /// </remarks>
+    /// <param name="kdf">The key-derivation function to allow.</param>
+    /// <param name="reason">Why the KDF is approved for your use case. Recorded in the generated documentation.</param>
+    /// <returns>A new, wider <see cref="SecureOnlyPolicy"/> named <c>"SecureOnly+custom"</c>.</returns>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="kdf"/> is not a defined <see cref="CKD"/>, or <paramref name="reason"/> is
+    /// <see langword="null"/>, empty, or whitespace.
+    /// </exception>
+    public SecureOnlyPolicy WithAllowedKeyAgreementKdf(CKD kdf, string reason)
+    {
+        if (!Enum.IsDefined(kdf))
+            throw new ArgumentException($"{(ulong)kdf} is not a defined {nameof(CKD)}.", nameof(kdf));
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        FrozenDictionary<CKD, string> kdfs = _catalogue.AllowedKdfs;
+        var updated = new Dictionary<CKD, string>(kdfs)
+        {
+            [kdf] = kdfs.TryGetValue(kdf, out string? existing) ? $"{existing} Extended: {reason}" : reason,
+        };
+        return new SecureOnlyPolicy(CopyCatalogue(allowedKdfs: updated.ToFrozenDictionary()), ExtendedName);
+    }
+
+    /// <summary>A copy of <see cref="_catalogue"/> with the given members replaced and everything else kept.</summary>
+    private PolicyCatalogue CopyCatalogue(
+        FrozenDictionary<CKM, MechanismRule>? allowedMechanisms = null,
+        FrozenDictionary<ulong, MechanismRule>? allowedVendorMechanisms = null,
+        FrozenDictionary<string, string>? allowedCurves = null,
+        FrozenDictionary<CKD, string>? allowedKdfs = null,
+        PolicyRules? rules = null) => new()
+        {
+            AllowedMechanisms = allowedMechanisms ?? _catalogue.AllowedMechanisms,
+            AllowedVendorMechanisms = allowedVendorMechanisms ?? _catalogue.AllowedVendorMechanisms,
+            AllowedHashes = _catalogue.AllowedHashes,
+            AllowedCurves = allowedCurves ?? _catalogue.AllowedCurves,
+            AllowedKdfs = allowedKdfs ?? _catalogue.AllowedKdfs,
+            AllowedKeyAgreementKeyTypes = _catalogue.AllowedKeyAgreementKeyTypes,
+            AllowedKdfPrfs = _catalogue.AllowedKdfPrfs,
+            Rules = rules ?? _catalogue.Rules,
+            DocumentedRefusedMechanisms = _catalogue.DocumentedRefusedMechanisms,
+            DocumentedRefusedHashes = _catalogue.DocumentedRefusedHashes,
+            DocumentedRefusedCurves = _catalogue.DocumentedRefusedCurves,
+            DocumentedRefusedKdfs = _catalogue.DocumentedRefusedKdfs,
+            DocumentedRefusedKeyAgreementKeyTypes = _catalogue.DocumentedRefusedKeyAgreementKeyTypes,
+            DocumentedRefusedPrfs = _catalogue.DocumentedRefusedPrfs,
+        };
 }

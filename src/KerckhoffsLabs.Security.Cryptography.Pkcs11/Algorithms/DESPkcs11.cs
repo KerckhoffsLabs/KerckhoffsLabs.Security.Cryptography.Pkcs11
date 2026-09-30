@@ -45,7 +45,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Single DES has a 56-bit key and is exhaustively breakable. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "DESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "DESPkcs11 throws CryptoPolicyViolationException unless the policy permits the DES mechanism it uses (e.g. CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_DES_CBC_PAD, [CryptoOperation.Decrypt], reason)) on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.Des,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DESPkcs11 : DES

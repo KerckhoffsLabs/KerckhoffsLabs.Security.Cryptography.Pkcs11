@@ -222,19 +222,18 @@ public sealed class MLDsaPkcs11Tests_Managed
     }
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
-    public void ExportMLDsaPublicKey_ValueAttributeSensitive_ThrowsPkcs11Exception()
+    public void ExportMLDsaPublicKey_ValueAttributeSensitive_ThrowsCryptographicException()
     {
         using var key = FakeKeys.Create(CKK.CKK_ML_DSA, ca => ca == CKA.CKA_PARAMETER_SET
             ? (CKR.CKR_OK, UlongAttr((ulong)CkpMlDsa.CKP_ML_DSA_44))
             : (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
         using var mldsa = new MLDsaPkcs11(key);
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
-        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+        Assert.Throws<CryptographicException>(() => mldsa.ExportMLDsaPublicKey());
     }
 
     [Fact(SkipUnless = nameof(MLDsa.IsSupported), SkipType = typeof(MLDsa), Skip = "Requires " + nameof(MLDsa.IsSupported))]
-    public void ExportMLDsaPublicKey_TokenReturnsWrongLength_ThrowsPkcs11Exception()
+    public void ExportMLDsaPublicKey_TokenReturnsWrongLength_ThrowsCryptographicException()
     {
         // MLDsa44's public key is 1312 bytes; a well-formed token could never return a different
         // length for its own advertised parameter set, so this drives CopyExact's mismatch guard.
@@ -243,7 +242,6 @@ public sealed class MLDsaPkcs11Tests_Managed
             : (CKR.CKR_OK, new byte[1]));
         using var mldsa = new MLDsaPkcs11(key);
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => mldsa.ExportMLDsaPublicKey());
-        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+        Assert.Throws<CryptographicException>(() => mldsa.ExportMLDsaPublicKey());
     }
 }

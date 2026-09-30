@@ -17,8 +17,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <b>Two surfaces.</b> The <c>DeriveKey</c> / <c>Extract</c> / <c>Expand</c> overloads that return or
 /// fill bytes mirror <see cref="HKDF"/> and produce the same output for the same inputs. Reading that
 /// output means taking key material off the token, so under the default policy they throw
-/// <see cref="CryptoPolicyViolationException"/> unless the caller opens a scoped
-/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>. The additions —
+/// <see cref="CryptoPolicyViolationException"/> unless the workspace's policy allows it, e.g.
+/// <c>CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.KdfOutput, reason)</c>. The additions —
 /// <see cref="DeriveKey(HashAlgorithmName, Pkcs11Key, ObjectTemplate, ReadOnlySpan{byte}, ReadOnlySpan{byte})"/>,
 /// <see cref="ExtractKey"/> and <see cref="ExpandKey"/> — keep the result on the token as a
 /// <see cref="Pkcs11Key"/> and need no override: prefer them whenever the derived material only has to
@@ -70,7 +70,7 @@ public static class HkdfPkcs11
         if (outputLength > prf.MaxOutputLength)
             throw new ArgumentOutOfRangeException(nameof(outputLength), MaxOutputMessage(prf));
 
-        return DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), outputLength);
+        return DeriveBytes(ikm, HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), outputLength);
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public static class HkdfPkcs11
         Prf prf = PrfFor(hashAlgorithmName);
         RequireOutputLength(output, prf);
 
-        FillFrom(DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), output.Length), output);
+        ikm.DeriveAndExportSecret(HkdfMechanism(HkdfOperation.ExtractAndExpand, prf, salt, info), output);
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public static class HkdfPkcs11
         RequireHkdfKey(ikm, nameof(ikm));
         Prf prf = PrfFor(hashAlgorithmName);
 
-        return DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength);
+        return DeriveBytes(ikm, HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength);
     }
 
     /// <summary>
@@ -173,7 +173,7 @@ public static class HkdfPkcs11
         if (prk.Length < prf.HashLength)
             throw new ArgumentException(PrkTooShortMessage(prf), nameof(prk));
 
-        FillFrom(DerivedKeyMaterial.DeriveAndRead(ikm, HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prf.HashLength), prk);
+        ikm.DeriveAndExportSecret(HkdfMechanism(HkdfOperation.ExtractOnly, prf, salt, default), prk[..prf.HashLength]);
         return prf.HashLength;
     }
 
@@ -233,7 +233,7 @@ public static class HkdfPkcs11
             throw new ArgumentOutOfRangeException(nameof(outputLength), MaxOutputMessage(prf));
         RequirePrkLength(prk, prf);
 
-        return DerivedKeyMaterial.DeriveAndRead(prk, HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), outputLength);
+        return DeriveBytes(prk, HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), outputLength);
     }
 
     /// <summary>
@@ -258,7 +258,7 @@ public static class HkdfPkcs11
         RequireOutputLength(output, prf);
         RequirePrkLength(prk, prf);
 
-        FillFrom(DerivedKeyMaterial.DeriveAndRead(prk, HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), output.Length), output);
+        prk.DeriveAndExportSecret(HkdfMechanism(HkdfOperation.ExpandOnly, prf, default, info), output);
     }
 
     /// <summary>
@@ -340,16 +340,11 @@ public static class HkdfPkcs11
             throw new ArgumentException(PrkTooShortMessage(prf), nameof(prk));
     }
 
-    private static void FillFrom(byte[] derived, Span<byte> destination)
+    private static byte[] DeriveBytes(Pkcs11Key key, Mechanism mechanism, int length)
     {
-        try
-        {
-            derived.CopyTo(destination);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(derived);
-        }
+        byte[] output = new byte[length];
+        key.DeriveAndExportSecret(mechanism, output);
+        return output;
     }
 
     private static string MaxOutputMessage(Prf prf)

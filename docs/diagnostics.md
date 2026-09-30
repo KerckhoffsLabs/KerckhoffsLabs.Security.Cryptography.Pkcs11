@@ -126,6 +126,29 @@ constructors are all `[Obsolete]` in favor of its static `Pbkdf2` method. Use th
 keep the derived key on the token; the constructors remain for streaming `GetBytes` calls that
 continue one PBKDF2 byte stream across several output chunks.
 
+## Experimental APIs
+
+API shapes that may still change in a minor release are marked `[Experimental]` with an id in the
+`KLPKCS115xx` range. Using one is a build error until acknowledged, the same way as above:
+
+```csharp
+#pragma warning disable KLPKCS11501 // ML-KEM read-back: shape may change; tracked in <ticket>
+int written = key.EncapsulateAndExportSecret(new Mechanism(CKM.CKM_ML_KEM), ciphertext, sharedSecret);
+#pragma warning restore KLPKCS11501
+```
+
+Acknowledging the diagnostic does not change the runtime policy: the operation is still decided by
+the workspace's crypto policy.
+
+<a id="KLPKCS11501"></a>
+### KLPKCS11501 — PKCS#11 v3.2 KEM read-back
+
+`Pkcs11Key.EncapsulateAndExportSecret` and `Pkcs11Key.DecapsulateAndExportSecret`. They are built on
+the PKCS#11 v3.2 `C_EncapsulateKey` / `C_DecapsulateKey` functions, which are new and on which token
+behaviour still differs (for example whether the shared-secret template may carry `CKA_VALUE_LEN`), so
+their shape may still change. `MLKemPkcs11`, whose shape is the BCL's `MLKem`, uses them without
+passing the diagnostic on.
+
 ## Runtime-only gates
 
 Not every insecure operation has a compile-time signal, and the analyzers are a best-effort early

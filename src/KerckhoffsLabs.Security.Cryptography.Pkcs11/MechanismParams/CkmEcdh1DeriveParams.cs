@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -18,6 +19,9 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
 
     /// <summary>The key derivation function applied to the shared secret, as the crypto policy sees it.</summary>
     internal CKD Kdf => _kdf;
+
+    /// <summary>The peer's public point as passed to the token; empty for <see cref="ForEncapsulation"/>.</summary>
+    internal ReadOnlySpan<byte> PublicData => _publicDataBytes;
 
     /// <summary>
     /// Initializes ECDH1-derive parameters for <c>C_DeriveKey</c>.
@@ -44,6 +48,61 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     /// <param name="sharedData">Optional shared data to mix into the KDF; pass <c>default</c> for none.</param>
     public static CkmEcdh1DeriveParams ForEncapsulation(CKD kdf, ReadOnlySpan<byte> sharedData = default) =>
         new(kdf, [], sharedData.IsEmpty ? [] : sharedData.ToArray(), default);
+
+    /// <summary>
+    /// Builds ECDH1-derive parameters for <c>C_DeriveKey</c> from the peer's public key as the BCL
+    /// represents it, encoding its point the way PKCS#11 expects (a DER OCTET STRING wrapping the
+    /// uncompressed point <c>04 ‖ X ‖ Y</c>).
+    /// </summary>
+    /// <remarks>
+    /// Only the point is encoded; the curve is not carried by the mechanism. The operations that take
+    /// these parameters and know the local key —
+    /// <see cref="Pkcs11Workspace.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/> and
+    /// <see cref="Pkcs11Key.DeriveAndExportSecret"/> — check the point against the local key's curve
+    /// before it reaches the token.
+    /// </remarks>
+    /// <param name="kdf">Key derivation function applied to the shared secret.</param>
+    /// <param name="peerPublicKey">The peer's public key. Both coordinates of <see cref="ECParameters.Q"/> are required and must have the same length.</param>
+    /// <param name="sharedData">Optional shared data to mix into the KDF; pass <c>default</c> for none.</param>
+    /// <returns>Parameters carrying the encoded peer point.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate, or the two differ in length.</exception>
+    public static CkmEcdh1DeriveParams ForPeer(CKD kdf, ECParameters peerPublicKey, ReadOnlySpan<byte> sharedData = default)
+    {
+        byte[] x = peerPublicKey.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(peerPublicKey));
+        byte[] y = peerPublicKey.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(peerPublicKey));
+        if (x.Length == 0 || x.Length != y.Length)
+            throw new ArgumentException(
+                $"Peer public key coordinates must be non-empty and of equal length; got {x.Length} and {y.Length} bytes.",
+                nameof(peerPublicKey));
+        return new(kdf, EncodeUncompressedPoint(x, y), sharedData.IsEmpty ? [] : sharedData.ToArray(), default);
+    }
+
+    /// <summary>
+    /// Encodes an uncompressed EC point (<c>04 ‖ X ‖ Y</c>) as a DER OCTET STRING — the full
+    /// <c>CKA_EC_POINT</c> form, which PKCS#11 accepts for the ECDH1 public-data parameter.
+    /// </summary>
+    internal static byte[] EncodeUncompressedPoint(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y)
+    {
+        int pointLength = 1 + x.Length + y.Length;
+        // Short-form length below 128 bytes; one long-form length byte covers every named curve
+        // (the largest, P-521, has a 133-byte point).
+        int header = pointLength < 0x80 ? 2 : 3;
+        byte[] der = new byte[header + pointLength];
+        der[0] = 0x04;
+        if (header == 2)
+        {
+            der[1] = (byte)pointLength;
+        }
+        else
+        {
+            der[1] = 0x81;
+            der[2] = checked((byte)pointLength);
+        }
+        der[header] = 0x04;
+        x.CopyTo(der.AsSpan(header + 1));
+        y.CopyTo(der.AsSpan(header + 1 + x.Length));
+        return der;
+    }
 
     // Unambiguous overload marker: byte[] converts implicitly to ReadOnlySpan<byte>, so without this
     // extra parameter the compiler cannot tell this constructor apart from the validating public one.

@@ -379,6 +379,7 @@ public sealed class FipsOnlyPolicyTests
     [InlineData(KeyMaterialExportKind.EcdhSharedSecret)]
     [InlineData(KeyMaterialExportKind.KemSharedSecret)]
     [InlineData(KeyMaterialExportKind.KdfOutput)]
+    [InlineData(KeyMaterialExportKind.PasswordKdfOutput)]
     public void KeyMaterialExport_Refused(KeyMaterialExportKind kind)
         => Assert.False(Policy.Evaluate(new KeyMaterialExportRequest(kind)).IsAllowed);
 

@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -104,6 +103,6 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
         using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
         ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
 
-        Assert.Throws<Pkcs11ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
+        Assert.Throws<ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
     }
 }

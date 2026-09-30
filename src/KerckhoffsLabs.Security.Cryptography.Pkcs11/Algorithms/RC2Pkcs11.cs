@@ -46,7 +46,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("RC2 (RFC 2268) is a weak legacy cipher with a reduced effective key length. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "RC2Pkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "RC2Pkcs11 throws CryptoPolicyViolationException unless the policy permits the RC2 mechanism it uses (e.g. CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_RC2_CBC_PAD, [CryptoOperation.Decrypt], reason)) on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.Rc2,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class RC2Pkcs11 : RC2

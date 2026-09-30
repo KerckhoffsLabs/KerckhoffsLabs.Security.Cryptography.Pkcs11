@@ -50,7 +50,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Triple-DES has a 64-bit block (Sweet32) and is NIST-deprecated. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "TripleDESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "TripleDESPkcs11 throws CryptoPolicyViolationException unless the policy permits the Triple-DES mechanism it uses (e.g. CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_DES3_CBC_PAD, [CryptoOperation.Decrypt], reason)) on the wrapped key's workspace.",
     DiagnosticId = DiagnosticIds.TripleDes,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class TripleDESPkcs11 : TripleDES

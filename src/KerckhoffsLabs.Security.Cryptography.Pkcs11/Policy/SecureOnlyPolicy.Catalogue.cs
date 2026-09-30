@@ -72,13 +72,33 @@ public sealed partial class SecureOnlyPolicy
     // secure key defaults set CKA_EXTRACTABLE to false when the caller says nothing.
     private static PolicyDecision EvaluateKeyTemplate(KeyTemplateRequest r) =>
         r.Attributes.Any(a => a.Type == CKA.CKA_SENSITIVE && !a.GetValueAsBool())
-            ? PolicyDecision.Deny("Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token.")
+            ? PolicyDecision.Deny(
+                "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
+                "Leave CKA_SENSITIVE true to keep the key on the token; to read a derived or shared secret back, use " +
+                "Pkcs11Key.DeriveAndExportSecret / EncapsulateAndExportSecret / DecapsulateAndExportSecret or " +
+                "Pkcs11Workspace.DeriveAndExportSecret, which the policy decides as a narrow key-material export.")
             : PolicyDecision.Allow;
 
+    // Names the on-token path that avoids the export, then the narrow opt-in for a caller who needs it.
     private static PolicyDecision EvaluateKeyMaterialExport(KeyMaterialExportRequest r) =>
         PolicyDecision.Deny(
             $"Reading the {r.Kind} off the token violates the non-extractable-by-default posture. " +
-            "Keep the secret on the token (Pkcs11Key.EncapsulateKey / DecapsulateKey / Derive to a sensitive key).");
+            $"Keep the secret on the token instead: {OnTokenAlternative(r.Kind)}. If the export is needed, " +
+            $"allow this one kind with CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.{r.Kind}, reason).");
+
+    private static string OnTokenAlternative(KeyMaterialExportKind kind) => kind switch
+    {
+        KeyMaterialExportKind.EcdhSharedSecret =>
+            "Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key",
+        KeyMaterialExportKind.KemSharedSecret =>
+            "Pkcs11Key.EncapsulateKey / DecapsulateKey return the shared secret as a sensitive key",
+        KeyMaterialExportKind.KdfOutput =>
+            "Pkcs11Key.Derive with a sensitive template, or the ObjectTemplate overloads of HkdfPkcs11 " +
+            "(DeriveKey / ExtractKey / ExpandKey) and SP800108HmacCounterKdfPkcs11.DeriveKey, derive a sensitive key",
+        KeyMaterialExportKind.PasswordKdfOutput =>
+            "Pkcs11Workspace.GenerateKey with CKM_PKCS5_PBKD2, or Rfc2898DeriveBytesPkcs11.Pbkdf2Key, derives a sensitive key",
+        _ => "derive a sensitive key with Pkcs11Key.Derive",
+    };
 
     // --- Mechanisms ---
 

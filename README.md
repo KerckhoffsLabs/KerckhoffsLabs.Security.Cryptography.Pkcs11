@@ -149,24 +149,65 @@ sub-128-bit EC curves, and SHA-1 KDF PRFs. Where the insecure choice is visible 
 [analyzers](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html)
 (`KLPKCS11001`–`KLPKCS11010`) surface it as a build warning too.
 
-When `SecureOnly` refuses something you need, there are two remedies:
+When `SecureOnly` refuses something you need, widen it for exactly that one thing. Each `With…` method
+returns a new policy named `"SecureOnly+custom"` that only adds; `CryptoPolicy.SecureOnly` itself is
+unchanged, and every other rule keeps applying:
+
+| Refused | Narrow opt-in |
+|---|---|
+| A mechanism (legacy, vendor-defined, or an operation it is not allowed for) | `WithAllowedMechanism(mechanism, operations, reason)` |
+| Reading one kind of secret off the token | `WithAllowedKeyMaterialExport(kind, reason)` |
+| An EC curve below the 128-bit baseline | `WithAllowedCurve(curve, reason)` |
+| A key-agreement KDF (e.g. `CKD_NULL` for an on-token key) | `WithAllowedKeyAgreementKdf(kdf, reason)` |
 
 ```csharp
-// A mechanism you have reviewed (here a vendor-defined one): a new, wider policy named
-// "SecureOnly+custom". It only adds; CryptoPolicy.SecureOnly itself is unchanged.
+// A mechanism you have reviewed (here a vendor-defined one).
 SecureOnlyPolicy reviewed = CryptoPolicy.SecureOnly.WithAllowedMechanism(
-    0x8000_1001UL,                                    // your vendor's CK_MECHANISM_TYPE
+    (CKM)0x8000_1001UL,                               // your vendor's CK_MECHANISM_TYPE
     [CryptoOperation.Sign, CryptoOperation.Verify],
     "Vendor HSM signature scheme, reviewed for our release signing.");
 using var workspace = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin, reviewed);
+```
 
-// One-off legacy interop: lift the policy for a single, scoped operation.
+**Reading a secret back.** Keeping derived and shared secrets on the token is the default: `Pkcs11Key.Derive`,
+`EncapsulateKey`, `DecapsulateKey` and `Pkcs11Workspace.DeriveSharedSecretEcdh` return sensitive keys, and a
+template asking for a non-sensitive key is refused. When a protocol needs the bytes in managed code — a
+BCL-shaped KDF, a TLS or Noise key schedule — use the read-back operations, which the policy decides as a
+`KeyMaterialExportRequest` of one kind:
+
+| Operation | Mechanisms | Export kind |
+|---|---|---|
+| `Pkcs11Key.DeriveAndExportSecret` | `CKM_ECDH1_DERIVE` / `CKM_ECDH1_COFACTOR_DERIVE` (peer point checked against the key's curve) | `EcdhSharedSecret` |
+| | `CKM_HKDF_DERIVE`, SP 800-108 counter / feedback / double-pipeline (no additional keys) | `KdfOutput` |
+| `Pkcs11Workspace.DeriveAndExportSecret` | `CKM_PKCS5_PBKD2` | `PasswordKdfOutput` |
+| `Pkcs11Key.EncapsulateAndExportSecret` / `DecapsulateAndExportSecret` (experimental, `KLPKCS11501`) | `CKM_ML_KEM` | `KemSharedSecret` |
+
+```csharp
+SecureOnlyPolicy policy = CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(
+    KeyMaterialExportKind.EcdhSharedSecret, "Z feeds our protocol's managed key schedule; reviewed.");
+using var workspace = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin, policy);
+using var key = workspace.OpenKey("ecdh-key");
+
+Span<byte> z = stackalloc byte[32];                   // P-256: one 32-byte field element
+key.DeriveAndExportSecret(
+    new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForPeer(CKD.CKD_NULL, peerPublicKey)), z);
+```
+
+Any other mechanism is refused whatever the policy, since several derivation mechanisms would return the base
+key itself or an encryption of it. The secret passes through an ephemeral session key the library creates and
+destroys; nothing else is exempted. The BCL adapters that return bytes (`ECDiffieHellmanPkcs11`,
+`MLKemPkcs11`, `HkdfPkcs11`, `SP800108HmacCounterKdfPkcs11`, `Rfc2898DeriveBytesPkcs11`) are built on these
+operations and need the same opt-in.
+
+Hashes and KDF PRFs cannot be added. As a last resort for one-off legacy interop, lift the policy for a single,
+scoped operation:
+
+```csharp
 using (workspace.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }
 ```
 
-Hashes, curves and key-agreement KDFs cannot be added this way. The generated
-[`secure-only.md`](docs/policies/secure-only.md) and [`fips-only.md`](docs/policies/fips-only.md) pages
-list exactly what each policy allows, for which operations, and why.
+The generated [`secure-only.md`](docs/policies/secure-only.md) and [`fips-only.md`](docs/policies/fips-only.md)
+pages list exactly what each policy allows, for which operations, and why.
 
 **SHA-224 is refused for a different reason than the broken hashes above: it isn't cryptographically
 weak.** It's FIPS 180-4-approved — just a truncated SHA-256 with no `HashAlgorithmName` constant in

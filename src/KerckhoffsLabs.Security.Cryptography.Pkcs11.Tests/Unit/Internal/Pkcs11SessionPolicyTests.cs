@@ -144,7 +144,7 @@ public sealed class Pkcs11SessionPolicyTests
         using var workspace = Support.Pkcs11Fakes.ManagedToken.OpenWorkspace(library);
         var request = new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret);
 
-        var ex = Assert.Throws<CryptoPolicyViolationException>(() => workspace.Enforce(request));
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() => workspace.EnsurePermitted(request));
 
         Assert.Equal("SecureOnly", ex.PolicyName);
         Assert.Same(request, ex.Request);
@@ -217,7 +217,7 @@ public sealed class Pkcs11SessionPolicyTests
     }
 
     [Fact]
-    public void Pbkdf2_ReadingTheDerivedBytes_RaisesTheKdfOutputExportCheck()
+    public void Pbkdf2_ReadingTheDerivedBytes_RaisesThePasswordKdfOutputExportCheck()
     {
         var policy = new RecordingPolicy(r => r is KeyMaterialExportRequest
             ? PolicyDecision.Deny("no export")
@@ -229,41 +229,38 @@ public sealed class Pkcs11SessionPolicyTests
             workspace, "placeholder-password"u8.ToArray(), new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32));
 
         var export = Assert.IsType<KeyMaterialExportRequest>(ex.Request);
-        Assert.Equal(KeyMaterialExportKind.KdfOutput, export.Kind);
+        Assert.Equal(KeyMaterialExportKind.PasswordKdfOutput, export.Kind);
+        Assert.Equal(CKM.CKM_PKCS5_PBKD2, export.Mechanism);
+        Assert.Null(export.BaseKeyClass);
         Assert.Equal("no export", ex.Reason);
         Assert.Empty(policy.Seen.OfType<KeyTemplateRequest>()); // refused before any key template was built or sent
     }
 
     [Fact]
-    public void Pbkdf2_UnderAllowInsecure_PassesThePolicy_AndReachesTheToken()
+    public void Pbkdf2_UnderAllowInsecure_PassesThePolicy_AndDerivesOnTheToken()
     {
         using var library = Support.Pkcs11Fakes.ManagedToken.NewLibrary();
         using var workspace = Support.Pkcs11Fakes.ManagedToken.OpenWorkspace(library, CryptoPolicy.AllowInsecure);
 
-        // The managed soft token does not implement CKM_PKCS5_PBKD2, so a token error (not a policy
-        // refusal) is the proof that every policy check passed and the call reached C_GenerateKey.
-        var ex = Record.Exception(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(
-            workspace, "placeholder-password"u8.ToArray(), new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32));
+        byte[] derived = Rfc2898DeriveBytesPkcs11.Pbkdf2(
+            workspace, "placeholder-password"u8.ToArray(), new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
 
-        var tokenError = Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
-        Assert.Equal(CKR.CKR_MECHANISM_INVALID, tokenError.ReturnValue);
+        Assert.Equal(System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+            "placeholder-password"u8, new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32), derived);
     }
 
     [Fact]
-    public void Pbkdf2Key_RaisesNoExportCheck_AndReachesTheTokenUnderSecureOnly()
+    public void Pbkdf2Key_RaisesNoExportCheck_AndDerivesOnTheTokenUnderSecureOnly()
     {
         var policy = new RecordingPolicy(CryptoPolicy.SecureOnly.Evaluate);
         using var library = Support.Pkcs11Fakes.ManagedToken.NewLibrary();
         using var workspace = Support.Pkcs11Fakes.ManagedToken.OpenWorkspace(library, policy);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
 
-        // The managed soft token does not implement CKM_PKCS5_PBKD2, so a token error (not a policy
-        // refusal) is the proof that every SecureOnly check passed and the call reached C_GenerateKey.
-        var ex = Record.Exception(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(
-            workspace, "placeholder-password"u8, new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, template));
+        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(
+            workspace, "placeholder-password"u8, new byte[16], 1000, System.Security.Cryptography.HashAlgorithmName.SHA256, template);
 
-        var tokenError = Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
-        Assert.Equal(CKR.CKR_MECHANISM_INVALID, tokenError.ReturnValue);
+        Assert.Equal(CKK.CKK_AES, key.KeyType);
         Assert.Empty(policy.Seen.OfType<KeyMaterialExportRequest>());
         Assert.Contains(policy.Seen.OfType<MechanismUseRequest>(), r => r.Mechanism.Type == CKM.CKM_PKCS5_PBKD2);
     }

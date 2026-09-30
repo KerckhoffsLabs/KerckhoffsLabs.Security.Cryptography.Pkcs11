@@ -30,7 +30,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("MD5 is a broken hash function with practical collisions. Use SHA256Pkcs11 or stronger. " +
-          "MD5Pkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect.",
+          "MD5Pkcs11 throws CryptoPolicyViolationException unless the policy permits CKM_MD5 (e.g. CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_MD5, [CryptoOperation.Digest], reason)).",
     DiagnosticId = DiagnosticIds.Md5,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class MD5Pkcs11 : MD5

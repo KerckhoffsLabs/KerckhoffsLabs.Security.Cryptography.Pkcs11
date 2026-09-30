@@ -52,9 +52,22 @@ public static class CryptoPolicy
     public static ICryptoPolicy FipsOnly { get; } = new FipsOnlyPolicy();
 
     /// <summary>
-    /// Allows everything, including broken algorithms and plaintext key export. For legacy interop only;
-    /// prefer a scoped <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a
-    /// whole workspace under it.
+    /// Allows everything, including broken algorithms and plaintext key export. For legacy interop only.
     /// </summary>
+    /// <remarks>
+    /// Reach for the narrowest opt-in first. Most single needs have one on <see cref="SecureOnly"/>, and
+    /// every other SecureOnly rule keeps applying:
+    /// <list type="bullet">
+    /// <item><description>a legacy mechanism — <see cref="SecureOnlyPolicy.WithAllowedMechanism(Common.CKM, IEnumerable{CryptoOperation}, string)"/>;</description></item>
+    /// <item><description>reading one kind of secret off the token (the <c>…AndExportSecret</c> operations on
+    /// <see cref="Pkcs11Key"/> and <see cref="Pkcs11Workspace"/>, and the byte-returning ECDH, ML-KEM and
+    /// KDF adapters built on them) — <see cref="SecureOnlyPolicy.WithAllowedKeyMaterialExport"/>;</description></item>
+    /// <item><description>a weak EC curve — <see cref="SecureOnlyPolicy.WithAllowedCurve"/>;</description></item>
+    /// <item><description>a key-agreement KDF — <see cref="SecureOnlyPolicy.WithAllowedKeyAgreementKdf"/>.</description></item>
+    /// </list>
+    /// When <c>AllowInsecure</c> is still needed, prefer a scoped
+    /// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a whole workspace
+    /// under it.
+    /// </remarks>
     public static ICryptoPolicy AllowInsecure { get; } = new AllowInsecurePolicy();
 }

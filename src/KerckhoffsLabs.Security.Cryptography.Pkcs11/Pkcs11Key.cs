@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -94,13 +95,6 @@ public sealed class Pkcs11Key : IDisposable
     public bool SupportsMechanism(CKM mechanism) => _workspace.Session.SupportsMechanism(mechanism);
 
     /// <summary>
-    /// <see cref="SupportsMechanism(CKM)"/> for a <see cref="Mechanism"/>, without casting its type to
-    /// <see cref="CKM"/>: a value wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits) cannot be
-    /// in the enum-typed mechanism list, so it is reported as unsupported rather than overflowing.
-    /// </summary>
-    internal bool SupportsMechanism(Mechanism mechanism) => SupportsMechanism(mechanism.Type);
-
-    /// <summary>
     /// Reads the requested attribute values from this key. Uses the public-key handle for
     /// asymmetric keys when it is available (matching the rule <see cref="Encrypt"/> follows), and
     /// the private-key handle otherwise — covering both public-companion key pairs and private-only
@@ -129,8 +123,11 @@ public sealed class Pkcs11Key : IDisposable
         return _workspace.Session.GetAttributeValue(handle, [.. types]);
     }
 
-    /// <summary>Internal accessor for the workspace this key belongs to.</summary>
-    internal Pkcs11Workspace Workspace => _workspace;
+    /// <summary>
+    /// The workspace this key belongs to, and whose session and <see cref="Pkcs11Workspace.Policy"/>
+    /// every operation on it goes through. The key does not own it.
+    /// </summary>
+    public Pkcs11Workspace Workspace => _workspace;
 
     /// <summary>Internal accessor for the private handle. <see cref="ObjectHandle.Invalid"/> for public-only keys.</summary>
     internal ObjectHandle PrivateHandle => _privateHandle;
@@ -309,7 +306,7 @@ public sealed class Pkcs11Key : IDisposable
         // Fall back to managed verify via synthesized public parameters. No session call happens on this
         // path, so the workspace policy is consulted here — the same verdict the token path gets from
         // the session's own check.
-        _workspace.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+        _workspace.Session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
 
         if (_keyType == CKK.CKK_RSA)
         {
@@ -572,7 +569,8 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
+    /// non-sensitive key is refused by <c>CryptoPolicy.SecureOnly</c>: to read a derived secret back, use
+    /// <see cref="DeriveAndExportSecret"/>, which the policy decides as a narrow key-material export. Symmetric
     /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
     /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
@@ -602,6 +600,293 @@ public sealed class Pkcs11Key : IDisposable
             sp800108.HydrateDerivedKeys(_workspace);
 
         return _workspace.HydrateExistingHandleAsKey(resulting);
+    }
+
+    /// <summary>
+    /// Returns this EC key's named curve, read from its <c>CKA_EC_PARAMS</c>.
+    /// </summary>
+    /// <returns>The curve. <see cref="Pkcs11ECCurve.FieldSizeBits"/> is set for every curve in the library's catalog.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if <see cref="KeyType"/> is not <see cref="CKK.CKK_EC"/>.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if the token does not expose <c>CKA_EC_PARAMS</c>, or its value is not a DER-encoded named-curve OID.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
+    public Pkcs11ECCurve GetEcCurve()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        RequireEcKey();
+
+        using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(CKA.CKA_EC_PARAMS);
+        if (attrs[0].CannotBeRead)
+            throw new System.Security.Cryptography.CryptographicException("The token does not expose this key's CKA_EC_PARAMS.");
+        try
+        {
+            return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray());
+        }
+        catch (ArgumentException ex)
+        {
+            throw new System.Security.Cryptography.CryptographicException("This key's CKA_EC_PARAMS is not a DER-encoded named-curve OID.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Returns this EC key's public key — its named curve and uncompressed point — read from
+    /// <c>CKA_EC_PARAMS</c> and <c>CKA_EC_POINT</c>. Reads the public object when the key has one, the
+    /// private object otherwise; PKCS#11 does not require a private key to carry <c>CKA_EC_POINT</c>.
+    /// </summary>
+    /// <returns>Public parameters only; <see cref="System.Security.Cryptography.ECParameters.D"/> is never set.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if <see cref="KeyType"/> is not <see cref="CKK.CKK_EC"/>.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if the token does not expose <c>CKA_EC_POINT</c> or <c>CKA_EC_PARAMS</c>, or they do not decode as a named curve and an uncompressed point.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
+    public System.Security.Cryptography.ECParameters ExportEcPublicParameters()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        RequireEcKey();
+
+        using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
+        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
+            throw new System.Security.Cryptography.CryptographicException(
+                "The token does not expose this key's CKA_EC_POINT and CKA_EC_PARAMS.");
+        return Pkcs11PublicKeyView.TryParseEcPublicKey(attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray())
+            ?? throw new System.Security.Cryptography.CryptographicException(
+                "This key's CKA_EC_POINT / CKA_EC_PARAMS do not decode as a named curve and an uncompressed point.");
+    }
+
+    private void RequireEcKey()
+    {
+        if (_keyType != CKK.CKK_EC)
+            throw new InvalidOperationException($"This is a {_keyType} key, not an EC key.");
+    }
+
+    /// <summary>
+    /// Derives a secret from this key on the token and copies it into <paramref name="destination"/>.
+    /// For a protocol whose next step runs in managed code — a BCL-shaped KDF, a TLS or Noise key
+    /// schedule — and so needs the bytes rather than a key that stays on the token.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exports key material.</b> The workspace's <see cref="Pkcs11Workspace.Policy"/> decides it
+    /// as a <see cref="KeyMaterialExportRequest"/>, which <c>CryptoPolicy.SecureOnly</c> refuses unless
+    /// widened for that one kind, e.g.
+    /// <c>CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.KdfOutput, reason)</c>.
+    /// When the secret can stay on the token, use <see cref="Derive"/> with a sensitive template instead;
+    /// nothing is exported and no opt-in is needed.
+    /// </para>
+    /// <para>
+    /// The mechanisms are a closed list, and the kind of export follows from the mechanism:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description><c>CKM_ECDH1_DERIVE</c> / <c>CKM_ECDH1_COFACTOR_DERIVE</c> with
+    /// <see cref="CkmEcdh1DeriveParams"/> naming a peer point (e.g. from
+    /// <see cref="CkmEcdh1DeriveParams.ForPeer"/>) — <see cref="KeyMaterialExportKind.EcdhSharedSecret"/>,
+    /// whatever the KDF. The key must be a <see cref="CKK.CKK_EC"/> key, and the peer point is checked
+    /// against its curve before it reaches the token. With <c>CKD_NULL</c> the result is the raw shared
+    /// secret Z; size <paramref name="destination"/> to the curve's field size
+    /// (<see cref="GetEcCurve"/>).</description></item>
+    /// <item><description><c>CKM_HKDF_DERIVE</c> with <see cref="CkmHkdfParams"/> —
+    /// <see cref="KeyMaterialExportKind.KdfOutput"/>.</description></item>
+    /// <item><description><c>CKM_SP800_108_COUNTER_KDF</c>, <c>_FEEDBACK_KDF</c> and
+    /// <c>_DOUBLE_PIPELINE_KDF</c> with <see cref="CkmSp800108KdfParams"/> that derive no additional keys —
+    /// <see cref="KeyMaterialExportKind.KdfOutput"/>.</description></item>
+    /// </list>
+    /// <para>
+    /// Any other mechanism is refused, whatever the policy: several derivation mechanisms
+    /// (<c>CKM_XOR_BASE_AND_DATA</c>, <c>CKM_CONCATENATE_BASE_AND_KEY</c>, <c>CKM_EXTRACT_KEY_FROM_KEY</c>,
+    /// <c>CKM_AES_ECB_ENCRYPT_DATA</c>, …) would return the base key itself, or an encryption of it.
+    /// </para>
+    /// <para>
+    /// The secret passes through an ephemeral session key the library creates — generic secret,
+    /// extractable, not sensitive, not copyable or modifiable, no usage — and destroys before this
+    /// returns, whether it succeeds or not. That template is covered by the export decision and not
+    /// judged again as a key template; for ECDH with <c>CKD_NULL</c>, neither is the key-agreement KDF.
+    /// The mechanism is still judged. On failure, <paramref name="destination"/> is zeroed.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism">One of the mechanisms listed in the remarks.</param>
+    /// <param name="destination">Receives the secret; its length is the length derived.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is empty; if <paramref name="mechanism"/> is not one of the supported shapes; or, for ECDH, if the key is not a <see cref="CKK.CKK_EC"/> key or the peer point is not an uncompressed point on its curve.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the key has no private or secret handle to derive from.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses the export or the mechanism.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if the token does not expose the derived value or produces one of another length, or, for ECDH, if the key's curve cannot be read.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c> call.</exception>
+    public void DeriveAndExportSecret(Mechanism mechanism, Span<byte> destination)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        RequireNonEmpty(destination, nameof(destination));
+        KeyMaterialExportKind kind = SecretExport.Classify(SecretExport.Operation.Derive, mechanism, nameof(mechanism));
+        if (_privateHandle.IsInvalid)
+            throw new InvalidOperationException("This key has no private or secret handle to derive from.");
+
+        Pkcs11Session session = _workspace.Session;
+        SecretExport.Authorize(session, kind, mechanism.Type, IsAsymmetricKeyType(_keyType) ? CKO.CKO_PRIVATE_KEY : CKO.CKO_SECRET_KEY, _keyType);
+
+        if (kind == KeyMaterialExportKind.EcdhSharedSecret)
+        {
+            if (_keyType != CKK.CKK_EC)
+                throw new ArgumentException(
+                    $"Exporting an ECDH shared secret requires a {nameof(CKK.CKK_EC)} key, whose curve the peer point is checked against; this is a {_keyType} key.",
+                    nameof(mechanism));
+            Pkcs11PublicKeyView.ValidatePeerPoint(GetEcCurve(), ((CkmEcdh1DeriveParams)mechanism.Parameters!).PublicData, nameof(mechanism));
+        }
+
+        List<ObjectAttribute> template = SecretExport.EphemeralTemplate(destination.Length);
+        try
+        {
+            ObjectHandle ephemeral = session.DeriveKey(mechanism, _privateHandle, template, kind);
+            SecretExport.ReadAndDestroy(session, ephemeral, destination);
+        }
+        finally
+        {
+            SecretExport.Release(template);
+        }
+    }
+
+    /// <summary>
+    /// Encapsulates a fresh shared secret against this key's public half (PKCS#11 v3.2 §5.18.10) and
+    /// copies both the ciphertext and the shared secret out. For a protocol that needs the secret's
+    /// bytes, such as a hybrid key exchange feeding a managed KDF.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exports key material</b>, decided as a <see cref="KeyMaterialExportRequest"/> of
+    /// <see cref="KeyMaterialExportKind.KemSharedSecret"/>, which <c>CryptoPolicy.SecureOnly</c> refuses
+    /// unless widened for it. When the secret can stay on the token, use <see cref="EncapsulateKey"/>.
+    /// Only <c>CKM_ML_KEM</c> is supported. The secret passes through an ephemeral session key that is
+    /// destroyed before this returns; on failure, <paramref name="sharedSecret"/> is zeroed.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism"><c>CKM_ML_KEM</c>.</param>
+    /// <param name="ciphertext">Receives the ciphertext. Must be at least the parameter set's ciphertext size (768, 1088 or 1568 bytes); the token is handed the whole buffer in one call.</param>
+    /// <param name="sharedSecret">Receives the shared secret; for ML-KEM, 32 bytes.</param>
+    /// <returns>The number of bytes written to <paramref name="ciphertext"/>.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="ciphertext"/> or <paramref name="sharedSecret"/> is empty, or <paramref name="mechanism"/> is not <c>CKM_ML_KEM</c>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the key has no public handle.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses the export or the mechanism.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if the token does not expose the shared secret or produces one of another length.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_EncapsulateKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c> call — <see cref="CKR.CKR_BUFFER_TOO_SMALL"/> when <paramref name="ciphertext"/> is too short.</exception>
+    [Experimental(DiagnosticIds.ExperimentalKem, UrlFormat = DiagnosticIds.UrlFormat)]
+    public int EncapsulateAndExportSecret(Mechanism mechanism, Span<byte> ciphertext, Span<byte> sharedSecret)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        RequireNonEmpty(ciphertext, nameof(ciphertext));
+        RequireNonEmpty(sharedSecret, nameof(sharedSecret));
+        KeyMaterialExportKind kind = SecretExport.Classify(SecretExport.Operation.Encapsulate, mechanism, nameof(mechanism));
+        if (_publicHandle.IsInvalid)
+            throw new InvalidOperationException("This key has no public handle to encapsulate against.");
+
+        Pkcs11Session session = _workspace.Session;
+        SecretExport.Authorize(session, kind, mechanism.Type, CKO.CKO_PUBLIC_KEY, _keyType);
+
+        List<ObjectAttribute> template = SecretExport.EphemeralTemplate(sharedSecret.Length);
+        try
+        {
+            var (ct, ephemeral) = session.EncapsulateKey(mechanism, _publicHandle, template, ciphertext.Length, kind);
+            SecretExport.ReadAndDestroy(session, ephemeral, sharedSecret);
+            // The token wrote into a buffer of ciphertext.Length and reports what it used, so this fits.
+            ct.CopyTo(ciphertext);
+            return ct.Length;
+        }
+        finally
+        {
+            SecretExport.Release(template);
+        }
+    }
+
+    /// <summary>
+    /// Decapsulates the shared secret from <paramref name="ciphertext"/> with this key's private half
+    /// (PKCS#11 v3.2 §5.18.11) and copies it into <paramref name="sharedSecret"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exports key material</b>, decided as a <see cref="KeyMaterialExportRequest"/> of
+    /// <see cref="KeyMaterialExportKind.KemSharedSecret"/>, which <c>CryptoPolicy.SecureOnly</c> refuses
+    /// unless widened for it. When the secret can stay on the token, use <see cref="DecapsulateKey"/>.
+    /// Only <c>CKM_ML_KEM</c> is supported: the KEM entry points also accept RSA PKCS#1 v1.5, whose
+    /// decapsulated output must never be handed back. The secret passes through an ephemeral session
+    /// key that is destroyed before this returns; on failure, <paramref name="sharedSecret"/> is zeroed.
+    /// </para>
+    /// <para>
+    /// Tokens disagree on whether the ephemeral key's template may carry <c>CKA_VALUE_LEN</c> here
+    /// (opencryptoki requires it, SoftHSM refuses it as read-only). The first call against a library
+    /// finds out, and the answer is remembered for that library.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism"><c>CKM_ML_KEM</c>.</param>
+    /// <param name="ciphertext">The ciphertext produced by the encapsulating party.</param>
+    /// <param name="sharedSecret">Receives the shared secret; for ML-KEM, 32 bytes.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="sharedSecret"/> is empty, or <paramref name="mechanism"/> is not <c>CKM_ML_KEM</c>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the key has no private handle.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses the export or the mechanism.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if the token does not expose the shared secret or produces one of another length.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DecapsulateKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c> call.</exception>
+    [Experimental(DiagnosticIds.ExperimentalKem, UrlFormat = DiagnosticIds.UrlFormat)]
+    public void DecapsulateAndExportSecret(Mechanism mechanism, ReadOnlySpan<byte> ciphertext, Span<byte> sharedSecret)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        RequireNonEmpty(sharedSecret, nameof(sharedSecret));
+        KeyMaterialExportKind kind = SecretExport.Classify(SecretExport.Operation.Decapsulate, mechanism, nameof(mechanism));
+        if (_privateHandle.IsInvalid)
+            throw new InvalidOperationException("This key has no private handle to decapsulate with.");
+
+        Pkcs11Session session = _workspace.Session;
+        SecretExport.Authorize(session, kind, mechanism.Type, CKO.CKO_PRIVATE_KEY, _keyType);
+
+        Pkcs11Library library = _workspace.Library;
+        ObjectHandle ephemeral = library.MlKemDecapsulateOmitsValueLen switch
+        {
+            bool omit => DecapsulateEphemeral(mechanism, ciphertext, sharedSecret.Length, includeValueLen: !omit, kind),
+            null => DecapsulateEphemeralProbing(mechanism, ciphertext, sharedSecret.Length, kind, library),
+        };
+        SecretExport.ReadAndDestroy(session, ephemeral, sharedSecret);
+    }
+
+    // First decapsulation against a library: try the conventional template with CKA_VALUE_LEN, fall back
+    // to omitting it on SoftHSM's read-only rejection, and record the form that worked so later calls
+    // skip the probe. The failed first attempt creates nothing.
+    private ObjectHandle DecapsulateEphemeralProbing(
+        Mechanism mechanism, ReadOnlySpan<byte> ciphertext, int length, KeyMaterialExportKind kind, Pkcs11Library library)
+    {
+        try
+        {
+            ObjectHandle ephemeral = DecapsulateEphemeral(mechanism, ciphertext, length, includeValueLen: true, kind);
+            library.MlKemDecapsulateOmitsValueLen = false;
+            return ephemeral;
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue == CKR.CKR_ATTRIBUTE_READ_ONLY)
+        {
+            ObjectHandle ephemeral = DecapsulateEphemeral(mechanism, ciphertext, length, includeValueLen: false, kind);
+            library.MlKemDecapsulateOmitsValueLen = true;
+            return ephemeral;
+        }
+    }
+
+    private ObjectHandle DecapsulateEphemeral(
+        Mechanism mechanism, ReadOnlySpan<byte> ciphertext, int length, bool includeValueLen, KeyMaterialExportKind kind)
+    {
+        List<ObjectAttribute> template = SecretExport.EphemeralTemplate(includeValueLen ? length : null);
+        try
+        {
+            return _workspace.Session.DecapsulateKey(mechanism, _privateHandle, ciphertext, template, kind);
+        }
+        finally
+        {
+            SecretExport.Release(template);
+        }
+    }
+
+    private static void RequireNonEmpty(ReadOnlySpan<byte> buffer, string paramName)
+    {
+        if (buffer.IsEmpty)
+            throw new ArgumentException("The buffer must not be empty.", paramName);
     }
 
     private static bool IsAsymmetricKeyType(CKK keyType) => keyType switch

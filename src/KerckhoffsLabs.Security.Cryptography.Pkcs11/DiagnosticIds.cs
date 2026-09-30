@@ -3,7 +3,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <summary>
 /// Diagnostic ids carried by the library's <see cref="ObsoleteAttribute"/>s, so a consumer with a
 /// documented reason to use one legacy primitive can suppress exactly that one — instead of the
-/// blanket <c>CS0618</c>, which would also hide every other obsoletion in their code.
+/// blanket <c>CS0618</c>, which would also hide every other obsoletion in their code — and by its
+/// <see cref="System.Diagnostics.CodeAnalysis.ExperimentalAttribute"/>s (<c>KLPKCS115xx</c>), which
+/// mark API shapes that may still change in a minor release.
 /// </summary>
 /// <remarks>
 /// The ids are part of the public contract (a consumer's <c>#pragma warning disable</c> or
@@ -45,4 +47,11 @@ internal static class DiagnosticIds
     /// are all <c>[Obsolete]</c> in favor of its static <c>Pbkdf2</c> method.
     /// </summary>
     internal const string Rfc2898DeriveBytesPkcs11Constructors = "KLPKCS11011";
+
+    /// <summary>
+    /// The PKCS#11 v3.2 KEM read-back surface (<c>Pkcs11Key.EncapsulateAndExportSecret</c> /
+    /// <c>DecapsulateAndExportSecret</c>): experimental, because the v3.2 KEM functions are new and
+    /// token support for them is still settling.
+    /// </summary>
+    internal const string ExperimentalKem = "KLPKCS11501";
 }

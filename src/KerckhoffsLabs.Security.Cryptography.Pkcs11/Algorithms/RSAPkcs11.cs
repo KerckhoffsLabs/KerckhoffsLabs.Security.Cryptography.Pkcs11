@@ -238,7 +238,7 @@ public sealed class RSAPkcs11 : RSA
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
-    /// <exception cref="Pkcs11Exception">Thrown when the public material (<c>CKA_MODULUS</c> / <c>CKA_PUBLIC_EXPONENT</c>) is sensitive or cannot be read from any available handle.</exception>
+    /// <exception cref="CryptographicException">Thrown when the token does not expose the public material (<c>CKA_MODULUS</c> / <c>CKA_PUBLIC_EXPONENT</c>) on any available handle.</exception>
     public override RSAParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
@@ -251,8 +251,8 @@ public sealed class RSAPkcs11 : RSA
         // companions and private-only objects whose CKA_MODULUS / CKA_PUBLIC_EXPONENT are readable.
         using var attrs = _key.GetAttributeValue(CKA.CKA_MODULUS, CKA.CKA_PUBLIC_EXPONENT);
         if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "RSAPkcs11.ExportParameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT)");
+            throw new CryptographicException(
+                "The token does not expose this key's public RSA parameters (CKA_MODULUS / CKA_PUBLIC_EXPONENT).");
 
         return new RSAParameters
         {

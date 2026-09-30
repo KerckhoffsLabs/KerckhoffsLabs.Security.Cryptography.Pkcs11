@@ -32,13 +32,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// Does not take ownership of the base key — disposing this provider does not dispose it.
 /// </para>
 /// <para>
-/// <b>Requires a policy that permits reading key material off the token, e.g.
-/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
+/// <b>Requires a policy that permits reading KDF output off the token, e.g.
+/// <c>CryptoPolicy.SecureOnly.WithAllowedKeyMaterialExport(KeyMaterialExportKind.KdfOutput, reason)</c>.</b> Every method here
+/// except <see cref="DeriveKey(ReadOnlySpan{byte}, ReadOnlySpan{byte}, ObjectTemplate)"/> returns
 /// <c>byte[]</c>, so the derived value must be read off the token — this adapter cannot be
-/// implemented without extracting key material. The refusal comes from the library's single
-/// secure-defaults gate, which declines to create the extractable, non-sensitive key the
-/// read-back needs. Scope the policy override to one operation, or stay on the on-token
-/// <c>Pkcs11Key.Derive</c> path if the derived key never needs to leave the HSM.
+/// implemented without extracting key material. The policy decides this as a
+/// <see cref="KeyMaterialExportRequest"/>, which the default SecureOnly policy refuses; allowing that
+/// one export kind is the narrow opt-in. The bytes are read with
+/// <see cref="Pkcs11Key.DeriveAndExportSecret"/>. If the derived key never needs to leave the HSM, use
+/// <see cref="DeriveKey(ReadOnlySpan{byte}, ReadOnlySpan{byte}, ObjectTemplate)"/> instead: it keeps the
+/// result on the token as a sensitive key and needs no opt-in.
 /// </para>
 /// </remarks>
 public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
@@ -84,7 +87,8 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> or <paramref name="context"/> is <c>null</c>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
+    /// <exception cref="CryptographicException">Thrown when the token does not expose the derived bytes.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(byte[] label, byte[] context, int derivedKeyLengthInBytes)
     {
@@ -99,7 +103,8 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
+    /// <exception cref="CryptographicException">Thrown when the token does not expose the derived bytes.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
@@ -116,7 +121,8 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// overload of <see cref="SP800108HmacCounterKdf"/>.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
+    /// <exception cref="CryptographicException">Thrown when the token does not expose the derived bytes.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
@@ -125,15 +131,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
         if (destination.IsEmpty)
             return;
 
-        byte[] derived = DeriveExtractable(label, context, destination.Length);
-        try
-        {
-            derived.CopyTo(destination);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(derived);
-        }
+        _key.DeriveAndExportSecret(CounterMechanism(label, context), destination);
     }
 
     /// <summary>
@@ -160,9 +158,13 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
 
     private byte[] DeriveExtractable(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int length)
     {
-        var p = CkmSp800108KdfParams.CounterModeHmac(_prf, label, context);
-        return DerivedKeyMaterial.DeriveAndRead(_key, new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, p), length);
+        byte[] output = new byte[length];
+        _key.DeriveAndExportSecret(CounterMechanism(label, context), output);
+        return output;
     }
+
+    private Mechanism CounterMechanism(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context)
+        => new(CKM.CKM_SP800_108_COUNTER_KDF, CkmSp800108KdfParams.CounterModeHmac(_prf, label, context));
 
     /// <summary>
     /// Does not dispose the underlying <see cref="Pkcs11Key"/> — the caller retains ownership.

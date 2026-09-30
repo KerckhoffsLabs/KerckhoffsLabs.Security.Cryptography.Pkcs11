@@ -206,6 +206,14 @@ internal sealed class Pkcs11Session : IDisposable
         throw new CryptoPolicyViolationException(policy.Name, request, decision.Reason!);
     }
 
+    /// <summary>
+    /// Logs a key-material export the policy allowed. Denials are logged by <see cref="Enforce(PolicyRequest)"/>;
+    /// an allowed export is logged too, because it is the one decision that lets secret bytes leave the
+    /// token. The request's description names the kind and mechanism, never the bytes.
+    /// </summary>
+    internal void LogExportAllowed(KeyMaterialExportRequest request)
+        => Log.PolicyExportAllowed(_logger, (ulong)_sessionId, _effectivePolicy.Name, request.Describe());
+
     /// <summary>Evaluates without throwing or logging.</summary>
     internal bool IsPermitted(PolicyRequest request)
     {
@@ -213,13 +221,22 @@ internal sealed class Pkcs11Session : IDisposable
         return _effectivePolicy.Evaluate(request).IsAllowed;
     }
 
-    private void Enforce(Mechanism mechanism, CryptoOperation operation)
+    /// <param name="mechanism">The mechanism about to run.</param>
+    /// <param name="operation">What it is used for.</param>
+    /// <param name="export">
+    /// The kind of export the caller already enforced when this call is one of the library's own
+    /// read-back operations (see <see cref="SecretExport"/>); <see langword="null"/> otherwise.
+    /// </param>
+    private void Enforce(Mechanism mechanism, CryptoOperation operation, KeyMaterialExportKind? export = null)
     {
         Enforce(new MechanismUseRequest(mechanism, operation));
 
         // The KDF an ECDH derivation or KEM applies to the shared secret is judged here, on every call
-        // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through.
-        if (mechanism.Parameters is CkmEcdh1DeriveParams ecdh)
+        // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through. The one
+        // exception is an allowed read-back of the raw ECDH secret: that secret is by definition the
+        // CKD_NULL output, and the export request already decided on it.
+        if (mechanism.Parameters is CkmEcdh1DeriveParams ecdh
+            && !(ecdh.Kdf == CKD.CKD_NULL && export == KeyMaterialExportKind.EcdhSharedSecret))
             Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf));
     }
 
@@ -1300,20 +1317,21 @@ internal sealed class Pkcs11Session : IDisposable
     /// </summary>
     /// <param name="mechanism">Generation mechanism</param>
     /// <param name="attributes">Attributes of the new key or set of domain parameters</param>
+    /// <param name="export">Set only by <see cref="SecretExport"/>: see <see cref="BuildSecureKeyDefaults"/>.</param>
     /// <returns>Handle of the new key or set of domain parameters</returns>
-    public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes)
+    public ObjectHandle GenerateKey(Mechanism mechanism, List<ObjectAttribute> attributes, KeyMaterialExportKind? export = null)
     {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        Enforce(mechanism, CryptoOperation.GenerateKey);
+        Enforce(mechanism, CryptoOperation.GenerateKey, export);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "GenerateKey");
 
         // A secret key: refuse a deliberately weakened template, and supply the secure defaults when
         // the caller stated nothing — the same treatment DeriveKey and UnwrapKey already gave.
-        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes, CKO.CKO_SECRET_KEY);
+        using ReadOnlyDisposableList<ObjectAttribute> generatedDefaults = BuildSecureKeyDefaults(attributes, CKO.CKO_SECRET_KEY, export);
         if (generatedDefaults.Count > 0)
         {
             attributes = attributes is null ? [] : [.. attributes];
@@ -1631,10 +1649,19 @@ internal sealed class Pkcs11Session : IDisposable
     /// caller. Note the asymmetry with the refusal: <c>CKA_EXTRACTABLE=false</c> is supplied as a
     /// default here, but an explicit <c>CKA_EXTRACTABLE=true</c> is not refused — only
     /// <c>CKA_SENSITIVE=false</c> is.
+    /// <para>
+    /// <paramref name="export"/> is set only by <see cref="SecretExport"/>, which has already enforced a
+    /// <see cref="KeyMaterialExportRequest"/> of that kind and passes its own ephemeral, non-sensitive
+    /// template. That template is what the export consists of, so it is not judged a second time as a
+    /// <see cref="KeyTemplateRequest"/>: a policy that allows one kind of export must not also have to
+    /// allow every non-sensitive key. The waiver is an argument of this one call, never state on the
+    /// session, so it cannot reach any other request.
+    /// </para>
     /// </remarks>
-    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes, CKO? objectClass)
+    private ReadOnlyDisposableList<ObjectAttribute> BuildSecureKeyDefaults(List<ObjectAttribute>? attributes, CKO? objectClass, KeyMaterialExportKind? export = null)
     {
-        EnforceKeyTemplate(attributes, objectClass);
+        if (export is null)
+            EnforceKeyTemplate(attributes, objectClass);
 
         bool hasSensitive = attributes?.Any(a => a.Type == CKA.CKA_SENSITIVE) ?? false;
         bool hasExtractable = attributes?.Any(a => a.Type == CKA.CKA_EXTRACTABLE) ?? false;
@@ -3139,8 +3166,9 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="mechanism">Derivation mechanism</param>
     /// <param name="baseKeyHandle">Handle of base key</param>
     /// <param name="attributes">Attributes for the new key</param>
+    /// <param name="export">Set only by <see cref="SecretExport"/>: see <see cref="BuildSecureKeyDefaults"/>.</param>
     /// <returns>Handle of derived key</returns>
-    public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes)
+    public ObjectHandle DeriveKey(Mechanism mechanism, ObjectHandle baseKeyHandle, List<ObjectAttribute> attributes, KeyMaterialExportKind? export = null)
     {
         using var _ = AcquireExclusive();
 
@@ -3154,7 +3182,7 @@ internal sealed class Pkcs11Session : IDisposable
                 "CKM_HKDF_DATA creates a data object holding the KDF output in the clear, not a key. " +
                 "Derive a key with CKM_HKDF_DERIVE instead.", nameof(mechanism));
 
-        Enforce(mechanism, CryptoOperation.Derive);
+        Enforce(mechanism, CryptoOperation.Derive, export);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
 
         // SP 800-108 can derive additional sibling keys in the same call, each from its own template.
@@ -3172,7 +3200,7 @@ internal sealed class Pkcs11Session : IDisposable
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
         // value requires a policy that permits it (throws otherwise). See BuildSecureKeyDefaults. Trusted internal
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(attributes, null, export);
         CK_ATTRIBUTE[]? template = BuildTemplateWithDefaults(attributes, secureDefaults);
 
         NativeCULong derivedKey = (NativeCULong)CK.CK_INVALID_HANDLE;
@@ -3293,20 +3321,22 @@ internal sealed class Pkcs11Session : IDisposable
     /// side-effectful encapsulation per call, so a probe would both fail to report the size and leak an
     /// extra shared-secret object. When 0, the two-call probe is used (caller does not know the size).
     /// </param>
+    /// <param name="export">Set only by <see cref="SecretExport"/>: see <see cref="BuildSecureKeyDefaults"/>.</param>
     /// <returns>Tuple of (ciphertext, sharedKeyHandle).</returns>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>
     public (byte[] Ciphertext, ObjectHandle SharedKey) EncapsulateKey(
         Mechanism mechanism,
         ObjectHandle encapsulatingPublicKey,
         List<ObjectAttribute> sharedKeyTemplate,
-        int expectedCiphertextLen = 0)
+        int expectedCiphertextLen = 0,
+        KeyMaterialExportKind? export = null)
     {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
 
-        Enforce(mechanism, CryptoOperation.Encapsulate);
+        Enforce(mechanism, CryptoOperation.Encapsulate, export);
         EnforceKeyAgreementKey(mechanism, encapsulatingPublicKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
@@ -3317,7 +3347,7 @@ internal sealed class Pkcs11Session : IDisposable
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null, export);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < sharedKeyTemplate.Count; i++)
@@ -3391,19 +3421,25 @@ internal sealed class Pkcs11Session : IDisposable
     /// <paramref name="decapsulatingPrivateKey"/> (typically an ML-KEM private key)
     /// (PKCS#11 v3.2 §5.18.11).
     /// </summary>
+    /// <param name="mechanism">Decapsulation mechanism (e.g. <see cref="CKM.CKM_ML_KEM"/>).</param>
+    /// <param name="decapsulatingPrivateKey">Handle of the private key to decapsulate with.</param>
+    /// <param name="ciphertext">The ciphertext produced by the encapsulating party.</param>
+    /// <param name="sharedKeyTemplate">Template applied to the recovered shared-secret key.</param>
+    /// <param name="export">Set only by <see cref="SecretExport"/>: see <see cref="BuildSecureKeyDefaults"/>.</param>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries.</exception>
     public ObjectHandle DecapsulateKey(
         Mechanism mechanism,
         ObjectHandle decapsulatingPrivateKey,
         ReadOnlySpan<byte> ciphertext,
-        List<ObjectAttribute> sharedKeyTemplate)
+        List<ObjectAttribute> sharedKeyTemplate,
+        KeyMaterialExportKind? export = null)
     {
         using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedKeyTemplate);
 
-        Enforce(mechanism, CryptoOperation.Decapsulate);
+        Enforce(mechanism, CryptoOperation.Decapsulate, export);
         EnforceKeyAgreementKey(mechanism, decapsulatingPrivateKey);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
@@ -3414,7 +3450,7 @@ internal sealed class Pkcs11Session : IDisposable
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
         // insecure value requires a policy that permits it. See BuildSecureKeyDefaults.
-        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null);
+        using ReadOnlyDisposableList<ObjectAttribute> secureDefaults = BuildSecureKeyDefaults(sharedKeyTemplate, null, export);
         CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[sharedKeyTemplate.Count + secureDefaults.Count];
         int idx = 0;
         for (int i = 0; i < sharedKeyTemplate.Count; i++)

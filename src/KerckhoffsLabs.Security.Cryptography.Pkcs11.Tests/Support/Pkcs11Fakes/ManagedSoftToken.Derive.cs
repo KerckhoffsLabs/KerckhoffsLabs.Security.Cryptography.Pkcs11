@@ -50,6 +50,38 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
+    // CKM_PKCS5_PBKD2 (PKCS#5 v2.1 / RFC 8018) over the BCL, from CK_PKCS5_PBKD2_PARAMS2 with a
+    // specified salt — the only shape the wrapper emits.
+    private static bool TryDerivePbkdf2(ref CK_MECHANISM mech, int length, out byte[] derived)
+    {
+        derived = [];
+        var p = UnmanagedMemory.Read<CK_PKCS5_PBKD2_PARAMS2>(mech.Parameter);
+        if ((ulong)p.SaltSource != CKZ.CKZ_SALT_SPECIFIED)
+            return false;
+        HashAlgorithmName hash;
+        switch ((CKP)(ulong)p.Prf)
+        {
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA1: hash = HashAlgorithmName.SHA1; break;
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA256: hash = HashAlgorithmName.SHA256; break;
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA384: hash = HashAlgorithmName.SHA384; break;
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA512: hash = HashAlgorithmName.SHA512; break;
+            default: return false;
+        }
+
+        // An empty buffer marshals as a NULL pointer.
+        byte[] password = (ulong)p.PasswordLen == 0 ? [] : UnmanagedMemory.Read(p.Password, (int)p.PasswordLen);
+        byte[] salt = (ulong)p.SaltSourceDataLen == 0 ? [] : UnmanagedMemory.Read(p.SaltSourceData, (int)p.SaltSourceDataLen);
+        try
+        {
+            derived = Rfc2898DeriveBytes.Pbkdf2(password, salt, (int)(ulong)p.Iterations, hash, length);
+            return true;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(password);
+        }
+    }
+
     // CKM_ECDH1_DERIVE with CKD_NULL: the raw shared secret Z (x-coordinate) is the keying material.
     private static byte[] DeriveEcdh(ECDsa baseEc, ref CK_MECHANISM mech, int valueLen)
     {

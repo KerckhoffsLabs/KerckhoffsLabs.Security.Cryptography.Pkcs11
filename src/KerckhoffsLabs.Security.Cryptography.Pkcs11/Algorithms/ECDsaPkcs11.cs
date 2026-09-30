@@ -65,20 +65,14 @@ public sealed class ECDsaPkcs11 : ECDsa
     {
         try
         {
-            using var attrs = key.GetAttributeValue(CKA.CKA_EC_PARAMS);
-            if (attrs.Count > 0 && !attrs[0].CannotBeRead)
-                return Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()).FieldSizeBits;
+            return key.GetEcCurve().FieldSizeBits;
         }
-        catch (Pkcs11Exception)
+        catch (Exception ex) when (ex is CryptographicException or Pkcs11Exception)
         {
-            // Token doesn't expose CKA_EC_PARAMS — leave KeySize at the ECDsa base-class default.
+            // CKA_EC_PARAMS is not exposed, or not a named-curve OID — leave KeySize at the ECDsa
+            // base-class default.
+            return null;
         }
-        catch (ArgumentException)
-        {
-            // CKA_EC_PARAMS wasn't a DER-encoded named-curve OID.
-        }
-
-        return null;
     }
 
     // -----------------------------------------------------------------------
@@ -128,7 +122,7 @@ public sealed class ECDsaPkcs11 : ECDsa
         HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
         {
             return _key.Verify(combined, data, signature);
         }
@@ -241,7 +235,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.EcdsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
             return _key.Sign(combined, data);
         byte[] hash = HashData(hashAlgorithm, data, CryptoOperation.Sign);
         var raw = new Mechanism(CKM.CKM_ECDSA);
@@ -257,7 +251,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     // Stream verification overload) with Verify. SignHash / VerifyHash(byte[]) take
     // caller-supplied digest bytes and cannot know the algorithm, so they are outside this gate.
     private void GuardWeakHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
-        => _key.Workspace.Enforce(new HashUseRequest(hashAlgorithm, operation));
+        => _key.Workspace.EnsurePermitted(new HashUseRequest(hashAlgorithm, operation));
 
     /// <inheritdoc/>
     protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
@@ -300,25 +294,17 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
-    /// <exception cref="Pkcs11Exception">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) is sensitive, cannot be read from any available handle, or cannot be parsed as a named-curve uncompressed point.</exception>
+    /// <exception cref="CryptographicException">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) cannot be read from any available handle, or cannot be parsed as a named-curve uncompressed point.</exception>
     public override ECParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one
-        // exists and falls back to the private-key handle otherwise — covering both real key-pair
-        // companions and private-only objects that carry CKA_EC_POINT / CKA_EC_PARAMS.
-        using var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
-        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS not readable from any available handle)");
-
-        var ec = Pkcs11PublicKeyView.TryParseEcPublicKey(
-            attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
-        return ec ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
-            "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be parsed as a named-curve uncompressed point)");
+        // Reads the public-key handle when one exists and falls back to the private-key handle
+        // otherwise — covering both real key-pair companions and private-only objects that carry
+        // CKA_EC_POINT / CKA_EC_PARAMS.
+        return _key.ExportEcPublicParameters();
     }
 
     /// <inheritdoc/>
