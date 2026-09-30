@@ -27,8 +27,7 @@ public sealed record MechanismUseRequest(Mechanism Mechanism, CryptoOperation Op
 {
     internal override string Describe() => $"{MechanismNames.Describe(Mechanism.Type)} for {Operation}";
 
-    // A type wider than 32 bits (CK_ULONG is 64-bit on most Unix platforms) has no CKM value.
-    internal override CKM? MechanismType => Mechanism.Type <= uint.MaxValue ? (CKM)Mechanism.Type : null;
+    internal override CKM? MechanismType => Mechanism.Type;
 }
 
 /// <summary>A hash chosen by a managed adapter that pre-hashes before a raw on-token signature.</summary>
@@ -42,7 +41,7 @@ public sealed record HashUseRequest(HashAlgorithmName Hash, CryptoOperation Oper
 /// <summary>RSA key-pair generation with a given modulus size.</summary>
 /// <param name="Mechanism">The key-pair generation mechanism.</param>
 /// <param name="ModulusBits">The requested <c>CKA_MODULUS_BITS</c>.</param>
-public sealed record RsaKeyGenerationRequest(CKM Mechanism, ulong ModulusBits) : PolicyRequest
+public sealed record RsaKeyGenerationRequest(CKM Mechanism, int ModulusBits) : PolicyRequest
 {
     internal override string Describe() => $"RSA-{ModulusBits} key generation ({Mechanism})";
     internal override CKM? MechanismType => Mechanism;

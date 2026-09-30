@@ -54,8 +54,8 @@ public abstract class Pkcs11Exception(CKR returnValue, string method, string? me
     private static string FormatReturnValue(CKR returnValue) => returnValue switch
     {
         _ when Enum.IsDefined(returnValue) => returnValue.ToString(),
-        >= CKR.CKR_VENDOR_DEFINED => $"vendor-defined CKR 0x{(uint)returnValue:X8}",
-        _ => $"unrecognized CKR 0x{(uint)returnValue:X8}",
+        >= CKR.CKR_VENDOR_DEFINED => $"vendor-defined CKR 0x{(ulong)returnValue:X8}",
+        _ => $"unrecognized CKR 0x{(ulong)returnValue:X8}",
     };
 
     /// <summary>

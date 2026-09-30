@@ -22,5 +22,5 @@ public sealed class CkmXeddsaParams : MechanismParameters
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
-        => new CK_XEDDSA_PARAMS { Hash = (NativeCULong)(ulong)_hashType };
+        => new CK_XEDDSA_PARAMS { Hash = CkULong.From((ulong)_hashType, "hashType") };
 }

@@ -27,7 +27,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 {
     private readonly byte[] _salt;
-    private readonly ulong _iterations;
+    private readonly int _iterations;
     private readonly CKP _prf;
     private readonly byte[] _prfData;
     private readonly byte[]? _password;
@@ -42,7 +42,8 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="prf">Pseudo-random function used to generate the key.</param>
     /// <param name="password">Password to derive the key from. May be empty.</param>
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
-    public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, ReadOnlySpan<byte> password, ReadOnlySpan<byte> prfData = default)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="iterations"/> is negative.</exception>
+    public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, int iterations, CKP prf, ReadOnlySpan<byte> password, ReadOnlySpan<byte> prfData = default)
         : this(prf, iterations, salt, prfData)
     {
         _password = GC.AllocateArray<byte>(password.Length, pinned: true);
@@ -64,7 +65,8 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="password">Password to derive the key from. Borrowed, not owned.</param>
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
     /// <exception cref="ArgumentNullException"><paramref name="password"/> is <see langword="null"/>.</exception>
-    public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, SecurePassword password, ReadOnlySpan<byte> prfData = default)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="iterations"/> is negative.</exception>
+    public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, int iterations, CKP prf, SecurePassword password, ReadOnlySpan<byte> prfData = default)
         : this(prf, iterations, salt, prfData)
     {
         ArgumentNullException.ThrowIfNull(password);
@@ -73,8 +75,9 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 
     // The fields every constructor sets. The PRF leads so this signature cannot be mistaken for the
     // public span constructor's.
-    private CkmPkcs5Pbkd2Params(CKP prf, ulong iterations, ReadOnlySpan<byte> salt, ReadOnlySpan<byte> prfData)
+    private CkmPkcs5Pbkd2Params(CKP prf, int iterations, ReadOnlySpan<byte> salt, ReadOnlySpan<byte> prfData)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(iterations);
         _salt = salt.ToArray();
         _iterations = iterations;
         _prf = prf;
@@ -95,8 +98,8 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
             SaltSource = (NativeCULong)CKZ.CKZ_SALT_SPECIFIED,
             SaltSourceData = scope.Write(_salt),
             SaltSourceDataLen = (NativeCULong)_salt.Length,
-            Iterations = (NativeCULong)_iterations,
-            Prf = _prf.ToCULong(),
+            Iterations = (NativeCULong)(ulong)_iterations,
+            Prf = _prf.ToCULong("prf"),
             PrfData = scope.Write(_prfData),
             PrfDataLen = (NativeCULong)_prfData.Length,
             Password = scope.Write(password),

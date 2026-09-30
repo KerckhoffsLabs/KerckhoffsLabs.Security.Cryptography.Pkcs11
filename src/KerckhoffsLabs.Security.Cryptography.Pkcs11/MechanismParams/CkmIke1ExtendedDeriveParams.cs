@@ -38,7 +38,7 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     {
         return new CK_IKE1_EXTENDED_DERIVE_PARAMS
         {
-            PrfMechanism = _prfMechanism.ToCULong(),
+            PrfMechanism = _prfMechanism.ToCULong("prfMechanism"),
             HasKeygxy = _keygxy is not null,
             Keygxy = _keygxy is null ? default : scope.KeyHandle(_keygxy, KeyHandlePart.Private, "keygxy"),
             ExtraData = scope.Write(_extraDataBytes),

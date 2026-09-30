@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// functions), which shares the <c>CKP_</c> prefix in the C headers but occupies a separate value
 /// space.
 /// </summary>
-public enum CkpProfile : uint
+public enum CkpProfile : ulong
 {
     /// <summary>No profile / unset (<c>CKP_INVALID_ID</c>).</summary>
     CKP_INVALID_ID = 0x00000000,

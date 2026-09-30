@@ -220,8 +220,7 @@ internal sealed class Pkcs11Session : IDisposable
         // The KDF an ECDH derivation or KEM applies to the shared secret is judged here, on every call
         // carrying CK_ECDH1_DERIVE_PARAMS, whichever public entry point it came through.
         if (mechanism.Parameters is CkmEcdh1DeriveParams ecdh)
-            Enforce(new KeyAgreementKdfRequest(
-                mechanism.Type <= uint.MaxValue ? (CKM)mechanism.Type : CKM.CKM_VENDOR_DEFINED, ecdh.Kdf));
+            Enforce(new KeyAgreementKdfRequest(mechanism.Type, ecdh.Kdf));
     }
 
     /// <summary>
@@ -1060,7 +1059,7 @@ internal sealed class Pkcs11Session : IDisposable
         int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
 
         if ((int)(parent.valueLen) % ckAttributeSize != 0)
-            throw Pkcs11AttributeException.For((ulong)parent.type);
+            throw new Pkcs11AttributeException((CKA)(ulong)parent.type);
 
         int nestedAttrCount = (int)(parent.valueLen) / ckAttributeSize;
         if (nestedAttrCount == 0)
@@ -1123,7 +1122,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (attribute.valueLen <= allocated)
             return;
 
-        throw Pkcs11AttributeException.For((ulong)attribute.type,
+        throw new Pkcs11AttributeException((CKA)(ulong)attribute.type,
             $"The PKCS#11 module reported attribute 0x{(ulong)attribute.type:X} as "
             + $"{(ulong)attribute.valueLen} bytes after being given a {(ulong)allocated}-byte buffer "
             + "sized from its own earlier answer. Reading the value at the reported length would read "
@@ -1354,22 +1353,22 @@ internal sealed class Pkcs11Session : IDisposable
 
         Enforce(mechanism, CryptoOperation.GenerateKeyPair);
 
-        if (mechanism.Type is (ulong)CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or (ulong)CKM.CKM_RSA_X9_31_KEY_PAIR_GEN)
+        if (mechanism.Type is CKM.CKM_RSA_PKCS_KEY_PAIR_GEN or CKM.CKM_RSA_X9_31_KEY_PAIR_GEN)
         {
             // Only the first CKA_MODULUS_BITS is consulted: a template carrying two is malformed, and
             // which one the token would honour is not ours to decide.
             ObjectAttribute? modulusBits =
-                publicKeyAttributes.FirstOrDefault(a => (CKA)a.Type == CKA.CKA_MODULUS_BITS);
+                publicKeyAttributes.FirstOrDefault(a => a.Type == CKA.CKA_MODULUS_BITS);
             if (modulusBits is not null)
-                Enforce(new RsaKeyGenerationRequest((CKM)mechanism.Type, modulusBits.GetValueAsUlong()));
+                Enforce(new RsaKeyGenerationRequest(mechanism.Type, ModulusBitsOf(modulusBits)));
         }
-        else if (mechanism.Type == (ulong)CKM.CKM_EC_KEY_PAIR_GEN)
+        else if (mechanism.Type == CKM.CKM_EC_KEY_PAIR_GEN)
         {
             // Every EC key-pair generation meets the curve allow-list here, whichever public entry point
             // it came through. As for the modulus above, only the first CKA_EC_PARAMS is consulted; with
             // none there is no curve to judge and the token rejects the incomplete template itself.
             ObjectAttribute? ecParams =
-                publicKeyAttributes.FirstOrDefault(a => (CKA)a.Type == CKA.CKA_EC_PARAMS);
+                publicKeyAttributes.FirstOrDefault(a => a.Type == CKA.CKA_EC_PARAMS);
             if (ecParams is not null)
                 Enforce(new EcKeyGenerationRequest(CurveOf(ecParams)));
         }
@@ -1440,7 +1439,7 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
-        byte[]? wrappedKey = mechanism.Type == (ulong)CKM.CKM_AES_KEY_WRAP_KWP
+        byte[]? wrappedKey = mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
             ? TryWrapKeyKwp(ref ckMechanism, wrappingKeyHandle, keyHandle)
             : null;
 
@@ -1572,7 +1571,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// </remarks>
     private void EnforceKeyAgreementKey(Mechanism mechanism, ObjectHandle key)
     {
-        if (mechanism.Type is not ((ulong)CKM.CKM_ECDH1_DERIVE or (ulong)CKM.CKM_ECDH1_COFACTOR_DERIVE))
+        if (mechanism.Type is not (CKM.CKM_ECDH1_DERIVE or CKM.CKM_ECDH1_COFACTOR_DERIVE))
             return;
 
         CKK keyType;
@@ -1581,15 +1580,22 @@ internal sealed class Pkcs11Session : IDisposable
             using ReadOnlyDisposableList<ObjectAttribute> attrs = GetAttributeValue(key, [CKA.CKA_KEY_TYPE]);
             if (attrs[0].CannotBeRead)
                 return;
-            ulong raw = attrs[0].GetValueAsUlong();
-            keyType = raw <= uint.MaxValue ? (CKK)raw : CKK.CKK_VENDOR_DEFINED;
+            keyType = (CKK)attrs[0].GetValueAsUlong();
         }
         catch (Exception ex) when (ex is Pkcs11Exception or Pkcs11AttributeException)
         {
             return;
         }
 
-        Enforce(new KeyAgreementKeyRequest((CKM)mechanism.Type, keyType));
+        Enforce(new KeyAgreementKeyRequest(mechanism.Type, keyType));
+    }
+
+    // A modulus length is judged as an int. One beyond int.MaxValue is not a key any token can make; it
+    // is reported as int.MaxValue, which every policy's minimum allows, so the token refuses it itself.
+    private static int ModulusBitsOf(ObjectAttribute modulusBits)
+    {
+        ulong bits = modulusBits.GetValueAsUlong();
+        return bits > int.MaxValue ? int.MaxValue : (int)bits;
     }
 
     private static Pkcs11ECCurve CurveOf(ObjectAttribute ecParams)
@@ -1630,8 +1636,8 @@ internal sealed class Pkcs11Session : IDisposable
     {
         EnforceKeyTemplate(attributes, objectClass);
 
-        bool hasSensitive = attributes?.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE) ?? false;
-        bool hasExtractable = attributes?.Any(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE) ?? false;
+        bool hasSensitive = attributes?.Any(a => a.Type == CKA.CKA_SENSITIVE) ?? false;
+        bool hasExtractable = attributes?.Any(a => a.Type == CKA.CKA_EXTRACTABLE) ?? false;
 
         List<ObjectAttribute> added = [];
         if (!hasSensitive)

@@ -75,7 +75,7 @@ internal sealed partial class FipsOnlyPolicy
             : PolicyDecision.Allow;
 
     private static PolicyDecision EvaluateKeyTemplate(KeyTemplateRequest r) =>
-        r.Attributes.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE && !a.GetValueAsBool())
+        r.Attributes.Any(a => a.Type == CKA.CKA_SENSITIVE && !a.GetValueAsBool())
             ? PolicyDecision.Deny("FIPS 140-3 (ISO/IEC 19790 §7.9): CSPs must not be output in plaintext; CKA_SENSITIVE=false is refused.")
             : PolicyDecision.Allow;
 

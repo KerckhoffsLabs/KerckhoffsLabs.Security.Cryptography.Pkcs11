@@ -71,7 +71,7 @@ public sealed partial class SecureOnlyPolicy
     // what CKA_SENSITIVE governs and what this refuses. Non-extractable remains the default: the session's
     // secure key defaults set CKA_EXTRACTABLE to false when the caller says nothing.
     private static PolicyDecision EvaluateKeyTemplate(KeyTemplateRequest r) =>
-        r.Attributes.Any(a => a.Type == (ulong)CKA.CKA_SENSITIVE && !a.GetValueAsBool())
+        r.Attributes.Any(a => a.Type == CKA.CKA_SENSITIVE && !a.GetValueAsBool())
             ? PolicyDecision.Deny("Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token.")
             : PolicyDecision.Allow;
 

@@ -34,14 +34,17 @@ public sealed class ObjectAttribute : IDisposable
 
     // --- Public read surface -------------------------------------------------
 
-    /// <summary>Attribute type (raw, e.g. 0x00000000 for CKA_CLASS).</summary>
+    /// <summary>
+    /// Attribute type. A vendor-defined or newer-than-this-library type names no <see cref="CKA"/>
+    /// member but is carried exactly.
+    /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    public ulong Type
+    public CKA Type
     {
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            return (ulong)_ckAttribute.type;
+            return (CKA)(ulong)_ckAttribute.type;
         }
     }
 
@@ -111,78 +114,78 @@ public sealed class ObjectAttribute : IDisposable
             GC.SuppressFinalize(this);
     }
 
-    /// <summary>Creates an attribute of the given vendor-defined attribute id with no value.</summary>
-    public ObjectAttribute(ulong type) { _ckAttribute = CreateAttribute((NativeCULong)type, []); }
-    /// <summary>Creates an attribute of the given <see cref="CKA"/> type with no value.</summary>
-    public ObjectAttribute(CKA type) : this((ulong)type) { }
+    // One constructor per value shape. A vendor-defined attribute is a CKA value too: CKA is ulong-backed
+    // like CK_ATTRIBUTE_TYPE, so (CKA)0x80000123 names it without loss. Every constructor refuses, with
+    // ArgumentOutOfRangeException, a type or CK_ULONG value wider than this platform's CK_ULONG (32 bits
+    // on Windows) instead of truncating it.
 
-    /// <summary>Creates a vendor-defined-id attribute holding a <see cref="ulong"/> value (encoded as CK_ULONG on the wire).</summary>
-    public ObjectAttribute(ulong type, ulong value)
+    /// <summary>Creates an attribute of the given type with no value.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type) { _ckAttribute = CreateAttribute(type.ToCULong(), []); }
+
+    /// <summary>Creates an attribute holding a <c>CK_ULONG</c> value.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, ulong value)
     {
-        Span<byte> buf = stackalloc byte[sizeof(ulong)];
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(buf, value);
-        _ckAttribute = CreateAttribute((NativeCULong)type, buf[..UnmanagedMemory.NativeULongSize]);
+        Span<byte> buf = stackalloc byte[UnmanagedMemory.NativeULongSize];
+        WriteCULong(buf, value, nameof(value));
+        _ckAttribute = CreateAttribute(type.ToCULong(), buf);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="ulong"/> value (encoded as CK_ULONG on the wire).</summary>
-    public ObjectAttribute(CKA type, ulong value) : this((ulong)type, value) { }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="CKC"/> enum value.</summary>
-    public ObjectAttribute(CKA type, CKC value) : this((ulong)type, (ulong)value) { }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="CKK"/> enum value.</summary>
-    public ObjectAttribute(CKA type, CKK value) : this((ulong)type, (ulong)value) { }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a <see cref="CKO"/> enum value.</summary>
-    public ObjectAttribute(CKA type, CKO value) : this((ulong)type, (ulong)value) { }
+    /// <summary>Creates an attribute holding a <see cref="CKC"/> value.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, CKC value) : this(type, (ulong)value) { }
+    /// <summary>Creates an attribute holding a <see cref="CKK"/> value.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, CKK value) : this(type, (ulong)value) { }
+    /// <summary>Creates an attribute holding a <see cref="CKO"/> value.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, CKO value) : this(type, (ulong)value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
-    public ObjectAttribute(ulong type, bool value)
+    /// <summary>Creates an attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, bool value)
     {
         Span<byte> buf = [value ? (byte)0x01 : (byte)0x00];
-        _ckAttribute = CreateAttribute((NativeCULong)type, buf);
+        _ckAttribute = CreateAttribute(type.ToCULong(), buf);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a bool value (encoded as a single byte: 0x01 or 0x00).</summary>
-    public ObjectAttribute(CKA type, bool value) : this((ulong)type, value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding a UTF-8 string with no null terminator.</summary>
+    /// <summary>Creates an attribute holding a UTF-8 string with no null terminator.</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, string value)
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, string value)
     {
         ArgumentNullException.ThrowIfNull(value);
         ReadOnlySpan<byte> bytes = Encoding.UTF8.GetBytes(value); // no null terminator
-        _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
+        _ckAttribute = CreateAttribute(type.ToCULong(), bytes);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a UTF-8 string with no null terminator.</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, string value) : this((ulong)type, value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding the bytes of <paramref name="value"/>.</summary>
-    public ObjectAttribute(ulong type, byte[] value)
-        : this(type, (ReadOnlySpan<byte>)(value ?? [])) { }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding the bytes of <paramref name="value"/>.</summary>
-    public ObjectAttribute(CKA type, byte[] value) : this((ulong)type, value) { }
-
-    /// <summary>Creates a vendor-defined-id attribute holding the bytes of <paramref name="value"/>. Zero-allocation when the caller already holds a span.</summary>
-    public ObjectAttribute(ulong type, ReadOnlySpan<byte> value)
+    /// <summary>
+    /// Creates an attribute holding the bytes of <paramref name="value"/>. A <c>byte[]</c> converts to the
+    /// span implicitly; a <see langword="null"/> array is an empty value.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, ReadOnlySpan<byte> value)
     {
-        _ckAttribute = CreateAttribute((NativeCULong)type, value);
+        _ckAttribute = CreateAttribute(type.ToCULong(), value);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding the bytes of <paramref name="value"/>. Zero-allocation when the caller already holds a span.</summary>
-    public ObjectAttribute(CKA type, ReadOnlySpan<byte> value) : this((ulong)type, value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding a date value (encoded as 8-byte ASCII "yyyyMMdd").</summary>
-    public ObjectAttribute(ulong type, DateTime value)
+    /// <summary>Creates an attribute holding a date value (encoded as 8-byte ASCII "yyyyMMdd").</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, DateTime value)
     {
         // CK_DATE wire format: 8 ASCII bytes "YYYYMMDD"
         string formatted = value.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
         ReadOnlySpan<byte> bytes = Encoding.ASCII.GetBytes(formatted);
-        _ckAttribute = CreateAttribute((NativeCULong)type, bytes);
+        _ckAttribute = CreateAttribute(type.ToCULong(), bytes);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a date value (encoded as 8-byte ASCII "yyyyMMdd").</summary>
-    public ObjectAttribute(CKA type, DateTime value) : this((ulong)type, value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
+    /// <summary>Creates an attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, IReadOnlyList<ObjectAttribute> value)
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, IReadOnlyList<ObjectAttribute> value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        NativeCULong nativeType = type.ToCULong();
         int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         byte[] flat = new byte[stride * value.Count];
         if (value.Count > 0)
@@ -210,57 +213,47 @@ public sealed class ObjectAttribute : IDisposable
                 UnmanagedMemory.Free(ref scratch);
             }
         }
-        _ckAttribute = CreateAttribute((NativeCULong)type, flat);
+        _ckAttribute = CreateAttribute(nativeType, flat);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, IReadOnlyList<ObjectAttribute> value) : this((ulong)type, value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
+    /// <summary>Creates an attribute holding a list of <c>CK_ULONG</c> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, IReadOnlyList<ulong> value)
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or an element of <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, IReadOnlyList<ulong> value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        NativeCULong nativeType = type.ToCULong();
         int stride = UnmanagedMemory.NativeULongSize;
         byte[] flat = new byte[stride * value.Count];
-        Span<byte> dest = flat;
         for (int i = 0; i < value.Count; i++)
-        {
-            // PKCS#11 uses CK_ULONG (NativeCULong) for these lists — 4 bytes on Windows, 8 on Unix-x64.
-            // We always write the low 32 bits little-endian when stride==4, otherwise 64 bits.
-            if (stride == 4)
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(i * stride, 4), checked((uint)value[i]));
-            else
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), value[i]);
-        }
-        _ckAttribute = CreateAttribute((NativeCULong)type, flat);
+            WriteCULong(flat.AsSpan(i * stride, stride), value[i], nameof(value));
+        _ckAttribute = CreateAttribute(nativeType, flat);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="ulong"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, IReadOnlyList<ulong> value) : this((ulong)type, value) { }
 
-    /// <summary>Creates a vendor-defined-id attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
+    /// <summary>Creates an attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(ulong type, IReadOnlyList<CKM> value)
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or an element of <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    public ObjectAttribute(CKA type, IReadOnlyList<CKM> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        // Writes directly from value[i] — no intermediate List<ulong> conversion pass needed.
+        NativeCULong nativeType = type.ToCULong();
         int stride = UnmanagedMemory.NativeULongSize;
         byte[] flat = new byte[stride * value.Count];
-        Span<byte> dest = flat;
         for (int i = 0; i < value.Count; i++)
-        {
-            ulong u = (ulong)value[i];
-            if (stride == 4)
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(i * stride, 4), checked((uint)u));
-            else
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(i * stride, 8), u);
-        }
-        _ckAttribute = CreateAttribute((NativeCULong)type, flat);
+            WriteCULong(flat.AsSpan(i * stride, stride), (ulong)value[i], nameof(value));
+        _ckAttribute = CreateAttribute(nativeType, flat);
     }
-    /// <summary>Creates a <see cref="CKA"/>-typed attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
-    public ObjectAttribute(CKA type, IReadOnlyList<CKM> value) : this((ulong)type, value) { }
+
+    // Writes one CK_ULONG at the platform's width (4 bytes on Windows, 8 on 64-bit Unix), little-endian,
+    // after CkULong.From has refused a value that does not fit.
+    private static void WriteCULong(Span<byte> destination, ulong value, string paramName)
+    {
+        _ = CkULong.From(value, paramName);
+        if (destination.Length == sizeof(uint))
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(destination, (uint)value);
+        else
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(destination, value);
+    }
 
     // --- Read-back -----------------------------------------------------------
 
@@ -270,9 +263,9 @@ public sealed class ObjectAttribute : IDisposable
     public bool GetValueAsBool()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         if ((int)_ckAttribute.valueLen != 1)
-            throw Pkcs11AttributeException.For(Type);
+            throw new Pkcs11AttributeException(Type);
         byte b = Marshal.ReadByte(_ckAttribute.value);
         return b != 0;
     }
@@ -283,10 +276,10 @@ public sealed class ObjectAttribute : IDisposable
     public ulong GetValueAsUlong()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int len = (int)_ckAttribute.valueLen;
         if (len != UnmanagedMemory.NativeULongSize)
-            throw Pkcs11AttributeException.For(Type);
+            throw new Pkcs11AttributeException(Type);
         Span<byte> tmp = stackalloc byte[8];
         UnmanagedMemory.Read(_ckAttribute.value, tmp[..len]);
         return len == 4
@@ -300,7 +293,7 @@ public sealed class ObjectAttribute : IDisposable
     public string GetValueAsString()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int len = (int)_ckAttribute.valueLen;
         if (len == 0) return string.Empty;
         byte[] buf = new byte[len];
@@ -314,7 +307,7 @@ public sealed class ObjectAttribute : IDisposable
     public byte[] GetValueAsByteArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int len = (int)_ckAttribute.valueLen;
         byte[] buf = new byte[len];
         if (len > 0) UnmanagedMemory.Read(_ckAttribute.value, buf);
@@ -332,7 +325,7 @@ public sealed class ObjectAttribute : IDisposable
     public int CopyValueTo(Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int len = (int)_ckAttribute.valueLen;
         if (destination.Length < len)
             throw new ArgumentException($"Destination too small: needs {len} bytes, got {destination.Length}.", nameof(destination));
@@ -346,10 +339,10 @@ public sealed class ObjectAttribute : IDisposable
     public DateTime? GetValueAsDateTime()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int len = (int)_ckAttribute.valueLen;
         if (len == 0) return null;
-        if (len != 8) throw Pkcs11AttributeException.For(Type);
+        if (len != 8) throw new Pkcs11AttributeException(Type);
         byte[] buf = new byte[8];
         UnmanagedMemory.Read(_ckAttribute.value, buf);
         string s = Encoding.ASCII.GetString(buf);
@@ -367,12 +360,12 @@ public sealed class ObjectAttribute : IDisposable
     public ObjectAttribute[] GetValueAsAttributeArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int total = (int)_ckAttribute.valueLen;
         int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         int n = total / stride;
         if (total % stride != 0)
-            throw Pkcs11AttributeException.For(Type);
+            throw new Pkcs11AttributeException(Type);
         ObjectAttribute[] result = new ObjectAttribute[n];
         for (int i = 0; i < n; i++)
         {
@@ -391,12 +384,12 @@ public sealed class ObjectAttribute : IDisposable
     public ulong[] GetValueAsUlongArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
+        if (CannotBeRead) throw new Pkcs11AttributeException(Type);
         int stride = UnmanagedMemory.NativeULongSize;
         int total = (int)_ckAttribute.valueLen;
         int n = total / stride;
         if (total % stride != 0)
-            throw Pkcs11AttributeException.For(Type);
+            throw new Pkcs11AttributeException(Type);
         ulong[] result = new ulong[n];
         byte[] buf = new byte[total];
         if (total > 0) UnmanagedMemory.Read(_ckAttribute.value, buf);
@@ -412,24 +405,16 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Reads the value as an array of <see cref="CKM"/> mechanism types (unvalidated cast from <c>CK_ULONG[]</c>).</summary>
     /// <remarks>
-    /// Vendor-defined and not-yet-named mechanisms come back as unnamed <see cref="CKM"/> values. A value
-    /// wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits) cannot be held by <see cref="CKM"/>;
-    /// read such a list with <see cref="GetValueAsUlongArray"/>.
+    /// Vendor-defined and not-yet-named mechanisms come back as unnamed <see cref="CKM"/> values.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable), its length is not a whole multiple of the <c>CK_ULONG</c> size, or it holds a mechanism value wider than <see cref="CKM"/> can represent.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ULONG</c> size.</exception>
     public CKM[] GetValueAsCkmArray()
     {
         ulong[] raw = GetValueAsUlongArray();
         CKM[] result = new CKM[raw.Length];
         for (int i = 0; i < raw.Length; i++)
-        {
-            if (raw[i] > uint.MaxValue)
-                throw Pkcs11AttributeException.For(Type,
-                    $"Value of attribute {Pkcs11AttributeException.Describe(Type)} holds mechanism 0x{raw[i]:X}, which is wider than CKM can " +
-                    "represent. Read it with GetValueAsUlongArray().");
             result[i] = (CKM)raw[i];
-        }
         return result;
     }
 
@@ -465,15 +450,13 @@ public sealed class ObjectAttribute : IDisposable
     {
         if (_disposed) return "ObjectAttribute (disposed)";
 
-        ulong type = (ulong)_ckAttribute.type;
-        string name = type <= uint.MaxValue && Enum.IsDefined((CKA)(uint)type)
-            ? ((CKA)(uint)type).ToString()
-            : $"CKA 0x{type:X8}";
+        var type = (CKA)(ulong)_ckAttribute.type;
+        string name = Pkcs11AttributeException.Describe(type);
 
         if (_ckAttribute.valueLen == NativeCULong.MaxValue) return $"{name} (unavailable)";
 
         int length = (int)_ckAttribute.valueLen;
-        string? value = type <= uint.MaxValue ? DescribeNonSecretValue((CKA)(uint)type, length) : null;
+        string? value = DescribeNonSecretValue(type, length);
         return value is null ? $"{name} ({length} bytes)" : $"{name} = {value}";
     }
 
@@ -502,12 +485,8 @@ public sealed class ObjectAttribute : IDisposable
 
     private static string NameOrHex<TEnum>(ulong value) where TEnum : struct, Enum
     {
-        if (value <= uint.MaxValue)
-        {
-            var named = (TEnum)Enum.ToObject(typeof(TEnum), value);
-            if (Enum.IsDefined(named)) return named.ToString();
-        }
-        return $"0x{value:X}";
+        var named = (TEnum)Enum.ToObject(typeof(TEnum), value);
+        return Enum.IsDefined(named) ? named.ToString() : $"0x{value:X}";
     }
 
     // --- IDisposable ---------------------------------------------------------

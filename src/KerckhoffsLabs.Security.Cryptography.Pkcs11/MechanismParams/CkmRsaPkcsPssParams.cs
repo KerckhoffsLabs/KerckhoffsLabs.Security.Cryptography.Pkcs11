@@ -35,8 +35,8 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     {
         return new CK_RSA_PKCS_PSS_PARAMS
         {
-            HashAlg = _hashAlg.ToCULong(),
-            Mgf = _mgf.ToCULong(),
+            HashAlg = _hashAlg.ToCULong("hashAlg"),
+            Mgf = _mgf.ToCULong("mgf"),
             Len = (NativeCULong)_saltLength,
         };
     }

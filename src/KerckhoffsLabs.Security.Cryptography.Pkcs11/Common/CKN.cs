@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Notifications
 /// </summary>
-public enum CKN : uint
+public enum CKN : ulong
 {
     /// <summary>
     /// Cryptoki is surrendering the execution of a function executing in a session so that the application may perform other operations
@@ -22,5 +24,6 @@ public enum CKN : uint
 internal static class CKNExtensions
 {
     /// <summary>Converts <see cref="CKN"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKN value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKN value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

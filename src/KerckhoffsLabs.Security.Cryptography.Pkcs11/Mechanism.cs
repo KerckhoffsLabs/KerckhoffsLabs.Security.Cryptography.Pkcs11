@@ -16,9 +16,8 @@ public sealed class Mechanism
     private readonly NativeCULong _type;
 
     /// <summary>
-    /// The raw parameter block for the <c>byte[]</c> and <c>ReadOnlySpan&lt;byte&gt;</c> constructors,
-    /// copied into the call scope by <see cref="Marshal"/>. <see langword="null"/> for every other
-    /// constructor.
+    /// The raw parameter block for the <c>ReadOnlySpan&lt;byte&gt;</c> constructor, copied into the
+    /// call scope by <see cref="Marshal"/>. <see langword="null"/> for every other constructor.
     /// </summary>
     private readonly byte[]? _rawParameter;
 
@@ -27,15 +26,16 @@ public sealed class Mechanism
     /// </summary>
     private readonly MechanismParameters? _mechanismParams = null;
 
-    // The constructors form two blocks. The CKM-typed block below is the ordinary API and carries the
-    // documentation; the ulong-typed block after it is the vendor escape hatch and inherits it. Within
-    // each block they run from least to most raw — no parameter, then a typed descriptor, then a block
-    // of bytes the caller laid out — which is also the order of preference for reaching for them.
+    // The constructors run from least to most raw — no parameter, then a typed descriptor, then a block
+    // of bytes the caller laid out — which is also the order of preference for reaching for them. A
+    // vendor mechanism is a CKM value too: CKM is ulong-backed like CK_MECHANISM_TYPE, so
+    // (CKM)0x80001234 names it without any loss.
 
     /// <summary>
     /// Creates mechanism of given type with no parameter
     /// </summary>
-    /// <param name="type">Mechanism type</param>
+    /// <param name="type">Mechanism type. A vendor mechanism is passed as its value cast to <see cref="CKM"/>.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c> (32 bits on Windows).</exception>
     public Mechanism(CKM type) => _type = type.ToCULong();
 
     /// <summary>
@@ -46,9 +46,10 @@ public sealed class Mechanism
     /// keeps a reference to it: each native call marshals it into that call's own scope. Sharing one
     /// parameter instance across several mechanisms is therefore safe.
     /// </remarks>
-    /// <param name="type">Mechanism type</param>
+    /// <param name="type">Mechanism type. A vendor mechanism is passed as its value cast to <see cref="CKM"/>.</param>
     /// <param name="parameter">Mechanism parameter</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c> (32 bits on Windows).</exception>
     public Mechanism(CKM type, MechanismParameters parameter)
     {
         ArgumentNullException.ThrowIfNull(parameter);
@@ -70,113 +71,36 @@ public sealed class Mechanism
     /// the struct's leading field here produces a block the token rejects as malformed.
     /// </para>
     /// <para>
-    /// The span overloads exist for callers that already hold the block as a span — the CBC and CFB
-    /// modes do, on every operation. Taking an array there forced a <c>ToArray()</c> at the call site
-    /// purely to satisfy the signature, and the constructor's own defensive copy then made that first
-    /// array garbage; one copy is enough.
+    /// A <c>byte[]</c> converts to the span implicitly, so this one overload serves both.
     /// </para>
     /// </remarks>
-    /// <param name="type">Mechanism type</param>
+    /// <param name="type">Mechanism type. A vendor mechanism is passed as its value cast to <see cref="CKM"/>.</param>
     /// <param name="parameter">
     /// Mechanism parameter, copied into the mechanism, so later changes to the caller's buffer are
     /// ignored. An empty parameter marshals as a null <c>pParameter</c> with zero length.
     /// </param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c> (32 bits on Windows).</exception>
     public Mechanism(CKM type, ReadOnlySpan<byte> parameter)
     {
         _type = type.ToCULong();
         _rawParameter = parameter.ToArray();
     }
 
-    /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
-    public Mechanism(CKM type, byte[] parameter)
-    {
-        _type = type.ToCULong();
-        _rawParameter = [.. parameter];
-    }
-
-    // The ulong-typed block: mechanisms outside CKM. Taking the type as a raw value rather than an
-    // invented enum member is the point — casting to CKM would assert the value is one this library
-    // knows, and for a vendor mechanism it is not.
-
-    /// <inheritdoc cref="Mechanism(CKM)"/>
-    public Mechanism(ulong type) => _type = (NativeCULong)type;
-
-    /// <inheritdoc cref="Mechanism(CKM, MechanismParameters)"/>
-    public Mechanism(ulong type, MechanismParameters parameter)
-    {
-        ArgumentNullException.ThrowIfNull(parameter);
-
-        _mechanismParams = parameter;
-        _type = (NativeCULong)type;
-    }
-
-    /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
-    public Mechanism(ulong type, ReadOnlySpan<byte> parameter)
-    {
-        _type = (NativeCULong)type;
-        _rawParameter = parameter.ToArray();
-    }
-
-    /// <inheritdoc cref="Mechanism(CKM, ReadOnlySpan{byte})"/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="parameter"/> is <c>null</c>.</exception>
-    public Mechanism(ulong type, byte[] parameter)
-    {
-        _type = (NativeCULong)type;
-        _rawParameter = [.. parameter];
-    }
-
     /// <summary>
-    /// The type of mechanism
+    /// The mechanism type. It may be vendor-defined (see <see cref="IsVendorDefined"/>) or newer than
+    /// this library, in which case it names no <see cref="CKM"/> member; <c>Enum.IsDefined</c> tells
+    /// the two apart.
     /// </summary>
-    public ulong Type => (ulong)_type;
+    public CKM Type => (CKM)(ulong)_type;
 
     /// <summary>
     /// Whether the mechanism type is vendor-defined (<c>≥ CKM_VENDOR_DEFINED</c>, <c>0x80000000</c>).
     /// </summary>
     /// <remarks>
-    /// This is the question that decides whether a <see cref="CKM"/> view of <see cref="Type"/> means
-    /// anything: a vendor value is outside the range the enum names, so it can be cast but not
-    /// meaningfully switched on. It answers what the mechanism <i>is</i>, not merely whether this
-    /// library happens to have heard of it — a standard mechanism newer than this enum is not vendor
-    /// defined, and <see cref="TryGetMechanism"/> is the check for that case.
+    /// It answers what the mechanism <i>is</i>, not merely whether this library has heard of it: a
+    /// standard mechanism newer than <see cref="CKM"/> is not vendor-defined, yet names no member.
     /// </remarks>
-    public bool IsVendorDefined => Type >= (ulong)CKM.CKM_VENDOR_DEFINED;
-
-    /// <summary>
-    /// Gets the mechanism as a <see cref="CKM"/> value, reporting whether the enum actually names it.
-    /// </summary>
-    /// <remarks>
-    /// Deliberately not a plain <c>CKM</c> property. A mechanism may be vendor-defined or simply newer
-    /// than this enum, and a property would hand back a value that names nothing while looking
-    /// authoritative — the same unchecked cast callers write today, with the warning removed.
-    /// </remarks>
-    /// <param name="mechanism">
-    /// Receives the mechanism value <b>whether or not the method returns <see langword="true"/></b>.
-    /// This departs from the usual <c>Try</c> convention on purpose: <c>default(CKM)</c> is
-    /// <c>CKM_RSA_PKCS_KEY_PAIR_GEN</c>, a real mechanism, so defaulting on failure would hand a
-    /// caller who ignored the result a plausible but entirely different mechanism. Returning the true
-    /// value costs nothing and cannot mislead. The one value it cannot carry is a vendor mechanism
-    /// wider than 32 bits (legal where <c>CK_ULONG</c> is 64 bits), which <see cref="CKM"/> cannot
-    /// hold: that receives <see cref="CKM.CKM_VENDOR_DEFINED"/> — the vendor marker, never a truncated
-    /// value that would name some other mechanism — and the method returns <see langword="false"/>.
-    /// Read <see cref="Type"/> for the exact value.
-    /// </param>
-    /// <returns>
-    /// <see langword="true"/> if <see cref="CKM"/> declares a member with this value; otherwise
-    /// <see langword="false"/>.
-    /// </returns>
-    public bool TryGetMechanism(out CKM mechanism)
-    {
-        if (Type > uint.MaxValue)
-        {
-            mechanism = CKM.CKM_VENDOR_DEFINED;
-            return false;
-        }
-
-        mechanism = (CKM)Type;
-        return Enum.IsDefined(mechanism);
-    }
+    public bool IsVendorDefined => Type >= CKM.CKM_VENDOR_DEFINED;
 
     /// <summary>
     /// Exposes the high-level mechanism parameters for test inspection (visible to the test assembly via InternalsVisibleTo).

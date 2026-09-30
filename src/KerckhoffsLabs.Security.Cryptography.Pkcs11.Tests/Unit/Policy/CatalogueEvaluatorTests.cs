@@ -47,7 +47,7 @@ public sealed class CatalogueEvaluatorTests
     // evaluator-level check, not something a catalogue can accidentally bypass.
     private const CKM NonRsaKeyGenMechanism = CKM.CKM_EC_KEY_PAIR_GEN;
 
-    private const ulong VendorMechanism = 0x8000_1234UL;
+    private const CKM VendorMechanism = (CKM)0x8000_1234UL;
 
     private static readonly PolicyDecision ParamCheckDenial = PolicyDecision.Deny("param check denial");
 
@@ -64,7 +64,7 @@ public sealed class CatalogueEvaluatorTests
         }.ToFrozenDictionary(),
         AllowedVendorMechanisms = new Dictionary<ulong, MechanismRule>
         {
-            [VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, null, "TEST-VENDOR"),
+            [(ulong)VendorMechanism] = new(CryptoOperations.Encrypt, CryptoOperations.None, null, "TEST-VENDOR"),
         }.ToFrozenDictionary(),
         AllowedHashes = new Dictionary<string, AllowedHash>(StringComparer.Ordinal)
         {
@@ -214,7 +214,7 @@ public sealed class CatalogueEvaluatorTests
     [Fact]
     public void UnlistedVendorMechanism_WithAnExtensionHint_AppendsIt()
     {
-        PolicyDecision d = Evaluate(new MechanismUseRequest(new Mechanism(0x8000_9999UL), CryptoOperation.Sign), Hint);
+        PolicyDecision d = Evaluate(new MechanismUseRequest(new Mechanism((CKM)0x8000_9999UL), CryptoOperation.Sign), Hint);
         Assert.Equal($"vendor mechanism 0x80009999 is not on the {PolicyName} allow-list (not reviewed). {Hint}", d.Reason);
     }
 
@@ -252,7 +252,7 @@ public sealed class CatalogueEvaluatorTests
     [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires a 64-bit CK_ULONG")]
     public void MechanismValueAbove32Bits_IsTreatedAsAVendorValue()
     {
-        const ulong wide = 0x1_0000_0001UL;
+        const CKM wide = (CKM)0x1_0000_0001UL;
         PolicyDecision d = Evaluate(new MechanismUseRequest(new Mechanism(wide), CryptoOperation.Encrypt), Hint);
         Assert.False(d.IsAllowed);
         Assert.Equal($"vendor mechanism 0x100000001 is not on the {PolicyName} allow-list (not reviewed). {Hint}", d.Reason);
@@ -269,13 +269,13 @@ public sealed class CatalogueEvaluatorTests
         // table must not have been consulted for it.
         PolicyDecision denied = Evaluate(new MechanismUseRequest(new Mechanism(VendorMechanism), CryptoOperation.Sign));
         Assert.False(denied.IsAllowed);
-        Assert.Equal($"vendor mechanism 0x{VendorMechanism:X} is allowed under {PolicyName} only for Encrypt; Sign is not. TEST-VENDOR", denied.Reason);
+        Assert.Equal($"vendor mechanism 0x{(ulong)VendorMechanism:X} is allowed under {PolicyName} only for Encrypt; Sign is not. TEST-VENDOR", denied.Reason);
     }
 
     [Fact]
     public void UnlistedVendorValue_IsDenied()
     {
-        PolicyDecision d = Evaluate(new MechanismUseRequest(new Mechanism(0xFFFF_FFFFUL), CryptoOperation.Encrypt));
+        PolicyDecision d = Evaluate(new MechanismUseRequest(new Mechanism((CKM)0xFFFF_FFFFUL), CryptoOperation.Encrypt));
         Assert.False(d.IsAllowed);
     }
 

@@ -155,7 +155,7 @@ public sealed class PolicyCatalogueConsistencyTests
             yield return new KeyAgreementKeyRequest(CKM.CKM_ECDH1_DERIVE, keyType);
 
         foreach (CKM rsa in (CKM[])[CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_RSA_X9_31_KEY_PAIR_GEN])
-            foreach (ulong bits in (ulong[])[1024, 2048, 4096])
+            foreach (int bits in (int[])[1024, 2048, 4096])
                 yield return new RsaKeyGenerationRequest(rsa, bits);
     }
 
@@ -227,14 +227,14 @@ public sealed class PolicyCatalogueConsistencyTests
         foreach ((Mechanism mechanism, CryptoOperation op, string prf, string family) in KdfRequestsOverEveryPrf())
         {
             // The KDF mechanism itself must be allowed for this operation, or the PRF is never reached.
-            if (!catalogue.AllowedMechanisms.TryGetValue((CKM)mechanism.Type, out MechanismRule? rule)
+            if (!catalogue.AllowedMechanisms.TryGetValue(mechanism.Type, out MechanismRule? rule)
                 || !(rule.Operations | rule.LegacyOperations).Contains(op))
                 continue;
 
             bool expected = AllowedPrfs(catalogue, family).Contains(prf);
             PolicyDecision decision = policy.Evaluate(new MechanismUseRequest(mechanism, op));
             Assert.True(expected == decision.IsAllowed,
-                $"{name}: {(CKM)mechanism.Type} for {op} with PRF {prf} — expected {(expected ? "allowed" : "denied")}, got {(decision.IsAllowed ? "allowed" : decision.Reason)}");
+                $"{name}: {mechanism.Type} for {op} with PRF {prf} — expected {(expected ? "allowed" : "denied")}, got {(decision.IsAllowed ? "allowed" : decision.Reason)}");
 
             if (catalogue.DocumentedRefusedPrfs.ContainsKey(prf))
                 documentedRefusedSeen++;

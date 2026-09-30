@@ -14,7 +14,7 @@ public sealed class ObjectAttributeReadbackTests
     [Fact]
     public void VendorIdCtor_NoValue_HasTypeAndEmptyValue()
     {
-        const ulong vendorId = 0x80000001UL;
+        const CKA vendorId = (CKA)0x80000001UL;
         using var a = new ObjectAttribute(vendorId);
 
         Assert.Equal(vendorId, a.Type);
@@ -27,7 +27,7 @@ public sealed class ObjectAttributeReadbackTests
     {
         using var a = new ObjectAttribute(CKA.CKA_TOKEN);
 
-        Assert.Equal((ulong)CKA.CKA_TOKEN, a.Type);
+        Assert.Equal(CKA.CKA_TOKEN, a.Type);
         Assert.Equal(0, a.ValueLength);
     }
 

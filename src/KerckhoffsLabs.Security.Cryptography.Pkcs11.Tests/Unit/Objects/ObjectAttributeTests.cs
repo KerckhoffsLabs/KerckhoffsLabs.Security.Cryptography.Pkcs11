@@ -23,7 +23,7 @@ public sealed class ObjectAttributeTests
     public void RoundTrip_Bool_True()
     {
         using var attr = new ObjectAttribute(CKA.CKA_TOKEN, true);
-        Assert.Equal((ulong)CKA.CKA_TOKEN, attr.Type);
+        Assert.Equal(CKA.CKA_TOKEN, attr.Type);
         Assert.Equal(1, attr.ValueLength);
         Assert.True(attr.GetValueAsBool());
     }
@@ -165,8 +165,8 @@ public sealed class ObjectAttributeTests
         // SAME unmanaged buffer as parent's child slot. Verify the type
         // field (which lives in the inline struct); reading the children's
         // bytes is unsafe because parent owns the buffer lifetime.
-        Assert.Equal((ulong)CKA.CKA_LABEL, readBack[0].Type);
-        Assert.Equal((ulong)CKA.CKA_TOKEN, readBack[1].Type);
+        Assert.Equal(CKA.CKA_LABEL, readBack[0].Type);
+        Assert.Equal(CKA.CKA_TOKEN, readBack[1].Type);
     }
 
     // ---- CopyValueTo --------------------------------------------------------
@@ -261,9 +261,9 @@ public sealed class ObjectAttributeTests
     // ---- ulong-typed constructor for raw vendor attribute IDs -------------
 
     [Fact]
-    public void RawUlongTypeCtor_PreservesVendorAttributeId()
+    public void VendorAttributeType_IsPreserved()
     {
-        const ulong vendorAttrId = 0x80000042; // CKA_VENDOR_DEFINED + 0x42
+        const CKA vendorAttrId = (CKA)0x80000042; // CKA_VENDOR_DEFINED + 0x42
         using var attr = new ObjectAttribute(vendorAttrId, [0xAA]);
         Assert.Equal(vendorAttrId, attr.Type);
         Assert.Single(attr.GetValueAsByteArray(), (byte)0xAA);
@@ -321,19 +321,14 @@ public sealed class ObjectAttributeTests
 
     public static bool NativeULongIs64Bit => UnmanagedMemory.NativeULongSize == sizeof(ulong);
 
-    // A token may report a vendor mechanism wider than CKM holds (CK_ULONG is 64 bits on LP64). The
-    // CKM-typed read must say so and point at the raw read, not overflow.
+    // A token may report a vendor mechanism wider than 32 bits (CK_ULONG is 64 bits on LP64). CKM is as
+    // wide as CK_ULONG, so the CKM-typed read carries it exactly.
     [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
-    public void GetValueAsCkmArray_ValueWiderThanCkm_ThrowsPkcs11AttributeException()
+    public void GetValueAsCkmArray_ValueWiderThan32Bits_IsCarriedExactly()
     {
         byte[] value = [.. BitConverter.GetBytes((ulong)CKM.CKM_AES_GCM), .. BitConverter.GetBytes(0x1_8000_0001UL)];
         using var attr = new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, value);
 
-        var ex = Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsCkmArray());
-        Assert.Equal(CKA.CKA_ALLOWED_MECHANISMS, ex.Attribute);
-        Assert.Contains("0x180000001", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("GetValueAsUlongArray", ex.Message, StringComparison.Ordinal);
-
-        Assert.Equal([(ulong)CKM.CKM_AES_GCM, 0x1_8000_0001UL], attr.GetValueAsUlongArray());
+        Assert.Equal([CKM.CKM_AES_GCM, (CKM)0x1_8000_0001UL], attr.GetValueAsCkmArray());
     }
 }

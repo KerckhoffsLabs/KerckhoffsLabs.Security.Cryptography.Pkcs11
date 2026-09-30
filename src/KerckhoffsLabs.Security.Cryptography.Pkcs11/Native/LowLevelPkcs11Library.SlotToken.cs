@@ -70,10 +70,9 @@ internal sealed partial class LowLevelPkcs11Library
         NativeCULong[] CULongList = new NativeCULong[mechanismList.Length];
         CKR rv = _delegates.C_GetMechanismList(slotId, CULongList, ref count).ToCKR();
 
-        // Vendor-defined and not-yet-named mechanisms survive as unnamed CKM values; a value too wide
-        // for CKM (possible where CK_ULONG is 64 bits) is left out, and count then reports only the
-        // entries actually handed back.
-        int kept = MechanismList.CopyRepresentable(CULongList, (ulong)count, mechanismList);
+        // Vendor-defined and not-yet-named mechanisms survive as unnamed CKM values. count reports the
+        // entries actually handed back, which the destination's length may cap.
+        int kept = MechanismList.Copy(CULongList, (ulong)count, mechanismList);
         if (rv == CKR.CKR_OK)
             count = (NativeCULong)(ulong)kept;
 

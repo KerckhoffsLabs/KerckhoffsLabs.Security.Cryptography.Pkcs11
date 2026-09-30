@@ -47,24 +47,20 @@ internal static class CatalogueEvaluator
 
     private static PolicyDecision EvaluateMechanism(PolicyCatalogue c, string name, string? extensionHint, Mechanism mechanism, CryptoOperation operation)
     {
-        ulong raw = mechanism.Type;
-        string item = MechanismNames.Describe(raw);
+        CKM type = mechanism.Type;
+        string item = MechanismNames.Describe(type);
 
-        // CKM is 32-bit, but CK_ULONG is 64-bit on most Unix platforms: a wider value is vendor-range
-        // (it can only be in AllowedVendorMechanisms) and is never cast to CKM, which would overflow.
-        CKM? standard = raw <= uint.MaxValue ? (CKM)raw : null;
-
-        if (standard is { } s && c.AllowedMechanisms.TryGetValue(s, out MechanismRule? rule))
+        if (c.AllowedMechanisms.TryGetValue(type, out MechanismRule? rule))
             return Covers(rule, operation)
                 ? rule.ParameterCheck?.Invoke(mechanism, operation) ?? PolicyDecision.Allow
                 : DenyOperationNotPermitted(item, name, rule.Operations | rule.LegacyOperations, rule.Rationale, operation);
 
-        if (c.AllowedVendorMechanisms.TryGetValue(raw, out MechanismRule? vendorRule))
+        if (c.AllowedVendorMechanisms.TryGetValue((ulong)type, out MechanismRule? vendorRule))
             return Covers(vendorRule, operation)
                 ? vendorRule.ParameterCheck?.Invoke(mechanism, operation) ?? PolicyDecision.Allow
                 : DenyOperationNotPermitted(item, name, vendorRule.Operations | vendorRule.LegacyOperations, vendorRule.Rationale, operation);
 
-        return standard is { } documented && c.DocumentedRefusedMechanisms.TryGetValue(documented, out DocumentedRefusal? refusal)
+        return c.DocumentedRefusedMechanisms.TryGetValue(type, out DocumentedRefusal? refusal)
             ? DenyDocumented(item, refusal)
             : DenyUnlisted(item, name, extensionHint);
     }

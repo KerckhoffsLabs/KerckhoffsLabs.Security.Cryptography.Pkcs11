@@ -102,8 +102,8 @@ public sealed class CkmHkdfParams : MechanismParameters
         {
             Extract = _extract,
             Expand = _expand,
-            PrfHashMechanism = (NativeCULong)(ulong)_prfHashMechanism,
-            SaltType = (NativeCULong)(ulong)_saltType,
+            PrfHashMechanism = CkULong.From((ulong)_prfHashMechanism, "prfHashMechanism"),
+            SaltType = CkULong.From((ulong)_saltType, "saltType"),
             Salt = scope.Write(_saltBytes),
             SaltLen = (NativeCULong)_saltBytes.Length,
             SaltKey = _saltKey is null ? default : scope.KeyHandle(_saltKey, KeyHandlePart.Private, "saltKey"),

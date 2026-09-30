@@ -38,7 +38,7 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     {
         return new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
         {
-            PrfMechanism = _prfMechanism.ToCULong(),
+            PrfMechanism = _prfMechanism.ToCULong("prfMechanism"),
             HasSeedKey = _seedKey is not null,
             SeedKey = _seedKey is null ? default : scope.KeyHandle(_seedKey, KeyHandlePart.Private, "seedKey"),
             SeedData = scope.Write(_seedDataBytes),

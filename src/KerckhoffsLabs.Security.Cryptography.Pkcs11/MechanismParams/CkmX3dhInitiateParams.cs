@@ -61,7 +61,7 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     {
         return new CK_X3DH_INITIATE_PARAMS
         {
-            Kdf = _kdf.ToCULong(),
+            Kdf = _kdf.ToCULong("kdf"),
             PeerIdentity = scope.KeyHandle(_peerIdentity, KeyHandlePart.Public, "peerIdentity"),
             PeerPrekey = scope.KeyHandle(_peerPrekey, KeyHandlePart.Public, "peerPrekey"),
             PrekeySignature = scope.Write(_prekeySignatureBytes),

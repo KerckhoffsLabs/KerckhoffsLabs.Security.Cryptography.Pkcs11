@@ -31,7 +31,7 @@ public sealed class CkmPqcSignParams : MechanismParameters
     {
         return new CK_SIGN_ADDITIONAL_CONTEXT
         {
-            HedgeVariant = (NativeCULong)(uint)_hedgeVariant,
+            HedgeVariant = CkULong.From((ulong)_hedgeVariant, "hedgeVariant"),
             Context = scope.Write(_contextBytes),
             ContextLen = (NativeCULong)_contextBytes.Length,
         };

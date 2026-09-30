@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Pseudo-random functions
 /// </summary>
-public enum CKP : uint
+public enum CKP : ulong
 {
     /// <summary>
     /// PKCS#5 PBKDF2 with HMAC-SHA-1 pseudorandom function
@@ -52,5 +54,6 @@ public enum CKP : uint
 internal static class CKPExtensions
 {
     /// <summary>Converts <see cref="CKP"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKP value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKP value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

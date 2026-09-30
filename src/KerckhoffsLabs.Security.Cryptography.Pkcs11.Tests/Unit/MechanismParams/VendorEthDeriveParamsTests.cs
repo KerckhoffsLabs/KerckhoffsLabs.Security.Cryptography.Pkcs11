@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -42,7 +43,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// </remarks>
 public sealed class VendorEthDeriveParamsTests
 {
-    private const ulong CkmIbmEthDerive = 0x80070002UL; // CKM_VENDOR_DEFINED + 0x70002
+    private const CKM CkmIbmEthDerive = (CKM)0x80070002UL; // CKM_VENDOR_DEFINED + 0x70002
     private const ulong Eip2333Prv2Prv = 1;             // CK_IBM_EIP2333_PRV2PRV
 
     /// <summary>The example a caller would write, transcribing the vendor's header field by field.</summary>
@@ -150,7 +151,7 @@ public sealed class VendorEthDeriveParamsTests
         using var scope = new MechanismParameterScope();
         CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
 
-        Assert.Equal(CkmIbmEthDerive, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)CkmIbmEthDerive, (ulong)marshalled.Mechanism);
         Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);
         Assert.Equal((ulong)((4 * Word) + IntPtr.Size + Word), (ulong)marshalled.ParameterLen);
 

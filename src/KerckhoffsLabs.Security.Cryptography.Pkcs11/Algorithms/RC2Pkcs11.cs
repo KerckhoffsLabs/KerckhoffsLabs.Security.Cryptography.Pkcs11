@@ -122,7 +122,7 @@ public sealed class RC2Pkcs11 : RC2
         // a full padding block, so that path always goes to the token.
         if (input.IsEmpty
             && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
-            && !(encrypt && mechanism.Type == (ulong)CKM.CKM_RC2_CBC_PAD))
+            && !(encrypt && mechanism.Type == CKM.CKM_RC2_CBC_PAD))
         {
             bytesWritten = 0;
             return true;
@@ -153,7 +153,7 @@ public sealed class RC2Pkcs11 : RC2
         // EffectiveKeySize (RFC 2268 effective-key-bits) as the CK_RC2_CBC_PARAMS mechanism
         // parameter. The base RC2.EffectiveKeySize/KeySize setters already enforce
         // EffectiveKeySize <= KeySize (and a >= 40-bit floor), so no separate check is needed here.
-        ulong effectiveBits = (ulong)EffectiveKeySize;
+        int effectiveBits = EffectiveKeySize;
         return paddingMode switch
         {
             PaddingMode.PKCS7 => new Mechanism(CKM.CKM_RC2_CBC_PAD, new CkmRc2CbcParams(effectiveBits, iv)),
@@ -169,7 +169,7 @@ public sealed class RC2Pkcs11 : RC2
             throw new NotSupportedException(
                 "RC2Pkcs11 supports only PaddingMode.None for ECB (PKCS#11 has no CKM_RC2_ECB_PAD). " +
                 "Pre-pad the input, or use CBC with PKCS7.");
-        return new Mechanism(CKM.CKM_RC2_ECB, new CkmRc2Params((ulong)EffectiveKeySize));
+        return new Mechanism(CKM.CKM_RC2_ECB, new CkmRc2Params(EffectiveKeySize));
     }
 
     /// <summary>Generates a random initialization vector (8 bytes) for CBC mode.</summary>

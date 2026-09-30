@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// attribute context. The C# enum is renamed <see cref="CkhHedge"/> to avoid colliding
 /// with the existing hardware-feature <see cref="CKH"/> enum.
 /// </remarks>
-public enum CkhHedge : uint
+public enum CkhHedge : ulong
 {
     /// <summary>Token chooses hedged (randomized) signing when possible; falls back to deterministic if no RNG seed is available. Default per FIPS 204 §3.6.</summary>
     CKH_HEDGE_PREFERRED = 0x00000000,

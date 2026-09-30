@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Certificate types
 /// </summary>
-public enum CKC : uint
+public enum CKC : ulong
 {
     /// <summary>
     /// X.509 public key certificate
@@ -35,6 +37,8 @@ internal static class CKCExtensions
     /// Converts CKC to NativeCULong
     /// </summary>
     /// <param name="value">CKC that should be converted</param>
+    /// <param name="paramName">The argument name reported if the value does not fit; supplied by the compiler.</param>
     /// <returns>NativeCULong with value from CKC</returns>
-    public static NativeCULong ToCULong(this CKC value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKC value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

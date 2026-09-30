@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// parameter sets across three security levels and two performance trade-offs
 /// (the 'S' suffix = small signature, slower; 'F' suffix = fast signing, larger signature).
 /// </summary>
-public enum CkpSlhDsa : uint
+public enum CkpSlhDsa : ulong
 {
     /// <summary>SLH-DSA-SHA2-128s: SHA2 family, NIST level 1, small signature (~7.8 KB).</summary>
     CKP_SLH_DSA_SHA2_128S = 0x00000001,

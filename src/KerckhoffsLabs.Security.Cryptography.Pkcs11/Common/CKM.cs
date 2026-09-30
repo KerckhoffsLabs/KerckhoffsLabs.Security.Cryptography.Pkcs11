@@ -1,10 +1,12 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Mechanism type
 /// </summary>
-public enum CKM : uint
+public enum CKM : ulong
 {
     /// <summary>
     /// Key pair generation mechanism based on the RSA public-key cryptosystem, as defined in PKCS #1
@@ -2397,8 +2399,10 @@ internal static class CKMExtensions
     /// Converts CKM to NativeCULong
     /// </summary>
     /// <param name="value">CKM that should be converted</param>
+    /// <param name="paramName">The argument name reported if the value does not fit; supplied by the compiler.</param>
     /// <returns>NativeCULong with value from CKM</returns>
-    public static NativeCULong ToCULong(this CKM value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKM value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKM"/>. Deliberately a non-validating

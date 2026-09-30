@@ -40,14 +40,13 @@ internal static class MechanismNames
         => Preferred.TryGetValue(mechanism, out string? name) ? name : mechanism.ToString();
 
     /// <summary>
-    /// Describes a raw <c>CK_MECHANISM_TYPE</c>: the <see cref="CKM"/> name when the value is a defined
-    /// member, otherwise <c>"vendor mechanism 0x…"</c>. A value above 32 bits (possible where
-    /// <c>CK_ULONG</c> is 64-bit) is never cast to <see cref="CKM"/>, which would overflow.
+    /// Describes a <c>CK_MECHANISM_TYPE</c>: the <see cref="CKM"/> name when the value is a defined
+    /// member, otherwise <c>"vendor mechanism 0x…"</c>.
     /// </summary>
-    public static string Describe(ulong raw)
-        => raw <= uint.MaxValue && Enum.IsDefined((CKM)raw)
-            ? Of((CKM)raw)
-            : "vendor mechanism 0x" + raw.ToString("X", CultureInfo.InvariantCulture);
+    public static string Describe(CKM mechanism)
+        => Enum.IsDefined(mechanism)
+            ? Of(mechanism)
+            : "vendor mechanism 0x" + ((ulong)mechanism).ToString("X", CultureInfo.InvariantCulture);
 }
 
 /// <summary>Names key types in denial messages and the generated catalogue documentation.</summary>

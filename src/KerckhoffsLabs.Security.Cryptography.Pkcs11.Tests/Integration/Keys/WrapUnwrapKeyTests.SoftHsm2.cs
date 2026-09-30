@@ -147,9 +147,9 @@ internal static class WrapUnwrapKeyTestCases
             try
             {
                 using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE]);
-                Assert.True(read.First(a => a.Type == (ulong)CKA.CKA_SENSITIVE).GetValueAsBool(),
+                Assert.True(read.First(a => a.Type == CKA.CKA_SENSITIVE).GetValueAsBool(),
                     "unwrapped key should default to CKA_SENSITIVE=true");
-                Assert.False(read.First(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool(),
+                Assert.False(read.First(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool(),
                     "unwrapped key should default to CKA_EXTRACTABLE=false");
             }
             finally { session.DestroyObject(unwrapped); }
@@ -181,7 +181,7 @@ internal static class WrapUnwrapKeyTestCases
                 try
                 {
                     using var read = session.GetAttributeValue(unwrapped, [CKA.CKA_EXTRACTABLE]);
-                    Assert.True(read.First(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool());
+                    Assert.True(read.First(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool());
                 }
                 finally { session.DestroyObject(unwrapped); }
             }

@@ -54,7 +54,7 @@ public sealed class SecureOnlyPolicyTests
     public void VendorMechanism_IsDeniedForEveryOperation(ulong vendor)
     {
         foreach (CryptoOperation op in Enum.GetValues<CryptoOperation>())
-            Assert.False(Allowed(new Mechanism(vendor), op), $"0x{vendor:X} was allowed for {op}");
+            Assert.False(Allowed(new Mechanism((CKM)vendor), op), $"0x{vendor:X} was allowed for {op}");
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public sealed class SecureOnlyPolicyTests
     [Fact]
     public void VendorMechanism_SaysNotReviewed_AndNamesTheExtensionPoint()
     {
-        string? reason = Reason(new MechanismUseRequest(new Mechanism(0x8000_1234UL), CryptoOperation.Sign));
+        string? reason = Reason(new MechanismUseRequest(new Mechanism((CKM)0x8000_1234UL), CryptoOperation.Sign));
         Assert.StartsWith("vendor mechanism 0x80001234 is not on the SecureOnly allow-list (not reviewed).", reason, StringComparison.Ordinal);
         Assert.Contains("WithAllowedMechanism", reason, StringComparison.Ordinal);
     }
@@ -440,11 +440,11 @@ public sealed class SecureOnlyPolicyTests
     // === Rules, hashes, curves, KDFs =======================================
 
     [Theory]
-    [InlineData(1024UL, false)]
-    [InlineData(2047UL, false)]
-    [InlineData(2048UL, true)]
-    [InlineData(4096UL, true)]
-    public void RsaKeyGeneration_Floor(ulong bits, bool allowed)
+    [InlineData(1024, false)]
+    [InlineData(2047, false)]
+    [InlineData(2048, true)]
+    [InlineData(4096, true)]
+    public void RsaKeyGeneration_Floor(int bits, bool allowed)
         => Assert.Equal(allowed, Allowed(new RsaKeyGenerationRequest(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, bits)));
 
     [Fact]

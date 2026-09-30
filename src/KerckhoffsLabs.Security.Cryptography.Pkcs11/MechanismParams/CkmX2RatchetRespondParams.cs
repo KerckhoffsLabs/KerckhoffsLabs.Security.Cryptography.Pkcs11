@@ -69,9 +69,9 @@ public sealed class CkmX2RatchetRespondParams : MechanismParameters
             InitiatorIdentity = scope.KeyHandle(_initiatorIdentity, KeyHandlePart.Public, "initiatorIdentity"),
             OwnPublicIdentity = scope.KeyHandle(_ownPublicIdentity, KeyHandlePart.Public, "ownPublicIdentity"),
             EncryptedHeader = _encryptedHeader,
-            Curve = (NativeCULong)_curve,
-            AeadMechanism = _aeadMechanism.ToCULong(),
-            KdfMechanism = _kdfMechanism.ToCULong(),
+            Curve = CkULong.From(_curve, "curve"),
+            AeadMechanism = _aeadMechanism.ToCULong("aeadMechanism"),
+            KdfMechanism = _kdfMechanism.ToCULong("kdfMechanism"),
         };
     }
 }

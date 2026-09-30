@@ -241,8 +241,8 @@ public sealed class FipsOnlyPolicyTests
     [Fact]
     public void VendorAndUnknownMechanisms_AreRefused()
     {
-        Assert.False(Allowed(new Mechanism(0x8000_1234UL), CryptoOperation.Encrypt));
-        Assert.False(Allowed(new Mechanism(0x7FFF_FFF0UL), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism((CKM)0x8000_1234UL), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism((CKM)0x7FFF_FFF0UL), CryptoOperation.Encrypt));
     }
 
     // A denial for a mechanism FipsOnly has reviewed — it is Allowed for at least one operation — always
@@ -319,9 +319,9 @@ public sealed class FipsOnlyPolicyTests
     }
 
     [Theory]
-    [InlineData(1024UL, false)]
-    [InlineData(2048UL, true)]
-    public void RsaKeyGeneration(ulong bits, bool allowed)
+    [InlineData(1024, false)]
+    [InlineData(2048, true)]
+    public void RsaKeyGeneration(int bits, bool allowed)
         => Assert.Equal(allowed, Policy.Evaluate(new RsaKeyGenerationRequest(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, bits)).IsAllowed);
 
     [Fact]

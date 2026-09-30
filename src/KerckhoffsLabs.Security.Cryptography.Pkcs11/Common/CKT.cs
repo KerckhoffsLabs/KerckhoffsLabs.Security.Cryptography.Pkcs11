@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// Trust-value identifiers for the CKA_TRUST_* attributes on <c>CKO_TRUST</c> objects
 /// (PKCS#11 v3.2). Each value indicates the trust level for a specific usage.
 /// </summary>
-public enum CKT : uint
+public enum CKT : ulong
 {
     /// <summary>Trust state is not known or has not been asserted.</summary>
     CKT_TRUST_UNKNOWN = 0x00000000,

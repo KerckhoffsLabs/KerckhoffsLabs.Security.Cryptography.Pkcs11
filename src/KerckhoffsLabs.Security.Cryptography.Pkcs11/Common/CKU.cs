@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Types of Cryptoki users
 /// </summary>
-public enum CKU : uint
+public enum CKU : ulong
 {
     /// <summary>
     /// Security Officer
@@ -27,5 +29,6 @@ public enum CKU : uint
 internal static class CKUExtensions
 {
     /// <summary>Converts <see cref="CKU"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKU value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKU value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

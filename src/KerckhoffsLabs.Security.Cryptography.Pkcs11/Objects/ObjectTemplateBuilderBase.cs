@@ -29,7 +29,7 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_built) throw new InvalidOperationException("Builder has already produced an ObjectTemplate. Start a new builder.");
 
-        var key = (CKA)attr.Type;
+        var key = attr.Type;
         if (_attributes.TryGetValue(key, out var existing))
             existing.Dispose();
         _attributes[key] = attr;

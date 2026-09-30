@@ -120,7 +120,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 
     // Borrows the password: the parameters keep no copy of their own.
     private static CkmPkcs5Pbkd2Params Pbkdf2Params(SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf)
-        => new(salt, (ulong)iterations, prf, password);
+        => new(salt, iterations, prf, password);
 
     private static CKP PrfForHash(HashAlgorithmName hash) => hash.Name switch
     {

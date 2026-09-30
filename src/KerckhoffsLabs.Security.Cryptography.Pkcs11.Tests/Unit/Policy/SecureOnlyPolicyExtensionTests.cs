@@ -6,12 +6,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
-/// <summary>Tests for <see cref="SecureOnlyPolicy.WithAllowedMechanism(CKM, IEnumerable{CryptoOperation}, string)"/>
-/// and its vendor-mechanism overload: a new, wider instance that adds to (never removes from) what the
-/// receiver allows.</summary>
+/// <summary>Tests for <see cref="SecureOnlyPolicy.WithAllowedMechanism(CKM, IEnumerable{CryptoOperation}, string)"/>,
+/// for standard and vendor mechanisms alike: a new, wider instance that adds to (never removes from) what
+/// the receiver allows.</summary>
 public sealed class SecureOnlyPolicyExtensionTests
 {
-    private const ulong VendorMechanism = 0x8000_1234UL;
+    private const CKM VendorMechanism = (CKM)0x8000_1234UL;
     private const string Reason = "Reviewed for this deployment.";
 
     private static bool Allowed(ICryptoPolicy policy, Mechanism mech, CryptoOperation op)
@@ -69,7 +69,7 @@ public sealed class SecureOnlyPolicyExtensionTests
     // === Vendor mechanisms ====================================================
 
     [Fact]
-    public void VendorMechanism_IsAllowedAfterExtension_ThroughTheUlongOverload()
+    public void VendorMechanism_IsAllowedAfterExtension()
     {
         Assert.False(Allowed(CryptoPolicy.SecureOnly, new Mechanism(VendorMechanism), CryptoOperation.Sign));
 
@@ -84,20 +84,18 @@ public sealed class SecureOnlyPolicyExtensionTests
     }
 
     [Fact]
-    public void Routing_IsByRawValue_RegardlessOfWhichOverloadIsUsed()
+    public void Routing_IsByValue()
     {
-        // A vendor-range value passed through the CKM overload still lands in the vendor table.
-        const ulong vendorRaw = 0x8000_5678UL;
-        SecureOnlyPolicy viaCkmOverload = CryptoPolicy.SecureOnly.WithAllowedMechanism(
-            (CKM)vendorRaw, [CryptoOperation.Sign], Reason);
-        Assert.True(viaCkmOverload.Catalogue.AllowedVendorMechanisms.ContainsKey(vendorRaw));
-        Assert.False(viaCkmOverload.Catalogue.AllowedMechanisms.ContainsKey((CKM)vendorRaw));
+        // A vendor-range value lands in the vendor table...
+        const CKM vendor = (CKM)0x8000_5678UL;
+        SecureOnlyPolicy withVendor = CryptoPolicy.SecureOnly.WithAllowedMechanism(vendor, [CryptoOperation.Sign], Reason);
+        Assert.True(withVendor.Catalogue.AllowedVendorMechanisms.ContainsKey((ulong)vendor));
+        Assert.False(withVendor.Catalogue.AllowedMechanisms.ContainsKey(vendor));
 
-        // A standard value passed through the ulong overload still lands in the standard table.
-        SecureOnlyPolicy viaUlongOverload = CryptoPolicy.SecureOnly.WithAllowedMechanism(
-            (ulong)CKM.CKM_DES_CBC, [CryptoOperation.Decrypt], Reason);
-        Assert.True(viaUlongOverload.Catalogue.AllowedMechanisms.ContainsKey(CKM.CKM_DES_CBC));
-        Assert.False(viaUlongOverload.Catalogue.AllowedVendorMechanisms.ContainsKey((ulong)CKM.CKM_DES_CBC));
+        // ...and a standard value in the standard table.
+        SecureOnlyPolicy withStandard = CryptoPolicy.SecureOnly.WithAllowedMechanism(CKM.CKM_DES_CBC, [CryptoOperation.Decrypt], Reason);
+        Assert.True(withStandard.Catalogue.AllowedMechanisms.ContainsKey(CKM.CKM_DES_CBC));
+        Assert.False(withStandard.Catalogue.AllowedVendorMechanisms.ContainsKey((ulong)CKM.CKM_DES_CBC));
     }
 
     // === Documented-refused mechanisms accepted ===============================
@@ -145,7 +143,7 @@ public sealed class SecureOnlyPolicyExtensionTests
         Assert.True(Allowed(twice, new Mechanism(VendorMechanism), CryptoOperation.Encrypt));
         Assert.True(Allowed(twice, new Mechanism(VendorMechanism), CryptoOperation.Decrypt));
         Assert.False(Allowed(twice, new Mechanism(VendorMechanism), CryptoOperation.Verify));
-        Assert.Equal("Signing reviewed too.", twice.Catalogue.AllowedVendorMechanisms[VendorMechanism].Rationale);
+        Assert.Equal("Signing reviewed too.", twice.Catalogue.AllowedVendorMechanisms[(ulong)VendorMechanism].Rationale);
     }
 
     [Fact]
@@ -239,7 +237,7 @@ public sealed class SecureOnlyPolicyExtensionTests
     [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires a 64-bit CK_ULONG")]
     public void MechanismValueAbove32Bits_IsDeniedByDefault_AndAllowedAfterExtension()
     {
-        const ulong wide = 0x1_0000_0001UL;
+        const CKM wide = (CKM)0x1_0000_0001UL;
         var mechanism = new Mechanism(wide);
 
         PolicyDecision denied = CryptoPolicy.SecureOnly.Evaluate(new MechanismUseRequest(mechanism, CryptoOperation.Sign));
@@ -248,7 +246,7 @@ public sealed class SecureOnlyPolicyExtensionTests
         SecureOnlyPolicy extended = CryptoPolicy.SecureOnly.WithAllowedMechanism(wide, [CryptoOperation.Sign], Reason);
         Assert.True(Allowed(extended, mechanism, CryptoOperation.Sign));
         Assert.False(Allowed(extended, mechanism, CryptoOperation.Verify));
-        Assert.True(extended.Catalogue.AllowedVendorMechanisms.ContainsKey(wide));
+        Assert.True(extended.Catalogue.AllowedVendorMechanisms.ContainsKey((ulong)wide));
     }
 
     // === Denial wording on an extended instance ===============================

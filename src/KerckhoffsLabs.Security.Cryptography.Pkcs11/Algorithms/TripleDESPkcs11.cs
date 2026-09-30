@@ -128,7 +128,7 @@ public sealed class TripleDESPkcs11 : TripleDES
         // goes to the token.
         if (input.IsEmpty
             && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
-            && !(encrypt && mechanism.Type == (ulong)CKM.CKM_DES3_CBC_PAD))
+            && !(encrypt && mechanism.Type == CKM.CKM_DES3_CBC_PAD))
         {
             bytesWritten = 0;
             return true;

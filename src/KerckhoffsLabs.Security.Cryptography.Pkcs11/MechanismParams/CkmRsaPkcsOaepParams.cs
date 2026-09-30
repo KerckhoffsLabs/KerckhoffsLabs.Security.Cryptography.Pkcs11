@@ -33,8 +33,8 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     {
         return new CK_RSA_PKCS_OAEP_PARAMS
         {
-            HashAlg = _hashAlg.ToCULong(),
-            Mgf = _mgf.ToCULong(),
+            HashAlg = _hashAlg.ToCULong("hashAlg"),
+            Mgf = _mgf.ToCULong("mgf"),
             Source = (NativeCULong)CKZ.CKZ_DATA_SPECIFIED,
             SourceData = scope.Write(_sourceDataBytes),
             SourceDataLen = (NativeCULong)_sourceDataBytes.Length,
