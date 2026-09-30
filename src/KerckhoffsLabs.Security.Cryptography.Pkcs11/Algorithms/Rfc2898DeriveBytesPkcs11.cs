@@ -242,19 +242,6 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         return Pbkdf2Core(workspace, secure, salt, iterations, hashAlgorithm, outputLength);
     }
 
-    // The byte[]-returning one-shots once each has its password in a SecurePassword; the one place
-    // their arguments are checked.
-    private static byte[] Pbkdf2Core(Pkcs11Workspace workspace, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
-    {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
-        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
-        if (outputLength == 0)
-            return [];
-        CKP prf = PrfForHash(hashAlgorithm);
-        return DeriveExtractable(workspace, password, salt, iterations, prf, outputLength);
-    }
-
     /// <summary>
     /// One-shot PBKDF2 into a caller-supplied buffer. Mirrors
     /// <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, int, HashAlgorithmName)"/>.
@@ -288,6 +275,19 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         {
             CryptographicOperations.ZeroMemory(derived);
         }
+    }
+
+    // The byte[]-returning one-shots once each has its password in a SecurePassword; the one place
+    // their arguments are checked.
+    private static byte[] Pbkdf2Core(Pkcs11Workspace workspace, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
+        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
+        if (outputLength == 0)
+            return [];
+        CKP prf = PrfForHash(hashAlgorithm);
+        return DeriveExtractable(workspace, password, salt, iterations, prf, outputLength);
     }
 
     /// <summary>
