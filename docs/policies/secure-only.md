@@ -80,7 +80,6 @@ An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs
 
 | Mechanism | Operations | Legacy operations | Parameter check | Rationale |
 |---|---|---|---|---|
-| `CKM_HKDF_DATA` | Derive | — | requires CkmHkdfParams naming an allowed PRF (CKM_SHA256/384/512 or CKM_SHA3_256/384/512, hash or _HMAC form) | HKDF (RFC 5869 / SP 800-56C). |
 | `CKM_HKDF_DERIVE` | Derive | — | requires CkmHkdfParams naming an allowed PRF (CKM_SHA256/384/512 or CKM_SHA3_256/384/512, hash or _HMAC form) | HKDF (RFC 5869 / SP 800-56C). |
 | `CKM_HKDF_KEY_GEN` | GenerateKey | — | — | HKDF salt / key generation. |
 | `CKM_PKCS5_PBKD2` | Derive, GenerateKey | — | requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256, _SHA384, _SHA512, or _SHA512_256) | PBKDF2 (RFC 8018 / SP 800-132) password-based key derivation. |
@@ -207,7 +206,7 @@ Per-family allow-list for the PRF named inside PBKDF2 / SP 800-108 / HKDF mechan
 
 | KDF family | Allowed PRFs |
 |---|---|
-| HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA) | `CKM_SHA256`, `CKM_SHA256_HMAC`, `CKM_SHA384`, `CKM_SHA384_HMAC`, `CKM_SHA3_256`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512`, `CKM_SHA3_512_HMAC`, `CKM_SHA512`, `CKM_SHA512_HMAC` |
+| HKDF (CKM_HKDF_DERIVE) | `CKM_SHA256`, `CKM_SHA256_HMAC`, `CKM_SHA384`, `CKM_SHA384_HMAC`, `CKM_SHA3_256`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512`, `CKM_SHA3_512_HMAC`, `CKM_SHA512`, `CKM_SHA512_HMAC` |
 | PBKDF2 (CKM_PKCS5_PBKD2) | `CKP_PKCS5_PBKD2_HMAC_SHA256`, `CKP_PKCS5_PBKD2_HMAC_SHA384`, `CKP_PKCS5_PBKD2_HMAC_SHA512`, `CKP_PKCS5_PBKD2_HMAC_SHA512_256` |
 | SP 800-108 (CKM_SP800_108_*_KDF) | `CKM_AES_CMAC`, `CKM_SHA256_HMAC`, `CKM_SHA384_HMAC`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512_HMAC`, `CKM_SHA512_HMAC` |
 

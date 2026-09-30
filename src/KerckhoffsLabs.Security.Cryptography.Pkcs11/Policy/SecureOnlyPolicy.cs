@@ -213,7 +213,7 @@ public sealed partial class SecureOnlyPolicy : ICryptoPolicy
         CkmHkdfParams p when Prfs.Hkdf.Contains(p.PrfHashMechanism) => PolicyDecision.Allow,
         CkmHkdfParams p => DenyPrf(p.PrfHashMechanism.ToString(), "HKDF", "CKM_SHA256 or stronger, hash or _HMAC form"),
         _ => PolicyDecision.Deny(
-            "CKM_HKDF_DERIVE / CKM_HKDF_DATA require CkmHkdfParams naming an allowed PRF " +
+            "CKM_HKDF_DERIVE requires CkmHkdfParams naming an allowed PRF " +
             "(CKM_SHA256 or stronger, hash or _HMAC form)."),
     };
 

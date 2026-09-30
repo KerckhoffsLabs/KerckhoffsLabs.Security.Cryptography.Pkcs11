@@ -211,8 +211,7 @@ public sealed class PolicyCatalogueConsistencyTests
                 yield return (new Mechanism(kdf, sp800108), CryptoOperation.Derive, prf.ToString(), "SP 800-108");
 
             var hkdf = CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf);
-            foreach (CKM kdf in new[] { CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA })
-                yield return (new Mechanism(kdf, hkdf), CryptoOperation.Derive, prf.ToString(), "HKDF");
+            yield return (new Mechanism(CKM.CKM_HKDF_DERIVE, hkdf), CryptoOperation.Derive, prf.ToString(), "HKDF");
         }
     }
 

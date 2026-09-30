@@ -73,6 +73,12 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
             .DkmLength(Sp800108DkmLengthMethod.SumOfKeys, widthInBits: 32, littleEndian: false)
             .Build();
 
+    /// <summary>
+    /// The templates of the additional sibling keys, in order. The session submits each to the policy
+    /// before the derive, as it does the primary key's template.
+    /// </summary>
+    internal IReadOnlyList<IReadOnlyList<ObjectAttribute>> AdditionalKeyTemplates => _retainedTemplates;
+
     internal CkmSp800108KdfParams(Sp800108KdfBuilder builder)
     {
         _feedback = builder.Mode == Sp800108KdfMode.Feedback;
@@ -283,24 +289,36 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         };
     }
 
+    // A sibling key gets the same secure defaults as the primary key — CKA_SENSITIVE=true and
+    // CKA_EXTRACTABLE=false unless its template says otherwise — written into the call's scope so
+    // nothing outlives the call.
     private static CK_DERIVED_KEY BuildDerivedKey(IReadOnlyList<ObjectAttribute> template, MechanismParameterScope scope)
     {
-        IntPtr templatePtr = IntPtr.Zero;
-        if (template.Count > 0)
-        {
-            var attributes = new CK_ATTRIBUTE[template.Count];
-            for (int k = 0; k < template.Count; k++)
-                attributes[k] = template[k].CkAttribute;
-            templatePtr = scope.WriteStructArray<CK_ATTRIBUTE>(attributes);
-        }
+        bool hasSensitive = template.Any(a => a.Type == CKA.CKA_SENSITIVE);
+        bool hasExtractable = template.Any(a => a.Type == CKA.CKA_EXTRACTABLE);
+
+        var attributes = new List<CK_ATTRIBUTE>(template.Count + 2);
+        foreach (ObjectAttribute attribute in template)
+            attributes.Add(attribute.CkAttribute);
+        if (!hasSensitive)
+            attributes.Add(BoolAttribute(CKA.CKA_SENSITIVE, true, scope));
+        if (!hasExtractable)
+            attributes.Add(BoolAttribute(CKA.CKA_EXTRACTABLE, false, scope));
 
         return new CK_DERIVED_KEY
         {
-            Template = templatePtr,
-            AttributeCount = (NativeCULong)(ulong)template.Count,
+            Template = scope.WriteStructArray<CK_ATTRIBUTE>([.. attributes]),
+            AttributeCount = (NativeCULong)(ulong)attributes.Count,
             Key = scope.Allocate(UnmanagedMemory.NativeULongSize), // zero-filled = CK_INVALID_HANDLE
         };
     }
+
+    private static CK_ATTRIBUTE BoolAttribute(CKA type, bool value, MechanismParameterScope scope) => new()
+    {
+        type = type.ToCULong(),
+        value = scope.Write([value ? (byte)1 : (byte)0]),
+        valueLen = (NativeCULong)1,
+    };
 
     // ---- handle marshalling at the platform's CK_ULONG width ----
 

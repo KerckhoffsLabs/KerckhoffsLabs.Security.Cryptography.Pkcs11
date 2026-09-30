@@ -182,7 +182,7 @@ public sealed partial class SecureOnlyPolicy
             CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF);
         AllowChecked(S.Derive, "HKDF (RFC 5869 / SP 800-56C).", CheckHkdfPrf,
             "requires CkmHkdfParams naming an allowed PRF (CKM_SHA256/384/512 or CKM_SHA3_256/384/512, hash or _HMAC form)",
-            CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+            CKM.CKM_HKDF_DERIVE);
         Allow(S.GenerateKey, "HKDF salt / key generation.", CKM.CKM_HKDF_KEY_GEN);
         AllowChecked(S.GenerateKey | S.Derive, "PBKDF2 (RFC 8018 / SP 800-132) password-based key derivation.", CheckPbkdf2Prf,
             "requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256, _SHA384, _SHA512, or _SHA512_256)",
@@ -490,6 +490,6 @@ public sealed partial class SecureOnlyPolicy
     {
         ["PBKDF2 (CKM_PKCS5_PBKD2)"] = Prfs.Pbkdf2.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
         ["SP 800-108 (CKM_SP800_108_*_KDF)"] = Prfs.Sp800108.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-        ["HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA)"] = Prfs.Hkdf.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
+        ["HKDF (CKM_HKDF_DERIVE)"] = Prfs.Hkdf.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
     }.ToFrozenDictionary(StringComparer.Ordinal);
 }

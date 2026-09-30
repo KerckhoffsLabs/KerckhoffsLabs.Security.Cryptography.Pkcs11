@@ -180,7 +180,7 @@ internal sealed partial class FipsOnlyPolicy : ICryptoPolicy
         CkmHkdfParams p => DenyPrf(p.PrfHashMechanism.ToString(), "HKDF", "SP 800-56C Rev.2",
             "an approved hash, hash or _HMAC form"),
         _ => PolicyDecision.Deny(
-            "SP 800-56C Rev.2: CKM_HKDF_DERIVE / CKM_HKDF_DATA require CkmHkdfParams naming an approved PRF " +
+            "SP 800-56C Rev.2: CKM_HKDF_DERIVE requires CkmHkdfParams naming an approved PRF " +
             "(an approved hash, hash or _HMAC form)."),
     };
 

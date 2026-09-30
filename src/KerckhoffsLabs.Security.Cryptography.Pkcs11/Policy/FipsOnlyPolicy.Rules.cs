@@ -193,7 +193,7 @@ internal sealed partial class FipsOnlyPolicy
             CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF);
         ApproveChecked(S.Derive, "SP 800-56C Rev.2", CheckHkdfPrf,
             "requires CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form)",
-            CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+            CKM.CKM_HKDF_DERIVE);
         Approve(S.GenerateKey, "SP 800-56C Rev.2", CKM.CKM_HKDF_KEY_GEN);
         ApproveChecked(S.GenerateKey | S.Derive, "SP 800-132", CheckPbkdf2Prf,
             "requires CkmPkcs5Pbkd2Params naming an approved PRF (HMAC-SHA-1/224/256/384/512/512-224/512-256)",
@@ -451,6 +451,6 @@ internal sealed partial class FipsOnlyPolicy
     {
         ["PBKDF2 (CKM_PKCS5_PBKD2)"] = Prfs.Pbkdf2.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
         ["SP 800-108 (CKM_SP800_108_*_KDF)"] = Prfs.Sp800108.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-        ["HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA)"] = Prfs.Hkdf.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
+        ["HKDF (CKM_HKDF_DERIVE)"] = Prfs.Hkdf.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
     }.ToFrozenDictionary(StringComparer.Ordinal);
 }

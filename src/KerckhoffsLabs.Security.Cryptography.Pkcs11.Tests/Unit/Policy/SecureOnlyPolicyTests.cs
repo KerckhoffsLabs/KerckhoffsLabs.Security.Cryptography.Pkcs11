@@ -79,7 +79,7 @@ public sealed class SecureOnlyPolicyTests
         CKM.CKM_SP800_108_COUNTER_KDF => new Mechanism(mech, CkmSp800108KdfParams.Counter(CKM.CKM_SHA256_HMAC).IterationCounter().Build()),
         CKM.CKM_SP800_108_FEEDBACK_KDF => new Mechanism(mech, CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC).IterationCounter().Build()),
         CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF => new Mechanism(mech, CkmSp800108KdfParams.DoublePipeline(CKM.CKM_SHA256_HMAC).IterationCounter().Build()),
-        CKM.CKM_HKDF_DERIVE or CKM.CKM_HKDF_DATA =>
+        CKM.CKM_HKDF_DERIVE =>
             new Mechanism(mech, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC)),
         CKM.CKM_ECDH1_DERIVE or CKM.CKM_ECDH1_COFACTOR_DERIVE =>
             new Mechanism(mech, new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, [0x04, 0x01, 0x04])),
@@ -133,7 +133,7 @@ public sealed class SecureOnlyPolicyTests
             CKM.CKM_HASH_SLH_DSA_SHAKE128, CKM.CKM_HASH_SLH_DSA_SHAKE256);
         Add(CryptoOperations.GenerateKeyPair, CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA_KEY_PAIR_GEN);
         Add(CryptoOperations.Derive, CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF,
-            CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF, CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+            CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF, CKM.CKM_HKDF_DERIVE);
         Add(CryptoOperations.GenerateKey, CKM.CKM_HKDF_KEY_GEN);
         Add(CryptoOperations.GenerateKey | CryptoOperations.Derive, CKM.CKM_PKCS5_PBKD2);
         return expected;
@@ -414,7 +414,7 @@ public sealed class SecureOnlyPolicyTests
     [Fact]
     public void Hkdf_Sha1_IsDenied()
     {
-        var mech = new Mechanism(CKM.CKM_HKDF_DATA, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA_1));
+        var mech = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA_1));
         Assert.False(Allowed(mech, CryptoOperation.Derive));
         Assert.Contains("CKM_SHA_1 is not an allowed HKDF PRF; use ", Reason(mech, CryptoOperation.Derive), StringComparison.Ordinal);
     }

@@ -3146,9 +3146,23 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
+        // CKM_HKDF_DATA derives a CKO_DATA object whose CKA_VALUE is the KDF output in the clear: no
+        // key template, no sensitivity, nothing a key policy can judge. Derivation creates keys, so
+        // it is refused here rather than left as an unjudged way to read KDF output.
+        if (mechanism.Type == CKM.CKM_HKDF_DATA)
+            throw new ArgumentException(
+                "CKM_HKDF_DATA creates a data object holding the KDF output in the clear, not a key. " +
+                "Derive a key with CKM_HKDF_DERIVE instead.", nameof(mechanism));
 
         Enforce(mechanism, CryptoOperation.Derive);
         EnforceKeyAgreementKey(mechanism, baseKeyHandle);
+
+        // SP 800-108 can derive additional sibling keys in the same call, each from its own template.
+        // Those are keys this call creates exactly like the primary one, so each template meets the
+        // same policy check; the secure defaults are appended when the parameters are marshalled.
+        if (mechanism.Parameters is CkmSp800108KdfParams sp800108)
+            foreach (IReadOnlyList<ObjectAttribute> sibling in sp800108.AdditionalKeyTemplates)
+                EnforceKeyTemplate([.. sibling], CKO.CKO_SECRET_KEY);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 

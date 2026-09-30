@@ -670,7 +670,8 @@ public sealed class BuildMarshalableTests
         Assert.NotEqual(IntPtr.Zero, array);
 
         var entry = UnmanagedMemory.Read<CK_DERIVED_KEY>(array);
-        Assert.Equal((ulong)template.Count, (ulong)entry.AttributeCount);
+        // The caller's attributes, then the secure defaults it omitted: CKA_SENSITIVE and CKA_EXTRACTABLE.
+        Assert.Equal((ulong)template.Count + 2, (ulong)entry.AttributeCount);
         Assert.NotEqual(IntPtr.Zero, entry.Template);
         Assert.NotEqual(IntPtr.Zero, entry.Key);
 
@@ -688,6 +689,13 @@ public sealed class BuildMarshalableTests
             // The value buffer belongs to the caller's ObjectAttribute and is referenced, not copied.
             Assert.Equal(expected.value, marshalled.value);
         }
+
+        var sensitive = UnmanagedMemory.Read<CK_ATTRIBUTE>(IntPtr.Add(entry.Template, template.Count * attrSize));
+        var extractable = UnmanagedMemory.Read<CK_ATTRIBUTE>(IntPtr.Add(entry.Template, (template.Count + 1) * attrSize));
+        Assert.Equal((ulong)CKA.CKA_SENSITIVE, (ulong)sensitive.type);
+        Assert.Equal([1], UnmanagedMemory.Read(sensitive.value, 1));
+        Assert.Equal((ulong)CKA.CKA_EXTRACTABLE, (ulong)extractable.type);
+        Assert.Equal([0], UnmanagedMemory.Read(extractable.value, 1));
     }
 
     /// <summary>
