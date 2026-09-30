@@ -37,18 +37,26 @@ public sealed class ObjectAttributeTests
     }
 
     [Fact]
-    public void RoundTrip_Ulong()
+    public void RoundTrip_Ulong_ThatFitsEveryPlatform()
     {
-        ulong source = 0x123456789ABCDEF0UL;
+        using var attr = new ObjectAttribute(CKA.CKA_VALUE_LEN, 0xFFFF_FFFFUL);
+        Assert.Equal(0xFFFF_FFFFUL, attr.GetValueAsUlong());
+    }
+
+    [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
+    public void RoundTrip_Ulong_WiderThan32Bits_WhereCkUlongIs64Bits()
+    {
+        const ulong source = 0x123456789ABCDEF0UL;
         using var attr = new ObjectAttribute(CKA.CKA_VALUE_LEN, source);
-        // On Windows, NativeCULong is 32-bit — only the low 32 bits are stored
-        // and the test platform is Linux-x64 (64-bit storage). Assert what the
-        // platform supports.
-        ulong roundtripped = attr.GetValueAsUlong();
-        if (UnmanagedMemory.NativeULongSize == 4)
-            Assert.Equal(source & 0xFFFFFFFFUL, roundtripped);
-        else
-            Assert.Equal(source, roundtripped);
+        Assert.Equal(source, attr.GetValueAsUlong());
+    }
+
+    // A value CK_ULONG cannot hold here is refused, not truncated to its low 32 bits.
+    [Fact(SkipUnless = nameof(NativeULongIs32Bit), Skip = "CK_ULONG is 64 bits on this platform")]
+    public void Ulong_WiderThan32Bits_IsRefused_WhereCkUlongIs32Bits()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => new ObjectAttribute(CKA.CKA_VALUE_LEN, 0x123456789ABCDEF0UL));
+        Assert.Equal("value", ex.ParamName);
     }
 
     [Fact]
@@ -320,6 +328,7 @@ public sealed class ObjectAttributeTests
     }
 
     public static bool NativeULongIs64Bit => UnmanagedMemory.NativeULongSize == sizeof(ulong);
+    public static bool NativeULongIs32Bit => UnmanagedMemory.NativeULongSize == sizeof(uint);
 
     // A token may report a vendor mechanism wider than 32 bits (CK_ULONG is 64 bits on LP64). CKM is as
     // wide as CK_ULONG, so the CKM-typed read carries it exactly.
