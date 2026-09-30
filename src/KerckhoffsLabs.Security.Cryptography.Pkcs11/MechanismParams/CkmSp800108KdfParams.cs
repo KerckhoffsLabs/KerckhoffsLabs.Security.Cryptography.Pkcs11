@@ -166,7 +166,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         {
             return new CK_SP800_108_FEEDBACK_KDF_PARAMS
             {
-                PrfType = _prfType.ToCULong("prfType"),
+                PrfType = CkULong.From((ulong)_prfType, "prfType"),
                 NumberOfDataParams = dataParamCount,
                 DataParams = dataParams,
                 IVLen = (NativeCULong)_iv.Length,
@@ -178,7 +178,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
 
         return new CK_SP800_108_KDF_PARAMS
         {
-            PrfType = _prfType.ToCULong("prfType"),
+            PrfType = CkULong.From((ulong)_prfType, "prfType"),
             NumberOfDataParams = dataParamCount,
             DataParams = dataParams,
             AdditionalDerivedKeys = derivedKeyCount,

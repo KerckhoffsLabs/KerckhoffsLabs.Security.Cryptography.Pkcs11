@@ -68,7 +68,7 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     {
         return new CK_ECDH1_DERIVE_PARAMS
         {
-            Kdf = _kdf.ToCULong("kdf"),
+            Kdf = CkULong.From((ulong)_kdf, "kdf"),
             SharedData = scope.Write(_sharedDataBytes),
             SharedDataLen = (NativeCULong)_sharedDataBytes.Length,
             PublicData = scope.Write(_publicDataBytes),

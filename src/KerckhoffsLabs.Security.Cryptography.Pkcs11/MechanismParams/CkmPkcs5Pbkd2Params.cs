@@ -99,7 +99,7 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
             SaltSourceData = scope.Write(_salt),
             SaltSourceDataLen = (NativeCULong)_salt.Length,
             Iterations = (NativeCULong)(ulong)_iterations,
-            Prf = _prf.ToCULong("prf"),
+            Prf = CkULong.From((ulong)_prf, "prf"),
             PrfData = scope.Write(_prfData),
             PrfDataLen = (NativeCULong)_prfData.Length,
             Password = scope.Write(password),

@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
@@ -17,8 +15,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal static class CkULong
 {
     /// <summary>Narrows <paramref name="value"/> to this platform's <c>CK_ULONG</c>.</summary>
+    /// <param name="value">The value to narrow.</param>
+    /// <param name="paramName">
+    /// The public argument the value came from, reported if it does not fit. Passed explicitly rather than
+    /// captured: inside a parameter type the expression at hand is a field, not the caller's argument.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is wider than <c>CK_ULONG</c> here.</exception>
-    public static NativeCULong From(ulong value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+    public static NativeCULong From(ulong value, string? paramName)
     {
         if (value > (ulong)NativeCULong.MaxValue)
             throw new ArgumentOutOfRangeException(paramName, value,
