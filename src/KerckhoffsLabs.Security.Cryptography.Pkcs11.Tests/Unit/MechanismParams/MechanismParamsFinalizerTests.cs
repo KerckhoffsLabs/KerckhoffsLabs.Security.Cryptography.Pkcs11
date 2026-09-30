@@ -107,5 +107,6 @@ public sealed class MechanismParamsFinalizerTests
         new CkmX3dhInitiateParams(kdf: CKM.CKM_SHA256_HMAC, peerIdentity: pair, peerPrekey: pair, new byte[3], new byte[2], ownIdentity: pair, ownEphemeral: pair),
         new CkmX3dhRespondParams(kdf: CKM.CKM_SHA384_HMAC, new byte[1], new byte[2], new byte[1], initiatorIdentity: pair, new byte[3]),
         new CkmXeddsaParams(CKM.CKM_SHA512),
+        new CkmPkcs5Pbkd2Params(new byte[16], 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, "pw"u8),
     ];
 }

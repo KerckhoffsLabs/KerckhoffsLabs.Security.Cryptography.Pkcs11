@@ -7,6 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <summary>
 /// Holds a PIN value in a pinned byte buffer that is zeroed on disposal.
 /// Prefer this over raw <c>byte[]</c> or <c>string</c> when passing PINs to PKCS#11.
+/// For the password of a password-based key derivation, use <see cref="SecurePassword"/>.
 /// </summary>
 /// <remarks>
 /// The buffer is pinned via <see cref="GCHandle.Alloc(object, GCHandleType)"/> so the

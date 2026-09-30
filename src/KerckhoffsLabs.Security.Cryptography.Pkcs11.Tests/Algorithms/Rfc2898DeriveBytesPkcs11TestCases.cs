@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // PBKDF2-HMAC-SHA1 is an RFC 8018-approved PRF (unlike using SHA1 directly for a signature or MAC),
@@ -249,5 +251,63 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     {
         using var workspace = OpenWorkspace(backend);
         Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.MD5, 32));
+    }
+
+    // === Pbkdf2Key (on-token result, no export) ===========================================
+
+    // No UsePolicy lease anywhere below: keeping the derived key on the token is what makes PBKDF2
+    // usable under the default SecureOnly policy.
+    internal static void Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(IPkcs11Backend backend)
+    {
+        backend.RequireMechanisms(CKM.CKM_PKCS5_PBKD2, CKM.CKM_AES_GCM);
+        using var workspace = OpenWorkspace(backend);
+        Assert.Same(CryptoPolicy.SecureOnly, workspace.Policy);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
+
+        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
+
+        // The key cannot be read, so prove its value by decrypting on the BCL with the expected bytes.
+        byte[] expectedKey = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
+        byte[] nonce = RandomNumberGenerator.GetBytes(12);
+        byte[] plaintext = Encoding.UTF8.GetBytes("pbkdf2 on-token key");
+        byte[] ciphertext = new byte[plaintext.Length];
+        byte[] tag = new byte[16];
+        using (var gcm = new AesGcmPkcs11(key))
+            gcm.Encrypt(nonce, plaintext, ciphertext, tag);
+
+        byte[] decrypted = new byte[plaintext.Length];
+        using (var bcl = new AesGcm(expectedKey, tag.Length))
+            bcl.Decrypt(nonce, ciphertext, tag, decrypted);
+        Assert.Equal(plaintext, decrypted);
+    }
+
+    internal static void Assert_Pbkdf2Key_IsSensitiveAndNonExtractableByDefault(IPkcs11Backend backend)
+    {
+        backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
+        using var workspace = OpenWorkspace(backend);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
+
+        using var attrs = key.GetAttributeValue(CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE);
+        Assert.True(attrs[0].GetValueAsBool());
+        Assert.False(attrs[1].GetValueAsBool());
+    }
+
+    internal static void Assert_Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
+
+        // Refused by the policy before the token is asked, so this holds on every backend.
+        Assert.Throws<CryptoPolicyViolationException>(() =>
+            Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA1, template));
+    }
+
+    internal static void Assert_Pbkdf2Key_NullTemplate_Throws(IPkcs11Backend backend)
+    {
+        using var workspace = OpenWorkspace(backend);
+        Assert.Throws<ArgumentNullException>(() =>
+            Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, null!));
     }
 }
