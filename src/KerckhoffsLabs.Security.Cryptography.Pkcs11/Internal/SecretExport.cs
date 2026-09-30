@@ -103,9 +103,15 @@ internal static class SecretExport
 
     /// <summary>
     /// The ephemeral key's template: a session generic secret that can be read and nothing else — not
-    /// stored on the token, not copyable or modifiable, with every usage flag off. Stated in full rather
-    /// than left to token defaults, several of which (the usage flags) default to true.
+    /// stored on the token, not copyable, with every usage flag off. Stated in full rather than left to
+    /// token defaults, several of which (the usage flags) default to true.
     /// </summary>
+    /// <remarks>
+    /// <c>CKA_MODIFIABLE=false</c> is deliberately absent. SoftHSM applies it while it is still writing
+    /// the template: on <c>C_DeriveKey</c> every attribute after it is refused with
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>. It would add little anyway: the key exists for one call and its
+    /// handle never leaves the library.
+    /// </remarks>
     /// <param name="valueLength">The <c>CKA_VALUE_LEN</c> to request, or <see langword="null"/> to omit it.</param>
     /// <returns>Attributes the caller owns and must dispose.</returns>
     internal static List<ObjectAttribute> EphemeralTemplate(int? valueLength)
@@ -118,7 +124,6 @@ internal static class SecretExport
             new(CKA.CKA_SENSITIVE, false),
             new(CKA.CKA_EXTRACTABLE, true),
             new(CKA.CKA_COPYABLE, false),
-            new(CKA.CKA_MODIFIABLE, false),
             new(CKA.CKA_ENCRYPT, false),
             new(CKA.CKA_DECRYPT, false),
             new(CKA.CKA_SIGN, false),

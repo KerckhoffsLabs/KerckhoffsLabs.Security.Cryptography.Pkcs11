@@ -362,7 +362,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <para>
     /// Only <c>CKM_PKCS5_PBKD2</c> with <see cref="CkmPkcs5Pbkd2Params"/> is supported. The output passes
     /// through an ephemeral session key the library creates — generic secret, extractable, not
-    /// sensitive, not copyable or modifiable, no usage — and destroys before this returns, whether it
+    /// sensitive, not copyable, no usage — and destroys before this returns, whether it
     /// succeeds or not. That template is covered by the export decision and not judged again as a key
     /// template; the mechanism is still judged. On failure, <paramref name="destination"/> is zeroed.
     /// </para>

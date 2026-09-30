@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
@@ -97,6 +98,30 @@ public sealed class SecretExportTests
         Assert.Equal(CKO.CKO_SECRET_KEY, request.BaseKeyClass);
         Assert.Equal(CKK.CKK_GENERIC_SECRET, request.BaseKeyType);
         Assert.Contains("WithAllowedKeyMaterialExport(KeyMaterialExportKind.KdfOutput, reason)", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EphemeralTemplate_StatesEveryRestriction_ButNotCkaModifiable()
+    {
+        List<ObjectAttribute> template = SecretExport.EphemeralTemplate(32);
+        try
+        {
+            bool Flag(CKA type) => template.Single(a => a.Type == type).GetValueAsBool();
+
+            Assert.False(Flag(CKA.CKA_TOKEN));
+            Assert.False(Flag(CKA.CKA_SENSITIVE));
+            Assert.True(Flag(CKA.CKA_EXTRACTABLE));
+            Assert.False(Flag(CKA.CKA_COPYABLE));
+            Assert.All([CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_SIGN, CKA.CKA_VERIFY, CKA.CKA_WRAP, CKA.CKA_UNWRAP, CKA.CKA_DERIVE],
+                usage => Assert.False(Flag(usage)));
+            Assert.Equal(32UL, template.Single(a => a.Type == CKA.CKA_VALUE_LEN).GetValueAsUlong());
+            // SoftHSM refuses every attribute written after CKA_MODIFIABLE=false on C_DeriveKey.
+            Assert.DoesNotContain(template, a => a.Type == CKA.CKA_MODIFIABLE);
+        }
+        finally
+        {
+            SecretExport.Release(template);
+        }
     }
 
     [Fact]

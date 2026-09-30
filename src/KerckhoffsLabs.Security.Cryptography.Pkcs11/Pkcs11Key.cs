@@ -696,7 +696,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </para>
     /// <para>
     /// The secret passes through an ephemeral session key the library creates — generic secret,
-    /// extractable, not sensitive, not copyable or modifiable, no usage — and destroys before this
+    /// extractable, not sensitive, not copyable, no usage — and destroys before this
     /// returns, whether it succeeds or not. That template is covered by the export decision and not
     /// judged again as a key template; for ECDH with <c>CKD_NULL</c>, neither is the key-agreement KDF.
     /// The mechanism is still judged. On failure, <paramref name="destination"/> is zeroed.
