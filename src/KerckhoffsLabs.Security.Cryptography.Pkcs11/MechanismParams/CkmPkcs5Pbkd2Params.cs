@@ -43,7 +43,7 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="password">Password to derive the key from. May be empty.</param>
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
     public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, ReadOnlySpan<byte> password, ReadOnlySpan<byte> prfData = default)
-        : this(salt, iterations, prf, prfData)
+        : this(prf, iterations, salt, prfData)
     {
         _password = GC.AllocateArray<byte>(password.Length, pinned: true);
         password.CopyTo(_password);
@@ -65,13 +65,15 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
     /// <exception cref="ArgumentNullException"><paramref name="password"/> is <see langword="null"/>.</exception>
     public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, SecurePassword password, ReadOnlySpan<byte> prfData = default)
-        : this(salt, iterations, prf, prfData)
+        : this(prf, iterations, salt, prfData)
     {
         ArgumentNullException.ThrowIfNull(password);
         _borrowedPassword = password;
     }
 
-    private CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, ReadOnlySpan<byte> prfData)
+    // The fields every constructor sets. The PRF leads so this signature cannot be mistaken for the
+    // public span constructor's.
+    private CkmPkcs5Pbkd2Params(CKP prf, ulong iterations, ReadOnlySpan<byte> salt, ReadOnlySpan<byte> prfData)
     {
         _salt = salt.ToArray();
         _iterations = iterations;
