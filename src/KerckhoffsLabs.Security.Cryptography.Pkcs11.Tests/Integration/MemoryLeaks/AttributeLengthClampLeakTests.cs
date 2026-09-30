@@ -45,7 +45,7 @@ public sealed class AttributeLengthClampLeakTests
     private static void ReadAndExpectRefusal()
     {
         using var session = new Pkcs11Session(new LyingLengthFake(), 1);
-        Assert.Throws<AttributeValueException>(
+        Assert.Throws<Pkcs11AttributeException>(
             () => session.GetAttributeValue(new ObjectHandle(7), [(ulong)CKA.CKA_VALUE]));
     }
 

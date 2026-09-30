@@ -103,7 +103,7 @@ public sealed class ExceptionMapperTests
 
     // Vendor-defined codes (≥ CKR_VENDOR_DEFINED) and codes newer than the CKR enum are
     // spec-legal on the return path. They must land in the typed hierarchy with the raw
-    // code preserved and rendered as hex — not escape as a bare InvalidEnumValueException.
+    // code preserved and rendered as hex — not escape as a bare conversion error.
     [Theory]
     [InlineData(0x80000123u)]
     [InlineData(0xF0001000u)]

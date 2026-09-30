@@ -1,5 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -817,16 +815,4 @@ internal static class CKAExtensions
     /// <param name="value">CKA that should be converted</param>
     /// <returns>NativeCULong with value from CKA</returns>
     public static NativeCULong ToCULong(this CKA value) => (NativeCULong)(ulong)value;
-
-    /// <summary>
-    /// Converts <see cref="NativeCULong"/> to <see cref="CKA"/>, validating that the value
-    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
-    /// </summary>
-    public static CKA ToCKA(this NativeCULong value)
-    {
-        CKA result = (CKA)(ulong)value;
-        if (!Enum.IsDefined(result))
-            throw new InvalidEnumValueException(typeof(CKA), (ulong)value);
-        return result;
-    }
 }

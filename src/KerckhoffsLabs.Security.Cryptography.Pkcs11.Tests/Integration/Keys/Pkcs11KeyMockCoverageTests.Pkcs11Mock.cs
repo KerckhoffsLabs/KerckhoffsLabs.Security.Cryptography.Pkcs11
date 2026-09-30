@@ -222,7 +222,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     // Pkcs11Workspace.HydrateExistingHandleAsKey on the result, which reads CKA_CLASS/CKA_KEY_TYPE —
     // attribute types pkcs11-mock's C_GetAttributeValue does not support at all (only CKA_LABEL and
     // CKA_VALUE; verified against vendor/pkcs11-mock/src/pkcs11-mock.c and empirically, where it
-    // throws AttributeValueException). The same applies to EncapsulateKey/DecapsulateKey's result
+    // throws Pkcs11AttributeException). The same applies to EncapsulateKey/DecapsulateKey's result
     // hydration and Derive's, though those two are moot anyway since v3.2 is absent from the mock's
     // function table before hydration would ever be reached. The handle-availability guard itself
     // (below) fires before any native call, so it is covered regardless.

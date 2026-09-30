@@ -1,5 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -80,16 +78,4 @@ internal static class CKOExtensions
 {
     /// <summary>Converts <see cref="CKO"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKO value) => (NativeCULong)(ulong)value;
-
-    /// <summary>
-    /// Converts <see cref="NativeCULong"/> to <see cref="CKO"/>, validating that the value
-    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
-    /// </summary>
-    public static CKO ToCKO(this NativeCULong value)
-    {
-        CKO result = (CKO)(ulong)value;
-        if (!Enum.IsDefined(result))
-            throw new InvalidEnumValueException(typeof(CKO), (ulong)value);
-        return result;
-    }
 }
