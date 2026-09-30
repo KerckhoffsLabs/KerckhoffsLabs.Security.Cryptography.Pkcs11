@@ -48,6 +48,11 @@ public sealed class AlgorithmsBoundaryTests
         Assert.True(found.Length == 0, "Non-public references across the boundary:" + Environment.NewLine + string.Join(Environment.NewLine, found));
     }
 
+    private static readonly string RootNamespace = typeof(Pkcs11Key).Namespace!;
+
+    private static bool IsLibraryNamespace(Type type) =>
+        type.Namespace == RootNamespace || (type.Namespace?.StartsWith(RootNamespace + ".", StringComparison.Ordinal) ?? false);
+
     private static bool InAlgorithms(Type type) =>
         type.Namespace == AlgorithmsNamespace || (type.Namespace?.StartsWith(AlgorithmsNamespace + ".", StringComparison.Ordinal) ?? false);
 
@@ -104,9 +109,10 @@ public sealed class AlgorithmsBoundaryTests
                 {
                     MemberInfo root = target is Type t && t.IsGenericType && !t.IsGenericTypeDefinition ? t.GetGenericTypeDefinition() : target;
                     Type? owner = root as Type ?? root.DeclaringType;
-                    // <PrivateImplementationDetails> holds compiler-emitted helpers (string-switch hashes,
-                    // array initialisers), not API either side chose to use.
-                    if (owner?.Assembly == Library && owner.Name != "<PrivateImplementationDetails>")
+                    // Only the library's own namespace: tools also emit types into the assembly — the
+                    // compiler's <PrivateImplementationDetails> (string-switch hashes, array initialisers),
+                    // Coverlet's hit tracker under coverage — which neither side chose to use.
+                    if (owner?.Assembly == Library && IsLibraryNamespace(owner))
                         yield return new Reference($"{type.FullName}.{method.Name}", target);
                 }
             }
