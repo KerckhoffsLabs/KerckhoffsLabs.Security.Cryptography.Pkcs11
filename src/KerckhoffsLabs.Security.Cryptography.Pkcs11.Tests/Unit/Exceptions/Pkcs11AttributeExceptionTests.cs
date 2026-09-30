@@ -19,7 +19,7 @@ public sealed class Pkcs11AttributeExceptionTests
         Assert.Equal(CKA.CKA_VALUE, ex.Attribute);
         Assert.Equal("Value of attribute CKA_VALUE could not be read", ex.Message);
         Assert.Null(ex.InnerException);
-        Assert.IsAssignableFrom<CryptographicException>(ex);
+        Assert.IsType<CryptographicException>(ex, exactMatch: false);
     }
 
     [Fact]
