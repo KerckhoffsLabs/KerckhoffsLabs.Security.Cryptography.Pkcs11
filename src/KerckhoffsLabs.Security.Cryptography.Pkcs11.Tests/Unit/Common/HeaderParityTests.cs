@@ -1,4 +1,3 @@
-using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Common;
@@ -40,7 +39,7 @@ public sealed class HeaderParityTests
         for (ulong v = 0x0A; v <= 0x1A; v++)
         {
             Assert.True(Enum.IsDefined((CKD)v), $"CKD value 0x{v:X} should be defined");
-            Assert.Equal((CKD)v, ((NativeCULong)v).ToCKD());
+            Assert.Equal(v, (ulong)((CKD)v).ToCULong());
         }
     }
 

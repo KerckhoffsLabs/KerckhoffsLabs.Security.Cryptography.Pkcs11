@@ -250,12 +250,12 @@ public sealed class ObjectAttributeTests
         };
         using var attr = new ObjectAttribute(raw);
 
-        Assert.Throws<AttributeValueException>(() => attr.GetValueAsBool());
-        Assert.Throws<AttributeValueException>(() => attr.GetValueAsUlong());
-        Assert.Throws<AttributeValueException>(() => attr.GetValueAsString());
-        Assert.Throws<AttributeValueException>(() => attr.GetValueAsByteArray());
-        Assert.Throws<AttributeValueException>(() => attr.CopyValueTo(new byte[16]));
-        Assert.Throws<AttributeValueException>(() => attr.GetValueAsDateTime());
+        Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsBool());
+        Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsUlong());
+        Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsString());
+        Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsByteArray());
+        Assert.Throws<Pkcs11AttributeException>(() => attr.CopyValueTo(new byte[16]));
+        Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsDateTime());
     }
 
     // ---- ulong-typed constructor for raw vendor attribute IDs -------------
@@ -324,12 +324,12 @@ public sealed class ObjectAttributeTests
     // A token may report a vendor mechanism wider than CKM holds (CK_ULONG is 64 bits on LP64). The
     // CKM-typed read must say so and point at the raw read, not overflow.
     [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
-    public void GetValueAsCkmArray_ValueWiderThanCkm_ThrowsAttributeValueException()
+    public void GetValueAsCkmArray_ValueWiderThanCkm_ThrowsPkcs11AttributeException()
     {
         byte[] value = [.. BitConverter.GetBytes((ulong)CKM.CKM_AES_GCM), .. BitConverter.GetBytes(0x1_8000_0001UL)];
         using var attr = new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, value);
 
-        var ex = Assert.Throws<AttributeValueException>(() => attr.GetValueAsCkmArray());
+        var ex = Assert.Throws<Pkcs11AttributeException>(() => attr.GetValueAsCkmArray());
         Assert.Equal(CKA.CKA_ALLOWED_MECHANISMS, ex.Attribute);
         Assert.Contains("0x180000001", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("GetValueAsUlongArray", ex.Message, StringComparison.Ordinal);

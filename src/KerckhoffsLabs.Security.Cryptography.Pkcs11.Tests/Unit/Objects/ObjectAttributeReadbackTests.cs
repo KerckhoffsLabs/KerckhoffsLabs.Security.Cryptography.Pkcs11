@@ -36,14 +36,14 @@ public sealed class ObjectAttributeReadbackTests
     {
         // A CK_ULONG-sized value (4/8 bytes) is not a CK_BBOOL (1 byte).
         using var a = new ObjectAttribute(CKA.CKA_VALUE, 5UL);
-        Assert.Throws<AttributeValueException>(() => a.GetValueAsBool());
+        Assert.Throws<Pkcs11AttributeException>(() => a.GetValueAsBool());
     }
 
     [Fact]
     public void GetValueAsUlong_WrongLength_Throws()
     {
         using var a = new ObjectAttribute(CKA.CKA_ID, [1, 2, 3]);
-        Assert.Throws<AttributeValueException>(() => a.GetValueAsUlong());
+        Assert.Throws<Pkcs11AttributeException>(() => a.GetValueAsUlong());
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class ObjectAttributeReadbackTests
     {
         // 3 bytes is not a whole number of CK_ULONGs (4 or 8 bytes each).
         using var a = new ObjectAttribute(CKA.CKA_ALLOWED_MECHANISMS, [1, 2, 3]);
-        Assert.Throws<AttributeValueException>(() => a.GetValueAsUlongArray());
+        Assert.Throws<Pkcs11AttributeException>(() => a.GetValueAsUlongArray());
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class ObjectAttributeReadbackTests
     {
         // 3 bytes is not a whole number of CK_ATTRIBUTEs.
         using var a = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [1, 2, 3]);
-        Assert.Throws<AttributeValueException>(() => a.GetValueAsAttributeArray());
+        Assert.Throws<Pkcs11AttributeException>(() => a.GetValueAsAttributeArray());
     }
 
     [Fact]

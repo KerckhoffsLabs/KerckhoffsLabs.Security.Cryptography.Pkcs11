@@ -69,7 +69,7 @@ public sealed class AttributeLengthClampTests
     [Fact]
     public void InflatedLengthOnTheFillCall_IsRefused()
     {
-        var ex = Assert.Throws<AttributeValueException>(
+        var ex = Assert.Throws<Pkcs11AttributeException>(
             () => Read(new LyingLengthFake(honestLen: 8, inflatedLen: 4096)));
 
         Assert.Equal(CKA.CKA_VALUE, ex.Attribute);

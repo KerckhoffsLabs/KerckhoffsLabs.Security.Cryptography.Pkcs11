@@ -1,5 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -358,16 +356,4 @@ internal static class CKKExtensions
 {
     /// <summary>Converts <see cref="CKK"/> to <see cref="NativeCULong"/>.</summary>
     public static NativeCULong ToCULong(this CKK value) => (NativeCULong)(ulong)value;
-
-    /// <summary>
-    /// Converts <see cref="NativeCULong"/> to <see cref="CKK"/>, validating that the value
-    /// matches a defined enum member. Throws <see cref="InvalidEnumValueException"/> otherwise.
-    /// </summary>
-    public static CKK ToCKK(this NativeCULong value)
-    {
-        CKK result = (CKK)(ulong)value;
-        if (!Enum.IsDefined(result))
-            throw new InvalidEnumValueException(typeof(CKK), (ulong)value);
-        return result;
-    }
 }

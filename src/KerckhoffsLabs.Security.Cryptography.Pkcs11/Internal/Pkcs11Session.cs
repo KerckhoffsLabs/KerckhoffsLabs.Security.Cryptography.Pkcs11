@@ -1048,7 +1048,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// Allocates the child buffers of one array attribute, returning <see langword="false"/> when it
     /// declares no children.
     /// </summary>
-    /// <exception cref="AttributeValueException">
+    /// <exception cref="Pkcs11AttributeException">
     /// The reported length is not a whole number of <c>CK_ATTRIBUTE</c>s, so the module is not
     /// describing an attribute array at all.
     /// </exception>
@@ -1060,7 +1060,7 @@ internal sealed class Pkcs11Session : IDisposable
         int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
 
         if ((int)(parent.valueLen) % ckAttributeSize != 0)
-            throw new AttributeValueException((ulong)parent.type);
+            throw Pkcs11AttributeException.For((ulong)parent.type);
 
         int nestedAttrCount = (int)(parent.valueLen) / ckAttributeSize;
         if (nestedAttrCount == 0)
@@ -1123,7 +1123,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (attribute.valueLen <= allocated)
             return;
 
-        throw new AttributeValueException((ulong)attribute.type,
+        throw Pkcs11AttributeException.For((ulong)attribute.type,
             $"The PKCS#11 module reported attribute 0x{(ulong)attribute.type:X} as "
             + $"{(ulong)attribute.valueLen} bytes after being given a {(ulong)allocated}-byte buffer "
             + "sized from its own earlier answer. Reading the value at the reported length would read "
@@ -1584,7 +1584,7 @@ internal sealed class Pkcs11Session : IDisposable
             ulong raw = attrs[0].GetValueAsUlong();
             keyType = raw <= uint.MaxValue ? (CKK)raw : CKK.CKK_VENDOR_DEFINED;
         }
-        catch (Exception ex) when (ex is Pkcs11Exception or AttributeValueException)
+        catch (Exception ex) when (ex is Pkcs11Exception or Pkcs11AttributeException)
         {
             return;
         }
@@ -1598,7 +1598,7 @@ internal sealed class Pkcs11Session : IDisposable
         {
             return Pkcs11ECCurve.FromEcParams(ecParams.GetValueAsByteArray());
         }
-        catch (Exception ex) when (ex is ArgumentException or AttributeValueException)
+        catch (Exception ex) when (ex is ArgumentException or Pkcs11AttributeException)
         {
             return default;
         }

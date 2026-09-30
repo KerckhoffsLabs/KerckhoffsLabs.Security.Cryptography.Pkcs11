@@ -266,27 +266,27 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Reads the value as a PKCS#11 <c>CK_BBOOL</c> (single byte; non-zero is <c>true</c>).</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or is not exactly one byte.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or is not exactly one byte.</exception>
     public bool GetValueAsBool()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         if ((int)_ckAttribute.valueLen != 1)
-            throw new AttributeValueException(Type);
+            throw Pkcs11AttributeException.For(Type);
         byte b = Marshal.ReadByte(_ckAttribute.value);
         return b != 0;
     }
 
     /// <summary>Reads the value as a platform-width PKCS#11 <c>CK_ULONG</c>.</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not that of a platform-width <c>CK_ULONG</c>.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not that of a platform-width <c>CK_ULONG</c>.</exception>
     public ulong GetValueAsUlong()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int len = (int)_ckAttribute.valueLen;
         if (len != UnmanagedMemory.NativeULongSize)
-            throw new AttributeValueException(Type);
+            throw Pkcs11AttributeException.For(Type);
         Span<byte> tmp = stackalloc byte[8];
         UnmanagedMemory.Read(_ckAttribute.value, tmp[..len]);
         return len == 4
@@ -296,11 +296,11 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Reads the value as a UTF-8 string (trailing NUL padding trimmed).</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
     public string GetValueAsString()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int len = (int)_ckAttribute.valueLen;
         if (len == 0) return string.Empty;
         byte[] buf = new byte[len];
@@ -310,11 +310,11 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Returns a copy of the raw value bytes.</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
     public byte[] GetValueAsByteArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int len = (int)_ckAttribute.valueLen;
         byte[] buf = new byte[len];
         if (len > 0) UnmanagedMemory.Read(_ckAttribute.value, buf);
@@ -327,12 +327,12 @@ public sealed class ObjectAttribute : IDisposable
     /// destination buffer.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable).</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is too small.</exception>
     public int CopyValueTo(Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int len = (int)_ckAttribute.valueLen;
         if (destination.Length < len)
             throw new ArgumentException($"Destination too small: needs {len} bytes, got {destination.Length}.", nameof(destination));
@@ -342,14 +342,14 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Reads the value as a PKCS#11 <c>CK_DATE</c> (UTC); returns <c>null</c> when empty or unparseable.</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is neither 0 nor 8 bytes.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or its length is neither 0 nor 8 bytes.</exception>
     public DateTime? GetValueAsDateTime()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int len = (int)_ckAttribute.valueLen;
         if (len == 0) return null;
-        if (len != 8) throw new AttributeValueException(Type);
+        if (len != 8) throw Pkcs11AttributeException.For(Type);
         byte[] buf = new byte[8];
         UnmanagedMemory.Read(_ckAttribute.value, buf);
         string s = Encoding.ASCII.GetString(buf);
@@ -363,16 +363,16 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Reads the value as a PKCS#11 attribute array (a contiguous <c>CK_ATTRIBUTE[]</c>).</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ATTRIBUTE</c> size.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ATTRIBUTE</c> size.</exception>
     public ObjectAttribute[] GetValueAsAttributeArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int total = (int)_ckAttribute.valueLen;
         int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
         int n = total / stride;
         if (total % stride != 0)
-            throw new AttributeValueException(Type);
+            throw Pkcs11AttributeException.For(Type);
         ObjectAttribute[] result = new ObjectAttribute[n];
         for (int i = 0; i < n; i++)
         {
@@ -387,16 +387,16 @@ public sealed class ObjectAttribute : IDisposable
 
     /// <summary>Reads the value as a contiguous array of platform-width <c>CK_ULONG</c> values.</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ULONG</c> size.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or its length is not a whole multiple of the <c>CK_ULONG</c> size.</exception>
     public ulong[] GetValueAsUlongArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (CannotBeRead) throw new AttributeValueException(Type);
+        if (CannotBeRead) throw Pkcs11AttributeException.For(Type);
         int stride = UnmanagedMemory.NativeULongSize;
         int total = (int)_ckAttribute.valueLen;
         int n = total / stride;
         if (total % stride != 0)
-            throw new AttributeValueException(Type);
+            throw Pkcs11AttributeException.For(Type);
         ulong[] result = new ulong[n];
         byte[] buf = new byte[total];
         if (total > 0) UnmanagedMemory.Read(_ckAttribute.value, buf);
@@ -417,7 +417,7 @@ public sealed class ObjectAttribute : IDisposable
     /// read such a list with <see cref="GetValueAsUlongArray"/>.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
-    /// <exception cref="AttributeValueException">Thrown if the value is unreadable (sensitive or unextractable), its length is not a whole multiple of the <c>CK_ULONG</c> size, or it holds a mechanism value wider than <see cref="CKM"/> can represent.</exception>
+    /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable), its length is not a whole multiple of the <c>CK_ULONG</c> size, or it holds a mechanism value wider than <see cref="CKM"/> can represent.</exception>
     public CKM[] GetValueAsCkmArray()
     {
         ulong[] raw = GetValueAsUlongArray();
@@ -425,8 +425,8 @@ public sealed class ObjectAttribute : IDisposable
         for (int i = 0; i < raw.Length; i++)
         {
             if (raw[i] > uint.MaxValue)
-                throw new AttributeValueException(Type,
-                    $"Value of attribute {(CKA)Type} holds mechanism 0x{raw[i]:X}, which is wider than CKM can " +
+                throw Pkcs11AttributeException.For(Type,
+                    $"Value of attribute {Pkcs11AttributeException.Describe(Type)} holds mechanism 0x{raw[i]:X}, which is wider than CKM can " +
                     "represent. Read it with GetValueAsUlongArray().");
             result[i] = (CKM)raw[i];
         }
