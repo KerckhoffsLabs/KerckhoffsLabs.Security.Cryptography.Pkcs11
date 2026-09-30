@@ -6,8 +6,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
 
 /// <summary>
-/// How <see cref="CkmPkcs5Pbkd2Params"/> holds the password: the <see cref="SecurePin"/> constructor
-/// borrows the pin and keeps no copy, the span constructor keeps its own, and neither makes the
+/// How <see cref="CkmPkcs5Pbkd2Params"/> holds the password: the <see cref="SecurePassword"/>
+/// constructor borrows the password and keeps no copy, the span constructor keeps its own, and neither makes the
 /// descriptor disposable or unshareable.
 /// </summary>
 public sealed class Pkcs5Pbkd2ParamsTests
@@ -20,31 +20,39 @@ public sealed class Pkcs5Pbkd2ParamsTests
         return length == 0 ? [] : UnmanagedMemory.Read(s.Password, length);
     }
 
-    private static CkmPkcs5Pbkd2Params WithPin(SecurePin pin) =>
-        new(new byte[16], 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, pin);
+    private static CkmPkcs5Pbkd2Params Borrowing(SecurePassword password) =>
+        new(new byte[16], 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, password);
 
     [Fact]
-    public void PinConstructor_MarshalsThePinsBytes()
+    public void PasswordConstructor_MarshalsThePasswordBytes()
     {
-        using var pin = new SecurePin("password"u8);
+        using var password = new SecurePassword("password"u8);
 
-        Assert.Equal("password"u8.ToArray(), MarshalledPassword(WithPin(pin)));
+        Assert.Equal("password"u8.ToArray(), MarshalledPassword(Borrowing(password)));
     }
 
     [Fact]
-    public void PinConstructor_ReadsThePinAtMarshalTime_AndRefusesOnceItIsDisposed()
+    public void PasswordConstructor_AcceptsAnEmptyPassword()
     {
-        var pin = new SecurePin("password"u8);
-        CkmPkcs5Pbkd2Params p = WithPin(pin);
+        using var password = new SecurePassword(ReadOnlySpan<byte>.Empty);
 
-        pin.Dispose();
+        Assert.Empty(MarshalledPassword(Borrowing(password)));
+    }
+
+    [Fact]
+    public void PasswordConstructor_ReadsThePasswordAtMarshalTime_AndRefusesOnceItIsDisposed()
+    {
+        var password = new SecurePassword("password"u8);
+        CkmPkcs5Pbkd2Params p = Borrowing(password);
+
+        password.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => MarshalledPassword(p));
     }
 
     [Fact]
-    public void PinConstructor_RejectsNull() =>
-        Assert.Throws<ArgumentNullException>(() => WithPin(null!));
+    public void PasswordConstructor_RejectsNull() =>
+        Assert.Throws<ArgumentNullException>(() => Borrowing(null!));
 
     [Fact]
     public void SpanConstructor_KeepsItsOwnCopy()
@@ -64,8 +72,8 @@ public sealed class Pkcs5Pbkd2ParamsTests
     [Fact]
     public void Descriptor_IsShareableAcrossCalls_AndNotDisposable()
     {
-        using var pin = new SecurePin("password"u8);
-        CkmPkcs5Pbkd2Params p = WithPin(pin);
+        using var password = new SecurePassword("password"u8);
+        CkmPkcs5Pbkd2Params p = Borrowing(password);
 
         Assert.Equal(MarshalledPassword(p), MarshalledPassword(p));
         Assert.False(typeof(IDisposable).IsAssignableFrom(typeof(CkmPkcs5Pbkd2Params)));

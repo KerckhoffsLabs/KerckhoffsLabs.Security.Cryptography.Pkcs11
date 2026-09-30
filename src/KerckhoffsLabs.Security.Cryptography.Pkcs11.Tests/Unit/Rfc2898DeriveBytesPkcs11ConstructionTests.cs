@@ -131,7 +131,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     }
 
     [Fact]
-    public void Instance_LendsItsPinUntilDisposed()
+    public void Instance_LendsItsPasswordUntilDisposed()
     {
         var policy = new PasswordCapturingPolicy();
         using var library = ManagedToken.NewLibrary();
@@ -146,7 +146,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     }
 
     [Fact]
-    public void OneShots_ReleaseTheirPinBeforeReturning()
+    public void OneShots_ReleaseTheirPasswordBeforeReturning()
     {
         var policy = new PasswordCapturingPolicy();
         using var library = ManagedToken.NewLibrary();
@@ -157,7 +157,13 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
         Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template));
 
-        Assert.Equal(3, policy.Parameters.Count);
+        using (var password = new SecurePassword("password"))
+        {
+            Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, password, Salt, 1000, HashAlgorithmName.SHA256, template));
+            Assert.True(StillMarshals(policy.Parameters[^1])); // borrowed from the caller, who has not disposed it yet
+        }
+
+        Assert.Equal(4, policy.Parameters.Count);
         Assert.All(policy.Parameters, p => Assert.False(StillMarshals(p)));
         Assert.All(policy.Passwords, p => Assert.Equal("password"u8.ToArray(), p));
     }

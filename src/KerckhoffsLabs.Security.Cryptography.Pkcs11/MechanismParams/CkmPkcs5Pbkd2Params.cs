@@ -12,10 +12,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// <remarks>
 /// <para>
 /// The password is a secret, and how it is held depends on the constructor. The
-/// <see cref="SecurePin"/> constructor borrows the caller's pin and keeps no copy: the password is
-/// read from the pin only while a call is being marshalled, into per-call memory that is zeroed when
-/// the call returns, and zeroing it for good is the pin's job — dispose it once the operation is done.
-/// Prefer that constructor.
+/// <see cref="SecurePassword"/> constructor borrows the caller's password and keeps no copy: it is
+/// read only while a call is being marshalled, into per-call memory that is zeroed when the call
+/// returns, and zeroing it for good is the <see cref="SecurePassword"/>'s job — dispose it once the
+/// operation is done. Prefer that constructor.
 /// </para>
 /// <para>
 /// The span constructor keeps its own copy for the life of this instance, in an array allocated on
@@ -31,11 +31,11 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     private readonly CKP _prf;
     private readonly byte[] _prfData;
     private readonly byte[]? _password;
-    private readonly SecurePin? _borrowedPassword;
+    private readonly SecurePassword? _borrowedPassword;
 
     /// <summary>
     /// Initializes the PBKDF2 parameters with a copy of <paramref name="password"/>, kept pinned and
-    /// never zeroed. Prefer the <see cref="SecurePin"/> overload, which keeps no copy.
+    /// never zeroed. Prefer the <see cref="SecurePassword"/> overload, which keeps no copy.
     /// </summary>
     /// <param name="salt">Salt bytes.</param>
     /// <param name="iterations">Number of iterations to perform when generating each block of keying material.</param>
@@ -51,7 +51,7 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 
     /// <summary>
     /// Initializes the PBKDF2 parameters with a borrowed <paramref name="password"/>: no copy is kept,
-    /// and the pin is read only while a call is being marshalled.
+    /// and it is read only while a call is being marshalled.
     /// </summary>
     /// <remarks>
     /// The caller keeps ownership of <paramref name="password"/> and must keep it undisposed until
@@ -61,10 +61,10 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="salt">Salt bytes.</param>
     /// <param name="iterations">Number of iterations to perform when generating each block of keying material.</param>
     /// <param name="prf">Pseudo-random function used to generate the key.</param>
-    /// <param name="password">Password to derive the key from, as UTF-8 or raw bytes. Borrowed, not owned.</param>
+    /// <param name="password">Password to derive the key from. Borrowed, not owned.</param>
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
     /// <exception cref="ArgumentNullException"><paramref name="password"/> is <see langword="null"/>.</exception>
-    public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, SecurePin password, ReadOnlySpan<byte> prfData = default)
+    public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, ulong iterations, CKP prf, SecurePassword password, ReadOnlySpan<byte> prfData = default)
         : this(salt, iterations, prf, prfData)
     {
         ArgumentNullException.ThrowIfNull(password);
@@ -83,11 +83,11 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     internal CKP Prf => _prf;
 
     /// <inheritdoc/>
-    /// <exception cref="ObjectDisposedException">The borrowed <see cref="SecurePin"/> has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">The borrowed <see cref="SecurePassword"/> has been disposed.</exception>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {
-        // Read straight from the caller's pin into the scope, whose memory is zeroed when the call returns.
-        ReadOnlySpan<byte> password = _borrowedPassword is { } pin ? pin.Pin : _password;
+        // Read straight from the caller's password into the scope, whose memory is zeroed when the call returns.
+        ReadOnlySpan<byte> password = _borrowedPassword is { } borrowed ? borrowed.Password : _password;
         return new CK_PKCS5_PBKD2_PARAMS2
         {
             SaltSource = (NativeCULong)CKZ.CKZ_SALT_SPECIFIED,
