@@ -710,8 +710,8 @@ public sealed class BuildMarshalableTests
 
         Assert.NotEqual(a.Iv, b.Iv);   // independent buffers
         Assert.Equal((ulong)a.IvLen, (ulong)b.IvLen);
-        Assert.Equal((ulong)CKM.CKM_AES_GCM, first.Type);
-        Assert.Equal((ulong)CKM.CKM_AES_GCM, second.Type);
+        Assert.Equal(CKM.CKM_AES_GCM, first.Type);
+        Assert.Equal(CKM.CKM_AES_GCM, second.Type);
     }
 
     /// <summary>

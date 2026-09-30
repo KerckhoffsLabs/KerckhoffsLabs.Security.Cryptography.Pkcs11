@@ -40,7 +40,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Sign;
 [Collection("OpenCryptoki")]
 public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFixture backend)
 {
-    private const ulong CkmIbmMlDsa = 0x80010036UL;  // CKM_VENDOR_DEFINED + 0x10036
+    private const CKM CkmIbmMlDsa = (CKM)0x80010036UL;  // CKM_VENDOR_DEFINED + 0x10036
     private const ulong HedgePreferred = 0;          // CK_IBM_HEDGE_PREFERRED
 
     private readonly OpenCryptokiBackendFixture _backend = backend;

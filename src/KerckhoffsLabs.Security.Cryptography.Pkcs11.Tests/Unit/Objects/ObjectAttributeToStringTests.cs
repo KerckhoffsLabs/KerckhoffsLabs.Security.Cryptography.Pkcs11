@@ -75,7 +75,7 @@ public sealed class ObjectAttributeToStringTests
     [Fact]
     public void VendorAttribute_IsNamedByItsCode()
     {
-        using var vendor = new ObjectAttribute(0x8000_0123UL, [0x01, 0x02]);
+        using var vendor = new ObjectAttribute((CKA)0x8000_0123UL, [0x01, 0x02]);
         Assert.Equal("CKA 0x80000123 (2 bytes)", vendor.ToString());
     }
 

@@ -56,7 +56,7 @@ public sealed class Pkcs11SessionPolicyTests
 
         var use = Assert.IsType<MechanismUseRequest>(Assert.Single(policy.Seen));
         Assert.Equal(CryptoOperation.Encrypt, use.Operation);
-        Assert.Equal((ulong)CKM.CKM_AES_GCM, use.Mechanism.Type);
+        Assert.Equal(CKM.CKM_AES_GCM, use.Mechanism.Type);
     }
 
     [Fact]
@@ -265,7 +265,7 @@ public sealed class Pkcs11SessionPolicyTests
         var tokenError = Assert.IsType<Pkcs11Exception>(ex, exactMatch: false);
         Assert.Equal(CKR.CKR_MECHANISM_INVALID, tokenError.ReturnValue);
         Assert.Empty(policy.Seen.OfType<KeyMaterialExportRequest>());
-        Assert.Contains(policy.Seen.OfType<MechanismUseRequest>(), r => r.Mechanism.Type == (ulong)CKM.CKM_PKCS5_PBKD2);
+        Assert.Contains(policy.Seen.OfType<MechanismUseRequest>(), r => r.Mechanism.Type == CKM.CKM_PKCS5_PBKD2);
     }
 
     [Fact]

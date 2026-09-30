@@ -34,13 +34,13 @@ public sealed class NestedKeyTemplateBuilderTests
             .ValueLen(32)
             .Build();
 
-        ulong[] present = [.. template.Attributes.Select(a => a.Type)];
-        Assert.Contains((ulong)CKA.CKA_CLASS, present);
-        Assert.Contains((ulong)CKA.CKA_KEY_TYPE, present);
-        Assert.Contains((ulong)CKA.CKA_SENSITIVE, present);
-        Assert.Contains((ulong)CKA.CKA_EXTRACTABLE, present);
-        Assert.Contains((ulong)CKA.CKA_WRAP_WITH_TRUSTED, present);
-        Assert.Contains((ulong)CKA.CKA_VALUE_LEN, present);
+        CKA[] present = [.. template.Attributes.Select(a => a.Type)];
+        Assert.Contains(CKA.CKA_CLASS, present);
+        Assert.Contains(CKA.CKA_KEY_TYPE, present);
+        Assert.Contains(CKA.CKA_SENSITIVE, present);
+        Assert.Contains(CKA.CKA_EXTRACTABLE, present);
+        Assert.Contains(CKA.CKA_WRAP_WITH_TRUSTED, present);
+        Assert.Contains(CKA.CKA_VALUE_LEN, present);
     }
 
     [Fact]
@@ -48,10 +48,10 @@ public sealed class NestedKeyTemplateBuilderTests
     {
         using var extractable = new NestedKeyTemplateBuilder();
         using ObjectTemplate yes = extractable.Extractable().Build();
-        Assert.True(yes.Attributes.Single(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool());
+        Assert.True(yes.Attributes.Single(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool());
 
         using var nonExtractable = new NestedKeyTemplateBuilder();
         using ObjectTemplate no = nonExtractable.NonExtractable().Build();
-        Assert.False(no.Attributes.Single(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE).GetValueAsBool());
+        Assert.False(no.Attributes.Single(a => a.Type == CKA.CKA_EXTRACTABLE).GetValueAsBool());
     }
 }

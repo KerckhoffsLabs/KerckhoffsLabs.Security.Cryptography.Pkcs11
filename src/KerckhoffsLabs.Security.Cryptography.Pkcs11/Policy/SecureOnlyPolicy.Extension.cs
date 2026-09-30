@@ -51,7 +51,11 @@ public sealed partial class SecureOnlyPolicy
     ///     "Legacy archive decryption only; verified offline that no code path re-encrypts under DES.");
     /// </code>
     /// </example>
-    /// <param name="mechanism">The standard mechanism to allow.</param>
+    /// <param name="mechanism">
+    /// The mechanism to allow. A vendor mechanism is passed as its value cast to <see cref="CKM"/>, and
+    /// lands in the vendor allow-list (<c>≥ CKM_VENDOR_DEFINED</c>, the split
+    /// <see cref="Mechanism.IsVendorDefined"/> uses).
+    /// </param>
     /// <param name="operations">The operations to approve <paramref name="mechanism"/> for. Must not be empty.</param>
     /// <param name="reason">
     /// Why <paramref name="mechanism"/> is approved for your use case. Recorded as the new entry's
@@ -64,33 +68,6 @@ public sealed partial class SecureOnlyPolicy
     /// <see cref="CryptoOperation"/>, or <paramref name="reason"/> is <see langword="null"/>, empty, or whitespace.
     /// </exception>
     public SecureOnlyPolicy WithAllowedMechanism(CKM mechanism, IEnumerable<CryptoOperation> operations, string reason)
-        => WithAllowedMechanism((ulong)mechanism, operations, reason);
-
-    /// <summary>
-    /// Vendor-mechanism overload of <see cref="WithAllowedMechanism(CKM, IEnumerable{CryptoOperation}, string)"/> —
-    /// see its remarks for what is allowed, how an existing entry is widened, and validation.
-    /// </summary>
-    /// <remarks>
-    /// Both overloads route by the raw <c>CK_MECHANISM_TYPE</c> value, not by which overload was called: a
-    /// value below <c>CKM_VENDOR_DEFINED</c> always lands in the standard allow-list and a value at or
-    /// above it — including one wider than 32 bits, where <c>CK_ULONG</c> is 64-bit — always lands in the
-    /// vendor allow-list, the same split <see cref="Mechanism.IsVendorDefined"/> uses. Passing a standard
-    /// mechanism's value through this overload, or a vendor value cast to <see cref="CKM"/> through the
-    /// other, behaves identically to using the matching overload directly.
-    /// </remarks>
-    /// <param name="vendorMechanism">The mechanism's raw <c>CK_MECHANISM_TYPE</c> value.</param>
-    /// <param name="operations">The operations to approve the mechanism for. Must not be empty.</param>
-    /// <param name="reason">
-    /// Why the mechanism is approved for your use case. Recorded as the new entry's rationale and shown
-    /// in the generated documentation for the returned instance.
-    /// </param>
-    /// <returns>A new, wider <see cref="SecureOnlyPolicy"/> named <c>"SecureOnly+custom"</c>.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="operations"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException">
-    /// <paramref name="operations"/> is empty or contains a value that is not a defined
-    /// <see cref="CryptoOperation"/>, or <paramref name="reason"/> is <see langword="null"/>, empty, or whitespace.
-    /// </exception>
-    public SecureOnlyPolicy WithAllowedMechanism(ulong vendorMechanism, IEnumerable<CryptoOperation> operations, string reason)
     {
         ArgumentNullException.ThrowIfNull(operations);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
@@ -105,7 +82,7 @@ public sealed partial class SecureOnlyPolicy
         if (ops == S.None)
             throw new ArgumentException("At least one operation must be approved.", nameof(operations));
 
-        PolicyCatalogue extendedCatalogue = WithMechanismEntry(vendorMechanism, ops, reason);
+        PolicyCatalogue extendedCatalogue = WithMechanismEntry((ulong)mechanism, ops, reason);
         return new SecureOnlyPolicy(extendedCatalogue, ExtendedName);
     }
 
@@ -113,8 +90,7 @@ public sealed partial class SecureOnlyPolicy
     /// Builds a copy of <see cref="_catalogue"/> with one mechanism entry added or widened, routed to
     /// <see cref="PolicyCatalogue.AllowedMechanisms"/> or <see cref="PolicyCatalogue.AllowedVendorMechanisms"/>
     /// by <paramref name="raw"/>'s value against <see cref="CKM.CKM_VENDOR_DEFINED"/>, the same test
-    /// <see cref="Mechanism.IsVendorDefined"/> uses. A value wider than 32 bits is vendor-range and is never
-    /// cast to <see cref="CKM"/>.
+    /// <see cref="Mechanism.IsVendorDefined"/> uses.
     /// </summary>
     private PolicyCatalogue WithMechanismEntry(ulong raw, S operations, string reason)
     {

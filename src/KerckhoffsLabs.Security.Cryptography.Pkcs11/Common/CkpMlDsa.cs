@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// <see cref="CkpMlKem"/>, <see cref="CkpSlhDsa"/>) — disambiguation is by the
 /// owning CKK key type and the attribute context.
 /// </remarks>
-public enum CkpMlDsa : uint
+public enum CkpMlDsa : ulong
 {
     /// <summary>ML-DSA-44: NIST security level 2; public key 1312 B, signature 2420 B.</summary>
     CKP_ML_DSA_44 = 0x00000001,

@@ -384,7 +384,7 @@ public sealed class Pkcs11Workspace : IDisposable
     private static void RequireClassIfSet(ObjectTemplate template, CKO expected, string paramName)
     {
         ObjectAttribute? contradicting = template.Attributes.FirstOrDefault(attribute =>
-            attribute.Type == (ulong)CKA.CKA_CLASS
+            attribute.Type == CKA.CKA_CLASS
             && !attribute.CannotBeRead
             && attribute.GetValueAsUlong() != (ulong)expected);
         if (contradicting is null) return;

@@ -18,14 +18,14 @@ public sealed class NestedTemplateOwnershipTests
             .WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY).Sensitive())
             .Build();
 
-        ObjectAttribute parent = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
         ObjectAttribute[] children = parent.GetValueAsAttributeArray();
 
         // Only Type is safe to read: each child wraps a fresh CK_ATTRIBUTE pointing at the same
         // unmanaged buffer the parent owns.
         Assert.Equal(2, children.Length);
-        Assert.Contains((ulong)CKA.CKA_CLASS, children.Select(c => c.Type));
-        Assert.Contains((ulong)CKA.CKA_SENSITIVE, children.Select(c => c.Type));
+        Assert.Contains(CKA.CKA_CLASS, children.Select(c => c.Type));
+        Assert.Contains(CKA.CKA_SENSITIVE, children.Select(c => c.Type));
     }
 
     /// <summary>
@@ -44,7 +44,7 @@ public sealed class NestedTemplateOwnershipTests
 
         builder.Dispose();
 
-        ObjectAttribute parent = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
         Assert.Single(parent.GetValueAsAttributeArray());
     }
 
@@ -96,7 +96,7 @@ public sealed class NestedTemplateOwnershipTests
             .WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY).Sensitive().NonExtractable())
             .Build();
 
-        ObjectAttribute parent = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
         Assert.Equal(3, parent.GetValueAsAttributeArray().Length);
     }
 
@@ -113,7 +113,7 @@ public sealed class NestedTemplateOwnershipTests
             .Attribute(CKA.CKA_WRAP_TEMPLATE, t => t.Sensitive().NonExtractable())
             .Build();
 
-        ObjectAttribute parent = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
         Assert.Equal(2, parent.GetValueAsAttributeArray().Length);
         Assert.Single(template.NestedChildren);
     }
@@ -152,9 +152,9 @@ public sealed class NestedTemplateOwnershipTests
             .DeriveTemplate(t => t.Sensitive())
             .Build();
 
-        ulong[] present = [.. template.Attributes.Select(a => a.Type)];
-        Assert.Contains((ulong)CKA.CKA_UNWRAP_TEMPLATE, present);
-        Assert.Contains((ulong)CKA.CKA_DERIVE_TEMPLATE, present);
+        CKA[] present = [.. template.Attributes.Select(a => a.Type)];
+        Assert.Contains(CKA.CKA_UNWRAP_TEMPLATE, present);
+        Assert.Contains(CKA.CKA_DERIVE_TEMPLATE, present);
     }
 
     [Fact]
@@ -165,9 +165,9 @@ public sealed class NestedTemplateOwnershipTests
             .DeriveTemplate(t => t.Sensitive())
             .Build();
 
-        ulong[] present = [.. template.Attributes.Select(a => a.Type)];
-        Assert.Contains((ulong)CKA.CKA_UNWRAP_TEMPLATE, present);
-        Assert.Contains((ulong)CKA.CKA_DERIVE_TEMPLATE, present);
+        CKA[] present = [.. template.Attributes.Select(a => a.Type)];
+        Assert.Contains(CKA.CKA_UNWRAP_TEMPLATE, present);
+        Assert.Contains(CKA.CKA_DERIVE_TEMPLATE, present);
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public sealed class NestedTemplateOwnershipTests
             .WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY).NonExtractable())
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_WRAP_TEMPLATE);
     }
 
     /// <summary>
@@ -192,8 +192,8 @@ public sealed class NestedTemplateOwnershipTests
             .UnwrapTemplate(t => t.Sensitive().NonExtractable().Class(CKO.CKO_SECRET_KEY))
             .Build();
 
-        ObjectAttribute wrap = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_TEMPLATE);
-        ObjectAttribute unwrap = template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_UNWRAP_TEMPLATE);
+        ObjectAttribute wrap = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
+        ObjectAttribute unwrap = template.Attributes.Single(a => a.Type == CKA.CKA_UNWRAP_TEMPLATE);
 
         Assert.Single(wrap.GetValueAsAttributeArray());
         Assert.Equal(3, unwrap.GetValueAsAttributeArray().Length);

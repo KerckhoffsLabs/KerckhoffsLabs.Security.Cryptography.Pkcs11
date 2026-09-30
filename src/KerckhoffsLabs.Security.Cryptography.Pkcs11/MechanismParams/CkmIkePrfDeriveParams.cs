@@ -47,7 +47,7 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     {
         return new CK_IKE_PRF_DERIVE_PARAMS
         {
-            PrfMechanism = (NativeCULong)(ulong)_prfMechanism,
+            PrfMechanism = CkULong.From((ulong)_prfMechanism, "prfMechanism"),
             DataAsKey = _dataAsKey,
             Rekey = _rekey,
             Ni = scope.Write(_niBytes),

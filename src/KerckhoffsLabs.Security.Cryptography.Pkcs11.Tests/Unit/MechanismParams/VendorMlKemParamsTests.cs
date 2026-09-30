@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -46,7 +47,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// </remarks>
 public sealed class VendorMlKemParamsTests
 {
-    private const ulong CkmIbmMlKem = 0x80010037UL;   // CKM_VENDOR_DEFINED + 0x10037
+    private const CKM CkmIbmMlKem = (CKM)0x80010037UL;   // CKM_VENDOR_DEFINED + 0x10037
     private const ulong ModeDecapsulate = 2;          // CK_IBM_ML_KEM_DECAPSULATE
 
     private sealed class CkmIbmMlKemParams(
@@ -168,7 +169,7 @@ public sealed class VendorMlKemParamsTests
         using var scope = keys.NewScope();
         CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
 
-        Assert.Equal(CkmIbmMlKem, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)CkmIbmMlKem, (ulong)marshalled.Mechanism);
         Assert.Equal((ulong)Expected.Total, (ulong)marshalled.ParameterLen);
         Assert.Null(Record.Exception(() => mech.AbsorbOutput(marshalledParams)));
     }

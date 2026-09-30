@@ -48,7 +48,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 internal static class Pkcs5Pbkd2ReferenceVectorTestCases
 {
     private const string Password = "correct horse battery staple";
-    private const ulong Iterations = 10_000;
+    private const int Iterations = 10_000;
 
     // (prf, salt, expectedHex, outputLength)
     public static TheoryData<CKP, string, string, int> SharedPrfs =>

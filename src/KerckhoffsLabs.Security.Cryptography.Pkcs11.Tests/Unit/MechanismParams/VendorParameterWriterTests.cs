@@ -207,13 +207,13 @@ public sealed class VendorParameterWriterTests
     [Fact]
     public void VendorParameters_ReachCkMechanism()
     {
-        const ulong CkmIbmMlDsa = 0x80010036UL; // CKM_VENDOR_DEFINED + 0x10036
+        const CKM CkmIbmMlDsa = (CKM)0x80010036UL; // CKM_VENDOR_DEFINED + 0x10036
         var mech = new Mechanism(CkmIbmMlDsa, new Described(w => w.CkULong(7).CkBBool(true)));
         using var scope = new MechanismParameterScope();
 
         CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
 
-        Assert.Equal(CkmIbmMlDsa, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)CkmIbmMlDsa, (ulong)marshalled.Mechanism);
         Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);
         Assert.Equal(
             (ulong)WrittenBytes(w => w.CkULong(7).CkBBool(true)).Length,
@@ -228,8 +228,8 @@ public sealed class VendorParameterWriterTests
     public void OneVendorDescriptor_CanBackTwoMechanisms()
     {
         var shared = new Described(w => w.CkULong(3).Buffer([1, 2, 3]));
-        var first = new Mechanism(0x80010036UL, shared);
-        var second = new Mechanism(0x80010036UL, shared);
+        var first = new Mechanism((CKM)0x80010036UL, shared);
+        var second = new Mechanism((CKM)0x80010036UL, shared);
 
         using var scopeA = new MechanismParameterScope();
         using var scopeB = new MechanismParameterScope();

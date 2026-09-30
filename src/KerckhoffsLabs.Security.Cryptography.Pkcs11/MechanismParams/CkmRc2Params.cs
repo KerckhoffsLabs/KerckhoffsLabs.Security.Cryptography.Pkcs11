@@ -10,15 +10,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmRc2Params : MechanismParameters
 {
-    private readonly ulong _effectiveBits;
+    private readonly int _effectiveBits;
 
     /// <summary>
     /// Initializes RC2 ECB/MAC parameters.
     /// </summary>
     /// <param name="effectiveBits">Effective number of bits in the RC2 search space (RFC 2268, 1–1024).</param>
-    public CkmRc2Params(ulong effectiveBits) => _effectiveBits = effectiveBits;
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="effectiveBits"/> is negative.</exception>
+    public CkmRc2Params(int effectiveBits)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(effectiveBits);
+        _effectiveBits = effectiveBits;
+    }
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
-        => new CK_RC2_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
+        => new CK_RC2_PARAMS { EffectiveBits = (NativeCULong)(ulong)_effectiveBits };
 }

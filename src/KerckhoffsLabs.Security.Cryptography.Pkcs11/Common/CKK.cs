@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Key types
 /// </summary>
-public enum CKK : uint
+public enum CKK : ulong
 {
     /// <summary>
     /// RSA key
@@ -355,5 +357,6 @@ public enum CKK : uint
 internal static class CKKExtensions
 {
     /// <summary>Converts <see cref="CKK"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKK value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKK value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

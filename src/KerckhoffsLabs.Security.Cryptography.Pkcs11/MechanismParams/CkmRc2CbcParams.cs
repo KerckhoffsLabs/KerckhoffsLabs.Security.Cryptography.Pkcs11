@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 public sealed class CkmRc2CbcParams : MechanismParameters
 {
-    private readonly ulong _effectiveBits;
+    private readonly int _effectiveBits;
     private readonly byte[] _iv;
 
     /// <summary>
@@ -19,9 +19,11 @@ public sealed class CkmRc2CbcParams : MechanismParameters
     /// </summary>
     /// <param name="effectiveBits">Effective number of bits in the RC2 search space (RFC 2268, 1–1024).</param>
     /// <param name="iv">The 8-byte initialization vector.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="effectiveBits"/> is negative.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="iv"/> is not exactly 8 bytes.</exception>
-    public CkmRc2CbcParams(ulong effectiveBits, ReadOnlySpan<byte> iv)
+    public CkmRc2CbcParams(int effectiveBits, ReadOnlySpan<byte> iv)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(effectiveBits);
         if (iv.Length != 8)
             throw new ArgumentException("RC2 CBC IV must be exactly 8 bytes.", nameof(iv));
 
@@ -35,7 +37,7 @@ public sealed class CkmRc2CbcParams : MechanismParameters
 
         // The IV is an inline buffer, which an object initializer cannot assign from a span,
         // so construct first and copy into the field afterwards.
-        var lowLevel = new CK_RC2_CBC_PARAMS { EffectiveBits = (NativeCULong)_effectiveBits };
+        var lowLevel = new CK_RC2_CBC_PARAMS { EffectiveBits = (NativeCULong)(ulong)_effectiveBits };
         _iv.CopyTo(lowLevel.Iv);
         return lowLevel;
     }

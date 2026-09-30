@@ -88,8 +88,8 @@ public sealed class ObjectTemplateTests
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Build();
         var attrs = template.Attributes;
 
-        var sensitive = attrs.Single(a => a.Type == (ulong)CKA.CKA_SENSITIVE);
-        var extractable = attrs.Single(a => a.Type == (ulong)CKA.CKA_EXTRACTABLE);
+        var sensitive = attrs.Single(a => a.Type == CKA.CKA_SENSITIVE);
+        var extractable = attrs.Single(a => a.Type == CKA.CKA_EXTRACTABLE);
 
         // Both attributes carry a CK_BBOOL — value length is 1.
         Assert.Equal(1, sensitive.ValueLength);
@@ -115,7 +115,7 @@ public sealed class ObjectTemplateTests
             .ValueLen(256 / 8)
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VALUE_LEN);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VALUE_LEN);
     }
 
     [Fact]
@@ -131,13 +131,13 @@ public sealed class ObjectTemplateTests
             .Derive()
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_ENCRYPT);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_DECRYPT);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SIGN);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VERIFY);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_WRAP);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_UNWRAP);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_DERIVE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_ENCRYPT);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_DECRYPT);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SIGN);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VERIFY);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_WRAP);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_UNWRAP);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_DERIVE);
     }
 
     [Fact]
@@ -160,9 +160,9 @@ public sealed class ObjectTemplateTests
             .Derive()
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SIGN);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_DECRYPT);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_DERIVE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SIGN);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_DECRYPT);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_DERIVE);
     }
 
     [Fact]
@@ -186,9 +186,9 @@ public sealed class ObjectTemplateTests
             .Wrap()
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VERIFY);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_ENCRYPT);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_WRAP);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VERIFY);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_ENCRYPT);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_WRAP);
     }
 
     [Fact]
@@ -211,8 +211,8 @@ public sealed class ObjectTemplateTests
             .Value(cert)
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SUBJECT);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VALUE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SUBJECT);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VALUE);
     }
 
     [Fact]
@@ -234,15 +234,15 @@ public sealed class ObjectTemplateTests
             .Value(payload)
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_APPLICATION);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VALUE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_APPLICATION);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VALUE);
     }
 
     [Fact]
     public void Data_ObjectId_AddsAttribute()
     {
         using var template = ObjectTemplate.ForData().ObjectId([0x06, 0x03, 0x55, 0x04]).Build();
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_OBJECT_ID);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_OBJECT_ID);
     }
 
     [Fact]
@@ -255,9 +255,9 @@ public sealed class ObjectTemplateTests
             .Value(raw)
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SENSITIVE);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_EXTRACTABLE);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VALUE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SENSITIVE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_EXTRACTABLE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VALUE);
     }
 
     [Fact]
@@ -271,10 +271,10 @@ public sealed class ObjectTemplateTests
             .Unwrap()
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SENSITIVE);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_EXTRACTABLE);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SIGN_RECOVER);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_UNWRAP);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SENSITIVE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_EXTRACTABLE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SIGN_RECOVER);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_UNWRAP);
     }
 
     [Fact]
@@ -288,11 +288,11 @@ public sealed class ObjectTemplateTests
             .EcParams([0x06, 0x08, 0x2A])
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_VERIFY_RECOVER);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_DERIVE);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_MODULUS_BITS);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_PUBLIC_EXPONENT);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_EC_PARAMS);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_VERIFY_RECOVER);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_DERIVE);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_MODULUS_BITS);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_PUBLIC_EXPONENT);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_EC_PARAMS);
     }
 
     [Fact]
@@ -304,9 +304,9 @@ public sealed class ObjectTemplateTests
             .SerialNumber([0x02, 0x01, 0x01])
             .Build();
 
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_TRUSTED);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_ISSUER);
-        Assert.Contains(template.Attributes, a => a.Type == (ulong)CKA.CKA_SERIAL_NUMBER);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_TRUSTED);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_ISSUER);
+        Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SERIAL_NUMBER);
     }
 
     /// <summary>

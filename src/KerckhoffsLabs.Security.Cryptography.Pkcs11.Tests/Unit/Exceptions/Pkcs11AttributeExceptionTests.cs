@@ -5,8 +5,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 
 /// <summary>
-/// <see cref="Pkcs11AttributeException"/>: the public constructor's defaults, and the internal
-/// factory for attribute codes as a module reports them, which must never throw while building the
+/// <see cref="Pkcs11AttributeException"/>: the constructor's defaults, and attribute codes as a module
+/// reports them — vendor-defined or wider than 32 bits — which must never throw while building the
 /// exception.
 /// </summary>
 public sealed class Pkcs11AttributeExceptionTests
@@ -43,31 +43,22 @@ public sealed class Pkcs11AttributeExceptionTests
     }
 
     [Fact]
-    public void For_ADefinedCode_NamesTheAttribute()
+    public void AnUndefinedVendorAttribute_IsKeptAndShownInHex()
     {
-        var ex = Pkcs11AttributeException.For((ulong)CKA.CKA_MODULUS);
+        var ex = new Pkcs11AttributeException((CKA)0x8000_0123UL);
 
-        Assert.Equal(CKA.CKA_MODULUS, ex.Attribute);
-        Assert.Equal("Value of attribute CKA_MODULUS could not be read", ex.Message);
-    }
-
-    [Fact]
-    public void For_AnUndefinedVendorCode_KeepsTheCodeAndShowsItInHex()
-    {
-        var ex = Pkcs11AttributeException.For(0x8000_0123UL);
-
-        Assert.Equal((CKA)0x8000_0123u, ex.Attribute);
+        Assert.Equal((CKA)0x8000_0123UL, ex.Attribute);
         Assert.Contains("CKA 0x80000123", ex.Message, StringComparison.Ordinal);
     }
 
-    // The old ulong constructors narrowed with Convert.ToUInt32, so a 64-bit vendor code made the
-    // exception constructor itself throw OverflowException in place of the real error.
+    // CKA is as wide as CK_ULONG, so an attribute code wider than 32 bits (legal where CK_ULONG is 64
+    // bits) is carried exactly; building the exception never narrows it.
     [Fact]
-    public void For_ACodeWiderThanCka_DoesNotThrow_AndCarriesTheFullCode()
+    public void AnAttributeWiderThan32Bits_IsCarriedExactly()
     {
-        var ex = Pkcs11AttributeException.For(0x1_8000_0001UL, innerException: new FormatException());
+        var ex = new Pkcs11AttributeException((CKA)0x1_8000_0001UL, innerException: new FormatException());
 
-        Assert.Equal(CKA.CKA_VENDOR_DEFINED, ex.Attribute);
+        Assert.Equal((CKA)0x1_8000_0001UL, ex.Attribute);
         Assert.Contains("CKA 0x180000001", ex.Message, StringComparison.Ordinal);
         Assert.Contains("could not be converted", ex.Message, StringComparison.Ordinal);
     }

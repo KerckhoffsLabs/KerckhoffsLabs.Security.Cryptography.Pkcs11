@@ -167,7 +167,7 @@ public sealed class Pkcs11SlotTests
         Assert.Equal(2, list.Count);
         Assert.Equal(ckmIbmEthDerive, (ulong)list[1]);
         Assert.False(Enum.IsDefined(list[1]));            // present, but unnamed
-        Assert.True(new Mechanism((ulong)list[1]).IsVendorDefined);  // and usable from here
+        Assert.True(new Mechanism(list[1]).IsVendorDefined);  // and usable from here
     }
 
     [Fact]

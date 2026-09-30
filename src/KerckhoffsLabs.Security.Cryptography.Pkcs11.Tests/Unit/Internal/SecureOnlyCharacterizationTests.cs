@@ -51,7 +51,7 @@ public sealed class SecureOnlyCharacterizationTests
     public void VendorDefinedMechanism_IsDenied()
     {
         using var session = NewSession();
-        var ex = Assert.Throws<CryptoPolicyViolationException>(() => session.Encrypt(new Mechanism(0x8000_1234UL), AnyKey, [1]));
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() => session.Encrypt(new Mechanism((CKM)0x8000_1234UL), AnyKey, [1]));
         Assert.Contains("not on the SecureOnly allow-list", ex.Message, StringComparison.Ordinal);
     }
 

@@ -255,7 +255,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
 
         Assert.Throws<CryptoPolicyViolationException>(
-            () => key.Verify(new Mechanism(0x8000_1234UL), Data, new byte[256]));
+            () => key.Verify(new Mechanism((CKM)0x8000_1234UL), Data, new byte[256]));
     }
 
     // FipsOnly allows SHA-1 RSA signatures only for Verify (legacy use): proves the fallback reports
@@ -294,7 +294,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
 
     public static bool NativeULongIs64Bit => UnmanagedMemory.NativeULongSize == sizeof(ulong);
 
-    private const ulong WideVendorMechanism = 0x1_8000_0001UL;
+    private const CKM WideVendorMechanism = (CKM)0x1_8000_0001UL;
 
     [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
     public void ManagedFallback_RsaKey_WideVendorMechanism_IsNotSupported()

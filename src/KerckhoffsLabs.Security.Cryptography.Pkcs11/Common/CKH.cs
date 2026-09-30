@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Hardware feature types
 /// </summary>
-public enum CKH : uint
+public enum CKH : ulong
 {
     /// <summary>
     /// Monotonic counter objects represent hardware counters that exist on the device.
@@ -32,5 +34,6 @@ public enum CKH : uint
 internal static class CKHExtensions
 {
     /// <summary>Converts <see cref="CKH"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKH value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKH value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

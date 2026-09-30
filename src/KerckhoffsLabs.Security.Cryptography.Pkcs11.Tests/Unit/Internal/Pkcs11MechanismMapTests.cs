@@ -13,24 +13,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 public sealed class Pkcs11MechanismMapTests
 {
     [Theory]
-    [InlineData("SHA1", (ulong)CKM.CKM_SHA1_RSA_PKCS)]
-    [InlineData("SHA224", (ulong)CKM.CKM_SHA224_RSA_PKCS)]
-    [InlineData("SHA256", (ulong)CKM.CKM_SHA256_RSA_PKCS)]
-    [InlineData("SHA384", (ulong)CKM.CKM_SHA384_RSA_PKCS)]
-    [InlineData("SHA512", (ulong)CKM.CKM_SHA512_RSA_PKCS)]
-    public void RsaPkcs1_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
+    [InlineData("SHA1", CKM.CKM_SHA1_RSA_PKCS)]
+    [InlineData("SHA224", CKM.CKM_SHA224_RSA_PKCS)]
+    [InlineData("SHA256", CKM.CKM_SHA256_RSA_PKCS)]
+    [InlineData("SHA384", CKM.CKM_SHA384_RSA_PKCS)]
+    [InlineData("SHA512", CKM.CKM_SHA512_RSA_PKCS)]
+    public void RsaPkcs1_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.RsaPkcs1Sign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
     }
 
     [Theory]
-    [InlineData("SHA1", (ulong)CKM.CKM_SHA1_RSA_PKCS_PSS)]
-    [InlineData("SHA224", (ulong)CKM.CKM_SHA224_RSA_PKCS_PSS)]
-    [InlineData("SHA256", (ulong)CKM.CKM_SHA256_RSA_PKCS_PSS)]
-    [InlineData("SHA384", (ulong)CKM.CKM_SHA384_RSA_PKCS_PSS)]
-    [InlineData("SHA512", (ulong)CKM.CKM_SHA512_RSA_PKCS_PSS)]
-    public void RsaPss_HashToCkm_ReturnsExpectedWithParams(string hashName, ulong expectedCkm)
+    [InlineData("SHA1", CKM.CKM_SHA1_RSA_PKCS_PSS)]
+    [InlineData("SHA224", CKM.CKM_SHA224_RSA_PKCS_PSS)]
+    [InlineData("SHA256", CKM.CKM_SHA256_RSA_PKCS_PSS)]
+    [InlineData("SHA384", CKM.CKM_SHA384_RSA_PKCS_PSS)]
+    [InlineData("SHA512", CKM.CKM_SHA512_RSA_PKCS_PSS)]
+    public void RsaPss_HashToCkm_ReturnsExpectedWithParams(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.RsaPssSign(new HashAlgorithmName(hashName), saltLength: -1);
         Assert.Equal(expectedCkm, mech.Type);
@@ -62,31 +62,31 @@ public sealed class Pkcs11MechanismMapTests
         string hashName, CKM expectedInnerHash, CKG expectedMgf)
     {
         var mech = Pkcs11MechanismMap.RsaOaep(new HashAlgorithmName(hashName));
-        Assert.Equal((ulong)CKM.CKM_RSA_PKCS_OAEP, mech.Type);
+        Assert.Equal(CKM.CKM_RSA_PKCS_OAEP, mech.Type);
         var oaepParams = Assert.IsType<CkmRsaPkcsOaepParams>(mech.Parameters);
         Assert.Equal(expectedInnerHash, oaepParams.HashAlg);
         Assert.Equal(expectedMgf, oaepParams.Mgf);
     }
 
     [Theory]
-    [InlineData("SHA1", (ulong)CKM.CKM_ECDSA_SHA1)]
-    [InlineData("SHA224", (ulong)CKM.CKM_ECDSA_SHA224)]
-    [InlineData("SHA256", (ulong)CKM.CKM_ECDSA_SHA256)]
-    [InlineData("SHA384", (ulong)CKM.CKM_ECDSA_SHA384)]
-    [InlineData("SHA512", (ulong)CKM.CKM_ECDSA_SHA512)]
-    public void EcdsaSign_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
+    [InlineData("SHA1", CKM.CKM_ECDSA_SHA1)]
+    [InlineData("SHA224", CKM.CKM_ECDSA_SHA224)]
+    [InlineData("SHA256", CKM.CKM_ECDSA_SHA256)]
+    [InlineData("SHA384", CKM.CKM_ECDSA_SHA384)]
+    [InlineData("SHA512", CKM.CKM_ECDSA_SHA512)]
+    public void EcdsaSign_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.EcdsaSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
     }
 
     [Theory]
-    [InlineData("SHA1", (ulong)CKM.CKM_DSA_SHA1)]
-    [InlineData("SHA224", (ulong)CKM.CKM_DSA_SHA224)]
-    [InlineData("SHA256", (ulong)CKM.CKM_DSA_SHA256)]
-    [InlineData("SHA384", (ulong)CKM.CKM_DSA_SHA384)]
-    [InlineData("SHA512", (ulong)CKM.CKM_DSA_SHA512)]
-    public void DsaSign_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
+    [InlineData("SHA1", CKM.CKM_DSA_SHA1)]
+    [InlineData("SHA224", CKM.CKM_DSA_SHA224)]
+    [InlineData("SHA256", CKM.CKM_DSA_SHA256)]
+    [InlineData("SHA384", CKM.CKM_DSA_SHA384)]
+    [InlineData("SHA512", CKM.CKM_DSA_SHA512)]
+    public void DsaSign_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.DsaSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
@@ -107,28 +107,28 @@ public sealed class Pkcs11MechanismMapTests
     }
 
     [Theory]
-    [InlineData("SHA1", (ulong)CKM.CKM_SHA_1_HMAC)]
-    [InlineData("SHA224", (ulong)CKM.CKM_SHA224_HMAC)]
-    [InlineData("SHA256", (ulong)CKM.CKM_SHA256_HMAC)]
-    [InlineData("SHA384", (ulong)CKM.CKM_SHA384_HMAC)]
-    [InlineData("SHA512", (ulong)CKM.CKM_SHA512_HMAC)]
-    public void HmacHash_HashToCkm_ReturnsExpected(string hashName, ulong expectedCkm)
+    [InlineData("SHA1", CKM.CKM_SHA_1_HMAC)]
+    [InlineData("SHA224", CKM.CKM_SHA224_HMAC)]
+    [InlineData("SHA256", CKM.CKM_SHA256_HMAC)]
+    [InlineData("SHA384", CKM.CKM_SHA384_HMAC)]
+    [InlineData("SHA512", CKM.CKM_SHA512_HMAC)]
+    public void HmacHash_HashToCkm_ReturnsExpected(string hashName, CKM expectedCkm)
     {
         var mech = Pkcs11MechanismMap.Hmac(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
     }
 
     [Theory]
-    [InlineData("SHA224", (ulong)CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_SHA224)]
-    [InlineData("SHA256", (ulong)CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256)]
-    [InlineData("SHA384", (ulong)CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384)]
-    [InlineData("SHA512", (ulong)CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512)]
-    [InlineData("SHA3-224", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224)]
-    [InlineData("SHA3-256", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256)]
-    [InlineData("SHA3-384", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384)]
-    [InlineData("SHA3-512", (ulong)CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512)]
+    [InlineData("SHA224", CKM.CKM_HASH_ML_DSA_SHA224, CKM.CKM_SHA224)]
+    [InlineData("SHA256", CKM.CKM_HASH_ML_DSA_SHA256, CKM.CKM_SHA256)]
+    [InlineData("SHA384", CKM.CKM_HASH_ML_DSA_SHA384, CKM.CKM_SHA384)]
+    [InlineData("SHA512", CKM.CKM_HASH_ML_DSA_SHA512, CKM.CKM_SHA512)]
+    [InlineData("SHA3-224", CKM.CKM_HASH_ML_DSA_SHA3_224, CKM.CKM_SHA3_224)]
+    [InlineData("SHA3-256", CKM.CKM_HASH_ML_DSA_SHA3_256, CKM.CKM_SHA3_256)]
+    [InlineData("SHA3-384", CKM.CKM_HASH_ML_DSA_SHA3_384, CKM.CKM_SHA3_384)]
+    [InlineData("SHA3-512", CKM.CKM_HASH_ML_DSA_SHA3_512, CKM.CKM_SHA3_512)]
     public void MlDsaHashSign_HashToCkm_ReturnsExpectedWithParams(
-        string hashName, ulong expectedCkm, CKM expectedInnerHash)
+        string hashName, CKM expectedCkm, CKM expectedInnerHash)
     {
         var mech = Pkcs11MechanismMap.MlDsaHashSign(new HashAlgorithmName(hashName));
         Assert.Equal(expectedCkm, mech.Type);
@@ -152,7 +152,7 @@ public sealed class Pkcs11MechanismMapTests
     public void MlDsaSign_ReturnsMlDsaMechanismWithPqcParams()
     {
         var mech = Pkcs11MechanismMap.MlDsaSign();
-        Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
+        Assert.Equal(CKM.CKM_ML_DSA, mech.Type);
         Assert.IsType<CkmPqcSignParams>(mech.Parameters);
     }
 
@@ -160,7 +160,7 @@ public sealed class Pkcs11MechanismMapTests
     public void MlDsaSign_WithContext_ReturnsMlDsaMechanism()
     {
         var mech = Pkcs11MechanismMap.MlDsaSign(context: [0x01, 0x02, 0x03]);
-        Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
+        Assert.Equal(CKM.CKM_ML_DSA, mech.Type);
         Assert.IsType<CkmPqcSignParams>(mech.Parameters);
     }
 }

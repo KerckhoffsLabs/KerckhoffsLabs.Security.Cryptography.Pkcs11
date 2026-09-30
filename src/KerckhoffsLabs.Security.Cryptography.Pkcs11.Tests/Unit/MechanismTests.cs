@@ -5,34 +5,31 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 // CKM_AES_CBC appears here only as a realistic mechanism whose parameter is a raw IV block, which is
-// what the byte[] constructors marshal. Nothing is encrypted and no token is involved, so the
+// what the raw-block constructor marshals. Nothing is encrypted and no token is involved, so the
 // crypto-policy check never runs; the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
-// Covers the raw-ulong Mechanism constructors (the CKM-typed siblings are exercised throughout the
-// crypto suite). No token needed — these only build the CK_MECHANISM value.
+// Covers the Mechanism constructors and marshalling, for standard and vendor types alike. No token
+// needed — these only build the CK_MECHANISM value.
 public sealed class MechanismTests
 {
     [Fact]
-    public void Ctor_RawUlong_NoParameter_SetsType()
+    public void Ctor_NoParameter_SetsType()
     {
-        var mech = new Mechanism((ulong)CKM.CKM_AES_KEY_GEN);
-        Assert.Equal((ulong)CKM.CKM_AES_KEY_GEN, mech.Type);
+        var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
+        Assert.Equal(CKM.CKM_AES_KEY_GEN, mech.Type);
         Assert.Null(mech.Parameters);
     }
 
-    // A vendor mechanism the CKM enum has no member for. Passing the type as a raw ulong rather than
-    // casting an invented enum value is the point of the ulong constructors: the cast would assert the
-    // value is a known CKM, which it is not.
-    private const ulong CkmIbmEthDerive = 0x80070002UL;  // CKM_VENDOR_DEFINED + 0x70002
+    // A vendor mechanism the CKM enum has no member for. CKM is ulong-backed like CK_MECHANISM_TYPE, so
+    // the cast names it exactly.
+    private const CKM CkmIbmEthDerive = (CKM)0x80070002UL;  // CKM_VENDOR_DEFINED + 0x70002
 
-    // The ulong+byte[] pairing is the escape hatch for a vendor mechanism whose parameter this library
-    // cannot describe — an opaque or nested block the caller lays out themselves. Every other test of
-    // the raw path goes through the CKM-typed constructor, so nothing covered the one thing this
-    // overload does differently: carry a mechanism value from outside the enum. Asserting the type
-    // alone would not have caught a block that never reached the scope, which is the failure a caller
+    // A vendor type with a raw block is the escape hatch for a vendor mechanism whose parameter this
+    // library cannot describe — an opaque or nested block the caller lays out themselves. Asserting the
+    // type alone would not catch a block that never reached the scope, which is the failure a caller
     // would see as the token rejecting a well-formed parameter.
     [Fact]
     public void Marshal_VendorTypeWithByteArrayParameter_CarriesBothTheTypeAndTheBlock()
@@ -44,7 +41,7 @@ public sealed class MechanismTests
         CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
 
         Assert.Equal(CkmIbmEthDerive, mech.Type);
-        Assert.Equal(CkmIbmEthDerive, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)CkmIbmEthDerive, (ulong)marshalled.Mechanism);
         Assert.Equal((ulong)block.Length, (ulong)marshalled.ParameterLen);
         Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);
         Assert.Equal(block, UnmanagedMemory.Read(marshalled.Parameter, block.Length));
@@ -53,9 +50,8 @@ public sealed class MechanismTests
         Assert.Null(mechParams);
     }
 
-    // The defensive copy is a separate line of code in each byte[] constructor, so the CKM-typed
-    // sibling's coverage does not extend here: aliasing the caller's array in this one alone would go
-    // unnoticed until a caller zeroized their block and the token silently received all zeroes.
+    // Aliasing the caller's array would go unnoticed until a caller zeroized their block and the token
+    // silently received all zeroes.
     [Fact]
     public void Marshal_VendorTypeWithByteArrayParameter_IgnoresLaterChangesToTheCallersArray()
     {
@@ -71,17 +67,17 @@ public sealed class MechanismTests
     }
 
     [Fact]
-    public void Ctor_RawUlong_MechanismParameters_SetsTypeAndKeepsParameter()
+    public void Ctor_MechanismParameters_SetsTypeAndKeepsParameter()
     {
         var p = new CkmPqcSignParams();
-        var mech = new Mechanism((ulong)CKM.CKM_ML_DSA, p);
-        Assert.Equal((ulong)CKM.CKM_ML_DSA, mech.Type);
+        var mech = new Mechanism(CKM.CKM_ML_DSA, p);
+        Assert.Equal(CKM.CKM_ML_DSA, mech.Type);
         Assert.Same(p, mech.Parameters);
     }
 
     [Fact]
-    public void Ctor_RawUlong_NullMechanismParameters_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new Mechanism((ulong)CKM.CKM_ML_DSA, (MechanismParameters)null!));
+    public void Ctor_NullMechanismParameters_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => new Mechanism(CKM.CKM_ML_DSA, (MechanismParameters)null!));
 
     // Marshal must stay a pure function of (mechanism, scope). One instance can be marshalled twice
     // for two live operations — two sessions, or the same instance passed as both arguments of
@@ -107,10 +103,9 @@ public sealed class MechanismTests
             ((CK_GCM_MESSAGE_PARAMS)secondParams).Tag);
     }
 
-    // The raw byte[] constructors used to hand Marshal a block their constructor had allocated, so
-    // deleting the constructor-time allocation had to route them through the scope instead. Nothing
-    // about that is visible to the compiler — a miss would surface only as a token rejecting an empty
-    // or garbage parameter — so the block is asserted here directly.
+    // A byte[] reaches the raw-block constructor through its implicit conversion to a span. A block that
+    // never reached the scope would surface only as a token rejecting an empty or garbage parameter, so
+    // the block is asserted here directly.
     [Fact]
     public void Marshal_ByteArrayParameter_CopiesTheBytesIntoTheScope()
     {
@@ -147,10 +142,7 @@ public sealed class MechanismTests
         Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
     }
 
-    // Reaches the byte[] constructor with nothing in it — a mechanism that takes no parameter is the
-    // only way to do that without tripping the weak-mechanism gate. The cast is load-bearing: an
-    // untyped collection expression binds to the ReadOnlySpan<byte> sibling, so without it this would
-    // silently stop covering the constructor it is named for.
+    // An empty array, through the same conversion, is an absent parameter.
     [Fact]
     public void Marshal_EmptyByteArrayParameter_IsNullPointerAndZeroLength()
     {
@@ -166,10 +158,9 @@ public sealed class MechanismTests
     // The span constructor is the one every CBC and CFB operation goes through: those paths hold the
     // IV as a span, and taking an array there made each call copy it twice.
     //
-    // Unlike its byte[] siblings, this one cannot alias the caller's buffer even in principle — a span
-    // does not fit in the byte[] field, so the copy is the type system's doing rather than a line that
-    // could regress. What is not guaranteed, and is what the zeroize below pins, is that the copy
-    // happens at construction: a design that captured the source and read it during Marshal would
+    // A span cannot be aliased in the byte[] field even in principle, so the copy is the type system's
+    // doing. What is not guaranteed, and is what the zeroize below pins, is that the copy happens at
+    // construction: a design that captured the source and read it during Marshal would
     // compile just as well and would hand the token whatever the buffer held by then. For a stack
     // span that is not merely stale data but memory the frame no longer owns.
     [Fact]
@@ -189,13 +180,10 @@ public sealed class MechanismTests
         Assert.Null(mechParams);
     }
 
-    // An empty span is an absent parameter, not a pointer to nothing — the same distinction the byte[]
-    // sibling makes, asserted here because the two constructors build _rawParameter separately.
+    // An empty span is an absent parameter, not a pointer to nothing.
     [Fact]
     public void Marshal_EmptySpanParameter_IsNullPointerAndZeroLength()
     {
-        // Typed local rather than an inline `[]`: the constructor has a byte[] sibling, and naming the
-        // type is what keeps this test on the overload it is written for.
         ReadOnlySpan<byte> empty = [];
         var mech = new Mechanism(CKM.CKM_AES_KEY_GEN, empty);
         using var scope = new MechanismParameterScope();
@@ -206,9 +194,8 @@ public sealed class MechanismTests
         Assert.Equal(0UL, (ulong)marshalled.ParameterLen);
     }
 
-    // The vendor half of the span pair. It shares Marshal with its CKM sibling but not its own two
-    // lines — the mechanism value and the copy — and those are exactly what a vendor caller depends
-    // on: a type the enum cannot name, and a block that outlives the buffer it was read from.
+    // What a vendor caller depends on: a type the enum cannot name, and a block that outlives the buffer
+    // it was read from.
     [Fact]
     public void Marshal_VendorTypeWithSpanParameter_CarriesBothTheTypeAndTheBlock()
     {
@@ -221,46 +208,32 @@ public sealed class MechanismTests
         CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
 
         Assert.Equal(CkmIbmEthDerive, mech.Type);
-        Assert.Equal(CkmIbmEthDerive, (ulong)marshalled.Mechanism);
+        Assert.Equal((ulong)CkmIbmEthDerive, (ulong)marshalled.Mechanism);
         Assert.Equal((ulong)expected.Length, (ulong)marshalled.ParameterLen);
         Assert.Equal(expected, UnmanagedMemory.Read(marshalled.Parameter, expected.Length));
         Assert.Null(mechParams);
     }
 
-    // The CKM/ulong boundary. Both members exist because casting Type to CKM is lossy for exactly the
-    // mechanisms the ulong constructors serve, and nothing in the type system says so.
     [Fact]
     public void IsVendorDefined_SeparatesVendorTypesFromStandardOnes()
     {
         Assert.True(new Mechanism(CkmIbmEthDerive).IsVendorDefined);
-        Assert.True(new Mechanism((ulong)CKM.CKM_VENDOR_DEFINED).IsVendorDefined);  // the boundary itself
+        Assert.True(new Mechanism(CKM.CKM_VENDOR_DEFINED).IsVendorDefined);  // the boundary itself
         Assert.False(new Mechanism(CKM.CKM_AES_KEY_GEN).IsVendorDefined);
 
         // One below the boundary is still standard, so the comparison cannot be >.
-        Assert.False(new Mechanism((ulong)CKM.CKM_VENDOR_DEFINED - 1).IsVendorDefined);
+        Assert.False(new Mechanism((CKM)((ulong)CKM.CKM_VENDOR_DEFINED - 1)).IsVendorDefined);
     }
 
+    // Type is the exact value for every mechanism; whether the enum names it is Enum.IsDefined's call.
     [Fact]
-    public void TryGetMechanism_ReportsWhetherTheEnumNamesTheValue()
+    public void Type_IsExact_AndEnumIsDefinedTellsNamedFromUnnamed()
     {
-        Assert.True(new Mechanism(CKM.CKM_AES_GCM).TryGetMechanism(out CKM known));
-        Assert.Equal(CKM.CKM_AES_GCM, known);
+        Assert.Equal(CKM.CKM_AES_GCM, new Mechanism(CKM.CKM_AES_GCM).Type);
+        Assert.True(Enum.IsDefined(new Mechanism(CKM.CKM_AES_GCM).Type));
 
-        Assert.False(new Mechanism(CkmIbmEthDerive).TryGetMechanism(out _));
-    }
-
-    // The out parameter carries the true value even when the method returns false. Defaulting would
-    // hand a caller who ignored the result CKM_RSA_PKCS_KEY_PAIR_GEN — value 0, a real mechanism and
-    // an entirely different one — so this is the difference between an unnamed value and a wrong one.
-    [Fact]
-    public void TryGetMechanism_OnFailure_StillYieldsTheActualValue()
-    {
-        var mech = new Mechanism(CkmIbmEthDerive);
-
-        Assert.False(mech.TryGetMechanism(out CKM unnamed));
-
-        Assert.Equal(CkmIbmEthDerive, (ulong)unnamed);
-        Assert.NotEqual(default, unnamed);
+        Assert.Equal(CkmIbmEthDerive, new Mechanism(CkmIbmEthDerive).Type);
+        Assert.False(Enum.IsDefined(new Mechanism(CkmIbmEthDerive).Type));
     }
 
     [Fact]
@@ -291,17 +264,31 @@ public sealed class MechanismTests
     }
 
     public static bool NativeULongIs64Bit => UnmanagedMemory.NativeULongSize == sizeof(ulong);
+    public static bool NativeULongIs32Bit => UnmanagedMemory.NativeULongSize == sizeof(uint);
 
-    // Where CK_ULONG is 64 bits a vendor value can exceed what CKM (a uint enum) holds. There is no CKM
-    // value to hand back, and truncating would name a different mechanism, so the method reports false
-    // and yields the vendor marker — never an overflow, never a stranger's mechanism.
+    private const CKM WideVendorMechanism = (CKM)0x1_8000_0001UL;
+
+    // Where CK_ULONG is 64 bits a vendor value can exceed 32 bits. CKM holds it exactly, and it reaches
+    // the token unchanged.
     [Fact(SkipUnless = nameof(NativeULongIs64Bit), Skip = "CK_ULONG is 32 bits on this platform")]
-    public void TryGetMechanism_ValueWiderThanCkm_ReportsFalseWithTheVendorMarker()
+    public void WideType_IsCarriedExactly_WhereCkUlongIs64Bits()
     {
-        var mech = new Mechanism(0x1_8000_0001UL);
+        var mech = new Mechanism(WideVendorMechanism);
+        using var scope = new MechanismParameterScope();
 
-        Assert.False(mech.TryGetMechanism(out CKM mechanism));
-        Assert.Equal(CKM.CKM_VENDOR_DEFINED, mechanism);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out _);
+
+        Assert.Equal(WideVendorMechanism, mech.Type);
         Assert.True(mech.IsVendorDefined);
+        Assert.Equal((ulong)WideVendorMechanism, (ulong)marshalled.Mechanism);
+    }
+
+    // Where CK_ULONG is 32 bits the same value cannot be sent; it is refused naming the argument, never
+    // truncated into a different mechanism.
+    [Fact(SkipUnless = nameof(NativeULongIs32Bit), Skip = "CK_ULONG is 64 bits on this platform")]
+    public void WideType_IsRefused_WhereCkUlongIs32Bits()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => new Mechanism(WideVendorMechanism));
+        Assert.Equal("type", ex.ParamName);
     }
 }

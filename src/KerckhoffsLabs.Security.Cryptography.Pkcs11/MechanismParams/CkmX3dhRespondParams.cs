@@ -53,7 +53,7 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     {
         return new CK_X3DH_RESPOND_PARAMS
         {
-            Kdf = _kdf.ToCULong(),
+            Kdf = CkULong.From((ulong)_kdf, "kdf"),
             IdentityId = scope.Write(_identityIdBytes),
             PrekeyId = scope.Write(_prekeyIdBytes),
             OnetimeId = scope.Write(_onetimeIdBytes),

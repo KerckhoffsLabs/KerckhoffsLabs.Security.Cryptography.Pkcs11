@@ -40,23 +40,23 @@ public sealed class CryptoPolicyViolationExceptionTests
 
     public static bool IsUnix => OperatingSystem.IsLinux() || OperatingSystem.IsMacOS();
 
-    // CK_ULONG is 64-bit on Unix: a mechanism type wider than CKM's 32 bits must still describe itself
-    // (as a vendor value) rather than overflow while the denial is being reported.
+    // CK_ULONG is 64-bit on Unix: a mechanism type wider than 32 bits is carried exactly and describes
+    // itself as a vendor value while the denial is being reported.
     [Fact(SkipUnless = nameof(IsUnix), Skip = "Requires a 64-bit CK_ULONG")]
     public void PolicyConstructor_DescribesAMechanismWiderThan32Bits()
     {
-        var request = new MechanismUseRequest(new Mechanism(0x1_0000_0001UL), CryptoOperation.Sign);
+        var request = new MechanismUseRequest(new Mechanism((CKM)0x1_0000_0001UL), CryptoOperation.Sign);
 
         var ex = new CryptoPolicyViolationException("SecureOnly", request, "Not reviewed.");
 
-        Assert.Null(ex.Mechanism);
+        Assert.Equal((CKM)0x1_0000_0001UL, ex.Mechanism);
         Assert.Equal("SecureOnly policy refused vendor mechanism 0x100000001 for Sign: Not reviewed.", ex.Message);
     }
 
     [Fact]
     public void PolicyConstructor_DescribesAVendorMechanismByItsHexValue()
     {
-        var request = new MechanismUseRequest(new Mechanism(0x8000_1234UL), CryptoOperation.Sign);
+        var request = new MechanismUseRequest(new Mechanism((CKM)0x8000_1234UL), CryptoOperation.Sign);
 
         var ex = new CryptoPolicyViolationException("SecureOnly", request, "Not reviewed.");
 

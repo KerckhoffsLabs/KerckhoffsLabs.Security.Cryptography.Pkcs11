@@ -13,8 +13,8 @@ public sealed class WrapHardeningAttributeTests
             .Trusted()
             .Build();
 
-        Assert.True(template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_WITH_TRUSTED).GetValueAsBool());
-        Assert.True(template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_TRUSTED).GetValueAsBool());
+        Assert.True(template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_WITH_TRUSTED).GetValueAsBool());
+        Assert.True(template.Attributes.Single(a => a.Type == CKA.CKA_TRUSTED).GetValueAsBool());
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public sealed class WrapHardeningAttributeTests
             .WrapWithTrusted()
             .Build();
 
-        Assert.True(template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_WITH_TRUSTED).GetValueAsBool());
+        Assert.True(template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_WITH_TRUSTED).GetValueAsBool());
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class WrapHardeningAttributeTests
             .Trusted()
             .Build();
 
-        Assert.True(template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_TRUSTED).GetValueAsBool());
+        Assert.True(template.Attributes.Single(a => a.Type == CKA.CKA_TRUSTED).GetValueAsBool());
     }
 
     [Fact]
@@ -44,6 +44,6 @@ public sealed class WrapHardeningAttributeTests
             .WrapWithTrusted(false)
             .Build();
 
-        Assert.False(template.Attributes.Single(a => a.Type == (ulong)CKA.CKA_WRAP_WITH_TRUSTED).GetValueAsBool());
+        Assert.False(template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_WITH_TRUSTED).GetValueAsBool());
     }
 }

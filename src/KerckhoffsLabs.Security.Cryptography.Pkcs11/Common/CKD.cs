@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Key derivation functions
 /// </summary>
-public enum CKD : uint
+public enum CKD : ulong
 {
     /// <summary>
     /// No derivation function
@@ -108,5 +110,6 @@ public enum CKD : uint
 internal static class CKDExtensions
 {
     /// <summary>Converts <see cref="CKD"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKD value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKD value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

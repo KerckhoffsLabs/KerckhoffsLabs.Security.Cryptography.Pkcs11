@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// ML-KEM parameter-set identifier (FIPS 203 / PKCS#11 v3.2). Used as the value of the
 /// <see cref="CKA.CKA_PARAMETER_SET"/> attribute on ML-KEM keys.
 /// </summary>
-public enum CkpMlKem : uint
+public enum CkpMlKem : ulong
 {
     /// <summary>ML-KEM-512: NIST security level 1; public key 800 B, ciphertext 768 B.</summary>
     CKP_ML_KEM_512 = 0x00000001,

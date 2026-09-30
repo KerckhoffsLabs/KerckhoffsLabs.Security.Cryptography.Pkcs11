@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
 /// Session States
 /// </summary>
-public enum CKS : uint
+public enum CKS : ulong
 {
     /// <summary>
     /// The application has opened a read-only session. The application has read-only access to public token objects and read/write access to public session objects.
@@ -35,7 +37,7 @@ public enum CKS : uint
 /// Session validation flags type (PKCS#11 v3.2 <c>CK_SESSION_VALIDATION_FLAGS_TYPE</c>). Selects
 /// which set of validation flags <c>C_GetSessionValidationFlags</c> returns for a session.
 /// </summary>
-public enum CksValidationFlagsType : uint
+public enum CksValidationFlagsType : ulong
 {
     /// <summary>
     /// Request the flags describing whether the session's most recent validatable operation
@@ -52,5 +54,6 @@ public enum CksValidationFlagsType : uint
 internal static class CKSExtensions
 {
     /// <summary>Converts <see cref="CKS"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKS value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKS value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 }

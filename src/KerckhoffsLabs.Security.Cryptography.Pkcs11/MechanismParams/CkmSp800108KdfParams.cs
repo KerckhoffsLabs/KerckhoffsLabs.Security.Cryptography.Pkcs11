@@ -166,7 +166,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         {
             return new CK_SP800_108_FEEDBACK_KDF_PARAMS
             {
-                PrfType = _prfType.ToCULong(),
+                PrfType = CkULong.From((ulong)_prfType, "prfType"),
                 NumberOfDataParams = dataParamCount,
                 DataParams = dataParams,
                 IVLen = (NativeCULong)_iv.Length,
@@ -178,7 +178,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
 
         return new CK_SP800_108_KDF_PARAMS
         {
-            PrfType = _prfType.ToCULong(),
+            PrfType = CkULong.From((ulong)_prfType, "prfType"),
             NumberOfDataParams = dataParamCount,
             DataParams = dataParams,
             AdditionalDerivedKeys = derivedKeyCount,
@@ -247,7 +247,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
                     valueLen = UnmanagedMemory.SizeOf<CK_SP800_108_DKM_LENGTH_FORMAT>();
                     value = scope.WriteStruct(new CK_SP800_108_DKM_LENGTH_FORMAT
                     {
-                        DkmLengthMethod = (NativeCULong)(ulong)seg.DkmMethod,
+                        DkmLengthMethod = CkULong.From((ulong)seg.DkmMethod, "method"),
                         LittleEndian = seg.LittleEndian,
                         WidthInBits = (NativeCULong)seg.WidthInBits,
                     });

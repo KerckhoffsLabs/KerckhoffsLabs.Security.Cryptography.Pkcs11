@@ -41,10 +41,10 @@ public sealed class CkmHashPqcSignParams : MechanismParameters
     {
         return new CK_HASH_SIGN_ADDITIONAL_CONTEXT
         {
-            HedgeVariant = (NativeCULong)(uint)_hedgeVariant,
+            HedgeVariant = CkULong.From((ulong)_hedgeVariant, "hedgeVariant"),
             Context = scope.Write(_contextBytes),
             ContextLen = (NativeCULong)_contextBytes.Length,
-            Hash = (NativeCULong)(ulong)_hash,
+            Hash = CkULong.From((ulong)_hash, "hash"),
         };
     }
 }

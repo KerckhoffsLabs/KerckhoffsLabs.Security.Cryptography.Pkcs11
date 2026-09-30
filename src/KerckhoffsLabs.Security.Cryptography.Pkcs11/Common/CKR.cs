@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -5,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 /// <summary>
 /// Return values
 /// </summary>
-public enum CKR : uint
+public enum CKR : ulong
 {
     /// <summary>
     /// The function executed successfully
@@ -539,7 +541,8 @@ public enum CKR : uint
 internal static class CKRExtensions
 {
     /// <summary>Converts <see cref="CKR"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKR value) => (NativeCULong)(ulong)value;
+    public static NativeCULong ToCULong(this CKR value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        => CkULong.From((ulong)value, paramName);
 
     /// <summary>
     /// Converts <see cref="NativeCULong"/> to <see cref="CKR"/>. Deliberately a non-validating
