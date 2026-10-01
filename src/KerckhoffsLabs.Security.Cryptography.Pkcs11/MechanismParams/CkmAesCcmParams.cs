@@ -27,7 +27,15 @@ public sealed class CkmAesCcmParams : MechanismParameters
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative or too long for the nonce's length field, or <paramref name="macLen"/> is not one of {4, 6, 8, 10, 12, 14, 16}.</exception>
     public CkmAesCcmParams(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> aad, int macLen)
     {
-        CcmLimits.ValidateNonceAndDataLength(dataLen, nonce);
+        ArgumentOutOfRangeException.ThrowIfNegative(dataLen);
+        if (nonce.Length is < 7 or > 13)
+            throw new ArgumentException("CCM nonce must be 7..13 bytes (RFC 3610).", nameof(nonce));
+        // RFC 3610 §2.1 encodes the data length in L = 15 - nonce length bytes, so it must be below
+        // 2^(8L). With an int length, only 13- and 12-byte nonces leave a field it can overflow.
+        int lengthFieldBits = 8 * (15 - nonce.Length);
+        if (lengthFieldBits < 31 && dataLen >= 1 << lengthFieldBits)
+            throw new ArgumentOutOfRangeException(nameof(dataLen), dataLen,
+                $"A {nonce.Length}-byte CCM nonce leaves a {15 - nonce.Length}-byte length field, so the data must be shorter than {1 << lengthFieldBits} bytes (RFC 3610).");
         if (macLen is not (4 or 6 or 8 or 10 or 12 or 14 or 16))
             throw new ArgumentOutOfRangeException(nameof(macLen),
                 "CCM MAC length must be one of {4, 6, 8, 10, 12, 14, 16} bytes.");

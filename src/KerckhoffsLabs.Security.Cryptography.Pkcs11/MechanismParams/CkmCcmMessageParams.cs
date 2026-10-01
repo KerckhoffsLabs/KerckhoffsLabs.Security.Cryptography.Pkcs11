@@ -31,7 +31,15 @@ public sealed class CkmCcmMessageParams : MechanismParameters
 
     private CkmCcmMessageParams(int dataLen, ReadOnlySpan<byte> nonce, int macLen, ReadOnlySpan<byte> macInput)
     {
-        CcmLimits.ValidateNonceAndDataLength(dataLen, nonce);
+        ArgumentOutOfRangeException.ThrowIfNegative(dataLen);
+        if (nonce.Length is < 7 or > 13)
+            throw new ArgumentException("CCM nonce must be 7..13 bytes (RFC 3610).", nameof(nonce));
+        // RFC 3610 §2.1 encodes the data length in L = 15 - nonce length bytes, so it must be below
+        // 2^(8L). With an int length, only 13- and 12-byte nonces leave a field it can overflow.
+        int lengthFieldBits = 8 * (15 - nonce.Length);
+        if (lengthFieldBits < 31 && dataLen >= 1 << lengthFieldBits)
+            throw new ArgumentOutOfRangeException(nameof(dataLen), dataLen,
+                $"A {nonce.Length}-byte CCM nonce leaves a {15 - nonce.Length}-byte length field, so the data must be shorter than {1 << lengthFieldBits} bytes (RFC 3610).");
         if (macLen is not 4 and not 6 and not 8 and not 10 and not 12 and not 14 and not 16)
             throw new ArgumentOutOfRangeException(nameof(macLen), "CCM MAC length must be 4/6/8/10/12/14/16 bytes.");
 
