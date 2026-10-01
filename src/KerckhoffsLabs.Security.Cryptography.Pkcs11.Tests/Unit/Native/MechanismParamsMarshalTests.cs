@@ -214,6 +214,37 @@ public sealed class MechanismParamsMarshalTests
     public void AesCcm_RejectsEmptyNonce() =>
         Assert.Throws<ArgumentException>(() => new CkmAesCcmParams(64, default, default, 16));
 
+    [Theory]
+    [InlineData(6)]  // below 7
+    [InlineData(14)] // above 13
+    public void AesCcm_RejectsBadNonceLength(int nonceLen) =>
+        Assert.Throws<ArgumentException>(() => new CkmAesCcmParams(64, new byte[nonceLen], default, 16));
+
+    // RFC 3610 encodes the data length in 15 - nonceLen bytes; only 13- and 12-byte nonces leave a
+    // field an int can overflow.
+    [Theory]
+    [InlineData(13, 65_535)]
+    [InlineData(12, 16_777_215)]
+    [InlineData(11, int.MaxValue)]
+    [InlineData(7, int.MaxValue)]
+    public void AesCcm_AcceptsDataLenThatFitsTheLengthField(int nonceLen, int dataLen)
+    {
+        var p = new CkmAesCcmParams(dataLen, new byte[nonceLen], default, macLen: 16);
+        using var scope = new MechanismParameterScope();
+        var s = Marshalled<CK_CCM_PARAMS>(p.BuildMarshalable(scope));
+        Assert.Equal((ulong)dataLen, (ulong)s.DataLen);
+    }
+
+    [Theory]
+    [InlineData(13, 65_536)]       // 2-byte length field
+    [InlineData(12, 16_777_216)]   // 3-byte length field
+    public void AesCcm_RejectsDataLenBeyondTheLengthField(int nonceLen, int dataLen)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new CkmAesCcmParams(dataLen, new byte[nonceLen], default, macLen: 16));
+        Assert.Equal("dataLen", ex.ParamName);
+    }
+
     // === ChaCha20 (CK_CHACHA20_PARAMS) ===================================
 
     [Fact]

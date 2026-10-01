@@ -4,8 +4,8 @@ _Generated 2026-07-09, extended 2026-08-11 from a second full multi-specialist d
 
 ## Summary
 
-- Total items: 160 (55 resolved, 105 open)
-- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (62 open, 25 resolved) | Low: 41 (30 open, 11 resolved)
+- Total items: 160 (56 resolved, 104 open)
+- Critical: 0 | High: 32 (13 open, 19 resolved) | Medium: 87 (61 open, 26 resolved) | Low: 41 (30 open, 11 resolved)
 - Headline risks:
   - **The advertised streaming surface does not exist, and the previous coverage matrix said it did.** No multi-part or streaming operation is reachable from the public API, and multi-part *sign* is not implemented at any layer — `C_SignUpdate`/`C_SignFinal`/`C_SignRecover` have zero callers outside `Native/` while their encrypt/digest/verify counterparts all have wrappers. A consumer cannot sign or encrypt a payload larger than memory (BL-087, BL-099). Two matrix rows have been corrected below.
   - **Nine public-API decisions are cheap now and SemVer-major later — seven of them now settled.** Exceptions did not derive from `CryptographicException`, so `catch (CryptographicException)` around the BCL-shaped façades silently failed; they now do (BL-063, resolved); `ECCurve` collided with `System.Security.Cryptography.ECCurve` and is now `Pkcs11ECCurve`, with a reflection guard against the next such clash (BL-066, resolved); 96 `CKF`/`CK`/`CKZ` constants published the platform-width-dependent third-party `NativeCULong` and are now `ulong`, with that package gone from the public surface entirely (BL-067, resolved); every `CK_VERSION` reached the API as a lossy string in which a v3.1 module rendered as `"3.01"` and is now a comparable `System.Version` (BL-068, resolved); `LoadStaticallyLinked()` could not work on any shipped RID because `__Internal` is Mono-only, and now resolves against the entry-point module instead (BL-064, resolved); the secure-defaults key generators granted conflicting roles on one key and are now split into role-specific helpers (BL-070, resolved); and `CloseAllSessions()`'s bookkeeping gap was closed by removing the method from the public surface, its only legitimate use being narrow enough that disposing tracked workspaces/sessions is the supported path (BL-071, resolved). `AdditionalDerivedKeys` now returns hydrated `Pkcs11Key` instances instead of raw `ulong` handles (BL-069, resolved). Only BL-065 (`Verify` throwing instead of returning `false`) remains open. The set is BL-063 – BL-071.
@@ -966,7 +966,8 @@ Three findings came closest and were deliberately held at High rather than infla
 - **Raised by:** Cryptographer A
 - **Spec / References:** PKCS#11 v3.2 §2.1.8 (`CK_RSA_PKCS_OAEP_PARAMS.source`/`pSourceData`); RFC 8017 §7.1 (empty label)
 
-### [BL-106] `CkmAesCcmParams` does not validate the nonce length that its own message-mode sibling enforces
+### [BL-106] ✅ RESOLVED — `CkmAesCcmParams` does not validate the nonce length that its own message-mode sibling enforces
+- **Status:** Resolved 2026-10-01. `CkmAesCcmParams` and `CkmCcmMessageParams` now share one internal check, `MechanismParams/CcmLimits.ValidateNonceAndDataLength`: the nonce must be 7..13 bytes (`ArgumentException`, `nonce`) and `dataLen` must fit the `L = 15 − nonceLen` length field, below `2^(8L)` (`ArgumentOutOfRangeException`, `dataLen`). With an `int` length only 13- and 12-byte nonces can exceed it (65,536 and 16,777,216 bytes). The classic type previously accepted any non-empty nonce; both types previously sent an over-long `dataLen` to the token. For comparison, the BCL `AesCcm` does not check the length bound either and fails with an opaque OpenSSL `CryptographicException`. New tests in `MechanismParamsMarshalTests` (6- and 14-byte nonces rejected; each bound accepted at its maximum and rejected one past it, for both types). Full suite green locally (2526 passed, 0 failed, 1957 gated skips).
 - **Area:** Cryptography
 - **Severity:** Medium
 - **Effort:** S
