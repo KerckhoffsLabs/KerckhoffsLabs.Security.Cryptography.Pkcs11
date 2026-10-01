@@ -399,7 +399,7 @@ public sealed class AesCcmPkcs11Tests_Managed
         ccm.Encrypt(nonce, pt, ct, tag);
         tag[0] ^= 1;
 
-        byte[] destination = Enumerable.Repeat((byte)0xAA, pt.Length).ToArray();
+        byte[] destination = [.. Enumerable.Repeat((byte)0xAA, pt.Length)];
         AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, destination));
         Assert.All(destination, b => Assert.Equal(0, b));
     });

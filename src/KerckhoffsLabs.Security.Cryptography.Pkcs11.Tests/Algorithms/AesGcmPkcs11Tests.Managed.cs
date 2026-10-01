@@ -396,7 +396,7 @@ public sealed class AesGcmPkcs11Tests_Managed
         gcm.Encrypt(nonce, pt, ct, tag);
         tag[0] ^= 1;
 
-        byte[] destination = Enumerable.Repeat((byte)0xAA, pt.Length).ToArray();
+        byte[] destination = [.. Enumerable.Repeat((byte)0xAA, pt.Length)];
         AssertAuthFailure(() => gcm.Decrypt(nonce, ct, tag, destination));
         Assert.All(destination, b => Assert.Equal(0, b));
     });
@@ -430,7 +430,7 @@ public sealed class AesGcmPkcs11Tests_Managed
             }
         }
 
-        byte[] destination = Enumerable.Repeat((byte)0xAA, pt.Length).ToArray();
+        byte[] destination = [.. Enumerable.Repeat((byte)0xAA, pt.Length)];
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => gcm.Decrypt(nonce, ct, tag, destination));
         Assert.Equal(CKR.CKR_KEY_HANDLE_INVALID, ex.ReturnValue);
         Assert.All(destination, b => Assert.Equal(0xAA, b));
