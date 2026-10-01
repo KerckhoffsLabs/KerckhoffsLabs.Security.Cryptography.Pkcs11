@@ -10,8 +10,9 @@ public static class CryptoPolicy
     /// meant for, plus allow-lists of hashes, EC curves (128-bit security or more) and key-agreement KDFs.
     /// <b>Denies by default:</b> everything else — including unreviewed standard mechanisms and every
     /// vendor-defined mechanism — is refused, whether or not it also appears in the documented (but
-    /// non-enforcing) deny list. Also refuses RSA keys under 2048 bits, non-sensitive key templates, and
-    /// reading secret key material off the token.
+    /// non-enforcing) deny list. Also refuses AES-GCM tags under 96 bits and AES-CCM MACs under 64 bits (in
+    /// the single-part and message-based parameters alike), RSA keys under 2048 bits, non-sensitive key
+    /// templates, and reading secret key material off the token.
     /// </summary>
     /// <remarks>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its rationale, the
@@ -26,7 +27,9 @@ public static class CryptoPolicy
     /// SHA-1/DSA signature verification. RSA PKCS#1 v1.5 encryption and decryption/unwrap are refused. AES
     /// key wrapping is approved only via KW/KWP (<c>CKM_AES_KEY_WRAP</c>, <c>CKM_AES_KEY_WRAP_KWP</c>) or the
     /// GCM/CCM modes; <c>CKM_AES_KEY_WRAP_PAD</c>, whose padding is vendor-defined, is refused. Other AES
-    /// modes encrypt and decrypt data but may not wrap or unwrap keys. <b>Denies by default:</b> refuses every mechanism, hash, curve, KDF and PRF
+    /// modes encrypt and decrypt data but may not wrap or unwrap keys. AES-GCM tags must be 96 to 128 bits
+    /// (SP 800-38D §5.2.1.2: shorter tags need application conditions a policy cannot verify) and AES-CCM
+    /// MACs at least 64 bits (SP 800-38C Appendix B.2). <b>Denies by default:</b> refuses every mechanism, hash, curve, KDF and PRF
     /// not on its allow-list, including every vendor-defined mechanism, whether or not it also appears in
     /// the documented (but non-enforcing) deny list. A workspace opened under this policy refuses every
     /// <c>UsePolicy</c> override.

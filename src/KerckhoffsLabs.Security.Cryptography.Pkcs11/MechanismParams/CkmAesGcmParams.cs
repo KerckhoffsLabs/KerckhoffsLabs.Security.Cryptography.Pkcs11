@@ -19,7 +19,9 @@ public sealed class CkmAesGcmParams : MechanismParameters
     /// </summary>
     /// <param name="iv">Initialization vector (typically 12 bytes / 96 bits).</param>
     /// <param name="aad">Additional authenticated data; pass <c>default</c> for none.</param>
-    /// <param name="tagBits">Authentication tag length in bits; must be a multiple of 8 in [32, 128]. Use 128 unless you have a specific reason.</param>
+    /// <param name="tagBits">Authentication tag length in bits; must be a multiple of 8 in [32, 128]. Use 128 unless you have a specific reason.
+    /// SP 800-38D §5.2.1.2 approves 96, 104, 112, 120 and 128 bits for general use (64 and 32 only under its Appendix C
+    /// conditions), so <c>CryptoPolicy.SecureOnly</c> and <c>CryptoPolicy.FipsOnly</c> refuse a tag under 96 bits.</param>
     /// <exception cref="ArgumentException">Thrown if <paramref name="iv"/> is empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="tagBits"/> is not a multiple of 8 in [32, 128].</exception>
     public CkmAesGcmParams(ReadOnlySpan<byte> iv, ReadOnlySpan<byte> aad, int tagBits)
@@ -32,6 +34,9 @@ public sealed class CkmAesGcmParams : MechanismParameters
         _aadBytes = aad.IsEmpty ? [] : aad.ToArray();
         _tagBits = tagBits;
     }
+
+    /// <summary>The tag length, in bits, for the crypto policies' tag-length check.</summary>
+    internal int TagBits => _tagBits;
 
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)

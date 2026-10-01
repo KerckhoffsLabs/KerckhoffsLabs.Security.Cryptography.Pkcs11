@@ -42,6 +42,9 @@ public sealed class CkmGcmMessageParams : MechanismParameters
         if (!tagInput.IsEmpty) tagInput.CopyTo(_tagBuffer);
     }
 
+    /// <summary>The tag length, in bytes, for the crypto policies' tag-length check.</summary>
+    internal int TagLength => _tagLen;
+
     /// <summary>Copies the tag bytes (output of encrypt) into the caller's buffer.</summary>
     /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than the tag length.</exception>
     public void CopyTagTo(Span<byte> destination)

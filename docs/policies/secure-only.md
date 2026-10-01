@@ -10,10 +10,10 @@ An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs
 
 | Mechanism | Operations | Legacy operations | Parameter check | Rationale |
 |---|---|---|---|---|
-| `CKM_AES_CCM` | Encrypt, Decrypt, Wrap, Unwrap | — | — | Authenticated encryption (AES-GCM / AES-CCM). |
+| `CKM_AES_CCM` | Encrypt, Decrypt, Wrap, Unwrap | — | MAC, when parameters are given, of at least 64 bits | Authenticated encryption (AES-CCM). |
 | `CKM_AES_CMAC` | Sign, Verify | — | — | AES-based MACs secure for variable-length messages (CMAC, GMAC). |
 | `CKM_AES_CMAC_GENERAL` | Sign, Verify | — | — | AES-based MACs secure for variable-length messages (CMAC, GMAC). |
-| `CKM_AES_GCM` | Encrypt, Decrypt, Wrap, Unwrap | — | — | Authenticated encryption (AES-GCM / AES-CCM). |
+| `CKM_AES_GCM` | Encrypt, Decrypt, Wrap, Unwrap | — | tag, when parameters are given, of at least 96 bits | Authenticated encryption (AES-GCM). |
 | `CKM_AES_GMAC` | Sign, Verify | — | — | AES-based MACs secure for variable-length messages (CMAC, GMAC). |
 | `CKM_AES_KEY_GEN` | GenerateKey | — | — | AES key generation. |
 | `CKM_AES_KEY_WRAP` | Encrypt, Decrypt, Wrap, Unwrap | — | — | Standard AES key wrapping (RFC 3394 / RFC 5649, SP 800-38F). |

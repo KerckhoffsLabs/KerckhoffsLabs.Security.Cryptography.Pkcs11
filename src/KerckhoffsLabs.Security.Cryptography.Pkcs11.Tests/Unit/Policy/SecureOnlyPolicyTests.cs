@@ -323,6 +323,59 @@ public sealed class SecureOnlyPolicyTests
         Assert.False(Allowed(new Mechanism(CKM.CKM_SHA384_RSA_PKCS_PSS, new CkmRsaPkcsPssParams(CKM.CKM_SHA224, CKG.CKG_MGF1_SHA224, 28)), CryptoOperation.Sign));
     }
 
+    // A short AEAD tag raises the odds that one forged message verifies. Both the single-part and
+    // the message-based parameter types carry it, so the floor must hold for each.
+    [Theory]
+    [InlineData(32, false)]
+    [InlineData(64, false)]
+    [InlineData(88, false)]
+    [InlineData(96, true)]
+    [InlineData(128, true)]
+    public void Gcm_TagShorterThan96Bits_IsRefused(int tagBits, bool allowed)
+    {
+        Assert.Equal(allowed, Allowed(
+            new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], default, tagBits)), CryptoOperation.Encrypt));
+        Assert.Equal(allowed, Allowed(
+            new Mechanism(CKM.CKM_AES_GCM, CkmGcmMessageParams.ForEncrypt(new byte[12], tagBits / 8)), CryptoOperation.Decrypt));
+    }
+
+    [Theory]
+    [InlineData(4, false)]
+    [InlineData(6, false)]
+    [InlineData(8, true)]
+    [InlineData(16, true)]
+    public void Ccm_MacShorterThan64Bits_IsRefused(int macBytes, bool allowed)
+    {
+        Assert.Equal(allowed, Allowed(
+            new Mechanism(CKM.CKM_AES_CCM, new CkmAesCcmParams(16, new byte[12], default, macBytes)), CryptoOperation.Encrypt));
+        Assert.Equal(allowed, Allowed(
+            new Mechanism(CKM.CKM_AES_CCM, CkmCcmMessageParams.ForEncrypt(16, new byte[12], macBytes)), CryptoOperation.Decrypt));
+    }
+
+    [Fact]
+    public void AeadTagChecks_ReasonNamesTheLength()
+    {
+        Assert.StartsWith("A 64-bit AES-GCM tag", Reason(
+            new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], default, 64)), CryptoOperation.Encrypt));
+        Assert.StartsWith("A 32-bit AES-CCM MAC", Reason(
+            new Mechanism(CKM.CKM_AES_CCM, new CkmAesCcmParams(16, new byte[12], default, 4)), CryptoOperation.Encrypt));
+    }
+
+    // A bare mechanism passes: the message API is judged with its per-message parameters, and a
+    // single-part call without parameters fails at the token. Parameters the check cannot read do not.
+    [Fact]
+    public void AeadTagChecks_AllowNoParameters_ButRefuseParametersTheyCannotRead()
+    {
+        Assert.True(Allowed(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Encrypt));
+        Assert.True(Allowed(new Mechanism(CKM.CKM_AES_CCM), CryptoOperation.Decrypt));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_GCM, new byte[40]), CryptoOperation.Encrypt));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_AES_CCM, new byte[40]), CryptoOperation.Encrypt));
+        Assert.False(Allowed(
+            new Mechanism(CKM.CKM_AES_CCM, CkmGcmMessageParams.ForEncrypt(new byte[12], 16)), CryptoOperation.Encrypt));
+        Assert.False(Allowed(
+            new Mechanism(CKM.CKM_AES_GCM, new CkmAesCcmParams(16, new byte[12], default, 16)), CryptoOperation.Encrypt));
+    }
+
     [Theory]
     [InlineData(CKM.CKM_SHA256, true)]
     [InlineData(CKM.CKM_SHA3_384, true)]

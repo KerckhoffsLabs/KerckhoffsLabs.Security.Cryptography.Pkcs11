@@ -32,10 +32,11 @@ public sealed class AesCcmPkcs11Tests_Managed
     }
 
     // Imports a known AES key by value and runs the body with an AesCcmPkcs11 over it (session key).
-    private static void WithImportedCcm(byte[] key, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
+    private static void WithImportedCcm(
+        byte[] key, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var workspace = ManagedToken.OpenWorkspace(library, policy);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("ccm").Value(key).Encrypt().Decrypt().Build();
         using var key1 = workspace.ImportKey(tpl);
@@ -113,8 +114,20 @@ public sealed class AesCcmPkcs11Tests_Managed
             byte[] dec = new byte[pt.Length];
             ccm.Decrypt(nonce, ct, tag, dec, aad);
             Assert.Equal(pt, dec);
-        }, tagLen);
+        }, tagLen, ShortMacOptIn(tagLen));
     }
+
+    // SecureOnly refuses CCM MACs below 64 bits; the tag-size matrix still proves the shorter legal
+    // sizes compute correctly, so it opts in to them explicitly.
+    private static ICryptoPolicy? ShortMacOptIn(int tagLen) => tagLen < 8 ? CryptoPolicy.AllowInsecure : null;
+
+    [Fact]
+    public void Encrypt_MacShorterThan64Bits_IsRefusedUnderSecureOnly() => WithImportedCcm(RandomNumberGenerator.GetBytes(32), ccm =>
+    {
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            ccm.Encrypt(Iota(12), Iota(8), new byte[8], new byte[4]));
+        Assert.Equal(CKM.CKM_AES_CCM, ex.Mechanism);
+    }, tagSizeInBytes: 4);
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
     [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]

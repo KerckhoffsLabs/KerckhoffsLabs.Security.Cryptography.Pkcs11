@@ -113,7 +113,10 @@ internal sealed partial class FipsOnlyPolicy
             CKM.CKM_AES_OFB, CKM.CKM_AES_CFB8, CKM.CKM_AES_CFB64, CKM.CKM_AES_CFB128, CKM.CKM_AES_CFB1);
         Approve(S.Encrypt | S.Decrypt, "SP 800-38E (storage devices only; key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)",
             CKM.CKM_AES_XTS);
-        Approve(Cipher, "SP 800-38D / SP 800-38C / SP 800-38F", CKM.CKM_AES_GCM, CKM.CKM_AES_CCM);
+        ApproveChecked(Cipher, "SP 800-38D / SP 800-38F", CheckGcmTag,
+            "tag, when parameters are given, of 96 to 128 bits (SP 800-38D §5.2.1.2)", CKM.CKM_AES_GCM);
+        ApproveChecked(Cipher, "SP 800-38C / SP 800-38F", CheckCcmMac,
+            "MAC, when parameters are given, of at least 64 bits (SP 800-38C Appendix B.2)", CKM.CKM_AES_CCM);
         // Not CKM_AES_KEY_WRAP_PAD: see its documented refusal.
         Approve(Cipher, "SP 800-38F", CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP);
         Approve(Mac, "SP 800-38B / SP 800-38D", CKM.CKM_AES_CMAC, CKM.CKM_AES_CMAC_GENERAL, CKM.CKM_AES_GMAC);

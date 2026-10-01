@@ -39,9 +39,11 @@ internal static class AesCcmPkcs11TestCases
 
     // Generates an ephemeral AES-256 key, wraps it as AesCcmPkcs11, runs the body, then destroys it.
     // Does not require CCM — argument-validation cases use this and throw before any native call.
-    private static void WithCcm(IPkcs11Backend backend, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
+    private static void WithCcm(
+        IPkcs11Backend backend, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
         using var workspace = OpenWorkspace(backend);
+        using var lease = policy is null ? null : workspace.UsePolicy(policy);
         string label = $"ccm-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
@@ -214,7 +216,7 @@ internal static class AesCcmPkcs11TestCases
             ccm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
 
             Assert.Equal(plaintext, decrypted);
-        }, tagLen);
+        }, tagLen, tagLen < 8 ? CryptoPolicy.AllowInsecure : null); // SecureOnly refuses MACs below 64 bits
     }
 
     internal static void Assert_EncryptDecrypt_EmptyPlaintext_RoundTrips(IPkcs11Backend backend)

@@ -16,7 +16,7 @@ An allow-list of NIST-approved security functions, per a fixed snapshot of NIST 
 |---|---|---|---|---|
 | `CKM_AES_CBC` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
 | `CKM_AES_CBC_PAD` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
-| `CKM_AES_CCM` | Encrypt, Decrypt, Wrap, Unwrap | — | — | SP 800-38D / SP 800-38C / SP 800-38F |
+| `CKM_AES_CCM` | Encrypt, Decrypt, Wrap, Unwrap | — | MAC, when parameters are given, of at least 64 bits (SP 800-38C Appendix B.2) | SP 800-38C / SP 800-38F |
 | `CKM_AES_CFB1` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
 | `CKM_AES_CFB128` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
 | `CKM_AES_CFB64` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
@@ -26,7 +26,7 @@ An allow-list of NIST-approved security functions, per a fixed snapshot of NIST 
 | `CKM_AES_CTR` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
 | `CKM_AES_CTS` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
 | `CKM_AES_ECB` | Encrypt, Decrypt | — | — | SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7) |
-| `CKM_AES_GCM` | Encrypt, Decrypt, Wrap, Unwrap | — | — | SP 800-38D / SP 800-38C / SP 800-38F |
+| `CKM_AES_GCM` | Encrypt, Decrypt, Wrap, Unwrap | — | tag, when parameters are given, of 96 to 128 bits (SP 800-38D §5.2.1.2) | SP 800-38D / SP 800-38F |
 | `CKM_AES_GMAC` | Sign, Verify | — | — | SP 800-38B / SP 800-38D |
 | `CKM_AES_KEY_GEN` | GenerateKey | — | — | SP 800-133 Rev.2 |
 | `CKM_AES_KEY_WRAP` | Encrypt, Decrypt, Wrap, Unwrap | — | — | SP 800-38F |

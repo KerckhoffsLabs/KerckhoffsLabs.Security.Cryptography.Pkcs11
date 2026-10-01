@@ -99,7 +99,10 @@ public sealed partial class SecureOnlyPolicy
         }
 
         // --- AES ---
-        Allow(Cipher, "Authenticated encryption (AES-GCM / AES-CCM).", CKM.CKM_AES_GCM, CKM.CKM_AES_CCM);
+        AllowChecked(Cipher, "Authenticated encryption (AES-GCM).", CheckGcmTag,
+            "tag, when parameters are given, of at least 96 bits", CKM.CKM_AES_GCM);
+        AllowChecked(Cipher, "Authenticated encryption (AES-CCM).", CheckCcmMac,
+            "MAC, when parameters are given, of at least 64 bits", CKM.CKM_AES_CCM);
         Allow(Cipher, "Standard AES key wrapping (RFC 3394 / RFC 5649, SP 800-38F).",
             CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP);
         Allow(Cipher,

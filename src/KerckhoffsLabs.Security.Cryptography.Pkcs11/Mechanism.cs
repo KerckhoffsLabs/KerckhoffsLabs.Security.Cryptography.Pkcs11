@@ -109,6 +109,13 @@ public sealed class Mechanism
     internal MechanismParameters? Parameters => _mechanismParams;
 
     /// <summary>
+    /// Whether the mechanism carries a non-empty raw parameter block (the <c>ReadOnlySpan&lt;byte&gt;</c>
+    /// constructor). A crypto policy cannot read such a block, so it tells "no parameter" apart from
+    /// "a parameter it cannot inspect" with this.
+    /// </summary>
+    internal bool HasRawParameter => _rawParameter is { Length: > 0 };
+
+    /// <summary>
     /// Builds the <c>CK_MECHANISM</c> for one native call, allocating the parameter block and any
     /// buffers it points at inside <paramref name="scope"/>.
     /// </summary>

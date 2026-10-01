@@ -132,6 +132,49 @@ public sealed partial class SecureOnlyPolicy : ICryptoPolicy
         return PolicyDecision.Allow;
     }
 
+    // AEAD tag floors. A t-bit tag lets one forgery attempt succeed with probability about 2^-t, and
+    // short GCM tags are weaker still (SP 800-38D Appendix C). 96 bits is the shortest GCM tag for
+    // general use (SP 800-38D §5.2.1.2); below 64 bits CCM needs a risk analysis (SP 800-38C B.2).
+    private const int MinGcmTagBits = 96;
+    private const int MinCcmMacBits = 64;
+
+    /// <summary>
+    /// The tag of AES-GCM, in either the single-part <see cref="CkmAesGcmParams"/> or the message-based
+    /// <see cref="CkmGcmMessageParams"/>. A mechanism without parameters passes: the message API judges
+    /// the call with its per-message parameters instead, and a classic call without them fails at the token.
+    /// </summary>
+    private static PolicyDecision CheckGcmTag(Mechanism m, CryptoOperation op) => m.Parameters switch
+    {
+        CkmAesGcmParams p => RequireGcmTagBits(p.TagBits),
+        CkmGcmMessageParams p => RequireGcmTagBits(8 * p.TagLength),
+        null when !m.HasRawParameter => PolicyDecision.Allow,
+        _ => PolicyDecision.Deny(
+            "AES-GCM parameters must be CkmAesGcmParams or CkmGcmMessageParams, so the tag length can be checked."),
+    };
+
+    private static PolicyDecision RequireGcmTagBits(int tagBits) =>
+        tagBits >= MinGcmTagBits
+            ? PolicyDecision.Allow
+            : PolicyDecision.Deny($"A {tagBits}-bit AES-GCM tag is too short to resist forgery; use 96 bits or more (128 recommended).");
+
+    /// <summary>
+    /// The MAC of AES-CCM, in either the single-part <see cref="CkmAesCcmParams"/> or the message-based
+    /// <see cref="CkmCcmMessageParams"/>; a mechanism without parameters passes, as for AES-GCM.
+    /// </summary>
+    private static PolicyDecision CheckCcmMac(Mechanism m, CryptoOperation op) => m.Parameters switch
+    {
+        CkmAesCcmParams p => RequireCcmMacBits(8 * p.MacLength),
+        CkmCcmMessageParams p => RequireCcmMacBits(8 * p.MacLength),
+        null when !m.HasRawParameter => PolicyDecision.Allow,
+        _ => PolicyDecision.Deny(
+            "AES-CCM parameters must be CkmAesCcmParams or CkmCcmMessageParams, so the MAC length can be checked."),
+    };
+
+    private static PolicyDecision RequireCcmMacBits(int macBits) =>
+        macBits >= MinCcmMacBits
+            ? PolicyDecision.Allow
+            : PolicyDecision.Deny($"A {macBits}-bit AES-CCM MAC is too short to resist forgery; use 64 bits or more (128 recommended).");
+
     /// <summary>Pre-hashes of at least 256 bits for the generic HashML-DSA / HashSLH-DSA mechanisms.</summary>
     private static readonly FrozenSet<CKM> AllowedPqcPreHashes = FrozenSet.ToFrozenSet(
     [
