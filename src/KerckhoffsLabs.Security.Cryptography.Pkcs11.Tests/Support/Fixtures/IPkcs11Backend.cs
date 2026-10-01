@@ -70,11 +70,13 @@ public interface IPkcs11Backend
     /// advertised <see cref="CKM.CKM_SLH_DSA"/>; SoftHSM overrides this with a build marker.</summary>
     bool SupportsSlhDsa => Supports(CKM.CKM_SLH_DSA);
 
-    /// <summary>The <see cref="CKR"/> an AEAD decryption (AES-GCM/CCM, ChaCha20-Poly1305) returns when
-    /// the authentication tag check fails, for backends that return a stable, specific code. When set,
-    /// AEAD authenticity tests assert it exactly; <see langword="null"/> (the default) means the code is
-    /// not pinned for this backend, so those tests only assert that some <c>Pkcs11Exception</c> is
-    /// thrown (forgery rejected). SoftHSM returns <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/>;
-    /// opencryptoki's code is not pinned here.</summary>
-    CKR? AeadAuthFailureCode => null;
+    /// <summary>The <see cref="CKR"/> an AEAD decryption with <paramref name="mechanism"/> (AES-GCM/CCM,
+    /// ChaCha20-Poly1305) returns when the authentication tag check fails, for backends that return a
+    /// stable code. AEAD authenticity tests assert it exactly: as the inner code of the
+    /// <c>AuthenticationTagMismatchException</c> when it is one of the codes the adapters map, or as the
+    /// <c>Pkcs11Exception</c>'s own code when the module uses a generic code the adapters deliberately
+    /// leave alone (it cannot be told apart from a real fault). <see langword="null"/> (the default)
+    /// means the code is not pinned, so those tests only assert an <c>AuthenticationTagMismatchException</c>
+    /// wrapping one of the mapped codes.</summary>
+    CKR? AeadAuthFailureCode(CKM mechanism) => null;
 }

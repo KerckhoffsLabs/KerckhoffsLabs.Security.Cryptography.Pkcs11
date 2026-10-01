@@ -246,7 +246,7 @@ internal static class AesCcmPkcs11TestCases
             tag[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => ccm.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_CCM, () => ccm.Decrypt(nonce, ciphertext, tag, dest));
         });
     }
 
@@ -264,7 +264,7 @@ internal static class AesCcmPkcs11TestCases
             ciphertext[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => ccm.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_CCM, () => ccm.Decrypt(nonce, ciphertext, tag, dest));
         });
     }
 
@@ -281,7 +281,7 @@ internal static class AesCcmPkcs11TestCases
             ccm.Encrypt(nonce, plaintext, ciphertext, tag, Encoding.UTF8.GetBytes("aad-A"));
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () =>
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_CCM, () =>
                 ccm.Decrypt(nonce, ciphertext, tag, dest, Encoding.UTF8.GetBytes("aad-B")));
         });
     }
@@ -301,7 +301,7 @@ internal static class AesCcmPkcs11TestCases
             wrongNonce[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => ccm.Decrypt(wrongNonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_CCM, () => ccm.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
     }
 
