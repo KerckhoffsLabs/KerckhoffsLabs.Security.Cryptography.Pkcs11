@@ -23,6 +23,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// propagates unchanged.
 /// </para>
 /// <para>
+/// Some modules report a failed tag check with a generic code instead: SoftHSM 2.5 returns
+/// <see cref="CKR.CKR_GENERAL_ERROR"/> for AES-GCM, and Kryoptic returns <see cref="CKR.CKR_DEVICE_ERROR"/>
+/// for AES-CCM through <c>C_DecryptMessage</c>. Those codes are deliberately not mapped: nothing tells
+/// them apart from a genuine module fault, and reporting a fault as tampering would mislead the caller.
+/// On such modules the forgery is still rejected, as a <see cref="Pkcs11Exception"/>.
+/// </para>
+/// <para>
 /// Methods rather than a <c>try</c>/<c>catch</c>-wrapping delegate helper: the calls take
 /// <c>ReadOnlySpan&lt;byte&gt;</c> arguments, which a lambda closure cannot capture.
 /// </para>

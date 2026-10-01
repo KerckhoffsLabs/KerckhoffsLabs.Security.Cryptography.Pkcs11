@@ -120,7 +120,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if this provider has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> or <paramref name="tag"/> has an invalid length, or <paramref name="plaintext"/> length does not equal <paramref name="ciphertext"/> length.</exception>
     /// <exception cref="System.Security.Cryptography.AuthenticationTagMismatchException">Thrown if the tag does not verify. <paramref name="plaintext"/> is cleared first, and the module's <see cref="Exceptions.Pkcs11Exception"/> (<see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/>, <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_INVALID"/>) is the <see cref="Exception.InnerException"/>.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> / <c>C_DecryptMessage</c> call for any other failure.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> / <c>C_DecryptMessage</c> call for any other failure. A module that reports a failed tag check with a generic code, such as <see cref="CKR.CKR_GENERAL_ERROR"/> or <see cref="CKR.CKR_DEVICE_ERROR"/>, also lands here: the data is still rejected, but the failure cannot be recognised as a tag mismatch.</exception>
     public void Decrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> ciphertext,

@@ -238,7 +238,7 @@ internal static class AesGcmPkcs11TestCases
             tag[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => gcm.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_GCM, () => gcm.Decrypt(nonce, ciphertext, tag, dest));
         });
 
     internal static void Assert_Decrypt_TamperedCiphertext_Throws(IPkcs11Backend backend) =>
@@ -253,7 +253,7 @@ internal static class AesGcmPkcs11TestCases
             ciphertext[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => gcm.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_GCM, () => gcm.Decrypt(nonce, ciphertext, tag, dest));
         });
 
     internal static void Assert_Decrypt_WrongAad_Throws(IPkcs11Backend backend) =>
@@ -267,7 +267,7 @@ internal static class AesGcmPkcs11TestCases
             gcm.Encrypt(nonce, plaintext, ciphertext, tag, Encoding.UTF8.GetBytes("aad-A"));
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () =>
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_GCM, () =>
                 gcm.Decrypt(nonce, ciphertext, tag, dest, Encoding.UTF8.GetBytes("aad-B")));
         });
 
@@ -284,7 +284,7 @@ internal static class AesGcmPkcs11TestCases
             wrongNonce[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_AES_GCM, () => gcm.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
 
     // === Known-answer test ================================================

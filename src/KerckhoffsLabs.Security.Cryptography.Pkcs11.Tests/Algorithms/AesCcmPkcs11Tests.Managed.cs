@@ -389,7 +389,7 @@ public sealed class AesCcmPkcs11Tests_Managed
     /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a
     /// caller that reuses buffers never reads stale data after a forgery.
     /// </summary>
-    [Fact]
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
     public void Decrypt_TagMismatch_ClearsPlaintext() => WithAnyCcm(ccm =>
     {
         byte[] nonce = Iota(12);

@@ -43,10 +43,17 @@ public sealed partial class KryopticBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when <paramref name="mechanism"/> appears in the token's mechanism list.</summary>
     public bool Supports(CKM mechanism) => SupportedMechanisms.Contains(mechanism);
 
-    // SupportsMlDsa/MlKem/SlhDsa and AeadAuthFailureCode intentionally use IPkcs11Backend's default
-    // implementations (the advertised C_GetMechanismList / null): no SoftHSM-style build-marker
-    // override is needed because this backend is built with `pqc` on every leg that runs it
-    // (see build-kryoptic.sh) — the mechanism list already tells the truth.
+    // SupportsMlDsa/MlKem/SlhDsa intentionally use IPkcs11Backend's default implementations (the
+    // advertised C_GetMechanismList): no SoftHSM-style build-marker override is needed because this
+    // backend is built with `pqc` on every leg that runs it (see build-kryoptic.sh) — the mechanism
+    // list already tells the truth.
+
+    /// <inheritdoc/>
+    // Kryoptic reports a failed AES-CCM tag check through C_DecryptMessage as CKR_DEVICE_ERROR, a code
+    // the AEAD adapters deliberately do not map; pin it so the tests prove it stays a Pkcs11Exception.
+    // AES-GCM and ChaCha20-Poly1305 report a mapped code, which is left unpinned.
+    public CKR? AeadAuthFailureCode(CKM mechanism) =>
+        mechanism == CKM.CKM_AES_CCM ? CKR.CKR_DEVICE_ERROR : null;
 
     /// <summary>True if the token supports <see cref="CKM.CKM_CHACHA20_POLY1305"/>. Added upstream
     /// alongside <c>CKM_CHACHA20</c> — before that, Kryoptic had no ChaCha20 support of any kind and
