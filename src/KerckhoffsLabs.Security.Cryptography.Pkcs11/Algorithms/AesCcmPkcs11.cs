@@ -131,7 +131,8 @@ public sealed class AesCcmPkcs11 : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if this provider has been disposed.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> has an invalid length, <paramref name="tag"/> is not <see cref="TagSizeInBytes"/> bytes, or <paramref name="plaintext"/> length does not equal <paramref name="ciphertext"/> length.</exception>
-    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> / <c>C_DecryptMessage</c> call; an authentication failure surfaces as <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/> or <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/>.</exception>
+    /// <exception cref="System.Security.Cryptography.AuthenticationTagMismatchException">Thrown if the tag does not verify. <paramref name="plaintext"/> is cleared first, and the module's <see cref="Exceptions.Pkcs11Exception"/> (<see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/>, <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/> or <see cref="CKR.CKR_SIGNATURE_INVALID"/>) is the <see cref="Exception.InnerException"/>.</exception>
+    /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> / <c>C_DecryptMessage</c> call for any other failure.</exception>
     public void Decrypt(
         ReadOnlySpan<byte> nonce,
         ReadOnlySpan<byte> ciphertext,
@@ -150,7 +151,7 @@ public sealed class AesCcmPkcs11 : IDisposable
             {
                 var msgParams = CkmCcmMessageParams.ForDecrypt(plaintext.Length, nonce, tag);
                 var mech = new Mechanism(CKM.CKM_AES_CCM);
-                byte[] pt = _key.MessageDecrypt(mech, msgParams, associatedData, ciphertext);
+                byte[] pt = AeadDecryption.MessageDecrypt(_key, mech, msgParams, associatedData, ciphertext, plaintext);
                 try
                 {
                     if (pt.Length != plaintext.Length)
@@ -178,7 +179,7 @@ public sealed class AesCcmPkcs11 : IDisposable
         byte[] combined = new byte[ciphertext.Length + tag.Length];
         ciphertext.CopyTo(combined);
         tag.CopyTo(combined.AsSpan(ciphertext.Length));
-        byte[] result = _key.Decrypt(legacyMech, combined);
+        byte[] result = AeadDecryption.Decrypt(_key, legacyMech, combined, plaintext);
         try
         {
             if (result.Length != plaintext.Length)

@@ -72,9 +72,9 @@ public interface IPkcs11Backend
 
     /// <summary>The <see cref="CKR"/> an AEAD decryption (AES-GCM/CCM, ChaCha20-Poly1305) returns when
     /// the authentication tag check fails, for backends that return a stable, specific code. When set,
-    /// AEAD authenticity tests assert it exactly; <see langword="null"/> (the default) means the code is
-    /// not pinned for this backend, so those tests only assert that some <c>Pkcs11Exception</c> is
-    /// thrown (forgery rejected). SoftHSM returns <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/>;
+    /// AEAD authenticity tests assert it exactly as the inner exception's code; <see langword="null"/>
+    /// (the default) means the code is not pinned for this backend, so those tests only assert an
+    /// <c>AuthenticationTagMismatchException</c> wrapping one of the tag-failure codes (forgery rejected). SoftHSM returns <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/>;
     /// opencryptoki's code is not pinned here.</summary>
     CKR? AeadAuthFailureCode => null;
 }

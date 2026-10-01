@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -11,9 +10,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <summary>
 /// Backend-agnostic AesGcmPkcs11 tests: argument validation, AEAD round-trips (with/without AAD,
 /// various tag sizes), authenticity negatives, and a published known-answer vector. Operations skip
-/// where the backend does not advertise <c>CKM_AES_GCM</c>. Authentication-failure cases assert a
-/// <see cref="Pkcs11Exception"/> (forgery rejected, not a crash) rather than an exact CKR, since that
-/// code varies by backend (SoftHSM: CKR_ENCRYPTED_DATA_INVALID; opencryptoki may differ).
+/// where the backend does not advertise <c>CKM_AES_GCM</c>. Authentication-failure cases assert an
+/// <see cref="AuthenticationTagMismatchException"/> (forgery rejected, not a crash) and pin the module's
+/// inner CKR only where the backend declares one, since that code varies by backend (SoftHSM:
+/// CKR_ENCRYPTED_DATA_INVALID; opencryptoki may differ).
 /// </summary>
 internal static class AesGcmPkcs11TestCases
 {

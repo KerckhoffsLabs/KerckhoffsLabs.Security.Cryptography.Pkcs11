@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
@@ -42,12 +41,9 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
     private static void WithAnyChaCha(Action<ChaCha20Poly1305Pkcs11> body) =>
         WithImportedChaCha(RandomNumberGenerator.GetBytes(32), body);
 
-    // ChaCha20-Poly1305 authentication failures surface from the token as CKR_ENCRYPTED_DATA_INVALID.
-    private static void AssertAuthFailure(Action decrypt)
-    {
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(decrypt);
-        Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, ex.ReturnValue);
-    }
+    // The managed token reports a ChaCha20-Poly1305 tag failure as CKR_ENCRYPTED_DATA_INVALID.
+    private static void AssertAuthFailure(Action decrypt) =>
+        AeadTestSupport.AssertAuthFailure(decrypt, CKR.CKR_ENCRYPTED_DATA_INVALID);
 
     // === Real crypto: cross-checked against the BCL ======================================
 
@@ -296,5 +292,24 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
         chacha.Dispose();
         Assert.Throws<ObjectDisposedException>(() =>
             chacha.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
+    });
+
+    /// <summary>
+    /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a
+    /// caller that reuses buffers never reads stale data after a forgery.
+    /// </summary>
+    [Fact]
+    public void Decrypt_TagMismatch_ClearsPlaintext() => WithAnyChaCha(chacha =>
+    {
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        chacha.Encrypt(nonce, pt, ct, tag);
+        tag[0] ^= 1;
+
+        byte[] destination = Enumerable.Repeat((byte)0xAA, pt.Length).ToArray();
+        AssertAuthFailure(() => chacha.Decrypt(nonce, ct, tag, destination));
+        Assert.All(destination, b => Assert.Equal(0, b));
     });
 }
