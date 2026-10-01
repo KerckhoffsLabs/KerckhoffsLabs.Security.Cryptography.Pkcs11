@@ -19,13 +19,13 @@ public sealed class CkmCcmMessageParams : MechanismParameters
 
     /// <summary>For encryption — wrapper allocates the MAC output buffer of <paramref name="macBytes"/>.</summary>
     /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is not 7 to 13 bytes long.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative, or <paramref name="macBytes"/> is not one of {4, 6, 8, 10, 12, 14, 16}.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative or too long for the nonce's length field (RFC 3610), or <paramref name="macBytes"/> is not one of {4, 6, 8, 10, 12, 14, 16}.</exception>
     public static CkmCcmMessageParams ForEncrypt(int dataLen, ReadOnlySpan<byte> nonce, int macBytes)
         => new(dataLen, nonce, macBytes, default);
 
     /// <summary>For decryption — wrapper stores caller's MAC bytes for the library to verify.</summary>
     /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is not 7 to 13 bytes long.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative, or the length of <paramref name="mac"/> is not one of {4, 6, 8, 10, 12, 14, 16} bytes.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative or too long for the nonce's length field (RFC 3610), or the length of <paramref name="mac"/> is not one of {4, 6, 8, 10, 12, 14, 16} bytes.</exception>
     public static CkmCcmMessageParams ForDecrypt(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> mac)
         => new(dataLen, nonce, mac.Length, mac);
 
@@ -34,6 +34,12 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         ArgumentOutOfRangeException.ThrowIfNegative(dataLen);
         if (nonce.Length is < 7 or > 13)
             throw new ArgumentException("CCM nonce must be 7..13 bytes (RFC 3610).", nameof(nonce));
+        // RFC 3610 §2.1 encodes the data length in L = 15 - nonce length bytes, so it must be below
+        // 2^(8L). With an int length, only 13- and 12-byte nonces leave a field it can overflow.
+        int lengthFieldBits = 8 * (15 - nonce.Length);
+        if (lengthFieldBits < 31 && dataLen >= 1 << lengthFieldBits)
+            throw new ArgumentOutOfRangeException(nameof(dataLen), dataLen,
+                $"A {nonce.Length}-byte CCM nonce leaves a {15 - nonce.Length}-byte length field, so the data must be shorter than {1 << lengthFieldBits} bytes (RFC 3610).");
         if (macLen is not 4 and not 6 and not 8 and not 10 and not 12 and not 14 and not 16)
             throw new ArgumentOutOfRangeException(nameof(macLen), "CCM MAC length must be 4/6/8/10/12/14/16 bytes.");
 

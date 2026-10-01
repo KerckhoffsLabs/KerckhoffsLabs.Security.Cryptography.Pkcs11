@@ -102,6 +102,29 @@ public sealed class MechanismAeadMessageParamsTests
         Assert.Throws<ArgumentException>(() => CkmCcmMessageParams.ForEncrypt(32, new byte[nonceLen], 16));
 
     [Theory]
+    [InlineData(13, 65_535)]
+    [InlineData(12, 16_777_215)]
+    [InlineData(11, int.MaxValue)]
+    [InlineData(7, int.MaxValue)]
+    public void CcmMessage_AcceptsDataLenThatFitsTheLengthField(int nonceLen, int dataLen)
+    {
+        var p = CkmCcmMessageParams.ForEncrypt(dataLen, new byte[nonceLen], macBytes: 16);
+        using var scope = new MechanismParameterScope();
+        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
+        Assert.Equal((ulong)dataLen, (ulong)s.DataLen);
+    }
+
+    [Theory]
+    [InlineData(13, 65_536)]       // 2-byte length field
+    [InlineData(12, 16_777_216)]   // 3-byte length field
+    public void CcmMessage_RejectsDataLenBeyondTheLengthField(int nonceLen, int dataLen)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => CkmCcmMessageParams.ForDecrypt(dataLen, new byte[nonceLen], new byte[16]));
+        Assert.Equal("dataLen", ex.ParamName);
+    }
+
+    [Theory]
     [InlineData(5)]
     [InlineData(18)]
     public void CcmMessage_RejectsBadMacLen(int macBytes) =>
