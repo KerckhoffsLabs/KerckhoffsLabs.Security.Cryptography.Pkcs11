@@ -32,14 +32,14 @@ public sealed class AesGcmPkcs11Tests_Managed
     }
 
     // Imports a known AES key by value and runs the body with an AesGcmPkcs11 over it (session key).
-    private static void WithImportedGcm(byte[] key, Action<AesGcmPkcs11> body)
+    private static void WithImportedGcm(byte[] key, Action<AesGcmPkcs11> body, int tagSizeInBytes = 16)
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("gcm").Value(key).Encrypt().Decrypt().Build();
         using var key1 = workspace.ImportKey(tpl);
-        using var gcm = new AesGcmPkcs11(key1);
+        using var gcm = new AesGcmPkcs11(key1, tagSizeInBytes);
         body(gcm);
     }
 
@@ -114,7 +114,7 @@ public sealed class AesGcmPkcs11Tests_Managed
             byte[] dec = new byte[pt.Length];
             gcm.Decrypt(nonce, ct, tag, dec, aad);
             Assert.Equal(pt, dec);
-        });
+        }, tagLen);
     }
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
@@ -272,6 +272,53 @@ public sealed class AesGcmPkcs11Tests_Managed
 
     // === Construction and argument validation (run before the native call) ================
 
+    // === Fixed tag size ==================================================
+
+    [Fact]
+    public void TagSizeInBytes_IsTheConstructorValue() =>
+        WithAnyGcm(gcm => Assert.Equal(16, gcm.TagSizeInBytes));
+
+    [Theory]
+    [InlineData(8)]   // below MinSize (12)
+    [InlineData(17)]  // above MaxSize (16)
+    public void Ctor_InvalidTagSize_Throws(int tagSizeInBytes)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label("gcm").Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
+        using var key = workspace.ImportKey(tpl);
+
+        var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key, tagSizeInBytes));
+        Assert.Equal("tagSizeInBytes", ex.ParamName);
+    }
+
+    /// <summary>
+    /// A GCM tag truncated to its first 12 bytes is exactly what a 12-byte-tag decrypt would verify,
+    /// so an adapter that sized the check from the tag it was handed would accept it. The instance's
+    /// fixed size must refuse it before the token is asked.
+    /// </summary>
+    [Fact]
+    public void Decrypt_TruncatedTag_IsRefused() => WithAnyGcm(gcm =>
+    {
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        gcm.Encrypt(nonce, pt, ct, tag);
+
+        var ex = Assert.Throws<ArgumentException>(() => gcm.Decrypt(nonce, ct, tag.AsSpan(..12), new byte[pt.Length]));
+        Assert.Equal("tag", ex.ParamName);
+    });
+
+    [Fact]
+    public void Encrypt_TagOfAnotherSupportedSize_Throws() => WithAnyGcm(gcm =>
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            gcm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[12]));
+        Assert.Equal("tag", ex.ParamName);
+    });
+
     [Fact]
     public void Ctor_NonAesKey_Throws()
     {
@@ -281,7 +328,7 @@ public sealed class AesGcmPkcs11Tests_Managed
             .Label("gen").ValueLen(32).Sign().Build();
         using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
-        var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key));
+        var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key, 16));
         Assert.Equal("key", ex.ParamName);
     }
 
@@ -303,7 +350,7 @@ public sealed class AesGcmPkcs11Tests_Managed
     {
         var ex = Assert.Throws<ArgumentException>(() =>
             gcm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
-        Assert.Equal("tagLength", ex.ParamName);
+        Assert.Equal("tag", ex.ParamName);
     });
 
     [Fact]

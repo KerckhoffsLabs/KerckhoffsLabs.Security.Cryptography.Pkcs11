@@ -39,7 +39,7 @@ internal static class AesCcmPkcs11TestCases
 
     // Generates an ephemeral AES-256 key, wraps it as AesCcmPkcs11, runs the body, then destroys it.
     // Does not require CCM — argument-validation cases use this and throw before any native call.
-    private static void WithCcm(IPkcs11Backend backend, Action<AesCcmPkcs11> body)
+    private static void WithCcm(IPkcs11Backend backend, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
     {
         using var workspace = OpenWorkspace(backend);
         string label = $"ccm-{Guid.NewGuid():N}";
@@ -51,13 +51,13 @@ internal static class AesCcmPkcs11TestCases
         try
         {
             using var key = workspace.OpenKey(label);
-            using var ccm = new AesCcmPkcs11(key);
+            using var ccm = new AesCcmPkcs11(key, tagSizeInBytes);
             body(ccm);
         }
         finally { DestroyByLabel(workspace, label); }
     }
 
-    private static void WithImportedCcm(IPkcs11Backend backend, byte[] rawKey, Action<AesCcmPkcs11> body)
+    private static void WithImportedCcm(IPkcs11Backend backend, byte[] rawKey, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
     {
         using var workspace = OpenWorkspace(backend);
         string label = $"ccm-kat-{Guid.NewGuid():N}";
@@ -66,7 +66,7 @@ internal static class AesCcmPkcs11TestCases
         try
         {
             using var key = workspace.ImportKey(tpl);
-            using var ccm = new AesCcmPkcs11(key);
+            using var ccm = new AesCcmPkcs11(key, tagSizeInBytes);
             body(ccm);
         }
         finally { DestroyByLabel(workspace, label); }
@@ -86,7 +86,7 @@ internal static class AesCcmPkcs11TestCases
         try
         {
             using var key = workspace.OpenKey(label);
-            var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key));
+            var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key, 16));
             Assert.Equal("key", ex.ParamName);
         }
         finally { DestroyByLabel(workspace, label); }
@@ -115,7 +115,7 @@ internal static class AesCcmPkcs11TestCases
         {
             var ex = Assert.Throws<ArgumentException>(() =>
                 ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
-            Assert.Equal("tagLength", ex.ParamName);
+            Assert.Equal("tag", ex.ParamName);
         });
 
     internal static void Assert_Decrypt_InvalidTagLength_Throws(IPkcs11Backend backend, int tagLength) =>
@@ -123,7 +123,7 @@ internal static class AesCcmPkcs11TestCases
         {
             var ex = Assert.Throws<ArgumentException>(() =>
                 ccm.Decrypt(new byte[12], new byte[8], new byte[tagLength], new byte[8]));
-            Assert.Equal("tagLength", ex.ParamName);
+            Assert.Equal("tag", ex.ParamName);
         });
 
     internal static void Assert_Encrypt_CiphertextLengthMismatch_Throws(IPkcs11Backend backend) =>
@@ -214,7 +214,7 @@ internal static class AesCcmPkcs11TestCases
             ccm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
 
             Assert.Equal(plaintext, decrypted);
-        });
+        }, tagLen);
     }
 
     internal static void Assert_EncryptDecrypt_EmptyPlaintext_RoundTrips(IPkcs11Backend backend)

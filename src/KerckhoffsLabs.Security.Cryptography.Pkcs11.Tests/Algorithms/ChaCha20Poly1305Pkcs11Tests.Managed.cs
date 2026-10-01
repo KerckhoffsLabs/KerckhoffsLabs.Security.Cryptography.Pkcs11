@@ -263,7 +263,7 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
     {
         var ex = Assert.Throws<ArgumentException>(() =>
             chacha.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
-        Assert.Equal("tagLength", ex.ParamName);
+        Assert.Equal("tag", ex.ParamName);
     });
 
     [Fact(SkipUnless = nameof(ChaCha20Poly1305.IsSupported), SkipType = typeof(ChaCha20Poly1305), Skip = "Requires " + nameof(ChaCha20Poly1305.IsSupported))]

@@ -23,7 +23,7 @@ internal static class SpecVersionGateTestSupport
     internal static void AssertAesGcmRoundTrips(Pkcs11Workspace workspace)
     {
         using var key = workspace.GenerateAesKey(256);
-        using var gcm = new AesGcmPkcs11(key);
+        using var gcm = new AesGcmPkcs11(key, 16);
 
         byte[] nonce = workspace.GenerateRandom(12);
         byte[] plaintext = Encoding.UTF8.GetBytes("spec-version gate round trip");

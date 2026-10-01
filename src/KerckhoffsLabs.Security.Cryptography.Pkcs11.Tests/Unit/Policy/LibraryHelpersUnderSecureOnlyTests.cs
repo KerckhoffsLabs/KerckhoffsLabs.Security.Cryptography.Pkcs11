@@ -34,7 +34,7 @@ public sealed class LibraryHelpersUnderSecureOnlyTests
     public void GenerateAesKey_AndAesGcmAdapter_RoundTrip() => WithWorkspace(workspace =>
     {
         using var key = workspace.GenerateAesKey();
-        using var gcm = new AesGcmPkcs11(key);
+        using var gcm = new AesGcmPkcs11(key, 16);
 
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
         byte[] ciphertext = new byte[Message.Length];
@@ -109,11 +109,11 @@ public sealed class LibraryHelpersUnderSecureOnlyTests
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
         byte[] ciphertext = new byte[Message.Length];
         byte[] tag = new byte[16];
-        using (var sender = new AesGcmPkcs11(aliceAes))
+        using (var sender = new AesGcmPkcs11(aliceAes, 16))
             sender.Encrypt(nonce, Message, ciphertext, tag);
 
         byte[] plaintext = new byte[Message.Length];
-        using (var receiver = new AesGcmPkcs11(bobAes))
+        using (var receiver = new AesGcmPkcs11(bobAes, 16))
             receiver.Decrypt(nonce, ciphertext, tag, plaintext);
         Assert.Equal(Message, plaintext);
     });
@@ -164,11 +164,11 @@ public sealed class LibraryHelpersUnderSecureOnlyTests
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
         byte[] ciphertext = new byte[Message.Length];
         byte[] tag = new byte[16];
-        using (var sender = new AesGcmPkcs11(encapsulated.SharedSecret))
+        using (var sender = new AesGcmPkcs11(encapsulated.SharedSecret, 16))
             sender.Encrypt(nonce, Message, ciphertext, tag);
 
         byte[] plaintext = new byte[Message.Length];
-        using (var receiver = new AesGcmPkcs11(decapsulated))
+        using (var receiver = new AesGcmPkcs11(decapsulated, 16))
             receiver.Decrypt(nonce, ciphertext, tag, plaintext);
         Assert.Equal(Message, plaintext);
     });

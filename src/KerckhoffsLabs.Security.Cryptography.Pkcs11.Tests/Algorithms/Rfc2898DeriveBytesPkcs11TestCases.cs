@@ -272,7 +272,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
         byte[] plaintext = Encoding.UTF8.GetBytes("pbkdf2 on-token key");
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[16];
-        using (var gcm = new AesGcmPkcs11(key))
+        using (var gcm = new AesGcmPkcs11(key, tag.Length))
             gcm.Encrypt(nonce, plaintext, ciphertext, tag);
 
         byte[] decrypted = new byte[plaintext.Length];

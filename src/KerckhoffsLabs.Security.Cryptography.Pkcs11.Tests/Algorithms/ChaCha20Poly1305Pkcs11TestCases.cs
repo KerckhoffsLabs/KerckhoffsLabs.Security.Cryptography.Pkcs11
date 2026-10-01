@@ -122,7 +122,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
         {
             var ex = Assert.Throws<ArgumentException>(() =>
                 chacha.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
-            Assert.Equal("tagLength", ex.ParamName);
+            Assert.Equal("tag", ex.ParamName);
         });
 
     internal static void Assert_Decrypt_InvalidTagLength_Throws(IPkcs11Backend backend, int tagLength) =>
@@ -130,7 +130,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
         {
             var ex = Assert.Throws<ArgumentException>(() =>
                 chacha.Decrypt(new byte[12], new byte[8], new byte[tagLength], new byte[8]));
-            Assert.Equal("tagLength", ex.ParamName);
+            Assert.Equal("tag", ex.ParamName);
         });
 
     internal static void Assert_Encrypt_CiphertextLengthMismatch_Throws(IPkcs11Backend backend) =>
