@@ -55,21 +55,10 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private static void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, int tagLength)
+    private static void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
     {
-        var ns = NonceByteSizes;
-        if (nonce.Length < ns.MinSize || nonce.Length > ns.MaxSize
-            || (ns.SkipSize > 0 && (nonce.Length - ns.MinSize) % ns.SkipSize != 0))
-            throw new ArgumentException(
-                $"Nonce length must be between {ns.MinSize} and {ns.MaxSize} bytes (step {ns.SkipSize}); got {nonce.Length}.",
-                nameof(nonce));
-
-        var ts = TagByteSizes;
-        if (tagLength < ts.MinSize || tagLength > ts.MaxSize
-            || (ts.SkipSize > 0 && (tagLength - ts.MinSize) % ts.SkipSize != 0))
-            throw new ArgumentException(
-                $"Tag length must be between {ts.MinSize} and {ts.MaxSize} bytes (step {ts.SkipSize}); got {tagLength}.",
-                nameof(tagLength));
+        AeadSizes.RequireLegal(NonceByteSizes, nonce.Length, "Nonce length", nameof(nonce));
+        AeadSizes.RequireLegal(TagByteSizes, tag.Length, "Tag length", nameof(tag));
     }
 
     /// <summary>
@@ -87,7 +76,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         ReadOnlySpan<byte> associatedData = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ValidateNonceAndTag(nonce, tag.Length);
+        ValidateNonceAndTag(nonce, tag);
         if (ciphertext.Length != plaintext.Length)
             throw new ArgumentException("ciphertext length must equal plaintext length.", nameof(ciphertext));
 
@@ -139,7 +128,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
         ReadOnlySpan<byte> associatedData = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ValidateNonceAndTag(nonce, tag.Length);
+        ValidateNonceAndTag(nonce, tag);
         if (plaintext.Length != ciphertext.Length)
             throw new ArgumentException("plaintext length must equal ciphertext length.", nameof(plaintext));
 

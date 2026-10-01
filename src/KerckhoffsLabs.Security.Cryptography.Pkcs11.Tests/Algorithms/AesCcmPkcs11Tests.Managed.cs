@@ -32,14 +32,14 @@ public sealed class AesCcmPkcs11Tests_Managed
     }
 
     // Imports a known AES key by value and runs the body with an AesCcmPkcs11 over it (session key).
-    private static void WithImportedCcm(byte[] key, Action<AesCcmPkcs11> body)
+    private static void WithImportedCcm(byte[] key, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("ccm").Value(key).Encrypt().Decrypt().Build();
         using var key1 = workspace.ImportKey(tpl);
-        using var ccm = new AesCcmPkcs11(key1);
+        using var ccm = new AesCcmPkcs11(key1, tagSizeInBytes);
         body(ccm);
     }
 
@@ -113,7 +113,7 @@ public sealed class AesCcmPkcs11Tests_Managed
             byte[] dec = new byte[pt.Length];
             ccm.Decrypt(nonce, ct, tag, dec, aad);
             Assert.Equal(pt, dec);
-        });
+        }, tagLen);
     }
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
@@ -203,7 +203,7 @@ public sealed class AesCcmPkcs11Tests_Managed
             byte[] dec = new byte[pt.Length];
             ccm.Decrypt(nonce, expectedCt, expectedTag, dec, aad);
             Assert.Equal(pt, dec);
-        });
+        }, expectedTag.Length);
     }
 
     // === Authenticity: every input the tag covers must be rejected when altered ===========
@@ -275,6 +275,54 @@ public sealed class AesCcmPkcs11Tests_Managed
 
     // === Construction and argument validation (run before the native call) ================
 
+    // === Fixed tag size ==================================================
+
+    [Fact]
+    public void TagSizeInBytes_IsTheConstructorValue() =>
+        WithAnyCcm(ccm => Assert.Equal(16, ccm.TagSizeInBytes));
+
+    [Theory]
+    [InlineData(2)]   // below MinSize (4)
+    [InlineData(5)]   // violates SkipSize (2)
+    [InlineData(18)]  // above MaxSize (16)
+    public void Ctor_InvalidTagSize_Throws(int tagSizeInBytes)
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label("ccm").Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
+        using var key = workspace.ImportKey(tpl);
+
+        var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key, tagSizeInBytes));
+        Assert.Equal("tagSizeInBytes", ex.ParamName);
+    }
+
+    /// <summary>
+    /// CCM accepts tags as short as 4 bytes, so an adapter that sized the check from the tag it was
+    /// handed would let a forger shrink the tag to 32 bits. The instance's fixed size must refuse a
+    /// shorter tag before the token is asked.
+    /// </summary>
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    public void Decrypt_TruncatedTag_IsRefused() => WithAnyCcm(ccm =>
+    {
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        ccm.Encrypt(nonce, pt, ct, tag);
+
+        var ex = Assert.Throws<ArgumentException>(() => ccm.Decrypt(nonce, ct, tag.AsSpan(..4), new byte[pt.Length]));
+        Assert.Equal("tag", ex.ParamName);
+    });
+
+    [Fact]
+    public void Encrypt_TagOfAnotherSupportedSize_Throws() => WithAnyCcm(ccm =>
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[8]));
+        Assert.Equal("tag", ex.ParamName);
+    });
+
     [Fact]
     public void Ctor_NonAesKey_Throws()
     {
@@ -284,7 +332,7 @@ public sealed class AesCcmPkcs11Tests_Managed
             .Label("gen").ValueLen(32).Sign().Build();
         using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
-        var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key));
+        var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key, 16));
         Assert.Equal("key", ex.ParamName);
     }
 
@@ -306,7 +354,7 @@ public sealed class AesCcmPkcs11Tests_Managed
     {
         var ex = Assert.Throws<ArgumentException>(() =>
             ccm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
-        Assert.Equal("tagLength", ex.ParamName);
+        Assert.Equal("tag", ex.ParamName);
     });
 
     [Fact]

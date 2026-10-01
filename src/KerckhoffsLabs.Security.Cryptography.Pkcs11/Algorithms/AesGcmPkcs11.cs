@@ -22,21 +22,35 @@ public sealed class AesGcmPkcs11 : IDisposable
     private readonly Pkcs11Key _key;
     private bool _disposed;
 
+    /// <summary>The authentication-tag size, in bytes, that every <see cref="Encrypt"/> writes and every <see cref="Decrypt"/> requires.</summary>
+    public int TagSizeInBytes { get; }
+
     /// <summary>
     /// Wraps a PKCS#11 AES key as an <see cref="System.Security.Cryptography.AesGcm"/>-shaped
     /// AEAD provider. Does not take ownership — disposing this provider does not dispose
     /// <paramref name="key"/>.
     /// </summary>
+    /// <remarks>
+    /// The tag size is fixed here, as <see cref="System.Security.Cryptography.AesGcm"/> fixes it, rather
+    /// than taken from the tag each call is handed. Otherwise <see cref="Decrypt"/> would verify
+    /// whatever length it received, and an attacker who controls the ciphertext could present a
+    /// truncated tag. A 12-byte GCM tag already costs 32 bits of forgery resistance against a 16-byte one.
+    /// </remarks>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
     /// is <see cref="CKK.CKK_AES"/>.</param>
+    /// <param name="tagSizeInBytes">The authentication-tag size, in bytes, one of <see cref="TagByteSizes"/>.
+    /// Prefer 16, the full tag.</param>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an AES key.</exception>
-    public AesGcmPkcs11(Pkcs11Key key)
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an AES key, or
+    /// <paramref name="tagSizeInBytes"/> is not a size in <see cref="TagByteSizes"/>.</exception>
+    public AesGcmPkcs11(Pkcs11Key key, int tagSizeInBytes)
     {
         ArgumentNullException.ThrowIfNull(key);
         if (key.KeyType != CKK.CKK_AES)
             throw new ArgumentException(
                 $"Expected an AES key, got {key.KeyType}.", nameof(key));
+
+        TagSizeInBytes = AeadSizes.RequireLegal(TagByteSizes, tagSizeInBytes, "Tag size", nameof(tagSizeInBytes));
         _key = key;
     }
 
@@ -51,21 +65,10 @@ public sealed class AesGcmPkcs11 : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private static void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, int tagLength)
+    private void ValidateNonceAndTag(ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
     {
-        var ns = NonceByteSizes;
-        if (nonce.Length < ns.MinSize || nonce.Length > ns.MaxSize
-            || (ns.SkipSize > 0 && (nonce.Length - ns.MinSize) % ns.SkipSize != 0))
-            throw new ArgumentException(
-                $"Nonce length must be between {ns.MinSize} and {ns.MaxSize} bytes (step {ns.SkipSize}); got {nonce.Length}.",
-                nameof(nonce));
-
-        var ts = TagByteSizes;
-        if (tagLength < ts.MinSize || tagLength > ts.MaxSize
-            || (ts.SkipSize > 0 && (tagLength - ts.MinSize) % ts.SkipSize != 0))
-            throw new ArgumentException(
-                $"Tag length must be between {ts.MinSize} and {ts.MaxSize} bytes (step {ts.SkipSize}); got {tagLength}.",
-                nameof(tagLength));
+        AeadSizes.RequireLegal(NonceByteSizes, nonce.Length, "Nonce length", nameof(nonce));
+        AeadSizes.RequireTagSize(tag, TagSizeInBytes);
     }
 
     /// <summary>
@@ -73,7 +76,7 @@ public sealed class AesGcmPkcs11 : IDisposable
     /// one-shot AES-GCM AEAD, mirroring <see cref="System.Security.Cryptography.AesGcm"/>.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if this provider has been disposed.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> or <paramref name="tag"/> has an invalid length, or <paramref name="ciphertext"/> length does not equal <paramref name="plaintext"/> length.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> has an invalid length, <paramref name="tag"/> is not <see cref="TagSizeInBytes"/> bytes, or <paramref name="ciphertext"/> length does not equal <paramref name="plaintext"/> length.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Encrypt</c> / <c>C_MessageEncrypt</c> call.</exception>
     public void Encrypt(
         ReadOnlySpan<byte> nonce,
@@ -83,7 +86,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         ReadOnlySpan<byte> associatedData = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ValidateNonceAndTag(nonce, tag.Length);
+        ValidateNonceAndTag(nonce, tag);
         if (ciphertext.Length != plaintext.Length)
             throw new ArgumentException("ciphertext length must equal plaintext length.", nameof(ciphertext));
 
@@ -126,7 +129,7 @@ public sealed class AesGcmPkcs11 : IDisposable
     /// one-shot AES-GCM AEAD, mirroring <see cref="System.Security.Cryptography.AesGcm"/>.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if this provider has been disposed.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> or <paramref name="tag"/> has an invalid length, or <paramref name="plaintext"/> length does not equal <paramref name="ciphertext"/> length.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> has an invalid length, <paramref name="tag"/> is not <see cref="TagSizeInBytes"/> bytes, or <paramref name="plaintext"/> length does not equal <paramref name="ciphertext"/> length.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Decrypt</c> / <c>C_DecryptMessage</c> call; an authentication failure surfaces as <see cref="CKR.CKR_ENCRYPTED_DATA_INVALID"/> or <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/>.</exception>
     public void Decrypt(
         ReadOnlySpan<byte> nonce,
@@ -136,7 +139,7 @@ public sealed class AesGcmPkcs11 : IDisposable
         ReadOnlySpan<byte> associatedData = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ValidateNonceAndTag(nonce, tag.Length);
+        ValidateNonceAndTag(nonce, tag);
         if (plaintext.Length != ciphertext.Length)
             throw new ArgumentException("plaintext length must equal ciphertext length.", nameof(plaintext));
 

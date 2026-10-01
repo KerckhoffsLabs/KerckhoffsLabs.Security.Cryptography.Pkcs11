@@ -41,7 +41,7 @@ internal static class AesGcmPkcs11TestCases
 
     // Generates an ephemeral AES-256 key, wraps it as AesGcmPkcs11, runs the body, then destroys it.
     // Skips when the backend does not advertise CKM_AES_GCM.
-    private static void WithGcm(IPkcs11Backend backend, Action<AesGcmPkcs11> body)
+    private static void WithGcm(IPkcs11Backend backend, Action<AesGcmPkcs11> body, int tagSizeInBytes = 16)
     {
         if (!backend.Supports(CKM.CKM_AES_GCM))
             Assert.Skip("Backend does not advertise CKM_AES_GCM.");
@@ -56,14 +56,14 @@ internal static class AesGcmPkcs11TestCases
         try
         {
             using var key = workspace.OpenKey(label);
-            using var gcm = new AesGcmPkcs11(key);
+            using var gcm = new AesGcmPkcs11(key, tagSizeInBytes);
             body(gcm);
         }
         finally { DestroyByLabel(workspace, label); }
     }
 
     // Imports a known AES key (by value) so a deterministic vector can be checked.
-    private static void WithImportedGcm(IPkcs11Backend backend, byte[] rawKey, Action<AesGcmPkcs11> body)
+    private static void WithImportedGcm(IPkcs11Backend backend, byte[] rawKey, Action<AesGcmPkcs11> body, int tagSizeInBytes = 16)
     {
         if (!backend.Supports(CKM.CKM_AES_GCM))
             Assert.Skip("Backend does not advertise CKM_AES_GCM.");
@@ -75,7 +75,7 @@ internal static class AesGcmPkcs11TestCases
         try
         {
             using var key = workspace.ImportKey(tpl);
-            using var gcm = new AesGcmPkcs11(key);
+            using var gcm = new AesGcmPkcs11(key, tagSizeInBytes);
             body(gcm);
         }
         finally { DestroyByLabel(workspace, label); }
@@ -95,7 +95,7 @@ internal static class AesGcmPkcs11TestCases
         try
         {
             using var key = workspace.OpenKey(label);
-            var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key));
+            var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key, 16));
             Assert.Equal("key", ex.ParamName);
         }
         finally { DestroyByLabel(workspace, label); }
@@ -124,7 +124,7 @@ internal static class AesGcmPkcs11TestCases
         {
             var ex = Assert.Throws<ArgumentException>(() =>
                 gcm.Encrypt(new byte[12], new byte[8], new byte[8], new byte[tagLength]));
-            Assert.Equal("tagLength", ex.ParamName);
+            Assert.Equal("tag", ex.ParamName);
         });
 
     internal static void Assert_Decrypt_InvalidTagLength_Throws(IPkcs11Backend backend, int tagLength) =>
@@ -132,7 +132,7 @@ internal static class AesGcmPkcs11TestCases
         {
             var ex = Assert.Throws<ArgumentException>(() =>
                 gcm.Decrypt(new byte[12], new byte[8], new byte[tagLength], new byte[8]));
-            Assert.Equal("tagLength", ex.ParamName);
+            Assert.Equal("tag", ex.ParamName);
         });
 
     internal static void Assert_Encrypt_CiphertextLengthMismatch_Throws(IPkcs11Backend backend) =>
@@ -201,14 +201,15 @@ internal static class AesGcmPkcs11TestCases
             Assert.Equal(plaintext, decrypted);
         });
 
-    internal static void Assert_EncryptDecrypt_RoundTrips_VariousTagSizes(IPkcs11Backend backend, int tagLen) =>
+    internal static void Assert_EncryptDecrypt_RoundTrips_VariousTagSizes(IPkcs11Backend backend, int tagLen)
+    {
+        // AesGcmPkcs11.TagByteSizes mirrors the BCL AesGcm, which on macOS is 16..16 — so sub-16
+        // tags are unsupported there regardless of the token. Skip those rather than fail.
+        if (tagLen < AesGcm.TagByteSizes.MinSize)
+            Assert.Skip($"Platform AesGcm minimum tag size is {AesGcm.TagByteSizes.MinSize} bytes.");
+
         WithGcm(backend, gcm =>
         {
-            // AesGcmPkcs11.TagByteSizes mirrors the BCL AesGcm, which on macOS is 16..16 — so sub-16
-            // tags are unsupported there regardless of the token. Skip those rather than fail.
-            if (tagLen < AesGcm.TagByteSizes.MinSize)
-                Assert.Skip($"Platform AesGcm minimum tag size is {AesGcm.TagByteSizes.MinSize} bytes.");
-
             byte[] nonce = Iota(12);
             byte[] plaintext = Iota(40);
             byte[] aad = Iota(13);
@@ -220,7 +221,8 @@ internal static class AesGcmPkcs11TestCases
             gcm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
 
             Assert.Equal(plaintext, decrypted);
-        });
+        }, tagLen);
+    }
 
     // === Authenticity negatives ===========================================
 

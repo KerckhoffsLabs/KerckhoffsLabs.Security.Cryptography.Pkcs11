@@ -19,7 +19,7 @@ public sealed class AesCcmPkcs11ArgumentTests
 {
     [Fact]
     public void Ctor_NullKey_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new AesCcmPkcs11(key: null!));
+        Assert.Throws<ArgumentNullException>(() => new AesCcmPkcs11(key: null!, 16));
 
     [Fact]
     public void NonceByteSizes_MirrorsBcl()
