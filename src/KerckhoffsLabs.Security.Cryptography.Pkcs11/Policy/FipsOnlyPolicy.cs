@@ -105,6 +105,54 @@ internal sealed partial class FipsOnlyPolicy : ICryptoPolicy
         return PolicyDecision.Allow;
     }
 
+    // === AEAD tag-length checks ===
+
+    // SP 800-38D §5.2.1.2 approves 128-, 120-, 112-, 104- and 96-bit GCM tags for general use; 64 and
+    // 32 bits only under Appendix C's conditions on the protocol, which a policy cannot verify, and no
+    // other length at all. SP 800-38C Appendix B.2: a CCM MAC below 64 bits "shall not be used without
+    // a careful analysis of the risks", which a policy cannot perform either.
+    private const int MinGcmTagBits = 96;
+    private const int MinCcmMacBits = 64;
+
+    /// <summary>
+    /// The tag of AES-GCM, in either <see cref="CkmAesGcmParams"/> or <see cref="CkmGcmMessageParams"/>.
+    /// A mechanism without parameters passes: the message API judges the call with its per-message
+    /// parameters instead, and a classic call without them fails at the token.
+    /// </summary>
+    private static PolicyDecision CheckGcmTag(Mechanism m, CryptoOperation op) => m.Parameters switch
+    {
+        CkmAesGcmParams p => RequireGcmTagBits(p.TagBits),
+        CkmGcmMessageParams p => RequireGcmTagBits(8 * p.TagLength),
+        null when !m.HasRawParameter => PolicyDecision.Allow,
+        _ => PolicyDecision.Deny(
+            "SP 800-38D §5.2.1.2: AES-GCM requires CkmAesGcmParams or CkmGcmMessageParams, so the tag length can be checked."),
+    };
+
+    private static PolicyDecision RequireGcmTagBits(int tagBits) =>
+        tagBits >= MinGcmTagBits
+            ? PolicyDecision.Allow
+            : PolicyDecision.Deny(
+                $"SP 800-38D §5.2.1.2: a {tagBits}-bit tag is not approved for general use; use 96, 104, 112, 120 or 128 bits.");
+
+    /// <summary>
+    /// The MAC of AES-CCM, in either <see cref="CkmAesCcmParams"/> or <see cref="CkmCcmMessageParams"/>;
+    /// a mechanism without parameters passes, as for AES-GCM.
+    /// </summary>
+    private static PolicyDecision CheckCcmMac(Mechanism m, CryptoOperation op) => m.Parameters switch
+    {
+        CkmAesCcmParams p => RequireCcmMacBits(8 * p.MacLength),
+        CkmCcmMessageParams p => RequireCcmMacBits(8 * p.MacLength),
+        null when !m.HasRawParameter => PolicyDecision.Allow,
+        _ => PolicyDecision.Deny(
+            "SP 800-38C: AES-CCM requires CkmAesCcmParams or CkmCcmMessageParams, so the MAC length can be checked."),
+    };
+
+    private static PolicyDecision RequireCcmMacBits(int macBits) =>
+        macBits >= MinCcmMacBits
+            ? PolicyDecision.Allow
+            : PolicyDecision.Deny(
+                $"SP 800-38C Appendix B.2: a {macBits}-bit MAC is below 64 bits, which requires a risk analysis this policy cannot perform.");
+
     // === KDF PRF checks ===
 
     /// <summary>

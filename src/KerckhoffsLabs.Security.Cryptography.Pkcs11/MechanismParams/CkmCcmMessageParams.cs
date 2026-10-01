@@ -51,6 +51,9 @@ public sealed class CkmCcmMessageParams : MechanismParameters
         if (!macInput.IsEmpty) macInput.CopyTo(_macBuffer);
     }
 
+    /// <summary>The MAC length, in bytes, for the crypto policies' MAC-length check.</summary>
+    internal int MacLength => _macLen;
+
     /// <summary>Copies the MAC bytes (output of encrypt) into the caller's buffer.</summary>
     /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is smaller than the MAC length.</exception>
     public void CopyMacTo(Span<byte> destination)

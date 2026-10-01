@@ -224,6 +224,19 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
+    /// Enforces the policy for a message-based operation. Its per-message parameters, which carry an
+    /// AEAD's tag length, never reach the mechanism <c>C_Message[En|De]cryptInit</c> receives, so a
+    /// mechanism without parameters of its own is judged with them: a parameter rule then sees the
+    /// call exactly as the single-part API would show it.
+    /// </summary>
+    private void EnforceMessage(Mechanism mechanism, MechanismParameters messageParams, CryptoOperation operation) =>
+        Enforce(
+            mechanism.Parameters is null && !mechanism.HasRawParameter
+                ? new Mechanism(mechanism.Type, messageParams)
+                : mechanism,
+            operation);
+
+    /// <summary>
     /// Replaces the effective policy until the returned lease is disposed. Logged. Refused when the
     /// session's base policy does not allow overrides.
     /// </summary>
@@ -2080,7 +2093,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        Enforce(mechanism, CryptoOperation.Encrypt);
+        EnforceMessage(mechanism, messageParams, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageEncrypt");
 
@@ -2309,7 +2322,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        Enforce(mechanism, CryptoOperation.Decrypt);
+        EnforceMessage(mechanism, messageParams, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "MessageDecrypt");
 

@@ -125,6 +125,8 @@ list (reason and alternative), is generated straight from the policy source into
 > compliance also requires a validated cryptographic module operating in its approved mode. Under
 > `FipsOnly`, AES key wrapping is approved only via KW/KWP (`CKM_AES_KEY_WRAP`, `CKM_AES_KEY_WRAP_KWP`)
 > or the GCM/CCM modes; other AES modes encrypt and decrypt data but may not wrap or unwrap keys.
+> AES-GCM tags must be 96 to 128 bits (SP 800-38D §5.2.1.2) and AES-CCM MACs at least 64 bits
+> (SP 800-38C Appendix B.2).
 > `CKM_AES_KEY_WRAP_PAD` is refused: its padding is vendor-defined (RFC 5649 on some tokens, KW over
 > PKCS#7 — not an SP 800-38F method — on others), so its approval cannot be established.
 
@@ -145,7 +147,7 @@ sign — and **denies every vendor-defined or unreviewed mechanism by default**,
 specific objection to. Refusals it documents include unauthenticated symmetric modes (ECB, CBC, CTR, …),
 broken/legacy ciphers (DES/3DES, RC2, RC4, SEED, CAST, Blowfish, SKIPJACK), broken hashes
 (MD2/MD5/SHA-1/RIPEMD), PKCS#1 v1.5 *encryption* and raw RSA (`CKM_RSA_PKCS`, `CKM_RSA_X_509`),
-sub-128-bit EC curves, and SHA-1 KDF PRFs. Where the insecure choice is visible at compile time,
+sub-128-bit EC curves, SHA-1 KDF PRFs, and AES-GCM tags under 96 bits or AES-CCM MACs under 64 bits. Where the insecure choice is visible at compile time,
 [analyzers](https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html)
 (`KLPKCS11001`–`KLPKCS11010`) surface it as a build warning too.
 

@@ -64,6 +64,47 @@ public sealed class Pkcs11SessionMessageAndMiscTests
 
     private static Pkcs11Session NewSession(FakeLowLevelPkcs11Library fake) => new(fake, SessionId);
 
+    // The tag length of a message-based AEAD lives in the per-message parameters, not on the mechanism
+    // C_MessageEncryptInit receives, so the session must show them to the policy for it to judge the tag.
+    [Fact]
+    public void MessageEncrypt_ShortGcmTag_IsRefusedByThePolicy_BeforeTheToken()
+    {
+        var fake = new MessageFake();
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 8);
+
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            s.MessageEncrypt(new Mechanism(CKM.CKM_AES_GCM), new ObjectHandle(1), p, associatedData: [], plaintext: [1]));
+
+        Assert.StartsWith("A 64-bit AES-GCM tag", ex.Reason);
+        Assert.Equal(0, fake.EncryptFinalCalls); // the operation never started
+    }
+
+    [Fact]
+    public void MessageDecrypt_ShortCcmMac_IsRefusedByThePolicy_BeforeTheToken()
+    {
+        var fake = new MessageFake();
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        var p = CkmCcmMessageParams.ForDecrypt(2, new byte[12], new byte[4]);
+
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            s.MessageDecrypt(new Mechanism(CKM.CKM_AES_CCM), new ObjectHandle(1), p, associatedData: [], ciphertext: [1, 2]));
+
+        Assert.StartsWith("A 32-bit AES-CCM MAC", ex.Reason);
+        Assert.Equal(0, fake.DecryptFinalCalls);
+    }
+
+    [Fact]
+    public void MessageEncrypt_FullGcmTag_IsAllowedByThePolicy()
+    {
+        var fake = new MessageFake { Ciphertext = [1, 2] };
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+
+        Assert.Equal(new byte[] { 1, 2 },
+            s.MessageEncrypt(new Mechanism(CKM.CKM_AES_GCM), new ObjectHandle(1), p, associatedData: [], plaintext: [9, 9]));
+    }
+
     [Fact]
     public void MessageEncrypt_Ok_ReturnsCiphertext_AndFinalizes()
     {
