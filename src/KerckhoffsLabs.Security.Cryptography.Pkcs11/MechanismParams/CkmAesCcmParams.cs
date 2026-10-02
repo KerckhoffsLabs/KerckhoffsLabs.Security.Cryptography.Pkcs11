@@ -23,8 +23,8 @@ public sealed class CkmAesCcmParams : MechanismParameters
     /// <param name="nonce">Nonce, 7 to 13 bytes (RFC 3610).</param>
     /// <param name="aad">Additional authenticated data; pass <c>default</c> for none.</param>
     /// <param name="macLen">MAC (tag) length in bytes; must be one of {4, 6, 8, 10, 12, 14, 16}. SP 800-38C Appendix B.2
-    /// rules out MACs under 8 bytes (64 bits) without a risk analysis, so <c>CryptoPolicy.SecureOnly</c> and
-    /// <c>CryptoPolicy.FipsOnly</c> refuse them.</param>
+    /// rules out MACs under 8 bytes (64 bits) without a risk analysis, so <c>CryptoPolicy.Recommended</c> and
+    /// <c>CryptoPolicy.NistApproved</c> refuse them.</param>
     /// <exception cref="ArgumentException">Thrown if <paramref name="nonce"/> is not 7 to 13 bytes long.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="dataLen"/> is negative or too long for the nonce's length field, or <paramref name="macLen"/> is not one of {4, 6, 8, 10, 12, 14, 16}.</exception>
     public CkmAesCcmParams(int dataLen, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> aad, int macLen)

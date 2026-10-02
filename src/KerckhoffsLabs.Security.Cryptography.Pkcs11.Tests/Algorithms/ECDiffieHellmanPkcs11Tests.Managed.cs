@@ -396,7 +396,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     public void DeriveKeyFromHash_PeerOnDifferentCurve_Throws() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP384);
-        Assert.Throws<Pkcs11ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () => alice.DeriveKeyFromHash(bob.PublicKey, HashAlgorithmName.SHA256, null, null));
     });
 
@@ -404,7 +404,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     public void DeriveRawSecretAgreement_PeerOnDifferentCurve_Throws() => WithEcdh("P-256", alice =>
     {
         using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP384);
-        Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(bob.PublicKey));
+        Assert.Throws<ArgumentException>(() => alice.DeriveRawSecretAgreement(bob.PublicKey));
     });
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
@@ -418,7 +418,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             Curve = BclECCurve.NamedCurves.nistP256,
             Q = new ECPoint { X = new byte[size], Y = new byte[size] }, // (0, 0) is not on the curve
         });
-        Assert.Throws<Pkcs11ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () => alice.DeriveKeyFromHash(badPeer, HashAlgorithmName.SHA256, null, null));
     });
 
@@ -433,7 +433,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
             Curve = BclECCurve.NamedCurves.nistP256,
             Q = new ECPoint { X = new byte[wrongSize], Y = new byte[wrongSize] },
         });
-        Assert.Throws<Pkcs11ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () => alice.DeriveKeyFromHash(badPeer, HashAlgorithmName.SHA256, null, null));
     });
 }

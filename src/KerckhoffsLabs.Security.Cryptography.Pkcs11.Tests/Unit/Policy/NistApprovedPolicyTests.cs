@@ -8,9 +8,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
-public sealed class FipsOnlyPolicyTests
+public sealed class NistApprovedPolicyTests
 {
-    private static readonly ICryptoPolicy Policy = CryptoPolicy.FipsOnly;
+    private static readonly ComposedCryptoPolicy Policy = CryptoPolicy.NistApproved;
 
     private static bool Allowed(CKM mech, CryptoOperation op)
         => Policy.Evaluate(new MechanismUseRequest(new Mechanism(mech), op)).IsAllowed;
@@ -24,7 +24,7 @@ public sealed class FipsOnlyPolicyTests
     [Fact]
     public void Identity()
     {
-        Assert.Equal("FipsOnly", Policy.Name);
+        Assert.Equal("NistApproved", Policy.Name);
         Assert.False(Policy.AllowsOverride);
     }
 
@@ -55,7 +55,7 @@ public sealed class FipsOnlyPolicyTests
     [InlineData(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CryptoOperation.GenerateKeyPair)]
     [InlineData(CKM.CKM_EC_KEY_PAIR_GEN, CryptoOperation.GenerateKeyPair)]
     [InlineData(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN, CryptoOperation.GenerateKeyPair)]
-    public void Approved(CKM mech, CryptoOperation op) => Assert.True(Allowed(SecureOnlyPolicyTests.ValidMechanismFor(mech), op));
+    public void Approved(CKM mech, CryptoOperation op) => Assert.True(Allowed(RecommendedPolicyTests.ValidMechanismFor(mech), op));
 
     [Theory]
     [InlineData(CKM.CKM_DES3_CBC, CryptoOperation.Decrypt, true)]
@@ -129,7 +129,7 @@ public sealed class FipsOnlyPolicyTests
     // === KDF PRF checks ======================================================
 
     [Theory]
-    [InlineData(CKP.CKP_PKCS5_PBKD2_HMAC_SHA1)] // FIPS: HMAC-SHA-1 PBKDF2 stays approved (SP 800-132); SecureOnly refuses it.
+    [InlineData(CKP.CKP_PKCS5_PBKD2_HMAC_SHA1)] // FIPS: HMAC-SHA-1 PBKDF2 stays approved (SP 800-132); Recommended refuses it.
     [InlineData(CKP.CKP_PKCS5_PBKD2_HMAC_SHA224)]
     [InlineData(CKP.CKP_PKCS5_PBKD2_HMAC_SHA256)]
     [InlineData(CKP.CKP_PKCS5_PBKD2_HMAC_SHA384)]
@@ -207,7 +207,7 @@ public sealed class FipsOnlyPolicyTests
     [Fact]
     public void DocumentedRefusedPrf_QuotesReasonAndAlternative()
     {
-        DocumentedRefusal refusal = FipsOnlyPolicy.Catalogue.DocumentedRefusedPrfs[nameof(CKP.CKP_PKCS5_PBKD2_HMAC_GOSTR3411)];
+        DocumentedRefusal refusal = CryptoPolicy.NistApproved.Catalogue.DocumentedRefusedPrfs[nameof(CKP.CKP_PKCS5_PBKD2_HMAC_GOSTR3411)];
         Assert.NotNull(refusal.Alternative);
         var mech = new Mechanism(CKM.CKM_PKCS5_PBKD2, new CkmPkcs5Pbkd2Params([1], 1, CKP.CKP_PKCS5_PBKD2_HMAC_GOSTR3411, [1]));
         Assert.Equal(
@@ -245,9 +245,9 @@ public sealed class FipsOnlyPolicyTests
         Assert.False(Allowed(new Mechanism((CKM)0x7FFF_FFF0UL), CryptoOperation.Encrypt));
     }
 
-    // A denial for a mechanism FipsOnly has reviewed — it is Allowed for at least one operation — always
+    // A denial for a mechanism NistApproved has reviewed — it is Allowed for at least one operation — always
     // cites a NIST source: either the allow-list rule's own rationale (operation-restricted wording) or a
-    // documented refusal's reason. Only a mechanism FipsOnly has never reviewed at all may say so
+    // documented refusal's reason. Only a mechanism NistApproved has never reviewed at all may say so
     // explicitly instead of fabricating a citation.
     [Fact]
     public void Denials_CiteTheirSource()
@@ -262,7 +262,7 @@ public sealed class FipsOnlyPolicyTests
             bool isListed = decisions.Exists(d => d.IsAllowed);
             string pattern = isListed
                 ? @"(SP 800-|FIPS 1|FIPS 2)"
-                : @"(SP 800-|FIPS 1|FIPS 2|is not on the FipsOnly allow-list \(not reviewed\)\.)";
+                : @"(SP 800-|FIPS 1|FIPS 2|is not on the NistApproved allow-list \(not reviewed\)\.)";
 
             foreach (PolicyDecision d in decisions.Where(d => !d.IsAllowed))
                 Assert.Matches(pattern, d.Reason!);
@@ -330,7 +330,7 @@ public sealed class FipsOnlyPolicyTests
 
     // RsaKeyGenerationRequest names an RSA key-pair-generation mechanism specifically; a mechanism for a
     // different key type is refused outright, not silently treated as an approved RSA generator just
-    // because it's on FipsOnly's allow-list for GenerateKeyPair under some other request kind.
+    // because it's on NistApproved's allow-list for GenerateKeyPair under some other request kind.
     [Theory]
     [InlineData(CKM.CKM_EC_KEY_PAIR_GEN)]
     [InlineData(CKM.CKM_ML_DSA_KEY_PAIR_GEN)]
@@ -376,11 +376,12 @@ public sealed class FipsOnlyPolicyTests
         => Assert.Equal(allowed, Policy.Evaluate(new HashUseRequest(new HashAlgorithmName(hash), op)).IsAllowed);
 
     [Theory]
-    [InlineData(KeyMaterialExportKind.EcdhSharedSecret)]
-    [InlineData(KeyMaterialExportKind.KemSharedSecret)]
-    [InlineData(KeyMaterialExportKind.KdfOutput)]
-    public void KeyMaterialExport_Refused(KeyMaterialExportKind kind)
-        => Assert.False(Policy.Evaluate(new KeyMaterialExportRequest(kind)).IsAllowed);
+    [InlineData(SecretExportKind.EcdhSharedSecret)]
+    [InlineData(SecretExportKind.KemSharedSecret)]
+    [InlineData(SecretExportKind.KdfOutput)]
+    [InlineData(SecretExportKind.PasswordKdfOutput)]
+    public void SecretExport_Refused(SecretExportKind kind)
+        => Assert.False(Policy.Evaluate(new SecretExportRequest(kind)).IsAllowed);
 
     // A hash-bound PSS mechanism fixes the message hash, but the MGF/parameter hash it is given must
     // still be approved — otherwise a caller could smuggle MD5 into the MGF of an "approved" mechanism.
@@ -402,6 +403,14 @@ public sealed class FipsOnlyPolicyTests
         var pss = new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
         Assert.False(Allowed(pss, CryptoOperation.Sign));
         Assert.False(Allowed(pss, CryptoOperation.Verify));
+    }
+
+    [Fact]
+    public void HashedPss_WithRawParameterBytes_IsRefused()
+    {
+        Assert.Equal("FIPS 186-5 §5.4: RSA-PSS parameters must be CkmRsaPkcsPssParams.",
+            Reason(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Sign));
+        Assert.False(Allowed(new Mechanism(CKM.CKM_SHA1_RSA_PKCS_PSS, new byte[24]), CryptoOperation.Verify));
     }
 
     // A short AEAD tag raises the odds that one forged message verifies. Both the single-part and
@@ -467,4 +476,27 @@ public sealed class FipsOnlyPolicyTests
     [Fact]
     public void EcKeyGeneration_OnACurveWithNoOid_IsRefused()
         => Assert.False(Policy.Evaluate(new EcKeyGenerationRequest(default)).IsAllowed);
+
+    // Like every policy's export refusal, NistApproved's names the on-token operation that avoids the export.
+    [Theory]
+    [InlineData(SecretExportKind.EcdhSharedSecret, "Pkcs11Workspace.DeriveSharedSecretEcdh")]
+    [InlineData(SecretExportKind.PasswordKdfOutput, "Pkcs11Workspace.GenerateKey")]
+    public void ExportRefusal_NamesTheOnTokenAlternative(SecretExportKind kind, string alternative)
+    {
+        string? reason = Policy.Evaluate(new SecretExportRequest(kind)).Reason;
+
+        Assert.StartsWith("FIPS 140-3 (ISO/IEC 19790 §7.9)", reason);
+        Assert.Contains(alternative, reason);
+    }
+
+    // SP 800-186 does specify Curve25519 and Curve448; X25519 / X448 lack approval because SP 800-56A Rev.3 has
+    // no scheme over them and FIPS 186-5 approves those curves only for EdDSA.
+    [Fact]
+    public void MontgomeryRefusals_DoNotClaimSp800_186ListsNoMontgomeryCurves()
+    {
+        Assert.DoesNotContain("lists no Montgomery", Policy.Evaluate(
+            new MechanismUseRequest(new Mechanism(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN), CryptoOperation.GenerateKeyPair)).Reason);
+        Assert.DoesNotContain("lists no Montgomery", Policy.Evaluate(
+            new KeyAgreementKeyRequest(CKM.CKM_ECDH1_DERIVE, CKK.CKK_EC_MONTGOMERY)).Reason);
+    }
 }

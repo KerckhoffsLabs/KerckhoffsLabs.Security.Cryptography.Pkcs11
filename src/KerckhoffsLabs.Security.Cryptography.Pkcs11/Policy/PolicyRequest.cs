@@ -13,6 +13,9 @@ public abstract record PolicyRequest
 {
     private protected PolicyRequest() { }
 
+    /// <summary>The request as it appears in refusals and logs: what is requested, never secret values.</summary>
+    public sealed override string ToString() => Describe();
+
     /// <summary>Log- and message-safe description. Never includes attribute values or key material.</summary>
     internal abstract string Describe();
 
@@ -81,19 +84,60 @@ public sealed record KeyAgreementKeyRequest(CKM Mechanism, CKK KeyType) : Policy
 }
 
 /// <summary>Reading secret key material off the token into managed memory.</summary>
+/// <remarks>
+/// <para>
+/// Submitted by the read-back operations — <see cref="Pkcs11Key.DeriveAndExportSecret"/>,
+/// <see cref="Pkcs11Key.EncapsulateAndExportSecret"/>, <see cref="Pkcs11Key.DecapsulateAndExportSecret"/>
+/// and <see cref="Pkcs11Workspace.DeriveAndExportSecret"/> — and so by every adapter built on them. When
+/// the policy allows it, the operation creates an ephemeral extractable, non-sensitive session key,
+/// copies its value out and destroys it. That key's template is what the export consists of, so it is
+/// not submitted again as a <see cref="KeyTemplateRequest"/>; for
+/// <see cref="SecretExportKind.EcdhSharedSecret"/> with <c>CKD_NULL</c>, neither is the derivation
+/// that yields the raw secret, as a <see cref="KeyAgreementKdfRequest"/>. The mechanism itself is still
+/// judged as a <see cref="MechanismUseRequest"/>.
+/// </para>
+/// <para>
+/// A custom policy can tell exports of the same kind apart by <see cref="Mechanism"/>,
+/// <see cref="BaseKeyClass"/> and <see cref="BaseKeyType"/> — for example HKDF over a master key from
+/// HKDF over an ECDH output.
+/// </para>
+/// </remarks>
 /// <param name="Kind">What is being read.</param>
-public sealed record KeyMaterialExportRequest(KeyMaterialExportKind Kind) : PolicyRequest
+public sealed record SecretExportRequest(SecretExportKind Kind) : PolicyRequest
 {
-    internal override string Describe() => $"export of {Kind}";
+    /// <summary>The mechanism that produces the exported secret, when known.</summary>
+    public CKM? Mechanism { get; init; }
+
+    /// <summary>
+    /// The class of the key the secret is produced from (<see cref="CKO.CKO_PRIVATE_KEY"/> for ECDH and
+    /// ML-KEM decapsulation, <see cref="CKO.CKO_PUBLIC_KEY"/> for ML-KEM encapsulation,
+    /// <see cref="CKO.CKO_SECRET_KEY"/> for a KDF over a secret key), or <see langword="null"/> when there
+    /// is none, as for PBKDF2.
+    /// </summary>
+    public CKO? BaseKeyClass { get; init; }
+
+    /// <summary>The type of the key the secret is produced from, or <see langword="null"/> when there is none.</summary>
+    public CKK? BaseKeyType { get; init; }
+
+    internal override string Describe() => Mechanism is { } m
+        ? $"export of {Kind} from {MechanismNames.Of(m)}"
+        : $"export of {Kind}";
+
+    internal override CKM? MechanismType => Mechanism;
 }
 
-/// <summary>The kind of secret a <see cref="KeyMaterialExportRequest"/> reads off the token.</summary>
-public enum KeyMaterialExportKind
+/// <summary>The kind of secret a <see cref="SecretExportRequest"/> reads off the token.</summary>
+public enum SecretExportKind
 {
-    /// <summary>The raw ECDH shared secret (or a value derived from it in managed code).</summary>
+    /// <summary>
+    /// An ECDH shared secret: the raw secret Z (<c>CKD_NULL</c>), or the output of the token's key-agreement
+    /// KDF applied to it. Allowing the raw secret already allows anything derived from it.
+    /// </summary>
     EcdhSharedSecret,
-    /// <summary>A KEM shared secret (ML-KEM encapsulate/decapsulate through the BCL adapter).</summary>
+    /// <summary>An ML-KEM shared secret, from encapsulation or decapsulation.</summary>
     KemSharedSecret,
-    /// <summary>Output bytes of an on-token KDF.</summary>
+    /// <summary>Output of an on-token KDF over a key: HKDF (<c>CKM_HKDF_DERIVE</c>) or SP 800-108.</summary>
     KdfOutput,
+    /// <summary>Output of an on-token password-based KDF: PBKDF2 (<c>CKM_PKCS5_PBKD2</c>).</summary>
+    PasswordKdfOutput,
 }

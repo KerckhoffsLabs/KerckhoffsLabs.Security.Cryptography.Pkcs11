@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// <c>CKM_ECDH1_DERIVE</c> serves both Weierstrass (<c>CKK_EC</c>) and Montgomery (<c>CKK_EC_MONTGOMERY</c>,
-/// X25519/X448) keys, so the mechanism alone cannot tell FipsOnly that an existing X25519 key is in use.
+/// X25519/X448) keys, so the mechanism alone cannot tell NistApproved that an existing X25519 key is in use.
 /// The session reads the key's <c>CKA_KEY_TYPE</c> and submits it as a <see cref="KeyAgreementKeyRequest"/>.
 /// </summary>
 public sealed class EcdhKeyTypeGateTests
@@ -58,10 +58,10 @@ public sealed class EcdhKeyTypeGateTests
     [Theory]
     [InlineData(CKM.CKM_ECDH1_DERIVE)]
     [InlineData(CKM.CKM_ECDH1_COFACTOR_DERIVE)]
-    public void FipsOnly_RefusesAMontgomeryKey_BeforeReachingTheToken(CKM type)
+    public void NistApproved_RefusesAMontgomeryKey_BeforeReachingTheToken(CKM type)
     {
         var fake = new KeyTypeFake(CKK.CKK_EC_MONTGOMERY);
-        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.FipsOnly);
+        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.NistApproved);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() => Derive(session, type));
         var request = Assert.IsType<KeyAgreementKeyRequest>(ex.Request);
@@ -72,10 +72,10 @@ public sealed class EcdhKeyTypeGateTests
     }
 
     [Fact]
-    public void FipsOnly_AllowsAWeierstrassKey()
+    public void NistApproved_AllowsAWeierstrassKey()
     {
         var fake = new KeyTypeFake(CKK.CKK_EC);
-        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.FipsOnly);
+        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.NistApproved);
 
         Derive(session);
         Assert.Equal(1, fake.Calls);
@@ -84,7 +84,7 @@ public sealed class EcdhKeyTypeGateTests
     [Theory]
     [InlineData(CKK.CKK_EC)]
     [InlineData(CKK.CKK_EC_MONTGOMERY)]
-    public void SecureOnly_AllowsBothEcKeyTypes(CKK keyType)
+    public void Recommended_AllowsBothEcKeyTypes(CKK keyType)
     {
         var fake = new KeyTypeFake(keyType);
         using var session = new Pkcs11Session(fake, sessionId: 1);
@@ -110,13 +110,13 @@ public sealed class EcdhKeyTypeGateTests
     public void AnUnreadableKeyType_IsLeftToTheToken()
     {
         var fake = new KeyTypeFake(keyType: null);
-        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.FipsOnly);
+        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.NistApproved);
 
         Derive(session);
         Assert.Equal(1, fake.Calls);
     }
 
-    /// <summary>Refuses only key agreement with a Montgomery key. FipsOnly cannot stand in here: it refuses the ECDH KEM outright, on the mechanism.</summary>
+    /// <summary>Refuses only key agreement with a Montgomery key. NistApproved cannot stand in here: it refuses the ECDH KEM outright, on the mechanism.</summary>
     private sealed class RefuseMontgomeryKeys : ICryptoPolicy
     {
         public string Name => "RefuseMontgomeryKeys";
@@ -147,7 +147,7 @@ public sealed class EcdhKeyTypeGateTests
     public void NonEcdhDerivation_DoesNotConsultTheKeyType()
     {
         var fake = new KeyTypeFake(CKK.CKK_EC_MONTGOMERY);
-        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.FipsOnly);
+        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.NistApproved);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var hkdf = new Mechanism(CKM.CKM_HKDF_DERIVE, CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC));
 

@@ -216,7 +216,7 @@ internal static class AesCcmPkcs11TestCases
             ccm.Decrypt(nonce, ciphertext, tag, decrypted, aad);
 
             Assert.Equal(plaintext, decrypted);
-        }, tagLen, tagLen < 8 ? CryptoPolicy.AllowInsecure : null); // SecureOnly refuses MACs below 64 bits
+        }, tagLen, tagLen < 8 ? CryptoPolicy.AllowInsecure : null); // Recommended refuses MACs below 64 bits
     }
 
     internal static void Assert_EncryptDecrypt_EmptyPlaintext_RoundTrips(IPkcs11Backend backend)

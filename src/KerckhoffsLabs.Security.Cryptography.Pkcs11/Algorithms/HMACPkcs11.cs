@@ -50,7 +50,7 @@ public sealed class HMACPkcs11 : HMAC
     /// SHA-224 is accepted here (it merely determines the HMAC output size); the
     /// workspace's crypto policy gate for it fires later, at the actual
     /// <c>CKM_SHA224_HMAC</c> sign call inside <see cref="HashFinal"/> — see
-    /// <c>SecureOnlyPolicy</c>.
+    /// <c>CryptoPolicy.Recommended</c>.
     /// </remarks>
     public HMACPkcs11(Pkcs11Key key, HashAlgorithmName hashAlgorithm)
     {

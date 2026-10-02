@@ -83,7 +83,7 @@ internal static class DSAPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        // SecureOnly documents CKM_DSA_KEY_PAIR_GEN as refused, so key generation always opts in; the
+        // Recommended documents CKM_DSA_KEY_PAIR_GEN as refused, so key generation always opts in; the
         // body's own lease below decides whether the sign/verify under test does.
         Pkcs11Key generated;
         using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))

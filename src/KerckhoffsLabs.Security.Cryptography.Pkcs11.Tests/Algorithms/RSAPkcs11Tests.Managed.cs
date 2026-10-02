@@ -60,7 +60,7 @@ public sealed class RSAPkcs11Tests_Managed
     }
 
     // === Key sizes: sign/verify round-trips scale with the modulus =========
-    // RSA < 2048 is refused under SecureOnly (NIST SP 800-131A), so the 1024 case generates under an
+    // RSA < 2048 is refused under Recommended (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048/3072/4096 need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
 
     [Theory]

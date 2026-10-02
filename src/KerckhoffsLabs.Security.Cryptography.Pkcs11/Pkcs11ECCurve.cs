@@ -66,10 +66,10 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// <summary>
     /// The curve's field size in bits (e.g. 256 for NIST P-256), when this is a known catalog curve;
     /// otherwise <see langword="null"/> — an arbitrary OID's field size can't be inferred without
-    /// decoding its domain parameters, which this type does not do. Used by the BCL adapters
-    /// (<c>ECDsaPkcs11</c>, <c>ECDiffieHellmanPkcs11</c>) to populate <c>KeySize</c>.
+    /// decoding its domain parameters, which this type does not do. The byte length of a coordinate,
+    /// and of a raw ECDH shared secret, is <c>(FieldSizeBits + 7) / 8</c>.
     /// </summary>
-    internal int? FieldSizeBits => Oid is not null && _fieldSizeBitsByOid.TryGetValue(Oid, out int bits) ? bits : null;
+    public int? FieldSizeBits => Oid is not null && _fieldSizeBitsByOid.TryGetValue(Oid, out int bits) ? bits : null;
 
     /// <summary>
     /// Gets the <c>CKA_EC_PARAMS</c> value for this curve: the DER encoding of the curve OID as an

@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -49,6 +48,38 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         byte[] recovered = TestAesGcm.Decrypt(workspace.Session, bobAes.PrivateHandle, iv, ciphertext);
 
         Assert.Equal(plaintext, recovered);
+    }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X25519_TwoParties_ReadBackTheSameSecret()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "SoftHSM", null);
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_TwoParties_ReadBackTheSameSecret(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X25519_KnownAnswer()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "SoftHSM", null);
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_X25519KnownAnswer(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X448_KnownAnswer()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "SoftHSM", null);
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_X448KnownAnswer(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
+    public void X25519_LowOrderPeer_IsRefused()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "SoftHSM", null);
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_LowOrderPeer_IsRefused(workspace);
     }
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
@@ -104,6 +135,6 @@ public sealed class DeriveSharedSecretEcdhTests_SoftHsm(SoftHsmBackendFixture ba
         using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
         ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
 
-        Assert.Throws<Pkcs11ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
+        Assert.Throws<ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
     }
 }

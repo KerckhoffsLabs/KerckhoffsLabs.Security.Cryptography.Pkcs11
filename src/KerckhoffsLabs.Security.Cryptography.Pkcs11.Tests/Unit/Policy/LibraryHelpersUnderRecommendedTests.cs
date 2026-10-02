@@ -18,15 +18,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 /// </summary>
 [NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
                      "the token holds no static state, so this is safe alongside every backend collection.")]
-public sealed class LibraryHelpersUnderSecureOnlyTests
+public sealed class LibraryHelpersUnderRecommendedTests
 {
-    private static readonly byte[] Message = Encoding.UTF8.GetBytes("secure-only helper payload");
+    private static readonly byte[] Message = Encoding.UTF8.GetBytes("recommended helper payload");
 
     private static void WithWorkspace(Action<Pkcs11Workspace> body)
     {
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
-        Assert.Same(CryptoPolicy.SecureOnly, workspace.Policy);
+        Assert.Same(CryptoPolicy.Recommended, workspace.Policy);
         body(workspace);
     }
 
@@ -142,7 +142,7 @@ public sealed class LibraryHelpersUnderSecureOnlyTests
 
     // The adapter's Encapsulate / Decapsulate read the shared secret off the token, which the default
     // policy refuses by design; the on-token path (EncapsulateKey / DecapsulateKey into sensitive keys)
-    // is the one SecureOnly supports. The two AES keys are shown equal by an AES-GCM round trip across
+    // is the one Recommended supports. The two AES keys are shown equal by an AES-GCM round trip across
     // them, without ever reading either value.
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void MlKem_KeyGenerationAndOnTokenEncapsulation_AgreeOnAnAesKey() => WithWorkspace(workspace =>

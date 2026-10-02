@@ -2,7 +2,7 @@
 
 Weak and legacy cryptography stays available for interoperability, but it is never silent: each
 such API is `[Obsolete]` with its own **diagnostic id**, and is additionally refused at runtime by
-the default `SecureOnly` crypto policy (which throws `CryptoPolicyViolationException`).
+the default `Recommended` crypto policy (which throws `CryptoPolicyViolationException`).
 
 The per-API ids exist so that a deliberate, documented use of one legacy primitive does not blind
 you to every other obsoletion in your codebase. Suppress the specific id — never the blanket
@@ -31,34 +31,40 @@ other is an explicit runtime acknowledgement.
 ### KLPKCS11001 — MD5
 
 MD5 is a broken hash function with practical collisions. Use `SHA256Pkcs11` or stronger.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#md5).
 
 <a id="KLPKCS11002"></a>
 ### KLPKCS11002 — SHA-1
 
 SHA-1 is broken (SHAttered demonstrated practical collisions). Use `SHA256Pkcs11` or stronger.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#sha-1).
 
 <a id="KLPKCS11003"></a>
 ### KLPKCS11003 — DES
 
 Single DES has a 56-bit key and is exhaustively breakable. Use `AesGcmPkcs11` or `AesCcmPkcs11`.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#des).
 
 <a id="KLPKCS11004"></a>
 ### KLPKCS11004 — Triple-DES
 
 Triple-DES has a 64-bit block (Sweet32) and is NIST-deprecated. Use `AesGcmPkcs11` or
 `AesCcmPkcs11`.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#triple-des).
 
 <a id="KLPKCS11005"></a>
 ### KLPKCS11005 — RC2
 
 RC2 (RFC 2268) is a weak legacy cipher with a reduced effective key length. Use `AesGcmPkcs11` or
 `AesCcmPkcs11`.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#rc2).
 
 <a id="KLPKCS11006"></a>
 ### KLPKCS11006 — DSA
 
 DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern
 protocol suites. Use `ECDsaPkcs11`, or `MLDsaPkcs11` for post-quantum signatures.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#dsa).
 
 <a id="KLPKCS11007"></a>
 ### KLPKCS11007 — Weak elliptic curve
@@ -66,6 +72,7 @@ protocol suites. Use `ECDsaPkcs11`, or `MLDsaPkcs11` for post-quantum signatures
 The named curve provides less than the 128-bit security baseline (NIST SP 800-57) — this covers
 P-192, P-224, secp192k1, secp224k1, and the Brainpool 160/192/224-bit curves. Use `NistP256`,
 `BrainpoolP256r1`, or stronger.
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#weak-curves).
 
 <a id="KLPKCS11008"></a>
 ### KLPKCS11008 — RSA encryption without OAEP
@@ -74,14 +81,15 @@ Reported by an analyzer rather than `[Obsolete]`, because the insecure choice he
 a symbol: there is nothing to mark obsolete when a consumer writes
 `rsa.Encrypt(data, RSAEncryptionPadding.Pkcs1)` (a BCL padding singleton passed to a BCL override) or
 `new Mechanism(CKM.CKM_RSA_PKCS)`. Both routes select RSAES-PKCS#1 v1.5 or raw RSA, where the
-Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `SecureOnly`
+Bleichenbacher / ROBOT padding-oracle attacks live, and both end at the same runtime `Recommended`
 policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#rsa-pkcs1-encryption).
 
 > **RSA *signatures* are a different story.** RSASSA-PKCS#1 v1.5 with a strong hash
 > (`CKM_SHA256_RSA_PKCS` and friends) is **allowed by default** and is *not* reported: it is
 > FIPS 186-5-approved and required by JWT RS256, TLS 1.2 CertificateVerify, X.509, and code signing.
 > Only *encryption* and the raw `CKM_RSA_PKCS` / `CKM_RSA_X_509` mechanisms carry the padding-oracle
-> exposure. `SecureOnly` allows these signature mechanisms for both Sign and Verify, so third-party
+> exposure. `Recommended` allows these signature mechanisms for both Sign and Verify, so third-party
 > signatures keep verifying.
 
 <a id="KLPKCS11009"></a>
@@ -90,7 +98,7 @@ policy check. Use `RSAEncryptionPadding.OaepSHA256` (`CKM_RSA_PKCS_OAEP`).
 Also an analyzer, for the same reason as KLPKCS11008: the legacy primitives have `[Obsolete]` façade
 types, but the *mechanisms* underneath are reachable as values — `new Mechanism(CKM.CKM_DES3_CBC)`,
 or `aes.Mode = CipherMode.CBC` — where there is no symbol to mark. Covers the mechanisms on
-`SecureOnly`'s documented deny list ([`secure-only.md`](policies/secure-only.md)) apart from the RSA pair
+`Recommended`'s documented deny list ([`recommended.md`](policies/recommended.md)) apart from the RSA pair
 above. Mechanisms that are merely not on the allow-list — vendor-defined or not yet reviewed — are refused
 at run time too, but are not reported:
 
@@ -101,6 +109,7 @@ at run time too, but are not reported:
 - **Broken hashes** — MD2, MD5, SHA-1, RIPEMD-128/160 (and their HMAC / RSA-signature variants).
 - **Broken or legacy ciphers** — RC2, RC4, DES, 3DES, SEED, CAST/CAST5/CAST128, RC5, Blowfish, Skipjack.
 - **DSA** — every `CKM_DSA*` mechanism (FIPS 186-5 disallows DSA signature generation).
+To enable it for legacy interop, see [Legacy algorithms](legacy-algorithms.md#legacy-mechanisms).
 
 <a id="KLPKCS11010"></a>
 ### KLPKCS11010 — Broken hash in a signature or MAC
@@ -112,9 +121,9 @@ token as a *value*: `rsa.SignData(data, HashAlgorithmName.SHA1, …)`,
 SHA-256 or stronger.
 
 Note that **verifying** an existing SHA-1 signature is refused too: SHA-1 signature mechanisms are not on
-the `SecureOnly` allow-list for any operation, so legacy verification under `SecureOnly` needs an
-override (`UsePolicy(CryptoPolicy.AllowInsecure)`, or `CryptoPolicy.SecureOnly.WithAllowedMechanism(...)`
-for Verify only); `FipsOnly` permits SP 800-131A legacy verification.
+the `Recommended` allow-list for any operation, so legacy verification under `Recommended` needs a policy that
+allows it — see [Legacy algorithms](legacy-algorithms.md#sha-1); `NistApproved` permits SP 800-131A legacy
+verification.
 
 <a id="KLPKCS11011"></a>
 ### KLPKCS11011 — Rfc2898DeriveBytesPkcs11 constructors
@@ -125,6 +134,35 @@ constructors are all `[Obsolete]` in favor of its static `Pbkdf2` method. Use th
 `Rfc2898DeriveBytesPkcs11.Pbkdf2(...)` overloads instead, or `Rfc2898DeriveBytesPkcs11.Pbkdf2Key(...)` to
 keep the derived key on the token; the constructors remain for streaming `GetBytes` calls that
 continue one PBKDF2 byte stream across several output chunks.
+
+## Experimental APIs
+
+API shapes that may still change in a minor release are marked `[Experimental]` with an id in the
+`KLPKCS115xx` range. Using one is a build error until acknowledged, the same way as above:
+
+```csharp
+#pragma warning disable KLPKCS11501 // ML-KEM read-back: shape may change; tracked in <ticket>
+int written = key.EncapsulateAndExportSecret(new Mechanism(CKM.CKM_ML_KEM), ciphertext, sharedSecret);
+#pragma warning restore KLPKCS11501
+```
+
+Acknowledging the diagnostic does not change the runtime policy: the operation is still decided by
+the workspace's crypto policy.
+
+<a id="KLPKCS11501"></a>
+### KLPKCS11501 — PKCS#11 v3.2 KEM
+
+PKCS#11 v3.2 KEM API whose shape may still change. Today it marks `Pkcs11Key.EncapsulateAndExportSecret`
+and `Pkcs11Key.DecapsulateAndExportSecret`. They are built on the v3.2 `C_EncapsulateKey` /
+`C_DecapsulateKey` functions, which are new and on which token behaviour still differs (for example whether
+the shared-secret template may carry `CKA_VALUE_LEN`). Any v3.2 KEM API added later carries the same id.
+`MLKemPkcs11`, whose shape is the BCL's `MLKem`, uses them without passing the diagnostic on.
+
+An experimental id names a feature area, not one member: a project-wide `NoWarn` of `KLPKCS11501` also
+suppresses the diagnostic on v3.2 KEM API added later. Prefer suppressing it where you call the API.
+
+The on-token `Pkcs11Key.EncapsulateKey` / `DecapsulateKey` are deliberately not marked: they were public
+before this id existed, and their shape (a template in, a sensitive key out) mirrors `Pkcs11Key.Derive`.
 
 ## Runtime-only gates
 
@@ -137,9 +175,9 @@ configuration, a `CKM` variable, or a hash name computed at run time — cannot 
 rejected only when the operation executes, with a `CryptoPolicyViolationException` naming the
 mechanism.
 
-The analyzers above mirror the default `SecureOnly` policy only. Under `FipsOnly`, a mechanism can be
+The analyzers above mirror the default `Recommended` policy only. Under `NistApproved`, a mechanism can be
 refused — or permitted, for example SP 800-131A legacy-use verification — without a matching
-diagnostic: `FipsOnly` is a separate allow-list the analyzers do not model.
+diagnostic: `NistApproved` is a separate allow-list the analyzers do not model.
 
 These policies are inherently runtime-only, because they depend on values rather than symbols:
 

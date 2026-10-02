@@ -1,0 +1,858 @@
+ccm	CkmAesCcmParams mac 112	allow	
+ccm	CkmAesCcmParams mac 128	allow	
+ccm	CkmAesCcmParams mac 32	deny	A 32-bit AES-CCM MAC is too short to resist forgery; use 64 bits or more (128 recommended).
+ccm	CkmAesCcmParams mac 48	deny	A 48-bit AES-CCM MAC is too short to resist forgery; use 64 bits or more (128 recommended).
+ccm	CkmAesCcmParams mac 64	allow	
+ccm	CkmAesCcmParams mac 80	allow	
+ccm	CkmAesCcmParams mac 96	allow	
+ccm	CkmCcmMessageParams mac 112	allow	
+ccm	CkmCcmMessageParams mac 128	allow	
+ccm	CkmCcmMessageParams mac 32	deny	A 32-bit AES-CCM MAC is too short to resist forgery; use 64 bits or more (128 recommended).
+ccm	CkmCcmMessageParams mac 48	deny	A 48-bit AES-CCM MAC is too short to resist forgery; use 64 bits or more (128 recommended).
+ccm	CkmCcmMessageParams mac 64	allow	
+ccm	CkmCcmMessageParams mac 80	allow	
+ccm	CkmCcmMessageParams mac 96	allow	
+curve	BrainpoolP160r1	deny	brainpoolP160r1 (1.3.36.3.3.2.8.1.1.1) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	BrainpoolP160t1	deny	brainpoolP160t1 (1.3.36.3.3.2.8.1.1.2) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	BrainpoolP192r1	deny	brainpoolP192r1 (1.3.36.3.3.2.8.1.1.3) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	BrainpoolP192t1	deny	brainpoolP192t1 (1.3.36.3.3.2.8.1.1.4) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	BrainpoolP224r1	deny	brainpoolP224r1 (1.3.36.3.3.2.8.1.1.5) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	BrainpoolP224t1	deny	brainpoolP224t1 (1.3.36.3.3.2.8.1.1.6) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	BrainpoolP256r1	allow	
+curve	BrainpoolP256t1	allow	
+curve	BrainpoolP320r1	allow	
+curve	BrainpoolP320t1	allow	
+curve	BrainpoolP384r1	allow	
+curve	BrainpoolP384t1	allow	
+curve	BrainpoolP512r1	allow	
+curve	BrainpoolP512t1	allow	
+curve	NistP192	deny	nistP192 (1.2.840.10045.3.1.1) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	NistP224	deny	nistP224 (1.3.132.0.33) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	NistP256	allow	
+curve	NistP384	allow	
+curve	NistP521	allow	
+curve	Secp192k1	deny	secp192k1 (1.3.132.0.31) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	Secp224k1	deny	secp224k1 (1.3.132.0.32) is not allowed: The curve provides less than 128-bit security. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+curve	Secp256k1	allow	
+curve	Sm2	deny	sm2 (1.2.156.10197.1.301) is not allowed: SM2 is a regional (Chinese national standard) curve that has not been reviewed for this policy. Use NistP256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+derived-copy	CKM_DES3_CBC Decrypt	deny	CKM_DES3_CBC is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+derived-copy	export EcdhSharedSecret	deny	Reading the EcdhSharedSecret off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key. If the export is needed, allow this one kind with ToBuilder(...).AllowSecretExport(SecretExportKind.EcdhSharedSecret, reason) on the Derived policy.
+derived-copy	export KdfOutput	deny	Reading the KdfOutput off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Key.Derive with a sensitive template, or the ObjectTemplate overloads of HkdfPkcs11 (DeriveKey / ExtractKey / ExpandKey) and SP800108HmacCounterKdfPkcs11.DeriveKey, derive a sensitive key. If the export is needed, allow this one kind with ToBuilder(...).AllowSecretExport(SecretExportKind.KdfOutput, reason) on the Derived policy.
+derived-copy	export KemSharedSecret	deny	Reading the KemSharedSecret off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Key.EncapsulateKey / DecapsulateKey return the shared secret as a sensitive key. If the export is needed, allow this one kind with ToBuilder(...).AllowSecretExport(SecretExportKind.KemSharedSecret, reason) on the Derived policy.
+derived-copy	export PasswordKdfOutput	deny	Reading the PasswordKdfOutput off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Workspace.GenerateKey with CKM_PKCS5_PBKD2, or Rfc2898DeriveBytesPkcs11.Pbkdf2Key, derives a sensitive key. If the export is needed, allow this one kind with ToBuilder(...).AllowSecretExport(SecretExportKind.PasswordKdfOutput, reason) on the Derived policy.
+derived-copy	unlisted vendor mechanism	deny	vendor mechanism 0x80001234 is not on the Derived allow-list (not reviewed). If you have reviewed it, add it with ToBuilder(...).AllowMechanism(...) on the Derived policy.
+ecdh-params	CKD_BLAKE2B_160_KDF	allow	
+ecdh-params	CKD_BLAKE2B_256_KDF	allow	
+ecdh-params	CKD_BLAKE2B_384_KDF	allow	
+ecdh-params	CKD_BLAKE2B_512_KDF	allow	
+ecdh-params	CKD_CPDIVERSIFY_KDF	allow	
+ecdh-params	CKD_NULL	allow	
+ecdh-params	CKD_SHA1_KDF	allow	
+ecdh-params	CKD_SHA1_KDF_ASN1	allow	
+ecdh-params	CKD_SHA1_KDF_CONCATENATE	allow	
+ecdh-params	CKD_SHA1_KDF_SP800	allow	
+ecdh-params	CKD_SHA224_KDF	allow	
+ecdh-params	CKD_SHA224_KDF_SP800	allow	
+ecdh-params	CKD_SHA256_KDF	allow	
+ecdh-params	CKD_SHA256_KDF_SP800	allow	
+ecdh-params	CKD_SHA384_KDF	allow	
+ecdh-params	CKD_SHA384_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_224_KDF	allow	
+ecdh-params	CKD_SHA3_224_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_256_KDF	allow	
+ecdh-params	CKD_SHA3_256_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_384_KDF	allow	
+ecdh-params	CKD_SHA3_384_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_512_KDF	allow	
+ecdh-params	CKD_SHA3_512_KDF_SP800	allow	
+ecdh-params	CKD_SHA512_KDF	allow	
+ecdh-params	CKD_SHA512_KDF_SP800	allow	
+export	EcdhSharedSecret	deny	Reading the EcdhSharedSecret off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key. If the export is needed, allow this one kind with CryptoPolicy.Recommended.ToBuilder(...).AllowSecretExport(SecretExportKind.EcdhSharedSecret, reason).
+export	EcdhSharedSecret with mechanism and base key	deny	Reading the EcdhSharedSecret off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key. If the export is needed, allow this one kind with CryptoPolicy.Recommended.ToBuilder(...).AllowSecretExport(SecretExportKind.EcdhSharedSecret, reason).
+export	KdfOutput	deny	Reading the KdfOutput off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Key.Derive with a sensitive template, or the ObjectTemplate overloads of HkdfPkcs11 (DeriveKey / ExtractKey / ExpandKey) and SP800108HmacCounterKdfPkcs11.DeriveKey, derive a sensitive key. If the export is needed, allow this one kind with CryptoPolicy.Recommended.ToBuilder(...).AllowSecretExport(SecretExportKind.KdfOutput, reason).
+export	KemSharedSecret	deny	Reading the KemSharedSecret off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Key.EncapsulateKey / DecapsulateKey return the shared secret as a sensitive key. If the export is needed, allow this one kind with CryptoPolicy.Recommended.ToBuilder(...).AllowSecretExport(SecretExportKind.KemSharedSecret, reason).
+export	PasswordKdfOutput	deny	Reading the PasswordKdfOutput off the token violates the non-extractable-by-default posture. Keep the secret on the token instead: Pkcs11Workspace.GenerateKey with CKM_PKCS5_PBKD2, or Rfc2898DeriveBytesPkcs11.Pbkdf2Key, derives a sensitive key. If the export is needed, allow this one kind with CryptoPolicy.Recommended.ToBuilder(...).AllowSecretExport(SecretExportKind.PasswordKdfOutput, reason).
+gcm	CkmAesGcmParams tag 104	allow	
+gcm	CkmAesGcmParams tag 112	allow	
+gcm	CkmAesGcmParams tag 120	allow	
+gcm	CkmAesGcmParams tag 128	allow	
+gcm	CkmAesGcmParams tag 32	deny	A 32-bit AES-GCM tag is too short to resist forgery; use 96 bits or more (128 recommended).
+gcm	CkmAesGcmParams tag 64	deny	A 64-bit AES-GCM tag is too short to resist forgery; use 96 bits or more (128 recommended).
+gcm	CkmAesGcmParams tag 96	allow	
+gcm	CkmGcmMessageParams tag 104	allow	
+gcm	CkmGcmMessageParams tag 112	allow	
+gcm	CkmGcmMessageParams tag 120	allow	
+gcm	CkmGcmMessageParams tag 128	allow	
+gcm	CkmGcmMessageParams tag 32	deny	A 32-bit AES-GCM tag is too short to resist forgery; use 96 bits or more (128 recommended).
+gcm	CkmGcmMessageParams tag 64	deny	A 64-bit AES-GCM tag is too short to resist forgery; use 96 bits or more (128 recommended).
+gcm	CkmGcmMessageParams tag 96	allow	
+hash	MD5 Digest	deny	MD5 is not allowed: MD5 is a broken hash function. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	MD5 Sign	deny	MD5 is not allowed: MD5 is a broken hash function. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	MD5 Verify	deny	MD5 is not allowed: MD5 is a broken hash function. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	RIPEMD160 Digest	deny	RIPEMD160 is not on the Recommended allow-list (not reviewed).
+hash	RIPEMD160 Sign	deny	RIPEMD160 is not on the Recommended allow-list (not reviewed).
+hash	RIPEMD160 Verify	deny	RIPEMD160 is not on the Recommended allow-list (not reviewed).
+hash	SHA1 Digest	deny	SHA1 is not allowed: SHA-1 is collision-broken and deprecated in signature contexts. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	SHA1 Sign	deny	SHA1 is not allowed: SHA-1 is collision-broken and deprecated in signature contexts. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	SHA1 Verify	deny	SHA1 is not allowed: SHA-1 is collision-broken and deprecated in signature contexts. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	SHA224 Digest	deny	SHA224 is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	SHA224 Sign	deny	SHA224 is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	SHA224 Verify	deny	SHA224 is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+hash	SHA256 Digest	allow	
+hash	SHA256 Sign	allow	
+hash	SHA256 Verify	allow	
+hash	SHA3-256 Digest	allow	
+hash	SHA3-256 Sign	allow	
+hash	SHA3-256 Verify	allow	
+hash	SHA3-384 Digest	allow	
+hash	SHA3-384 Sign	allow	
+hash	SHA3-384 Verify	allow	
+hash	SHA3-512 Digest	allow	
+hash	SHA3-512 Sign	allow	
+hash	SHA3-512 Verify	allow	
+hash	SHA384 Digest	allow	
+hash	SHA384 Sign	allow	
+hash	SHA384 Verify	allow	
+hash	SHA512 Digest	allow	
+hash	SHA512 Sign	allow	
+hash	SHA512 Verify	allow	
+hkdf	CKM_AES_CMAC	deny	CKM_AES_CMAC is not an allowed HKDF PRF; use CKM_SHA256 or stronger, hash or _HMAC form.
+hkdf	CKM_MD5_HMAC	deny	CKM_MD5_HMAC is not an allowed HKDF PRF; use CKM_SHA256 or stronger, hash or _HMAC form.
+hkdf	CKM_SHA224_HMAC	deny	CKM_SHA224_HMAC is not allowed as a HKDF PRF: SHA-224 offers no practical benefit over SHA-256 on equal-cost hardware. Use a SHA-256-or-stronger PRF.
+hkdf	CKM_SHA256_HMAC	allow	
+hkdf	CKM_SHA384_HMAC	allow	
+hkdf	CKM_SHA3_256_HMAC	allow	
+hkdf	CKM_SHA512_HMAC	allow	
+hkdf	CKM_SHA_1_HMAC	deny	CKM_SHA_1_HMAC is not allowed as a HKDF PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+hkdf	expand only CKM_SHA256_HMAC	allow	
+hkdf	expand only CKM_SHA_1_HMAC	deny	CKM_SHA_1_HMAC is not allowed as a HKDF PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+hkdf	no salt CKM_SHA256_HMAC	allow	
+hkdf	no salt CKM_SHA_1_HMAC	deny	CKM_SHA_1_HMAC is not allowed as a HKDF PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+kdf	CKD_BLAKE2B_160_KDF	deny	CKD_BLAKE2B_160_KDF is not allowed: BLAKE2b-based key-agreement KDFs are not NIST SP 800-56C KDFs and have not been reviewed for this policy; BLAKE2b-160 is also below 128-bit collision resistance. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_BLAKE2B_256_KDF	deny	CKD_BLAKE2B_256_KDF is not allowed: BLAKE2b-based key-agreement KDFs are not NIST SP 800-56C KDFs and have not been reviewed for this policy; BLAKE2b-160 is also below 128-bit collision resistance. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_BLAKE2B_384_KDF	deny	CKD_BLAKE2B_384_KDF is not allowed: BLAKE2b-based key-agreement KDFs are not NIST SP 800-56C KDFs and have not been reviewed for this policy; BLAKE2b-160 is also below 128-bit collision resistance. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_BLAKE2B_512_KDF	deny	CKD_BLAKE2B_512_KDF is not allowed: BLAKE2b-based key-agreement KDFs are not NIST SP 800-56C KDFs and have not been reviewed for this policy; BLAKE2b-160 is also below 128-bit collision resistance. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_CPDIVERSIFY_KDF	deny	CKD_CPDIVERSIFY_KDF is not allowed: CKD_CPDIVERSIFY_KDF is a CryptoPro (GOST) key-diversification function, not a general-purpose key-agreement KDF. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_NULL	deny	CKD_NULL is not allowed: CKD_NULL applies no KDF to the ECDH shared secret: the derived AES key becomes the raw x-coordinate (or a token-chosen truncation of it), which NIST SP 800-56A Rev. 3 §5.8 forbids. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA1_KDF	deny	CKD_SHA1_KDF is not allowed: SHA-1 is collision-broken and deprecated. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA1_KDF_ASN1	deny	CKD_SHA1_KDF_ASN1 is not allowed: SHA-1 is collision-broken and deprecated. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA1_KDF_CONCATENATE	deny	CKD_SHA1_KDF_CONCATENATE is not allowed: SHA-1 is collision-broken and deprecated. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA1_KDF_SP800	deny	CKD_SHA1_KDF_SP800 is not allowed: SHA-1 is collision-broken and deprecated. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA224_KDF	deny	CKD_SHA224_KDF is not allowed: SHA-224 / SHA3-224 offer no practical benefit over SHA-256 on equal-cost hardware. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA224_KDF_SP800	deny	CKD_SHA224_KDF_SP800 is not allowed: SHA-224 / SHA3-224 offer no practical benefit over SHA-256 on equal-cost hardware. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA256_KDF	allow	
+kdf	CKD_SHA256_KDF_SP800	allow	
+kdf	CKD_SHA384_KDF	allow	
+kdf	CKD_SHA384_KDF_SP800	allow	
+kdf	CKD_SHA3_224_KDF	deny	CKD_SHA3_224_KDF is not allowed: SHA-224 / SHA3-224 offer no practical benefit over SHA-256 on equal-cost hardware. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA3_224_KDF_SP800	deny	CKD_SHA3_224_KDF_SP800 is not allowed: SHA-224 / SHA3-224 offer no practical benefit over SHA-256 on equal-cost hardware. Use the default CKD_SHA256_KDF or stronger.
+kdf	CKD_SHA3_256_KDF	allow	
+kdf	CKD_SHA3_256_KDF_SP800	allow	
+kdf	CKD_SHA3_384_KDF	allow	
+kdf	CKD_SHA3_384_KDF_SP800	allow	
+kdf	CKD_SHA3_512_KDF	allow	
+kdf	CKD_SHA3_512_KDF_SP800	allow	
+kdf	CKD_SHA512_KDF	allow	
+kdf	CKD_SHA512_KDF_SP800	allow	
+key-agreement-key	CKK_ACTI	deny	Key agreement with a CKK_ACTI key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_AES	deny	Key agreement with a CKK_AES key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_AES_XTS	deny	Key agreement with a CKK_AES_XTS key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_ARIA	deny	Key agreement with a CKK_ARIA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_BATON	deny	Key agreement with a CKK_BATON key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_160_HMAC	deny	Key agreement with a CKK_BLAKE2B_160_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_256_HMAC	deny	Key agreement with a CKK_BLAKE2B_256_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_384_HMAC	deny	Key agreement with a CKK_BLAKE2B_384_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_512_HMAC	deny	Key agreement with a CKK_BLAKE2B_512_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_BLOWFISH	deny	Key agreement with a CKK_BLOWFISH key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_CAMELLIA	deny	Key agreement with a CKK_CAMELLIA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_CAST	deny	Key agreement with a CKK_CAST key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_CAST3	deny	Key agreement with a CKK_CAST3 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_CAST5	deny	Key agreement with a CKK_CAST128 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_CDMF	deny	Key agreement with a CKK_CDMF key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_CHACHA20	deny	Key agreement with a CKK_CHACHA20 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_DES	deny	Key agreement with a CKK_DES key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_DES2	deny	Key agreement with a CKK_DES2 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_DES3	deny	Key agreement with a CKK_DES3 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_DH	deny	Key agreement with a CKK_DH key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_DSA	deny	Key agreement with a CKK_DSA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_ECDSA	allow	
+key-agreement-key	CKK_EC_EDWARDS	deny	Key agreement with a CKK_EC_EDWARDS key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_EC_MONTGOMERY	allow	
+key-agreement-key	CKK_GENERIC_SECRET	deny	Key agreement with a CKK_GENERIC_SECRET key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_GOST28147	deny	Key agreement with a CKK_GOST28147 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_GOSTR3410	deny	Key agreement with a CKK_GOSTR3410 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_GOSTR3411	deny	Key agreement with a CKK_GOSTR3411 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_HKDF	deny	Key agreement with a CKK_HKDF key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_HOTP	deny	Key agreement with a CKK_HOTP key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_HSS	deny	Key agreement with a CKK_HSS key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_IDEA	deny	Key agreement with a CKK_IDEA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_JUNIPER	deny	Key agreement with a CKK_JUNIPER key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_KEA	deny	Key agreement with a CKK_KEA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_MD5_HMAC	deny	Key agreement with a CKK_MD5_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_ML_DSA	deny	Key agreement with a CKK_ML_DSA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_ML_KEM	deny	Key agreement with a CKK_ML_KEM key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_POLY1305	deny	Key agreement with a CKK_POLY1305 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_RC2	deny	Key agreement with a CKK_RC2 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_RC4	deny	Key agreement with a CKK_RC4 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_RC5	deny	Key agreement with a CKK_RC5 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_RIPEMD128_HMAC	deny	Key agreement with a CKK_RIPEMD128_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_RIPEMD160_HMAC	deny	Key agreement with a CKK_RIPEMD160_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_RSA	deny	Key agreement with a CKK_RSA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SALSA20	deny	Key agreement with a CKK_SALSA20 key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SECURID	deny	Key agreement with a CKK_SECURID key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SEED	deny	Key agreement with a CKK_SEED key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA224_HMAC	deny	Key agreement with a CKK_SHA224_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA256_HMAC	deny	Key agreement with a CKK_SHA256_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA384_HMAC	deny	Key agreement with a CKK_SHA384_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_224_HMAC	deny	Key agreement with a CKK_SHA3_224_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_256_HMAC	deny	Key agreement with a CKK_SHA3_256_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_384_HMAC	deny	Key agreement with a CKK_SHA3_384_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_512_HMAC	deny	Key agreement with a CKK_SHA3_512_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_224_HMAC	deny	Key agreement with a CKK_SHA512_224_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_256_HMAC	deny	Key agreement with a CKK_SHA512_256_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_HMAC	deny	Key agreement with a CKK_SHA512_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_T_HMAC	deny	Key agreement with a CKK_SHA512_T_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SHA_1_HMAC	deny	Key agreement with a CKK_SHA_1_HMAC key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SKIPJACK	deny	Key agreement with a CKK_SKIPJACK key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_SLH_DSA	deny	Key agreement with a CKK_SLH_DSA key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_TWOFISH	deny	Key agreement with a CKK_TWOFISH key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_VENDOR_DEFINED	deny	Key agreement with a CKK_VENDOR_DEFINED key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_X2RATCHET	deny	Key agreement with a CKK_X2RATCHET key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_X9_42_DH	deny	Key agreement with a CKK_X9_42_DH key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_XMSS	deny	Key agreement with a CKK_XMSS key is not on the Recommended allow-list (not reviewed).
+key-agreement-key	CKK_XMSSMT	deny	Key agreement with a CKK_XMSSMT key is not on the Recommended allow-list (not reviewed).
+mechanism	CKM_ACTI	allow: -	CKM_ACTI is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ACTI_KEY_GEN	allow: -	CKM_ACTI_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_AES_CBC	allow: -	CKM_AES_CBC is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CBC_ENCRYPT_DATA	allow: -	CKM_AES_CBC_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_AES_CBC_PAD	allow: -	CKM_AES_CBC_PAD is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CCM	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_CCM is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. Authenticated encryption (AES-CCM).
+mechanism	CKM_AES_CFB1	allow: -	CKM_AES_CFB1 is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CFB128	allow: -	CKM_AES_CFB128 is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CFB64	allow: -	CKM_AES_CFB64 is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CFB8	allow: -	CKM_AES_CFB8 is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CMAC	allow: Sign,Verify	CKM_AES_CMAC is allowed under Recommended only for Sign, Verify; {op} is not. AES-based MACs secure for variable-length messages (CMAC, GMAC).
+mechanism	CKM_AES_CMAC_GENERAL	allow: Sign,Verify	CKM_AES_CMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. AES-based MACs secure for variable-length messages (CMAC, GMAC).
+mechanism	CKM_AES_CTR	allow: -	CKM_AES_CTR is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_CTS	allow: -	CKM_AES_CTS is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_ECB	allow: -	CKM_AES_ECB is not allowed: ECB mode leaks structural information from the plaintext. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_ECB_ENCRYPT_DATA	allow: -	CKM_AES_ECB_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_AES_GCM	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_GCM is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. Authenticated encryption (AES-GCM).
+mechanism	CKM_AES_GMAC	allow: Sign,Verify	CKM_AES_GMAC is allowed under Recommended only for Sign, Verify; {op} is not. AES-based MACs secure for variable-length messages (CMAC, GMAC).
+mechanism	CKM_AES_KEY_GEN	allow: GenerateKey	CKM_AES_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. AES key generation.
+mechanism	CKM_AES_KEY_WRAP	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. Standard AES key wrapping (RFC 3394 / RFC 5649, SP 800-38F).
+mechanism	CKM_AES_KEY_WRAP_KWP	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP_KWP is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. Standard AES key wrapping (RFC 3394 / RFC 5649, SP 800-38F).
+mechanism	CKM_AES_KEY_WRAP_PAD	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP_PAD is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. AES key wrap with vendor-defined padding (RFC 5649 on some tokens, KW over PKCS#7 on others), kept for interop with tokens that lack CKM_AES_KEY_WRAP_KWP; see the known limits.
+mechanism	CKM_AES_KEY_WRAP_PKCS7	allow: -	CKM_AES_KEY_WRAP_PKCS7 is not allowed: Non-standard padding, not RFC 5649. Use CKM_AES_KEY_WRAP_KWP. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_MAC	allow: -	CKM_AES_MAC is not allowed: CBC-MAC is unsafe for variable-length messages; TDEA is deprecated. Use CKM_AES_CMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_MAC_GENERAL	allow: -	CKM_AES_MAC_GENERAL is not allowed: CBC-MAC is unsafe for variable-length messages; TDEA is deprecated. Use CKM_AES_CMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_OFB	allow: -	CKM_AES_OFB is not allowed: Unauthenticated AES modes (CBC, CBC-PAD, CTR, CTS, OFB, CFB) provide no integrity protection and are malleable; raw/padded CBC also enables padding-oracle attacks. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_XCBC_MAC	allow: -	CKM_AES_XCBC_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_AES_XCBC_MAC_96	allow: -	CKM_AES_XCBC_MAC_96 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_AES_XTS	allow: -	CKM_AES_XTS is not allowed: AES-XTS provides no integrity protection and is designed for disk-sector encryption, not general-purpose use. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_AES_XTS_KEY_GEN	allow: -	CKM_AES_XTS_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_CBC	allow: -	CKM_ARIA_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_CBC_ENCRYPT_DATA	allow: -	CKM_ARIA_CBC_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_CBC_PAD	allow: -	CKM_ARIA_CBC_PAD is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_ECB	allow: -	CKM_ARIA_ECB is not allowed: ECB mode leaks structural information from the plaintext. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_ARIA_ECB_ENCRYPT_DATA	allow: -	CKM_ARIA_ECB_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_KEY_GEN	allow: -	CKM_ARIA_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_MAC	allow: -	CKM_ARIA_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ARIA_MAC_GENERAL	allow: -	CKM_ARIA_MAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_CBC128	allow: -	CKM_BATON_CBC128 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_COUNTER	allow: -	CKM_BATON_COUNTER is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_ECB128	allow: -	CKM_BATON_ECB128 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_ECB96	allow: -	CKM_BATON_ECB96 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_KEY_GEN	allow: -	CKM_BATON_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_SHUFFLE	allow: -	CKM_BATON_SHUFFLE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BATON_WRAP	allow: -	CKM_BATON_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_160	allow: -	CKM_BLAKE2B_160 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_160_HMAC	allow: -	CKM_BLAKE2B_160_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_160_HMAC_GENERAL	allow: -	CKM_BLAKE2B_160_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_160_KEY_DERIVE	allow: -	CKM_BLAKE2B_160_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_160_KEY_GEN	allow: -	CKM_BLAKE2B_160_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_256	allow: -	CKM_BLAKE2B_256 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_256_HMAC	allow: -	CKM_BLAKE2B_256_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_256_HMAC_GENERAL	allow: -	CKM_BLAKE2B_256_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_256_KEY_DERIVE	allow: -	CKM_BLAKE2B_256_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_256_KEY_GEN	allow: -	CKM_BLAKE2B_256_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_384	allow: -	CKM_BLAKE2B_384 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_384_HMAC	allow: -	CKM_BLAKE2B_384_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_384_HMAC_GENERAL	allow: -	CKM_BLAKE2B_384_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_384_KEY_DERIVE	allow: -	CKM_BLAKE2B_384_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_384_KEY_GEN	allow: -	CKM_BLAKE2B_384_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_512	allow: -	CKM_BLAKE2B_512 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_512_HMAC	allow: -	CKM_BLAKE2B_512_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_512_HMAC_GENERAL	allow: -	CKM_BLAKE2B_512_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_512_KEY_DERIVE	allow: -	CKM_BLAKE2B_512_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLAKE2B_512_KEY_GEN	allow: -	CKM_BLAKE2B_512_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_BLOWFISH_CBC	allow: -	CKM_BLOWFISH_CBC is not allowed: Blowfish is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_BLOWFISH_CBC_PAD	allow: -	CKM_BLOWFISH_CBC_PAD is not allowed: Blowfish is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_BLOWFISH_KEY_GEN	allow: -	CKM_BLOWFISH_KEY_GEN is not allowed: Blowfish is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAMELLIA_CBC	allow: -	CKM_CAMELLIA_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_CBC_ENCRYPT_DATA	allow: -	CKM_CAMELLIA_CBC_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_CBC_PAD	allow: -	CKM_CAMELLIA_CBC_PAD is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_CTR	allow: -	CKM_CAMELLIA_CTR is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_ECB	allow: -	CKM_CAMELLIA_ECB is not allowed: ECB mode leaks structural information from the plaintext. Use CKM_AES_GCM or CKM_AES_CCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAMELLIA_ECB_ENCRYPT_DATA	allow: -	CKM_CAMELLIA_ECB_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_KEY_GEN	allow: -	CKM_CAMELLIA_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_MAC	allow: -	CKM_CAMELLIA_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAMELLIA_MAC_GENERAL	allow: -	CKM_CAMELLIA_MAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CAST128_CBC	allow: -	CKM_CAST128_CBC is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST128_CBC_PAD	allow: -	CKM_CAST128_CBC_PAD is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST128_ECB	allow: -	CKM_CAST128_ECB is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST128_KEY_GEN	allow: -	CKM_CAST128_KEY_GEN is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST128_MAC	allow: -	CKM_CAST128_MAC is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST128_MAC_GENERAL	allow: -	CKM_CAST128_MAC_GENERAL is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST3_CBC	allow: -	CKM_CAST3_CBC is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST3_CBC_PAD	allow: -	CKM_CAST3_CBC_PAD is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST3_ECB	allow: -	CKM_CAST3_ECB is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST3_KEY_GEN	allow: -	CKM_CAST3_KEY_GEN is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST3_MAC	allow: -	CKM_CAST3_MAC is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST3_MAC_GENERAL	allow: -	CKM_CAST3_MAC_GENERAL is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST_CBC	allow: -	CKM_CAST_CBC is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST_CBC_PAD	allow: -	CKM_CAST_CBC_PAD is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST_ECB	allow: -	CKM_CAST_ECB is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST_KEY_GEN	allow: -	CKM_CAST_KEY_GEN is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST_MAC	allow: -	CKM_CAST_MAC is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CAST_MAC_GENERAL	allow: -	CKM_CAST_MAC_GENERAL is not allowed: CAST is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CDMF_CBC	allow: -	CKM_CDMF_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CDMF_CBC_PAD	allow: -	CKM_CDMF_CBC_PAD is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CDMF_ECB	allow: -	CKM_CDMF_ECB is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CDMF_KEY_GEN	allow: -	CKM_CDMF_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CDMF_MAC	allow: -	CKM_CDMF_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CDMF_MAC_GENERAL	allow: -	CKM_CDMF_MAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CHACHA20	allow: -	CKM_CHACHA20 is not allowed: Raw ChaCha20/Salsa20 provide no integrity protection and are malleable. Use CKM_CHACHA20_POLY1305 or CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CHACHA20_KEY_GEN	allow: GenerateKey	CKM_CHACHA20_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. ChaCha20 key generation.
+mechanism	CKM_CHACHA20_POLY1305	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_CHACHA20_POLY1305 is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. Authenticated encryption (RFC 8439 ChaCha20-Poly1305).
+mechanism	CKM_CMS_SIG	allow: -	CKM_CMS_SIG is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_CONCATENATE_BASE_AND_DATA	allow: -	CKM_CONCATENATE_BASE_AND_DATA is not allowed: This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CONCATENATE_BASE_AND_KEY	allow: -	CKM_CONCATENATE_BASE_AND_KEY is not allowed: This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_CONCATENATE_DATA_AND_BASE	allow: -	CKM_CONCATENATE_DATA_AND_BASE is not allowed: This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES2_KEY_GEN	allow: -	CKM_DES2_KEY_GEN is not allowed: DES and 3DES key generation produces deprecated keys. Use CKM_AES_KEY_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_CBC	allow: -	CKM_DES3_CBC is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_CBC_ENCRYPT_DATA	allow: -	CKM_DES3_CBC_ENCRYPT_DATA is not allowed: DES3 key-derive mechanisms are weak. Use an SP 800-108 KDF (CKM_SP800_108_COUNTER_KDF) or CKM_HKDF_DERIVE on a strong base key. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_CBC_PAD	allow: -	CKM_DES3_CBC_PAD is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_CMAC	allow: -	CKM_DES3_CMAC is not allowed: CBC-MAC is unsafe for variable-length messages; TDEA is deprecated. Use CKM_AES_CMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_CMAC_GENERAL	allow: -	CKM_DES3_CMAC_GENERAL is not allowed: CBC-MAC is unsafe for variable-length messages; TDEA is deprecated. Use CKM_AES_CMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_ECB	allow: -	CKM_DES3_ECB is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_ECB_ENCRYPT_DATA	allow: -	CKM_DES3_ECB_ENCRYPT_DATA is not allowed: DES3 key-derive mechanisms are weak. Use an SP 800-108 KDF (CKM_SP800_108_COUNTER_KDF) or CKM_HKDF_DERIVE on a strong base key. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_KEY_GEN	allow: -	CKM_DES3_KEY_GEN is not allowed: DES and 3DES key generation produces deprecated keys. Use CKM_AES_KEY_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_MAC	allow: -	CKM_DES3_MAC is not allowed: DES/3DES MAC is weak. Use CKM_AES_CMAC or CKM_SHA256_HMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES3_MAC_GENERAL	allow: -	CKM_DES3_MAC_GENERAL is not allowed: DES/3DES MAC is weak. Use CKM_AES_CMAC or CKM_SHA256_HMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_CBC	allow: -	CKM_DES_CBC is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_CBC_ENCRYPT_DATA	allow: -	CKM_DES_CBC_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DES_CBC_PAD	allow: -	CKM_DES_CBC_PAD is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_CFB64	allow: -	CKM_DES_CFB64 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DES_CFB8	allow: -	CKM_DES_CFB8 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DES_ECB	allow: -	CKM_DES_ECB is not allowed: DES and 3DES are deprecated. Use AES (CKM_AES_GCM or CKM_AES_CCM). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_ECB_ENCRYPT_DATA	allow: -	CKM_DES_ECB_ENCRYPT_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DES_KEY_GEN	allow: -	CKM_DES_KEY_GEN is not allowed: DES and 3DES key generation produces deprecated keys. Use CKM_AES_KEY_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_MAC	allow: -	CKM_DES_MAC is not allowed: DES/3DES MAC is weak. Use CKM_AES_CMAC or CKM_SHA256_HMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_MAC_GENERAL	allow: -	CKM_DES_MAC_GENERAL is not allowed: DES/3DES MAC is weak. Use CKM_AES_CMAC or CKM_SHA256_HMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DES_OFB64	allow: -	CKM_DES_OFB64 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DES_OFB8	allow: -	CKM_DES_OFB8 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DH_PKCS_DERIVE	allow: -	CKM_DH_PKCS_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DH_PKCS_KEY_PAIR_GEN	allow: -	CKM_DH_PKCS_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DH_PKCS_PARAMETER_GEN	allow: -	CKM_DH_PKCS_PARAMETER_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA	allow: -	CKM_DSA is not allowed: DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys. Use CKM_ECDSA_SHA256 or CKM_ML_DSA. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_FIPS_G_GEN	allow: -	CKM_DSA_FIPS_G_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_KEY_PAIR_GEN	allow: -	CKM_DSA_KEY_PAIR_GEN is not allowed: DSA signing is refused; its keys have no secure use. Use CKM_EC_KEY_PAIR_GEN or CKM_ML_DSA_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_PARAMETER_GEN	allow: -	CKM_DSA_PARAMETER_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_PROBABILISTIC_PARAMETER_GEN	allow: -	CKM_DSA_PROBABILISTIC_PARAMETER_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_SHA1	allow: -	CKM_DSA_SHA1 is not allowed: DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys. Use CKM_ECDSA_SHA256 or CKM_ML_DSA. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_SHA224	allow: -	CKM_DSA_SHA224 is not allowed: DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys. Use CKM_ECDSA_SHA256 or CKM_ML_DSA. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_SHA256	allow: -	CKM_DSA_SHA256 is not allowed: DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys. Use CKM_ECDSA_SHA256 or CKM_ML_DSA. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_SHA384	allow: -	CKM_DSA_SHA384 is not allowed: DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys. Use CKM_ECDSA_SHA256 or CKM_ML_DSA. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_SHA3_224	allow: -	CKM_DSA_SHA3_224 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_SHA3_256	allow: -	CKM_DSA_SHA3_256 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_SHA3_384	allow: -	CKM_DSA_SHA3_384 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_SHA3_512	allow: -	CKM_DSA_SHA3_512 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_DSA_SHA512	allow: -	CKM_DSA_SHA512 is not allowed: DSA (FIPS 186) is disallowed for signature generation by NIST FIPS 186-5 and is retained only for interop with existing keys. Use CKM_ECDSA_SHA256 or CKM_ML_DSA. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN	allow: -	CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ECDH1_COFACTOR_DERIVE	allow: -	CKM_ECDH1_COFACTOR_DERIVE is allowed under Recommended only for Derive, Encapsulate, Decapsulate; {op} is not. ECDH key agreement (the key-agreement KDF allow-list applies), also as a PKCS#11 v3.2 KEM. || CKM_ECDH1_COFACTOR_DERIVE requires CkmEcdh1DeriveParams, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked. || CKM_ECDH1_COFACTOR_DERIVE requires CkmEcdh1{op}Params, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked.
+mechanism	CKM_ECDH1_DERIVE	allow: -	CKM_ECDH1_DERIVE is allowed under Recommended only for Derive, Encapsulate, Decapsulate; {op} is not. ECDH key agreement (the key-agreement KDF allow-list applies), also as a PKCS#11 v3.2 KEM. || CKM_ECDH1_DERIVE requires CkmEcdh1DeriveParams, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked. || CKM_ECDH1_DERIVE requires CkmEcdh1{op}Params, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked.
+mechanism	CKM_ECDH_AES_KEY_WRAP	allow: -	CKM_ECDH_AES_KEY_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ECDH_COF_AES_KEY_WRAP	allow: -	CKM_ECDH_COF_AES_KEY_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ECDH_X_AES_KEY_WRAP	allow: -	CKM_ECDH_X_AES_KEY_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ECDSA	allow: Sign,Verify	CKM_ECDSA is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECDSA_SHA1	allow: -	CKM_ECDSA_SHA1 is not allowed: SHA-1 is collision-broken and deprecated in signature/MAC contexts. Use CKM_SHA256_HMAC or CKM_ECDSA_SHA256. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_ECDSA_SHA224	allow: -	CKM_ECDSA_SHA224 is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_ECDSA_SHA256	allow: Sign,Verify	CKM_ECDSA_SHA256 is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECDSA_SHA384	allow: Sign,Verify	CKM_ECDSA_SHA384 is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECDSA_SHA3_224	allow: -	CKM_ECDSA_SHA3_224 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_ECDSA_SHA3_256	allow: Sign,Verify	CKM_ECDSA_SHA3_256 is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECDSA_SHA3_384	allow: Sign,Verify	CKM_ECDSA_SHA3_384 is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECDSA_SHA3_512	allow: Sign,Verify	CKM_ECDSA_SHA3_512 is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECDSA_SHA512	allow: Sign,Verify	CKM_ECDSA_SHA512 is allowed under Recommended only for Sign, Verify; {op} is not. ECDSA with a SHA-2 / SHA-3 hash (raw CKM_ECDSA signs a caller-computed digest).
+mechanism	CKM_ECMQV_DERIVE	allow: -	CKM_ECMQV_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_EC_EDWARDS_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_EC_EDWARDS_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. Edwards (Ed25519 / Ed448) and Montgomery (X25519 / X448) key generation. || CKM_EC_EDWARDS_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. Edwards (Ed25519 / Ed448) and Montgomery (X25519 / X448) key generation.
+mechanism	CKM_EC_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_EC_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. EC key generation (the curve allow-list applies). || CKM_EC_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. EC key generation (the curve allow-list applies).
+mechanism	CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS	allow: -	CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_EC_MONTGOMERY_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_EC_MONTGOMERY_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. Edwards (Ed25519 / Ed448) and Montgomery (X25519 / X448) key generation. || CKM_EC_MONTGOMERY_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. Edwards (Ed25519 / Ed448) and Montgomery (X25519 / X448) key generation.
+mechanism	CKM_EDDSA	allow: Sign,Verify	CKM_EDDSA is allowed under Recommended only for Sign, Verify; {op} is not. EdDSA (Ed25519 / Ed448, RFC 8032).
+mechanism	CKM_EXTRACT_KEY_FROM_KEY	allow: -	CKM_EXTRACT_KEY_FROM_KEY is not allowed: This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_FASTHASH	allow: -	CKM_FASTHASH is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_FORTEZZA_TIMESTAMP	allow: -	CKM_FORTEZZA_TIMESTAMP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GENERIC_SECRET_KEY_GEN	allow: GenerateKey	CKM_GENERIC_SECRET_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_GOST28147	allow: -	CKM_GOST28147 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOST28147_ECB	allow: -	CKM_GOST28147_ECB is not allowed: This is a legacy 64-bit-block cipher in ECB mode, both leaking structural information from the plaintext and vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_GOST28147_KEY_GEN	allow: -	CKM_GOST28147_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOST28147_KEY_WRAP	allow: -	CKM_GOST28147_KEY_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOST28147_MAC	allow: -	CKM_GOST28147_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3410	allow: -	CKM_GOSTR3410 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3410_DERIVE	allow: -	CKM_GOSTR3410_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3410_KEY_PAIR_GEN	allow: -	CKM_GOSTR3410_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3410_KEY_WRAP	allow: -	CKM_GOSTR3410_KEY_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3410_WITH_GOSTR3411	allow: -	CKM_GOSTR3410_WITH_GOSTR3411 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3411	allow: -	CKM_GOSTR3411 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_GOSTR3411_HMAC	allow: -	CKM_GOSTR3411_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HASH_ML_DSA	allow: -	CKM_HASH_ML_DSA is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) / HashSLH-DSA (FIPS 205) with a caller-chosen pre-hash. || HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512). || HashML-DSA / HashSLH-DSA require CkmHashPqc{op}Params with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512).
+mechanism	CKM_HASH_ML_DSA_SHA224	allow: -	CKM_HASH_ML_DSA_SHA224 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HASH_ML_DSA_SHA256	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA256 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHA384	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA384 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHA3_224	allow: -	CKM_HASH_ML_DSA_SHA3_224 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HASH_ML_DSA_SHA3_256	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA3_256 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHA3_384	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA3_384 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHA3_512	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA3_512 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHA512	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA512 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHAKE128	allow: Sign,Verify	CKM_HASH_ML_DSA_SHAKE128 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_ML_DSA_SHAKE256	allow: Sign,Verify	CKM_HASH_ML_DSA_SHAKE256 is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA	allow: -	CKM_HASH_SLH_DSA is allowed under Recommended only for Sign, Verify; {op} is not. HashML-DSA (FIPS 204) / HashSLH-DSA (FIPS 205) with a caller-chosen pre-hash. || HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512). || HashML-DSA / HashSLH-DSA require CkmHashPqc{op}Params with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512).
+mechanism	CKM_HASH_SLH_DSA_SHA224	allow: -	CKM_HASH_SLH_DSA_SHA224 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HASH_SLH_DSA_SHA256	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA256 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHA384	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA384 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHA3_224	allow: -	CKM_HASH_SLH_DSA_SHA3_224 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HASH_SLH_DSA_SHA3_256	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA3_256 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHA3_384	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA3_384 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHA3_512	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA3_512 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHA512	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA512 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHAKE128	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHAKE128 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HASH_SLH_DSA_SHAKE256	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHAKE256 is allowed under Recommended only for Sign, Verify; {op} is not. HashSLH-DSA (FIPS 205) with a pre-hash of at least 256 bits.
+mechanism	CKM_HKDF_DATA	allow: -	CKM_HKDF_DATA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HKDF_DERIVE	allow: -	CKM_HKDF_DERIVE is allowed under Recommended only for Derive; {op} is not. HKDF (RFC 5869 / SP 800-56C). || CKM_HKDF_DERIVE requires CkmHkdfParams naming an allowed PRF (CKM_SHA256 or stronger, hash or _HMAC form).
+mechanism	CKM_HKDF_KEY_GEN	allow: GenerateKey	CKM_HKDF_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. HKDF salt / key generation.
+mechanism	CKM_HOTP	allow: -	CKM_HOTP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HOTP_KEY_GEN	allow: -	CKM_HOTP_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HSS	allow: -	CKM_HSS is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_HSS_KEY_PAIR_GEN	allow: -	CKM_HSS_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_IDEA_CBC	allow: -	CKM_IDEA_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_IDEA_CBC_PAD	allow: -	CKM_IDEA_CBC_PAD is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_IDEA_ECB	allow: -	CKM_IDEA_ECB is not allowed: This is a legacy 64-bit-block cipher in ECB mode, both leaking structural information from the plaintext and vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_IDEA_KEY_GEN	allow: -	CKM_IDEA_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_IDEA_MAC	allow: -	CKM_IDEA_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_IDEA_MAC_GENERAL	allow: -	CKM_IDEA_MAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_IKE1_EXTENDED_DERIVE	allow: -	CKM_IKE1_EXTENDED_DERIVE is not allowed: Protocol-specific; IPsec stacks should opt in explicitly. Use an explicit AllowMechanism(...) opt-in after review. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_IKE1_PRF_DERIVE	allow: -	CKM_IKE1_PRF_DERIVE is not allowed: Protocol-specific; IPsec stacks should opt in explicitly. Use an explicit AllowMechanism(...) opt-in after review. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_IKE2_PRF_PLUS_DERIVE	allow: -	CKM_IKE2_PRF_PLUS_DERIVE is not allowed: Protocol-specific; IPsec stacks should opt in explicitly. Use an explicit AllowMechanism(...) opt-in after review. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_IKE_PRF_DERIVE	allow: -	CKM_IKE_PRF_DERIVE is not allowed: Protocol-specific; IPsec stacks should opt in explicitly. Use an explicit AllowMechanism(...) opt-in after review. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_JUNIPER_CBC128	allow: -	CKM_JUNIPER_CBC128 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_JUNIPER_COUNTER	allow: -	CKM_JUNIPER_COUNTER is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_JUNIPER_ECB128	allow: -	CKM_JUNIPER_ECB128 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_JUNIPER_KEY_GEN	allow: -	CKM_JUNIPER_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_JUNIPER_SHUFFLE	allow: -	CKM_JUNIPER_SHUFFLE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_JUNIPER_WRAP	allow: -	CKM_JUNIPER_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KEA_DERIVE	allow: -	CKM_KEA_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KEA_KEY_DERIVE	allow: -	CKM_KEA_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KEA_KEY_PAIR_GEN	allow: -	CKM_KEA_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KEY_WRAP_LYNKS	allow: -	CKM_KEY_WRAP_LYNKS is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KEY_WRAP_SET_OAEP	allow: -	CKM_KEY_WRAP_SET_OAEP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KIP_DERIVE	allow: -	CKM_KIP_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KIP_MAC	allow: -	CKM_KIP_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_KIP_WRAP	allow: -	CKM_KIP_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_MD2	allow: -	CKM_MD2 is not allowed: MD2 is a broken hash function. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD2_HMAC	allow: -	CKM_MD2_HMAC is not allowed: MD2 is a broken hash function. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD2_HMAC_GENERAL	allow: -	CKM_MD2_HMAC_GENERAL is not allowed: MD2 is a broken hash function. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD2_KEY_DERIVATION	allow: -	CKM_MD2_KEY_DERIVATION is not allowed: MD2 is a broken hash function. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD2_RSA_PKCS	allow: -	CKM_MD2_RSA_PKCS is not allowed: MD2 is a broken hash function. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD5	allow: -	CKM_MD5 is not allowed: MD5 and SHA-1 are broken hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD5_HMAC	allow: -	CKM_MD5_HMAC is not allowed: MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. Use CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD5_HMAC_GENERAL	allow: -	CKM_MD5_HMAC_GENERAL is not allowed: MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. Use CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD5_KEY_DERIVATION	allow: -	CKM_MD5_KEY_DERIVATION is not allowed: MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. Use CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_MD5_RSA_PKCS	allow: -	CKM_MD5_RSA_PKCS is not allowed: MD5/SHA-1 in RSA signature contexts is broken (SHAttered breaks PSS-SHA-1 too). Use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_ML_DSA	allow: Sign,Verify	CKM_ML_DSA is allowed under Recommended only for Sign, Verify; {op} is not. ML-DSA (FIPS 204) / SLH-DSA (FIPS 205).
+mechanism	CKM_ML_DSA_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_ML_DSA_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205). || CKM_ML_DSA_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205).
+mechanism	CKM_ML_KEM	allow: Encapsulate,Decapsulate	CKM_ML_KEM is allowed under Recommended only for Encapsulate, Decapsulate; {op} is not. ML-KEM (FIPS 203).
+mechanism	CKM_ML_KEM_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_ML_KEM_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205). || CKM_ML_KEM_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205).
+mechanism	CKM_NULL	allow: -	CKM_NULL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBA_SHA1_WITH_SHA1_HMAC	allow: -	CKM_PBA_SHA1_WITH_SHA1_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_MD2_DES_CBC	allow: -	CKM_PBE_MD2_DES_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_MD5_CAST128_CBC	allow: -	CKM_PBE_MD5_CAST128_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_MD5_CAST3_CBC	allow: -	CKM_PBE_MD5_CAST3_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_MD5_CAST_CBC	allow: -	CKM_PBE_MD5_CAST_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_MD5_DES_CBC	allow: -	CKM_PBE_MD5_DES_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_CAST128_CBC	allow: -	CKM_PBE_SHA1_CAST128_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_DES2_EDE_CBC	allow: -	CKM_PBE_SHA1_DES2_EDE_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_DES3_EDE_CBC	allow: -	CKM_PBE_SHA1_DES3_EDE_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_RC2_128_CBC	allow: -	CKM_PBE_SHA1_RC2_128_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_RC2_40_CBC	allow: -	CKM_PBE_SHA1_RC2_40_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_RC4_128	allow: -	CKM_PBE_SHA1_RC4_128 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PBE_SHA1_RC4_40	allow: -	CKM_PBE_SHA1_RC4_40 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PKCS5_PBKD2	allow: -	CKM_PKCS5_PBKD2 is allowed under Recommended only for Derive, GenerateKey; {op} is not. PBKDF2 (RFC 8018 / SP 800-132) password-based key derivation. || CKM_PKCS5_PBKD2 requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256 or stronger).
+mechanism	CKM_POLY1305	allow: -	CKM_POLY1305 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_POLY1305_KEY_GEN	allow: -	CKM_POLY1305_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_PUB_KEY_FROM_PRIV_KEY	allow: -	CKM_PUB_KEY_FROM_PRIV_KEY is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_RC2_CBC	allow: -	CKM_RC2_CBC is not allowed: RC2 is a deprecated 40/64-bit-key cipher with known weaknesses. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC2_CBC_PAD	allow: -	CKM_RC2_CBC_PAD is not allowed: RC2 is a deprecated 40/64-bit-key cipher with known weaknesses. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC2_ECB	allow: -	CKM_RC2_ECB is not allowed: RC2 is a deprecated 40/64-bit-key cipher with known weaknesses. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC2_KEY_GEN	allow: -	CKM_RC2_KEY_GEN is not allowed: RC2 is a deprecated 40/64-bit-key cipher with known weaknesses. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC2_MAC	allow: -	CKM_RC2_MAC is not allowed: RC2 is a deprecated 40/64-bit-key cipher with known weaknesses. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC2_MAC_GENERAL	allow: -	CKM_RC2_MAC_GENERAL is not allowed: RC2 is a deprecated 40/64-bit-key cipher with known weaknesses. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC4	allow: -	CKM_RC4 is not allowed: RC4 is a broken stream cipher with a biased keystream (prohibited in TLS by RFC 7465). Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC4_KEY_GEN	allow: -	CKM_RC4_KEY_GEN is not allowed: RC4 is a broken stream cipher with a biased keystream (prohibited in TLS by RFC 7465). Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC5_CBC	allow: -	CKM_RC5_CBC is not allowed: RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC5_CBC_PAD	allow: -	CKM_RC5_CBC_PAD is not allowed: RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC5_ECB	allow: -	CKM_RC5_ECB is not allowed: RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC5_KEY_GEN	allow: -	CKM_RC5_KEY_GEN is not allowed: RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC5_MAC	allow: -	CKM_RC5_MAC is not allowed: RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RC5_MAC_GENERAL	allow: -	CKM_RC5_MAC_GENERAL is not allowed: RC5 is a legacy 64-bit-block cipher vulnerable to birthday (Sweet32) attacks. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD128	allow: -	CKM_RIPEMD128 is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD128_HMAC	allow: -	CKM_RIPEMD128_HMAC is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD128_HMAC_GENERAL	allow: -	CKM_RIPEMD128_HMAC_GENERAL is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD128_RSA_PKCS	allow: -	CKM_RIPEMD128_RSA_PKCS is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD160	allow: -	CKM_RIPEMD160 is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD160_HMAC	allow: -	CKM_RIPEMD160_HMAC is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD160_HMAC_GENERAL	allow: -	CKM_RIPEMD160_HMAC_GENERAL is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RIPEMD160_RSA_PKCS	allow: -	CKM_RIPEMD160_RSA_PKCS is not allowed: RIPEMD-128/160 are deprecated hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RSA_9796	allow: -	CKM_RSA_9796 is not allowed: ISO 9796-2 RSA signing is forgeable (Coron-Naccache-Stern). Use CKM_RSA_PKCS_PSS. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RSA_AES_KEY_WRAP	allow: -	CKM_RSA_AES_KEY_WRAP is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_RSA_PKCS	allow: -	CKM_RSA_PKCS is not allowed: RSA PKCS#1 v1.5 padding is vulnerable to Bleichenbacher attacks and fault attacks. Use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RSA_PKCS_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_RSA_PKCS_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. RSA key generation (modulus of at least 2048 bits, see the rules). || CKM_RSA_PKCS_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. RSA key generation (modulus of at least 2048 bits, see the rules).
+mechanism	CKM_RSA_PKCS_OAEP	allow: -	CKM_RSA_PKCS_OAEP is allowed under Recommended only for Encrypt, Decrypt, Wrap, Unwrap, Encapsulate, Decapsulate; {op} is not. RSAES-OAEP key transport (also as a PKCS#11 v3.2 KEM). || CKM_RSA_PKCS_OAEP requires CkmRsaPkcsOaepParams naming SHA-256 or stronger; without them the token chooses the hash (typically SHA-1).
+mechanism	CKM_RSA_PKCS_OAEP_TPM_1_1	allow: -	CKM_RSA_PKCS_OAEP_TPM_1_1 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_RSA_PKCS_PSS	allow: -	CKM_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS over a caller-computed digest. || CKM_RSA_PKCS_PSS requires CkmRsaPkcsPssParams naming SHA-256 or stronger.
+mechanism	CKM_RSA_PKCS_TPM_1_1	allow: -	CKM_RSA_PKCS_TPM_1_1 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_RSA_X9_31	allow: -	CKM_RSA_X9_31 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_RSA_X9_31_KEY_PAIR_GEN	allow: -	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_RSA_X_509	allow: -	CKM_RSA_X_509 is not allowed: Raw RSA (X.509, no padding) is malleable and forgeable. Use CKM_RSA_PKCS_OAEP for encryption or CKM_RSA_PKCS_PSS for signing. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SALSA20	allow: -	CKM_SALSA20 is not allowed: Raw ChaCha20/Salsa20 provide no integrity protection and are malleable. Use CKM_CHACHA20_POLY1305 or CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SALSA20_KEY_GEN	allow: -	CKM_SALSA20_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SALSA20_POLY1305	allow: -	CKM_SALSA20_POLY1305 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SECURID	allow: -	CKM_SECURID is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SECURID_KEY_GEN	allow: -	CKM_SECURID_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SEED_CBC	allow: -	CKM_SEED_CBC is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_CBC_ENCRYPT_DATA	allow: -	CKM_SEED_CBC_ENCRYPT_DATA is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_CBC_PAD	allow: -	CKM_SEED_CBC_PAD is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_ECB	allow: -	CKM_SEED_ECB is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_ECB_ENCRYPT_DATA	allow: -	CKM_SEED_ECB_ENCRYPT_DATA is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_KEY_GEN	allow: -	CKM_SEED_KEY_GEN is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_MAC	allow: -	CKM_SEED_MAC is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SEED_MAC_GENERAL	allow: -	CKM_SEED_MAC_GENERAL is not allowed: SEED is a legacy regional cipher retained only for Korean-standard interop. Use CKM_AES_GCM. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA1_KEY_DERIVATION	allow: -	CKM_SHA1_KEY_DERIVATION is not allowed: MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. Use CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA1_RSA_PKCS	allow: -	CKM_SHA1_RSA_PKCS is not allowed: MD5/SHA-1 in RSA signature contexts is broken (SHAttered breaks PSS-SHA-1 too). Use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA1_RSA_PKCS_PSS	allow: -	CKM_SHA1_RSA_PKCS_PSS is not allowed: MD5/SHA-1 in RSA signature contexts is broken (SHAttered breaks PSS-SHA-1 too). Use CKM_SHA256_RSA_PKCS_PSS or CKM_ECDSA_SHA256. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA1_RSA_X9_31	allow: -	CKM_SHA1_RSA_X9_31 is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA224	allow: -	CKM_SHA224 is not allowed: No practical benefit over SHA-256; SHA512_T has a caller-chosen truncation. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA224_HMAC	allow: -	CKM_SHA224_HMAC is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA224_HMAC_GENERAL	allow: -	CKM_SHA224_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA224_KEY_DERIVATION	allow: -	CKM_SHA224_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA224_KEY_GEN	allow: -	CKM_SHA224_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA224_RSA_PKCS	allow: -	CKM_SHA224_RSA_PKCS is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA224_RSA_PKCS_PSS	allow: -	CKM_SHA224_RSA_PKCS_PSS is not allowed: SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA256	allow: Digest	CKM_SHA256 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA256_HMAC	allow: Sign,Verify	CKM_SHA256_HMAC is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA256_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA256_HMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA256_KEY_DERIVATION	allow: -	CKM_SHA256_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA256_KEY_GEN	allow: GenerateKey	CKM_SHA256_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_SHA256_RSA_PKCS	allow: Sign,Verify	CKM_SHA256_RSA_PKCS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.
+mechanism	CKM_SHA256_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA256_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS with a SHA-2 / SHA-3 hash.
+mechanism	CKM_SHA384	allow: Digest	CKM_SHA384 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA384_HMAC	allow: Sign,Verify	CKM_SHA384_HMAC is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA384_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA384_HMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA384_KEY_DERIVATION	allow: -	CKM_SHA384_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA384_KEY_GEN	allow: GenerateKey	CKM_SHA384_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_SHA384_RSA_PKCS	allow: Sign,Verify	CKM_SHA384_RSA_PKCS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.
+mechanism	CKM_SHA384_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA384_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS with a SHA-2 / SHA-3 hash.
+mechanism	CKM_SHA3_224	allow: -	CKM_SHA3_224 is not allowed: No practical benefit over SHA-256; SHA512_T has a caller-chosen truncation. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA3_224_HMAC	allow: -	CKM_SHA3_224_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA3_224_HMAC_GENERAL	allow: -	CKM_SHA3_224_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA3_224_KEY_DERIVE	allow: -	CKM_SHA3_224_KEY_DERIVE is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA3_224_KEY_GEN	allow: -	CKM_SHA3_224_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA3_224_RSA_PKCS	allow: -	CKM_SHA3_224_RSA_PKCS is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA3_224_RSA_PKCS_PSS	allow: -	CKM_SHA3_224_RSA_PKCS_PSS is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA3_256	allow: Digest	CKM_SHA3_256 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA3_256_HMAC	allow: Sign,Verify	CKM_SHA3_256_HMAC is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA3_256_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_256_HMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA3_256_KEY_DERIVE	allow: -	CKM_SHA3_256_KEY_DERIVE is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA3_256_KEY_GEN	allow: GenerateKey	CKM_SHA3_256_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_SHA3_256_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_256_RSA_PKCS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.
+mechanism	CKM_SHA3_256_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_256_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS with a SHA-2 / SHA-3 hash.
+mechanism	CKM_SHA3_384	allow: Digest	CKM_SHA3_384 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA3_384_HMAC	allow: Sign,Verify	CKM_SHA3_384_HMAC is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA3_384_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_384_HMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA3_384_KEY_DERIVE	allow: -	CKM_SHA3_384_KEY_DERIVE is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA3_384_KEY_GEN	allow: GenerateKey	CKM_SHA3_384_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_SHA3_384_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_384_RSA_PKCS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.
+mechanism	CKM_SHA3_384_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_384_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS with a SHA-2 / SHA-3 hash.
+mechanism	CKM_SHA3_512	allow: Digest	CKM_SHA3_512 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA3_512_HMAC	allow: Sign,Verify	CKM_SHA3_512_HMAC is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA3_512_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_512_HMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA3_512_KEY_DERIVE	allow: -	CKM_SHA3_512_KEY_DERIVE is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA3_512_KEY_GEN	allow: GenerateKey	CKM_SHA3_512_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_SHA3_512_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_512_RSA_PKCS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.
+mechanism	CKM_SHA3_512_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_512_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS with a SHA-2 / SHA-3 hash.
+mechanism	CKM_SHA512	allow: Digest	CKM_SHA512 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA512_224	allow: -	CKM_SHA512_224 is not allowed: No practical benefit over SHA-256; SHA512_T has a caller-chosen truncation. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA512_224_HMAC	allow: -	CKM_SHA512_224_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_224_HMAC_GENERAL	allow: -	CKM_SHA512_224_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_224_KEY_DERIVATION	allow: -	CKM_SHA512_224_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA512_224_KEY_GEN	allow: -	CKM_SHA512_224_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_256	allow: Digest	CKM_SHA512_256 is allowed under Recommended only for Digest; {op} is not. SHA-2 / SHA-3 digest with at least 128-bit collision resistance.
+mechanism	CKM_SHA512_256_HMAC	allow: -	CKM_SHA512_256_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_256_HMAC_GENERAL	allow: -	CKM_SHA512_256_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_256_KEY_DERIVATION	allow: -	CKM_SHA512_256_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA512_256_KEY_GEN	allow: -	CKM_SHA512_256_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_HMAC	allow: Sign,Verify	CKM_SHA512_HMAC is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA512_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA512_HMAC_GENERAL is allowed under Recommended only for Sign, Verify; {op} is not. HMAC over SHA-2 / SHA-3 with at least 256-bit output.
+mechanism	CKM_SHA512_KEY_DERIVATION	allow: -	CKM_SHA512_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA512_KEY_GEN	allow: GenerateKey	CKM_SHA512_KEY_GEN is allowed under Recommended only for GenerateKey; {op} is not. Generic-secret / HMAC key generation.
+mechanism	CKM_SHA512_RSA_PKCS	allow: Sign,Verify	CKM_SHA512_RSA_PKCS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.
+mechanism	CKM_SHA512_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA512_RSA_PKCS_PSS is allowed under Recommended only for Sign, Verify; {op} is not. RSASSA-PSS with a SHA-2 / SHA-3 hash.
+mechanism	CKM_SHA512_T	allow: -	CKM_SHA512_T is not allowed: No practical benefit over SHA-256; SHA512_T has a caller-chosen truncation. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA512_T_HMAC	allow: -	CKM_SHA512_T_HMAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_T_HMAC_GENERAL	allow: -	CKM_SHA512_T_HMAC_GENERAL is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHA512_T_KEY_DERIVATION	allow: -	CKM_SHA512_T_KEY_DERIVATION is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA512_T_KEY_GEN	allow: -	CKM_SHA512_T_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SHAKE_128_KEY_DERIVE	allow: -	CKM_SHAKE_128_KEY_DERIVE is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHAKE_256_KEY_DERIVE	allow: -	CKM_SHAKE_256_KEY_DERIVE is not allowed: Hash-of-key derivation with no salt or label. Use CKM_HKDF_DERIVE or an SP 800-108 KDF (CKM_SP800_108_*_KDF). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA_1	allow: -	CKM_SHA_1 is not allowed: MD5 and SHA-1 are broken hash functions. Use CKM_SHA256 or stronger. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA_1_HMAC	allow: -	CKM_SHA_1_HMAC is not allowed: SHA-1 is collision-broken and deprecated in signature/MAC contexts. Use CKM_SHA256_HMAC or CKM_ECDSA_SHA256. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA_1_HMAC_GENERAL	allow: -	CKM_SHA_1_HMAC_GENERAL is not allowed: SHA-1 is collision-broken and deprecated in signature/MAC contexts. Use CKM_SHA256_HMAC or CKM_ECDSA_SHA256. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SHA_1_KEY_GEN	allow: -	CKM_SHA_1_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SKIPJACK_CBC64	allow: -	CKM_SKIPJACK_CBC64 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_CFB16	allow: -	CKM_SKIPJACK_CFB16 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_CFB32	allow: -	CKM_SKIPJACK_CFB32 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_CFB64	allow: -	CKM_SKIPJACK_CFB64 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_CFB8	allow: -	CKM_SKIPJACK_CFB8 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_ECB64	allow: -	CKM_SKIPJACK_ECB64 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_KEY_GEN	allow: -	CKM_SKIPJACK_KEY_GEN is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_OFB64	allow: -	CKM_SKIPJACK_OFB64 is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_PRIVATE_WRAP	allow: -	CKM_SKIPJACK_PRIVATE_WRAP is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_RELAYX	allow: -	CKM_SKIPJACK_RELAYX is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SKIPJACK_WRAP	allow: -	CKM_SKIPJACK_WRAP is not allowed: SKIPJACK is a withdrawn 80-bit-key, 64-bit-block cipher with known weaknesses. Use CKM_AES_GCM (or CKM_AES_KEY_WRAP for key wrapping). For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SLH_DSA	allow: Sign,Verify	CKM_SLH_DSA is allowed under Recommended only for Sign, Verify; {op} is not. ML-DSA (FIPS 204) / SLH-DSA (FIPS 205).
+mechanism	CKM_SLH_DSA_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_SLH_DSA_KEY_PAIR_GEN is allowed under Recommended only for GenerateKeyPair; {op} is not. ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205). || CKM_SLH_DSA_KEY_PAIR_GEN is allowed under Recommended only for {op}Pair; {op} is not. ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205).
+mechanism	CKM_SP800_108_COUNTER_KDF	allow: -	CKM_SP800_108_COUNTER_KDF is allowed under Recommended only for Derive; {op} is not. SP 800-108 key derivation. || SP 800-108 key derivation requires CkmSp800108KdfParams naming an allowed PRF (CKM_SHA256_HMAC or stronger, or CKM_AES_CMAC).
+mechanism	CKM_SP800_108_DOUBLE_PIPELINE_KDF	allow: -	CKM_SP800_108_DOUBLE_PIPELINE_KDF is allowed under Recommended only for Derive; {op} is not. SP 800-108 key derivation. || SP 800-108 key derivation requires CkmSp800108KdfParams naming an allowed PRF (CKM_SHA256_HMAC or stronger, or CKM_AES_CMAC).
+mechanism	CKM_SP800_108_FEEDBACK_KDF	allow: -	CKM_SP800_108_FEEDBACK_KDF is allowed under Recommended only for Derive; {op} is not. SP 800-108 key derivation. || SP 800-108 key derivation requires CkmSp800108KdfParams naming an allowed PRF (CKM_SHA256_HMAC or stronger, or CKM_AES_CMAC).
+mechanism	CKM_SSL3_KEY_AND_MAC_DERIVE	allow: -	CKM_SSL3_KEY_AND_MAC_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SSL3_MASTER_KEY_DERIVE	allow: -	CKM_SSL3_MASTER_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SSL3_MASTER_KEY_DERIVE_DH	allow: -	CKM_SSL3_MASTER_KEY_DERIVE_DH is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SSL3_MD5_MAC	allow: -	CKM_SSL3_MD5_MAC is not allowed: SSLv3 MAC mechanisms are tied to a protocol version prohibited by RFC 7568. Use TLS 1.2+ with CKM_SHA256_HMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_SSL3_PRE_MASTER_KEY_GEN	allow: -	CKM_SSL3_PRE_MASTER_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_SSL3_SHA1_MAC	allow: -	CKM_SSL3_SHA1_MAC is not allowed: SSLv3 MAC mechanisms are tied to a protocol version prohibited by RFC 7568. Use TLS 1.2+ with CKM_SHA256_HMAC. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+mechanism	CKM_TLS10_MAC_CLIENT	allow: -	CKM_TLS10_MAC_CLIENT is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS10_MAC_SERVER	allow: -	CKM_TLS10_MAC_SERVER is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE	allow: -	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_KDF	allow: -	CKM_TLS12_KDF is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_KEY_AND_MAC_DERIVE	allow: -	CKM_TLS12_KEY_AND_MAC_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_KEY_SAFE_DERIVE	allow: -	CKM_TLS12_KEY_SAFE_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_MAC	allow: -	CKM_TLS12_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_MASTER_KEY_DERIVE	allow: -	CKM_TLS12_MASTER_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS12_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS12_MASTER_KEY_DERIVE_DH is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_KDF	allow: -	CKM_TLS_KDF is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_KEY_AND_MAC_DERIVE	allow: -	CKM_TLS_KEY_AND_MAC_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_MAC	allow: -	CKM_TLS_MAC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_MASTER_KEY_DERIVE	allow: -	CKM_TLS_MASTER_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS_MASTER_KEY_DERIVE_DH is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_PRE_MASTER_KEY_GEN	allow: -	CKM_TLS_PRE_MASTER_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TLS_PRF	allow: -	CKM_TLS_PRF is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TWOFISH_CBC	allow: -	CKM_TWOFISH_CBC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TWOFISH_CBC_PAD	allow: -	CKM_TWOFISH_CBC_PAD is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_TWOFISH_KEY_GEN	allow: -	CKM_TWOFISH_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_VENDOR_DEFINED	allow: -	CKM_VENDOR_DEFINED is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE	allow: -	CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_WTLS_MASTER_KEY_DERIVE	allow: -	CKM_WTLS_MASTER_KEY_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC	allow: -	CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_WTLS_PRE_MASTER_KEY_GEN	allow: -	CKM_WTLS_PRE_MASTER_KEY_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_WTLS_PRF	allow: -	CKM_WTLS_PRF is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE	allow: -	CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X2RATCHET_DECRYPT	allow: -	CKM_X2RATCHET_DECRYPT is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X2RATCHET_ENCRYPT	allow: -	CKM_X2RATCHET_ENCRYPT is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X2RATCHET_INITIALIZE	allow: -	CKM_X2RATCHET_INITIALIZE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X2RATCHET_RESPOND	allow: -	CKM_X2RATCHET_RESPOND is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X3DH_INITIALIZE	allow: -	CKM_X3DH_INITIALIZE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X3DH_RESPOND	allow: -	CKM_X3DH_RESPOND is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X9_42_DH_DERIVE	allow: -	CKM_X9_42_DH_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X9_42_DH_HYBRID_DERIVE	allow: -	CKM_X9_42_DH_HYBRID_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X9_42_DH_KEY_PAIR_GEN	allow: -	CKM_X9_42_DH_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X9_42_DH_PARAMETER_GEN	allow: -	CKM_X9_42_DH_PARAMETER_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_X9_42_MQV_DERIVE	allow: -	CKM_X9_42_MQV_DERIVE is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_XEDDSA	allow: -	CKM_XEDDSA is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_XMSS	allow: -	CKM_XMSS is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_XMSSMT	allow: -	CKM_XMSSMT is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_XMSSMT_KEY_PAIR_GEN	allow: -	CKM_XMSSMT_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_XMSS_KEY_PAIR_GEN	allow: -	CKM_XMSS_KEY_PAIR_GEN is not on the Recommended allow-list (not reviewed). If you have reviewed it, add it with CryptoPolicy.Recommended.ToBuilder(...).AllowMechanism(...).
+mechanism	CKM_XOR_BASE_AND_DATA	allow: -	CKM_XOR_BASE_AND_DATA is not allowed: This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+oaep	CKM_SHA224/CKG_MGF1_SHA224	deny	SHA-224 has no HashAlgorithmName constant in the BCL and offers no practical benefit over SHA-256 on equal-cost hardware; use CKM_SHA256 or stronger as the OAEP hash.
+oaep	CKM_SHA256/CKG_MGF1_SHA1	allow	
+oaep	CKM_SHA256/CKG_MGF1_SHA256	allow	
+oaep	CKM_SHA384/CKG_MGF1_SHA384	allow	
+oaep	CKM_SHA3_256/CKG_MGF1_SHA3_256	allow	
+oaep	CKM_SHA512/CKG_MGF1_SHA512	allow	
+oaep	CKM_SHA_1/CKG_MGF1_SHA1	deny	SHA-1 is collision-broken; use CKM_SHA256 or stronger as the OAEP hash.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_GOSTR3411	deny	CKP_PKCS5_PBKD2_HMAC_GOSTR3411 is not allowed as a PBKDF2 PRF: GOST R 34.11-94 is a regional (Russian national standard) hash that has not been reviewed for this policy. Use a SHA-256-or-stronger PRF.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA1	deny	CKP_PKCS5_PBKD2_HMAC_SHA1 is not allowed as a PBKDF2 PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA224	deny	CKP_PKCS5_PBKD2_HMAC_SHA224 is not allowed as a PBKDF2 PRF: SHA-224 offers no practical benefit over SHA-256 on equal-cost hardware. Use a SHA-256-or-stronger PRF.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA256	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA384	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512_224	deny	CKP_PKCS5_PBKD2_HMAC_SHA512_224 is not allowed as a PBKDF2 PRF: SHA-512/224's truncated output offers no practical benefit over SHA-256. Use a SHA-256-or-stronger PRF.
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512_256	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA256	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA3_256	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA512	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA_1	deny	HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512).
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA256	allow	
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA3_256	allow	
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA512	allow	
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA_1	deny	HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 256 bits (SHA-256/384/512, SHA-512/256 or SHA3-256/384/512).
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Sign	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Verify	deny	CKM_SHA224 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Sign	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Verify	deny	A 64-byte RSA-PSS salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Sign	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Verify	deny	CKM_SHA_1 is not an allowed RSA-PSS hash; use CKM_SHA256 or stronger.
+raw	CKM_AES_CCM	deny	AES-CCM parameters must be CkmAesCcmParams or CkmCcmMessageParams, so the MAC length can be checked.
+raw	CKM_AES_GCM	deny	AES-GCM parameters must be CkmAesGcmParams or CkmGcmMessageParams, so the tag length can be checked.
+raw	CKM_ECDH1_DERIVE	deny	CKM_ECDH1_DERIVE requires CkmEcdh1DeriveParams, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked.
+raw	CKM_HKDF_DERIVE	deny	CKM_HKDF_DERIVE requires CkmHkdfParams naming an allowed PRF (CKM_SHA256 or stronger, hash or _HMAC form).
+raw	CKM_PKCS5_PBKD2	deny	CKM_PKCS5_PBKD2 requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256 or stronger).
+raw	CKM_RSA_PKCS_OAEP	deny	CKM_RSA_PKCS_OAEP requires CkmRsaPkcsOaepParams naming SHA-256 or stronger; without them the token chooses the hash (typically SHA-1).
+raw	CKM_RSA_PKCS_PSS	deny	CKM_RSA_PKCS_PSS requires CkmRsaPkcsPssParams naming SHA-256 or stronger.
+raw	CKM_SHA256_RSA_PKCS_PSS	deny	RSA-PSS parameters must be CkmRsaPkcsPssParams.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 1024	deny	RSA-1024 is below the NIST SP 800-131A 2048-bit minimum; generate a key of at least 2048 bits.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 1536	deny	RSA-1536 is below the NIST SP 800-131A 2048-bit minimum; generate a key of at least 2048 bits.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 2047	deny	RSA-2047 is below the NIST SP 800-131A 2048-bit minimum; generate a key of at least 2048 bits.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 2048	allow	
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 3072	allow	
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 4096	allow	
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 1024	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 1536	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 2047	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 2048	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 3072	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 4096	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: RSA key generation via ANSI X9.31 was removed from FIPS 186-5. Use CKM_RSA_PKCS_KEY_PAIR_GEN. For legacy interop, see https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/legacy-algorithms.html.
+sp800-108	CKM_AES_CMAC	allow	
+sp800-108	CKM_MD5_HMAC	deny	CKM_MD5_HMAC is not an allowed SP 800-108 PRF; use CKM_SHA256_HMAC or stronger, or CKM_AES_CMAC.
+sp800-108	CKM_SHA224_HMAC	deny	CKM_SHA224_HMAC is not allowed as a SP 800-108 PRF: SHA-224 offers no practical benefit over SHA-256 on equal-cost hardware. Use a SHA-256-or-stronger PRF.
+sp800-108	CKM_SHA256_HMAC	allow	
+sp800-108	CKM_SHA384_HMAC	allow	
+sp800-108	CKM_SHA3_256_HMAC	allow	
+sp800-108	CKM_SHA512_HMAC	allow	
+sp800-108	CKM_SHA_1_HMAC	deny	CKM_SHA_1_HMAC is not allowed as a SP 800-108 PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+sp800-108	double-pipeline CKM_SHA256_HMAC	allow	
+sp800-108	double-pipeline CKM_SHA_1_HMAC	deny	CKM_SHA_1_HMAC is not allowed as a SP 800-108 PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+sp800-108	feedback CKM_SHA256_HMAC	allow	
+sp800-108	feedback CKM_SHA_1_HMAC	deny	CKM_SHA_1_HMAC is not allowed as a SP 800-108 PRF: SHA-1 is collision-broken and deprecated. Use a SHA-256-or-stronger PRF.
+template	private, CKA_SENSITIVE=false	deny	Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. Leave CKA_SENSITIVE true to keep the key on the token; to read a derived or shared secret back, use Pkcs11Key.DeriveAndExportSecret / EncapsulateAndExportSecret / DecapsulateAndExportSecret or Pkcs11Workspace.DeriveAndExportSecret, which the policy decides as a narrow secret export.
+template	secret, CKA_EXTRACTABLE=true	allow	
+template	secret, CKA_SENSITIVE=false	deny	Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. Leave CKA_SENSITIVE true to keep the key on the token; to read a derived or shared secret back, use Pkcs11Key.DeriveAndExportSecret / EncapsulateAndExportSecret / DecapsulateAndExportSecret or Pkcs11Workspace.DeriveAndExportSecret, which the policy decides as a narrow secret export.
+template	secret, CKA_SENSITIVE=true	allow	

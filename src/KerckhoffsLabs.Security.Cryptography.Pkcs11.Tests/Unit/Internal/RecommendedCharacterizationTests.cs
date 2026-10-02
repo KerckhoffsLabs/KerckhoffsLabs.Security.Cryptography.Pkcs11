@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// verdicts that depend on mechanism parameters, the denial of mechanisms the policy has never reviewed
 /// (vendor-defined ones included), and denials that hold in both directions of an operation pair.
 /// </summary>
-public sealed class SecureOnlyCharacterizationTests
+public sealed class RecommendedCharacterizationTests
 {
     private static readonly ObjectHandle AnyKey = new(0);
 
@@ -52,7 +52,7 @@ public sealed class SecureOnlyCharacterizationTests
     {
         using var session = NewSession();
         var ex = Assert.Throws<CryptoPolicyViolationException>(() => session.Encrypt(new Mechanism((CKM)0x8000_1234UL), AnyKey, [1]));
-        Assert.Contains("not on the SecureOnly allow-list", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("not on the Recommended allow-list", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

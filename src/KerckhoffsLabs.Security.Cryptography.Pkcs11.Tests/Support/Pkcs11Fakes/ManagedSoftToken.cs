@@ -111,7 +111,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         var keyGen = (CKM)(ulong)mechanism.Mechanism;
-        if (keyGen is not (CKM.CKM_AES_KEY_GEN or CKM.CKM_GENERIC_SECRET_KEY_GEN))
+        if (keyGen is not (CKM.CKM_AES_KEY_GEN or CKM.CKM_GENERIC_SECRET_KEY_GEN or CKM.CKM_PKCS5_PBKD2))
             return CKR.CKR_MECHANISM_INVALID;
 
         var attrs = ReadTemplate(template);
@@ -120,7 +120,16 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         if (len <= 0 || (keyGen == CKM.CKM_AES_KEY_GEN && len is not (16 or 24 or 32)))
             return CKR.CKR_ATTRIBUTE_VALUE_INVALID;
 
-        attrs[(ulong)CKA.CKA_VALUE] = RandomNumberGenerator.GetBytes(len);
+        if (keyGen == CKM.CKM_PKCS5_PBKD2)
+        {
+            if (!TryDerivePbkdf2(ref mechanism, len, out byte[] derived))
+                return CKR.CKR_MECHANISM_PARAM_INVALID;
+            attrs[(ulong)CKA.CKA_VALUE] = derived;
+        }
+        else
+        {
+            attrs[(ulong)CKA.CKA_VALUE] = RandomNumberGenerator.GetBytes(len);
+        }
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
     }
@@ -134,6 +143,9 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
+    /// <summary>Number of objects the token currently holds — lets tests assert an ephemeral object was destroyed.</summary>
+    public int ObjectCount => _objects.Count;
+
     /// <summary>When set, the next <c>C_DestroyObject</c> reports this code and leaves the object
     /// in place — lets tests exercise the path where a token rejects the destroy.</summary>
     public CKR? DestroyObjectResultOverride { get; set; }
@@ -145,8 +157,22 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
     }
 
+    /// <summary>When set, <c>C_GetAttributeValue</c> reports this code and reads nothing.</summary>
+    public CKR? GetAttributeValueResultOverride { get; set; }
+
+    /// <summary>When set, this attribute reads as sensitive (unavailable, <c>CKR_ATTRIBUTE_SENSITIVE</c>).</summary>
+    public CKA? SensitiveAttribute { get; set; }
+
+    /// <summary>When set, <c>CKA_VALUE</c> reads back as only its first this-many bytes.</summary>
+    public int? ValueTruncation { get; set; }
+
+    /// <summary>When set, runs at the start of every <c>C_GetAttributeValue</c>, before it reads anything.</summary>
+    public Action? BeforeGetAttributeValue { get; set; }
+
     public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
+        BeforeGetAttributeValue?.Invoke();
+        if (GetAttributeValueResultOverride is { } forced) return forced;
         if (!_objects.TryGetValue((ulong)objectId, out var obj)) return CKR.CKR_OBJECT_HANDLE_INVALID;
 
         CKR rv = CKR.CKR_OK;
@@ -154,6 +180,12 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         for (int i = 0; i < n; i++)
         {
             ulong type = (ulong)template[i].type;
+            if (SensitiveAttribute is { } hidden && type == (ulong)hidden)
+            {
+                template[i].valueLen = AttrUnavailable;
+                rv = CKR.CKR_ATTRIBUTE_SENSITIVE;
+                continue;
+            }
             if (!obj.TryGetValue(type, out var val))
             {
                 // PKCS#11 sentinel: ulValueLen = (CK_ULONG)-1 marks an unavailable attribute.
@@ -161,6 +193,9 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
                 rv = CKR.CKR_ATTRIBUTE_TYPE_INVALID; // non-fatal in the caller's two-pass read
                 continue;
             }
+
+            if (type == (ulong)CKA.CKA_VALUE && ValueTruncation is { } keep && keep < val.Length)
+                val = val[..keep];
 
             // Pass 1 (value == NULL): report the size. Pass 2: copy into the caller's buffer.
             if (template[i].value != IntPtr.Zero)

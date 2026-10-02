@@ -146,8 +146,9 @@ public sealed class Sp800108KdfTests
             int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
             var dk0 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr);
             var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(s.AdditionalDerivedKeysPtr, dkSize));
-            Assert.Equal(2UL, (ulong)dk0.AttributeCount);
-            Assert.Equal(1UL, (ulong)dk1.AttributeCount);
+            // Each template, plus the secure defaults it omitted (CKA_SENSITIVE, CKA_EXTRACTABLE).
+            Assert.Equal(4UL, (ulong)dk0.AttributeCount);
+            Assert.Equal(3UL, (ulong)dk1.AttributeCount);
             Assert.NotEqual(IntPtr.Zero, dk0.Template);
             Assert.NotEqual(IntPtr.Zero, dk1.Template);
 
@@ -199,8 +200,9 @@ public sealed class Sp800108KdfTests
                 int dkSize = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
                 var dk0 = UnmanagedMemory.Read<CK_DERIVED_KEY>(s.AdditionalDerivedKeysPtr);
                 var dk1 = UnmanagedMemory.Read<CK_DERIVED_KEY>(IntPtr.Add(s.AdditionalDerivedKeysPtr, dkSize));
-                Assert.Equal(2UL, (ulong)dk0.AttributeCount);
-                Assert.Equal(1UL, (ulong)dk1.AttributeCount);
+                // Each template, plus the secure defaults it omitted (CKA_SENSITIVE, CKA_EXTRACTABLE).
+                Assert.Equal(4UL, (ulong)dk0.AttributeCount);
+                Assert.Equal(3UL, (ulong)dk1.AttributeCount);
 
                 WriteHandle(dk0.Key, 0xDEAD);
                 WriteHandle(dk1.Key, 0xBEEF);

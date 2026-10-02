@@ -269,19 +269,18 @@ public sealed class SlhDsaPkcs11Tests_Managed
     }
 
     [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
-    public void ExportSlhDsaPublicKey_ValueAttributeSensitive_ThrowsPkcs11Exception()
+    public void ExportSlhDsaPublicKey_ValueAttributeSensitive_ThrowsCryptographicException()
     {
         using var key = FakeKeys.Create(CKK.CKK_SLH_DSA, ca => ca == CKA.CKA_PARAMETER_SET
             ? (CKR.CKR_OK, UlongAttr((ulong)CkpSlhDsa.CKP_SLH_DSA_SHA2_128S))
             : (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
         using var slhdsa = new SlhDsaPkcs11(key);
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => slhdsa.ExportSlhDsaPublicKey());
-        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+        Assert.Throws<CryptographicException>(() => slhdsa.ExportSlhDsaPublicKey());
     }
 
     [Fact(SkipUnless = nameof(SlhDsa.IsSupported), SkipType = typeof(SlhDsa), Skip = "Requires " + nameof(SlhDsa.IsSupported))]
-    public void ExportSlhDsaPublicKey_TokenReturnsWrongLength_ThrowsPkcs11Exception()
+    public void ExportSlhDsaPublicKey_TokenReturnsWrongLength_ThrowsCryptographicException()
     {
         // A well-formed token could never return a length other than the one it advertised via
         // its own CKA_PARAMETER_SET, so this drives CopyExact's mismatch guard.
@@ -290,7 +289,6 @@ public sealed class SlhDsaPkcs11Tests_Managed
             : (CKR.CKR_OK, new byte[1]));
         using var slhdsa = new SlhDsaPkcs11(key);
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => slhdsa.ExportSlhDsaPublicKey());
-        Assert.Equal(CKR.CKR_GENERAL_ERROR, ex.ReturnValue);
+        Assert.Throws<CryptographicException>(() => slhdsa.ExportSlhDsaPublicKey());
     }
 }

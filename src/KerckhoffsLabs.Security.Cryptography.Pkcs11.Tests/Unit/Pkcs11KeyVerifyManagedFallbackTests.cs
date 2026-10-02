@@ -10,8 +10,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 // not what this test pins, so the compile-time warning is suppressed for this file only.
 #pragma warning disable KLPKCS11008
 // SHA-1 mechanisms are used on purpose: the synthesis tests cover every mapped mechanism, and the
-// policy tests pin that the managed fallback refuses them under SecureOnly (and allows legacy
-// verification under FipsOnly).
+// policy tests pin that the managed fallback refuses them under Recommended (and allows legacy
+// verification under NistApproved).
 #pragma warning disable KLPKCS11009
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -225,7 +225,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     [Theory]
     [InlineData(CKM.CKM_SHA1_RSA_PKCS)]
     [InlineData(CKM.CKM_SHA1_RSA_PKCS_PSS)]
-    public void ManagedFallback_UnderSecureOnly_RefusesSha1RsaVerification(CKM mechanismType)
+    public void ManagedFallback_UnderRecommended_RefusesSha1RsaVerification(CKM mechanismType)
     {
         var (hash, padding) = HashAndPaddingFor(mechanismType);
         using var rsa = RSA.Create(2048);
@@ -234,12 +234,12 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Verify(new Mechanism(mechanismType), Data, signature));
-        Assert.Equal("SecureOnly", ex.PolicyName);
+        Assert.Equal("Recommended", ex.PolicyName);
         Assert.Equal(mechanismType, ex.Mechanism);
     }
 
     [Fact]
-    public void ManagedFallback_UnderSecureOnly_AllowsSha256RsaVerification()
+    public void ManagedFallback_UnderRecommended_AllowsSha256RsaVerification()
     {
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
@@ -249,7 +249,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     }
 
     [Fact]
-    public void ManagedFallback_UnderSecureOnly_RefusesAnUnlistedVendorMechanism()
+    public void ManagedFallback_UnderRecommended_RefusesAnUnlistedVendorMechanism()
     {
         using var rsa = RSA.Create(2048);
         using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
@@ -258,20 +258,20 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
             () => key.Verify(new Mechanism((CKM)0x8000_1234UL), Data, new byte[256]));
     }
 
-    // FipsOnly allows SHA-1 RSA signatures only for Verify (legacy use): proves the fallback reports
+    // NistApproved allows SHA-1 RSA signatures only for Verify (legacy use): proves the fallback reports
     // the verification direction, not just that it consults the policy.
     [Fact]
-    public void ManagedFallback_UnderFipsOnly_AllowsLegacySha1RsaVerification()
+    public void ManagedFallback_UnderNistApproved_AllowsLegacySha1RsaVerification()
     {
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
-        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), CryptoPolicy.FipsOnly);
+        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), CryptoPolicy.NistApproved);
 
         Assert.True(key.Verify(new Mechanism(CKM.CKM_SHA1_RSA_PKCS), Data, signature));
     }
 
     [Fact]
-    public void ManagedFallback_UnderSecureOnly_RefusesSha1EcdsaVerification()
+    public void ManagedFallback_UnderRecommended_RefusesSha1EcdsaVerification()
     {
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         ECParameters pub = ec.ExportParameters(includePrivateParameters: false);
@@ -330,7 +330,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 
         // CKM_SHA256 is on the managed token's mechanism list: the positive control that the probe works.
-        Assert.True(key.SupportsMechanism(new Mechanism(CKM.CKM_SHA256)));
-        Assert.False(key.SupportsMechanism(new Mechanism(WideVendorMechanism)));
+        Assert.True(key.SupportsMechanism(CKM.CKM_SHA256));
+        Assert.False(key.SupportsMechanism(WideVendorMechanism));
     }
 }

@@ -11,17 +11,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
 /// Structural invariants of both restrictive catalogues: nothing is both allowed and documented as
-/// refused, every entry explains itself, every FipsOnly entry cites NIST, and the documented deny list
+/// refused, every entry explains itself, every NistApproved entry cites NIST, and the documented deny list
 /// never decides a verdict.
 /// </summary>
 public sealed class PolicyCatalogueConsistencyTests
 {
-    public static TheoryData<string> Catalogues => ["SecureOnly", "FipsOnly"];
+    public static TheoryData<string> Catalogues => ["Recommended", "NistApproved"];
 
     private static PolicyCatalogue CatalogueFor(string name) => name switch
     {
-        "SecureOnly" => CryptoPolicy.SecureOnly.Catalogue,
-        "FipsOnly" => FipsOnlyPolicy.Catalogue,
+        "Recommended" => CryptoPolicy.Recommended.Catalogue,
+        "NistApproved" => CryptoPolicy.NistApproved.Catalogue,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -78,10 +78,10 @@ public sealed class PolicyCatalogueConsistencyTests
     }
 
     [Fact]
-    public void EveryFipsOnlyAllowedEntry_CitesNist()
+    public void EveryNistApprovedAllowedEntry_CitesNist()
     {
         var citation = new Regex("(SP 800-|FIPS 1|FIPS 2)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        PolicyCatalogue c = FipsOnlyPolicy.Catalogue;
+        PolicyCatalogue c = CryptoPolicy.NistApproved.Catalogue;
         Assert.All(c.AllowedMechanisms, kv => Assert.Matches(citation, kv.Value.Rationale));
         Assert.All(c.AllowedHashes, kv => Assert.Matches(citation, kv.Value.Rationale));
         Assert.All(c.AllowedCurves, kv => Assert.Matches(citation, kv.Value));
@@ -107,10 +107,10 @@ public sealed class PolicyCatalogueConsistencyTests
 
     // === The documented deny list never decides a verdict ====================
 
-    private static (ICryptoPolicy Policy, string? Hint) PolicyFor(string name) => name switch
+    private static ComposedCryptoPolicy PolicyFor(string name) => name switch
     {
-        "SecureOnly" => (CryptoPolicy.SecureOnly, SecureOnlyPolicy.ExtensionHint),
-        "FipsOnly" => (CryptoPolicy.FipsOnly, null),
+        "Recommended" => CryptoPolicy.Recommended,
+        "NistApproved" => CryptoPolicy.NistApproved,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -123,7 +123,10 @@ public sealed class PolicyCatalogueConsistencyTests
         AllowedKdfs = c.AllowedKdfs,
         AllowedKeyAgreementKeyTypes = c.AllowedKeyAgreementKeyTypes,
         AllowedKdfPrfs = c.AllowedKdfPrfs,
-        Rules = c.Rules,
+        RsaKeyGeneration = c.RsaKeyGeneration,
+        KeyTemplate = c.KeyTemplate,
+        SecretExport = c.SecretExport,
+        UnlistedMechanismHint = c.UnlistedMechanismHint,
         DocumentedRefusedMechanisms = FrozenDictionary<CKM, DocumentedRefusal>.Empty,
         DocumentedRefusedHashes = FrozenDictionary<string, DocumentedRefusal>.Empty,
         DocumentedRefusedCurves = FrozenDictionary<string, DocumentedRefusal>.Empty,
@@ -138,7 +141,7 @@ public sealed class PolicyCatalogueConsistencyTests
             foreach (CryptoOperation op in Enum.GetValues<CryptoOperation>())
             {
                 yield return new MechanismUseRequest(new Mechanism(mech), op);
-                yield return new MechanismUseRequest(SecureOnlyPolicyTests.ValidMechanismFor(mech), op);
+                yield return new MechanismUseRequest(RecommendedPolicyTests.ValidMechanismFor(mech), op);
             }
 
         foreach (string hash in c.AllowedHashes.Keys.Concat(c.DocumentedRefusedHashes.Keys).Append("SHA512_256").Append("NOT-A-HASH"))
@@ -165,7 +168,7 @@ public sealed class PolicyCatalogueConsistencyTests
     [MemberData(nameof(Catalogues))]
     public void EmptyingTheDocumentedDenyList_ChangesNoVerdict(string name)
     {
-        (ICryptoPolicy policy, string? hint) = PolicyFor(name);
+        ComposedCryptoPolicy policy = PolicyFor(name);
         PolicyCatalogue original = CatalogueFor(name);
         PolicyCatalogue stripped = WithoutDocumentedRefusals(original);
         int compared = 0;
@@ -173,8 +176,8 @@ public sealed class PolicyCatalogueConsistencyTests
         foreach (PolicyRequest request in EveryRequest(original))
         {
             bool expected = policy.Evaluate(request).IsAllowed;
-            Assert.Equal(expected, CatalogueEvaluator.Evaluate(original, policy.Name, hint, request).IsAllowed);
-            PolicyDecision withoutDocs = CatalogueEvaluator.Evaluate(stripped, policy.Name, hint, request);
+            Assert.Equal(expected, CatalogueEvaluator.Evaluate(original, policy.Name, request).IsAllowed);
+            PolicyDecision withoutDocs = CatalogueEvaluator.Evaluate(stripped, policy.Name, request);
             Assert.True(expected == withoutDocs.IsAllowed, $"{name}: {request} changed verdict without the documented deny list");
             compared++;
         }
@@ -188,10 +191,10 @@ public sealed class PolicyCatalogueConsistencyTests
     // through every KDF mechanism and pin the verdict to the allow-list alone — allowed exactly when the
     // PRF is on the family's allow-list, whether or not it is also documented as refused.
 
-    private static ICryptoPolicy PolicyNamed(string name) => name switch
+    private static ComposedCryptoPolicy PolicyNamed(string name) => name switch
     {
-        "SecureOnly" => CryptoPolicy.SecureOnly,
-        "FipsOnly" => CryptoPolicy.FipsOnly,
+        "Recommended" => CryptoPolicy.Recommended,
+        "NistApproved" => CryptoPolicy.NistApproved,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -211,8 +214,7 @@ public sealed class PolicyCatalogueConsistencyTests
                 yield return (new Mechanism(kdf, sp800108), CryptoOperation.Derive, prf.ToString(), "SP 800-108");
 
             var hkdf = CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, prf);
-            foreach (CKM kdf in new[] { CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA })
-                yield return (new Mechanism(kdf, hkdf), CryptoOperation.Derive, prf.ToString(), "HKDF");
+            yield return (new Mechanism(CKM.CKM_HKDF_DERIVE, hkdf), CryptoOperation.Derive, prf.ToString(), "HKDF");
         }
     }
 
@@ -220,7 +222,7 @@ public sealed class PolicyCatalogueConsistencyTests
     [MemberData(nameof(Catalogues))]
     public void KdfPrfVerdicts_FollowTheAllowList_AndIgnoreTheDocumentedPrfDenyList(string name)
     {
-        ICryptoPolicy policy = PolicyNamed(name);
+        ComposedCryptoPolicy policy = PolicyNamed(name);
         PolicyCatalogue catalogue = CatalogueFor(name);
         int documentedRefusedSeen = 0;
 

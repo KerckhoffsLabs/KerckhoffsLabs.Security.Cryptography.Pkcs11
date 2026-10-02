@@ -12,6 +12,13 @@ algorithm adapters (`RSAPkcs11`, `ECDsaPkcs11`, `AesGcmPkcs11`, `MLKemPkcs11`, `
 ## Highlights
 
 - Secure-by-default: weak mechanisms (MD5, SHA-1, DES/3DES/RC2, RSA PKCS#1 v1.5, DSA) are
-  `[Obsolete]` and refused by the default `SecureOnly` crypto policy unless a permissive policy is used.
+  `[Obsolete]` and refused by the default `Recommended` crypto policy unless a permissive policy is used.
 - Post-quantum ready: ML-KEM (FIPS 203), ML-DSA (FIPS 204), SLH-DSA (FIPS 205).
 - Token-resident keys: non-extractable private keys with on-token operations by default.
+
+## Guides
+
+- [Security model](security-model.md) — what the library guarantees and its known limits.
+- [Using crypto policies](crypto-policies.md) — choosing, widening and tightening the policy a workspace enforces.
+- [Legacy algorithms](legacy-algorithms.md) — enabling a legacy algorithm for interop.
+- [Recommended](policies/recommended.md) and [NistApproved](policies/nist-approved.md) — what each built-in policy allows.

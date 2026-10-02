@@ -117,12 +117,12 @@ public sealed class AesCcmPkcs11Tests_Managed
         }, tagLen, ShortMacOptIn(tagLen));
     }
 
-    // SecureOnly refuses CCM MACs below 64 bits; the tag-size matrix still proves the shorter legal
+    // Recommended refuses CCM MACs below 64 bits; the tag-size matrix still proves the shorter legal
     // sizes compute correctly, so it opts in to them explicitly.
     private static ICryptoPolicy? ShortMacOptIn(int tagLen) => tagLen < 8 ? CryptoPolicy.AllowInsecure : null;
 
     [Fact]
-    public void Encrypt_MacShorterThan64Bits_IsRefusedUnderSecureOnly() => WithImportedCcm(RandomNumberGenerator.GetBytes(32), ccm =>
+    public void Encrypt_MacShorterThan64Bits_IsRefusedUnderRecommended() => WithImportedCcm(RandomNumberGenerator.GetBytes(32), ccm =>
     {
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
             ccm.Encrypt(Iota(12), Iota(8), new byte[8], new byte[4]));

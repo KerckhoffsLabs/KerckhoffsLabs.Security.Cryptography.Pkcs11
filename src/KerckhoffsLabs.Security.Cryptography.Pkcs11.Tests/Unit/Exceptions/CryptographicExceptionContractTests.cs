@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-// Deliberately drives the PKCS#1 v1.5 path refused under the default SecureOnly policy: the refusal
+// Deliberately drives the PKCS#1 v1.5 path refused under the default Recommended policy: the refusal
 // is what is being caught.
 #pragma warning disable KLPKCS11008
 

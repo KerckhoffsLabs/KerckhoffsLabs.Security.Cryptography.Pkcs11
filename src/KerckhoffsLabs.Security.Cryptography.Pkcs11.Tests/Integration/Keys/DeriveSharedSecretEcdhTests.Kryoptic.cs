@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
@@ -104,6 +103,38 @@ public sealed class DeriveSharedSecretEcdhTests_Kryoptic(KryopticBackendFixture 
         using var bobEcdh = new ECDiffieHellmanPkcs11(bob);
         ECParameters bobPub = bobEcdh.ExportParameters(includePrivateParameters: false);
 
-        Assert.Throws<Pkcs11ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
+        Assert.Throws<ArgumentException>(() => workspace.DeriveSharedSecretEcdh(alice, bobPub));
+    }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void X25519_TwoParties_ReadBackTheSameSecret()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "Kryoptic", "PKCS11_TEST_EXPECT_KRYOPTIC");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_TwoParties_ReadBackTheSameSecret(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void X25519_KnownAnswer()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "Kryoptic", "PKCS11_TEST_EXPECT_KRYOPTIC");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_X25519KnownAnswer(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void X448_KnownAnswer()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "Kryoptic", "PKCS11_TEST_EXPECT_KRYOPTIC");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_X448KnownAnswer(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
+    public void X25519_LowOrderPeer_IsRefused()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "Kryoptic", "PKCS11_TEST_EXPECT_KRYOPTIC");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_LowOrderPeer_IsRefused(workspace);
     }
 }

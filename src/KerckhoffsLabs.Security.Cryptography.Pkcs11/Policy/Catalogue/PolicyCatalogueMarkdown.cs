@@ -2,14 +2,15 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 
 /// <summary>
 /// Renders a <see cref="PolicyCatalogue"/> to the Markdown catalogue documentation:
-/// <c>docs/policies/secure-only.md</c> and <c>docs/policies/fips-only.md</c> are the
-/// committed output of <see cref="Render"/> against <c>CryptoPolicy.SecureOnly.Catalogue</c> and
-/// <c>FipsOnlyPolicy.Catalogue</c>, kept in sync by <c>PolicyDocsAreCurrentTests</c>.
+/// <c>docs/policies/recommended.md</c> and <c>docs/policies/nist-approved.md</c> are the
+/// committed output of <see cref="Render"/> against <c>CryptoPolicy.Recommended.Catalogue</c> and
+/// <c>CryptoPolicy.NistApproved.Catalogue</c>, kept in sync by <c>PolicyDocsAreCurrentTests</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -43,7 +44,7 @@ internal static class PolicyCatalogueMarkdown
 
     /// <summary>
     /// Known limits applicable to every restrictive policy. The policy-specific limits
-    /// (<see cref="SecureOnlyKnownLimits"/>, <see cref="FipsKnownLimits"/>) are appended after them.
+    /// (<see cref="RecommendedKnownLimits"/>, <see cref="FipsKnownLimits"/>) are appended after them.
     /// </summary>
     private static readonly string[] SharedKnownLimits =
     [
@@ -55,9 +56,9 @@ internal static class PolicyCatalogueMarkdown
     ];
 
     /// <summary>
-    /// Known limits of the SecureOnly family alone: FipsOnly refuses <c>CKM_AES_KEY_WRAP_PAD</c> outright.
+    /// Known limits of the Recommended family alone: NistApproved refuses <c>CKM_AES_KEY_WRAP_PAD</c> outright.
     /// </summary>
-    private static readonly string[] SecureOnlyKnownLimits =
+    private static readonly string[] RecommendedKnownLimits =
     [
         "`CKM_AES_KEY_WRAP_PAD` is allowed, but its padding is vendor-defined: some tokens implement RFC 5649 "
             + "(KWP), others KW over PKCS#7-padded input, so a key wrapped on one token may not unwrap on "
@@ -65,29 +66,29 @@ internal static class PolicyCatalogueMarkdown
     ];
 
     /// <summary>
-    /// Known limits of FipsOnly alone.
+    /// Known limits of NistApproved alone.
     /// </summary>
     private static readonly string[] FipsKnownLimits =
     [
-        "FipsOnly restricts what this library sends to the token. FIPS 140-3 compliance also requires a "
+        "NistApproved restricts what this library sends to the token. FIPS 140-3 compliance also requires a "
             + "validated cryptographic module operating in its approved mode.",
     ];
 
     /// <summary>Renders <paramref name="catalogue"/> as the full Markdown catalogue page for the policy named <paramref name="policyName"/>.</summary>
     /// <param name="catalogue">The allow-list, rules and documented deny list to render.</param>
     /// <param name="policyName">
-    /// <c>"SecureOnly"</c> or <c>"FipsOnly"</c> — selects the policy-specific sections: the
-    /// <c>WithAllowedMechanism</c> extension-point paragraph for the SecureOnly family (a name starting
-    /// with <c>"SecureOnly"</c>), or the FIPS 140-3 disclaimer, NIST baseline, and extra known limit for
-    /// <c>"FipsOnly"</c>.
+    /// <c>"Recommended"</c> or <c>"NistApproved"</c> — selects the policy-specific sections: the
+    /// <c>ToBuilder</c> extension-point paragraph for the Recommended family (a name starting
+    /// with <c>"Recommended"</c>), or the FIPS 140-3 disclaimer, NIST baseline, and extra known limit for
+    /// <c>"NistApproved"</c>.
     /// </param>
     public static string Render(PolicyCatalogue catalogue, string policyName)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentException.ThrowIfNullOrWhiteSpace(policyName);
 
-        bool isSecureOnlyFamily = policyName.StartsWith("SecureOnly", StringComparison.Ordinal);
-        bool isFipsOnly = policyName == "FipsOnly";
+        bool isRecommendedFamily = catalogue.Documentation == PolicyDocumentation.Recommended;
+        bool isNistApproved = catalogue.Documentation == PolicyDocumentation.NistApproved;
 
         var sb = new StringBuilder();
         void Line(string text = "") => sb.Append(text).Append('\n');
@@ -97,7 +98,7 @@ internal static class PolicyCatalogueMarkdown
         Line("*Generated from the `" + policyName + "` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*");
         Line();
 
-        if (isSecureOnlyFamily)
+        if (isRecommendedFamily)
         {
             Line(
                 "An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs and KDF PRFs. "
@@ -114,13 +115,13 @@ internal static class PolicyCatalogueMarkdown
         }
         Line();
 
-        if (isFipsOnly)
+        if (isNistApproved)
         {
-            Line("> **`FipsOnly` is not a FIPS 140-3 certification.** It restricts what this library sends to the " +
+            Line("> **`NistApproved` is not a FIPS 140-3 certification.** It restricts what this library sends to the " +
                  "token; FIPS 140-3 compliance also requires a validated cryptographic module operating in its " +
                  "approved mode.");
             Line(">");
-            Line($"> Baseline: {Escape(FipsOnlyPolicy.Baseline)}");
+            Line($"> Baseline: {Escape(NistApprovedDefinition.Baseline)}");
             Line();
         }
 
@@ -130,20 +131,22 @@ internal static class PolicyCatalogueMarkdown
         RenderAllowedKdfs(sb, catalogue);
         RenderAllowedKeyAgreementKeyTypes(sb, catalogue);
         RenderAllowedKdfPrfs(sb, catalogue);
+        RenderAllowedSecretExports(sb, catalogue);
         RenderRules(sb, catalogue);
         RenderDocumentedRefusals(sb, catalogue);
 
-        if (isSecureOnlyFamily)
+        if (isRecommendedFamily)
         {
             Line("## Extension point");
             Line();
             Line(
-                "`CryptoPolicy.SecureOnly.WithAllowedMechanism(...)` returns a new, wider `SecureOnlyPolicy` "
-                + "(named `SecureOnly+custom`) that also allows one more mechanism, for the operations and reason "
-                + "you supply — including a mechanism listed under Documented refusals above, and any "
-                + "vendor-defined mechanism. It only adds: an already-allowed mechanism keeps its operations and "
-                + "parameter check. It never modifies `CryptoPolicy.SecureOnly` itself or any other instance; "
-                + "call it on the returned policy to add more.");
+                "`CryptoPolicy.Recommended.ToBuilder(name)` returns a `CryptoPolicyBuilder` holding a copy of every rule on "
+                + "this page; `AllowMechanism(...)` on it allows one more mechanism for the operations and reason you supply "
+                + "— including a mechanism listed under Documented refusals above, and any vendor-defined mechanism — and "
+                + "`Build()` returns the new policy under your name. Allowing an already-allowed mechanism adds operations and "
+                + "keeps its parameter check. `AllowSecretExport(...)`, `AllowCurve(...)` and `AllowKeyAgreementKdf(...)` "
+                + "likewise allow one kind of secret read-back, one EC curve or one key-agreement KDF. "
+                + "`ToBuilder` never modifies `CryptoPolicy.Recommended` itself.");
             Line();
         }
 
@@ -151,12 +154,12 @@ internal static class PolicyCatalogueMarkdown
         Line();
         foreach (string limit in SharedKnownLimits)
             Line($"- {Escape(limit)}");
-        if (isSecureOnlyFamily)
+        if (isRecommendedFamily)
         {
-            foreach (string limit in SecureOnlyKnownLimits)
+            foreach (string limit in RecommendedKnownLimits)
                 Line($"- {Escape(limit)}");
         }
-        if (isFipsOnly)
+        if (isNistApproved)
         {
             foreach (string limit in FipsKnownLimits)
                 Line($"- {Escape(limit)}");
@@ -189,7 +192,7 @@ internal static class PolicyCatalogueMarkdown
             {
                 string operations = rule.Operations == CryptoOperations.None ? "—" : CatalogueEvaluator.FormatOperations(rule.Operations);
                 string legacy = rule.LegacyOperations == CryptoOperations.None ? "—" : CatalogueEvaluator.FormatOperations(rule.LegacyOperations);
-                string check = rule.ParameterCheck is null ? "—" : Escape(rule.ParameterCheckDescription ?? "(see rationale)");
+                string check = rule.ParameterCheck is null ? "—" : Escape(rule.ParameterCheck.Description);
                 Line($"| `{name}` | {Escape(operations)} | {Escape(legacy)} | {check} | {Escape(rule.Rationale)} |");
             }
             Line();
@@ -205,7 +208,7 @@ internal static class PolicyCatalogueMarkdown
             {
                 string operations = rule.Operations == CryptoOperations.None ? "—" : CatalogueEvaluator.FormatOperations(rule.Operations);
                 string legacy = rule.LegacyOperations == CryptoOperations.None ? "—" : CatalogueEvaluator.FormatOperations(rule.LegacyOperations);
-                string check = rule.ParameterCheck is null ? "—" : Escape(rule.ParameterCheckDescription ?? "(see rationale)");
+                string check = rule.ParameterCheck is null ? "—" : Escape(rule.ParameterCheck.Description);
                 string value = "0x" + raw.ToString("X", CultureInfo.InvariantCulture);
                 Line($"| `{value}` | {Escape(operations)} | {Escape(legacy)} | {check} | {Escape(rule.Rationale)} |");
             }
@@ -287,6 +290,24 @@ internal static class PolicyCatalogueMarkdown
         Line();
     }
 
+    private static void RenderAllowedSecretExports(StringBuilder sb, PolicyCatalogue catalogue)
+    {
+        if (catalogue.AllowedSecretExports.Count == 0)
+            return;
+
+        void Line(string text = "") => sb.Append(text).Append('\n');
+
+        Line("## Allowed secret exports");
+        Line();
+        Line("Kinds of secret key material this policy lets callers read off the token; the export rule below refuses every other kind.");
+        Line();
+        Line("| Kind | Rationale |");
+        Line(TwoColumnSeparator);
+        foreach ((SecretExportKind kind, string rationale) in catalogue.AllowedSecretExports.OrderBy(kv => kv.Key.ToString(), StringComparer.Ordinal))
+            Line($"| `{kind}` | {Escape(rationale)} |");
+        Line();
+    }
+
     // === Rules ===
 
     private static void RenderRules(StringBuilder sb, PolicyCatalogue catalogue)
@@ -302,9 +323,9 @@ internal static class PolicyCatalogueMarkdown
         Line();
         Line("| Rule | Rationale |");
         Line(TwoColumnSeparator);
-        Line($"| RSA key-pair generation modulus | {Escape(catalogue.Rules.RsaKeyGenerationRationale)} |");
-        Line($"| Key template (`CKA_SENSITIVE`) | {Escape(catalogue.Rules.KeyTemplateRationale)} |");
-        Line($"| Key-material export | {Escape(catalogue.Rules.KeyMaterialExportRationale)} |");
+        Line($"| RSA key-pair generation modulus | {Escape(catalogue.RsaKeyGeneration.Rationale)} |");
+        Line($"| Key template (`CKA_SENSITIVE`) | {Escape(catalogue.KeyTemplate.Rationale)} |");
+        Line($"| Secret export | {Escape(catalogue.SecretExport.Rationale)} |");
         Line();
     }
 

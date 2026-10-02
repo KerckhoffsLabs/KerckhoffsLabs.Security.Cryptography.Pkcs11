@@ -1,6 +1,6 @@
-# SecureOnly policy catalogue
+# Recommended policy catalogue
 
-*Generated from the `SecureOnly` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
+*Generated from the `Recommended` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
 
 An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs and KDF PRFs. Anything not on the list below — including every vendor-defined mechanism — is denied by default, whether or not it also appears in the documented deny list further down this page.
 
@@ -80,7 +80,6 @@ An allow-list of reviewed, modern mechanisms, hashes, curves, key-agreement KDFs
 
 | Mechanism | Operations | Legacy operations | Parameter check | Rationale |
 |---|---|---|---|---|
-| `CKM_HKDF_DATA` | Derive | — | requires CkmHkdfParams naming an allowed PRF (CKM_SHA256/384/512 or CKM_SHA3_256/384/512, hash or _HMAC form) | HKDF (RFC 5869 / SP 800-56C). |
 | `CKM_HKDF_DERIVE` | Derive | — | requires CkmHkdfParams naming an allowed PRF (CKM_SHA256/384/512 or CKM_SHA3_256/384/512, hash or _HMAC form) | HKDF (RFC 5869 / SP 800-56C). |
 | `CKM_HKDF_KEY_GEN` | GenerateKey | — | — | HKDF salt / key generation. |
 | `CKM_PKCS5_PBKD2` | Derive, GenerateKey | — | requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256, _SHA384, _SHA512, or _SHA512_256) | PBKDF2 (RFC 8018 / SP 800-132) password-based key derivation. |
@@ -207,7 +206,7 @@ Per-family allow-list for the PRF named inside PBKDF2 / SP 800-108 / HKDF mechan
 
 | KDF family | Allowed PRFs |
 |---|---|
-| HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA) | `CKM_SHA256`, `CKM_SHA256_HMAC`, `CKM_SHA384`, `CKM_SHA384_HMAC`, `CKM_SHA3_256`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512`, `CKM_SHA3_512_HMAC`, `CKM_SHA512`, `CKM_SHA512_HMAC` |
+| HKDF (CKM_HKDF_DERIVE) | `CKM_SHA256`, `CKM_SHA256_HMAC`, `CKM_SHA384`, `CKM_SHA384_HMAC`, `CKM_SHA3_256`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512`, `CKM_SHA3_512_HMAC`, `CKM_SHA512`, `CKM_SHA512_HMAC` |
 | PBKDF2 (CKM_PKCS5_PBKD2) | `CKP_PKCS5_PBKD2_HMAC_SHA256`, `CKP_PKCS5_PBKD2_HMAC_SHA384`, `CKP_PKCS5_PBKD2_HMAC_SHA512`, `CKP_PKCS5_PBKD2_HMAC_SHA512_256` |
 | SP 800-108 (CKM_SP800_108_*_KDF) | `CKM_AES_CMAC`, `CKM_SHA256_HMAC`, `CKM_SHA384_HMAC`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512_HMAC`, `CKM_SHA512_HMAC` |
 
@@ -219,7 +218,7 @@ Beyond the allow-lists above, three rules apply: the modulus rule to RSA key-pai
 |---|---|
 | RSA key-pair generation modulus | RSA key generation requires a modulus of at least 2048 bits (NIST SP 800-131A Rev.2). |
 | Key template (`CKA_SENSITIVE`) | A key template with CKA_SENSITIVE=false is refused; non-extractable (CKA_EXTRACTABLE=false) stays the default. |
-| Key-material export | Reading secret key material off the token in the clear is refused; wrap it under a KEK instead. |
+| Secret export | Reading secret key material off the token in the clear is refused; wrap it under a KEK instead. |
 
 ## Documented refusals
 
@@ -329,10 +328,10 @@ Documentation only: every item below is refused because it is absent from the al
 | `CKM_CONCATENATE_BASE_AND_KEY` | This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. | — |
 | `CKM_CONCATENATE_DATA_AND_BASE` | This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. | — |
 | `CKM_EXTRACT_KEY_FROM_KEY` | This is Clulow's classic PKCS#11 key-extraction attack: it derives a short, attacker-chosen sub-key from a sensitive base key, which can then be brute-forced via a legitimate encrypt/decrypt call — the derived key's own CKA_SENSITIVE=true default does not block this, since the attack works entirely through mechanisms the token permits. Restrict CKA_DERIVE on sensitive keys via token policy rather than relying on application-level checks. | — |
-| `CKM_IKE1_EXTENDED_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
-| `CKM_IKE1_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
-| `CKM_IKE2_PRF_PLUS_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
-| `CKM_IKE_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review |
+| `CKM_IKE1_EXTENDED_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
+| `CKM_IKE1_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
+| `CKM_IKE2_PRF_PLUS_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
+| `CKM_IKE_PRF_DERIVE` | Protocol-specific; IPsec stacks should opt in explicitly. | an explicit AllowMechanism(...) opt-in after review |
 | `CKM_MD2_KEY_DERIVATION` | MD2 is a broken hash function. | CKM_SHA256 or stronger |
 | `CKM_MD5_KEY_DERIVATION` | MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. | CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger |
 | `CKM_SHA1_KEY_DERIVATION` | MD5/SHA-1-based HMAC and key derivation rely on broken hash functions. | CKM_SHA256_HMAC or an SP800-108 KDF with SHA-256 or stronger |
@@ -499,7 +498,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 ## Extension point
 
-`CryptoPolicy.SecureOnly.WithAllowedMechanism(...)` returns a new, wider `SecureOnlyPolicy` (named `SecureOnly+custom`) that also allows one more mechanism, for the operations and reason you supply — including a mechanism listed under Documented refusals above, and any vendor-defined mechanism. It only adds: an already-allowed mechanism keeps its operations and parameter check. It never modifies `CryptoPolicy.SecureOnly` itself or any other instance; call it on the returned policy to add more.
+`CryptoPolicy.Recommended.ToBuilder(name)` returns a `CryptoPolicyBuilder` holding a copy of every rule on this page; `AllowMechanism(...)` on it allows one more mechanism for the operations and reason you supply — including a mechanism listed under Documented refusals above, and any vendor-defined mechanism — and `Build()` returns the new policy under your name. Allowing an already-allowed mechanism adds operations and keeps its parameter check. `AllowSecretExport(...)`, `AllowCurve(...)` and `AllowKeyAgreementKdf(...)` likewise allow one kind of secret read-back, one EC curve or one key-agreement KDF. `ToBuilder` never modifies `CryptoPolicy.Recommended` itself.
 
 ## Known limits
 

@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -16,9 +15,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// The <see cref="Rfc2898DeriveBytesPkcs11"/> constructors write the password straight into the
-/// instance's pinned buffer. Runs on the in-process token, which does not implement
-/// <c>CKM_PKCS5_PBKD2</c>: the password is captured from the parameters while the policy judges the
-/// call, before the token refuses it.
+/// instance's pinned buffer. Runs on the in-process token: the password is captured from the
+/// parameters while the policy judges the call, and the token's output is checked against the BCL.
 /// </summary>
 public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
 {
@@ -54,9 +52,10 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         using var workspace = ManagedToken.OpenWorkspace(library, policy);
         using var kdf = create(workspace);
 
-        var ex = Assert.IsType<Pkcs11Exception>(Record.Exception(() => kdf.GetBytes(16)), exactMatch: false);
-        Assert.Equal(CKR.CKR_MECHANISM_INVALID, ex.ReturnValue);
-        return Assert.Single(policy.Passwords);
+        byte[] output = kdf.GetBytes(16);
+        byte[] sent = Assert.Single(policy.Passwords);
+        Assert.Equal(Rfc2898DeriveBytes.Pbkdf2(sent, Salt, 1000, HashAlgorithmName.SHA256, 16), output);
+        return sent;
     }
 
     [Fact]
@@ -137,7 +136,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library, policy);
         var kdf = new Rfc2898DeriveBytesPkcs11(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256);
-        Assert.ThrowsAny<Pkcs11Exception>(() => kdf.GetBytes(16));
+        kdf.GetBytes(16);
         CkmPkcs5Pbkd2Params borrowed = Assert.Single(policy.Parameters);
 
         Assert.True(StillMarshals(borrowed));
@@ -153,13 +152,13 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         using var workspace = ManagedToken.OpenWorkspace(library, policy);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
-        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256, 16));
-        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
-        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template));
+        Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256, 16);
+        Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256);
+        using (Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template)) { }
 
         using (var password = new SecurePassword("password"))
         {
-            Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, password, Salt, 1000, HashAlgorithmName.SHA256, template));
+            using (Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, password, Salt, 1000, HashAlgorithmName.SHA256, template)) { }
             Assert.True(StillMarshals(policy.Parameters[^1])); // borrowed from the caller, who has not disposed it yet
         }
 

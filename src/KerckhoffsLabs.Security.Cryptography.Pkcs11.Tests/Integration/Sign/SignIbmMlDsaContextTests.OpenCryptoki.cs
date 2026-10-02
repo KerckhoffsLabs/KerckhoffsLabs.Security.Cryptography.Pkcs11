@@ -80,7 +80,7 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
             .Label(label).Id(id).Sign().Build();
 
         using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
-        // SecureOnly denies every vendor mechanism it has not been told about; the parameter block, not
+        // Recommended denies every vendor mechanism it has not been told about; the parameter block, not
         // the policy, is under test here.
         using var vendorOptIn = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         try

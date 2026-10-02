@@ -88,13 +88,13 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_SoftHsm(SoftHsmBackendFixture 
     public void StaticPbkdf2_UnsupportedHash_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnsupportedHash_Throws(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void Pbkdf2Key_UnderSecureOnly_MatchesBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(_backend);
+    public void Pbkdf2Key_UnderRecommended_MatchesBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_UnderRecommended_MatchesBcl(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Pbkdf2Key_IsSensitiveAndNonExtractableByDefault() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_IsSensitiveAndNonExtractableByDefault(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
-    public void Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly(_backend);
+    public void Pbkdf2Key_Sha1Prf_IsRefusedUnderRecommended() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_Sha1Prf_IsRefusedUnderRecommended(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void Pbkdf2Key_NullTemplate_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_NullTemplate_Throws(_backend);

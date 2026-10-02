@@ -75,7 +75,7 @@ public sealed class EcKeyGenCurveGateTests
         Assert.Equal(1, secure.Calls);
 
         var fips = new RecordingFake();
-        using (var session = new Pkcs11Session(fips, sessionId: 1, policy: CryptoPolicy.FipsOnly))
+        using (var session = new Pkcs11Session(fips, sessionId: 1, policy: CryptoPolicy.NistApproved))
             Assert.Throws<CryptoPolicyViolationException>(() => GenerateEc(session, brainpool));
         Assert.Equal(0, fips.Calls);
     }

@@ -30,7 +30,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("SHA-1 is broken (SHAttered demonstrated practical collisions). Use SHA256Pkcs11 or stronger. " +
-          "SHA1Pkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect.",
+          "SHA1Pkcs11 is refused by the default crypto policy; to enable it for legacy interop, see " +
+          DiagnosticIds.LegacyAlgorithmsUrl + "#sha-1.",
     DiagnosticId = DiagnosticIds.Sha1,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class SHA1Pkcs11 : SHA1

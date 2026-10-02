@@ -17,17 +17,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
 /// is approved; <see langword="null"/> when the mechanism type alone decides. Its denial, when it
 /// denies, is returned as-is.
 /// </param>
-/// <param name="Rationale">Why the mechanism is allowed — for <c>FipsOnly</c>, the NIST publication citation.</param>
+/// <param name="Rationale">Why the mechanism is allowed — for <c>NistApproved</c>, the NIST publication citation.</param>
 internal sealed record MechanismRule(
     CryptoOperations Operations,
     CryptoOperations LegacyOperations,
-    Func<Mechanism, CryptoOperation, PolicyDecision>? ParameterCheck,
-    string Rationale)
-{
-    /// <summary>
-    /// A human-readable description of <see cref="ParameterCheck"/>, for the generated catalogue
-    /// documentation. <see langword="null"/> when there is no parameter check, or the check needs no
-    /// explanation beyond <see cref="Rationale"/>.
-    /// </summary>
-    public string? ParameterCheckDescription { get; init; }
-}
+    MechanismCheck? ParameterCheck,
+    string Rationale);

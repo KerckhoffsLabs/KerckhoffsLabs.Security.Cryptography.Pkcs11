@@ -70,7 +70,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     public void MessageEncrypt_ShortGcmTag_IsRefusedByThePolicy_BeforeTheToken()
     {
         var fake = new MessageFake();
-        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 8);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
@@ -84,7 +84,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     public void MessageDecrypt_ShortCcmMac_IsRefusedByThePolicy_BeforeTheToken()
     {
         var fake = new MessageFake();
-        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
         var p = CkmCcmMessageParams.ForDecrypt(2, new byte[12], new byte[4]);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
@@ -94,11 +94,70 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         Assert.Equal(0, fake.DecryptFinalCalls);
     }
 
+    // Parameters on the init mechanism must not stand in for the per-message ones: the token takes the
+    // tag length from the per-message block, so a full tag on the mechanism cannot vouch for a short one there.
+    [Fact]
+    public void MessageEncrypt_ShortGcmTag_IsRefused_EvenWhenTheMechanismCarriesAFullTag()
+    {
+        var fake = new MessageFake();
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
+        var mechanism = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 4);
+
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            s.MessageEncrypt(mechanism, new ObjectHandle(1), p, associatedData: [], plaintext: [1]));
+
+        Assert.StartsWith("A 32-bit AES-GCM tag", ex.Reason);
+        Assert.Equal(0, fake.EncryptFinalCalls);
+    }
+
+    [Fact]
+    public void MessageDecrypt_ShortCcmMac_IsRefused_EvenWhenTheMechanismCarriesAFullMac()
+    {
+        var fake = new MessageFake();
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
+        var mechanism = new Mechanism(CKM.CKM_AES_CCM, new CkmAesCcmParams(2, new byte[12], [], macLen: 16));
+        var p = CkmCcmMessageParams.ForDecrypt(2, new byte[12], new byte[4]);
+
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            s.MessageDecrypt(mechanism, new ObjectHandle(1), p, associatedData: [], ciphertext: [1, 2]));
+
+        Assert.StartsWith("A 32-bit AES-CCM MAC", ex.Reason);
+        Assert.Equal(0, fake.DecryptFinalCalls);
+    }
+
+    [Fact]
+    public void MessageEncrypt_ShortTagOnTheMechanism_IsRefused_EvenWithAFullPerMessageTag()
+    {
+        var fake = new MessageFake();
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
+        var mechanism = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 32));
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+
+        var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
+            s.MessageEncrypt(mechanism, new ObjectHandle(1), p, associatedData: [], plaintext: [1]));
+
+        Assert.StartsWith("A 32-bit AES-GCM tag", ex.Reason);
+        Assert.Equal(0, fake.EncryptFinalCalls);
+    }
+
+    [Fact]
+    public void MessageEncrypt_FullTags_OnTheMechanismAndTheMessage_AreAllowed()
+    {
+        var fake = new MessageFake { Ciphertext = [1, 2] };
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
+        var mechanism = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
+        var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
+
+        Assert.Equal(new byte[] { 1, 2 },
+            s.MessageEncrypt(mechanism, new ObjectHandle(1), p, associatedData: [], plaintext: [9, 9]));
+    }
+
     [Fact]
     public void MessageEncrypt_FullGcmTag_IsAllowedByThePolicy()
     {
         var fake = new MessageFake { Ciphertext = [1, 2] };
-        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.Recommended);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         Assert.Equal(new byte[] { 1, 2 },
