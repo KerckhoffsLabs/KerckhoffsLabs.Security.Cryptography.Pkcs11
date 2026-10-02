@@ -130,7 +130,7 @@ internal static class RSAPkcs11TestCases
         RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X64;
 
     // === Key sizes: sign/verify round-trips scale with the modulus =========
-    // RSA < 2048 is refused under SecureOnly (NIST SP 800-131A), so the 1024 case generates under an
+    // RSA < 2048 is refused under Recommended (NIST SP 800-131A), so the 1024 case generates under an
     // opt-in scope; 2048+ need no opt-in. PSS-SHA256 fits even a 1024-bit modulus.
     internal static void Assert_SignVerifyData_AcrossKeySizes_RoundTrips(IPkcs11Backend backend, int modulusBits)
     {

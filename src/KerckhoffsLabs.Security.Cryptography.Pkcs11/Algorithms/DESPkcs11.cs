@@ -45,7 +45,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Single DES has a 56-bit key and is exhaustively breakable. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "DESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "DESPkcs11 is refused by the default crypto policy; to enable it for legacy interop, see " +
+          DiagnosticIds.LegacyAlgorithmsUrl + "#des.",
     DiagnosticId = DiagnosticIds.Des,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DESPkcs11 : DES
@@ -99,7 +100,7 @@ public sealed class DESPkcs11 : DES
         // Padded encryption (CKM_DES_CBC_PAD) must emit a full padding block, so that path always
         // goes to the token.
         if (input.IsEmpty
-            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && _key.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
             && !(encrypt && mechanism.Type == CKM.CKM_DES_CBC_PAD))
         {
             bytesWritten = 0;

@@ -23,7 +23,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// Calling <c>Session.Encrypt</c> with an insecure
     /// mechanism must throw <see cref="CryptoPolicyViolationException"/> when
-    /// the session's crypto policy is <c>CryptoPolicy.SecureOnly</c> (the default).
+    /// the session's crypto policy is <c>CryptoPolicy.Recommended</c> (the default).
     /// </summary>
     internal static void Assert_Encrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
@@ -77,7 +77,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// Calling <c>Session.Decrypt</c> with an insecure
     /// mechanism must throw <see cref="CryptoPolicyViolationException"/> when
-    /// the session's crypto policy is <c>CryptoPolicy.SecureOnly</c> (the default).
+    /// the session's crypto policy is <c>CryptoPolicy.Recommended</c> (the default).
     /// </summary>
     internal static void Assert_Decrypt_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
     {
@@ -131,7 +131,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// Calling <c>Session.Sign</c> with an
     /// insecure mechanism must throw <see cref="CryptoPolicyViolationException"/> when
-    /// the session's crypto policy is <c>CryptoPolicy.SecureOnly</c> (the default). The guard fires in managed
+    /// the session's crypto policy is <c>CryptoPolicy.Recommended</c> (the default). The guard fires in managed
     /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
     /// </summary>
     internal static void Assert_Sign_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
@@ -159,7 +159,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// Calling <c>Session.Verify</c>
     /// with an insecure mechanism must throw <see cref="CryptoPolicyViolationException"/> when
-    /// the session's crypto policy is <c>CryptoPolicy.SecureOnly</c> (the default). The guard fires in managed
+    /// the session's crypto policy is <c>CryptoPolicy.Recommended</c> (the default). The guard fires in managed
     /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
     /// </summary>
     internal static void Assert_Verify_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
@@ -193,7 +193,7 @@ internal static class InsecureOperationGateTestCases
     internal static void Assert_Sign_MechanismNotGated(IPkcs11Backend backend, ulong mechanismId)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
-        // The default SecureOnly policy is deliberately left in place — a strong-hash v1.5 signature
+        // The default Recommended policy is deliberately left in place — a strong-hash v1.5 signature
         // is a secure, standard scheme and must not require an insecure opt-in.
         try
         {
@@ -267,7 +267,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// Calling <c>Session.GenerateKey</c> with an
     /// insecure mechanism must throw <see cref="CryptoPolicyViolationException"/> when
-    /// the session's crypto policy is <c>CryptoPolicy.SecureOnly</c> (the default). The guard fires in managed
+    /// the session's crypto policy is <c>CryptoPolicy.Recommended</c> (the default). The guard fires in managed
     /// code before any P/Invoke call, so no real token is needed.
     /// </summary>
     internal static void Assert_GenerateKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)
@@ -294,7 +294,7 @@ internal static class InsecureOperationGateTestCases
     /// <summary>
     /// Calling <c>Session.DeriveKey</c>
     /// with an insecure mechanism must throw <see cref="CryptoPolicyViolationException"/> when
-    /// the session's crypto policy is <c>CryptoPolicy.SecureOnly</c> (the default). The guard fires in managed
+    /// the session's crypto policy is <c>CryptoPolicy.Recommended</c> (the default). The guard fires in managed
     /// code before any P/Invoke call, so a fake <see cref="ObjectHandle"/> (id=0) is sufficient.
     /// </summary>
     internal static void Assert_DeriveKey_InsecureMechanismThrows(IPkcs11Backend backend, ulong mechanismId)

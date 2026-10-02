@@ -43,6 +43,9 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): {PolicyName} policy refused {Request}")]
     public static partial void PolicyDenied(ILogger logger, ulong sessionId, string policyName, string request);
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "Session({SessionId}): {PolicyName} policy allowed {Request}")]
+    public static partial void PolicyExportAllowed(ILogger logger, ulong sessionId, string policyName, string request);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy override {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyOverridden(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 

@@ -95,9 +95,21 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
+    /// <summary>
+    /// Mimics SoftHSM: <c>C_DecapsulateKey</c> refuses a template carrying <c>CKA_VALUE_LEN</c> with
+    /// <c>CKR_ATTRIBUTE_READ_ONLY</c>, creating nothing.
+    /// </summary>
+    public bool DecapsulateRejectsValueLen { get; set; }
+
+    /// <summary>Number of <c>C_DecapsulateKey</c> calls, refused ones included.</summary>
+    public int DecapsulateCalls { get; private set; }
+
     public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
     {
+        DecapsulateCalls++;
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
+        if (DecapsulateRejectsValueLen && ReadTemplate(template).ContainsKey((ulong)CKA.CKA_VALUE_LEN))
+            return CKR.CKR_ATTRIBUTE_READ_ONLY;
         if (!_asymKeys.TryGetValue((ulong)privateKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;
 
         byte[] ct = ciphertext.ToArray();

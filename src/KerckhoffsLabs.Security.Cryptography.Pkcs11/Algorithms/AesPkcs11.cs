@@ -130,7 +130,7 @@ public sealed class AesPkcs11 : Aes
         // Padded encryption (CKM_AES_CBC_PAD) must emit a full padding block, so that path always
         // goes to the token.
         if (input.IsEmpty
-            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && _key.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
             && !(encrypt && mechanism.Type == CKM.CKM_AES_CBC_PAD))
         {
             bytesWritten = 0;

@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// The compile-time diagnostics warn about exactly what the default policy documents as refused: its
 /// documented deny list, not every mechanism it merely has not reviewed. The analyzer
 /// cannot reference the library (it targets netstandard2.0 and would be a cycle), so its mechanism list
-/// is a transcription of <c>SecureOnlyPolicy</c>'s documented refusals — and a transcription can drift.
+/// is a transcription of <c>CryptoPolicy.Recommended</c>'s documented refusals — and a transcription can drift.
 /// These tests pin the two together in both directions: a documented refusal the analyzer stays silent
 /// on is a missed warning; the reverse is a warning with no documented reason behind it.
 /// </summary>
@@ -35,7 +35,7 @@ public sealed class AnalyzerGateParityTests
     /// <summary>Mechanisms the default policy documents as refused.</summary>
     private static HashSet<CKM> DocumentedRefusedMechanisms()
     {
-        var documented = CryptoPolicy.SecureOnly.Catalogue.DocumentedRefusedMechanisms.Keys.ToHashSet();
+        var documented = CryptoPolicy.Recommended.Catalogue.DocumentedRefusedMechanisms.Keys.ToHashSet();
         Assert.NotEmpty(documented); // the harness itself must not silently no-op
         return documented;
     }
@@ -51,7 +51,7 @@ public sealed class AnalyzerGateParityTests
         var missing = DocumentedRefusedMechanisms().Except(covered).ToList();
 
         Assert.True(missing.Count == 0,
-            "SecureOnly documents refusals no analyzer warns about, so a consumer would only find out at " +
+            "Recommended documents refusals no analyzer warns about, so a consumer would only find out at " +
             "run time. Add them to InsecureMechanismData.GatedMechanisms: " + Describe(missing));
     }
 
@@ -64,7 +64,7 @@ public sealed class AnalyzerGateParityTests
             .Except(documented).ToList();
 
         Assert.True(spurious.Count == 0,
-            "The analyzer warns about mechanisms SecureOnly does not document as refused — a warning " +
+            "The analyzer warns about mechanisms Recommended does not document as refused — a warning " +
             "with no reason behind it: " + Describe(spurious));
     }
 
@@ -73,7 +73,7 @@ public sealed class AnalyzerGateParityTests
     {
         foreach (CKM mechanism in ToValues(InsecureMechanismData.GatedMechanisms.Concat(RsaPaddingRuleMechanisms)))
             foreach (CryptoOperation op in Enum.GetValues<CryptoOperation>())
-                Assert.False(CryptoPolicy.SecureOnly.Evaluate(new MechanismUseRequest(new Mechanism(mechanism), op)).IsAllowed,
+                Assert.False(CryptoPolicy.Recommended.Evaluate(new MechanismUseRequest(new Mechanism(mechanism), op)).IsAllowed,
                     $"{mechanism} is flagged by an analyzer but allowed for {op}.");
     }
 

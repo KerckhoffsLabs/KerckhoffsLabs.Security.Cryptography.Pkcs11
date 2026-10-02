@@ -19,7 +19,7 @@ public sealed class AllowInsecurePolicyTests
         [nameof(EcKeyGenerationRequest)] = () => new EcKeyGenerationRequest(Pkcs11ECCurve.NamedCurves.NistP256),
         [nameof(KeyTemplateRequest)] = () => new KeyTemplateRequest(CKO.CKO_SECRET_KEY, []),
         [nameof(KeyAgreementKdfRequest)] = () => new KeyAgreementKdfRequest(CKM.CKM_ECDH1_DERIVE, CKD.CKD_NULL),
-        [nameof(KeyMaterialExportRequest)] = () => new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret),
+        [nameof(SecretExportRequest)] = () => new SecretExportRequest(SecretExportKind.KemSharedSecret),
     };
 
     public static TheoryData<string> EveryRequestKind() => [.. RequestsByKind.Keys];

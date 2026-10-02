@@ -1,12 +1,18 @@
 - name: Home
   href: index.md
-- name: Diagnostics
-  href: diagnostics.md
+- name: Security model
+  href: security-model.md
 - name: Crypto policies
   items:
-    - name: SecureOnly
-      href: policies/secure-only.md
-    - name: FipsOnly
-      href: policies/fips-only.md
+    - name: Using crypto policies
+      href: crypto-policies.md
+    - name: Legacy algorithms
+      href: legacy-algorithms.md
+    - name: Recommended policy
+      href: policies/recommended.md
+    - name: NistApproved policy
+      href: policies/nist-approved.md
+- name: Diagnostics
+  href: diagnostics.md
 - name: API
   href: api/

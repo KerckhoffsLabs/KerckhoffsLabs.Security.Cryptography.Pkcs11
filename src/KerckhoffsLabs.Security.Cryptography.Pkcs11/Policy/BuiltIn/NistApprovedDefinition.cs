@@ -1,13 +1,37 @@
 using System.Collections.Frozen;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Rules;
 using S = KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoOperations;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 
-/// <summary>The FipsOnly catalogue: its allow-lists, rules, and documented deny list.</summary>
-internal sealed partial class FipsOnlyPolicy
+/// <summary>
+/// The definition of <see cref="CryptoPolicy.NistApproved"/>: only NIST-approved security functions, per a fixed snapshot of NIST guidance
+/// (<see cref="Baseline"/>). Anything not on the list — including vendor-defined mechanisms — is refused.
+/// </summary>
+/// <remarks>
+/// This restricts what the library sends to the token; it does not make an application FIPS 140-3
+/// compliant, which also requires a validated module operating in its approved mode. AES key wrapping is
+/// approved only via KW/KWP (<c>CKM_AES_KEY_WRAP</c>, <c>CKM_AES_KEY_WRAP_KWP</c>) or the GCM/CCM modes;
+/// <c>CKM_AES_KEY_WRAP_PAD</c>, whose padding is vendor-defined, is refused. Other AES modes encrypt and
+/// decrypt data but may not wrap or unwrap keys. ECDH with an existing Montgomery (X25519/X448) key is refused through
+/// <see cref="KeyAgreementKeyRequest"/>, which the session raises with the key's <c>CKA_KEY_TYPE</c>.
+/// Known limits (mirrored in the public <see cref="CryptoPolicy.NistApproved"/> docs): the key sizes and curves
+/// of existing keys, and the ML-DSA / SLH-DSA parameter set behind a pre-hash mechanism, are not inspected. (The KDF inside
+/// <c>CK_ECDH1_DERIVE_PARAMS</c>, judged as a <see cref="KeyAgreementKdfRequest"/> on every ECDH derivation
+/// and KEM, and the PRF inside SP 800-108, HKDF and PBKDF2 parameters <i>are</i> checked — see
+/// the KDF PRF checks in <see cref="NistApprovedWording"/>.) The EC curve is
+/// judged through <see cref="EcKeyGenerationRequest"/> on every <c>CKM_EC_KEY_PAIR_GEN</c> generation,
+/// whichever public entry point it comes through. Raw <c>CKM_RSA_PKCS</c> signing and raw <c>CKM_ECDSA</c>
+/// cannot see which digest the caller pre-computed, so both are approved without checking it.
+/// </remarks>
+internal static class NistApprovedDefinition
 {
+    /// <summary>The NIST publications this table reflects.</summary>
+    internal const string Baseline =
+        "SP 800-131A Rev.2; SP 800-140C Rev.2 / SP 800-140D Rev.2 (CMVP lists of 2026-08-21); FIPS 186-5; SP 800-186; FIPS 203/204/205";
+
     private const S Cipher = S.Encrypt | S.Decrypt | S.Wrap | S.Unwrap;
     private const S Mac = S.Sign | S.Verify;
     private const S Signature = S.Sign | S.Verify;
@@ -17,70 +41,44 @@ internal sealed partial class FipsOnlyPolicy
 
     // HashUseRequest carries whatever CryptoOperation the caller is pre-hashing for; a hash approved by
     // FIPS 180-4 / FIPS 202 is approved regardless of which one (verdict parity with the pre-catalogue
-    // FipsOnlyPolicy.EvaluateHash, which never consulted the operation for these six hashes at all).
+    // NistApproved hash evaluation, which never consulted the operation for these six hashes at all).
     private const S AnyOperation =
         S.Encrypt | S.Decrypt | S.Sign | S.Verify | S.Wrap | S.Unwrap | S.Derive | S.Digest |
         S.GenerateKey | S.GenerateKeyPair | S.Encapsulate | S.Decapsulate;
 
-    /// <summary>
-    /// The catalogue evaluated by <see cref="Evaluate"/>. A mechanism, hash, curve, or KDF absent from
-    /// its <c>Allowed*</c> tables is refused for every operation.
-    /// </summary>
-    internal static readonly PolicyCatalogue Catalogue = BuildCatalogue();
-
-    private static PolicyCatalogue BuildCatalogue() => new()
+    /// <summary>Builds the NistApproved policy.</summary>
+    internal static ComposedCryptoPolicy Create()
     {
-        AllowedMechanisms = BuildAllowedMechanisms(),
-        AllowedVendorMechanisms = FrozenDictionary<ulong, MechanismRule>.Empty,
-        AllowedHashes = BuildAllowedHashes(),
-        AllowedCurves = BuildAllowedCurves(),
-        AllowedKdfs = BuildAllowedKdfs(),
-        AllowedKeyAgreementKeyTypes = new Dictionary<CKK, string>
-        {
-            [CKK.CKK_EC] = "SP 800-56A Rev.3 §5.7.1.2 (ECC CDH over an SP 800-186 prime curve)",
-        }.ToFrozenDictionary(),
-        Rules = new PolicyRules(
-            EvaluateRsaKeyGeneration, EvaluateKeyTemplate, EvaluateKeyMaterialExport,
-            RsaKeyGenerationRationale: "RSA key generation requires a modulus of at least 2048 bits (FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3).",
-            KeyTemplateRationale: "CSPs must not be output in plaintext; a key template with CKA_SENSITIVE=false is refused (FIPS 140-3, ISO/IEC 19790 §7.9).",
-            KeyMaterialExportRationale: "Reading key material off the module in plaintext is not permitted (FIPS 140-3, ISO/IEC 19790 §7.9)."),
-        DocumentedRefusedMechanisms = BuildDocumentedRefusedMechanisms(),
-        DocumentedRefusedHashes = BuildDocumentedRefusedHashes(),
-        DocumentedRefusedCurves = BuildDocumentedRefusedCurves(),
-        DocumentedRefusedKdfs = BuildDocumentedRefusedKdfs(),
-        DocumentedRefusedKeyAgreementKeyTypes = new Dictionary<CKK, DocumentedRefusal>
-        {
-            [CKK.CKK_EC_MONTGOMERY] = new(
-                "SP 800-56A Rev.3 specifies no X25519/X448 scheme and SP 800-186 lists no Montgomery curves, so key agreement with an existing X25519/X448 key has no approval.",
-                "ECDH with a CKK_EC key on a NIST prime curve"),
-        }.ToFrozenDictionary(),
-        // Not DocumentedRefusedPrfsTable: that field is declared later in this file, and C# runs static
-        // field initializers in textual order — referencing it here (from Catalogue's own initializer,
-        // which appears first) would read it before it is assigned. Building it fresh here is only a
-        // cheap dictionary construction and sidesteps the ordering hazard entirely.
-        //
-        // AllowedKdfPrfs, by contrast, safely reads Prfs.Pbkdf2/Prfs.Sp800108/Prfs.Hkdf (the nested
-        // Prfs holder in FipsOnlyPolicy.cs) directly — a nested type's static initializer runs on that
-        // type's own first access, independent of this type's field-declaration order; see
-        // BuildAllowedKdfPrfs' remarks.
-        DocumentedRefusedPrfs = BuildDocumentedRefusedPrfs(),
-        AllowedKdfPrfs = BuildAllowedKdfPrfs(),
-    };
-
-    // --- Rules (RSA key-generation modulus, key template, key-material export) ---
-
-    private static PolicyDecision EvaluateRsaKeyGeneration(RsaKeyGenerationRequest r) =>
-        r.ModulusBits < 2048
-            ? PolicyDecision.Deny($"FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3: RSA-{r.ModulusBits} is below the 2048-bit minimum for key generation.")
-            : PolicyDecision.Allow;
-
-    private static PolicyDecision EvaluateKeyTemplate(KeyTemplateRequest r) =>
-        r.Attributes.Any(a => a.Type == CKA.CKA_SENSITIVE && !a.GetValueAsBool())
-            ? PolicyDecision.Deny("FIPS 140-3 (ISO/IEC 19790 §7.9): CSPs must not be output in plaintext; CKA_SENSITIVE=false is refused.")
-            : PolicyDecision.Allow;
-
-    private static PolicyDecision EvaluateKeyMaterialExport(KeyMaterialExportRequest r) =>
-        PolicyDecision.Deny($"FIPS 140-3 (ISO/IEC 19790 §7.9): reading the {r.Kind} off the module in plaintext is not permitted.");
+        CryptoPolicyBuilder b = CryptoPolicyBuilder.ForBuiltIn("NistApproved")
+            .WithBuiltInReference("CryptoPolicy.NistApproved")
+            .WithDocumentation(PolicyDocumentation.NistApproved)
+            .AllowsOverride(false)
+            .WithRsaKeyGenerationRule(RsaKeyGenerationRule.Minimum(
+                2048,
+                "RSA key generation requires a modulus of at least 2048 bits (FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3).",
+                bits => $"FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3: RSA-{bits} is below the 2048-bit minimum for key generation."))
+            .WithKeyTemplateRule(KeyTemplateRule.RequireSensitive(
+                "CSPs must not be output in plaintext; a key template with CKA_SENSITIVE=false is refused (FIPS 140-3, ISO/IEC 19790 §7.9).",
+                "FIPS 140-3 (ISO/IEC 19790 §7.9): CSPs must not be output in plaintext; CKA_SENSITIVE=false is refused."))
+            .WithSecretExportRule(SecretExportRule.Refuse(
+                "Reading key material off the module in plaintext is not permitted (FIPS 140-3, ISO/IEC 19790 §7.9).",
+                (kind, _) => $"FIPS 140-3 (ISO/IEC 19790 §7.9): reading the {kind} off the module in plaintext is not permitted. " +
+                             $"Keep the secret on the module instead: {SecretExportRule.OnTokenAlternative(kind)}."));
+        foreach ((CKM mechanism, MechanismRule rule) in BuildAllowedMechanisms()) b.AllowRule(mechanism, rule);
+        foreach ((string name, AllowedHash hash) in BuildAllowedHashes()) b.AllowHash(name, hash.Operations, hash.Rationale);
+        foreach ((string oid, string rationale) in BuildAllowedCurves()) b.AllowCurve(oid, rationale);
+        foreach ((CKD kdf, string rationale) in BuildAllowedKdfs()) b.AllowKeyAgreementKdf(kdf, rationale);
+        foreach ((CKM mechanism, DocumentedRefusal refusal) in BuildDocumentedRefusedMechanisms()) b.DocumentRefusedMechanism(mechanism, refusal);
+        foreach ((string hash, DocumentedRefusal refusal) in BuildDocumentedRefusedHashes()) b.DocumentRefusedHash(hash, refusal);
+        foreach ((string oid, DocumentedRefusal refusal) in BuildDocumentedRefusedCurves()) b.DocumentRefusedCurve(oid, refusal);
+        foreach ((CKD kdf, DocumentedRefusal refusal) in BuildDocumentedRefusedKdfs()) b.DocumentRefusedKdf(kdf, refusal);
+        foreach ((string prf, DocumentedRefusal refusal) in BuildDocumentedRefusedPrfs()) b.DocumentRefusedPrf(prf, refusal);
+        b.AllowKeyAgreementKeyType(CKK.CKK_EC, "SP 800-56A Rev.3 §5.7.1.2 (ECC CDH over an SP 800-186 prime curve)");
+        b.DocumentRefusedKeyAgreementKeyType(CKK.CKK_EC_MONTGOMERY, new(
+            "SP 800-56A Rev.3 specifies no key-agreement scheme over Curve25519 or Curve448 (X25519/X448), so key agreement with an existing X25519/X448 key has no approval.",
+            "ECDH with a CKK_EC key on a NIST prime curve"));
+        return b.Build();
+    }
 
     // --- Mechanisms ---
 
@@ -98,10 +96,10 @@ internal sealed partial class FipsOnlyPolicy
         {
             foreach (CKM m in mechanisms) rules[m] = new MechanismRule(S.None, ops, null, citation);
         }
-        void ApproveChecked(S ops, string citation, Func<Mechanism, CryptoOperation, PolicyDecision> check, string checkDescription, params CKM[] mechanisms)
+        void ApproveChecked(S ops, string citation, MechanismCheck check, params CKM[] mechanisms)
         {
             foreach (CKM m in mechanisms)
-                rules[m] = new MechanismRule(ops, S.None, check, citation) { ParameterCheckDescription = checkDescription };
+                rules[m] = new MechanismRule(ops, S.None, check, citation);
         }
 
         // --- AES (SP 800-38A and Addendum, 38B, 38C, 38D, 38E, 38F) ---
@@ -113,10 +111,8 @@ internal sealed partial class FipsOnlyPolicy
             CKM.CKM_AES_OFB, CKM.CKM_AES_CFB8, CKM.CKM_AES_CFB64, CKM.CKM_AES_CFB128, CKM.CKM_AES_CFB1);
         Approve(S.Encrypt | S.Decrypt, "SP 800-38E (storage devices only; key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)",
             CKM.CKM_AES_XTS);
-        ApproveChecked(Cipher, "SP 800-38D / SP 800-38F", CheckGcmTag,
-            "tag, when parameters are given, of 96 to 128 bits (SP 800-38D §5.2.1.2)", CKM.CKM_AES_GCM);
-        ApproveChecked(Cipher, "SP 800-38C / SP 800-38F", CheckCcmMac,
-            "MAC, when parameters are given, of at least 64 bits (SP 800-38C Appendix B.2)", CKM.CKM_AES_CCM);
+        ApproveChecked(Cipher, "SP 800-38D / SP 800-38F", NistApprovedWording.GcmTag, CKM.CKM_AES_GCM);
+        ApproveChecked(Cipher, "SP 800-38C / SP 800-38F", NistApprovedWording.CcmMac, CKM.CKM_AES_CCM);
         // Not CKM_AES_KEY_WRAP_PAD: see its documented refusal.
         Approve(Cipher, "SP 800-38F", CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP);
         Approve(Mac, "SP 800-38B / SP 800-38D", CKM.CKM_AES_CMAC, CKM.CKM_AES_CMAC_GENERAL, CKM.CKM_AES_GMAC);
@@ -153,24 +149,18 @@ internal sealed partial class FipsOnlyPolicy
         foreach (CKM m in (CKM[])[
             CKM.CKM_SHA224_RSA_PKCS_PSS, CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA384_RSA_PKCS_PSS, CKM.CKM_SHA512_RSA_PKCS_PSS,
             CKM.CKM_SHA3_224_RSA_PKCS_PSS, CKM.CKM_SHA3_256_RSA_PKCS_PSS, CKM.CKM_SHA3_384_RSA_PKCS_PSS, CKM.CKM_SHA3_512_RSA_PKCS_PSS])
-            rules[m] = new MechanismRule(Signature, S.None, CheckHashedPss, "FIPS 186-5 §5.4") { ParameterCheckDescription = "the MGF/parameter hash, when given, must be an approved hash" };
+            rules[m] = new MechanismRule(Signature, S.None, NistApprovedWording.HashedPss, "FIPS 186-5 §5.4");
         Legacy(S.Verify, "SP 800-131A Rev.2 §9 (SHA-1 signature generation disallowed)", CKM.CKM_SHA1_RSA_PKCS);
-        rules[CKM.CKM_SHA1_RSA_PKCS_PSS] = new MechanismRule(S.None, S.Verify, CheckHashedPss,
+        rules[CKM.CKM_SHA1_RSA_PKCS_PSS] = new MechanismRule(S.None, S.Verify, NistApprovedWording.LegacySha1HashedPss,
             "SP 800-131A Rev.2 §9 (SHA-1 signature generation disallowed)");
-        rules[CKM.CKM_RSA_PKCS_PSS] = new MechanismRule(Signature, S.None, CheckPss, "FIPS 186-5 §5.4")
-        {
-            ParameterCheckDescription = "requires CkmRsaPkcsPssParams naming an approved hash, with a salt no longer than that hash",
-        };
+        rules[CKM.CKM_RSA_PKCS_PSS] = new MechanismRule(Signature, S.None, NistApprovedWording.RawPss, "FIPS 186-5 §5.4");
         // Raw CKM_RSA_PKCS: RSASSA-PKCS1-v1_5 over a caller-built DigestInfo is approved (FIPS 186-5 §5.4)
         // for Sign/Verify. PKCS#1 v1.5 key transport (Encrypt/Decrypt/Wrap/Unwrap) is disallowed after
         // 2023 (SP 800-131A Rev.2 §6, Table 5; FIPS 140-3 IG D.G grants no legacy-use unwrapping for it).
         // The rationale carries that citation, since an allowed entry's operation denial quotes it.
         rules[CKM.CKM_RSA_PKCS] = new MechanismRule(Signature, S.None, null,
             "FIPS 186-5 §5.4 (signatures only: SP 800-131A Rev.2 §6 / Table 5 disallows PKCS#1 v1.5 key transport after 2023; use CKM_RSA_PKCS_OAEP)");
-        rules[CKM.CKM_RSA_PKCS_OAEP] = new MechanismRule(Cipher, S.None, CheckOaep, "SP 800-56B Rev.2")
-        {
-            ParameterCheckDescription = "requires CkmRsaPkcsOaepParams naming an approved hash",
-        };
+        rules[CKM.CKM_RSA_PKCS_OAEP] = new MechanismRule(Cipher, S.None, NistApprovedWording.Oaep, "SP 800-56B Rev.2");
         Approve(S.GenerateKeyPair, "FIPS 186-5 §A.1", CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
         // --- DSA: verification of existing signatures only (FIPS 186-5 §4) ---
@@ -186,20 +176,17 @@ internal sealed partial class FipsOnlyPolicy
         Approve(Signature, "FIPS 186-5 §7", CKM.CKM_EDDSA);
         Approve(S.GenerateKeyPair, "FIPS 186-5 §A.2 / SP 800-186", CKM.CKM_EC_KEY_PAIR_GEN, CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
         ApproveChecked(S.Derive, "SP 800-56A Rev.3",
-            KeyAgreementParameterChecks.RequireEcdh1DeriveParams, KeyAgreementParameterChecks.Ecdh1DeriveDescription,
+            Ecdh1DeriveParamsCheck.Instance,
             CKM.CKM_ECDH1_DERIVE, CKM.CKM_ECDH1_COFACTOR_DERIVE);
 
         // --- KDFs (SP 800-108r1, SP 800-56C Rev.2, SP 800-132; PRF allow-listed inside each
         // mechanism's parameters, see the KDF PRF checks region) ---
-        ApproveChecked(S.Derive, "SP 800-108r1", CheckSp800108Prf,
-            "requires CkmSp800108KdfParams naming an approved PRF (HMAC over an approved hash, or AES-CMAC)",
+        ApproveChecked(S.Derive, "SP 800-108r1", NistApprovedWording.Sp800108Prf,
             CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF);
-        ApproveChecked(S.Derive, "SP 800-56C Rev.2", CheckHkdfPrf,
-            "requires CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form)",
-            CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+        ApproveChecked(S.Derive, "SP 800-56C Rev.2", NistApprovedWording.HkdfPrf,
+            CKM.CKM_HKDF_DERIVE);
         Approve(S.GenerateKey, "SP 800-56C Rev.2", CKM.CKM_HKDF_KEY_GEN);
-        ApproveChecked(S.GenerateKey | S.Derive, "SP 800-132", CheckPbkdf2Prf,
-            "requires CkmPkcs5Pbkd2Params naming an approved PRF (HMAC-SHA-1/224/256/384/512/512-224/512-256)",
+        ApproveChecked(S.GenerateKey | S.Derive, "SP 800-132", NistApprovedWording.Pbkdf2Prf,
             CKM.CKM_PKCS5_PBKD2);
 
         // --- Post-quantum (FIPS 203 / 204 / 205) ---
@@ -218,14 +205,8 @@ internal sealed partial class FipsOnlyPolicy
             CKM.CKM_HASH_SLH_DSA_SHA3_256, CKM.CKM_HASH_SLH_DSA_SHA3_384, CKM.CKM_HASH_SLH_DSA_SHA3_512,
             CKM.CKM_HASH_SLH_DSA_SHAKE128, CKM.CKM_HASH_SLH_DSA_SHAKE256);
         // The generic pre-hash mechanisms take the hash in CkmHashPqcSignParams; it is checked the same way.
-        rules[CKM.CKM_HASH_ML_DSA] = new MechanismRule(Signature, S.None, CheckPqcPreHash, "FIPS 204 §5.4")
-        {
-            ParameterCheckDescription = "requires CkmHashPqcSignParams naming a pre-hash of at least 128-bit collision strength",
-        };
-        rules[CKM.CKM_HASH_SLH_DSA] = new MechanismRule(Signature, S.None, CheckPqcPreHash, "FIPS 205 §10")
-        {
-            ParameterCheckDescription = "requires CkmHashPqcSignParams naming a pre-hash of at least 128-bit collision strength",
-        };
+        rules[CKM.CKM_HASH_ML_DSA] = new MechanismRule(Signature, S.None, NistApprovedWording.PqcPreHash, "FIPS 204 §5.4");
+        rules[CKM.CKM_HASH_SLH_DSA] = new MechanismRule(Signature, S.None, NistApprovedWording.PqcPreHash, "FIPS 205 §10");
         Approve(S.GenerateKeyPair, "FIPS 203 / 204 / 205",
             CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA_KEY_PAIR_GEN);
 
@@ -258,7 +239,7 @@ internal sealed partial class FipsOnlyPolicy
             "CKM_AES_KEY_WRAP_KWP (RFC 5649) or CKM_AES_KEY_WRAP",
             CKM.CKM_AES_KEY_WRAP_PAD);
         Refuse(
-            "SP 800-186 lists no Montgomery curves; X25519/X448 key generation has no FIPS 186-5 / SP 800-186 approval.",
+            "SP 800-186 specifies Curve25519 and Curve448, but FIPS 186-5 approves them only for EdDSA (Ed25519/Ed448) and SP 800-56A Rev.3 has no X25519/X448 key-agreement scheme, so X25519/X448 key generation has no approval.",
             "CKM_EC_KEY_PAIR_GEN (a NIST prime curve) or CKM_EC_EDWARDS_KEY_PAIR_GEN",
             CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN);
         Refuse(
@@ -341,7 +322,7 @@ internal sealed partial class FipsOnlyPolicy
         var curves = new Dictionary<string, string>(StringComparer.Ordinal);
         const string Rationale = "SP 800-186 §3.2.1.2 / SP 800-131A Rev.2 Table 2 (len(n) >= 224 acceptable)";
 
-        // P-224 is below SecureOnly's 128-bit baseline but approved here: SP 800-186 §3.2.1.2 and
+        // P-224 is below Recommended's 128-bit baseline but approved here: SP 800-186 §3.2.1.2 and
         // SP 800-131A Rev.2 Table 2 (len(n) >= 224 is acceptable).
 #pragma warning disable KLPKCS11007
         curves[Pkcs11ECCurve.NamedCurves.NistP224.Oid!] = Rationale;
@@ -416,17 +397,8 @@ internal sealed partial class FipsOnlyPolicy
         }.ToFrozenDictionary();
     }
 
-    // --- KDF PRFs (documentation only; see the KDF PRF checks region in FipsOnlyPolicy.cs, which
+    // --- KDF PRFs (documentation only; see the KDF PRF checks in NistApprovedWording.cs, which
     // decides the verdict, and DocumentedRefusedPrfs' remarks) ---
-
-    /// <summary>
-    /// PRFs considered and refused inside PBKDF2 / SP 800-108 / HKDF parameters, keyed by the PRF's own
-    /// <c>ToString()</c> (its <c>CKP</c> name for PBKDF2, its <c>CKM</c> name for SP 800-108 / HKDF).
-    /// Documentation only: every one of them is refused because it is absent from the approved sets the
-    /// KDF PRF checks (<see cref="CheckPbkdf2Prf"/>, <see cref="CheckSp800108Prf"/>,
-    /// <see cref="CheckHkdfPrf"/>) apply.
-    /// </summary>
-    private static readonly FrozenDictionary<string, DocumentedRefusal> DocumentedRefusedPrfsTable = BuildDocumentedRefusedPrfs();
 
     private static FrozenDictionary<string, DocumentedRefusal> BuildDocumentedRefusedPrfs()
     {
@@ -440,20 +412,4 @@ internal sealed partial class FipsOnlyPolicy
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    /// <summary>
-    /// Builds <see cref="PolicyCatalogue.AllowedKdfPrfs"/> for the generated catalogue documentation
-    /// — derived directly from <see cref="Prfs.Pbkdf2"/>, <see cref="Prfs.Sp800108"/>
-    /// and <see cref="Prfs.Hkdf"/>, the same sets <see cref="CheckPbkdf2Prf"/>, <see cref="CheckSp800108Prf"/>
-    /// and <see cref="CheckHkdfPrf"/> decide the verdict from — one source of truth, so the documentation
-    /// cannot drift from what is actually enforced. Safe to call from <see cref="BuildCatalogue"/>'s own
-    /// field initializer despite the static-field-ordering hazard documented on <see cref="Prfs"/>: a
-    /// nested type's static initializer runs on that type's own first access here, not in textual order
-    /// with <see cref="FipsOnlyPolicy"/>'s other fields, so there is no "not yet initialized" state to race.
-    /// </summary>
-    private static FrozenDictionary<string, FrozenSet<string>> BuildAllowedKdfPrfs() => new Dictionary<string, FrozenSet<string>>(StringComparer.Ordinal)
-    {
-        ["PBKDF2 (CKM_PKCS5_PBKD2)"] = Prfs.Pbkdf2.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-        ["SP 800-108 (CKM_SP800_108_*_KDF)"] = Prfs.Sp800108.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-        ["HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA)"] = Prfs.Hkdf.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-    }.ToFrozenDictionary(StringComparer.Ordinal);
 }

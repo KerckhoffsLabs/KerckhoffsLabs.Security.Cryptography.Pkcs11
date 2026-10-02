@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // These tests exercise the gated RSAES-PKCS#1 v1.5 / raw-RSA paths on purpose (the runtime
-// SecureOnly policy check is the behaviour under test), so the compile-time warning is suppressed
+// Recommended policy check is the behaviour under test), so the compile-time warning is suppressed
 // for this file only — the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -19,7 +19,7 @@ internal static class SignRsaPkcsTestCases
 {
     /// <summary>
     /// Asserts that RSA PKCS#1 v1.5 signing (CKM_RSA_PKCS) throws
-    /// <see cref="CryptoPolicyViolationException"/> by default (the SecureOnly policy).
+    /// <see cref="CryptoPolicyViolationException"/> by default (the Recommended policy).
     /// </summary>
     internal static void Assert_SignRsaPkcs1V15_GatedByDefault(IPkcs11Backend backend)
     {

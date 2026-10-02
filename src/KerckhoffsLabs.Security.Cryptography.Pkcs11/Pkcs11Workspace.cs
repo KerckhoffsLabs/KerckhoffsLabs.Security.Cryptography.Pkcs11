@@ -32,6 +32,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </remarks>
 public sealed class Pkcs11Workspace : IDisposable
 {
+    private const string AesKeyLengthMessage = "AES key length must be 128, 192, or 256 bits.";
+
     private readonly Pkcs11Session _session;
     private bool _disposed;
 
@@ -51,11 +53,38 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <summary>Internal accessor for the underlying session. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11Session Session => _session;
 
-    /// <summary>Submits <paramref name="request"/> to the workspace's effective policy; throws on denial.</summary>
-    internal void Enforce(PolicyRequest request) => _session.Enforce(request);
+    /// <summary>
+    /// Asks the workspace's effective <see cref="Policy"/> whether it would allow <paramref name="request"/>,
+    /// without throwing or logging. For choosing between alternatives up front — for example a BCL
+    /// adapter picking the first cipher mode the policy accepts.
+    /// </summary>
+    /// <param name="request">The operation to evaluate.</param>
+    /// <returns><see langword="true"/> when the policy allows it.</returns>
+    /// <exception cref="ObjectDisposedException">The workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public bool IsPermitted(PolicyRequest request)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(request);
+        return _session.IsPermitted(request);
+    }
 
-    /// <summary>Evaluates <paramref name="request"/> without throwing or logging.</summary>
-    internal bool IsPermitted(PolicyRequest request) => _session.IsPermitted(request);
+    /// <summary>
+    /// Submits <paramref name="request"/> to the workspace's effective <see cref="Policy"/> and throws
+    /// when it is refused, logging the refusal as every built-in operation does. For code that makes a
+    /// security-relevant choice the token never sees — for example the hash a managed pre-hashing step
+    /// uses before a raw on-token signature — so that choice meets the same policy as the rest.
+    /// </summary>
+    /// <param name="request">The operation to check.</param>
+    /// <exception cref="ObjectDisposedException">The workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The policy refused the request.</exception>
+    public void EnsurePermitted(PolicyRequest request)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(request);
+        _session.Enforce(request);
+    }
 
     /// <summary>
     /// The crypto policy currently enforced by this workspace: the one it was opened with, unless a
@@ -84,7 +113,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="ObjectDisposedException">The workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="policy"/> is null.</exception>
     /// <exception cref="InvalidOperationException">The workspace was opened under a policy whose
-    /// <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.FipsOnly</c>).</exception>
+    /// <see cref="ICryptoPolicy.AllowsOverride"/> is false (for example <c>CryptoPolicy.NistApproved</c>).</exception>
     public IDisposable UsePolicy(ICryptoPolicy policy)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -322,6 +351,48 @@ public sealed class Pkcs11Workspace : IDisposable
     }
 
     /// <summary>
+    /// Runs a password-based KDF on the token and copies its output into <paramref name="destination"/>.
+    /// For a protocol that needs the derived bytes in managed code.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This exports key material.</b> The <see cref="Policy"/> decides it as a
+    /// <see cref="SecretExportRequest"/> of <see cref="SecretExportKind.PasswordKdfOutput"/>,
+    /// which <c>CryptoPolicy.Recommended</c> refuses unless widened for it. When the derived key can stay
+    /// on the token, use <see cref="GenerateKey(Mechanism, ObjectTemplate)"/> with a sensitive template.
+    /// </para>
+    /// <para>
+    /// Only <c>CKM_PKCS5_PBKD2</c> with <see cref="CkmPkcs5Pbkd2Params"/> is supported. The output passes
+    /// through an ephemeral session key the library creates — generic secret, extractable, not
+    /// sensitive, not copyable, no usage — and destroys before this returns, whether it
+    /// succeeds or not. That template is covered by the export decision and not judged again as a key
+    /// template; the mechanism is still judged. On failure, <paramref name="destination"/> is zeroed.
+    /// </para>
+    /// </remarks>
+    /// <param name="mechanism"><c>CKM_PKCS5_PBKD2</c> with its parameters.</param>
+    /// <param name="destination">Receives the derived bytes; its length is the length derived.</param>
+    /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="destination"/> is empty, or <paramref name="mechanism"/> is not <c>CKM_PKCS5_PBKD2</c> with <see cref="CkmPkcs5Pbkd2Params"/>.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the <see cref="Policy"/> refuses the export or the mechanism.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">Thrown if the token does not expose the derived value or produces one of another length.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c>, <c>C_GetAttributeValue</c> or <c>C_DestroyObject</c> call.</exception>
+    public void DeriveAndExportSecret(Mechanism mechanism, Span<byte> destination)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(mechanism);
+        if (destination.IsEmpty)
+            throw new ArgumentException("The buffer must not be empty.", nameof(destination));
+        SecretExportKind kind = SecretExport.Classify(SecretExport.Operation.Generate, mechanism, nameof(mechanism));
+
+        using IDisposable export = SecretExport.Authorize(_session, kind, mechanism.Type, baseKeyClass: null, baseKeyType: null);
+
+        SecretExport.Export(_session, destination.Length,
+            template => _session.GenerateKey(mechanism, template, kind),
+            destination);
+    }
+
+    /// <summary>
     /// Generates a new asymmetric key pair using <c>C_GenerateKeyPair</c> and returns
     /// it as a single <see cref="Pkcs11Key"/> carrying both handles.
     /// </summary>
@@ -420,7 +491,7 @@ public sealed class Pkcs11Workspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (bitLength is not 128 and not 192 and not 256)
-            throw new ArgumentOutOfRangeException(nameof(bitLength), "AES key length must be 128, 192, or 256 bits.");
+            throw new ArgumentOutOfRangeException(nameof(bitLength), AesKeyLengthMessage);
 
         var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .ValueLen(bitLength / 8)
@@ -459,7 +530,7 @@ public sealed class Pkcs11Workspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (bitLength is not 128 and not 192 and not 256)
-            throw new ArgumentOutOfRangeException(nameof(bitLength), "AES key length must be 128, 192, or 256 bits.");
+            throw new ArgumentOutOfRangeException(nameof(bitLength), AesKeyLengthMessage);
 
         var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .ValueLen(bitLength / 8)
@@ -630,17 +701,15 @@ public sealed class Pkcs11Workspace : IDisposable
     /// non-extractable, and non-modifiable — suitable for use with AES-GCM.
     /// </summary>
     /// <remarks>
-    /// <b>The peer's point is not validated here.</b> A raw DER-encoded octet string carries no
-    /// curve identity, so this overload cannot check that <paramref name="peerPublicPoint"/> is on
-    /// the same curve as <paramref name="ecPrivateKey"/> or that it satisfies that curve's equation
-    /// — PKCS#11 does not require the token to check either, and skipping both is the invalid-curve
-    /// / small-subgroup attack (it recovers a token-resident private key one residue at a time).
-    /// The caller is responsible for that validation before calling this overload. Prefer
-    /// <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/>, which validates the
-    /// peer automatically because <see cref="ECParameters"/> carries its own curve.
+    /// When <paramref name="ecPrivateKey"/> is on one of the library's catalog curves, the peer point is
+    /// checked against that curve before it reaches the token, as on every ECDH derivation: it must be an uncompressed point of the curve's field size
+    /// that satisfies the curve equation. PKCS#11 does not require the token to check either, and
+    /// skipping both is the invalid-curve / small-subgroup attack, which recovers a token-resident
+    /// private key one residue at a time. The raw point carries no curve name, so a peer that claims
+    /// another curve cannot be told apart here; the <see cref="ECParameters"/> overload also refuses that.
     /// </remarks>
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
-    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value). Caller-validated — see remarks.</param>
+    /// <param name="peerPublicPoint">The peer's uncompressed public EC point, as a DER OCTET STRING (the full <c>CKA_EC_POINT</c> value) or raw.</param>
     /// <param name="aesBitLength">Derived AES key length in bits — 128, 192, or 256. Default 256.</param>
     /// <param name="kdf">KDF applied to the raw ECDH shared secret before it becomes the derived AES
     /// key's material. Default <see cref="CKD.CKD_SHA256_KDF"/>. <see cref="CKD.CKD_NULL"/> applies no
@@ -651,6 +720,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicPoint"/> is empty, is not an uncompressed point of the curve's field size, or does not satisfy the curve equation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is not on the workspace's <see cref="Policy"/> KDF allow-list (under the default policy this includes <see cref="CKD.CKD_NULL"/> and the SHA-1 / SHA-224 KDFs).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
@@ -663,18 +733,8 @@ public sealed class Pkcs11Workspace : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
         if (aesBitLength is not 128 and not 192 and not 256)
-            throw new ArgumentOutOfRangeException(nameof(aesBitLength), "AES key length must be 128, 192, or 256 bits.");
-        // The KDF allow-list is enforced by the session on the Derive below, as on every ECDH derivation.
-        var p = new CkmEcdh1DeriveParams(kdf, peerPublicPoint);
-        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, p);
-        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
-            .ValueLen(aesBitLength / 8)
-            .Sensitive().NonExtractable()
-            .Encrypt().Decrypt()
-            .OnToken(false)
-            .Attribute(CKA.CKA_MODIFIABLE, false)
-            .Build();
-        return ecPrivateKey.Derive(mechanism, template);
+            throw new ArgumentOutOfRangeException(nameof(aesBitLength), AesKeyLengthMessage);
+        return DeriveSharedSecretEcdhCore(ecPrivateKey, new CkmEcdh1DeriveParams(kdf, peerPublicPoint), aesBitLength, nameof(peerPublicPoint));
     }
 
     /// <summary>
@@ -685,10 +745,9 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <remarks>
     /// Validates <paramref name="peerPublicKey"/> before it reaches the token: it must be on the
     /// same curve as <paramref name="ecPrivateKey"/>, its coordinates must match that curve's field
-    /// size, and the point must satisfy the curve equation — the validation the raw-span overload
-    /// cannot perform, because a DER-encoded octet string carries no curve identity for it to check
-    /// against. See <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/> for
-    /// why that matters (invalid-curve / small-subgroup recovery of the token-resident private key).
+    /// size, and the point must satisfy the curve equation. See
+    /// <see cref="DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/> for why that
+    /// matters (invalid-curve / small-subgroup recovery of the token-resident private key).
     /// </remarks>
     /// <param name="ecPrivateKey">The caller's EC private key (must have <c>CKA_DERIVE=true</c>).</param>
     /// <param name="peerPublicKey">The peer's public key. <see cref="ECParameters.Curve"/> and both coordinates of <see cref="ECParameters.Q"/> are required.</param>
@@ -702,11 +761,10 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <returns>The derived AES key.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the workspace has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="ecPrivateKey"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate, its curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is not on the workspace's <see cref="Policy"/> KDF allow-list (under the default policy this includes <see cref="CKD.CKD_NULL"/> and the SHA-1 / SHA-224 KDFs).</exception>
-    /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="peerPublicKey"/>'s curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown if <paramref name="ecPrivateKey"/>'s <c>CKA_EC_PARAMS</c> cannot be read.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
         ECParameters peerPublicKey,
@@ -715,15 +773,25 @@ public sealed class Pkcs11Workspace : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
-        byte[] x = peerPublicKey.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(peerPublicKey));
-        byte[] y = peerPublicKey.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(peerPublicKey));
+        if (aesBitLength is not 128 and not 192 and not 256)
+            throw new ArgumentOutOfRangeException(nameof(aesBitLength), AesKeyLengthMessage);
 
-        const string op = "Pkcs11Workspace.DeriveSharedSecretEcdh";
-        Pkcs11ECCurve localCurve = Pkcs11PublicKeyView.GetCurve(ecPrivateKey, op);
-        Pkcs11PublicKeyView.ValidatePeerEcKey(localCurve, peerPublicKey, x, y, op);
+        return DeriveSharedSecretEcdhCore(ecPrivateKey, CkmEcdh1DeriveParams.ForPeer(kdf, peerPublicKey), aesBitLength, nameof(peerPublicKey));
+    }
 
-        byte[] peerPoint = Algorithms.ECDiffieHellmanPkcs11.EncodeEcPointAsDerOctetString(x, y);
-        return DeriveSharedSecretEcdh(ecPrivateKey, peerPoint, aesBitLength, kdf);
+    // Both overloads: the session enforces the KDF allow-list and checks the peer against the key's
+    // curve on the derive below, as on every ECDH derivation.
+    private static Pkcs11Key DeriveSharedSecretEcdhCore(Pkcs11Key ecPrivateKey, CkmEcdh1DeriveParams parameters, int aesBitLength, string peerParamName)
+    {
+        var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, parameters);
+        using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .ValueLen(aesBitLength / 8)
+            .Sensitive().NonExtractable()
+            .Encrypt().Decrypt()
+            .OnToken(false)
+            .Attribute(CKA.CKA_MODIFIABLE, false)
+            .Build();
+        return ecPrivateKey.DeriveCore(mechanism, template, peerParamName);
     }
 
     /// <summary>

@@ -1,10 +1,10 @@
-# FipsOnly policy catalogue
+# NistApproved policy catalogue
 
-*Generated from the `FipsOnly` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
+*Generated from the `NistApproved` policy catalogue by `PolicyCatalogueMarkdown`; do not edit by hand.*
 
 An allow-list of NIST-approved security functions, per a fixed snapshot of NIST guidance (see the baseline below). Anything not on the list below — including every vendor-defined mechanism — is denied by default, whether or not it also appears in the documented deny list further down this page.
 
-> **`FipsOnly` is not a FIPS 140-3 certification.** It restricts what this library sends to the token; FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
+> **`NistApproved` is not a FIPS 140-3 certification.** It restricts what this library sends to the token; FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
 >
 > Baseline: SP 800-131A Rev.2; SP 800-140C Rev.2 / SP 800-140D Rev.2 (CMVP lists of 2026-08-21); FIPS 186-5; SP 800-186; FIPS 203/204/205
 
@@ -134,7 +134,6 @@ An allow-list of NIST-approved security functions, per a fixed snapshot of NIST 
 
 | Mechanism | Operations | Legacy operations | Parameter check | Rationale |
 |---|---|---|---|---|
-| `CKM_HKDF_DATA` | Derive | — | requires CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form) | SP 800-56C Rev.2 |
 | `CKM_HKDF_DERIVE` | Derive | — | requires CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form) | SP 800-56C Rev.2 |
 | `CKM_HKDF_KEY_GEN` | GenerateKey | — | — | SP 800-56C Rev.2 |
 | `CKM_PKCS5_PBKD2` | Derive, GenerateKey | — | requires CkmPkcs5Pbkd2Params naming an approved PRF (HMAC-SHA-1/224/256/384/512/512-224/512-256) | SP 800-132 |
@@ -260,7 +259,7 @@ Per-family allow-list for the PRF named inside PBKDF2 / SP 800-108 / HKDF mechan
 
 | KDF family | Allowed PRFs |
 |---|---|
-| HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA) | `CKM_SHA224`, `CKM_SHA224_HMAC`, `CKM_SHA256`, `CKM_SHA256_HMAC`, `CKM_SHA384`, `CKM_SHA384_HMAC`, `CKM_SHA3_224`, `CKM_SHA3_224_HMAC`, `CKM_SHA3_256`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512`, `CKM_SHA3_512_HMAC`, `CKM_SHA512`, `CKM_SHA512_224`, `CKM_SHA512_224_HMAC`, `CKM_SHA512_256`, `CKM_SHA512_256_HMAC`, `CKM_SHA512_HMAC`, `CKM_SHA_1`, `CKM_SHA_1_HMAC` |
+| HKDF (CKM_HKDF_DERIVE) | `CKM_SHA224`, `CKM_SHA224_HMAC`, `CKM_SHA256`, `CKM_SHA256_HMAC`, `CKM_SHA384`, `CKM_SHA384_HMAC`, `CKM_SHA3_224`, `CKM_SHA3_224_HMAC`, `CKM_SHA3_256`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512`, `CKM_SHA3_512_HMAC`, `CKM_SHA512`, `CKM_SHA512_224`, `CKM_SHA512_224_HMAC`, `CKM_SHA512_256`, `CKM_SHA512_256_HMAC`, `CKM_SHA512_HMAC`, `CKM_SHA_1`, `CKM_SHA_1_HMAC` |
 | PBKDF2 (CKM_PKCS5_PBKD2) | `CKP_PKCS5_PBKD2_HMAC_SHA1`, `CKP_PKCS5_PBKD2_HMAC_SHA224`, `CKP_PKCS5_PBKD2_HMAC_SHA256`, `CKP_PKCS5_PBKD2_HMAC_SHA384`, `CKP_PKCS5_PBKD2_HMAC_SHA512`, `CKP_PKCS5_PBKD2_HMAC_SHA512_224`, `CKP_PKCS5_PBKD2_HMAC_SHA512_256` |
 | SP 800-108 (CKM_SP800_108_*_KDF) | `CKM_AES_CMAC`, `CKM_SHA224_HMAC`, `CKM_SHA256_HMAC`, `CKM_SHA384_HMAC`, `CKM_SHA3_224_HMAC`, `CKM_SHA3_256_HMAC`, `CKM_SHA3_384_HMAC`, `CKM_SHA3_512_HMAC`, `CKM_SHA512_224_HMAC`, `CKM_SHA512_256_HMAC`, `CKM_SHA512_HMAC`, `CKM_SHA_1_HMAC` |
 
@@ -272,7 +271,7 @@ Beyond the allow-lists above, three rules apply: the modulus rule to RSA key-pai
 |---|---|
 | RSA key-pair generation modulus | RSA key generation requires a modulus of at least 2048 bits (FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3). |
 | Key template (`CKA_SENSITIVE`) | CSPs must not be output in plaintext; a key template with CKA_SENSITIVE=false is refused (FIPS 140-3, ISO/IEC 19790 §7.9). |
-| Key-material export | Reading key material off the module in plaintext is not permitted (FIPS 140-3, ISO/IEC 19790 §7.9). |
+| Secret export | Reading key material off the module in plaintext is not permitted (FIPS 140-3, ISO/IEC 19790 §7.9). |
 
 ## Documented refusals
 
@@ -322,7 +321,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | Mechanism | Reason | Alternative |
 |---|---|---|
-| `CKM_EC_MONTGOMERY_KEY_PAIR_GEN` | SP 800-186 lists no Montgomery curves; X25519/X448 key generation has no FIPS 186-5 / SP 800-186 approval. | CKM_EC_KEY_PAIR_GEN (a NIST prime curve) or CKM_EC_EDWARDS_KEY_PAIR_GEN |
+| `CKM_EC_MONTGOMERY_KEY_PAIR_GEN` | SP 800-186 specifies Curve25519 and Curve448, but FIPS 186-5 approves them only for EdDSA (Ed25519/Ed448) and SP 800-56A Rev.3 has no X25519/X448 key-agreement scheme, so X25519/X448 key generation has no approval. | CKM_EC_KEY_PAIR_GEN (a NIST prime curve) or CKM_EC_EDWARDS_KEY_PAIR_GEN |
 
 #### Legacy ciphers
 
@@ -446,7 +445,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 | Key type | Reason | Alternative |
 |---|---|---|
-| `CKK_EC_MONTGOMERY` | SP 800-56A Rev.3 specifies no X25519/X448 scheme and SP 800-186 lists no Montgomery curves, so key agreement with an existing X25519/X448 key has no approval. | ECDH with a CKK_EC key on a NIST prime curve |
+| `CKK_EC_MONTGOMERY` | SP 800-56A Rev.3 specifies no key-agreement scheme over Curve25519 or Curve448 (X25519/X448), so key agreement with an existing X25519/X448 key has no approval. | ECDH with a CKK_EC key on a NIST prime curve |
 
 ### KDF PRFs
 
@@ -459,7 +458,7 @@ Documentation only: every item below is refused because it is absent from the al
 
 - The size and curve of keys already on the token are not inspected: using an existing key that would not pass generation (a short RSA modulus, a weak curve, …) is not refused. Only an ECDH key's type is checked.
 - Raw `CKM_ECDSA`, `CKM_RSA_PKCS` and `CKM_RSA_PKCS_PSS` sign a caller-computed digest; the hash that produced it is not visible to the policy.
-- FipsOnly restricts what this library sends to the token. FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
+- NistApproved restricts what this library sends to the token. FIPS 140-3 compliance also requires a validated cryptographic module operating in its approved mode.
 
 ---
 

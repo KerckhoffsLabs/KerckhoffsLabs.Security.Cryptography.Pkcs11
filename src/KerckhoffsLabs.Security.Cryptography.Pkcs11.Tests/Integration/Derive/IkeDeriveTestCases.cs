@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
-// The IKE PRFs are documented refusals under SecureOnly (protocol-specific; opt in after review), so every
+// The IKE PRFs are documented refusals under Recommended (protocol-specific; opt in after review), so every
 // case here opts in with UsePolicy(CryptoPolicy.AllowInsecure) and the analyzer warning is expected.
 #pragma warning disable KLPKCS11009
 
@@ -247,7 +247,7 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
-        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        // The IKE PRFs are not on the Recommended allow-list (documented refusal).
         using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
@@ -275,7 +275,7 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
-        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        // The IKE PRFs are not on the Recommended allow-list (documented refusal).
         using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] gxy = RandomNumberGenerator.GetBytes(24);
@@ -312,7 +312,7 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
-        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        // The IKE PRFs are not on the Recommended allow-list (documented refusal).
         using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] extraData = RandomNumberGenerator.GetBytes(20);
@@ -341,7 +341,7 @@ internal static class IkeDeriveTestCases
         backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
         using var workspace = backend.OpenWorkspace();
-        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        // The IKE PRFs are not on the Recommended allow-list (documented refusal).
         using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] seedData = RandomNumberGenerator.GetBytes(24);
@@ -378,7 +378,7 @@ internal static class IkeDeriveTestCases
     {
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         using var workspace = backend.OpenWorkspace();
-        // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
+        // The IKE PRFs are not on the Recommended allow-list (documented refusal).
         using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);

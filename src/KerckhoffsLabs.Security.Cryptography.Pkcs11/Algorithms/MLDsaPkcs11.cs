@@ -141,13 +141,12 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
 
     /// <inheritdoc/>
     /// <remarks>Reads <c>CKA_VALUE</c> from the public-key handle (FIPS 204 standard public-key encoding).</remarks>
-    /// <exception cref="Pkcs11Exception">No public handle reachable or <c>CKA_VALUE</c> is sensitive.</exception>
+    /// <exception cref="CryptographicException">The token does not expose <c>CKA_VALUE</c>, or it has the wrong length.</exception>
     protected override void ExportMLDsaPublicKeyCore(Span<byte> destination)
     {
         using var attrs = _key.GetAttributeValue(CKA.CKA_VALUE);
         if (attrs[0].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "MLDsaPkcs11.ExportMLDsaPublicKey (CKA_VALUE unreadable)");
+            throw new CryptographicException("The token does not expose this key's public value (CKA_VALUE).");
 
         byte[] value = attrs[0].GetValueAsByteArray();
         CopyExact(value, destination, Algorithm.PublicKeySizeInBytes);
@@ -200,8 +199,8 @@ public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
     private static void CopyExact(byte[] source, Span<byte> destination, int expectedLength)
     {
         if (source.Length != expectedLength)
-            throw Pkcs11Exception.Create(CKR.CKR_GENERAL_ERROR,
-                $"Token returned {source.Length}-byte buffer; expected {expectedLength} bytes for this parameter set.");
+            throw new CryptographicException(
+                $"The token returned {source.Length} bytes; this parameter set uses {expectedLength}.");
         source.CopyTo(destination);
     }
 }

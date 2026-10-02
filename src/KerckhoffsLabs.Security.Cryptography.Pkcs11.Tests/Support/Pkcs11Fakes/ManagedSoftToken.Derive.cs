@@ -21,6 +21,10 @@ internal sealed partial class ManagedSoftToken
         byte[] derived;
         switch ((CKM)(ulong)mechanism.Mechanism)
         {
+            case CKM.CKM_ECDH1_DERIVE when IsMontgomeryKey((ulong)baseKey, out byte[] privateValue):
+                derived = DeriveMontgomeryStandIn(privateValue, ref mechanism);
+                break;
+
             case CKM.CKM_ECDH1_DERIVE:
                 if (!_asymKeys.TryGetValue((ulong)baseKey, out var alg) || alg is not ECDsa ec)
                     return CKR.CKR_KEY_HANDLE_INVALID;
@@ -48,6 +52,70 @@ internal sealed partial class ManagedSoftToken
         attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
+    }
+
+    // CKM_PKCS5_PBKD2 (PKCS#5 v2.1 / RFC 8018) over the BCL, from CK_PKCS5_PBKD2_PARAMS2 with a
+    // specified salt — the only shape the wrapper emits.
+    private static bool TryDerivePbkdf2(ref CK_MECHANISM mech, int length, out byte[] derived)
+    {
+        derived = [];
+        var p = UnmanagedMemory.Read<CK_PKCS5_PBKD2_PARAMS2>(mech.Parameter);
+        if ((ulong)p.SaltSource != CKZ.CKZ_SALT_SPECIFIED)
+            return false;
+        HashAlgorithmName hash;
+        switch ((CKP)(ulong)p.Prf)
+        {
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA1: hash = HashAlgorithmName.SHA1; break;
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA256: hash = HashAlgorithmName.SHA256; break;
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA384: hash = HashAlgorithmName.SHA384; break;
+            case CKP.CKP_PKCS5_PBKD2_HMAC_SHA512: hash = HashAlgorithmName.SHA512; break;
+            default: return false;
+        }
+
+        // An empty buffer marshals as a NULL pointer.
+        byte[] password = (ulong)p.PasswordLen == 0 ? [] : UnmanagedMemory.Read(p.Password, (int)p.PasswordLen);
+        byte[] salt = (ulong)p.SaltSourceDataLen == 0 ? [] : UnmanagedMemory.Read(p.SaltSourceData, (int)p.SaltSourceDataLen);
+        try
+        {
+            derived = Rfc2898DeriveBytes.Pbkdf2(password, salt, (int)(ulong)p.Iterations, hash, length);
+            return true;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(password);
+        }
+    }
+
+    private bool IsMontgomeryKey(ulong handle, out byte[] privateValue)
+    {
+        privateValue = [];
+        if (!_objects.TryGetValue(handle, out var obj)
+            || !obj.TryGetValue((ulong)CKA.CKA_KEY_TYPE, out var type) || ToUlong(type) != (ulong)CKK.CKK_EC_MONTGOMERY)
+            return false;
+        privateValue = obj.TryGetValue((ulong)CKA.CKA_VALUE, out var v) ? v : [];
+        return true;
+    }
+
+    // NOT X25519: the BCL has no Montgomery curve. A stand-in that is a deterministic function of the private
+    // value and the peer's u-coordinate, of the u-coordinate's length, and all zeros for an all-zero
+    // u-coordinate (as a low-order point gives) — enough to test the library's plumbing and checks. The real
+    // agreement is tested against Kryoptic and NSS (X25519ReadBackTestCases).
+    /// <summary>The peer public value of the last Montgomery derivation, exactly as the token received it.</summary>
+    public byte[]? LastMontgomeryPeer { get; private set; }
+
+    /// <summary>When set, a Montgomery derivation returns an all-zero secret whatever the peer.</summary>
+    public bool MontgomeryReturnsZeros { get; set; }
+
+    private byte[] DeriveMontgomeryStandIn(byte[] privateValue, ref CK_MECHANISM mech)
+    {
+        var p = UnmanagedMemory.Read<CK_ECDH1_DERIVE_PARAMS>(mech.Parameter);
+        byte[] u = UnmanagedMemory.Read(p.PublicData, (int)p.PublicDataLen);
+        LastMontgomeryPeer = u;
+        if (u.Length > 2 && u[0] == 0x04 && u[1] == u.Length - 2)
+            u = u[2..];
+        if (MontgomeryReturnsZeros || u.All(b => b == 0))
+            return new byte[u.Length];
+        return SHA512.HashData([.. privateValue, .. u])[..u.Length];
     }
 
     // CKM_ECDH1_DERIVE with CKD_NULL: the raw shared secret Z (x-coordinate) is the keying material.

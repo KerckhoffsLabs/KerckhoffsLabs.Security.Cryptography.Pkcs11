@@ -190,7 +190,7 @@ public sealed class Pkcs11SessionTests
     }
 
     // === Secure-defaults gate (the session's crypto policy check) ============================
-    // SecureOnlyPolicy's evaluation is mechanism-based, not operation-based, so routing every
+    // Recommended's evaluation is mechanism-based, not operation-based, so routing every
     // insecure mechanism through Digest exercises each rejection arm.
 
     [Theory]

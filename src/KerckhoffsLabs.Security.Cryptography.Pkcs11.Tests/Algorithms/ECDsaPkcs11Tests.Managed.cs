@@ -194,22 +194,22 @@ public sealed class ECDsaPkcs11Tests_Managed
         }
     });
 
-    // === SHA-1 under FipsOnly: legacy verification allowed, signing refused ===
-    // FipsOnly allows the SHA-1 hash only for Verify (SP 800-131A legacy use). Every BCL verification
+    // === SHA-1 under NistApproved: legacy verification allowed, signing refused ===
+    // NistApproved allows the SHA-1 hash only for Verify (SP 800-131A legacy use). Every BCL verification
     // entry point must report its own direction to the policy, so a legacy signature verifies through
     // whichever overload the caller picks. The signature is made over a managed SHA-1 digest with
-    // SignHash (raw CKM_ECDSA, which carries no hash choice), because FipsOnly refuses SHA-1 SignData.
+    // SignHash (raw CKM_ECDSA, which carries no hash choice), because NistApproved refuses SHA-1 SignData.
 
-    private static void WithFipsOnlyEcDsa(Action<ECDsaPkcs11> body)
+    private static void WithNistApprovedEcDsa(Action<ECDsaPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library, CryptoPolicy.FipsOnly);
+        using var workspace = ManagedToken.OpenWorkspace(library, CryptoPolicy.NistApproved);
         using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ec = new ECDsaPkcs11(key);
         body(ec);
     }
 
-    private static readonly byte[] LegacyData = Encoding.UTF8.GetBytes("legacy signature, verified under FipsOnly");
+    private static readonly byte[] LegacyData = Encoding.UTF8.GetBytes("legacy signature, verified under NistApproved");
 
     public static TheoryData<string> Sha1VerifyEntryPoints() =>
     [
@@ -218,7 +218,7 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     [Theory]
     [MemberData(nameof(Sha1VerifyEntryPoints))]
-    public void VerifyData_Sha1_UnderFipsOnly_VerifiesALegacySignature(string entryPoint) => WithFipsOnlyEcDsa(ec =>
+    public void VerifyData_Sha1_UnderNistApproved_VerifiesALegacySignature(string entryPoint) => WithNistApprovedEcDsa(ec =>
     {
         byte[] digest = SHA1.HashData(LegacyData);
         byte[] p1363 = ec.SignHash(digest);
@@ -243,7 +243,7 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     [Theory]
     [MemberData(nameof(Sha1VerifyEntryPoints))]
-    public void VerifyData_Sha1_UnderSecureOnly_IsStillRefused(string entryPoint) => WithEcDsa("P-256", (_, ec) =>
+    public void VerifyData_Sha1_UnderRecommended_IsStillRefused(string entryPoint) => WithEcDsa("P-256", (_, ec) =>
     {
         byte[] signature = new byte[64];
         HashAlgorithmName sha1 = HashAlgorithmName.SHA1;
@@ -264,7 +264,7 @@ public sealed class ECDsaPkcs11Tests_Managed
     });
 
     [Fact]
-    public void SignData_Sha1_UnderFipsOnly_IsRefusedOnEveryEntryPoint() => WithFipsOnlyEcDsa(ec =>
+    public void SignData_Sha1_UnderNistApproved_IsRefusedOnEveryEntryPoint() => WithNistApprovedEcDsa(ec =>
     {
         HashAlgorithmName sha1 = HashAlgorithmName.SHA1;
         using var stream = new MemoryStream(LegacyData);
@@ -278,7 +278,7 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     // The Stream signing overloads now hash for themselves; they must still produce signatures that verify.
     [Fact]
-    public void SignData_Stream_Sha256_RoundTripsInBothFormats() => WithFipsOnlyEcDsa(ec =>
+    public void SignData_Stream_Sha256_RoundTripsInBothFormats() => WithNistApprovedEcDsa(ec =>
     {
         HashAlgorithmName sha256 = HashAlgorithmName.SHA256;
         using var stream = new MemoryStream(LegacyData);
@@ -291,7 +291,7 @@ public sealed class ECDsaPkcs11Tests_Managed
 
     // The overloads this class overrides validate the hash name the way the BCL does, naming the parameter.
     [Fact]
-    public void OverriddenOverloads_EmptyHashName_ThrowArgumentExceptionNamingHashAlgorithm() => WithFipsOnlyEcDsa(ec =>
+    public void OverriddenOverloads_EmptyHashName_ThrowArgumentExceptionNamingHashAlgorithm() => WithNistApprovedEcDsa(ec =>
     {
         var empty = new HashAlgorithmName("");
 

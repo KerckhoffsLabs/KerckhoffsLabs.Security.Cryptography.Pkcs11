@@ -1,3 +1,5 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
 /// <summary>The built-in <see cref="ICryptoPolicy"/> instances.</summary>
@@ -16,10 +18,10 @@ public static class CryptoPolicy
     /// </summary>
     /// <remarks>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its rationale, the
-    /// documented deny list, and <c>SecureOnlyPolicy.WithAllowedMechanism(...)</c>, the extension point for
-    /// adding a reviewed mechanism — is at <c>docs/policies/secure-only.md</c> in the repository.
+    /// documented deny list — is at <c>docs/policies/recommended.md</c> in the repository. To allow a reviewed
+    /// mechanism, derive your own policy: <c>CryptoPolicy.Recommended.ToBuilder("MyApp").AllowMechanism(...).Build()</c>.
     /// </remarks>
-    public static SecureOnlyPolicy SecureOnly { get; } = new SecureOnlyPolicy();
+    public static ComposedCryptoPolicy Recommended { get; } = RecommendedDefinition.Create();
 
     /// <summary>
     /// Allows only NIST-approved security functions (SP 800-131A / SP 800-140C, FIPS 186-5, FIPS 203–205),
@@ -41,7 +43,7 @@ public static class CryptoPolicy
     /// </para>
     /// <para>
     /// The full generated catalogue — every allowed mechanism/hash/curve/KDF/PRF with its NIST citation and
-    /// the documented deny list — is at <c>docs/policies/fips-only.md</c> in the repository.
+    /// the documented deny list — is at <c>docs/policies/nist-approved.md</c> in the repository.
     /// </para>
     /// <para>Known limits — the policy judges requests, not the token's contents:</para>
     /// <list type="bullet">
@@ -51,13 +53,30 @@ public static class CryptoPolicy
     /// <item><description>Raw <c>CKM_RSA_PKCS</c> signing and raw <c>CKM_ECDSA</c> cannot see which digest the
     /// caller pre-computed, so the digest is not checked.</description></item>
     /// </list>
+    /// <para>
+    /// A policy derived with <see cref="ComposedCryptoPolicy.ToBuilder(string)"/> gets its own name and keeps
+    /// <see cref="ICryptoPolicy.AllowsOverride"/> false unless changed; <c>CryptoPolicy.NistApproved</c> itself never changes.
+    /// </para>
     /// </remarks>
-    public static ICryptoPolicy FipsOnly { get; } = new FipsOnlyPolicy();
+    public static ComposedCryptoPolicy NistApproved { get; } = NistApprovedDefinition.Create();
 
     /// <summary>
-    /// Allows everything, including broken algorithms and plaintext key export. For legacy interop only;
-    /// prefer a scoped <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a
-    /// whole workspace under it.
+    /// Allows everything, including broken algorithms and plaintext key export. For legacy interop only.
     /// </summary>
+    /// <remarks>
+    /// Reach for the narrowest opt-in first. Most single needs have one on the builder that
+    /// <c>Recommended.ToBuilder(name)</c> returns, and every other Recommended rule keeps applying:
+    /// <list type="bullet">
+    /// <item><description>a legacy mechanism — <see cref="CryptoPolicyBuilder.AllowMechanism(Common.CKM, IEnumerable{CryptoOperation}, string, MechanismCheck?)"/>;</description></item>
+    /// <item><description>reading one kind of secret off the token (the <c>…AndExportSecret</c> operations on
+    /// <see cref="Pkcs11Key"/> and <see cref="Pkcs11Workspace"/>, and the byte-returning ECDH, ML-KEM and
+    /// KDF adapters built on them) — <see cref="CryptoPolicyBuilder.AllowSecretExport"/>;</description></item>
+    /// <item><description>a weak EC curve — <see cref="CryptoPolicyBuilder.AllowCurve(Pkcs11ECCurve, string)"/>;</description></item>
+    /// <item><description>a key-agreement KDF — <see cref="CryptoPolicyBuilder.AllowKeyAgreementKdf"/>.</description></item>
+    /// </list>
+    /// When <c>AllowInsecure</c> is still needed, prefer a scoped
+    /// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a whole workspace
+    /// under it.
+    /// </remarks>
     public static ICryptoPolicy AllowInsecure { get; } = new AllowInsecurePolicy();
 }

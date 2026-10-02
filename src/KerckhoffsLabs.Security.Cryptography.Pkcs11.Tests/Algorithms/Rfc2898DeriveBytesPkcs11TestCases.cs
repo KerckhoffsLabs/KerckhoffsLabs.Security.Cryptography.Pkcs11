@@ -35,7 +35,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
 
     // Constructing the instance makes no token call, so it needs no opt-in. Every GetBytes does: it
-    // reads the derived value back off the token, which the default SecureOnly policy refuses. The
+    // reads the derived value back off the token, which the default Recommended policy refuses. The
     // opt-in therefore has to span the calls to GetBytes, not just construction — callers that derive
     // hold a UsePolicy(CryptoPolicy.AllowInsecure) lease for the instance's whole use.
     private static Rfc2898DeriveBytesPkcs11 NewKdf(Pkcs11Workspace workspace, HashAlgorithmName hash, byte[]? password = null, byte[]? salt = null, int iterations = Iterations)
@@ -256,12 +256,12 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     // === Pbkdf2Key (on-token result, no export) ===========================================
 
     // No UsePolicy lease anywhere below: keeping the derived key on the token is what makes PBKDF2
-    // usable under the default SecureOnly policy.
-    internal static void Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(IPkcs11Backend backend)
+    // usable under the default Recommended policy.
+    internal static void Assert_Pbkdf2Key_UnderRecommended_MatchesBcl(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_PKCS5_PBKD2, CKM.CKM_AES_GCM);
         using var workspace = OpenWorkspace(backend);
-        Assert.Same(CryptoPolicy.SecureOnly, workspace.Policy);
+        Assert.Same(CryptoPolicy.Recommended, workspace.Policy);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
 
         using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
@@ -294,7 +294,7 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
         Assert.False(attrs[1].GetValueAsBool());
     }
 
-    internal static void Assert_Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly(IPkcs11Backend backend)
+    internal static void Assert_Pbkdf2Key_Sha1Prf_IsRefusedUnderRecommended(IPkcs11Backend backend)
     {
         using var workspace = OpenWorkspace(backend);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();

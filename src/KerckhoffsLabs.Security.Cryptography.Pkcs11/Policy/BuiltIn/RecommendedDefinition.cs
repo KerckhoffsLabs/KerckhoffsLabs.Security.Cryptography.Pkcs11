@@ -1,12 +1,16 @@
 using System.Collections.Frozen;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Catalogue;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.Rules;
 using S = KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoOperations;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.BuiltIn;
 
-// The SecureOnly catalogue: its allow-lists, rules, and documented deny list.
-public sealed partial class SecureOnlyPolicy
+/// <summary>
+/// The definition of <see cref="CryptoPolicy.Recommended"/>: its allow-lists, rules and documented deny list,
+/// assembled with <see cref="CryptoPolicyBuilder"/>.
+/// </summary>
+internal static class RecommendedDefinition
 {
     private const S Cipher = S.Encrypt | S.Decrypt | S.Wrap | S.Unwrap;
     private const S Signature = S.Sign | S.Verify;
@@ -17,68 +21,50 @@ public sealed partial class SecureOnlyPolicy
         S.Encrypt | S.Decrypt | S.Sign | S.Verify | S.Wrap | S.Unwrap | S.Derive | S.Digest |
         S.GenerateKey | S.GenerateKeyPair | S.Encapsulate | S.Decapsulate;
 
-    /// <summary>
-    /// The built-in SecureOnly catalogue. A mechanism, hash, curve, or KDF absent from its
-    /// <c>Allowed*</c> tables is refused for every operation.
-    /// </summary>
-    private static readonly PolicyCatalogue DefaultCatalogue = BuildCatalogue();
+    /// <summary>Appended to an unlisted-mechanism denial from Recommended and every policy built from it.</summary>
+    /// <param name="policy">The policy that refused, so a derived policy's hint names it.</param>
+    internal static string UnlistedMechanismHint(PolicyIdentity policy) =>
+        $"If you have reviewed it, add it with {policy.WideningCall("AllowMechanism(...)")}.";
 
-    private static PolicyCatalogue BuildCatalogue() => new()
+    /// <summary>Builds the Recommended policy.</summary>
+    internal static ComposedCryptoPolicy Create()
     {
-        AllowedMechanisms = BuildAllowedMechanisms(),
-        AllowedVendorMechanisms = FrozenDictionary<ulong, MechanismRule>.Empty,
-        AllowedHashes = BuildAllowedHashes(),
-        AllowedCurves = BuildAllowedCurves(),
-        AllowedKdfs = BuildAllowedKdfs(),
-        AllowedKeyAgreementKeyTypes = new Dictionary<CKK, string>
-        {
-            [CKK.CKK_EC] = "ECDH over a Weierstrass curve (SP 800-56A Rev.3); the curve allow-list applies when the key is generated.",
-            [CKK.CKK_EC_MONTGOMERY] = "X25519 / X448 (RFC 7748).",
-        }.ToFrozenDictionary(),
-        Rules = new PolicyRules(
-            EvaluateRsaKeyGeneration, EvaluateKeyTemplate, EvaluateKeyMaterialExport,
-            RsaKeyGenerationRationale: "RSA key generation requires a modulus of at least 2048 bits (NIST SP 800-131A Rev.2).",
-            KeyTemplateRationale: "A key template with CKA_SENSITIVE=false is refused; non-extractable (CKA_EXTRACTABLE=false) stays the default.",
-            KeyMaterialExportRationale: "Reading secret key material off the token in the clear is refused; wrap it under a KEK instead."),
-        DocumentedRefusedMechanisms = BuildDocumentedRefusedMechanisms(),
-        DocumentedRefusedHashes = BuildDocumentedRefusedHashes(),
-        DocumentedRefusedCurves = BuildDocumentedRefusedCurves(),
-        DocumentedRefusedKdfs = BuildDocumentedRefusedKdfs(),
-        DocumentedRefusedKeyAgreementKeyTypes = FrozenDictionary<CKK, DocumentedRefusal>.Empty,
-        // Not DocumentedRefusedPrfsTable: that field is declared later in this file, and C# runs static
-        // field initializers in textual order — referencing it here (from DefaultCatalogue's own
-        // initializer, which appears first) would read it before it is assigned. Building it fresh here
-        // is only a cheap dictionary construction and sidesteps the ordering hazard entirely.
-        //
-        // AllowedKdfPrfs, by contrast, safely reads Prfs.Pbkdf2/Prfs.Sp800108/Prfs.Hkdf (the nested
-        // Prfs holder in SecureOnlyPolicy.cs) directly — a nested type's static initializer runs on that
-        // type's own first access, independent of this type's field-declaration order; see
-        // BuildAllowedKdfPrfs' remarks.
-        DocumentedRefusedPrfs = BuildDocumentedRefusedPrfs(),
-        AllowedKdfPrfs = BuildAllowedKdfPrfs(),
-    };
+        // Only a false CKA_SENSITIVE is refused (KeyTemplateRule.RequireSensitive): an extractable key can
+        // still be wrapped — exported encrypted under a KEK — which is the standard way to back up and
+        // transport keys. Non-extractable remains the default: the session's secure key defaults set
+        // CKA_EXTRACTABLE to false when the caller says nothing.
+        CryptoPolicyBuilder b = CryptoPolicyBuilder.ForBuiltIn("Recommended")
+            .WithBuiltInReference("CryptoPolicy.Recommended")
+            .WithDocumentation(PolicyDocumentation.Recommended)
+            .AllowsOverride(true)
+            .WithUnlistedMechanismHint(UnlistedMechanismHint)
+            .WithLegacyUseHint($"For legacy interop, see {DiagnosticIds.LegacyAlgorithmsUrl}.")
+            .WithRsaKeyGenerationRule(RsaKeyGenerationRule.Minimum(
+                2048,
+                "RSA key generation requires a modulus of at least 2048 bits (NIST SP 800-131A Rev.2).",
+                bits => $"RSA-{bits} is below the NIST SP 800-131A 2048-bit minimum; generate a key of at least 2048 bits."))
+            .WithKeyTemplateRule(KeyTemplateRule.RequireSensitive(
+                "A key template with CKA_SENSITIVE=false is refused; non-extractable (CKA_EXTRACTABLE=false) stays the default.",
+                "Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token. " +
+                "Leave CKA_SENSITIVE true to keep the key on the token; to read a derived or shared secret back, use " +
+                "Pkcs11Key.DeriveAndExportSecret / EncapsulateAndExportSecret / DecapsulateAndExportSecret or " +
+                "Pkcs11Workspace.DeriveAndExportSecret, which the policy decides as a narrow secret export."))
+            // Names the on-token path that avoids the export, then the narrow opt-in for a caller who needs it.
+            .WithSecretExportRule(SecretExportRule.Refuse());
+        foreach ((CKM mechanism, MechanismRule rule) in BuildAllowedMechanisms()) b.AllowRule(mechanism, rule);
+        foreach ((string name, AllowedHash hash) in BuildAllowedHashes()) b.AllowHash(name, hash.Operations, hash.Rationale);
+        foreach ((string oid, string rationale) in BuildAllowedCurves()) b.AllowCurve(oid, rationale);
+        foreach ((CKD kdf, string rationale) in BuildAllowedKdfs()) b.AllowKeyAgreementKdf(kdf, rationale);
+        foreach ((CKM mechanism, DocumentedRefusal refusal) in BuildDocumentedRefusedMechanisms()) b.DocumentRefusedMechanism(mechanism, refusal);
+        foreach ((string hash, DocumentedRefusal refusal) in BuildDocumentedRefusedHashes()) b.DocumentRefusedHash(hash, refusal);
+        foreach ((string oid, DocumentedRefusal refusal) in BuildDocumentedRefusedCurves()) b.DocumentRefusedCurve(oid, refusal);
+        foreach ((CKD kdf, DocumentedRefusal refusal) in BuildDocumentedRefusedKdfs()) b.DocumentRefusedKdf(kdf, refusal);
+        foreach ((string prf, DocumentedRefusal refusal) in BuildDocumentedRefusedPrfs()) b.DocumentRefusedPrf(prf, refusal);
+        b.AllowKeyAgreementKeyType(CKK.CKK_EC, "ECDH over a Weierstrass curve (SP 800-56A Rev.3); the curve allow-list applies when the key is generated.");
+        b.AllowKeyAgreementKeyType(CKK.CKK_EC_MONTGOMERY, "X25519 / X448 (RFC 7748).");
+        return b.Build();
+    }
 
-    // --- Rules (RSA key-generation modulus, key template, key-material export) ---
-
-    private static PolicyDecision EvaluateRsaKeyGeneration(RsaKeyGenerationRequest r) =>
-        r.ModulusBits < 2048
-            ? PolicyDecision.Deny($"RSA-{r.ModulusBits} is below the NIST SP 800-131A 2048-bit minimum; generate a key of at least 2048 bits.")
-            : PolicyDecision.Allow;
-
-    // Only a false CKA_SENSITIVE is refused. A true CKA_EXTRACTABLE is not: an extractable key can still
-    // be wrapped — exported encrypted under a KEK — which is the standard way to back up and transport
-    // keys, and PKCS#11 requires the attribute for it. The value still never leaves in the clear, which is
-    // what CKA_SENSITIVE governs and what this refuses. Non-extractable remains the default: the session's
-    // secure key defaults set CKA_EXTRACTABLE to false when the caller says nothing.
-    private static PolicyDecision EvaluateKeyTemplate(KeyTemplateRequest r) =>
-        r.Attributes.Any(a => a.Type == CKA.CKA_SENSITIVE && !a.GetValueAsBool())
-            ? PolicyDecision.Deny("Creating a key with CKA_SENSITIVE=false would create a non-sensitive key whose value can be read off the token.")
-            : PolicyDecision.Allow;
-
-    private static PolicyDecision EvaluateKeyMaterialExport(KeyMaterialExportRequest r) =>
-        PolicyDecision.Deny(
-            $"Reading the {r.Kind} off the token violates the non-extractable-by-default posture. " +
-            "Keep the secret on the token (Pkcs11Key.EncapsulateKey / DecapsulateKey / Derive to a sensitive key).");
 
     // --- Mechanisms ---
 
@@ -92,17 +78,15 @@ public sealed partial class SecureOnlyPolicy
         {
             foreach (CKM m in mechanisms) rules[m] = new MechanismRule(ops, S.None, null, rationale);
         }
-        void AllowChecked(S ops, string rationale, Func<Mechanism, CryptoOperation, PolicyDecision> check, string checkDescription, params CKM[] mechanisms)
+        void AllowChecked(S ops, string rationale, MechanismCheck check, params CKM[] mechanisms)
         {
             foreach (CKM m in mechanisms)
-                rules[m] = new MechanismRule(ops, S.None, check, rationale) { ParameterCheckDescription = checkDescription };
+                rules[m] = new MechanismRule(ops, S.None, check, rationale);
         }
 
         // --- AES ---
-        AllowChecked(Cipher, "Authenticated encryption (AES-GCM).", CheckGcmTag,
-            "tag, when parameters are given, of at least 96 bits", CKM.CKM_AES_GCM);
-        AllowChecked(Cipher, "Authenticated encryption (AES-CCM).", CheckCcmMac,
-            "MAC, when parameters are given, of at least 64 bits", CKM.CKM_AES_CCM);
+        AllowChecked(Cipher, "Authenticated encryption (AES-GCM).", RecommendedWording.GcmTag, CKM.CKM_AES_GCM);
+        AllowChecked(Cipher, "Authenticated encryption (AES-CCM).", RecommendedWording.CcmMac, CKM.CKM_AES_CCM);
         Allow(Cipher, "Standard AES key wrapping (RFC 3394 / RFC 5649, SP 800-38F).",
             CKM.CKM_AES_KEY_WRAP, CKM.CKM_AES_KEY_WRAP_KWP);
         Allow(Cipher,
@@ -131,12 +115,10 @@ public sealed partial class SecureOnlyPolicy
             CKM.CKM_SHA3_256_KEY_GEN, CKM.CKM_SHA3_384_KEY_GEN, CKM.CKM_SHA3_512_KEY_GEN);
 
         // --- RSA signatures ---
-        AllowChecked(Signature, "RSASSA-PSS with a SHA-2 / SHA-3 hash.", CheckHashedPss,
-            "parameters, when given, must be CkmRsaPkcsPssParams naming SHA-256 or stronger, with a salt no longer than that hash",
+        AllowChecked(Signature, "RSASSA-PSS with a SHA-2 / SHA-3 hash.", RecommendedWording.HashedPss,
             CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA384_RSA_PKCS_PSS, CKM.CKM_SHA512_RSA_PKCS_PSS,
             CKM.CKM_SHA3_256_RSA_PKCS_PSS, CKM.CKM_SHA3_384_RSA_PKCS_PSS, CKM.CKM_SHA3_512_RSA_PKCS_PSS);
-        AllowChecked(Signature, "RSASSA-PSS over a caller-computed digest.", CheckPss,
-            "requires CkmRsaPkcsPssParams naming SHA-256 or stronger, with a salt no longer than that hash",
+        AllowChecked(Signature, "RSASSA-PSS over a caller-computed digest.", RecommendedWording.RawPss,
             CKM.CKM_RSA_PKCS_PSS);
         Allow(Signature,
             "RSASSA-PKCS1-v1_5 signatures with a SHA-2 / SHA-3 hash: FIPS 186-5-approved and required for JWT RS256, TLS 1.2, X.509 and code-signing interop.",
@@ -144,8 +126,7 @@ public sealed partial class SecureOnlyPolicy
             CKM.CKM_SHA3_256_RSA_PKCS, CKM.CKM_SHA3_384_RSA_PKCS, CKM.CKM_SHA3_512_RSA_PKCS);
 
         // --- RSA encryption and key generation ---
-        AllowChecked(Cipher | S.Encapsulate | S.Decapsulate, "RSAES-OAEP key transport (also as a PKCS#11 v3.2 KEM).", CheckOaep,
-            "requires CkmRsaPkcsOaepParams naming SHA-256 or stronger",
+        AllowChecked(Cipher | S.Encapsulate | S.Decapsulate, "RSAES-OAEP key transport (also as a PKCS#11 v3.2 KEM).", RecommendedWording.Oaep,
             CKM.CKM_RSA_PKCS_OAEP);
         Allow(S.GenerateKeyPair, "RSA key generation (modulus of at least 2048 bits, see the rules).", CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
@@ -156,7 +137,7 @@ public sealed partial class SecureOnlyPolicy
         Allow(S.GenerateKeyPair, "EC key generation (the curve allow-list applies).", CKM.CKM_EC_KEY_PAIR_GEN);
         AllowChecked(S.Derive | S.Encapsulate | S.Decapsulate,
             "ECDH key agreement (the key-agreement KDF allow-list applies), also as a PKCS#11 v3.2 KEM.",
-            KeyAgreementParameterChecks.RequireEcdh1DeriveParams, KeyAgreementParameterChecks.Ecdh1DeriveDescription,
+            Ecdh1DeriveParamsCheck.Instance,
             CKM.CKM_ECDH1_DERIVE, CKM.CKM_ECDH1_COFACTOR_DERIVE);
         Allow(Signature, "EdDSA (Ed25519 / Ed448, RFC 8032).", CKM.CKM_EDDSA);
         Allow(S.GenerateKeyPair, "Edwards (Ed25519 / Ed448) and Montgomery (X25519 / X448) key generation.",
@@ -173,22 +154,18 @@ public sealed partial class SecureOnlyPolicy
             CKM.CKM_HASH_SLH_DSA_SHA256, CKM.CKM_HASH_SLH_DSA_SHA384, CKM.CKM_HASH_SLH_DSA_SHA512,
             CKM.CKM_HASH_SLH_DSA_SHA3_256, CKM.CKM_HASH_SLH_DSA_SHA3_384, CKM.CKM_HASH_SLH_DSA_SHA3_512,
             CKM.CKM_HASH_SLH_DSA_SHAKE128, CKM.CKM_HASH_SLH_DSA_SHAKE256);
-        AllowChecked(Signature, "HashML-DSA (FIPS 204) / HashSLH-DSA (FIPS 205) with a caller-chosen pre-hash.", CheckPqcPreHash,
-            "requires CkmHashPqcSignParams naming a pre-hash of at least 256 bits",
+        AllowChecked(Signature, "HashML-DSA (FIPS 204) / HashSLH-DSA (FIPS 205) with a caller-chosen pre-hash.", RecommendedWording.PqcPreHash,
             CKM.CKM_HASH_ML_DSA, CKM.CKM_HASH_SLH_DSA);
         Allow(S.GenerateKeyPair, "ML-KEM / ML-DSA / SLH-DSA key generation (FIPS 203 / 204 / 205).",
             CKM.CKM_ML_KEM_KEY_PAIR_GEN, CKM.CKM_ML_DSA_KEY_PAIR_GEN, CKM.CKM_SLH_DSA_KEY_PAIR_GEN);
 
         // --- KDFs (PRF allow-listed inside each mechanism's parameters, see the KDF PRF checks region) ---
-        AllowChecked(S.Derive, "SP 800-108 key derivation.", CheckSp800108Prf,
-            "requires CkmSp800108KdfParams naming an allowed PRF (CKM_SHA256/384/512_HMAC, CKM_SHA3_256/384/512_HMAC, or CKM_AES_CMAC)",
+        AllowChecked(S.Derive, "SP 800-108 key derivation.", RecommendedWording.Sp800108Prf,
             CKM.CKM_SP800_108_COUNTER_KDF, CKM.CKM_SP800_108_FEEDBACK_KDF, CKM.CKM_SP800_108_DOUBLE_PIPELINE_KDF);
-        AllowChecked(S.Derive, "HKDF (RFC 5869 / SP 800-56C).", CheckHkdfPrf,
-            "requires CkmHkdfParams naming an allowed PRF (CKM_SHA256/384/512 or CKM_SHA3_256/384/512, hash or _HMAC form)",
-            CKM.CKM_HKDF_DERIVE, CKM.CKM_HKDF_DATA);
+        AllowChecked(S.Derive, "HKDF (RFC 5869 / SP 800-56C).", RecommendedWording.HkdfPrf,
+            CKM.CKM_HKDF_DERIVE);
         Allow(S.GenerateKey, "HKDF salt / key generation.", CKM.CKM_HKDF_KEY_GEN);
-        AllowChecked(S.GenerateKey | S.Derive, "PBKDF2 (RFC 8018 / SP 800-132) password-based key derivation.", CheckPbkdf2Prf,
-            "requires CkmPkcs5Pbkd2Params naming an allowed PRF (CKP_PKCS5_PBKD2_HMAC_SHA256, _SHA384, _SHA512, or _SHA512_256)",
+        AllowChecked(S.GenerateKey | S.Derive, "PBKDF2 (RFC 8018 / SP 800-132) password-based key derivation.", RecommendedWording.Pbkdf2Prf,
             CKM.CKM_PKCS5_PBKD2);
 
         return rules.ToFrozenDictionary();
@@ -279,7 +256,7 @@ public sealed partial class SecureOnlyPolicy
             CKM.CKM_SHA3_224_KEY_DERIVE, CKM.CKM_SHA3_256_KEY_DERIVE, CKM.CKM_SHA3_384_KEY_DERIVE, CKM.CKM_SHA3_512_KEY_DERIVE,
             CKM.CKM_SHAKE_128_KEY_DERIVE, CKM.CKM_SHAKE_256_KEY_DERIVE);
         Refuse("Protocol-specific; IPsec stacks should opt in explicitly.",
-            "CryptoPolicy.SecureOnly.WithAllowedMechanism(...) after review",
+            "an explicit AllowMechanism(...) opt-in after review",
             CKM.CKM_IKE_PRF_DERIVE, CKM.CKM_IKE1_PRF_DERIVE, CKM.CKM_IKE1_EXTENDED_DERIVE, CKM.CKM_IKE2_PRF_PLUS_DERIVE);
 
         // --- Broken, deprecated or truncated hashes ---
@@ -446,17 +423,8 @@ public sealed partial class SecureOnlyPolicy
         return refused.ToFrozenDictionary();
     }
 
-    // --- KDF PRFs (documentation only; see the KDF PRF checks region in SecureOnlyPolicy.cs, which
+    // --- KDF PRFs (documentation only; see the KDF PRF checks in RecommendedWording.cs, which
     // decides the verdict, and DocumentedRefusedPrfs' remarks) ---
-
-    /// <summary>
-    /// PRFs considered and refused inside PBKDF2 / SP 800-108 / HKDF parameters, keyed by the PRF's own
-    /// <c>ToString()</c> (its <c>CKP</c> name for PBKDF2, its <c>CKM</c> name for SP 800-108 / HKDF).
-    /// Documentation only: every one of them is refused because it is absent from the allow-lists the
-    /// KDF PRF checks (<see cref="CheckPbkdf2Prf"/>, <see cref="CheckSp800108Prf"/>,
-    /// <see cref="CheckHkdfPrf"/>) apply.
-    /// </summary>
-    private static readonly FrozenDictionary<string, DocumentedRefusal> DocumentedRefusedPrfsTable = BuildDocumentedRefusedPrfs();
 
     private static FrozenDictionary<string, DocumentedRefusal> BuildDocumentedRefusedPrfs()
     {
@@ -479,20 +447,4 @@ public sealed partial class SecureOnlyPolicy
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    /// <summary>
-    /// Builds <see cref="PolicyCatalogue.AllowedKdfPrfs"/> for the generated catalogue documentation
-    /// — derived directly from <see cref="Prfs.Pbkdf2"/>, <see cref="Prfs.Sp800108"/>
-    /// and <see cref="Prfs.Hkdf"/>, the same sets <see cref="CheckPbkdf2Prf"/>, <see cref="CheckSp800108Prf"/>
-    /// and <see cref="CheckHkdfPrf"/> decide the verdict from — one source of truth, so the documentation
-    /// cannot drift from what is actually enforced. Safe to call from <see cref="BuildCatalogue"/>'s own
-    /// field initializer despite the static-field-ordering hazard documented on <see cref="Prfs"/>: a
-    /// nested type's static initializer runs on that type's own first access here, not in textual order
-    /// with <see cref="SecureOnlyPolicy"/>'s other fields, so there is no "not yet initialized" state to race.
-    /// </summary>
-    private static FrozenDictionary<string, FrozenSet<string>> BuildAllowedKdfPrfs() => new Dictionary<string, FrozenSet<string>>(StringComparer.Ordinal)
-    {
-        ["PBKDF2 (CKM_PKCS5_PBKD2)"] = Prfs.Pbkdf2.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-        ["SP 800-108 (CKM_SP800_108_*_KDF)"] = Prfs.Sp800108.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-        ["HKDF (CKM_HKDF_DERIVE / CKM_HKDF_DATA)"] = Prfs.Hkdf.Select(prf => prf.ToString()).ToFrozenSet(StringComparer.Ordinal),
-    }.ToFrozenDictionary(StringComparer.Ordinal);
 }

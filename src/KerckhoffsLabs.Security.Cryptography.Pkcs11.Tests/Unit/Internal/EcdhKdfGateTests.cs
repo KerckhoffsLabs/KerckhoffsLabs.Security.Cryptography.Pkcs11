@@ -86,7 +86,7 @@ public sealed class EcdhKdfGateTests
         Assert.Equal(1, fake.Calls);
     }
 
-    // CKD_SHA224_KDF is refused by SecureOnly but approved by FipsOnly (SP 800-56C): the verdict is the
+    // CKD_SHA224_KDF is refused by Recommended but approved by NistApproved (SP 800-56C): the verdict is the
     // policy's, not a fixed list in the session.
     [Fact]
     public void TheKdfVerdictFollowsThePolicy()
@@ -97,7 +97,7 @@ public sealed class EcdhKdfGateTests
         Assert.Equal(0, secure.Calls);
 
         var fips = new RecordingFake();
-        using (var session = new Pkcs11Session(fips, sessionId: 1, policy: CryptoPolicy.FipsOnly))
+        using (var session = new Pkcs11Session(fips, sessionId: 1, policy: CryptoPolicy.NistApproved))
             Derive(session, Ecdh(CKD.CKD_SHA224_KDF));
         Assert.Equal(1, fips.Calls);
 
@@ -109,11 +109,11 @@ public sealed class EcdhKdfGateTests
 
     // Raw bytes would hide the KDF from the policy, so the restrictive policies require the typed params.
     [Theory]
-    [InlineData("SecureOnly")]
-    [InlineData("FipsOnly")]
+    [InlineData("Recommended")]
+    [InlineData("NistApproved")]
     public void UntypedParameters_AreRefused(string policyName)
     {
-        ICryptoPolicy policy = policyName == "FipsOnly" ? CryptoPolicy.FipsOnly : CryptoPolicy.SecureOnly;
+        ICryptoPolicy policy = policyName == "NistApproved" ? CryptoPolicy.NistApproved : CryptoPolicy.Recommended;
         var fake = new RecordingFake();
         using var session = new Pkcs11Session(fake, sessionId: 1, policy: policy);
 

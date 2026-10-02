@@ -8,12 +8,12 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Security;
 
 [Collection("SoftHsm")]
-public sealed class FipsOnlyPolicyTests_SoftHsm(SoftHsmBackendFixture f)
+public sealed class NistApprovedPolicyTests_SoftHsm(SoftHsmBackendFixture f)
 {
     private readonly SoftHsmBackendFixture _backend = f;
 
     private Pkcs11Workspace OpenFips() =>
-        _backend.Library.OpenWorkspaceWithPin(_backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span), CryptoPolicy.FipsOnly);
+        _backend.Library.OpenWorkspaceWithPin(_backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span), CryptoPolicy.NistApproved);
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void AesGcm_RoundTrips()
@@ -50,7 +50,7 @@ public sealed class FipsOnlyPolicyTests_SoftHsm(SoftHsmBackendFixture f)
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Encrypt(new Mechanism(CKM.CKM_CHACHA20_POLY1305), [1]));
 
-        Assert.Equal("FipsOnly", ex.PolicyName);
+        Assert.Equal("NistApproved", ex.PolicyName);
         Assert.Equal(CKM.CKM_CHACHA20_POLY1305, ex.Mechanism);
     }
 
@@ -63,6 +63,6 @@ public sealed class FipsOnlyPolicyTests_SoftHsm(SoftHsmBackendFixture f)
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Encrypt(new Mechanism(CKM.CKM_RSA_PKCS), [1]));
 
-        Assert.Equal("FipsOnly", ex.PolicyName);
+        Assert.Equal("NistApproved", ex.PolicyName);
     }
 }

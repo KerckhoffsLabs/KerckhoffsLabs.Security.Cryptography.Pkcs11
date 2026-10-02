@@ -95,6 +95,9 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// <summary>The PRF hash mechanism (typically a <c>CKM_*_HMAC</c> variant, or the bare hash), for policy evaluation.</summary>
     internal CKM PrfHashMechanism => _prfHashMechanism;
 
+    /// <summary>Whether the salt is the value of an on-token key (<see cref="WithSaltKey"/>).</summary>
+    internal bool HasSaltKey => _saltType == HkdfSaltType.Key;
+
     /// <inheritdoc/>
     internal override object BuildMarshalable(MechanismParameterScope scope)
     {

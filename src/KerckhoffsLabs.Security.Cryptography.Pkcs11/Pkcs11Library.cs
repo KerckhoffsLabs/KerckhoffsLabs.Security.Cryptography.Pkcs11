@@ -67,7 +67,15 @@ public sealed class Pkcs11Library : IDisposable
     /// query this, so it is learned the first time <see cref="Algorithms.MLKemPkcs11"/> decapsulates
     /// against this token and reused thereafter. <c>null</c> until probed; constant for a given module.
     /// </summary>
-    internal bool? MlKemDecapsulateOmitsValueLen { get; set; }
+    internal bool? MlKemDecapsulateOmitsValueLen
+    {
+        get => Volatile.Read(ref _mlKemDecapsulateOmitsValueLen) switch { 1 => false, 2 => true, _ => null };
+        set => Volatile.Write(ref _mlKemDecapsulateOmitsValueLen, value switch { false => 1, true => 2, null => 0 });
+    }
+
+    // 0 = not probed, 1 = keeps CKA_VALUE_LEN, 2 = omits it. An int, not a bool?, so sessions on other threads
+    // read and publish it atomically.
+    private int _mlKemDecapsulateOmitsValueLen;
 
     /// <summary>
     /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/>.
@@ -424,7 +432,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
     /// <param name="pin">The PIN. The workspace does not retain the PIN past construction.</param>
     /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
@@ -460,7 +468,7 @@ public sealed class Pkcs11Library : IDisposable
     /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
     /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
@@ -493,7 +501,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </summary>
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing spaces).</param>
     /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
-    /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
+    /// <see cref="CryptoPolicy.Recommended"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>

@@ -267,11 +267,11 @@ public sealed class Pkcs11SessionLifecycleTests
     public void UsePolicy_RoundTrips()
     {
         var s = NewSession();
-        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        Assert.Same(CryptoPolicy.Recommended, s.Policy);
         var insecure = s.UsePolicy(CryptoPolicy.AllowInsecure);
         Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
         insecure.Dispose();
-        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        Assert.Same(CryptoPolicy.Recommended, s.Policy);
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public sealed class Pkcs11SessionLifecycleTests
         }
 
         // Restored to gated after the scope.
-        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        Assert.Same(CryptoPolicy.Recommended, s.Policy);
         var gatedAgain = new Mechanism(CKM.CKM_DES_KEY_GEN);
         Assert.Throws<CryptoPolicyViolationException>(() => s.GenerateKey(gatedAgain, []));
     }
@@ -302,17 +302,17 @@ public sealed class Pkcs11SessionLifecycleTests
     public void UsePolicy_NestsLifo()
     {
         var s = NewSession();
-        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        Assert.Same(CryptoPolicy.Recommended, s.Policy);
         using (s.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
             using (s.UsePolicy(CryptoPolicy.AllowInsecure))
                 Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
             // Inner lease restores to its captured "previous" (CryptoPolicy.AllowInsecure), not to
-            // CryptoPolicy.SecureOnly.
+            // CryptoPolicy.Recommended.
             Assert.Same(CryptoPolicy.AllowInsecure, s.Policy);
         }
-        Assert.Same(CryptoPolicy.SecureOnly, s.Policy);
+        Assert.Same(CryptoPolicy.Recommended, s.Policy);
     }
 
     [Fact]

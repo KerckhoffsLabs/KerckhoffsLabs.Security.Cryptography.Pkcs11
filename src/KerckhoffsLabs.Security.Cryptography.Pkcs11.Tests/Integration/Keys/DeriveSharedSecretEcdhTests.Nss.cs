@@ -65,4 +65,36 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
         Assert.Throws<ArgumentNullException>(
             () => workspace.DeriveSharedSecretEcdh(null!, new byte[1]));
     }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void X25519_TwoParties_ReadBackTheSameSecret()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "NSS", "PKCS11_TEST_EXPECT_NSS");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_TwoParties_ReadBackTheSameSecret(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void X25519_KnownAnswer()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "NSS", "PKCS11_TEST_EXPECT_NSS");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_X25519KnownAnswer(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void X448_KnownAnswer()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "NSS", "PKCS11_TEST_EXPECT_NSS");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_X448KnownAnswer(workspace);
+    }
+
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
+    public void X25519_LowOrderPeer_IsRefused()
+    {
+        X25519ReadBackTestCases.RequireX25519(_backend.Supports(CKM.CKM_EC_MONTGOMERY_KEY_PAIR_GEN) && _backend.Supports(CKM.CKM_ECDH1_DERIVE), "NSS", "PKCS11_TEST_EXPECT_NSS");
+        using var workspace = OpenWorkspace();
+        X25519ReadBackTestCases.Assert_LowOrderPeer_IsRefused(workspace);
+    }
 }

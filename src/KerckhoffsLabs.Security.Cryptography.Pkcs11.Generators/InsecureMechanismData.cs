@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 /// </summary>
 /// <remarks>
 /// Deliberately free of any Roslyn type: the library's test project reads these sets to pin them
-/// against <c>SecureOnlyPolicy</c>'s documented refusals, and touching a type
+/// against <c>CryptoPolicy.Recommended</c>'s documented refusals, and touching a type
 /// that derived from <c>DiagnosticAnalyzer</c> would drag the compiler assemblies into the test host.
 /// The analyzer cannot simply reference the library's <c>CKM</c> enum — it targets netstandard2.0 and
 /// referencing the library would be a cycle — so this list is a transcription, and the parity tests
@@ -16,7 +16,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
 public static class InsecureMechanismData
 {
     /// <summary>
-    /// The default <c>SecureOnly</c> policy's documented refusals, minus the RSA-encryption pair covered
+    /// The default <c>Recommended</c> policy's documented refusals, minus the RSA-encryption pair covered
     /// by KLPKCS11008.
     /// </summary>
     /// <remarks>
@@ -24,7 +24,7 @@ public static class InsecureMechanismData
     /// policy also denies every mechanism it has not reviewed (vendor mechanisms included); those carry
     /// no warning here, since "not reviewed" is not a finding about the mechanism.
     /// <para>
-    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>SecureOnlyPolicy</c> denies it only without
+    /// Deliberately excludes <c>CKM_RSA_PKCS_OAEP</c>: <c>CryptoPolicy.Recommended</c> denies it only without
     /// <c>CkmRsaPkcsOaepParams</c> or with a hash outside its allowed set (SHA-256/384/512, SHA-512/256,
     /// SHA3-256/384/512) — a mechanism-*parameter* condition no static analyzer here can evaluate (the
     /// type alone is used just as often with a safe hash and must not be flagged). The runtime policy
@@ -37,7 +37,7 @@ public static class InsecureMechanismData
         "CKM_SHA1_RSA_PKCS_PSS",
         // Not cryptographically broken (FIPS 180-4-approved, just a truncated SHA-256), but gated
         // like SHA-1: no HashAlgorithmName constant in the BCL, no benefit over SHA-256 on
-        // equal-cost hardware (SecureOnlyPolicy documents the refusal).
+        // equal-cost hardware (Recommended documents the refusal).
         "CKM_SHA224_RSA_PKCS",
         "CKM_SHA224_RSA_PKCS_PSS",
         "CKM_ECDSA_SHA224",

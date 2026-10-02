@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
@@ -15,15 +16,33 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     private readonly byte[] _publicDataBytes;
     private readonly byte[] _sharedDataBytes;
     private readonly CKD _kdf;
+    private readonly Pkcs11ECCurve? _peerCurve;
 
     /// <summary>The key derivation function applied to the shared secret, as the crypto policy sees it.</summary>
     internal CKD Kdf => _kdf;
+
+    /// <summary>The peer's public point as passed to the token; empty for <see cref="ForEncapsulation"/>.</summary>
+    internal ReadOnlySpan<byte> PublicData => _publicDataBytes;
+
+    /// <summary>
+    /// The curve the peer's key says it is on, when built by <see cref="ForPeer"/> from a key that names
+    /// one; <see langword="null"/> when only the point is known.
+    /// </summary>
+    internal Pkcs11ECCurve? PeerCurve => _peerCurve;
+
+    /// <summary>The same parameters with <paramref name="publicData"/> as the peer public value.</summary>
+    internal CkmEcdh1DeriveParams WithPublicData(ReadOnlySpan<byte> publicData) =>
+        new(_kdf, publicData.ToArray(), _sharedDataBytes, default, _peerCurve);
 
     /// <summary>
     /// Initializes ECDH1-derive parameters for <c>C_DeriveKey</c>.
     /// </summary>
     /// <param name="kdf">Key derivation function (typically <see cref="CKD.CKD_SHA256_KDF"/> or stronger). Use <see cref="CKD.CKD_NULL"/> only if the caller will derive separately.</param>
-    /// <param name="peerPublicPoint">DER-encoded OCTET STRING of the peer's public EC point (the full <c>CKA_EC_POINT</c> value).</param>
+    /// <param name="peerPublicPoint">
+    /// The peer's public key: for a <c>CKK_EC</c> key, its EC point (the full <c>CKA_EC_POINT</c> value, or the raw
+    /// uncompressed point); for an X25519 / X448 <c>CKK_EC_MONTGOMERY</c> key, its u-coordinate (32 / 56 bytes, raw
+    /// as RFC 7748 encodes it, or DER OCTET STRING-wrapped).
+    /// </param>
     /// <param name="sharedData">Optional shared data to mix into the KDF; pass <c>default</c> for none.</param>
     /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicPoint"/> is empty.</exception>
     public CkmEcdh1DeriveParams(CKD kdf, ReadOnlySpan<byte> peerPublicPoint, ReadOnlySpan<byte> sharedData = default)
@@ -45,15 +64,78 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     public static CkmEcdh1DeriveParams ForEncapsulation(CKD kdf, ReadOnlySpan<byte> sharedData = default) =>
         new(kdf, [], sharedData.IsEmpty ? [] : sharedData.ToArray(), default);
 
+    /// <summary>
+    /// Builds ECDH1-derive parameters for <c>C_DeriveKey</c> from the peer's public key as the BCL
+    /// represents it, encoding its point the way PKCS#11 expects (a DER OCTET STRING wrapping the
+    /// uncompressed point <c>04 ‖ X ‖ Y</c>).
+    /// </summary>
+    /// <remarks>
+    /// When <paramref name="peerPublicKey"/> names its curve, it is kept with the point, and every
+    /// ECDH derivation refuses a peer whose curve is not the local key's. The point itself is always
+    /// checked against the local key's curve before it reaches the token.
+    /// </remarks>
+    /// <param name="kdf">Key derivation function applied to the shared secret.</param>
+    /// <param name="peerPublicKey">The peer's public key. Both coordinates of <see cref="ECParameters.Q"/> are required and must have the same length.</param>
+    /// <param name="sharedData">Optional shared data to mix into the KDF; pass <c>default</c> for none.</param>
+    /// <returns>Parameters carrying the encoded peer point.</returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="peerPublicKey"/> has no X or Y coordinate, the two differ in length or are longer than any supported curve's, or its curve OID is not a valid object identifier.</exception>
+    public static CkmEcdh1DeriveParams ForPeer(CKD kdf, ECParameters peerPublicKey, ReadOnlySpan<byte> sharedData = default)
+    {
+        byte[] x = peerPublicKey.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(peerPublicKey));
+        byte[] y = peerPublicKey.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(peerPublicKey));
+        if (x.Length == 0 || x.Length != y.Length)
+            throw new ArgumentException(
+                $"Peer public key coordinates must be non-empty and of equal length; got {x.Length} and {y.Length} bytes.",
+                nameof(peerPublicKey));
+        // The encoding carries one long-form length byte, enough for every named curve (P-521: 66-byte coordinates).
+        if (x.Length > MaxCoordinateLength)
+            throw new ArgumentException(
+                $"Peer public key coordinates of {x.Length} bytes are longer than any supported curve's.", nameof(peerPublicKey));
+        Pkcs11ECCurve? peerCurve = peerPublicKey.Curve.IsNamed && peerPublicKey.Curve.Oid.Value is { } oid
+            ? Pkcs11ECCurve.CreateFromValue(oid, peerPublicKey.Curve.Oid.FriendlyName)
+            : null;
+        return new(kdf, EncodeUncompressedPoint(x, y), sharedData.IsEmpty ? [] : sharedData.ToArray(), default, peerCurve);
+    }
+
+    /// <summary>
+    /// Encodes an uncompressed EC point (<c>04 ‖ X ‖ Y</c>) as a DER OCTET STRING — the full
+    /// <c>CKA_EC_POINT</c> form, which PKCS#11 accepts for the ECDH1 public-data parameter.
+    /// </summary>
+    private const int MaxCoordinateLength = (byte.MaxValue - 1) / 2;
+
+    internal static byte[] EncodeUncompressedPoint(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y)
+    {
+        int pointLength = 1 + x.Length + y.Length;
+        // Short-form length below 128 bytes; one long-form length byte covers every named curve
+        // (the largest, P-521, has a 133-byte point).
+        int header = pointLength < 0x80 ? 2 : 3;
+        byte[] der = new byte[header + pointLength];
+        der[0] = 0x04;
+        if (header == 2)
+        {
+            der[1] = (byte)pointLength;
+        }
+        else
+        {
+            der[1] = 0x81;
+            der[2] = checked((byte)pointLength);
+        }
+        der[header] = 0x04;
+        x.CopyTo(der.AsSpan(header + 1));
+        y.CopyTo(der.AsSpan(header + 1 + x.Length));
+        return der;
+    }
+
     // Unambiguous overload marker: byte[] converts implicitly to ReadOnlySpan<byte>, so without this
     // extra parameter the compiler cannot tell this constructor apart from the validating public one.
     private readonly struct RawParams;
 
-    private CkmEcdh1DeriveParams(CKD kdf, byte[] publicDataBytes, byte[] sharedDataBytes, RawParams _)
+    private CkmEcdh1DeriveParams(CKD kdf, byte[] publicDataBytes, byte[] sharedDataBytes, RawParams _, Pkcs11ECCurve? peerCurve = null)
     {
         _kdf = kdf;
         _publicDataBytes = publicDataBytes;
         _sharedDataBytes = sharedDataBytes;
+        _peerCurve = peerCurve;
     }
 
     private static byte[] RequireNonEmptyPeerPoint(ReadOnlySpan<byte> peerPublicPoint)

@@ -355,13 +355,12 @@ public sealed class DSAPkcs11Tests_Managed
     // A real token can't be coaxed into reporting its domain parameters / public value as sensitive on
     // a well-formed DSA key object, so this drives ExportParameters' fallback error path via a fake.
     [Fact]
-    public void ExportParameters_AttributesSensitive_ThrowsPkcs11Exception()
+    public void ExportParameters_AttributesSensitive_ThrowsCryptographicException()
     {
         using var key = FakeKeys.Create(CKK.CKK_DSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null));
         using var dsa = new DSAPkcs11(key);
 
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => dsa.ExportParameters(includePrivateParameters: false));
-        Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
+        Assert.Throws<CryptographicException>(() => dsa.ExportParameters(includePrivateParameters: false));
     }
 
     // === LeftPad edge cases (G / Y shorter or longer than P after trimming leading zeros) ============

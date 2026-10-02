@@ -1,0 +1,858 @@
+ccm	CkmAesCcmParams mac 112	allow	
+ccm	CkmAesCcmParams mac 128	allow	
+ccm	CkmAesCcmParams mac 32	deny	SP 800-38C Appendix B.2: a 32-bit MAC is below 64 bits, which requires a risk analysis this policy cannot perform.
+ccm	CkmAesCcmParams mac 48	deny	SP 800-38C Appendix B.2: a 48-bit MAC is below 64 bits, which requires a risk analysis this policy cannot perform.
+ccm	CkmAesCcmParams mac 64	allow	
+ccm	CkmAesCcmParams mac 80	allow	
+ccm	CkmAesCcmParams mac 96	allow	
+ccm	CkmCcmMessageParams mac 112	allow	
+ccm	CkmCcmMessageParams mac 128	allow	
+ccm	CkmCcmMessageParams mac 32	deny	SP 800-38C Appendix B.2: a 32-bit MAC is below 64 bits, which requires a risk analysis this policy cannot perform.
+ccm	CkmCcmMessageParams mac 48	deny	SP 800-38C Appendix B.2: a 48-bit MAC is below 64 bits, which requires a risk analysis this policy cannot perform.
+ccm	CkmCcmMessageParams mac 64	allow	
+ccm	CkmCcmMessageParams mac 80	allow	
+ccm	CkmCcmMessageParams mac 96	allow	
+curve	BrainpoolP160r1	deny	brainpoolP160r1 (1.3.36.3.3.2.8.1.1.1) is not on the NistApproved allow-list (not reviewed).
+curve	BrainpoolP160t1	deny	brainpoolP160t1 (1.3.36.3.3.2.8.1.1.2) is not on the NistApproved allow-list (not reviewed).
+curve	BrainpoolP192r1	deny	brainpoolP192r1 (1.3.36.3.3.2.8.1.1.3) is not on the NistApproved allow-list (not reviewed).
+curve	BrainpoolP192t1	deny	brainpoolP192t1 (1.3.36.3.3.2.8.1.1.4) is not on the NistApproved allow-list (not reviewed).
+curve	BrainpoolP224r1	deny	brainpoolP224r1 (1.3.36.3.3.2.8.1.1.5) is not on the NistApproved allow-list (not reviewed).
+curve	BrainpoolP224t1	deny	brainpoolP224t1 (1.3.36.3.3.2.8.1.1.6) is not on the NistApproved allow-list (not reviewed).
+curve	BrainpoolP256r1	deny	brainpoolP256r1 (1.3.36.3.3.2.8.1.1.7) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP256t1	deny	brainpoolP256t1 (1.3.36.3.3.2.8.1.1.8) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP320r1	deny	brainpoolP320r1 (1.3.36.3.3.2.8.1.1.9) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP320t1	deny	brainpoolP320t1 (1.3.36.3.3.2.8.1.1.10) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP384r1	deny	brainpoolP384r1 (1.3.36.3.3.2.8.1.1.11) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP384t1	deny	brainpoolP384t1 (1.3.36.3.3.2.8.1.1.12) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP512r1	deny	brainpoolP512r1 (1.3.36.3.3.2.8.1.1.13) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	BrainpoolP512t1	deny	brainpoolP512t1 (1.3.36.3.3.2.8.1.1.14) is not allowed: SP 800-186 lists no Brainpool curve (RFC 5639); FIPS 186-5 Appendix A approves only the NIST prime curves. Use NistP256, NistP384, or NistP521.
+curve	NistP192	deny	nistP192 (1.2.840.10045.3.1.1) is not on the NistApproved allow-list (not reviewed).
+curve	NistP224	allow	
+curve	NistP256	allow	
+curve	NistP384	allow	
+curve	NistP521	allow	
+curve	Secp192k1	deny	secp192k1 (1.3.132.0.31) is not on the NistApproved allow-list (not reviewed).
+curve	Secp224k1	deny	secp224k1 (1.3.132.0.32) is not on the NistApproved allow-list (not reviewed).
+curve	Secp256k1	deny	secp256k1 (1.3.132.0.10) is not on the NistApproved allow-list (not reviewed).
+curve	Sm2	deny	sm2 (1.2.156.10197.1.301) is not on the NistApproved allow-list (not reviewed).
+derived-copy	CKM_DES3_CBC Decrypt	allow	
+derived-copy	export EcdhSharedSecret	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the EcdhSharedSecret off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key.
+derived-copy	export KdfOutput	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the KdfOutput off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Key.Derive with a sensitive template, or the ObjectTemplate overloads of HkdfPkcs11 (DeriveKey / ExtractKey / ExpandKey) and SP800108HmacCounterKdfPkcs11.DeriveKey, derive a sensitive key.
+derived-copy	export KemSharedSecret	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the KemSharedSecret off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Key.EncapsulateKey / DecapsulateKey return the shared secret as a sensitive key.
+derived-copy	export PasswordKdfOutput	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the PasswordKdfOutput off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Workspace.GenerateKey with CKM_PKCS5_PBKD2, or Rfc2898DeriveBytesPkcs11.Pbkdf2Key, derives a sensitive key.
+derived-copy	unlisted vendor mechanism	deny	vendor mechanism 0x80001234 is not on the Derived allow-list (not reviewed).
+ecdh-params	CKD_BLAKE2B_160_KDF	allow	
+ecdh-params	CKD_BLAKE2B_256_KDF	allow	
+ecdh-params	CKD_BLAKE2B_384_KDF	allow	
+ecdh-params	CKD_BLAKE2B_512_KDF	allow	
+ecdh-params	CKD_CPDIVERSIFY_KDF	allow	
+ecdh-params	CKD_NULL	allow	
+ecdh-params	CKD_SHA1_KDF	allow	
+ecdh-params	CKD_SHA1_KDF_ASN1	allow	
+ecdh-params	CKD_SHA1_KDF_CONCATENATE	allow	
+ecdh-params	CKD_SHA1_KDF_SP800	allow	
+ecdh-params	CKD_SHA224_KDF	allow	
+ecdh-params	CKD_SHA224_KDF_SP800	allow	
+ecdh-params	CKD_SHA256_KDF	allow	
+ecdh-params	CKD_SHA256_KDF_SP800	allow	
+ecdh-params	CKD_SHA384_KDF	allow	
+ecdh-params	CKD_SHA384_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_224_KDF	allow	
+ecdh-params	CKD_SHA3_224_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_256_KDF	allow	
+ecdh-params	CKD_SHA3_256_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_384_KDF	allow	
+ecdh-params	CKD_SHA3_384_KDF_SP800	allow	
+ecdh-params	CKD_SHA3_512_KDF	allow	
+ecdh-params	CKD_SHA3_512_KDF_SP800	allow	
+ecdh-params	CKD_SHA512_KDF	allow	
+ecdh-params	CKD_SHA512_KDF_SP800	allow	
+export	EcdhSharedSecret	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the EcdhSharedSecret off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key.
+export	EcdhSharedSecret with mechanism and base key	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the EcdhSharedSecret off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Workspace.DeriveSharedSecretEcdh applies the KDF on the token and returns a sensitive key.
+export	KdfOutput	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the KdfOutput off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Key.Derive with a sensitive template, or the ObjectTemplate overloads of HkdfPkcs11 (DeriveKey / ExtractKey / ExpandKey) and SP800108HmacCounterKdfPkcs11.DeriveKey, derive a sensitive key.
+export	KemSharedSecret	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the KemSharedSecret off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Key.EncapsulateKey / DecapsulateKey return the shared secret as a sensitive key.
+export	PasswordKdfOutput	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): reading the PasswordKdfOutput off the module in plaintext is not permitted. Keep the secret on the module instead: Pkcs11Workspace.GenerateKey with CKM_PKCS5_PBKD2, or Rfc2898DeriveBytesPkcs11.Pbkdf2Key, derives a sensitive key.
+gcm	CkmAesGcmParams tag 104	allow	
+gcm	CkmAesGcmParams tag 112	allow	
+gcm	CkmAesGcmParams tag 120	allow	
+gcm	CkmAesGcmParams tag 128	allow	
+gcm	CkmAesGcmParams tag 32	deny	SP 800-38D §5.2.1.2: a 32-bit tag is not approved for general use; use 96, 104, 112, 120 or 128 bits.
+gcm	CkmAesGcmParams tag 64	deny	SP 800-38D §5.2.1.2: a 64-bit tag is not approved for general use; use 96, 104, 112, 120 or 128 bits.
+gcm	CkmAesGcmParams tag 96	allow	
+gcm	CkmGcmMessageParams tag 104	allow	
+gcm	CkmGcmMessageParams tag 112	allow	
+gcm	CkmGcmMessageParams tag 120	allow	
+gcm	CkmGcmMessageParams tag 128	allow	
+gcm	CkmGcmMessageParams tag 32	deny	SP 800-38D §5.2.1.2: a 32-bit tag is not approved for general use; use 96, 104, 112, 120 or 128 bits.
+gcm	CkmGcmMessageParams tag 64	deny	SP 800-38D §5.2.1.2: a 64-bit tag is not approved for general use; use 96, 104, 112, 120 or 128 bits.
+gcm	CkmGcmMessageParams tag 96	allow	
+hash	MD5 Digest	deny	MD5 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD5 is cryptographically broken. Use SHA256.
+hash	MD5 Sign	deny	MD5 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD5 is cryptographically broken. Use SHA256.
+hash	MD5 Verify	deny	MD5 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD5 is cryptographically broken. Use SHA256.
+hash	RIPEMD160 Digest	deny	RIPEMD160 is not on the NistApproved allow-list (not reviewed).
+hash	RIPEMD160 Sign	deny	RIPEMD160 is not on the NistApproved allow-list (not reviewed).
+hash	RIPEMD160 Verify	deny	RIPEMD160 is not on the NistApproved allow-list (not reviewed).
+hash	SHA1 Digest	deny	SHA1 is allowed under NistApproved only for Verify; Digest is not. SP 800-131A Rev.2 §9 (legacy-use verification only; SHA-1 signature generation is no longer approved)
+hash	SHA1 Sign	deny	SHA1 is allowed under NistApproved only for Verify; Sign is not. SP 800-131A Rev.2 §9 (legacy-use verification only; SHA-1 signature generation is no longer approved)
+hash	SHA1 Verify	allow	
+hash	SHA224 Digest	deny	SHA224 is not on the NistApproved allow-list (not reviewed).
+hash	SHA224 Sign	deny	SHA224 is not on the NistApproved allow-list (not reviewed).
+hash	SHA224 Verify	deny	SHA224 is not on the NistApproved allow-list (not reviewed).
+hash	SHA256 Digest	allow	
+hash	SHA256 Sign	allow	
+hash	SHA256 Verify	allow	
+hash	SHA3-256 Digest	allow	
+hash	SHA3-256 Sign	allow	
+hash	SHA3-256 Verify	allow	
+hash	SHA3-384 Digest	allow	
+hash	SHA3-384 Sign	allow	
+hash	SHA3-384 Verify	allow	
+hash	SHA3-512 Digest	allow	
+hash	SHA3-512 Sign	allow	
+hash	SHA3-512 Verify	allow	
+hash	SHA384 Digest	allow	
+hash	SHA384 Sign	allow	
+hash	SHA384 Verify	allow	
+hash	SHA512 Digest	allow	
+hash	SHA512 Sign	allow	
+hash	SHA512 Verify	allow	
+hkdf	CKM_AES_CMAC	deny	SP 800-56C Rev.2: CKM_AES_CMAC is not an approved HKDF PRF; use an approved hash, hash or _HMAC form.
+hkdf	CKM_MD5_HMAC	deny	SP 800-56C Rev.2: CKM_MD5_HMAC is not an approved HKDF PRF; use an approved hash, hash or _HMAC form.
+hkdf	CKM_SHA224_HMAC	allow	
+hkdf	CKM_SHA256_HMAC	allow	
+hkdf	CKM_SHA384_HMAC	allow	
+hkdf	CKM_SHA3_256_HMAC	allow	
+hkdf	CKM_SHA512_HMAC	allow	
+hkdf	CKM_SHA_1_HMAC	allow	
+hkdf	expand only CKM_SHA256_HMAC	allow	
+hkdf	expand only CKM_SHA_1_HMAC	allow	
+hkdf	no salt CKM_SHA256_HMAC	allow	
+hkdf	no salt CKM_SHA_1_HMAC	allow	
+kdf	CKD_BLAKE2B_160_KDF	deny	CKD_BLAKE2B_160_KDF is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_BLAKE2B_256_KDF	deny	CKD_BLAKE2B_256_KDF is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_BLAKE2B_384_KDF	deny	CKD_BLAKE2B_384_KDF is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_BLAKE2B_512_KDF	deny	CKD_BLAKE2B_512_KDF is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_CPDIVERSIFY_KDF	deny	CKD_CPDIVERSIFY_KDF is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_NULL	deny	CKD_NULL is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_SHA1_KDF	deny	CKD_SHA1_KDF is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_ASN1	deny	CKD_SHA1_KDF_ASN1 is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_CONCATENATE	deny	CKD_SHA1_KDF_CONCATENATE is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_SHA1_KDF_SP800	deny	CKD_SHA1_KDF_SP800 is not on the NistApproved allow-list (not reviewed).
+kdf	CKD_SHA224_KDF	allow	
+kdf	CKD_SHA224_KDF_SP800	allow	
+kdf	CKD_SHA256_KDF	allow	
+kdf	CKD_SHA256_KDF_SP800	allow	
+kdf	CKD_SHA384_KDF	allow	
+kdf	CKD_SHA384_KDF_SP800	allow	
+kdf	CKD_SHA3_224_KDF	deny	CKD_SHA3_224_KDF is not allowed: SP 800-135 Rev.1 §5.1 approves the ANSI X9.63 KDF only with a FIPS 180 hash; no SHA-3 variant is defined. Use CKD_SHA3_224_KDF_SP800.
+kdf	CKD_SHA3_224_KDF_SP800	allow	
+kdf	CKD_SHA3_256_KDF	deny	CKD_SHA3_256_KDF is not allowed: SP 800-135 Rev.1 §5.1 approves the ANSI X9.63 KDF only with a FIPS 180 hash; no SHA-3 variant is defined. Use CKD_SHA3_256_KDF_SP800.
+kdf	CKD_SHA3_256_KDF_SP800	allow	
+kdf	CKD_SHA3_384_KDF	deny	CKD_SHA3_384_KDF is not allowed: SP 800-135 Rev.1 §5.1 approves the ANSI X9.63 KDF only with a FIPS 180 hash; no SHA-3 variant is defined. Use CKD_SHA3_384_KDF_SP800.
+kdf	CKD_SHA3_384_KDF_SP800	allow	
+kdf	CKD_SHA3_512_KDF	deny	CKD_SHA3_512_KDF is not allowed: SP 800-135 Rev.1 §5.1 approves the ANSI X9.63 KDF only with a FIPS 180 hash; no SHA-3 variant is defined. Use CKD_SHA3_512_KDF_SP800.
+kdf	CKD_SHA3_512_KDF_SP800	allow	
+kdf	CKD_SHA512_KDF	allow	
+kdf	CKD_SHA512_KDF_SP800	allow	
+key-agreement-key	CKK_ACTI	deny	Key agreement with a CKK_ACTI key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_AES	deny	Key agreement with a CKK_AES key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_AES_XTS	deny	Key agreement with a CKK_AES_XTS key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_ARIA	deny	Key agreement with a CKK_ARIA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_BATON	deny	Key agreement with a CKK_BATON key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_160_HMAC	deny	Key agreement with a CKK_BLAKE2B_160_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_256_HMAC	deny	Key agreement with a CKK_BLAKE2B_256_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_384_HMAC	deny	Key agreement with a CKK_BLAKE2B_384_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_BLAKE2B_512_HMAC	deny	Key agreement with a CKK_BLAKE2B_512_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_BLOWFISH	deny	Key agreement with a CKK_BLOWFISH key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_CAMELLIA	deny	Key agreement with a CKK_CAMELLIA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_CAST	deny	Key agreement with a CKK_CAST key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_CAST3	deny	Key agreement with a CKK_CAST3 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_CAST5	deny	Key agreement with a CKK_CAST128 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_CDMF	deny	Key agreement with a CKK_CDMF key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_CHACHA20	deny	Key agreement with a CKK_CHACHA20 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_DES	deny	Key agreement with a CKK_DES key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_DES2	deny	Key agreement with a CKK_DES2 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_DES3	deny	Key agreement with a CKK_DES3 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_DH	deny	Key agreement with a CKK_DH key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_DSA	deny	Key agreement with a CKK_DSA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_ECDSA	allow	
+key-agreement-key	CKK_EC_EDWARDS	deny	Key agreement with a CKK_EC_EDWARDS key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_EC_MONTGOMERY	deny	Key agreement with a CKK_EC_MONTGOMERY key is not allowed: SP 800-56A Rev.3 specifies no key-agreement scheme over Curve25519 or Curve448 (X25519/X448), so key agreement with an existing X25519/X448 key has no approval. Use ECDH with a CKK_EC key on a NIST prime curve.
+key-agreement-key	CKK_GENERIC_SECRET	deny	Key agreement with a CKK_GENERIC_SECRET key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_GOST28147	deny	Key agreement with a CKK_GOST28147 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_GOSTR3410	deny	Key agreement with a CKK_GOSTR3410 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_GOSTR3411	deny	Key agreement with a CKK_GOSTR3411 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_HKDF	deny	Key agreement with a CKK_HKDF key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_HOTP	deny	Key agreement with a CKK_HOTP key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_HSS	deny	Key agreement with a CKK_HSS key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_IDEA	deny	Key agreement with a CKK_IDEA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_JUNIPER	deny	Key agreement with a CKK_JUNIPER key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_KEA	deny	Key agreement with a CKK_KEA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_MD5_HMAC	deny	Key agreement with a CKK_MD5_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_ML_DSA	deny	Key agreement with a CKK_ML_DSA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_ML_KEM	deny	Key agreement with a CKK_ML_KEM key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_POLY1305	deny	Key agreement with a CKK_POLY1305 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_RC2	deny	Key agreement with a CKK_RC2 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_RC4	deny	Key agreement with a CKK_RC4 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_RC5	deny	Key agreement with a CKK_RC5 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_RIPEMD128_HMAC	deny	Key agreement with a CKK_RIPEMD128_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_RIPEMD160_HMAC	deny	Key agreement with a CKK_RIPEMD160_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_RSA	deny	Key agreement with a CKK_RSA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SALSA20	deny	Key agreement with a CKK_SALSA20 key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SECURID	deny	Key agreement with a CKK_SECURID key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SEED	deny	Key agreement with a CKK_SEED key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA224_HMAC	deny	Key agreement with a CKK_SHA224_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA256_HMAC	deny	Key agreement with a CKK_SHA256_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA384_HMAC	deny	Key agreement with a CKK_SHA384_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_224_HMAC	deny	Key agreement with a CKK_SHA3_224_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_256_HMAC	deny	Key agreement with a CKK_SHA3_256_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_384_HMAC	deny	Key agreement with a CKK_SHA3_384_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA3_512_HMAC	deny	Key agreement with a CKK_SHA3_512_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_224_HMAC	deny	Key agreement with a CKK_SHA512_224_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_256_HMAC	deny	Key agreement with a CKK_SHA512_256_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_HMAC	deny	Key agreement with a CKK_SHA512_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA512_T_HMAC	deny	Key agreement with a CKK_SHA512_T_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SHA_1_HMAC	deny	Key agreement with a CKK_SHA_1_HMAC key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SKIPJACK	deny	Key agreement with a CKK_SKIPJACK key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_SLH_DSA	deny	Key agreement with a CKK_SLH_DSA key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_TWOFISH	deny	Key agreement with a CKK_TWOFISH key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_VENDOR_DEFINED	deny	Key agreement with a CKK_VENDOR_DEFINED key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_X2RATCHET	deny	Key agreement with a CKK_X2RATCHET key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_X9_42_DH	deny	Key agreement with a CKK_X9_42_DH key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_XMSS	deny	Key agreement with a CKK_XMSS key is not on the NistApproved allow-list (not reviewed).
+key-agreement-key	CKK_XMSSMT	deny	Key agreement with a CKK_XMSSMT key is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ACTI	allow: -	CKM_ACTI is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ACTI_KEY_GEN	allow: -	CKM_ACTI_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_CBC	allow: Encrypt,Decrypt	CKM_AES_CBC is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CBC_ENCRYPT_DATA	allow: -	CKM_AES_CBC_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_CBC_PAD	allow: Encrypt,Decrypt	CKM_AES_CBC_PAD is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CCM	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_CCM is allowed under NistApproved only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. SP 800-38C / SP 800-38F
+mechanism	CKM_AES_CFB1	allow: Encrypt,Decrypt	CKM_AES_CFB1 is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CFB128	allow: Encrypt,Decrypt	CKM_AES_CFB128 is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CFB64	allow: Encrypt,Decrypt	CKM_AES_CFB64 is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CFB8	allow: Encrypt,Decrypt	CKM_AES_CFB8 is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CMAC	allow: Sign,Verify	CKM_AES_CMAC is allowed under NistApproved only for Sign, Verify; {op} is not. SP 800-38B / SP 800-38D
+mechanism	CKM_AES_CMAC_GENERAL	allow: Sign,Verify	CKM_AES_CMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. SP 800-38B / SP 800-38D
+mechanism	CKM_AES_CTR	allow: Encrypt,Decrypt	CKM_AES_CTR is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_CTS	allow: Encrypt,Decrypt	CKM_AES_CTS is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_ECB	allow: Encrypt,Decrypt	CKM_AES_ECB is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_ECB_ENCRYPT_DATA	allow: -	CKM_AES_ECB_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_GCM	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_GCM is allowed under NistApproved only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. SP 800-38D / SP 800-38F
+mechanism	CKM_AES_GMAC	allow: Sign,Verify	CKM_AES_GMAC is allowed under NistApproved only for Sign, Verify; {op} is not. SP 800-38B / SP 800-38D
+mechanism	CKM_AES_KEY_GEN	allow: GenerateKey	CKM_AES_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_AES_KEY_WRAP	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP is allowed under NistApproved only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. SP 800-38F
+mechanism	CKM_AES_KEY_WRAP_KWP	allow: Encrypt,Decrypt,Wrap,Unwrap	CKM_AES_KEY_WRAP_KWP is allowed under NistApproved only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. SP 800-38F
+mechanism	CKM_AES_KEY_WRAP_PAD	allow: -	CKM_AES_KEY_WRAP_PAD is not allowed: Its padding is vendor-defined: some tokens implement RFC 5649 (SP 800-38F KWP), others KW over PKCS#7-padded input, which is not an SP 800-38F method. Whether a given token's wrap is approved cannot be told from the mechanism, so it is not approved. Use CKM_AES_KEY_WRAP_KWP (RFC 5649) or CKM_AES_KEY_WRAP.
+mechanism	CKM_AES_KEY_WRAP_PKCS7	allow: -	CKM_AES_KEY_WRAP_PKCS7 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_MAC	allow: -	CKM_AES_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_MAC_GENERAL	allow: -	CKM_AES_MAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_OFB	allow: Encrypt,Decrypt	CKM_AES_OFB is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38A (key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_XCBC_MAC	allow: -	CKM_AES_XCBC_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_XCBC_MAC_96	allow: -	CKM_AES_XCBC_MAC_96 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_AES_XTS	allow: Encrypt,Decrypt	CKM_AES_XTS is allowed under NistApproved only for Encrypt, Decrypt; {op} is not. SP 800-38E (storage devices only; key wrapping: SP 800-38F / SP 800-131A Rev.2 §7)
+mechanism	CKM_AES_XTS_KEY_GEN	allow: GenerateKey	CKM_AES_XTS_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_ARIA_CBC	allow: -	CKM_ARIA_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_CBC_ENCRYPT_DATA	allow: -	CKM_ARIA_CBC_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_CBC_PAD	allow: -	CKM_ARIA_CBC_PAD is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_ECB	allow: -	CKM_ARIA_ECB is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_ECB_ENCRYPT_DATA	allow: -	CKM_ARIA_ECB_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_KEY_GEN	allow: -	CKM_ARIA_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_MAC	allow: -	CKM_ARIA_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ARIA_MAC_GENERAL	allow: -	CKM_ARIA_MAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_CBC128	allow: -	CKM_BATON_CBC128 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_COUNTER	allow: -	CKM_BATON_COUNTER is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_ECB128	allow: -	CKM_BATON_ECB128 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_ECB96	allow: -	CKM_BATON_ECB96 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_KEY_GEN	allow: -	CKM_BATON_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_SHUFFLE	allow: -	CKM_BATON_SHUFFLE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BATON_WRAP	allow: -	CKM_BATON_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160	allow: -	CKM_BLAKE2B_160 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_HMAC	allow: -	CKM_BLAKE2B_160_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_HMAC_GENERAL	allow: -	CKM_BLAKE2B_160_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_KEY_DERIVE	allow: -	CKM_BLAKE2B_160_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_160_KEY_GEN	allow: -	CKM_BLAKE2B_160_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256	allow: -	CKM_BLAKE2B_256 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_HMAC	allow: -	CKM_BLAKE2B_256_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_HMAC_GENERAL	allow: -	CKM_BLAKE2B_256_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_KEY_DERIVE	allow: -	CKM_BLAKE2B_256_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_256_KEY_GEN	allow: -	CKM_BLAKE2B_256_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384	allow: -	CKM_BLAKE2B_384 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_HMAC	allow: -	CKM_BLAKE2B_384_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_HMAC_GENERAL	allow: -	CKM_BLAKE2B_384_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_KEY_DERIVE	allow: -	CKM_BLAKE2B_384_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_384_KEY_GEN	allow: -	CKM_BLAKE2B_384_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512	allow: -	CKM_BLAKE2B_512 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_HMAC	allow: -	CKM_BLAKE2B_512_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_HMAC_GENERAL	allow: -	CKM_BLAKE2B_512_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_KEY_DERIVE	allow: -	CKM_BLAKE2B_512_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLAKE2B_512_KEY_GEN	allow: -	CKM_BLAKE2B_512_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_BLOWFISH_CBC	allow: -	CKM_BLOWFISH_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_BLOWFISH_CBC_PAD	allow: -	CKM_BLOWFISH_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_BLOWFISH_KEY_GEN	allow: -	CKM_BLOWFISH_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAMELLIA_CBC	allow: -	CKM_CAMELLIA_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CBC_ENCRYPT_DATA	allow: -	CKM_CAMELLIA_CBC_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CBC_PAD	allow: -	CKM_CAMELLIA_CBC_PAD is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_CTR	allow: -	CKM_CAMELLIA_CTR is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_ECB	allow: -	CKM_CAMELLIA_ECB is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_ECB_ENCRYPT_DATA	allow: -	CKM_CAMELLIA_ECB_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_KEY_GEN	allow: -	CKM_CAMELLIA_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_MAC	allow: -	CKM_CAMELLIA_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAMELLIA_MAC_GENERAL	allow: -	CKM_CAMELLIA_MAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CAST128_CBC	allow: -	CKM_CAST128_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST128_CBC_PAD	allow: -	CKM_CAST128_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST128_ECB	allow: -	CKM_CAST128_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST128_KEY_GEN	allow: -	CKM_CAST128_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST128_MAC	allow: -	CKM_CAST128_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST128_MAC_GENERAL	allow: -	CKM_CAST128_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST3_CBC	allow: -	CKM_CAST3_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST3_CBC_PAD	allow: -	CKM_CAST3_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST3_ECB	allow: -	CKM_CAST3_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST3_KEY_GEN	allow: -	CKM_CAST3_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST3_MAC	allow: -	CKM_CAST3_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST3_MAC_GENERAL	allow: -	CKM_CAST3_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST_CBC	allow: -	CKM_CAST_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST_CBC_PAD	allow: -	CKM_CAST_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST_ECB	allow: -	CKM_CAST_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST_KEY_GEN	allow: -	CKM_CAST_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST_MAC	allow: -	CKM_CAST_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CAST_MAC_GENERAL	allow: -	CKM_CAST_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_CDMF_CBC	allow: -	CKM_CDMF_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CDMF_CBC_PAD	allow: -	CKM_CDMF_CBC_PAD is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CDMF_ECB	allow: -	CKM_CDMF_ECB is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CDMF_KEY_GEN	allow: -	CKM_CDMF_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CDMF_MAC	allow: -	CKM_CDMF_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CDMF_MAC_GENERAL	allow: -	CKM_CDMF_MAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CHACHA20	allow: -	CKM_CHACHA20 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list; ChaCha20-Poly1305 has no FIPS 140-3 validation entry. Use CKM_AES_GCM.
+mechanism	CKM_CHACHA20_KEY_GEN	allow: -	CKM_CHACHA20_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CHACHA20_POLY1305	allow: -	CKM_CHACHA20_POLY1305 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list; ChaCha20-Poly1305 has no FIPS 140-3 validation entry. Use CKM_AES_GCM.
+mechanism	CKM_CMS_SIG	allow: -	CKM_CMS_SIG is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CONCATENATE_BASE_AND_DATA	allow: -	CKM_CONCATENATE_BASE_AND_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CONCATENATE_BASE_AND_KEY	allow: -	CKM_CONCATENATE_BASE_AND_KEY is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_CONCATENATE_DATA_AND_BASE	allow: -	CKM_CONCATENATE_DATA_AND_BASE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES2_KEY_GEN	allow: -	CKM_DES2_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES3_CBC	allow: Decrypt,Unwrap	CKM_DES3_CBC is allowed under NistApproved only for Decrypt, Unwrap; {op} is not. SP 800-131A Rev.2 §2 / §7 (TDEA encryption and key wrapping disallowed after 2023)
+mechanism	CKM_DES3_CBC_ENCRYPT_DATA	allow: -	CKM_DES3_CBC_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES3_CBC_PAD	allow: Decrypt,Unwrap	CKM_DES3_CBC_PAD is allowed under NistApproved only for Decrypt, Unwrap; {op} is not. SP 800-131A Rev.2 §2 / §7 (TDEA encryption and key wrapping disallowed after 2023)
+mechanism	CKM_DES3_CMAC	allow: Verify	CKM_DES3_CMAC is allowed under NistApproved only for Verify; {op} is not. SP 800-131A Rev.2 §10 (TDEA CMAC generation disallowed after 2023)
+mechanism	CKM_DES3_CMAC_GENERAL	allow: Verify	CKM_DES3_CMAC_GENERAL is allowed under NistApproved only for Verify; {op} is not. SP 800-131A Rev.2 §10 (TDEA CMAC generation disallowed after 2023)
+mechanism	CKM_DES3_ECB	allow: Decrypt,Unwrap	CKM_DES3_ECB is allowed under NistApproved only for Decrypt, Unwrap; {op} is not. SP 800-131A Rev.2 §2 / §7 (TDEA encryption and key wrapping disallowed after 2023)
+mechanism	CKM_DES3_ECB_ENCRYPT_DATA	allow: -	CKM_DES3_ECB_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES3_KEY_GEN	allow: -	CKM_DES3_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES3_MAC	allow: -	CKM_DES3_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES3_MAC_GENERAL	allow: -	CKM_DES3_MAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES_CBC	allow: -	CKM_DES_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_CBC_ENCRYPT_DATA	allow: -	CKM_DES_CBC_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES_CBC_PAD	allow: -	CKM_DES_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_CFB64	allow: -	CKM_DES_CFB64 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_CFB8	allow: -	CKM_DES_CFB8 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_ECB	allow: -	CKM_DES_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_ECB_ENCRYPT_DATA	allow: -	CKM_DES_ECB_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DES_KEY_GEN	allow: -	CKM_DES_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_MAC	allow: -	CKM_DES_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_MAC_GENERAL	allow: -	CKM_DES_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_OFB64	allow: -	CKM_DES_OFB64 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DES_OFB8	allow: -	CKM_DES_OFB8 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_DH_PKCS_DERIVE	allow: -	CKM_DH_PKCS_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DH_PKCS_KEY_PAIR_GEN	allow: -	CKM_DH_PKCS_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DH_PKCS_PARAMETER_GEN	allow: -	CKM_DH_PKCS_PARAMETER_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DSA	allow: Verify	CKM_DSA is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_FIPS_G_GEN	allow: -	CKM_DSA_FIPS_G_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DSA_KEY_PAIR_GEN	allow: -	CKM_DSA_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DSA_PARAMETER_GEN	allow: -	CKM_DSA_PARAMETER_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DSA_PROBABILISTIC_PARAMETER_GEN	allow: -	CKM_DSA_PROBABILISTIC_PARAMETER_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_DSA_SHA1	allow: Verify	CKM_DSA_SHA1 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA224	allow: Verify	CKM_DSA_SHA224 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA256	allow: Verify	CKM_DSA_SHA256 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA384	allow: Verify	CKM_DSA_SHA384 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA3_224	allow: Verify	CKM_DSA_SHA3_224 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA3_256	allow: Verify	CKM_DSA_SHA3_256 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA3_384	allow: Verify	CKM_DSA_SHA3_384 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA3_512	allow: Verify	CKM_DSA_SHA3_512 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHA512	allow: Verify	CKM_DSA_SHA512 is allowed under NistApproved only for Verify; {op} is not. FIPS 186-5 §4 (DSA signature generation no longer approved)
+mechanism	CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN	allow: -	CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ECDH1_COFACTOR_DERIVE	allow: -	CKM_ECDH1_COFACTOR_DERIVE is allowed under NistApproved only for Derive; {op} is not. SP 800-56A Rev.3 || CKM_ECDH1_COFACTOR_DERIVE requires CkmEcdh1{op}Params, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked.
+mechanism	CKM_ECDH1_DERIVE	allow: -	CKM_ECDH1_DERIVE is allowed under NistApproved only for Derive; {op} is not. SP 800-56A Rev.3 || CKM_ECDH1_DERIVE requires CkmEcdh1{op}Params, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked.
+mechanism	CKM_ECDH_AES_KEY_WRAP	allow: -	CKM_ECDH_AES_KEY_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ECDH_COF_AES_KEY_WRAP	allow: -	CKM_ECDH_COF_AES_KEY_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ECDH_X_AES_KEY_WRAP	allow: -	CKM_ECDH_X_AES_KEY_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ECDSA	allow: Sign,Verify	CKM_ECDSA is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA1	allow: Verify	CKM_ECDSA_SHA1 is allowed under NistApproved only for Verify; {op} is not. SP 800-131A Rev.2 §9 (SHA-1 signature generation disallowed)
+mechanism	CKM_ECDSA_SHA224	allow: Sign,Verify	CKM_ECDSA_SHA224 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA256	allow: Sign,Verify	CKM_ECDSA_SHA256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA384	allow: Sign,Verify	CKM_ECDSA_SHA384 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA3_224	allow: Sign,Verify	CKM_ECDSA_SHA3_224 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA3_256	allow: Sign,Verify	CKM_ECDSA_SHA3_256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA3_384	allow: Sign,Verify	CKM_ECDSA_SHA3_384 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA3_512	allow: Sign,Verify	CKM_ECDSA_SHA3_512 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECDSA_SHA512	allow: Sign,Verify	CKM_ECDSA_SHA512 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §6
+mechanism	CKM_ECMQV_DERIVE	allow: -	CKM_ECMQV_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_EC_EDWARDS_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_EC_EDWARDS_KEY_PAIR_GEN is allowed under NistApproved only for GenerateKeyPair; {op} is not. FIPS 186-5 §A.2 / SP 800-186 || CKM_EC_EDWARDS_KEY_PAIR_GEN is allowed under NistApproved only for {op}Pair; {op} is not. FIPS 186-5 §A.2 / SP 800-186
+mechanism	CKM_EC_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_EC_KEY_PAIR_GEN is allowed under NistApproved only for GenerateKeyPair; {op} is not. FIPS 186-5 §A.2 / SP 800-186 || CKM_EC_KEY_PAIR_GEN is allowed under NistApproved only for {op}Pair; {op} is not. FIPS 186-5 §A.2 / SP 800-186
+mechanism	CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS	allow: -	CKM_EC_KEY_PAIR_GEN_W_EXTRA_BITS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_EC_MONTGOMERY_KEY_PAIR_GEN	allow: -	CKM_EC_MONTGOMERY_KEY_PAIR_GEN is not allowed: SP 800-186 specifies Curve25519 and Curve448, but FIPS 186-5 approves them only for EdDSA (Ed25519/Ed448) and SP 800-56A Rev.3 has no X25519/X448 key-agreement scheme, so X25519/X448 key generation has no approval. Use CKM_EC_KEY_PAIR_GEN (a NIST prime curve) or CKM_EC_EDWARDS_KEY_PAIR_GEN.
+mechanism	CKM_EDDSA	allow: Sign,Verify	CKM_EDDSA is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §7
+mechanism	CKM_EXTRACT_KEY_FROM_KEY	allow: -	CKM_EXTRACT_KEY_FROM_KEY is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_FASTHASH	allow: -	CKM_FASTHASH is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_FORTEZZA_TIMESTAMP	allow: -	CKM_FORTEZZA_TIMESTAMP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_GENERIC_SECRET_KEY_GEN	allow: GenerateKey	CKM_GENERIC_SECRET_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_GOST28147	allow: -	CKM_GOST28147 is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOST28147_ECB	allow: -	CKM_GOST28147_ECB is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOST28147_KEY_GEN	allow: -	CKM_GOST28147_KEY_GEN is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOST28147_KEY_WRAP	allow: -	CKM_GOST28147_KEY_WRAP is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOST28147_MAC	allow: -	CKM_GOST28147_MAC is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3410	allow: -	CKM_GOSTR3410 is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3410_DERIVE	allow: -	CKM_GOSTR3410_DERIVE is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3410_KEY_PAIR_GEN	allow: -	CKM_GOSTR3410_KEY_PAIR_GEN is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3410_KEY_WRAP	allow: -	CKM_GOSTR3410_KEY_WRAP is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3410_WITH_GOSTR3411	allow: -	CKM_GOSTR3410_WITH_GOSTR3411 is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3411	allow: -	CKM_GOSTR3411 is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_GOSTR3411_HMAC	allow: -	CKM_GOSTR3411_HMAC is not allowed: GOST algorithms (GOST 28147-89, GOST R 34.10/34.11) are Russian national standards, not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use an approved AES cipher, ECDSA signature, or SHA-2/SHA-3 hash.
+mechanism	CKM_HASH_ML_DSA	allow: -	CKM_HASH_ML_DSA is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204 §5.4 || FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512). || FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqc{op}Params with a pre-hash of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512).
+mechanism	CKM_HASH_ML_DSA_SHA224	allow: -	CKM_HASH_ML_DSA_SHA224 is not allowed: FIPS 204 §5.4 / FIPS 205 §10 require the pre-hash to give at least 128-bit collision strength; SHA-224 / SHA3-224 give only ~112 bits. Use the SHA-256/384/512 or SHA3-256/384/512 pre-hash variants.
+mechanism	CKM_HASH_ML_DSA_SHA256	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHA384	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA384 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHA3_224	allow: -	CKM_HASH_ML_DSA_SHA3_224 is not allowed: FIPS 204 §5.4 / FIPS 205 §10 require the pre-hash to give at least 128-bit collision strength; SHA-224 / SHA3-224 give only ~112 bits. Use the SHA-256/384/512 or SHA3-256/384/512 pre-hash variants.
+mechanism	CKM_HASH_ML_DSA_SHA3_256	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA3_256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHA3_384	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA3_384 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHA3_512	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA3_512 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHA512	allow: Sign,Verify	CKM_HASH_ML_DSA_SHA512 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHAKE128	allow: Sign,Verify	CKM_HASH_ML_DSA_SHAKE128 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_ML_DSA_SHAKE256	allow: Sign,Verify	CKM_HASH_ML_DSA_SHAKE256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_HASH_SLH_DSA	allow: -	CKM_HASH_SLH_DSA is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205 §10 || FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512). || FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqc{op}Params with a pre-hash of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512).
+mechanism	CKM_HASH_SLH_DSA_SHA224	allow: -	CKM_HASH_SLH_DSA_SHA224 is not allowed: FIPS 204 §5.4 / FIPS 205 §10 require the pre-hash to give at least 128-bit collision strength; SHA-224 / SHA3-224 give only ~112 bits. Use the SHA-256/384/512 or SHA3-256/384/512 pre-hash variants.
+mechanism	CKM_HASH_SLH_DSA_SHA256	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHA384	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA384 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHA3_224	allow: -	CKM_HASH_SLH_DSA_SHA3_224 is not allowed: FIPS 204 §5.4 / FIPS 205 §10 require the pre-hash to give at least 128-bit collision strength; SHA-224 / SHA3-224 give only ~112 bits. Use the SHA-256/384/512 or SHA3-256/384/512 pre-hash variants.
+mechanism	CKM_HASH_SLH_DSA_SHA3_256	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA3_256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHA3_384	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA3_384 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHA3_512	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA3_512 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHA512	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHA512 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHAKE128	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHAKE128 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HASH_SLH_DSA_SHAKE256	allow: Sign,Verify	CKM_HASH_SLH_DSA_SHAKE256 is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_HKDF_DATA	allow: -	CKM_HKDF_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_HKDF_DERIVE	allow: -	CKM_HKDF_DERIVE is allowed under NistApproved only for Derive; {op} is not. SP 800-56C Rev.2 || SP 800-56C Rev.2: CKM_HKDF_DERIVE requires CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form).
+mechanism	CKM_HKDF_KEY_GEN	allow: GenerateKey	CKM_HKDF_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-56C Rev.2
+mechanism	CKM_HOTP	allow: -	CKM_HOTP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_HOTP_KEY_GEN	allow: -	CKM_HOTP_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_HSS	allow: -	CKM_HSS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_HSS_KEY_PAIR_GEN	allow: -	CKM_HSS_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_IDEA_CBC	allow: -	CKM_IDEA_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_IDEA_CBC_PAD	allow: -	CKM_IDEA_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_IDEA_ECB	allow: -	CKM_IDEA_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_IDEA_KEY_GEN	allow: -	CKM_IDEA_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_IDEA_MAC	allow: -	CKM_IDEA_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_IDEA_MAC_GENERAL	allow: -	CKM_IDEA_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_IKE1_EXTENDED_DERIVE	allow: -	CKM_IKE1_EXTENDED_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_IKE1_PRF_DERIVE	allow: -	CKM_IKE1_PRF_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_IKE2_PRF_PLUS_DERIVE	allow: -	CKM_IKE2_PRF_PLUS_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_IKE_PRF_DERIVE	allow: -	CKM_IKE_PRF_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_JUNIPER_CBC128	allow: -	CKM_JUNIPER_CBC128 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_JUNIPER_COUNTER	allow: -	CKM_JUNIPER_COUNTER is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_JUNIPER_ECB128	allow: -	CKM_JUNIPER_ECB128 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_JUNIPER_KEY_GEN	allow: -	CKM_JUNIPER_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_JUNIPER_SHUFFLE	allow: -	CKM_JUNIPER_SHUFFLE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_JUNIPER_WRAP	allow: -	CKM_JUNIPER_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KEA_DERIVE	allow: -	CKM_KEA_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KEA_KEY_DERIVE	allow: -	CKM_KEA_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KEA_KEY_PAIR_GEN	allow: -	CKM_KEA_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KEY_WRAP_LYNKS	allow: -	CKM_KEY_WRAP_LYNKS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KEY_WRAP_SET_OAEP	allow: -	CKM_KEY_WRAP_SET_OAEP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KIP_DERIVE	allow: -	CKM_KIP_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KIP_MAC	allow: -	CKM_KIP_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_KIP_WRAP	allow: -	CKM_KIP_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD2	allow: -	CKM_MD2 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD2 and MD5 are cryptographically broken. Use CKM_SHA256 or stronger.
+mechanism	CKM_MD2_HMAC	allow: -	CKM_MD2_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD2_HMAC_GENERAL	allow: -	CKM_MD2_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD2_KEY_DERIVATION	allow: -	CKM_MD2_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD2_RSA_PKCS	allow: -	CKM_MD2_RSA_PKCS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD5	allow: -	CKM_MD5 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD2 and MD5 are cryptographically broken. Use CKM_SHA256 or stronger.
+mechanism	CKM_MD5_HMAC	allow: -	CKM_MD5_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD5_HMAC_GENERAL	allow: -	CKM_MD5_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD5_KEY_DERIVATION	allow: -	CKM_MD5_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_MD5_RSA_PKCS	allow: -	CKM_MD5_RSA_PKCS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_ML_DSA	allow: Sign,Verify	CKM_ML_DSA is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 204
+mechanism	CKM_ML_DSA_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_ML_DSA_KEY_PAIR_GEN is allowed under NistApproved only for GenerateKeyPair; {op} is not. FIPS 203 / 204 / 205 || CKM_ML_DSA_KEY_PAIR_GEN is allowed under NistApproved only for {op}Pair; {op} is not. FIPS 203 / 204 / 205
+mechanism	CKM_ML_KEM	allow: Encapsulate,Decapsulate	CKM_ML_KEM is allowed under NistApproved only for Encapsulate, Decapsulate; {op} is not. FIPS 203
+mechanism	CKM_ML_KEM_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_ML_KEM_KEY_PAIR_GEN is allowed under NistApproved only for GenerateKeyPair; {op} is not. FIPS 203 / 204 / 205 || CKM_ML_KEM_KEY_PAIR_GEN is allowed under NistApproved only for {op}Pair; {op} is not. FIPS 203 / 204 / 205
+mechanism	CKM_NULL	allow: -	CKM_NULL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBA_SHA1_WITH_SHA1_HMAC	allow: -	CKM_PBA_SHA1_WITH_SHA1_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_MD2_DES_CBC	allow: -	CKM_PBE_MD2_DES_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_CAST128_CBC	allow: -	CKM_PBE_MD5_CAST128_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_CAST3_CBC	allow: -	CKM_PBE_MD5_CAST3_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_CAST_CBC	allow: -	CKM_PBE_MD5_CAST_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_MD5_DES_CBC	allow: -	CKM_PBE_MD5_DES_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_CAST128_CBC	allow: -	CKM_PBE_SHA1_CAST128_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_DES2_EDE_CBC	allow: -	CKM_PBE_SHA1_DES2_EDE_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_DES3_EDE_CBC	allow: -	CKM_PBE_SHA1_DES3_EDE_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC2_128_CBC	allow: -	CKM_PBE_SHA1_RC2_128_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC2_40_CBC	allow: -	CKM_PBE_SHA1_RC2_40_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC4_128	allow: -	CKM_PBE_SHA1_RC4_128 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PBE_SHA1_RC4_40	allow: -	CKM_PBE_SHA1_RC4_40 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PKCS5_PBKD2	allow: -	CKM_PKCS5_PBKD2 is allowed under NistApproved only for Derive, GenerateKey; {op} is not. SP 800-132 || SP 800-132: CKM_PKCS5_PBKD2 requires CkmPkcs5Pbkd2Params naming an approved PRF (HMAC-SHA-1/224/256/384/512/512-224/512-256).
+mechanism	CKM_POLY1305	allow: -	CKM_POLY1305 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_POLY1305_KEY_GEN	allow: -	CKM_POLY1305_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_PUB_KEY_FROM_PRIV_KEY	allow: -	CKM_PUB_KEY_FROM_PRIV_KEY is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RC2_CBC	allow: -	CKM_RC2_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC2_CBC_PAD	allow: -	CKM_RC2_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC2_ECB	allow: -	CKM_RC2_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC2_KEY_GEN	allow: -	CKM_RC2_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC2_MAC	allow: -	CKM_RC2_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC2_MAC_GENERAL	allow: -	CKM_RC2_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC4	allow: -	CKM_RC4 is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC4_KEY_GEN	allow: -	CKM_RC4_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC5_CBC	allow: -	CKM_RC5_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC5_CBC_PAD	allow: -	CKM_RC5_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC5_ECB	allow: -	CKM_RC5_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC5_KEY_GEN	allow: -	CKM_RC5_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC5_MAC	allow: -	CKM_RC5_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RC5_MAC_GENERAL	allow: -	CKM_RC5_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_RIPEMD128	allow: -	CKM_RIPEMD128 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD2 and MD5 are cryptographically broken. Use CKM_SHA256 or stronger.
+mechanism	CKM_RIPEMD128_HMAC	allow: -	CKM_RIPEMD128_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RIPEMD128_HMAC_GENERAL	allow: -	CKM_RIPEMD128_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RIPEMD128_RSA_PKCS	allow: -	CKM_RIPEMD128_RSA_PKCS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RIPEMD160	allow: -	CKM_RIPEMD160 is not allowed: Not defined by FIPS 180-4 or FIPS 202; MD2 and MD5 are cryptographically broken. Use CKM_SHA256 or stronger.
+mechanism	CKM_RIPEMD160_HMAC	allow: -	CKM_RIPEMD160_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RIPEMD160_HMAC_GENERAL	allow: -	CKM_RIPEMD160_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RIPEMD160_RSA_PKCS	allow: -	CKM_RIPEMD160_RSA_PKCS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RSA_9796	allow: -	CKM_RSA_9796 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RSA_AES_KEY_WRAP	allow: -	CKM_RSA_AES_KEY_WRAP is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RSA_PKCS	allow: Sign,Verify	CKM_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4 (signatures only: SP 800-131A Rev.2 §6 / Table 5 disallows PKCS#1 v1.5 key transport after 2023; use CKM_RSA_PKCS_OAEP)
+mechanism	CKM_RSA_PKCS_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_RSA_PKCS_KEY_PAIR_GEN is allowed under NistApproved only for GenerateKeyPair; {op} is not. FIPS 186-5 §A.1 || CKM_RSA_PKCS_KEY_PAIR_GEN is allowed under NistApproved only for {op}Pair; {op} is not. FIPS 186-5 §A.1
+mechanism	CKM_RSA_PKCS_OAEP	allow: -	CKM_RSA_PKCS_OAEP is allowed under NistApproved only for Encrypt, Decrypt, Wrap, Unwrap; {op} is not. SP 800-56B Rev.2 || SP 800-56B Rev.2 §7.2.2.1: RSA-OAEP requires CkmRsaPkcsOaepParams with an approved hash.
+mechanism	CKM_RSA_PKCS_OAEP_TPM_1_1	allow: -	CKM_RSA_PKCS_OAEP_TPM_1_1 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RSA_PKCS_PSS	allow: -	CKM_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4 || FIPS 186-5 §5.4: RSA-PSS requires CkmRsaPkcsPssParams with an approved hash.
+mechanism	CKM_RSA_PKCS_TPM_1_1	allow: -	CKM_RSA_PKCS_TPM_1_1 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RSA_X9_31	allow: -	CKM_RSA_X9_31 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_RSA_X9_31_KEY_PAIR_GEN	allow: -	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+mechanism	CKM_RSA_X_509	allow: -	CKM_RSA_X_509 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SALSA20	allow: -	CKM_SALSA20 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SALSA20_KEY_GEN	allow: -	CKM_SALSA20_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SALSA20_POLY1305	allow: -	CKM_SALSA20_POLY1305 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SECURID	allow: -	CKM_SECURID is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SECURID_KEY_GEN	allow: -	CKM_SECURID_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SEED_CBC	allow: -	CKM_SEED_CBC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_SEED_CBC_ENCRYPT_DATA	allow: -	CKM_SEED_CBC_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SEED_CBC_PAD	allow: -	CKM_SEED_CBC_PAD is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_SEED_ECB	allow: -	CKM_SEED_ECB is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_SEED_ECB_ENCRYPT_DATA	allow: -	CKM_SEED_ECB_ENCRYPT_DATA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SEED_KEY_GEN	allow: -	CKM_SEED_KEY_GEN is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_SEED_MAC	allow: -	CKM_SEED_MAC is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_SEED_MAC_GENERAL	allow: -	CKM_SEED_MAC_GENERAL is not allowed: Not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_CBC, CKM_AES_GCM, or CKM_AES_CCM.
+mechanism	CKM_SHA1_KEY_DERIVATION	allow: -	CKM_SHA1_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA1_RSA_PKCS	allow: Verify	CKM_SHA1_RSA_PKCS is allowed under NistApproved only for Verify; {op} is not. SP 800-131A Rev.2 §9 (SHA-1 signature generation disallowed)
+mechanism	CKM_SHA1_RSA_PKCS_PSS	allow: Verify	CKM_SHA1_RSA_PKCS_PSS is allowed under NistApproved only for Verify; {op} is not. SP 800-131A Rev.2 §9 (SHA-1 signature generation disallowed)
+mechanism	CKM_SHA1_RSA_X9_31	allow: -	CKM_SHA1_RSA_X9_31 is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA224	allow: Digest	CKM_SHA224 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA224_HMAC	allow: Sign,Verify	CKM_SHA224_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA224_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA224_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA224_KEY_DERIVATION	allow: -	CKM_SHA224_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA224_KEY_GEN	allow: GenerateKey	CKM_SHA224_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA224_RSA_PKCS	allow: Sign,Verify	CKM_SHA224_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA224_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA224_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA256	allow: Digest	CKM_SHA256 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA256_HMAC	allow: Sign,Verify	CKM_SHA256_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA256_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA256_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA256_KEY_DERIVATION	allow: -	CKM_SHA256_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA256_KEY_GEN	allow: GenerateKey	CKM_SHA256_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA256_RSA_PKCS	allow: Sign,Verify	CKM_SHA256_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA256_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA256_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA384	allow: Digest	CKM_SHA384 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA384_HMAC	allow: Sign,Verify	CKM_SHA384_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA384_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA384_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA384_KEY_DERIVATION	allow: -	CKM_SHA384_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA384_KEY_GEN	allow: GenerateKey	CKM_SHA384_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA384_RSA_PKCS	allow: Sign,Verify	CKM_SHA384_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA384_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA384_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA3_224	allow: Digest	CKM_SHA3_224 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA3_224_HMAC	allow: Sign,Verify	CKM_SHA3_224_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_224_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_224_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_224_KEY_DERIVE	allow: -	CKM_SHA3_224_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA3_224_KEY_GEN	allow: GenerateKey	CKM_SHA3_224_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA3_224_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_224_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA3_224_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_224_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA3_256	allow: Digest	CKM_SHA3_256 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA3_256_HMAC	allow: Sign,Verify	CKM_SHA3_256_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_256_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_256_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_256_KEY_DERIVE	allow: -	CKM_SHA3_256_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA3_256_KEY_GEN	allow: GenerateKey	CKM_SHA3_256_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA3_256_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_256_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA3_256_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_256_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA3_384	allow: Digest	CKM_SHA3_384 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA3_384_HMAC	allow: Sign,Verify	CKM_SHA3_384_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_384_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_384_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_384_KEY_DERIVE	allow: -	CKM_SHA3_384_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA3_384_KEY_GEN	allow: GenerateKey	CKM_SHA3_384_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA3_384_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_384_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA3_384_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_384_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA3_512	allow: Digest	CKM_SHA3_512 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA3_512_HMAC	allow: Sign,Verify	CKM_SHA3_512_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_512_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA3_512_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA3_512_KEY_DERIVE	allow: -	CKM_SHA3_512_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA3_512_KEY_GEN	allow: GenerateKey	CKM_SHA3_512_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA3_512_RSA_PKCS	allow: Sign,Verify	CKM_SHA3_512_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA3_512_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA3_512_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA512	allow: Digest	CKM_SHA512 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA512_224	allow: Digest	CKM_SHA512_224 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA512_224_HMAC	allow: Sign,Verify	CKM_SHA512_224_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA512_224_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA512_224_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA512_224_KEY_DERIVATION	allow: -	CKM_SHA512_224_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA512_224_KEY_GEN	allow: GenerateKey	CKM_SHA512_224_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA512_256	allow: Digest	CKM_SHA512_256 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA512_256_HMAC	allow: Sign,Verify	CKM_SHA512_256_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA512_256_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA512_256_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA512_256_KEY_DERIVATION	allow: -	CKM_SHA512_256_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA512_256_KEY_GEN	allow: GenerateKey	CKM_SHA512_256_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA512_HMAC	allow: Sign,Verify	CKM_SHA512_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA512_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA512_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA512_KEY_DERIVATION	allow: -	CKM_SHA512_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA512_KEY_GEN	allow: GenerateKey	CKM_SHA512_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SHA512_RSA_PKCS	allow: Sign,Verify	CKM_SHA512_RSA_PKCS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5
+mechanism	CKM_SHA512_RSA_PKCS_PSS	allow: Sign,Verify	CKM_SHA512_RSA_PKCS_PSS is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 186-5 §5.4
+mechanism	CKM_SHA512_T	allow: -	CKM_SHA512_T is not allowed: FIPS 180-4 §5.3.6 approves SHA-512/t only for t = 224 and t = 256, which have their own mechanisms; a caller-chosen truncation has no approval. Use CKM_SHA512_224 or CKM_SHA512_256.
+mechanism	CKM_SHA512_T_HMAC	allow: -	CKM_SHA512_T_HMAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA512_T_HMAC_GENERAL	allow: -	CKM_SHA512_T_HMAC_GENERAL is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA512_T_KEY_DERIVATION	allow: -	CKM_SHA512_T_KEY_DERIVATION is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA512_T_KEY_GEN	allow: -	CKM_SHA512_T_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHAKE_128_KEY_DERIVE	allow: -	CKM_SHAKE_128_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHAKE_256_KEY_DERIVE	allow: -	CKM_SHAKE_256_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SHA_1	allow: Digest	CKM_SHA_1 is allowed under NistApproved only for Digest; {op} is not. FIPS 180-4 / FIPS 202
+mechanism	CKM_SHA_1_HMAC	allow: Sign,Verify	CKM_SHA_1_HMAC is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA_1_HMAC_GENERAL	allow: Sign,Verify	CKM_SHA_1_HMAC_GENERAL is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 198-1 / SP 800-131A Rev.2 §10
+mechanism	CKM_SHA_1_KEY_GEN	allow: GenerateKey	CKM_SHA_1_KEY_GEN is allowed under NistApproved only for GenerateKey; {op} is not. SP 800-133 Rev.2
+mechanism	CKM_SKIPJACK_CBC64	allow: -	CKM_SKIPJACK_CBC64 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_CFB16	allow: -	CKM_SKIPJACK_CFB16 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_CFB32	allow: -	CKM_SKIPJACK_CFB32 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_CFB64	allow: -	CKM_SKIPJACK_CFB64 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_CFB8	allow: -	CKM_SKIPJACK_CFB8 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_ECB64	allow: -	CKM_SKIPJACK_ECB64 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_KEY_GEN	allow: -	CKM_SKIPJACK_KEY_GEN is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_OFB64	allow: -	CKM_SKIPJACK_OFB64 is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_PRIVATE_WRAP	allow: -	CKM_SKIPJACK_PRIVATE_WRAP is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_RELAYX	allow: -	CKM_SKIPJACK_RELAYX is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SKIPJACK_WRAP	allow: -	CKM_SKIPJACK_WRAP is not allowed: Skipjack (Clipper/Capstone) was withdrawn and is not on the SP 800-140C Rev.2 CMVP-approved algorithm list. Use CKM_AES_KEY_WRAP, CKM_AES_KEY_WRAP_KWP, or CKM_AES_GCM.
+mechanism	CKM_SLH_DSA	allow: Sign,Verify	CKM_SLH_DSA is allowed under NistApproved only for Sign, Verify; {op} is not. FIPS 205
+mechanism	CKM_SLH_DSA_KEY_PAIR_GEN	allow: GenerateKeyPair	CKM_SLH_DSA_KEY_PAIR_GEN is allowed under NistApproved only for GenerateKeyPair; {op} is not. FIPS 203 / 204 / 205 || CKM_SLH_DSA_KEY_PAIR_GEN is allowed under NistApproved only for {op}Pair; {op} is not. FIPS 203 / 204 / 205
+mechanism	CKM_SP800_108_COUNTER_KDF	allow: -	CKM_SP800_108_COUNTER_KDF is allowed under NistApproved only for Derive; {op} is not. SP 800-108r1 || SP 800-108r1: key derivation requires CkmSp800108KdfParams naming an approved PRF (HMAC over an approved hash, or AES-CMAC).
+mechanism	CKM_SP800_108_DOUBLE_PIPELINE_KDF	allow: -	CKM_SP800_108_DOUBLE_PIPELINE_KDF is allowed under NistApproved only for Derive; {op} is not. SP 800-108r1 || SP 800-108r1: key derivation requires CkmSp800108KdfParams naming an approved PRF (HMAC over an approved hash, or AES-CMAC).
+mechanism	CKM_SP800_108_FEEDBACK_KDF	allow: -	CKM_SP800_108_FEEDBACK_KDF is allowed under NistApproved only for Derive; {op} is not. SP 800-108r1 || SP 800-108r1: key derivation requires CkmSp800108KdfParams naming an approved PRF (HMAC over an approved hash, or AES-CMAC).
+mechanism	CKM_SSL3_KEY_AND_MAC_DERIVE	allow: -	CKM_SSL3_KEY_AND_MAC_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SSL3_MASTER_KEY_DERIVE	allow: -	CKM_SSL3_MASTER_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SSL3_MASTER_KEY_DERIVE_DH	allow: -	CKM_SSL3_MASTER_KEY_DERIVE_DH is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SSL3_MD5_MAC	allow: -	CKM_SSL3_MD5_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SSL3_PRE_MASTER_KEY_GEN	allow: -	CKM_SSL3_PRE_MASTER_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_SSL3_SHA1_MAC	allow: -	CKM_SSL3_SHA1_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS10_MAC_CLIENT	allow: -	CKM_TLS10_MAC_CLIENT is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS10_MAC_SERVER	allow: -	CKM_TLS10_MAC_SERVER is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE	allow: -	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS12_EXTENDED_MASTER_KEY_DERIVE_DH is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_KDF	allow: -	CKM_TLS12_KDF is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_KEY_AND_MAC_DERIVE	allow: -	CKM_TLS12_KEY_AND_MAC_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_KEY_SAFE_DERIVE	allow: -	CKM_TLS12_KEY_SAFE_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_MAC	allow: -	CKM_TLS12_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_MASTER_KEY_DERIVE	allow: -	CKM_TLS12_MASTER_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS12_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS12_MASTER_KEY_DERIVE_DH is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_KDF	allow: -	CKM_TLS_KDF is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_KEY_AND_MAC_DERIVE	allow: -	CKM_TLS_KEY_AND_MAC_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_MAC	allow: -	CKM_TLS_MAC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_MASTER_KEY_DERIVE	allow: -	CKM_TLS_MASTER_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_MASTER_KEY_DERIVE_DH	allow: -	CKM_TLS_MASTER_KEY_DERIVE_DH is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_PRE_MASTER_KEY_GEN	allow: -	CKM_TLS_PRE_MASTER_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TLS_PRF	allow: -	CKM_TLS_PRF is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TWOFISH_CBC	allow: -	CKM_TWOFISH_CBC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TWOFISH_CBC_PAD	allow: -	CKM_TWOFISH_CBC_PAD is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_TWOFISH_KEY_GEN	allow: -	CKM_TWOFISH_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_VENDOR_DEFINED	allow: -	CKM_VENDOR_DEFINED is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE	allow: -	CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_WTLS_MASTER_KEY_DERIVE	allow: -	CKM_WTLS_MASTER_KEY_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC	allow: -	CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_WTLS_PRE_MASTER_KEY_GEN	allow: -	CKM_WTLS_PRE_MASTER_KEY_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_WTLS_PRF	allow: -	CKM_WTLS_PRF is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE	allow: -	CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_DECRYPT	allow: -	CKM_X2RATCHET_DECRYPT is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_ENCRYPT	allow: -	CKM_X2RATCHET_ENCRYPT is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_INITIALIZE	allow: -	CKM_X2RATCHET_INITIALIZE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X2RATCHET_RESPOND	allow: -	CKM_X2RATCHET_RESPOND is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X3DH_INITIALIZE	allow: -	CKM_X3DH_INITIALIZE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X3DH_RESPOND	allow: -	CKM_X3DH_RESPOND is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_DERIVE	allow: -	CKM_X9_42_DH_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_HYBRID_DERIVE	allow: -	CKM_X9_42_DH_HYBRID_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_KEY_PAIR_GEN	allow: -	CKM_X9_42_DH_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X9_42_DH_PARAMETER_GEN	allow: -	CKM_X9_42_DH_PARAMETER_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_X9_42_MQV_DERIVE	allow: -	CKM_X9_42_MQV_DERIVE is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_XEDDSA	allow: -	CKM_XEDDSA is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_XMSS	allow: -	CKM_XMSS is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_XMSSMT	allow: -	CKM_XMSSMT is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_XMSSMT_KEY_PAIR_GEN	allow: -	CKM_XMSSMT_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_XMSS_KEY_PAIR_GEN	allow: -	CKM_XMSS_KEY_PAIR_GEN is not on the NistApproved allow-list (not reviewed).
+mechanism	CKM_XOR_BASE_AND_DATA	allow: -	CKM_XOR_BASE_AND_DATA is not on the NistApproved allow-list (not reviewed).
+oaep	CKM_SHA224/CKG_MGF1_SHA224	allow	
+oaep	CKM_SHA256/CKG_MGF1_SHA1	allow	
+oaep	CKM_SHA256/CKG_MGF1_SHA256	allow	
+oaep	CKM_SHA384/CKG_MGF1_SHA384	allow	
+oaep	CKM_SHA3_256/CKG_MGF1_SHA3_256	allow	
+oaep	CKM_SHA512/CKG_MGF1_SHA512	allow	
+oaep	CKM_SHA_1/CKG_MGF1_SHA1	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_GOSTR3411	deny	SP 800-132: CKP_PKCS5_PBKD2_HMAC_GOSTR3411 is not allowed: GOST R 34.11-94 is a regional (Russian national standard) hash that has not been reviewed for this policy. Use an approved PRF (HMAC over an approved hash, or AES-CMAC where the mechanism allows it).
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA1	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA224	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA256	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA384	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512_224	allow	
+pbkdf2	CKP_PKCS5_PBKD2_HMAC_SHA512_256	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA256	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA3_256	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA512	allow	
+pqc-prehash	CKM_HASH_ML_DSA CKM_SHA_1	deny	FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512).
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA256	allow	
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA3_256	allow	
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA512	allow	
+pqc-prehash	CKM_HASH_SLH_DSA CKM_SHA_1	deny	FIPS 204 §5.4 / FIPS 205 §10: HashML-DSA / HashSLH-DSA require CkmHashPqcSignParams with a pre-hash of at least 128-bit collision strength (SHA-256/384/512 or SHA3-256/384/512).
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Sign	deny	FIPS 186-5 §5.4(g): a 32-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Verify	deny	FIPS 186-5 §5.4(g): a 32-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Sign	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Verify	allow	
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Verify	deny	FIPS 186-5 §5.4(g): a 32-byte salt exceeds the 20-byte CKM_SHA_1 output.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 20-byte CKM_SHA_1 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Sign	deny	FIPS 186-5 §5.4(g): a 32-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 32 Verify	deny	FIPS 186-5 §5.4(g): a 32-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA224/CKG_MGF1_SHA224 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 28-byte CKM_SHA224 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA1 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA256/CKG_MGF1_SHA256 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA384/CKG_MGF1_SHA384 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 48-byte CKM_SHA384 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Sign	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA3_256/CKG_MGF1_SHA3_256 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 32-byte CKM_SHA3_256 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 32 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Sign	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA512/CKG_MGF1_SHA512 salt 64 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 0 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 20 Verify	allow	
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 32 Verify	deny	FIPS 186-5 §5.4(g): a 32-byte salt exceeds the 20-byte CKM_SHA_1 output.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Sign	deny	SP 800-131A Rev.2 §9: CKM_SHA_1 is not approved for RSA-PSS Sign.
+pss	CKM_SHA256_RSA_PKCS_PSS CKM_SHA_1/CKG_MGF1_SHA1 salt 64 Verify	deny	FIPS 186-5 §5.4(g): a 64-byte salt exceeds the 20-byte CKM_SHA_1 output.
+raw	CKM_AES_CCM	deny	SP 800-38C: AES-CCM requires CkmAesCcmParams or CkmCcmMessageParams, so the MAC length can be checked.
+raw	CKM_AES_GCM	deny	SP 800-38D §5.2.1.2: AES-GCM requires CkmAesGcmParams or CkmGcmMessageParams, so the tag length can be checked.
+raw	CKM_ECDH1_DERIVE	deny	CKM_ECDH1_DERIVE requires CkmEcdh1DeriveParams, so that the key-agreement KDF it applies to the shared secret (SP 800-56A Rev.3 §5.8) can be checked.
+raw	CKM_HKDF_DERIVE	deny	SP 800-56C Rev.2: CKM_HKDF_DERIVE requires CkmHkdfParams naming an approved PRF (an approved hash, hash or _HMAC form).
+raw	CKM_PKCS5_PBKD2	deny	SP 800-132: CKM_PKCS5_PBKD2 requires CkmPkcs5Pbkd2Params naming an approved PRF (HMAC-SHA-1/224/256/384/512/512-224/512-256).
+raw	CKM_RSA_PKCS_OAEP	deny	SP 800-56B Rev.2 §7.2.2.1: RSA-OAEP requires CkmRsaPkcsOaepParams with an approved hash.
+raw	CKM_RSA_PKCS_PSS	deny	FIPS 186-5 §5.4: RSA-PSS requires CkmRsaPkcsPssParams with an approved hash.
+raw	CKM_SHA256_RSA_PKCS_PSS	deny	FIPS 186-5 §5.4: RSA-PSS parameters must be CkmRsaPkcsPssParams.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 1024	deny	FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3: RSA-1024 is below the 2048-bit minimum for key generation.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 1536	deny	FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3: RSA-1536 is below the 2048-bit minimum for key generation.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 2047	deny	FIPS 186-5 §5.1 / SP 800-131A Rev.2 §3: RSA-2047 is below the 2048-bit minimum for key generation.
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 2048	allow	
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 3072	allow	
+rsa-keygen	CKM_RSA_PKCS_KEY_PAIR_GEN 4096	allow	
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 1024	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 1536	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 2047	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 2048	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 3072	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+rsa-keygen	CKM_RSA_X9_31_KEY_PAIR_GEN 4096	deny	CKM_RSA_X9_31_KEY_PAIR_GEN is not allowed: FIPS 186-5 withdrew Appendix E; RSA key generation via ANSI X9.31 is no longer an approved method. Use CKM_RSA_PKCS_KEY_PAIR_GEN.
+sp800-108	CKM_AES_CMAC	allow	
+sp800-108	CKM_MD5_HMAC	deny	SP 800-108r1: CKM_MD5_HMAC is not an approved SP 800-108 PRF; use HMAC over an approved hash, or AES-CMAC.
+sp800-108	CKM_SHA224_HMAC	allow	
+sp800-108	CKM_SHA256_HMAC	allow	
+sp800-108	CKM_SHA384_HMAC	allow	
+sp800-108	CKM_SHA3_256_HMAC	allow	
+sp800-108	CKM_SHA512_HMAC	allow	
+sp800-108	CKM_SHA_1_HMAC	allow	
+sp800-108	double-pipeline CKM_SHA256_HMAC	allow	
+sp800-108	double-pipeline CKM_SHA_1_HMAC	allow	
+sp800-108	feedback CKM_SHA256_HMAC	allow	
+sp800-108	feedback CKM_SHA_1_HMAC	allow	
+template	private, CKA_SENSITIVE=false	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): CSPs must not be output in plaintext; CKA_SENSITIVE=false is refused.
+template	secret, CKA_EXTRACTABLE=true	allow	
+template	secret, CKA_SENSITIVE=false	deny	FIPS 140-3 (ISO/IEC 19790 §7.9): CSPs must not be output in plaintext; CKA_SENSITIVE=false is refused.
+template	secret, CKA_SENSITIVE=true	allow	

@@ -30,7 +30,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </remarks>
 [Obsolete("DSA is disallowed for signature generation by NIST FIPS 186-5 (2023) and is removed from modern " +
           "deployments. Use ECDsaPkcs11 (ECDSA) or MLDsaPkcs11 (ML-DSA). DSAPkcs11 remains only for interop " +
-          "with existing DSA keys; SHA-1 hashing additionally requires a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) on the wrapped key's workspace.",
+          "with existing DSA keys, and is refused by the default crypto policy; to enable it, see " +
+          DiagnosticIds.LegacyAlgorithmsUrl + "#dsa.",
     DiagnosticId = DiagnosticIds.Dsa,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class DSAPkcs11 : DSA
@@ -136,7 +137,7 @@ public sealed class DSAPkcs11 : DSA
         ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
             return _key.Verify(combined, data, signature);
 
         byte[] hash = HashData(hashAlgorithm, data);
@@ -147,7 +148,7 @@ public sealed class DSAPkcs11 : DSA
     private byte[] SignDataInternal(ReadOnlySpan<byte> data, HashAlgorithmName hashAlgorithm)
     {
         var combined = Pkcs11MechanismMap.DsaSign(hashAlgorithm);
-        if (_key.SupportsMechanism(combined))
+        if (_key.SupportsMechanism(combined.Type))
             return _key.Sign(combined, data);
 
         byte[] hash = HashData(hashAlgorithm, data);
@@ -185,7 +186,7 @@ public sealed class DSAPkcs11 : DSA
     /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
-    /// <exception cref="Pkcs11Exception">Thrown when the domain parameters or public value (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) are sensitive or cannot be read.</exception>
+    /// <exception cref="CryptographicException">Thrown when the token does not expose the domain parameters or public value (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>).</exception>
     public override DSAParameters ExportParameters(bool includePrivateParameters)
     {
         if (includePrivateParameters)
@@ -197,8 +198,8 @@ public sealed class DSAPkcs11 : DSA
         // so CKA_VALUE resolves to the public value Y (not the private value X).
         using var attrs = _key.GetAttributeValue(CKA.CKA_PRIME, CKA.CKA_SUBPRIME, CKA.CKA_BASE, CKA.CKA_VALUE);
         if (attrs[0].CannotBeRead || attrs[1].CannotBeRead || attrs[2].CannotBeRead || attrs[3].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "DSAPkcs11.ExportParameters (CKA_PRIME / CKA_SUBPRIME / CKA_BASE / CKA_VALUE)");
+            throw new CryptographicException(
+                "The token does not expose this key's public DSA parameters (CKA_PRIME / CKA_SUBPRIME / CKA_BASE / CKA_VALUE).");
 
         byte[] p = TrimLeadingZeros(attrs[0].GetValueAsByteArray());
         byte[] q = TrimLeadingZeros(attrs[1].GetValueAsByteArray());

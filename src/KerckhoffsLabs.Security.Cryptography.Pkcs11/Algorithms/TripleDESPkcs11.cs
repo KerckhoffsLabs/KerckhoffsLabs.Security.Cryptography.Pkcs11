@@ -50,7 +50,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("Triple-DES has a 64-bit block (Sweet32) and is NIST-deprecated. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "TripleDESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "TripleDESPkcs11 is refused by the default crypto policy; to enable it for legacy interop, see " +
+          DiagnosticIds.LegacyAlgorithmsUrl + "#triple-des.",
     DiagnosticId = DiagnosticIds.TripleDes,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class TripleDESPkcs11 : TripleDES
@@ -127,7 +128,7 @@ public sealed class TripleDESPkcs11 : TripleDES
         // Padded encryption (CKM_DES3_CBC_PAD) must emit a full padding block, so that path always
         // goes to the token.
         if (input.IsEmpty
-            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && _key.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
             && !(encrypt && mechanism.Type == CKM.CKM_DES3_CBC_PAD))
         {
             bytesWritten = 0;

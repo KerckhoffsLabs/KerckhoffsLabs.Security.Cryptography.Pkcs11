@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 internal static class WrapUnwrapKeyTestCases
 {
-    // CKM_AES_KEY_WRAP_PKCS7 is a SecureOnly documented refusal (non-standard padding, not RFC 5649), so its
+    // CKM_AES_KEY_WRAP_PKCS7 is a Recommended documented refusal (non-standard padding, not RFC 5649), so its
     // cases opt in for the wrap / unwrap calls; the RFC 3394 / 5649 variants run under the default policy.
     // Secure key defaults on unwrap do not depend on the policy, so the opt-in does not mask them.
     private static IDisposable? OptInIfRefusedByDefault(Pkcs11Session session, CKM wrapMechanism)

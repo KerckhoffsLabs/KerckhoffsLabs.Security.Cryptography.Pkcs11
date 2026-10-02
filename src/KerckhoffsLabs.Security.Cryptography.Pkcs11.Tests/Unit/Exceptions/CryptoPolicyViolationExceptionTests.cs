@@ -28,13 +28,13 @@ public sealed class CryptoPolicyViolationExceptionTests
     {
         var request = new MechanismUseRequest(new Mechanism(CKM.CKM_DES_ECB), CryptoOperation.Encrypt);
 
-        var ex = new CryptoPolicyViolationException("SecureOnly", request, "DES is deprecated.");
+        var ex = new CryptoPolicyViolationException("Recommended", request, "DES is deprecated.");
 
-        Assert.Equal("SecureOnly", ex.PolicyName);
+        Assert.Equal("Recommended", ex.PolicyName);
         Assert.Same(request, ex.Request);
         Assert.Equal("DES is deprecated.", ex.Reason);
         Assert.Equal(CKM.CKM_DES_ECB, ex.Mechanism);
-        Assert.Equal("SecureOnly policy refused CKM_DES_ECB for Encrypt: DES is deprecated.", ex.Message);
+        Assert.Equal("Recommended policy refused CKM_DES_ECB for Encrypt: DES is deprecated.", ex.Message);
         Assert.IsType<System.Security.Cryptography.CryptographicException>(ex, exactMatch: false);
     }
 
@@ -47,10 +47,10 @@ public sealed class CryptoPolicyViolationExceptionTests
     {
         var request = new MechanismUseRequest(new Mechanism((CKM)0x1_0000_0001UL), CryptoOperation.Sign);
 
-        var ex = new CryptoPolicyViolationException("SecureOnly", request, "Not reviewed.");
+        var ex = new CryptoPolicyViolationException("Recommended", request, "Not reviewed.");
 
         Assert.Equal((CKM)0x1_0000_0001UL, ex.Mechanism);
-        Assert.Equal("SecureOnly policy refused vendor mechanism 0x100000001 for Sign: Not reviewed.", ex.Message);
+        Assert.Equal("Recommended policy refused vendor mechanism 0x100000001 for Sign: Not reviewed.", ex.Message);
     }
 
     [Fact]
@@ -58,10 +58,10 @@ public sealed class CryptoPolicyViolationExceptionTests
     {
         var request = new MechanismUseRequest(new Mechanism((CKM)0x8000_1234UL), CryptoOperation.Sign);
 
-        var ex = new CryptoPolicyViolationException("SecureOnly", request, "Not reviewed.");
+        var ex = new CryptoPolicyViolationException("Recommended", request, "Not reviewed.");
 
         Assert.Equal((CKM)0x8000_1234U, ex.Mechanism);
-        Assert.Equal("SecureOnly policy refused vendor mechanism 0x80001234 for Sign: Not reviewed.", ex.Message);
+        Assert.Equal("Recommended policy refused vendor mechanism 0x80001234 for Sign: Not reviewed.", ex.Message);
     }
 
     [Fact]
@@ -72,9 +72,9 @@ public sealed class CryptoPolicyViolationExceptionTests
         Assert.Equal("policyName", Assert.Throws<ArgumentNullException>(
             () => new CryptoPolicyViolationException(null!, request, "reason")).ParamName);
         Assert.Equal("request", Assert.Throws<ArgumentNullException>(
-            () => new CryptoPolicyViolationException("SecureOnly", null!, "reason")).ParamName);
+            () => new CryptoPolicyViolationException("Recommended", null!, "reason")).ParamName);
         Assert.Equal("reason", Assert.Throws<ArgumentNullException>(
-            () => new CryptoPolicyViolationException("SecureOnly", request, null!)).ParamName);
+            () => new CryptoPolicyViolationException("Recommended", request, null!)).ParamName);
     }
 
     [Fact]
