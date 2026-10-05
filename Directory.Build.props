@@ -1,29 +1,16 @@
 <Project>
 
   <PropertyGroup>
-    <!--
-      Compiler and analyzer warnings fail the build across every project in the
-      repo. Warnings are not advisory: fix the warning, or suppress it at the
-      source with a justified #pragma / [SuppressMessage], never silently leave it.
-    -->
+    <!-- Fix a warning or suppress it at the source with a justified #pragma / [SuppressMessage]. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-    <!--
-      .NET analyzers and .editorconfig code-style rules, enabled once for every
-      project instead of per-csproj. EnforceCodeStyleInBuild runs the IDExxxx style
-      rules during `dotnet build`, so the .editorconfig style block has teeth on the
-      build and in CI — not just as IDE hints. Combined with TreatWarningsAsErrors
-      above, a `:warning`-severity style rule fails the build.
-    -->
+    <!-- Runs the .editorconfig IDExxxx rules during `dotnet build`; with TreatWarningsAsErrors,
+         a `warning`-severity style rule fails the build. -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
-    <!--
-      IDE0005 (remove unnecessary usings) only runs at build when a documentation file
-      is generated (dotnet/roslyn#41640), so turn it on repo-wide. The library documents
-      its public surface; projects without public XML docs (tests, the Roslyn generator)
-      silence CS1591 in their own csproj.
-    -->
+    <!-- Required for IDE0005 (unnecessary usings) to run at build time (dotnet/roslyn#41640).
+         Projects without public XML docs (tests, the generator) suppress CS1591 in their csproj. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
