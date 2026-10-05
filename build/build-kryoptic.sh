@@ -57,7 +57,7 @@ fi
 echo "Building Kryoptic for ${RID}..."
 
 # Kryoptic's "standard" feature set requires OpenSSL >= 3.2.0 (EdDSA needs ossl/ossl320);
-# "pqc" (ML-KEM/ML-DSA/SLH-DSA — the whole reason this backend exists, see BL-028) further
+# "pqc" (ML-KEM/ML-DSA/SLH-DSA — the whole reason this backend exists) further
 # requires OpenSSL >= 3.5.0 (ossl/ossl350). ubuntu-latest ships OpenSSL 3.0, so — exactly like
 # SoftHSM and opencryptoki above — this needs OPENSSL_PREFIX pointed at a locally built OpenSSL
 # 3.5+. The `ossl-sys` build script locates it via pkg-config, so PKG_CONFIG_PATH must include
@@ -76,7 +76,7 @@ fi
 # not the `tools` workspace member, which isn't needed to load the module. Its default features
 # ("standard" + "dynamic": AES [incl. CCM]/RSA/ECC/EdDSA/KDFs [incl. SP800-108]/SQLite storage,
 # linked dynamically against system libcrypto) are kept; "pqc" is added on top for ML-KEM, ML-DSA,
-# and SLH-DSA. Together this closes the AES-CCM and SLH-DSA real-backend coverage gap from BL-028
+# and SLH-DSA. Together this closes the AES-CCM and SLH-DSA real-backend coverage gap
 # (verified against C_GetMechanismList: CKM_AES_CCM and CKM_SLH_DSA are both advertised).
 # Kryoptic 1.5.2 has no ChaCha20 support at all, so ChaCha20-Poly1305 coverage remains NSS-only.
 # Note: cdylib/Cargo.toml
