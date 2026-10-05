@@ -49,6 +49,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The official OASIS v3.2 header from the vendor/pkcs11 submodule (oasis-tcs/pkcs11): the
+         reference the constant parity tests read at run time. Conditional so a checkout without
+         submodules still builds; the parity tests then fail saying the header is missing. -->
+    <None Include="..\..\vendor\pkcs11\published\3-02\pkcs11t.h" Link="pkcs11-v3.2\pkcs11t.h" CopyToOutputDirectory="PreserveNewest" Visible="false"
+          Condition="Exists('..\..\vendor\pkcs11\published\3-02\pkcs11t.h')" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy" />
   </ItemGroup>

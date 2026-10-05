@@ -19,3 +19,8 @@
 	path = vendor/kryoptic
 	url = https://github.com/latchset/kryoptic.git
 	ignore = untracked
+[submodule "vendor/pkcs11"]
+	path = vendor/pkcs11
+	url = https://github.com/oasis-tcs/pkcs11.git
+	shallow = true
+	ignore = untracked
