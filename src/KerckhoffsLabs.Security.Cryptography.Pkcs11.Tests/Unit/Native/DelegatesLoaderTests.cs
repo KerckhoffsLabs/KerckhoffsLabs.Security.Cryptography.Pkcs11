@@ -15,13 +15,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// memory with a unique sentinel pointer in every slot. After construction, reflection maps
 /// each <c>CK_FUNCTION_LIST*</c> field to its same-named <see cref="FunctionPointers"/> field
 /// (and <c>_Windows</c> sibling) and asserts the sentinel landed in the right slot — a
-/// transposed field in the struct or a mis-wired binding line fails by name.
+/// mis-wired binding line fails by name.
 /// </summary>
 /// <remarks>
+/// <para>
+/// The tables are written through the same <c>CK_FUNCTION_LIST*</c> structs the loader reads, so a
+/// transposition inside those structs round-trips unnoticed here. The struct order itself is checked
+/// against the C compiler's layout of the OASIS headers by <see cref="AbiOracleTests"/>.
+/// </para>
+/// <para>
 /// Static fields feed the <c>[UnmanagedCallersOnly]</c> stubs (which cannot capture state), and
 /// are written only through <c>InstallModule</c>. xUnit serializes tests within a class, so the
 /// statics are race-free. Sentinels are never invoked — the loader only calls the two bootstrap
 /// functions, which are real managed stubs.
+/// </para>
 /// </remarks>
 public sealed unsafe class DelegatesLoaderTests : IDisposable
 {
