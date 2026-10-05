@@ -407,11 +407,11 @@ jobs:
   # module — and it is what would have caught the bootstrap depending on Mono's "__Internal".
   #
   # Two OSes, and only because of that static half. AOT publish warnings are platform-independent,
-  # but the static link is not: forcing an archive member in and exporting a symbol are different
-  # flags on GNU ld and ld64, and ILC hands the linker a version script on Linux versus an
-  # exported-symbols list on Apple. Those are the parts that can break per-platform, so each is
-  # exercised where it runs. Windows is out: its ExportsFile is a .def and the AotSmoke project
-  # does not implement that path.
+  # but the static link is not: forcing an archive member in is a different flag on GNU ld and
+  # ld64, and the symbol is exported by editing the version script ILC hands the linker on Linux
+  # versus the exported-symbols list on Apple. Those are the parts that can break per-platform, so
+  # each is exercised where it runs. Windows is out: its ExportsFile is a .def and the AotSmoke
+  # project does not implement that path.
   aot-smoke:
     name: AOT smoke (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}

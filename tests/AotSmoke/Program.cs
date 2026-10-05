@@ -3,11 +3,9 @@
 // AOT-compiled, which a publish alone does not.
 //
 // Two modes, because the library has two ways in and they fail differently:
-//   dynamic <path>  loads a module with dlopen/LoadLibrary, the ordinary case.
-//   static          binds a module linked into this executable, resolved through the entry-point
-//                   module's symbol table. Only meaningful when published with
-//                   -p:StaticMockArchive=<libpkcs11-mock.a>, which links the module in and exports
-//                   its bootstrap symbol; without that the mode reports what is missing.
+//   <path>  loads a module with dlopen/LoadLibrary, the ordinary case.
+//   static  binds a module linked into this executable through LoadStaticallyLinked; needs the
+//           -p:StaticMockArchive publish described in AotSmoke.csproj.
 using KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 if (args.Length == 0)
