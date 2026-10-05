@@ -295,7 +295,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft
-      # token (see BL-028). Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA) and "pqc"
+      # token. Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA) and "pqc"
       # (ML-KEM/ML-DSA/SLH-DSA) needs >= 3.5, so it links against the same OpenSSL 3.5 built above
       # for SoftHSM/opencryptoki (ossl-sys locates it via pkg-config; PKG_CONFIG_PATH is set inside
       # build-kryoptic.sh from OPENSSL_PREFIX, already exported process-wide by the "Point SoftHSM
