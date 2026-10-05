@@ -782,6 +782,30 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
+    /// The logout an owning <see cref="Pkcs11Workspace"/> issues just before disposing this session.
+    /// Waits for the busy lock instead of going through <see cref="AcquireExclusive"/>, for the
+    /// reason <see cref="Dispose(bool)"/> does: it runs from a disposal, where throwing on
+    /// cross-thread contention would leave the session open and replace any exception a
+    /// surrounding <c>using</c> is unwinding. A session that is already disposed is left alone.
+    /// </summary>
+    /// <exception cref="Pkcs11Exception">The token rejected the logout; the caller treats it as best-effort.</exception>
+    /// <exception cref="ObjectDisposedException">The library has already closed the session.</exception>
+    internal void LogoutForDispose()
+    {
+        // Waits for the lock where AcquireExclusive would throw, then holds it the same way: the lease
+        // takes a reference on the session handle, so a library disposed meanwhile cannot close the
+        // session under the logout. A session the library has already closed throws
+        // ObjectDisposedException from Hold; there is nothing left to log out of.
+        Monitor.Enter(_busyLock);
+        using var lease = new ExclusiveLease(_busyLock);
+        if (_disposed)
+            return;
+        lease.Hold(_sessionHandle);
+
+        LogoutHeld();
+    }
+
+    /// <summary>
     /// Logs a user out from a token
     /// </summary>
     public void Logout()
@@ -790,6 +814,13 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Logout");
 
+        LogoutHeld();
+    }
+
+    // The logout itself, shared by Logout and LogoutForDispose, which differ only in how they take the
+    // session lease. The caller holds it.
+    private void LogoutHeld()
+    {
         Log.LoggingOutSession(_logger, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Logout(_sessionId);

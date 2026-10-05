@@ -114,9 +114,11 @@ public sealed class Pkcs11Workspace : IDisposable
         // (CKR_USER_NOT_LOGGED_IN), or the library/session may already be torn down — none of
         // those should make disposal throw. C_Logout affects the whole application's login state
         // on the slot, which is the intended end-of-context behaviour for an owned workspace.
+        // LogoutForDispose waits out a call in flight on another thread instead of throwing on
+        // the contention: the session close below must always be reached.
         try
         {
-            _session.Logout();
+            _session.LogoutForDispose();
         }
         catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException)
         {
