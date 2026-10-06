@@ -40,10 +40,13 @@ internal static class Pkcs11Operations
     public const string OpGenerateRandom = "C_GenerateRandom";
     public const string OpGetAttributeValue = "C_GetAttributeValue";
     public const string OpGetFunctionStatus = "C_GetFunctionStatus";
+    public const string OpGetInterfaceList = "C_GetInterfaceList";
+    public const string OpGetMechanismList = "C_GetMechanismList";
     public const string OpGetObjectSize = "C_GetObjectSize";
     public const string OpGetOperationState = "C_GetOperationState";
     public const string OpGetSessionInfo = "C_GetSessionInfo";
     public const string OpGetSessionValidationFlags = "C_GetSessionValidationFlags";
+    public const string OpGetSlotList = "C_GetSlotList";
     public const string OpInitPIN = "C_InitPIN";
     public const string OpLogin = "C_Login";
     public const string OpLoginUser = "C_LoginUser";

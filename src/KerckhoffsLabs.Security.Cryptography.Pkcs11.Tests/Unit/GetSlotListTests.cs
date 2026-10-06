@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
@@ -59,5 +60,29 @@ public sealed class GetSlotListTests
         var slots = library.GetSlotList();
 
         Assert.Single(slots);
+    }
+
+    [Fact]
+    public void SecondCallReportsMoreSlotsThanTheBuffer_IsRefused_NotPaddedWithSlotZero()
+    {
+        var fake = new SlotListFake
+        {
+            ProbeCount = (NativeCULong)1,
+            FillSlots = [(NativeCULong)7],
+            FillCount = (NativeCULong)2,
+        };
+        using var library = new Pkcs11Library(fake);
+
+        // Padding used to add slot 0, a slot the module never listed.
+        Assert.Throws<Pkcs11UnclassifiedException>(() => library.GetSlotList());
+    }
+
+    [Fact]
+    public void ProbeReportsUnavailableInformation_IsRefused()
+    {
+        var fake = new SlotListFake { ProbeCount = NativeCULong.MaxValue };
+        using var library = new Pkcs11Library(fake);
+
+        Assert.Throws<Pkcs11UnclassifiedException>(() => library.GetSlotList());
     }
 }

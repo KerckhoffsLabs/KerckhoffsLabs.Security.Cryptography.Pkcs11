@@ -1301,7 +1301,8 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, (NativeCULong)(objectCount), ref foundObjectsCount);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjects);
 
-        for (int i = 0; i < (int)(foundObjectsCount); i++)
+        int found = ReportedLength.Written(foundObjectsCount, objects.Length, OpFindObjects);
+        for (int i = 0; i < found; i++)
             foundObjects.Add(new ObjectHandle((ulong)objects[i]));
 
         return foundObjects;
@@ -1351,7 +1352,8 @@ internal sealed class Pkcs11Session : IDisposable
                 rv = _pkcs11Library.C_FindObjects(_sessionId, objects, objectsLength, ref objectCount);
                 Pkcs11Exception.ThrowIfError(rv, OpFindObjects);
 
-                for (int i = 0; i < (int)(objectCount); i++)
+                int found = ReportedLength.Written(objectCount, objects.Length, OpFindObjects);
+                for (int i = 0; i < found; i++)
                     foundObjects.Add(new ObjectHandle((ulong)objects[i]));
             }
         }
@@ -1572,9 +1574,7 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, out NativeCULong len);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKey);
 
-        if (buffer.Length != (int)len)
-            Array.Resize(ref buffer, (int)len);
-        return buffer;
+        return ReportedLength.Trim(buffer, len, OpWrapKey);
     }
 
     /// <summary>
@@ -1590,30 +1590,9 @@ internal sealed class Pkcs11Session : IDisposable
     public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, ReadOnlySpan<byte> wrappedKey, List<ObjectAttribute> attributes)
     {
         using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(mechanism);
-        ArgumentNullException.ThrowIfNull(attributes);
-        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
-        // P/Invoke when perf profiling proves it matters.
-        byte[] buffer = wrappedKey.ToArray();
-        return UnwrapKey(mechanism, unwrappingKeyHandle, buffer, attributes);
-    }
-
-    /// <summary>
-    /// Unwraps (i.e. decrypts) a wrapped key, creating a new private key or secret key object
-    /// </summary>
-    /// <param name="mechanism">Unwrapping mechanism</param>
-    /// <param name="unwrappingKeyHandle">Handle of unwrapping key</param>
-    /// <param name="wrappedKey">Wrapped key</param>
-    /// <param name="attributes">Attributes for unwrapped key</param>
-    /// <returns>Handle of unwrapped key</returns>
-    public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, byte[] wrappedKey, List<ObjectAttribute> attributes)
-    {
-        using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
-
-        ArgumentNullException.ThrowIfNull(wrappedKey);
 
         Enforce(mechanism, CryptoOperation.Unwrap);
 
@@ -1640,6 +1619,20 @@ internal sealed class Pkcs11Session : IDisposable
         mechanism.AbsorbOutput(mechParams);
 
         return new ObjectHandle((ulong)unwrappedKey);
+    }
+
+    /// <summary>
+    /// Unwraps (i.e. decrypts) a wrapped key, creating a new private key or secret key object
+    /// </summary>
+    /// <param name="mechanism">Unwrapping mechanism</param>
+    /// <param name="unwrappingKeyHandle">Handle of unwrapping key</param>
+    /// <param name="wrappedKey">Wrapped key</param>
+    /// <param name="attributes">Attributes for unwrapped key</param>
+    /// <returns>Handle of unwrapped key</returns>
+    public ObjectHandle UnwrapKey(Mechanism mechanism, ObjectHandle unwrappingKeyHandle, byte[] wrappedKey, List<ObjectAttribute> attributes)
+    {
+        ArgumentNullException.ThrowIfNull(wrappedKey);
+        return UnwrapKey(mechanism, unwrappingKeyHandle, wrappedKey.AsSpan(), attributes);
     }
 
     /// <summary>
@@ -1803,22 +1796,42 @@ internal sealed class Pkcs11Session : IDisposable
     private delegate CKR LengthProbedCall(Span<byte> buffer, out NativeCULong length);
 
     /// <summary>
-    /// Runs the standard PKCS#11 two-call pattern — probe the output length with an empty buffer,
-    /// allocate, fill, then trim to the reported length — throwing on any non-OK return from either
-    /// call (both tagged with <paramref name="operation"/>).
+    /// A <see cref="LengthProbedCall"/> that also takes the operation's input. The input is passed in
+    /// rather than captured, because a lambda cannot capture a span, and copying it into an array to
+    /// capture would leave a plaintext copy on the heap.
     /// </summary>
+    private delegate CKR InputLengthProbedCall(ReadOnlySpan<byte> input, Span<byte> buffer, out NativeCULong length);
+
+    /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string)"/>
     private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation)
+        => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, out NativeCULong length) => call(buffer, out length), operation);
+
+    /// <summary>
+    /// Runs the PKCS#11 two-call pattern: query the output length with a NULL buffer, allocate, fill,
+    /// and return exactly what the module reports writing.
+    /// </summary>
+    /// <remarks>
+    /// Every length the module reports is checked through <see cref="ReportedLength"/>: one it cannot
+    /// have written (larger than the buffer) or cannot mean (<c>CK_UNAVAILABLE_INFORMATION</c>) is
+    /// refused, never padded or truncated. A <c>CKR_BUFFER_TOO_SMALL</c> on the fill call leaves the
+    /// operation active (PKCS#11 v3.2 §5.2), so it is retried once with the size the module then asks
+    /// for. A trimmed buffer is zeroized, since for a decryption it holds plaintext.
+    /// </remarks>
+    private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation)
     {
-        CKR rv = call(default, out NativeCULong length);
+        CKR rv = call(input, default, out NativeCULong reported);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
-        byte[] buffer = new byte[(int)length];
-        rv = call(buffer, out length);
+        byte[] buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
+        rv = call(input, buffer, out reported);
+        if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+        {
+            buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
+            rv = call(input, buffer, out reported);
+        }
         Pkcs11Exception.ThrowIfError(rv, operation);
 
-        if (buffer.Length != (int)length)
-            Array.Resize(ref buffer, (int)length);
-        return buffer;
+        return ReportedLength.Trim(buffer, reported, operation);
     }
 
     /// <summary>
@@ -1849,23 +1862,32 @@ internal sealed class Pkcs11Session : IDisposable
     {
         byte[] input = new byte[bufferLength];
         byte[] output = new byte[bufferLength];
-
-        int bytesRead;
-        while ((bytesRead = inputStream.Read(input, 0, input.Length)) > 0)
+        try
         {
-            CKR rv = update(input.AsSpan(0, bytesRead), output, out NativeCULong outputLen);
-            if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
-                Pkcs11Exception.ThrowIfError(rv, operation);
-
-            if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+            int bytesRead;
+            while ((bytesRead = inputStream.Read(input, 0, input.Length)) > 0)
             {
-                output = new byte[(int)outputLen];
+                CKR rv = update(input.AsSpan(0, bytesRead), output, out NativeCULong outputLen);
+                if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
+                    Pkcs11Exception.ThrowIfError(rv, operation);
 
-                rv = update(input.AsSpan(0, bytesRead), output, out outputLen);
-                Pkcs11Exception.ThrowIfError(rv, operation);
+                if (rv == CKR.CKR_BUFFER_TOO_SMALL)
+                {
+                    CryptographicOperations.ZeroMemory(output);
+                    output = new byte[ReportedLength.ForAllocation(outputLen, operation)];
+
+                    rv = update(input.AsSpan(0, bytesRead), output, out outputLen);
+                    Pkcs11Exception.ThrowIfError(rv, operation);
+                }
+
+                outputStream.Write(output, 0, ReportedLength.Written(outputLen, output.Length, operation));
             }
-
-            outputStream.Write(output, 0, (int)(outputLen));
+        }
+        finally
+        {
+            // One side of the transform is plaintext; neither buffer outlives the call with it.
+            CryptographicOperations.ZeroMemory(input);
+            CryptographicOperations.ZeroMemory(output);
         }
     }
 
@@ -1968,23 +1990,6 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(mechanism);
-        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
-        // P/Invoke when perf profiling proves it matters.
-        byte[] buffer = data.ToArray();
-        return Encrypt(mechanism, keyHandle, buffer);
-    }
-
-    /// <summary>
-    /// Encrypts single-part data
-    /// </summary>
-    /// <param name="mechanism">Encryption mechanism</param>
-    /// <param name="keyHandle">Handle of the encryption key</param>
-    /// <param name="data">Data to be encrypted</param>
-    /// <returns>Encrypted data</returns>
-    public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
-    {
-        using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
@@ -1992,8 +1997,6 @@ internal sealed class Pkcs11Session : IDisposable
         Enforce(mechanism, CryptoOperation.Encrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
-
-        ArgumentNullException.ThrowIfNull(data);
 
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
@@ -2013,7 +2016,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
-            encryptedData = new byte[(int)encryptedDataLen];
+            encryptedData = new byte[ReportedLength.ForAllocation(encryptedDataLen, OpEncrypt)];
             rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
 
             // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
@@ -2030,7 +2033,7 @@ internal sealed class Pkcs11Session : IDisposable
                 rv = _pkcs11Library.C_Encrypt(_sessionId, data, null, out NativeCULong probeLen);
                 Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
 
-                encryptedData = new byte[(int)probeLen];
+                encryptedData = new byte[ReportedLength.ForAllocation(probeLen, OpEncrypt)];
                 rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
             }
         }
@@ -2041,10 +2044,22 @@ internal sealed class Pkcs11Session : IDisposable
         // IV, say) is still allocated. After `scope` is disposed the bytes are zeroized and freed.
         mechanism.AbsorbOutput(mechParams);
 
-        if (encryptedData.Length != (int)encryptedDataLen)
-            Array.Resize(ref encryptedData, (int)encryptedDataLen);
+        encryptedData = ReportedLength.Trim(encryptedData, encryptedDataLen, OpEncrypt);
 
         return encryptedData;
+    }
+
+    /// <summary>
+    /// Encrypts single-part data
+    /// </summary>
+    /// <param name="mechanism">Encryption mechanism</param>
+    /// <param name="keyHandle">Handle of the encryption key</param>
+    /// <param name="data">Data to be encrypted</param>
+    /// <returns>Encrypted data</returns>
+    public byte[] Encrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return Encrypt(mechanism, keyHandle, data.AsSpan());
     }
 
     /// <summary>
@@ -2116,15 +2131,14 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out NativeCULong lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
-            lastEncryptedPart = new byte[(int)lastEncryptedPartLen];
+            lastEncryptedPart = new byte[ReportedLength.ForAllocation(lastEncryptedPartLen, OpEncryptFinal)];
             rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, out lastEncryptedPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
             finalized = true;
 
             mechanism.AbsorbOutput(mechParams);
 
-            if (lastEncryptedPartLen > (NativeCULong)0)
-                outputStream.Write(lastEncryptedPart, 0, (int)(lastEncryptedPartLen));
+            outputStream.Write(lastEncryptedPart, 0, ReportedLength.Written(lastEncryptedPartLen, lastEncryptedPart.Length, OpEncryptFinal));
         }
         finally
         {
@@ -2188,21 +2202,18 @@ internal sealed class Pkcs11Session : IDisposable
             IntPtr paramsPtr = scope.Allocate(paramsSize);
             UnmanagedMemory.Write(paramsPtr, paramsStruct);
 
-            byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
-            byte[] pt = plaintext.ToArray();
-
             rv = _pkcs11Library.C_EncryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad,
-                pt,
+                associatedData,
+                plaintext,
                 null, out NativeCULong ctLen);
             Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
 
-            byte[] ct = new byte[(int)ctLen];
+            byte[] ct = new byte[ReportedLength.ForAllocation(ctLen, OpEncryptMessage)];
             rv = _pkcs11Library.C_EncryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad,
-                pt,
+                associatedData,
+                plaintext,
                 ct, out ctLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptMessage);
 
@@ -2210,10 +2221,7 @@ internal sealed class Pkcs11Session : IDisposable
             // the wrapper before `scope` is disposed and the bytes are zeroized.
             messageParams.AbsorbOutput(paramsStruct);
 
-            if (ct.Length != (int)ctLen)
-                Array.Resize(ref ct, (int)ctLen);
-
-            return ct;
+            return ReportedLength.Trim(ct, ctLen, OpEncryptMessage);
         }
         finally
         {
@@ -2235,29 +2243,12 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> encryptedData)
     {
         using var _ = AcquireExclusive();
-        ArgumentNullException.ThrowIfNull(mechanism);
-        byte[] buffer = encryptedData.ToArray();
-        return Decrypt(mechanism, keyHandle, buffer);
-    }
-
-    /// <summary>
-    /// Decrypts single-part data
-    /// </summary>
-    /// <param name="mechanism">Decryption mechanism</param>
-    /// <param name="keyHandle">Handle of the decryption key</param>
-    /// <param name="encryptedData">Data to be decrypted</param>
-    /// <returns>Decrypted data</returns>
-    public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] encryptedData)
-    {
-        using var _ = AcquireExclusive();
 
         ArgumentNullException.ThrowIfNull(mechanism);
 
         Enforce(mechanism, CryptoOperation.Decrypt);
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
-
-        ArgumentNullException.ThrowIfNull(encryptedData);
 
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
@@ -2274,7 +2265,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
-            decryptedData = new byte[(int)decryptedDataLen];
+            CryptographicOperations.ZeroMemory(decryptedData);
+            decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
             rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out decryptedDataLen);
         }
 
@@ -2282,10 +2274,20 @@ internal sealed class Pkcs11Session : IDisposable
 
         mechanism.AbsorbOutput(mechParams);
 
-        if (decryptedData.Length != (int)decryptedDataLen)
-            Array.Resize(ref decryptedData, (int)decryptedDataLen);
+        return ReportedLength.Trim(decryptedData, decryptedDataLen, OpDecrypt);
+    }
 
-        return decryptedData;
+    /// <summary>
+    /// Decrypts single-part data
+    /// </summary>
+    /// <param name="mechanism">Decryption mechanism</param>
+    /// <param name="keyHandle">Handle of the decryption key</param>
+    /// <param name="encryptedData">Data to be decrypted</param>
+    /// <returns>Decrypted data</returns>
+    public byte[] Decrypt(Mechanism mechanism, ObjectHandle keyHandle, byte[] encryptedData)
+    {
+        ArgumentNullException.ThrowIfNull(encryptedData);
+        return Decrypt(mechanism, keyHandle, encryptedData.AsSpan());
     }
 
     /// <summary>
@@ -2355,15 +2357,15 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
-            lastPart = new byte[(int)lastPartLen];
+            lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
             rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
             finalized = true;
 
             mechanism.AbsorbOutput(mechParams);
 
-            if (lastPartLen > (NativeCULong)0)
-                outputStream.Write(lastPart, 0, (int)(lastPartLen));
+            outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
+            CryptographicOperations.ZeroMemory(lastPart);
         }
         finally
         {
@@ -2417,30 +2419,24 @@ internal sealed class Pkcs11Session : IDisposable
             IntPtr paramsPtr = scope.Allocate(paramsSize);
             UnmanagedMemory.Write(paramsPtr, paramsStruct);
 
-            byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
-            byte[] ct = ciphertext.ToArray();
-
             rv = _pkcs11Library.C_DecryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad,
-                ct,
+                associatedData,
+                ciphertext,
                 null, out NativeCULong ptLen);
             Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
 
-            byte[] pt = new byte[(int)ptLen];
+            byte[] pt = new byte[ReportedLength.ForAllocation(ptLen, OpDecryptMessage)];
             rv = _pkcs11Library.C_DecryptMessage(
                 _sessionId, paramsPtr, (NativeCULong)paramsSize,
-                aad,
-                ct,
+                associatedData,
+                ciphertext,
                 pt, out ptLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
 
             messageParams.AbsorbOutput(paramsStruct);
 
-            if (pt.Length != (int)ptLen)
-                Array.Resize(ref pt, (int)ptLen);
-
-            return pt;
+            return ReportedLength.Trim(pt, ptLen, OpDecryptMessage);
         }
         finally
         {
@@ -2468,17 +2464,14 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
-        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
-        // P/Invoke when perf profiling proves it matters.
-        byte[] buffer = data.ToArray();
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpSignInit);
 
-        byte[] signature = CallWithLengthProbe(
-            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, buffer, buf, out len),
+        byte[] signature = CallWithLengthProbe(data,
+            (ReadOnlySpan<byte> input, Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, out len),
             OpSign);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -2500,10 +2493,24 @@ internal sealed class Pkcs11Session : IDisposable
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature, out bool isValid)
     {
         using var _ = AcquireExclusive();
+
         ArgumentNullException.ThrowIfNull(mechanism);
-        byte[] dataBuf = data.ToArray();
-        byte[] sigBuf = signature.ToArray();
-        Verify(mechanism, keyHandle, dataBuf, sigBuf, out isValid);
+
+
+        Enforce(mechanism, CryptoOperation.Verify);
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
+
+        using var scope = new MechanismParameterScope(this);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+
+        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
+        Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
+
+        rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
+        isValid = IsVerified(rv, OpVerify);
+
+        mechanism.AbsorbOutput(mechParams);
     }
 
     /// <summary>
@@ -2516,29 +2523,9 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="isValid">Flag indicating whether signature is valid</param>
     public void Verify(Mechanism mechanism, ObjectHandle keyHandle, byte[] data, byte[] signature, out bool isValid)
     {
-        using var _ = AcquireExclusive();
-
-        ArgumentNullException.ThrowIfNull(mechanism);
-
-
-        Enforce(mechanism, CryptoOperation.Verify);
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
-
         ArgumentNullException.ThrowIfNull(data);
-
         ArgumentNullException.ThrowIfNull(signature);
-
-        using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-
-        CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
-
-        rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
-        isValid = IsVerified(rv, OpVerify);
-
-        mechanism.AbsorbOutput(mechParams);
+        Verify(mechanism, keyHandle, data.AsSpan(), signature.AsSpan(), out isValid);
     }
 
     /// <summary>
@@ -2657,16 +2644,19 @@ internal sealed class Pkcs11Session : IDisposable
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, null, out NativeCULong dataLen);
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
 
-        byte[] data = new byte[(int)dataLen];
+        byte[] data = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, data, out dataLen);
         isValid = IsVerified(rv, OpVerifyRecover);
 
         mechanism.AbsorbOutput(mechParams);
 
-        if (data.Length != (int)(dataLen))
-            Array.Resize(ref data, (int)(dataLen));
-
-        return data;
+        if (!isValid)
+        {
+            // Nothing was recovered, and the reported length is not one to trust.
+            CryptographicOperations.ZeroMemory(data);
+            return [];
+        }
+        return ReportedLength.Trim(data, dataLen, OpVerifyRecover);
     }
 
     /// <summary>
@@ -2799,12 +2789,12 @@ internal sealed class Pkcs11Session : IDisposable
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
-        lastPart = new byte[(int)lastPartLen];
+        lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
-        if (lastPartLen > (NativeCULong)0)
-            outputStream.Write(lastPart, 0, (int)(lastPartLen));
+        outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
+        CryptographicOperations.ZeroMemory(lastPart);
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
         isValid = IsVerified(rv, OpVerifyFinal);
@@ -2847,17 +2837,14 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
-            byte[] digest = new byte[(int)digestLen];
+            byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             finalized = true;
 
             mechanism.AbsorbOutput(mechParams);
 
-            if (digest.Length != (int)(digestLen))
-                Array.Resize(ref digest, (int)(digestLen));
-
-            return digest;
+            return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
         }
         finally
         {
@@ -2877,11 +2864,27 @@ internal sealed class Pkcs11Session : IDisposable
     public byte[] Digest(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
         using var _ = AcquireExclusive();
+
         ArgumentNullException.ThrowIfNull(mechanism);
-        // Temporary array for the byte[]-based P/Invoke path. Replace with pinned-Span
-        // P/Invoke when perf profiling proves it matters.
-        byte[] buffer = data.ToArray();
-        return Digest(mechanism, buffer);
+
+        Enforce(mechanism, CryptoOperation.Digest);
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
+
+        using var scope = new MechanismParameterScope(this);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+
+        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
+        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
+
+        byte[] digest = CallWithLengthProbe(data,
+            (ReadOnlySpan<byte> input, Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, out len),
+            OpDigest);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput(mechParams);
+
+        return digest;
     }
 
     /// <summary>
@@ -2892,30 +2895,8 @@ internal sealed class Pkcs11Session : IDisposable
     /// <returns>Digest</returns>
     public byte[] Digest(Mechanism mechanism, byte[] data)
     {
-        using var _ = AcquireExclusive();
-
-        ArgumentNullException.ThrowIfNull(mechanism);
-
-        Enforce(mechanism, CryptoOperation.Digest);
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
-
         ArgumentNullException.ThrowIfNull(data);
-
-        using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-
-        CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
-
-        byte[] digest = CallWithLengthProbe(
-            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, data, buf, out len),
-            OpDigest);
-
-        // Absorbed before returning, so the scope that owns the parameter block is still alive.
-        mechanism.AbsorbOutput(mechParams);
-
-        return digest;
+        return Digest(mechanism, data.AsSpan());
     }
 
     /// <summary>
@@ -2982,17 +2963,14 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
-            byte[] digest = new byte[(int)digestLen];
+            byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
             rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
             Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
             finalized = true;
 
             mechanism.AbsorbOutput(mechParams);
 
-            if (digest.Length != (int)(digestLen))
-                Array.Resize(ref digest, (int)(digestLen));
-
-            return digest;
+            return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
         }
         finally
         {
@@ -3440,7 +3418,7 @@ internal sealed class Pkcs11Session : IDisposable
                 throw Pkcs11Exception.Create(CKR.CKR_BUFFER_TOO_SMALL,
                     "C_EncapsulateKey (length probe reported no size — pass expectedCiphertextLen)");
 
-            ct = new byte[(int)ctLen];
+            ct = new byte[ReportedLength.ForAllocation(ctLen, OpEncapsulateKey)];
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
@@ -3450,8 +3428,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         mechanism.AbsorbOutput(mechParams);
 
-        if (ct.Length != (int)ctLen)
-            Array.Resize(ref ct, (int)ctLen);
+        ct = ReportedLength.Trim(ct, ctLen, OpEncapsulateKey);
 
         // Root the managed attributes past every C_EncapsulateKey call above (probe and real):
         // the template holds raw copies of their pValue pointers.
@@ -3496,12 +3473,11 @@ internal sealed class Pkcs11Session : IDisposable
         foreach (ObjectAttribute d in secureDefaults)
             template[idx++] = d.CkAttribute;
 
-        byte[] ct = ciphertext.ToArray();
         NativeCULong sharedHandle = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_DecapsulateKey(
             _sessionId, ref ckMechanism, (NativeCULong)decapsulatingPrivateKey.ObjectId,
             template,
-            ct, ref sharedHandle);
+            ciphertext, ref sharedHandle);
         Pkcs11Exception.ThrowIfError(rv, OpDecapsulateKey);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
@@ -3536,29 +3512,25 @@ internal sealed class Pkcs11Session : IDisposable
 
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-        byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            aad, null!, out NativeCULong wrappedLen);
+            associatedData, null!, out NativeCULong wrappedLen);
         // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome (PKCS#11 v3.2 §5.2):
         // the token populated wrappedLen despite the (null) output buffer. Only a genuine
         // error aborts the probe.
         if (rv is not CKR.CKR_OK and not CKR.CKR_BUFFER_TOO_SMALL)
             Pkcs11Exception.ThrowIfError(rv, "C_WrapKeyAuthenticated (length probe)");
 
-        byte[] wrapped = new byte[(int)wrappedLen];
+        byte[] wrapped = new byte[ReportedLength.ForAllocation(wrappedLen, OpWrapKeyAuthenticated)];
         rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            aad, wrapped, out wrappedLen);
+            associatedData, wrapped, out wrappedLen);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKeyAuthenticated);
 
         mechanism.AbsorbOutput(mechParams);
 
-        if (wrapped.Length != (int)wrappedLen)
-            Array.Resize(ref wrapped, (int)wrappedLen);
-
-        return wrapped;
+        return ReportedLength.Trim(wrapped, wrappedLen, OpWrapKeyAuthenticated);
     }
 
     /// <summary>
@@ -3583,8 +3555,6 @@ internal sealed class Pkcs11Session : IDisposable
 
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-        byte[] wrapped = wrappedKey.ToArray();
-        byte[] aad = associatedData.IsEmpty ? [] : associatedData.ToArray();
 
         // Authenticated unwrap lands a new key object on the token, exactly as UnwrapKey does. Apply the
         // same secure defaults (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
@@ -3600,9 +3570,9 @@ internal sealed class Pkcs11Session : IDisposable
         NativeCULong newKey = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_UnwrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)unwrappingKey.ObjectId,
-            wrapped,
+            wrappedKey,
             template,
-            aad, ref newKey);
+            associatedData, ref newKey);
         Pkcs11Exception.ThrowIfError(rv, OpUnwrapKeyAuthenticated);
         // Root the managed attributes past the native call: the template holds raw copies of
         // their pValue pointers, and nothing else keeps them reachable once the loop above returns.
@@ -3638,15 +3608,13 @@ internal sealed class Pkcs11Session : IDisposable
 
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-        byte[] sig = signature.ToArray();
-        byte[] dataBuf = data.ToArray();
 
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
             _sessionId, ref ckMechanism, (NativeCULong)verificationKey.ObjectId,
-            sig);
+            signature);
         Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
 
-        rv = _pkcs11Library.C_VerifySignature(_sessionId, dataBuf);
+        rv = _pkcs11Library.C_VerifySignature(_sessionId, data);
         bool verified = IsVerified(rv, OpVerifySignature);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -3680,11 +3648,10 @@ internal sealed class Pkcs11Session : IDisposable
 
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
-        byte[] sig = signature.ToArray();
 
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
             _sessionId, ref ckMechanism, (NativeCULong)verificationKey.ObjectId,
-            sig);
+            signature);
         Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
 
         bool finalized = false;

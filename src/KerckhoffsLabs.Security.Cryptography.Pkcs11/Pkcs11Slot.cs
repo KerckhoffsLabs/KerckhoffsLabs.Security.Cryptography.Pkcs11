@@ -117,19 +117,16 @@ public sealed class Pkcs11Slot
 
         NativeCULong mechanismCount = (NativeCULong)0;
         CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismList");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetMechanismList);
 
         if (mechanismCount < (NativeCULong)1)
             return [];
 
-        CKM[] mechanismList = new CKM[(int)mechanismCount];
+        CKM[] mechanismList = new CKM[ReportedLength.ForAllocation(mechanismCount, Pkcs11Operations.OpGetMechanismList)];
         rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, ref mechanismCount);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismList");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetMechanismList);
 
-        if (mechanismList.Length != (int)(mechanismCount))
-            Array.Resize(ref mechanismList, (int)(mechanismCount));
-
-        return mechanismList;
+        return ReportedLength.Items(mechanismList, mechanismCount, Pkcs11Operations.OpGetMechanismList);
     }
 
     /// <summary>
