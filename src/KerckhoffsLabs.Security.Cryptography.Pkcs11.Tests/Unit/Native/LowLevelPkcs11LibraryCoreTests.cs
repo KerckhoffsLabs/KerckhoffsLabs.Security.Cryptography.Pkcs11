@@ -27,4 +27,17 @@ public sealed class LowLevelPkcs11LibraryCoreTests
         Assert.Contains("8 bytes", ex.Message);
         Assert.Contains("4 bytes", ex.Message);
     }
+
+    // The 4-byte build ships as a per-RID runtime asset, not a net10.0-windows target framework, which
+    // no longer exists: the message must name a remedy a consumer can actually apply.
+    [Fact]
+    public void ThrowIfWidthMismatch_MessageNamesTheRuntimeAsset_NotARemovedTargetFramework()
+    {
+        var ex = Assert.Throws<PlatformNotSupportedException>(
+            () => LowLevelPkcs11Library.ThrowIfWidthMismatch(actual: 8, expected: 4));
+
+        Assert.DoesNotContain("net10.0-windows", ex.Message);
+        Assert.Contains("KerckhoffsLabs.Runtime.InteropServices", ex.Message);
+        Assert.Contains("RuntimeIdentifier", ex.Message);
+    }
 }

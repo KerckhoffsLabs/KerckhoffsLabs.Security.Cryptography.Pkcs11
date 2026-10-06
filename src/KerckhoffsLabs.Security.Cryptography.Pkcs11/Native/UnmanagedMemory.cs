@@ -26,8 +26,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal static class UnmanagedMemory
 {
     /// <summary>
-    /// Size in bytes of one CK_ULONG (<see cref="NativeCULong"/>) for the current build: 4 on the
-    /// net10.0-windows asset, 8 on the neutral net10.0 asset (Unix-LP64). The runtime guard in
+    /// Size in bytes of one CK_ULONG (<see cref="NativeCULong"/>) for the current build: 4 on Windows
+    /// and 32-bit Unix, 8 on 64-bit Unix. The runtime guard in
     /// <see cref="LowLevelPkcs11Library"/> ensures this matches the host's native CK_ULONG width.
     /// </summary>
     /// <remarks>
