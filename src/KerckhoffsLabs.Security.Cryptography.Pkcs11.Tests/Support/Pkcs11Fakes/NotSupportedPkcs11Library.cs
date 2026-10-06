@@ -17,10 +17,11 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
 {
     public virtual bool IsMessageApiSupported => false;
     public virtual bool IsV32ApiSupported => false;
-    public virtual int TrackedSessionCount => 0;
-    public virtual void RegisterSession(Pkcs11SessionHandle handle) { }
-    public virtual void UnregisterSession(Pkcs11SessionHandle handle) { }
-    public virtual void CloseAllTrackedSessions() { }
+    private Pkcs11ModuleHandle? _module;
+
+    // A detached handle: sessions opened on a double are referenced and tracked as on a real module,
+    // and close through the double's own C_CloseSession.
+    public Pkcs11ModuleHandle Module => _module ??= Pkcs11ModuleHandle.Detached(this);
     public virtual void Dispose() { }
 
     /// <summary>What every un-overridden Cryptoki entry point does. The default reports the

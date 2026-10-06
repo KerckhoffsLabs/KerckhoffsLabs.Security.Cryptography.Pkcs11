@@ -1,4 +1,3 @@
-using System.Reflection;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
@@ -9,49 +8,49 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.SafeHandles;
 
 /// <summary>
-/// Coverage for <see cref="Pkcs11SessionHandle"/>'s explicit <c>DangerousAddRef</c> on the owning
-/// module's <see cref="Pkcs11ModuleHandle"/>: the CLR gives no relative ordering guarantee between
-/// two independent <c>CriticalFinalizerObject</c>s, so mere reachability of the library cannot
-/// guarantee the native module stays mapped until <c>C_CloseSession</c> runs — an explicit SafeHandle
-/// ref does. These tests pin the wiring (which cases take the ref, which don't) rather than SafeHandle's
-/// own ref-counting semantics, which are a BCL guarantee this project doesn't need to re-verify.
+/// Every valid <see cref="Pkcs11SessionHandle"/> takes a reference on its <see cref="Pkcs11ModuleHandle"/>
+/// and is tracked by it, whatever implementation sits behind <see cref="ILowLevelPkcs11Library"/>: the
+/// CLR gives no relative ordering between two critical finalizers, so only that reference keeps the
+/// module usable until the session's <c>C_CloseSession</c> has run.
 /// </summary>
 [Collection("Mock")]
 public sealed class Pkcs11SessionHandleModuleRefTests(MockBackendFixture f)
 {
     private readonly MockBackendFixture _backend = f;
 
-    private static object? GetPrivateField(object instance, string name) =>
-        instance.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(instance);
-
     [Fact]
-    public void RealLibrary_ValidSession_TakesModuleRef()
+    public void RealLibrary_ValidSession_IsTracked_UntilDisposed()
     {
         using var library = new LowLevelPkcs11Library(_backend.LibraryPath);
-        using var handle = new Pkcs11SessionHandle(library, (NativeCULong)1);
+        var handle = new Pkcs11SessionHandle(library, (NativeCULong)1);
+        Assert.Equal(1, library.Module.TrackedSessionCount);
 
-        Assert.NotNull(GetPrivateField(handle, "_moduleHandle"));
-        Assert.True((bool)GetPrivateField(handle, "_moduleHandleRefAdded")!);
+        handle.Dispose();
+
+        Assert.Equal(0, library.Module.TrackedSessionCount);
     }
 
     [Fact]
-    public void RealLibrary_InvalidSession_TakesNoModuleRef()
+    public void InvalidSession_IsNotTracked()
     {
         using var library = new LowLevelPkcs11Library(_backend.LibraryPath);
         using var handle = new Pkcs11SessionHandle(library, (NativeCULong)CK.CK_INVALID_HANDLE);
 
-        Assert.Null(GetPrivateField(handle, "_moduleHandle"));
-        Assert.False((bool)GetPrivateField(handle, "_moduleHandleRefAdded")!);
+        Assert.Equal(0, library.Module.TrackedSessionCount);
     }
 
+    // A test double gets the same reference and tracking: there is no type test any more.
     [Fact]
-    public void FakeLibrary_TakesNoModuleRef()
+    public void FakeLibrary_ValidSession_IsTracked_AndClosesAfterTheLibraryIsDisposed()
     {
-        var fake = new FakeLowLevelPkcs11Library();
-        using var handle = new Pkcs11SessionHandle(fake, (NativeCULong)1);
+        var fake = new ClosingFake();
+        var handle = new Pkcs11SessionHandle(fake, (NativeCULong)1);
+        Assert.Equal(1, fake.Module.TrackedSessionCount);
 
-        Assert.Null(GetPrivateField(handle, "_moduleHandle"));
-        Assert.False((bool)GetPrivateField(handle, "_moduleHandleRefAdded")!);
+        fake.Dispose();
+        handle.Dispose();
+
+        Assert.Equal(1, fake.CloseCalls);
     }
 
     [Fact]
@@ -59,15 +58,25 @@ public sealed class Pkcs11SessionHandleModuleRefTests(MockBackendFixture f)
     {
         using var library = new LowLevelPkcs11Library(_backend.LibraryPath);
         var handle = new Pkcs11SessionHandle(library, (NativeCULong)1);
-        var moduleHandle = (Pkcs11ModuleHandle)GetPrivateField(handle, "_moduleHandle")!;
 
         handle.Dispose();
 
         // If DangerousRelease had under- or over-run, a fresh Add/Release cycle on the same module
         // handle afterward would misbehave — it doesn't, so the pairing was exact.
         bool ok = false;
-        moduleHandle.DangerousAddRef(ref ok);
+        library.Module.DangerousAddRef(ref ok);
         Assert.True(ok);
-        moduleHandle.DangerousRelease();
+        library.Module.DangerousRelease();
+    }
+
+    private sealed class ClosingFake : FakeLowLevelPkcs11Library
+    {
+        public int CloseCalls { get; private set; }
+
+        public override CKR C_CloseSession(NativeCULong session)
+        {
+            CloseCalls++;
+            return CKR.CKR_OK;
+        }
     }
 }

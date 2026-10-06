@@ -161,7 +161,7 @@ public sealed class Pkcs11ModuleHandleTests
 
         lowLevel.Dispose();
 
-        Assert.True(lowLevel.ModuleHandle.IsClosed);
+        Assert.True(lowLevel.Module.IsClosed);
         Assert.Equal(0, module.CallCount("C_Finalize"));
     }
 
@@ -183,6 +183,25 @@ public sealed class Pkcs11ModuleHandleTests
         Assert.Equal(1, module.CallCount("C_Finalize"));
     }
 
+    // A failed C_CloseSession is reported by the session's release, not thrown, so closing every tracked
+    // session carries on past it.
+    [Fact]
+    public void CloseAllTrackedSessions_CarriesOnPastASessionThatFailsToClose()
+    {
+        using var module = new RecordingModule();
+        LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        NativeCULong failing = module.OpenSession();
+        _ = new Pkcs11SessionHandle(lowLevel, failing);
+        _ = new Pkcs11SessionHandle(lowLevel, module.OpenSession());
+        module.FailingClose = failing;
+
+        lowLevel.Module.CloseAllTrackedSessions();
+
+        Assert.Equal(2, module.CallCount("C_CloseSession"));
+        Assert.Equal(0, lowLevel.Module.TrackedSessionCount);
+        lowLevel.Dispose();
+    }
+
     /// <summary>
     /// One Cryptoki state shared by every load, as a real module has: the first <c>C_Initialize</c> succeeds,
     /// later ones see <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c> until <c>C_Finalize</c>.
@@ -192,6 +211,9 @@ public sealed class Pkcs11ModuleHandleTests
         private int _initialized;
 
         public CKR InitializeRv { get; init; } = CKR.CKR_OK;
+
+        /// <summary>A session whose <c>C_CloseSession</c> fails with <c>CKR_DEVICE_ERROR</c>.</summary>
+        public NativeCULong? FailingClose { get; set; }
         public List<string> Teardown { get; } = [];
 
         public NativeCULong OpenSession() => NewSessionHandle();
@@ -210,7 +232,7 @@ public sealed class Pkcs11ModuleHandleTests
         protected override CKR C_CloseSession(NativeCULong session)
         {
             Teardown.Add("C_CloseSession");
-            return CKR.CKR_OK;
+            return session == FailingClose ? CKR.CKR_DEVICE_ERROR : CKR.CKR_OK;
         }
 
         protected override CKR C_GetInfo(ref CK_INFO info) => CKR.CKR_OK;
