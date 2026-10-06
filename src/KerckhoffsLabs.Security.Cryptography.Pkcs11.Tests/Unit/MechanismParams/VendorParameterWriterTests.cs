@@ -69,6 +69,38 @@ public sealed class VendorParameterWriterTests
                 .CkULong(32)));
     }
 
+    // CK_ULONG is 32 bits on Windows: a wider value is refused rather than sent with its high half
+    // masked off, which the token would read as a different, valid-looking value.
+    [Fact]
+    public void CkULong_WiderThan32Bits_IsRefusedWhereCkULongIs32Bits()
+    {
+        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 4, "CK_ULONG is 64 bits on this platform.");
+
+        var e = Assert.Throws<ArgumentOutOfRangeException>(() => WrittenBytes(w => w.CkULong((ulong)uint.MaxValue + 2)));
+
+        Assert.Equal("value", e.ParamName);
+    }
+
+    [Fact]
+    public void CkULong_WiderThan32Bits_IsWrittenWhole_WhereCkULongIs64Bits()
+    {
+        Assert.SkipUnless(UnmanagedMemory.NativeULongSize == 8, "CK_ULONG is 32 bits on this platform.");
+        const ulong wide = (ulong)uint.MaxValue + 2;
+
+        Assert.Equal(BitConverter.GetBytes(wide), WrittenBytes(w => w.CkULong(wide)));
+    }
+
+    [Fact]
+    public void CkULong_Largest32BitValue_IsWrittenEverywhere()
+    {
+        byte[] written = WrittenBytes(w => w.CkULong(uint.MaxValue));
+
+        Assert.Equal(UnmanagedMemory.NativeULongSize, written.Length);
+        Assert.Equal(uint.MaxValue, UnmanagedMemory.NativeULongSize == 4
+            ? BitConverter.ToUInt32(written)
+            : BitConverter.ToUInt64(written));
+    }
+
     // The case that decides whether the layout rule is right: a one-byte field between two
     // CK_ULONGs. Naturally aligned, the second CK_ULONG cannot follow the bool immediately and the
     // struct gains trailing padding; packed, the whole thing is 8+1+8 with neither. Get this wrong

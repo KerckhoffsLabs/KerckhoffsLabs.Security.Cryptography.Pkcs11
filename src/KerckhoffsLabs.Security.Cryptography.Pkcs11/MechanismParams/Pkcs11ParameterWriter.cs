@@ -36,9 +36,11 @@ public sealed class Pkcs11ParameterWriter
     /// <summary>Appends a <c>CK_ULONG</c> field.</summary>
     /// <param name="value">Value to write.</param>
     /// <returns>This writer, for chaining.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> does not fit in this platform's
+    /// <c>CK_ULONG</c>, which is 32 bits on Windows and on 32-bit Unix.</exception>
     public Pkcs11ParameterWriter CkULong(ulong value)
     {
-        _fields.Add(new Field(Kind.CkULong, value, IntPtr.Zero, null));
+        _fields.Add(new Field(Kind.CkULong, (ulong)Native.CkULong.From(value, nameof(value)), IntPtr.Zero, null));
         return this;
     }
 
