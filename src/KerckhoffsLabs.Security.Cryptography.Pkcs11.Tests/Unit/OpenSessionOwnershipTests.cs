@@ -63,7 +63,7 @@ public sealed class OpenSessionOwnershipTests
         public NativeCULong SessionId { get; init; } = (NativeCULong)7UL;
         public List<NativeCULong> Closed { get; } = [];
 
-        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
         {
             session = SessionId;
             return CKR.CKR_OK;
