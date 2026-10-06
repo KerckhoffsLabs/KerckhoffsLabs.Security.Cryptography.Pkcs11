@@ -62,19 +62,6 @@ internal sealed partial class LowLevelPkcs11Library
     }
 
     /// <summary>
-    /// Returns a pointer to the Cryptoki library's list of function pointers
-    /// </summary>
-    /// <param name="functionList">Pointer to a value which will receive a pointer to the library's CK_FUNCTION_LIST structure</param>
-    /// <returns>CKR_ARGUMENTS_BAD, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
-    public CKR C_GetFunctionList(out IntPtr functionList)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        NativeCULong rv = _delegates.C_GetFunctionList(out functionList);
-        return rv.ToCKR();
-    }
-
-    /// <summary>
     /// Lists the interfaces a v3.0+ module exposes (PKCS#11 v3.0 §5.4.4). Standard two-call idiom:
     /// pass <c>null</c> to learn the count, then a buffer of that size to receive the descriptors.
     /// </summary>
