@@ -17,6 +17,7 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_GetInfo(ref CK_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_CloseSession(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
@@ -42,6 +43,8 @@ internal abstract unsafe partial class FakeModule
             list.C_GetInfo = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&GetInfo;
         if (Overrides(nameof(C_GetSlotList)))
             list.C_GetSlotList = (IntPtr)(delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong>)&GetSlotList;
+        if (Overrides(nameof(C_WaitForSlotEvent)))
+            list.C_WaitForSlotEvent = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, IntPtr, NativeCULong>)&WaitForSlotEvent;
         if (Overrides(nameof(C_GetTokenInfo)))
             list.C_GetTokenInfo = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&GetTokenInfo;
         if (Overrides(nameof(C_InitToken)))
@@ -121,6 +124,20 @@ internal abstract unsafe partial class FakeModule
             NativeCULong count = *pulCount;
             CKR rv = m.C_GetSlotList(tokenPresent != 0, new NativeBuffer<NativeCULong>(pSlotList, count), ref count);
             *pulCount = count;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong WaitForSlotEvent(NativeCULong flags, NativeCULong* pSlot, IntPtr pReserved)
+    {
+        if (Active(nameof(C_WaitForSlotEvent)) is not { } m) return Rv(CKR.CKR_CRYPTOKI_NOT_INITIALIZED);
+        try
+        {
+            NativeCULong slot = *pSlot;
+            CKR rv = m.C_WaitForSlotEvent(flags, ref slot);
+            *pSlot = slot;
             return Rv(rv);
         }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }

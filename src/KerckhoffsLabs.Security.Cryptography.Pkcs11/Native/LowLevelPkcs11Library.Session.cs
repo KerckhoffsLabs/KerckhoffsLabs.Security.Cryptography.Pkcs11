@@ -13,9 +13,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_PIN_INVALID, CKR_PIN_LEN_RANGE, CKR_SESSION_CLOSED, CKR_SESSION_READ_ONLY, CKR_SESSION_HANDLE_INVALID, CKR_TOKEN_WRITE_PROTECTED, CKR_USER_NOT_LOGGED_IN, CKR_ARGUMENTS_BAD</returns>
     public CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_InitPIN(session, pin);
+        NativeCULong rv = call.Table.C_InitPIN(session, pin);
         return rv.ToCKR();
     }
 
@@ -28,9 +28,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_PIN_INCORRECT, CKR_PIN_INVALID, CKR_PIN_LEN_RANGE, CKR_PIN_LOCKED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_SESSION_READ_ONLY, CKR_TOKEN_WRITE_PROTECTED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_SetPIN(session, oldPin, newPin);
+        NativeCULong rv = call.Table.C_SetPIN(session, oldPin, newPin);
         return rv.ToCKR();
     }
 
@@ -44,9 +44,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_COUNT, CKR_SESSION_PARALLEL_NOT_SUPPORTED, CKR_SESSION_READ_WRITE_SO_EXISTS, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_TOKEN_WRITE_PROTECTED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_OpenSession(slotId, flags, ref session);
+        NativeCULong rv = call.Table.C_OpenSession(slotId, flags, ref session);
         return rv.ToCKR();
     }
 
@@ -57,9 +57,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID</returns>
     public CKR C_CloseSession(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_CloseSession(session);
+        NativeCULong rv = call.Table.C_CloseSession(session);
         return rv.ToCKR();
     }
 
@@ -70,9 +70,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT</returns>
     public CKR C_CloseAllSessions(NativeCULong slotId)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_CloseAllSessions(slotId);
+        NativeCULong rv = call.Table.C_CloseAllSessions(slotId);
         return rv.ToCKR();
     }
 
@@ -84,9 +84,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_ARGUMENTS_BAD</returns>
     public CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GetSessionInfo(session, ref info).ToCKR();
+        return call.Table.C_GetSessionInfo(session, ref info).ToCKR();
     }
 
     /// <summary>
@@ -101,9 +101,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_STATE_UNSAVEABLE, CKR_ARGUMENTS_BAD</returns>
     public CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, out NativeCULong operationStateLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_GetOperationState(session, operationState, out operationStateLen);
+        NativeCULong rv = call.Table.C_GetOperationState(session, operationState, out operationStateLen);
         return rv.ToCKR();
     }
 
@@ -118,9 +118,9 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey,
         NativeCULong authenticationKey)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_SetOperationState(session, operationState, encryptionKey, authenticationKey);
+        NativeCULong rv = call.Table.C_SetOperationState(session, operationState, encryptionKey, authenticationKey);
         return rv.ToCKR();
     }
 
@@ -133,9 +133,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_PIN_INCORRECT, CKR_PIN_LOCKED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_SESSION_READ_ONLY_EXISTS, CKR_USER_ALREADY_LOGGED_IN, CKR_USER_ANOTHER_ALREADY_LOGGED_IN, CKR_USER_PIN_NOT_INITIALIZED, CKR_USER_TOO_MANY_TYPES, CKR_USER_TYPE_INVALID</returns>
     public CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_Login(session, userType.ToCULong(), pin);
+        NativeCULong rv = call.Table.C_Login(session, userType.ToCULong(), pin);
         return rv.ToCKR();
     }
 
@@ -149,12 +149,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_LoginUser(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_LoginUser)
+        if (!call.Table.HasC_LoginUser)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_LoginUser(session, userType.ToCULong(), pin, username);
+        NativeCULong rv = call.Table.C_LoginUser(session, userType.ToCULong(), pin, username);
         return rv.ToCKR();
     }
 
@@ -168,12 +168,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_SessionCancel(NativeCULong session, NativeCULong flags)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.IsC_SessionCancelSupported)
+        if (!call.Table.IsC_SessionCancelSupported)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_SessionCancel(session, flags);
+        NativeCULong rv = call.Table.C_SessionCancel(session, flags);
         return rv.ToCKR();
     }
 
@@ -183,12 +183,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_GetSessionValidationFlags)
+        if (!call.Table.HasC_GetSessionValidationFlags)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_GetSessionValidationFlags(session, type, ref flags);
+        NativeCULong rv = call.Table.C_GetSessionValidationFlags(session, type, ref flags);
         return rv.ToCKR();
     }
 
@@ -199,9 +199,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_Logout(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_Logout(session);
+        NativeCULong rv = call.Table.C_Logout(session);
         return rv.ToCKR();
     }
 }

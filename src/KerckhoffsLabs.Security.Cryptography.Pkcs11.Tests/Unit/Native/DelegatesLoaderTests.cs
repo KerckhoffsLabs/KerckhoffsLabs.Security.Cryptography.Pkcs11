@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
@@ -198,6 +199,27 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     // ---------------------------------------------------------------------------
     // Tests
     // ---------------------------------------------------------------------------
+
+    // ReleaseHandle can run on the finalizer thread, where nothing may throw. A module whose table leaves
+    // C_Finalize unbound must still be released cleanly, without calling into the empty slot.
+    [Fact]
+    public void ModuleWithoutC_Finalize_IsReleasedWithoutThrowing()
+    {
+        var (table, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        CK_FUNCTION_LIST list = UnmanagedMemory.Read<CK_FUNCTION_LIST>(table);
+        list.C_Finalize = IntPtr.Zero;
+        WriteTable(table, in list);
+        InstallModule(table);
+
+        var module = Pkcs11ModuleHandle.Bind(() => new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
+        Assert.False(module.Table.HasC_Finalize);
+        module.MarkInitialized();
+        module.FinalizeOnRelease();
+
+        module.Dispose();
+
+        Assert.True(module.IsClosed);
+    }
 
     [Fact]
     public void V240Module_BindsEveryBaseSlot_AndLeavesV3SurfaceNull()

@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
@@ -12,32 +13,31 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSa
 /// when the call is in flight, and the module records what the library did to it meanwhile.
 /// </summary>
 /// <remarks>
-/// Both tests fail today. <c>Pkcs11Library.Dispose</c> closes tracked sessions and calls
-/// <c>C_Finalize</c> immediately, guarded only by a disposed flag the in-flight call already passed;
-/// with a real module the next step, <c>NativeLibrary.Free</c>, unmaps the code that call is running.
-/// They are gated off by <see cref="DisposeRaceFixed"/> until the module and session handles hold a
-/// reference for every call in flight, and are the acceptance tests for that change. Neither depends
+/// Every call holds a reference on the module handle, so <c>C_Finalize</c> and the unmap wait for a
+/// call in flight. A call does not yet hold one on its session, so <c>Pkcs11Library.Dispose</c> can
+/// still close a session under a call on it; that test stays gated off by
+/// <see cref="SessionRaceFixed"/> until the session lease holds a reference too. Neither test depends
 /// on how the fix behaves: Dispose may return at once and defer the teardown, or wait for the call to
 /// finish.
 /// </remarks>
 [Collection(FakeModuleCollection.Name)]
 public sealed class LibraryDisposeRaceTests
 {
-    // The fix that makes every call in flight hold a reference on the module and session handles flips
-    // this to true, which turns both tests on. A static [Fact(Skip = "...")] (flagged by xUnit1004)
-    // hard-disables a test with no named, auditable gate; [Fact(SkipUnless = ...)] ties it to this
-    // property instead, matching the suite's other permanently-off gates.
-    public static bool DisposeRaceFixed => false;
+    // The fix that makes the session lease hold a reference on the session handle flips this to true.
+    // A static [Fact(Skip = "...")] (flagged by xUnit1004) hard-disables a test with no named, auditable
+    // gate; [Fact(SkipUnless = ...)] ties it to this property instead, matching the suite's other
+    // permanently-off gates.
+    public static bool SessionRaceFixed => false;
 
     private const string SkipReason =
-        "Reproduces the dispose race: Pkcs11Library.Dispose tears the module down under a call in flight. " +
-        "Set DisposeRaceFixed in the fix that makes every call in flight hold a reference on the module and session handles.";
+        "Reproduces the dispose race: Pkcs11Library.Dispose closes a session under a call on it. " +
+        "Set SessionRaceFixed in the fix that makes the session lease hold a reference on the session handle.";
 
     private static readonly TimeSpan Generous = TimeSpan.FromSeconds(10);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    [Fact(SkipUnless = nameof(DisposeRaceFixed), Skip = SkipReason)]
+    [Fact]
     public async Task Dispose_DoesNotFinalizeTheModule_UnderACallWithoutASession()
     {
         using var module = new ParkingModule();
@@ -57,7 +57,7 @@ public sealed class LibraryDisposeRaceTests
         Assert.Equal(1, module.CallCount("C_Finalize"));
     }
 
-    [Fact(SkipUnless = nameof(DisposeRaceFixed), Skip = SkipReason)]
+    [Fact(SkipUnless = nameof(SessionRaceFixed), Skip = SkipReason)]
     public async Task Dispose_DoesNotCloseASession_UnderACallOnIt()
     {
         using var module = new ParkingModule();
@@ -80,6 +80,47 @@ public sealed class LibraryDisposeRaceTests
 
         Assert.False(module.ClosedWhileInFlight, "C_CloseSession ran while a call on that session was still inside the module.");
         Assert.False(module.FinalizedWhileInFlight, "C_Finalize ran while a call was still inside the module.");
+    }
+
+    // SafeHandle only marks itself closed when its last reference goes, so while a call is in flight a
+    // disposed module would still let a new call in. It must be turned away like any call after Dispose.
+    [Fact]
+    public async Task Dispose_TurnsAwayANewCall_WhileAnotherIsStillInFlight()
+    {
+        using var module = new ParkingModule();
+        Pkcs11Library library = module.Load();
+        LowLevelPkcs11Library lowLevel = (LowLevelPkcs11Library)library.LowLevelLibrary!;
+
+        Task call = Task.Run(() => library.GetInfo(), Token);
+        Assert.True(module.Entered.Wait(Generous, Token), "the call never reached the module");
+        library.Dispose();
+
+        CK_INFO info = default;
+        Assert.Throws<ObjectDisposedException>(() => lowLevel.C_GetInfo(ref info));
+
+        module.Release.Set();
+        await call.WaitAsync(Generous, Token);
+        Assert.Equal(1, module.CallCount("C_GetInfo"));
+        Assert.Equal(1, module.CallCount("C_Finalize"));
+    }
+
+    // The one call C_Finalize is meant to interrupt: PKCS#11 has it wake a blocking C_WaitForSlotEvent
+    // with CKR_CRYPTOKI_NOT_INITIALIZED. Disposing must do that, not wait for an event that may never come.
+    [Fact]
+    public async Task Dispose_WakesABlockingWaitForSlotEvent()
+    {
+        using var module = new WaitingModule();
+        Pkcs11Library library = module.Load();
+
+        Task<Exception?> wait = Task.Run(() => Record.Exception(() => library.WaitForSlotEvent(nonBlocking: false)), Token);
+        Assert.True(module.Waiting.Wait(Generous, Token), "the wait never reached the module");
+
+        library.Dispose();
+
+        Exception? outcome = await wait.WaitAsync(Generous, Token);
+        var e = Assert.IsType<Pkcs11Exception>(outcome, exactMatch: false);
+        Assert.Equal(CKR.CKR_CRYPTOKI_NOT_INITIALIZED, e.ReturnValue);
+        Assert.Equal(1, module.CallCount("C_Finalize"));
     }
 
     private static async Task WaitBriefly(Task task)
@@ -139,6 +180,26 @@ public sealed class LibraryDisposeRaceTests
             Entered.Set();
             Release.Wait(Generous);
             Interlocked.Exchange(ref _inFlight, 0);
+        }
+    }
+
+    /// <summary>Blocks in <c>C_WaitForSlotEvent</c> until <c>C_Finalize</c> arrives, as a module does.</summary>
+    private sealed class WaitingModule : FakeModule
+    {
+        private readonly ManualResetEventSlim _finalized = new();
+
+        public ManualResetEventSlim Waiting { get; } = new();
+
+        protected override CKR C_Finalize(IntPtr pReserved)
+        {
+            _finalized.Set();
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot)
+        {
+            Waiting.Set();
+            return _finalized.Wait(Generous) ? CKR.CKR_CRYPTOKI_NOT_INITIALIZED : CKR.CKR_NO_EVENT;
         }
     }
 }

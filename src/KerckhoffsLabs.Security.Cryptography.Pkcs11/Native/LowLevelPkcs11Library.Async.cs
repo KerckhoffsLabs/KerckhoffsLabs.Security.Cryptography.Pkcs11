@@ -11,12 +11,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_AsyncComplete(NativeCULong session, ReadOnlySpan<byte> functionName, ref CK_ASYNC_DATA result)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_AsyncComplete)
+        if (!call.Table.HasC_AsyncComplete)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_AsyncComplete(session, functionName, ref result).ToCKR();
+        return call.Table.C_AsyncComplete(session, functionName, ref result).ToCKR();
     }
 
     /// <summary>
@@ -25,12 +25,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_AsyncGetID(NativeCULong session, ReadOnlySpan<byte> functionName, ref NativeCULong id)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_AsyncGetID)
+        if (!call.Table.HasC_AsyncGetID)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_AsyncGetID(session, functionName, ref id);
+        NativeCULong rv = call.Table.C_AsyncGetID(session, functionName, ref id);
         return rv.ToCKR();
     }
 
@@ -40,12 +40,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on pre-v3.2 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_AsyncJoin(NativeCULong session, ReadOnlySpan<byte> functionName, NativeCULong id, ReadOnlySpan<byte> data)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_AsyncJoin)
+        if (!call.Table.HasC_AsyncJoin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_AsyncJoin(session, functionName, id, data);
+        NativeCULong rv = call.Table.C_AsyncJoin(session, functionName, id, data);
         return rv.ToCKR();
     }
 }

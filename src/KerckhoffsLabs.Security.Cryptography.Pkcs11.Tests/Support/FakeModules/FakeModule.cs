@@ -6,6 +6,8 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
+using Microsoft.Extensions.Logging;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 /// <summary>
@@ -64,7 +66,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
     public int CallCount(string function) => _calls.GetValueOrDefault(function);
 
     /// <summary>Loads this module through the real loader and initializes it, as <c>Pkcs11Library.Load</c> would.</summary>
-    public Pkcs11Library Load() => new(ResolveExport);
+    public Pkcs11Library Load(ILoggerFactory? loggerFactory = null) => new(ResolveExport, loggerFactory);
 
     /// <summary>Binds this module through the real loader without initializing it.</summary>
     public LowLevelPkcs11Library LoadLowLevel() => new(ResolveExport);

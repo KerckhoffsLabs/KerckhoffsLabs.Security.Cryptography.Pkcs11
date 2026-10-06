@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
@@ -549,9 +550,14 @@ public sealed class Pkcs11Library : IDisposable
     #region IDisposable
 
     /// <summary>
-    /// Releases the library: closes any sessions still tracked against it, calls
-    /// <c>C_Finalize</c> (only if this instance drove <c>C_Initialize</c>), and disposes the
-    /// underlying low-level wrapper. There is no finalizer — the native module is released by
+    /// Releases the library: closes any sessions still tracked against it, and releases the module.
+    /// <c>C_Finalize</c> (only if this instance drove <c>C_Initialize</c>) and the unmap run when the
+    /// last use of the module goes: at once, or when a call still in flight on another thread returns.
+    /// A thread blocked in <see cref="WaitForSlotEvent"/> does not delay <c>C_Finalize</c>; it is woken
+    /// with <c>CKR_CRYPTOKI_NOT_INITIALIZED</c>, as PKCS#11 specifies. While another load of the same
+    /// module is still live, <c>C_Finalize</c> waits for that one too, since they share the module's
+    /// state. It therefore runs on whichever thread releases the last use. Dispose logs what it can know
+    /// of it: a failure when it ran at once, or that it was deferred or left to another load. There is no finalizer — the native module is released by
     /// <c>Pkcs11ModuleHandle</c>'s critical-finalizer <see cref="SafeHandle"/>
     /// if a caller forgets to dispose.
     /// </summary>
@@ -570,18 +576,44 @@ public sealed class Pkcs11Library : IDisposable
             // produced. This is the safety net for callers that violate it.
             _pkcs11Library.CloseAllTrackedSessions();
 
-            // Only call C_Finalize if THIS instance drove the C_Initialize to CKR_OK.
+            // Only finalize if THIS instance drove the C_Initialize to CKR_OK.
             // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
-            // responsible for finalization — calling it here would tear down their state.
+            // responsible for finalization — doing it here would tear down their state.
+            // The finalize is deferred to the module's last release, so it cannot run
+            // under a call that is still in flight on another thread.
             if (_ownsFinalize)
-                _pkcs11Library.C_Finalize(IntPtr.Zero);
+                _pkcs11Library.FinalizeOnLastRelease();
 
             Log.UnloadingLibrary(_logger, _libraryPath);
             _pkcs11Library.Dispose();
+            var loaded = _pkcs11Library as LowLevelPkcs11Library;
             _pkcs11Library = null;
+            _disposed = true;
+
+            // After the state change, so a logger that throws cannot leave the library half disposed.
+            if (_ownsFinalize && loaded is not null)
+                LogFinalizeStatus(loaded.FinalizeStatus);
         }
 
         _disposed = true;
+    }
+
+    // C_Finalize runs on whichever thread releases the module last (see Pkcs11ModuleHandle), which
+    // never logs: this reports what Dispose itself can know.
+    private void LogFinalizeStatus((FinalizeOutcome Outcome, CKR ReturnValue) status)
+    {
+        switch (status.Outcome)
+        {
+            case FinalizeOutcome.Failed:
+                Log.FinalizeFailed(_logger, _libraryPath, status.ReturnValue);
+                break;
+            case FinalizeOutcome.Deferred:
+                Log.FinalizeDeferred(_logger, _libraryPath);
+                break;
+            case FinalizeOutcome.HandedOff:
+                Log.FinalizeHandedOff(_logger, _libraryPath);
+                break;
+        }
     }
 
     #endregion

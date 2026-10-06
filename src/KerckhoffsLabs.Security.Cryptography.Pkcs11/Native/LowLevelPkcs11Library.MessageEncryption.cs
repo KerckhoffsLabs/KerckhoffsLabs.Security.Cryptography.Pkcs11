@@ -11,12 +11,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_MessageEncryptInit)
+        if (!call.Table.HasC_MessageEncryptInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_MessageEncryptInit(session, ref mechanism, key).ToCKR();
+        return call.Table.C_MessageEncryptInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -26,15 +26,15 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
         ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_EncryptMessage)
+        if (!call.Table.HasC_EncryptMessage)
         {
             ciphertextLen = (NativeCULong)0;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        NativeCULong rv = _delegates.C_EncryptMessage(session, parameter, parameterLen, associatedData, plaintext, ciphertext, out ciphertextLen);
+        NativeCULong rv = call.Table.C_EncryptMessage(session, parameter, parameterLen, associatedData, plaintext, ciphertext, out ciphertextLen);
         return rv.ToCKR();
     }
 
@@ -44,12 +44,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_EncryptMessageBegin)
+        if (!call.Table.HasC_EncryptMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_EncryptMessageBegin(session, parameter, parameterLen, associatedData);
+        NativeCULong rv = call.Table.C_EncryptMessageBegin(session, parameter, parameterLen, associatedData);
         return rv.ToCKR();
     }
 
@@ -60,15 +60,15 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> plaintextPart,
         Span<byte> ciphertextPart, out NativeCULong ciphertextPartLen, NativeCULong flags)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_EncryptMessageNext)
+        if (!call.Table.HasC_EncryptMessageNext)
         {
             ciphertextPartLen = (NativeCULong)0;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        NativeCULong rv = _delegates.C_EncryptMessageNext(session, parameter, parameterLen, plaintextPart, ciphertextPart, out ciphertextPartLen, flags);
+        NativeCULong rv = call.Table.C_EncryptMessageNext(session, parameter, parameterLen, plaintextPart, ciphertextPart, out ciphertextPartLen, flags);
         return rv.ToCKR();
     }
 
@@ -78,12 +78,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_MessageEncryptFinal(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_MessageEncryptFinal)
+        if (!call.Table.HasC_MessageEncryptFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_MessageEncryptFinal(session);
+        NativeCULong rv = call.Table.C_MessageEncryptFinal(session);
         return rv.ToCKR();
     }
 }

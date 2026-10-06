@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -33,6 +34,15 @@ internal static partial class Log
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Unloading PKCS#11 library {LibraryPath}")]
     public static partial void UnloadingLibrary(ILogger logger, string? libraryPath);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "C_Finalize on {LibraryPath} returned {ReturnValue}")]
+    public static partial void FinalizeFailed(ILogger logger, string? libraryPath, CKR returnValue);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "C_Finalize on {LibraryPath} deferred until the calls and sessions still using the module release it")]
+    public static partial void FinalizeDeferred(ILogger logger, string? libraryPath);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "C_Finalize on {LibraryPath} left to another load of the module that is still live")]
+    public static partial void FinalizeHandedOff(ILogger logger, string? libraryPath);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Allocated {Size} bytes at {Address}. Allocations: {AllocationCount}")]
     public static partial void AllocatedMemory(ILogger logger, int size, nint address, int allocationCount);

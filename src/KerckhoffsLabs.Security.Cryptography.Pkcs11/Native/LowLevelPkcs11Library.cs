@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -7,12 +8,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
 {
 
-    private volatile bool _disposed = false;
-
     /// <summary>
-    /// Handle to the PKCS#11 library
+    /// The loaded module. It owns the function table, so a call can reach the module only while it holds
+    /// a reference on this handle (<see cref="EnterModule"/>), and <c>C_Finalize</c> and the unmap wait
+    /// for the last such reference.
     /// </summary>
-    private readonly Pkcs11ModuleHandle _library = new();
+    private readonly Pkcs11ModuleHandle _module;
 
     /// <summary>
     /// The module handle, exposed so <see cref="Internal.SafeHandles.Pkcs11SessionHandle"/> can take
@@ -21,12 +22,18 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// SafeHandle ref count this module could be unmapped before an abandoned session's
     /// <c>C_CloseSession</c> runs.
     /// </summary>
-    internal Pkcs11ModuleHandle ModuleHandle => _library;
+    internal Pkcs11ModuleHandle ModuleHandle => _module;
 
     /// <summary>
-    /// Delegates for PKCS#11 functions
+    /// A use of the module for one call. Throws <see cref="ObjectDisposedException"/> once this
+    /// library has been disposed; there is no window between that check and the call, because the
+    /// use itself keeps the module from being finalized or unmapped.
     /// </summary>
-    private readonly Delegates _delegates;
+    /// <param name="holdsOffFinalize"><see langword="false"/> only for a blocking <c>C_WaitForSlotEvent</c>.</param>
+    private ModuleCall EnterModule(bool holdsOffFinalize = true) => new(_module, holdsOffFinalize);
+
+    /// <summary>What has happened to a requested <c>C_Finalize</c> so far.</summary>
+    internal (FinalizeOutcome Outcome, CKR ReturnValue) FinalizeStatus => _module.FinalizeStatus;
 
     /// <summary>
     /// Lock guarding <see cref="_trackedSessions"/>.
@@ -129,34 +136,7 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     {
         EnsureCkUlongWidthMatchesPlatform();
         ArgumentException.ThrowIfNullOrEmpty(libraryPath);
-        try
-        {
-            _library = new Pkcs11ModuleHandle(NativeLibrary.Load(libraryPath));
-
-            // Delegates resolves the function-pointer table via NativeLibrary.GetExport, which
-            // needs the raw module handle. DangerousGetHandle is the only way to obtain it from the
-            // SafeHandle; bracket it with DangerousAddRef/DangerousRelease so the module cannot be
-            // unloaded while symbols are resolved. The raw pointer is consumed entirely within the
-            // Delegates constructor and never retained, so it cannot outlive the ref.
-            bool addedRef = false;
-            try
-            {
-                _library.DangerousAddRef(ref addedRef);
-#pragma warning disable S3869 // DangerousGetHandle is unavoidable for NativeLibrary.GetExport and is bracketed by DangerousAddRef/Release.
-                _delegates = new Delegates(_library.DangerousGetHandle());
-#pragma warning restore S3869
-            }
-            finally
-            {
-                if (addedRef)
-                    _library.DangerousRelease();
-            }
-        }
-        catch
-        {
-            Dispose();
-            throw;
-        }
+        _module = Pkcs11ModuleHandle.Load(libraryPath);
     }
 
     /// <summary>
@@ -166,7 +146,7 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// returned function-pointer table, same as the dynamic-load path.
     /// </summary>
     internal LowLevelPkcs11Library()
-        : this(() => new Delegates(IntPtr.Zero))
+        : this(() => new Delegates(IntPtr.Zero), Pkcs11ModuleHandle.StaticallyLinked)
     {
     }
 
@@ -178,22 +158,16 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// </summary>
     /// <param name="resolveExport">Maps an export name to its address, or <see cref="IntPtr.Zero"/> when absent.</param>
     internal LowLevelPkcs11Library(Func<string, IntPtr> resolveExport)
-        : this(() => new Delegates(resolveExport))
+        : this(() => new Delegates(resolveExport), resolveExport.Target ?? resolveExport)
     {
     }
 
-    private LowLevelPkcs11Library(Func<Delegates> bind)
+    // identity: which module this is, so two bindings of the same one share its Cryptoki state. A test
+    // module is identified by the object whose method resolves its exports.
+    private LowLevelPkcs11Library(Func<Delegates> bind, object identity)
     {
         EnsureCkUlongWidthMatchesPlatform();
-        try
-        {
-            _delegates = bind();
-        }
-        catch
-        {
-            Dispose();
-            throw;
-        }
+        _module = Pkcs11ModuleHandle.Bind(bind, identity);
     }
 
     /// <summary>
@@ -241,13 +215,12 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// matching Decrypt variants). False on v2.40 libraries.
     /// </summary>
     public bool IsMessageApiSupported
-        => _delegates is not null
-           && _delegates.HasC_MessageEncryptInit
-           && _delegates.HasC_EncryptMessage
-           && _delegates.HasC_MessageEncryptFinal
-           && _delegates.HasC_MessageDecryptInit
-           && _delegates.HasC_DecryptMessage
-           && _delegates.HasC_MessageDecryptFinal;
+        => _module.Table.HasC_MessageEncryptInit
+           && _module.Table.HasC_EncryptMessage
+           && _module.Table.HasC_MessageEncryptFinal
+           && _module.Table.HasC_MessageDecryptInit
+           && _module.Table.HasC_DecryptMessage
+           && _module.Table.HasC_MessageDecryptFinal;
 
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
@@ -255,51 +228,25 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// validation-flags inspection). False on v2.40 / v3.0 / v3.1 libraries.
     /// </summary>
     public bool IsV32ApiSupported
-        => _delegates is not null
-           && _delegates.HasC_EncapsulateKey
-           && _delegates.HasC_DecapsulateKey
-           && _delegates.HasC_WrapKeyAuthenticated
-           && _delegates.HasC_UnwrapKeyAuthenticated
-           && _delegates.HasC_VerifySignatureInit
-           && _delegates.HasC_VerifySignature
-           && _delegates.HasC_GetSessionValidationFlags;
+        => _module.Table.HasC_EncapsulateKey
+           && _module.Table.HasC_DecapsulateKey
+           && _module.Table.HasC_WrapKeyAuthenticated
+           && _module.Table.HasC_UnwrapKeyAuthenticated
+           && _module.Table.HasC_VerifySignatureInit
+           && _module.Table.HasC_VerifySignature
+           && _module.Table.HasC_GetSessionValidationFlags;
 
     /// <summary>
-    /// Disposes object
+    /// Asks for <c>C_Finalize</c> on the module's last release instead of now. A call still in flight, or
+    /// a session still open, holds a reference, so the module is finalized only once nothing is using it.
+    /// Has no effect unless <c>C_Initialize</c> through this library succeeded.
     /// </summary>
-    public void Dispose()
-    {
-        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
+    public void FinalizeOnLastRelease() => _module.FinalizeOnRelease();
 
     /// <summary>
-    /// Disposes object
+    /// Releases this library's reference on the module. Calls that begin afterwards throw
+    /// <see cref="ObjectDisposedException"/>; one already in flight completes, and the module is
+    /// finalized (if requested) and unmapped when it, and every session, has released its reference.
     /// </summary>
-    /// <param name="disposing">Flag indicating whether managed resources should be disposed</param>
-    private void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-
-        // Set the flag before unmapping the module, not after: every native entry point guards
-        // with ObjectDisposedException.ThrowIf(_disposed, this) and then calls a
-        // delegate* unmanaged[Cdecl] loaded from this module. Flipping the flag first means a
-        // thread that reads it after this write is turned away before it can dispatch into
-        // memory NativeLibrary.Free (via _library.Dispose()) is about to unmap.
-        _disposed = true;
-
-        if (disposing)
-        {
-            _library.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Class destructor that disposes object if caller forgot to do so
-    /// </summary>
-    ~LowLevelPkcs11Library()
-    {
-        Dispose(false);
-    }
+    public void Dispose() => _module.Dispose();
 }

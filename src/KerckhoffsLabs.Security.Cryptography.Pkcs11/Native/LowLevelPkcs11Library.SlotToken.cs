@@ -17,9 +17,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
     public CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_GetSlotList(tokenPresent, slotList, out count);
+        NativeCULong rv = call.Table.C_GetSlotList(tokenPresent, slotList, out count);
         return rv.ToCKR();
     }
 
@@ -31,9 +31,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID</returns>
     public CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GetSlotInfo(slotId, ref info).ToCKR();
+        return call.Table.C_GetSlotInfo(slotId, ref info).ToCKR();
     }
 
     /// <summary>
@@ -44,9 +44,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GetTokenInfo(slotId, ref info).ToCKR();
+        return call.Table.C_GetTokenInfo(slotId, ref info).ToCKR();
     }
 
     /// <summary>
@@ -61,15 +61,15 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
         // NULL_PTR form: the caller is probing for the mechanism count, so there is nothing to copy back.
         if (mechanismList.IsEmpty)
-            return _delegates.C_GetMechanismList(slotId, default, out count).ToCKR();
+            return call.Table.C_GetMechanismList(slotId, default, out count).ToCKR();
 
         // CKM is 64-bit and CK_ULONG is not everywhere, so the module writes into a CK_ULONG buffer.
         NativeCULong[] CULongList = new NativeCULong[mechanismList.Length];
-        CKR rv = _delegates.C_GetMechanismList(slotId, CULongList, out count).ToCKR();
+        CKR rv = call.Table.C_GetMechanismList(slotId, CULongList, out count).ToCKR();
 
         // Vendor-defined and not-yet-named mechanisms survive as unnamed CKM values. count reports the
         // entries actually handed back, which the destination's length may cap.
@@ -89,9 +89,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_MECHANISM_INVALID, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, ref CK_MECHANISM_INFO info)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GetMechanismInfo(slotId, type.ToCULong(), ref info).ToCKR();
+        return call.Table.C_GetMechanismInfo(slotId, type.ToCULong(), ref info).ToCKR();
     }
 
     /// <summary>
@@ -104,9 +104,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_PIN_INCORRECT, CKR_PIN_LOCKED, CKR_SESSION_EXISTS, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_TOKEN_WRITE_PROTECTED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_InitToken(slotId, pin, label);
+        NativeCULong rv = call.Table.C_InitToken(slotId, pin, label);
         return rv.ToCKR();
     }
 
@@ -117,11 +117,17 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="slot">Location which will receive the ID of the slot that the event occurred in</param>
     /// <param name="reserved">Reserved for future versions (should be null)</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_NO_EVENT, CKR_OK</returns>
+    /// <remarks>
+    /// A blocking wait does not hold off <c>C_Finalize</c>: PKCS#11 has <c>C_Finalize</c> wake it with
+    /// <c>CKR_CRYPTOKI_NOT_INITIALIZED</c>, the only way to end it without an event, so disposing the
+    /// library while a thread waits ends the wait instead of waiting for it.
+    /// </remarks>
     public CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot, IntPtr reserved)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        bool blocking = ((ulong)flags & CKF.CKF_DONT_BLOCK) == 0;
+        using ModuleCall call = EnterModule(holdsOffFinalize: !blocking);
 
-        NativeCULong rv = _delegates.C_WaitForSlotEvent(flags, ref slot, reserved);
+        NativeCULong rv = call.Table.C_WaitForSlotEvent(flags, ref slot, reserved);
         return rv.ToCKR();
     }
 }
