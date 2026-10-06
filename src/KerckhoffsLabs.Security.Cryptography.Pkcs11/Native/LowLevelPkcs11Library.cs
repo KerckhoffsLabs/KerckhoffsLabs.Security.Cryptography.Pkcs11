@@ -199,10 +199,11 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// <summary>
     /// Verifies the resolved build's CK_ULONG width (<see cref="NativeCULong"/>) matches the
     /// host's native CK_ULONG: 4 bytes on Windows (LLP64), the pointer width on Unix (LP64/ILP32).
-    /// <see cref="NativeCULong"/> is <c>uint</c> in the net10.0-windows build and <c>nuint</c> in
-    /// the neutral net10.0 build, so a net10.0 build on Windows x64 (8 bytes) or a net10.0-windows
-    /// build on Unix-64 (4 bytes) would silently mis-marshal every CK_ULONG-bearing struct. Fail
-    /// loudly instead — the caller resolved the wrong target-framework asset.
+    /// KerckhoffsLabs.Runtime.InteropServices ships <see cref="NativeCULong"/> as <c>nuint</c> in its
+    /// <c>lib/net10.0</c> assembly and as <c>uint</c> in its <c>runtimes/win-x64</c> and
+    /// <c>runtimes/win-arm64</c> assets, so 64-bit Windows running the <c>lib</c> assembly (8 bytes)
+    /// would silently mis-marshal every CK_ULONG-bearing struct. Fail loudly instead: the
+    /// runtime-specific asset was not resolved.
     /// </summary>
     private static void EnsureCkUlongWidthMatchesPlatform()
     {
@@ -226,10 +227,11 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
         if (actual != expected)
         {
             throw new PlatformNotSupportedException(
-                $"CK_ULONG width mismatch: this build's NativeCULong is {actual} bytes but the " +
-                $"native CK_ULONG on this platform is {expected} bytes. On Windows, reference " +
-                "KerckhoffsLabs.Security.Cryptography.Pkcs11 from a net10.0-windows target framework " +
-                "so the 4-byte build is resolved; on Unix use the neutral net10.0 build.");
+                $"CK_ULONG width mismatch: NativeCULong is {actual} bytes but the native CK_ULONG on " +
+                $"this platform is {expected} bytes. The runtime-specific KerckhoffsLabs.Runtime.InteropServices " +
+                "assembly for this platform was not loaded. Deploy the application's .deps.json with it, or " +
+                "restore and publish with a RuntimeIdentifier, and check that no version of " +
+                "KerckhoffsLabs.Runtime.InteropServices older than 1.2.0 is referenced or overrides it.");
         }
     }
 
