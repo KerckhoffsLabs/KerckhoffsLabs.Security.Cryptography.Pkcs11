@@ -13,26 +13,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSa
 /// when the call is in flight, and the module records what the library did to it meanwhile.
 /// </summary>
 /// <remarks>
-/// Every call holds a reference on the module handle, so <c>C_Finalize</c> and the unmap wait for a
-/// call in flight. A call does not yet hold one on its session, so <c>Pkcs11Library.Dispose</c> can
-/// still close a session under a call on it; that test stays gated off by
-/// <see cref="SessionRaceFixed"/> until the session lease holds a reference too. Neither test depends
-/// on how the fix behaves: Dispose may return at once and defer the teardown, or wait for the call to
-/// finish.
+/// Every call holds a reference on the module handle, and every session operation one on its session
+/// handle, so <c>C_Finalize</c>, the unmap and <c>C_CloseSession</c> all wait for a call in flight.
+/// Neither test depends on how that is achieved: Dispose may return at once and defer the teardown,
+/// or wait for the call to finish.
 /// </remarks>
 [Collection(FakeModuleCollection.Name)]
 public sealed class LibraryDisposeRaceTests
 {
-    // The fix that makes the session lease hold a reference on the session handle flips this to true.
-    // A static [Fact(Skip = "...")] (flagged by xUnit1004) hard-disables a test with no named, auditable
-    // gate; [Fact(SkipUnless = ...)] ties it to this property instead, matching the suite's other
-    // permanently-off gates.
-    public static bool SessionRaceFixed => false;
-
-    private const string SkipReason =
-        "Reproduces the dispose race: Pkcs11Library.Dispose closes a session under a call on it. " +
-        "Set SessionRaceFixed in the fix that makes the session lease hold a reference on the session handle.";
-
     private static readonly TimeSpan Generous = TimeSpan.FromSeconds(10);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -57,7 +45,7 @@ public sealed class LibraryDisposeRaceTests
         Assert.Equal(1, module.CallCount("C_Finalize"));
     }
 
-    [Fact(SkipUnless = nameof(SessionRaceFixed), Skip = SkipReason)]
+    [Fact]
     public async Task Dispose_DoesNotCloseASession_UnderACallOnIt()
     {
         using var module = new ParkingModule();
