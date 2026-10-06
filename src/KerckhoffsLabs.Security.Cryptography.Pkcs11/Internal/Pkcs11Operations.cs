@@ -40,19 +40,27 @@ internal static class Pkcs11Operations
     public const string OpGenerateRandom = "C_GenerateRandom";
     public const string OpGetAttributeValue = "C_GetAttributeValue";
     public const string OpGetFunctionStatus = "C_GetFunctionStatus";
+    public const string OpGetInfo = "C_GetInfo";
+    public const string OpGetInterface = "C_GetInterface";
     public const string OpGetInterfaceList = "C_GetInterfaceList";
+    public const string OpGetMechanismInfo = "C_GetMechanismInfo";
     public const string OpGetMechanismList = "C_GetMechanismList";
     public const string OpGetObjectSize = "C_GetObjectSize";
     public const string OpGetOperationState = "C_GetOperationState";
     public const string OpGetSessionInfo = "C_GetSessionInfo";
     public const string OpGetSessionValidationFlags = "C_GetSessionValidationFlags";
+    public const string OpGetSlotInfo = "C_GetSlotInfo";
     public const string OpGetSlotList = "C_GetSlotList";
+    public const string OpGetTokenInfo = "C_GetTokenInfo";
     public const string OpInitPIN = "C_InitPIN";
+    public const string OpInitToken = "C_InitToken";
+    public const string OpInitialize = "C_Initialize";
     public const string OpLogin = "C_Login";
     public const string OpLoginUser = "C_LoginUser";
     public const string OpLogout = "C_Logout";
     public const string OpMessageDecryptInit = "C_MessageDecryptInit";
     public const string OpMessageEncryptInit = "C_MessageEncryptInit";
+    public const string OpOpenSession = "C_OpenSession";
     public const string OpSeedRandom = "C_SeedRandom";
     public const string OpSessionCancel = "C_SessionCancel";
     public const string OpSetAttributeValue = "C_SetAttributeValue";
@@ -72,6 +80,7 @@ internal static class Pkcs11Operations
     public const string OpVerifySignatureInit = "C_VerifySignatureInit";
     public const string OpVerifySignatureUpdate = "C_VerifySignatureUpdate";
     public const string OpVerifyUpdate = "C_VerifyUpdate";
+    public const string OpWaitForSlotEvent = "C_WaitForSlotEvent";
     public const string OpWrapKey = "C_WrapKey";
     public const string OpWrapKeyAuthenticated = "C_WrapKeyAuthenticated";
 }
