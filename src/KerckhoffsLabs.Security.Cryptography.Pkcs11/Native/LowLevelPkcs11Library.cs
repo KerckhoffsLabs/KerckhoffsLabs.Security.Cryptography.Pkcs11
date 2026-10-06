@@ -166,11 +166,28 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// returned function-pointer table, same as the dynamic-load path.
     /// </summary>
     internal LowLevelPkcs11Library()
+        : this(() => new Delegates(IntPtr.Zero))
+    {
+    }
+
+    /// <summary>
+    /// Binds to a module whose exports come from <paramref name="resolveExport"/> rather than from a
+    /// loaded library. This is the test seam: a test hands in a module built from managed
+    /// <c>[UnmanagedCallersOnly]</c> functions, and every call then goes through the same loader,
+    /// wrappers, pinning and struct packing as a real module.
+    /// </summary>
+    /// <param name="resolveExport">Maps an export name to its address, or <see cref="IntPtr.Zero"/> when absent.</param>
+    internal LowLevelPkcs11Library(Func<string, IntPtr> resolveExport)
+        : this(() => new Delegates(resolveExport))
+    {
+    }
+
+    private LowLevelPkcs11Library(Func<Delegates> bind)
     {
         EnsureCkUlongWidthMatchesPlatform();
         try
         {
-            _delegates = new Delegates(IntPtr.Zero);
+            _delegates = bind();
         }
         catch
         {

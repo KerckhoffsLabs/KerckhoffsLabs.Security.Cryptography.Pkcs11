@@ -84,7 +84,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library Load(string libraryPath, ILoggerFactory? loggerFactory = null)
-        => new(libraryPath, useStaticLink: false, loggerFactory);
+        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), loggerFactory);
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -141,9 +141,21 @@ public sealed class Pkcs11Library : IDisposable
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library LoadStaticallyLinked(ILoggerFactory? loggerFactory = null)
-        => new(libraryPath: "<statically-linked>", useStaticLink: true, loggerFactory);
+        => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), loggerFactory);
 
-    private Pkcs11Library(string libraryPath, bool useStaticLink, ILoggerFactory? loggerFactory)
+    /// <summary>
+    /// Test seam: binds to a module whose exports come from <paramref name="resolveExport"/> (a fake
+    /// module built from managed <c>[UnmanagedCallersOnly]</c> functions), then initializes it exactly
+    /// as <see cref="Load(string, ILoggerFactory?)"/> does. Unlike the in-process
+    /// <see cref="ILowLevelPkcs11Library"/> seam below, every call crosses the real loader, wrappers,
+    /// pinning and struct packing.
+    /// </summary>
+    internal Pkcs11Library(Func<string, IntPtr> resolveExport, ILoggerFactory? loggerFactory = null)
+        : this(libraryPath: "<fake module>", () => new LowLevelPkcs11Library(resolveExport), loggerFactory)
+    {
+    }
+
+    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, ILoggerFactory? loggerFactory)
     {
         _loggerFactory = loggerFactory;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
@@ -154,9 +166,7 @@ public sealed class Pkcs11Library : IDisposable
         try
         {
             Log.LoadingLibrary(_logger, _libraryPath);
-            _pkcs11Library = useStaticLink
-                ? new LowLevelPkcs11Library()
-                : new LowLevelPkcs11Library(_libraryPath);
+            _pkcs11Library = load();
             Initialize();
         }
         catch
