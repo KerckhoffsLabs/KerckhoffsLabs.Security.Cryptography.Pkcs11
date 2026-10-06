@@ -43,7 +43,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// Private because <see cref="Pkcs11SessionHandle"/> is internal; partials and subclasses
     /// access the session ID through the <see cref="_sessionId"/> shim property.
     /// </summary>
-    private Pkcs11SessionHandle _sessionHandle = null!;
+    private Pkcs11SessionHandle _sessionHandle;
 
     /// <summary>
     /// Compatibility shim — returns the underlying session ID, or <see cref="CK.CK_INVALID_HANDLE"/>
@@ -364,19 +364,44 @@ internal sealed class Pkcs11Session : IDisposable
     /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.SecureOnly"/>.
     /// </param>
     internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+        : this(pkcs11Library, OwnSession(pkcs11Library, sessionId), loggerFactory, policy)
     {
-        _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Session>();
-        Log.SessionTrace(_logger, sessionId, "ctor");
+    }
 
+    /// <summary>
+    /// Takes ownership of an open session's <paramref name="sessionHandle"/>: if construction throws, the
+    /// handle is disposed and the session closed, so it can never be left open with no owner.
+    /// </summary>
+    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, Pkcs11SessionHandle sessionHandle, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+    {
+        ArgumentNullException.ThrowIfNull(sessionHandle);
+        _sessionHandle = sessionHandle;
+        try
+        {
+            if (sessionHandle.IsInvalid)
+                throw new ArgumentException("Invalid handle specified", nameof(sessionHandle));
+
+            // Both run consumer code (the factory, the logger), which may throw.
+            _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Session>();
+            Log.SessionTrace(_logger, (ulong)sessionHandle.SessionId, "ctor");
+
+            _basePolicy = policy ?? CryptoPolicy.SecureOnly;
+            _effectivePolicy = _basePolicy;
+            _pkcs11Library = pkcs11Library;
+        }
+        catch
+        {
+            sessionHandle.Dispose();
+            throw;
+        }
+    }
+
+    private static Pkcs11SessionHandle OwnSession(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)
+    {
         ArgumentNullException.ThrowIfNull(pkcs11Library);
-
         if (sessionId == CK.CK_INVALID_HANDLE)
             throw new ArgumentException("Invalid handle specified", nameof(sessionId));
-
-        _basePolicy = policy ?? CryptoPolicy.SecureOnly;
-        _effectivePolicy = _basePolicy;
-        _pkcs11Library = pkcs11Library;
-        _sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, (NativeCULong)sessionId);
+        return new Pkcs11SessionHandle(pkcs11Library, (NativeCULong)sessionId);
     }
 
     // -----------------------------------------------------------------------

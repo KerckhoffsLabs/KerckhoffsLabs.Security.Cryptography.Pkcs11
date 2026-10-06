@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
@@ -243,11 +244,22 @@ public sealed class Pkcs11Slot
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation(
-                "Opened {SessionType} session {SessionId} with token in slot {SlotId} under {PolicyName} policy",
-                readWrite ? "read-write" : "read-only", sessionId, _slotId, (policy ?? CryptoPolicy.SecureOnly).Name);
+        // Owned before any consumer code (the logger) runs, so a throw there closes the session
+        // rather than leaving it open with nothing to close it.
+        var sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, sessionId);
+        try
+        {
+            if (_logger.IsEnabled(LogLevel.Information))
+                _logger.LogInformation(
+                    "Opened {SessionType} session {SessionId} with token in slot {SlotId} under {PolicyName} policy",
+                    readWrite ? "read-write" : "read-only", sessionId, _slotId, (policy ?? CryptoPolicy.SecureOnly).Name);
 
-        return new Pkcs11Session(_pkcs11Library, (ulong)sessionId, _loggerFactory, policy);
+            return new Pkcs11Session(_pkcs11Library, sessionHandle, _loggerFactory, policy);
+        }
+        catch
+        {
+            sessionHandle.Dispose();
+            throw;
+        }
     }
 }
