@@ -18,9 +18,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID</returns>
     public CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_DigestEncryptUpdate(session, part, encryptedPart, out encryptedPartLen);
+        NativeCULong rv = call.Table.C_DigestEncryptUpdate(session, part, encryptedPart, out encryptedPartLen);
         return rv.ToCKR();
     }
 
@@ -37,9 +37,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_ENCRYPTED_DATA_INVALID, CKR_ENCRYPTED_DATA_LEN_RANGE, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID</returns>
     public CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_DecryptDigestUpdate(session, encryptedPart, part, out partLen);
+        NativeCULong rv = call.Table.C_DecryptDigestUpdate(session, encryptedPart, part, out partLen);
         return rv.ToCKR();
     }
 
@@ -56,9 +56,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_SignEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_SignEncryptUpdate(session, part, encryptedPart, out encryptedPartLen);
+        NativeCULong rv = call.Table.C_SignEncryptUpdate(session, part, encryptedPart, out encryptedPartLen);
         return rv.ToCKR();
     }
 
@@ -75,9 +75,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_ENCRYPTED_DATA_INVALID, CKR_ENCRYPTED_DATA_LEN_RANGE, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID</returns>
     public CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_DecryptVerifyUpdate(session, encryptedPart, part, out partLen);
+        NativeCULong rv = call.Table.C_DecryptVerifyUpdate(session, encryptedPart, part, out partLen);
         return rv.ToCKR();
     }
 }

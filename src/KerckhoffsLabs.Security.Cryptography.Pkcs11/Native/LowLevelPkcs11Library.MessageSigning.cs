@@ -11,12 +11,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_MessageSignInit)
+        if (!call.Table.HasC_MessageSignInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_MessageSignInit(session, ref mechanism, key).ToCKR();
+        return call.Table.C_MessageSignInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -26,15 +26,15 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, Span<byte> signature,
         out NativeCULong signatureLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_SignMessage)
+        if (!call.Table.HasC_SignMessage)
         {
             signatureLen = (NativeCULong)0;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        NativeCULong rv = _delegates.C_SignMessage(session, parameter, parameterLen, data, signature, out signatureLen);
+        NativeCULong rv = call.Table.C_SignMessage(session, parameter, parameterLen, data, signature, out signatureLen);
         return rv.ToCKR();
     }
 
@@ -44,12 +44,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_SignMessageBegin)
+        if (!call.Table.HasC_SignMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_SignMessageBegin(session, parameter, parameterLen);
+        NativeCULong rv = call.Table.C_SignMessageBegin(session, parameter, parameterLen);
         return rv.ToCKR();
     }
 
@@ -60,15 +60,15 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, Span<byte> signature,
         out NativeCULong signatureLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_SignMessageNext)
+        if (!call.Table.HasC_SignMessageNext)
         {
             signatureLen = (NativeCULong)0;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        NativeCULong rv = _delegates.C_SignMessageNext(session, parameter, parameterLen, data, signature, out signatureLen);
+        NativeCULong rv = call.Table.C_SignMessageNext(session, parameter, parameterLen, data, signature, out signatureLen);
         return rv.ToCKR();
     }
 
@@ -78,12 +78,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_MessageSignFinal(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_MessageSignFinal)
+        if (!call.Table.HasC_MessageSignFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_MessageSignFinal(session);
+        NativeCULong rv = call.Table.C_MessageSignFinal(session);
         return rv.ToCKR();
     }
 }

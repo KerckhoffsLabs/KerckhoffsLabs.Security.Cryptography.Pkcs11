@@ -12,9 +12,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_FUNCTION_NOT_PARALLEL, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_SESSION_HANDLE_INVALID, CKR_SESSION_CLOSED</returns>
     public CKR C_GetFunctionStatus(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_GetFunctionStatus(session);
+        NativeCULong rv = call.Table.C_GetFunctionStatus(session);
         return rv.ToCKR();
     }
 
@@ -25,9 +25,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_FUNCTION_NOT_PARALLEL, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_SESSION_HANDLE_INVALID, CKR_SESSION_CLOSED</returns>
     public CKR C_CancelFunction(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_CancelFunction(session);
+        NativeCULong rv = call.Table.C_CancelFunction(session);
         return rv.ToCKR();
     }
 }

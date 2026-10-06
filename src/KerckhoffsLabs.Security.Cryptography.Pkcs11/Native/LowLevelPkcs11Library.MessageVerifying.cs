@@ -11,12 +11,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_MessageVerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_MessageVerifyInit)
+        if (!call.Table.HasC_MessageVerifyInit)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_MessageVerifyInit(session, ref mechanism, key).ToCKR();
+        return call.Table.C_MessageVerifyInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -26,12 +26,12 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data,
         ReadOnlySpan<byte> signature)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_VerifyMessage)
+        if (!call.Table.HasC_VerifyMessage)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_VerifyMessage(session, parameter, parameterLen, data, signature);
+        NativeCULong rv = call.Table.C_VerifyMessage(session, parameter, parameterLen, data, signature);
         return rv.ToCKR();
     }
 
@@ -41,12 +41,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_VerifyMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_VerifyMessageBegin)
+        if (!call.Table.HasC_VerifyMessageBegin)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_VerifyMessageBegin(session, parameter, parameterLen);
+        NativeCULong rv = call.Table.C_VerifyMessageBegin(session, parameter, parameterLen);
         return rv.ToCKR();
     }
 
@@ -57,12 +57,12 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data,
         ReadOnlySpan<byte> signature)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_VerifyMessageNext)
+        if (!call.Table.HasC_VerifyMessageNext)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_VerifyMessageNext(session, parameter, parameterLen, data, signature);
+        NativeCULong rv = call.Table.C_VerifyMessageNext(session, parameter, parameterLen, data, signature);
         return rv.ToCKR();
     }
 
@@ -72,12 +72,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_MessageVerifyFinal(NativeCULong session)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_MessageVerifyFinal)
+        if (!call.Table.HasC_MessageVerifyFinal)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = _delegates.C_MessageVerifyFinal(session);
+        NativeCULong rv = call.Table.C_MessageVerifyFinal(session);
         return rv.ToCKR();
     }
 }

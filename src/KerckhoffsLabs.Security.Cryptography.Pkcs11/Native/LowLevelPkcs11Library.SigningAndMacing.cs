@@ -14,9 +14,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_KEY_FUNCTION_NOT_PERMITTED,CKR_KEY_HANDLE_INVALID, CKR_KEY_SIZE_RANGE, CKR_KEY_TYPE_INCONSISTENT, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_SignInit(session, ref mechanism, key).ToCKR();
+        return call.Table.C_SignInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -32,9 +32,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_INVALID, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN, CKR_FUNCTION_REJECTED</returns>
     public CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_Sign(session, data, signature, out signatureLen);
+        NativeCULong rv = call.Table.C_Sign(session, data, signature, out signatureLen);
         return rv.ToCKR();
     }
 
@@ -46,9 +46,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_SignUpdate(NativeCULong session, ReadOnlySpan<byte> part)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_SignUpdate(session, part);
+        NativeCULong rv = call.Table.C_SignUpdate(session, part);
         return rv.ToCKR();
     }
 
@@ -64,9 +64,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN, CKR_FUNCTION_REJECTED</returns>
     public CKR C_SignFinal(NativeCULong session, Span<byte> signature, out NativeCULong signatureLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_SignFinal(session, signature, out signatureLen);
+        NativeCULong rv = call.Table.C_SignFinal(session, signature, out signatureLen);
         return rv.ToCKR();
     }
 
@@ -79,9 +79,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_KEY_FUNCTION_NOT_PERMITTED, CKR_KEY_HANDLE_INVALID, CKR_KEY_SIZE_RANGE, CKR_KEY_TYPE_INCONSISTENT, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_SignRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_SignRecoverInit(session, ref mechanism, key).ToCKR();
+        return call.Table.C_SignRecoverInit(session, ref mechanism, key).ToCKR();
     }
 
     /// <summary>
@@ -97,9 +97,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DATA_INVALID, CKR_DATA_LEN_RANGE, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_SignRecover(session, data, signature, out signatureLen);
+        NativeCULong rv = call.Table.C_SignRecover(session, data, signature, out signatureLen);
         return rv.ToCKR();
     }
 }

@@ -30,6 +30,9 @@ internal partial class Delegates
         return _fp.C_Finalize(reserved);
     }
 
+    /// <summary>Returns <see langword="true"/> if the module's function table binds <c>C_Finalize</c>.</summary>
+    internal unsafe bool HasC_Finalize => _fp.C_Finalize is not null;
+
     /// <summary>Wrapper for <c>C_GetInfo</c>. Matches the prior delegate signature exactly.</summary>
     /// <remarks>On Windows the call is routed through the Pack=1 struct layout; the
     /// conversion to and from the unified structs happens here, so callers never see

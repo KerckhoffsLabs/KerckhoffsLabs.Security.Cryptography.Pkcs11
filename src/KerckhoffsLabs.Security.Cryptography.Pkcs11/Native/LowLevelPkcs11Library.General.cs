@@ -12,12 +12,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CANT_LOCK, CKR_CRYPTOKI_ALREADY_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_NEED_TO_CREATE_THREADS, CKR_OK</returns>
     public CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
+        CKR rv;
         if (initArgs == null)
         {
-            NativeCULong rv = _delegates.C_Initialize(IntPtr.Zero);
-            return rv.ToCKR();
+            rv = call.Table.C_Initialize(IntPtr.Zero).ToCKR();
         }
         else
         {
@@ -26,14 +26,18 @@ internal sealed partial class LowLevelPkcs11Library
             {
                 CK_C_INITIALIZE_ARGS initArgsValue = initArgs.Value;
                 UnmanagedMemory.Write(pInitArgs, in initArgsValue);
-                NativeCULong rv = _delegates.C_Initialize(pInitArgs);
-                return rv.ToCKR();
+                rv = call.Table.C_Initialize(pInitArgs).ToCKR();
             }
             finally
             {
                 UnmanagedMemory.Free(ref pInitArgs);
             }
         }
+
+        // The module handle owes C_Finalize only for an initialization it performed itself.
+        if (rv == CKR.CKR_OK)
+            _module.MarkInitialized();
+        return rv;
     }
 
     /// <summary>
@@ -43,10 +47,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
     public CKR C_Finalize(IntPtr reserved)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        NativeCULong rv = _delegates.C_Finalize(reserved);
-        return rv.ToCKR();
+        CKR rv = call.Table.C_Finalize(reserved).ToCKR();
+        if (rv == CKR.CKR_OK)
+            _module.MarkFinalized();
+        return rv;
     }
 
     /// <summary>
@@ -56,9 +62,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
     public CKR C_GetInfo(ref CK_INFO info)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GetInfo(ref info).ToCKR();
+        return call.Table.C_GetInfo(ref info).ToCKR();
     }
 
     /// <summary>
@@ -70,12 +76,12 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_GetInterfaceList)
+        if (!call.Table.HasC_GetInterfaceList)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_GetInterfaceList(interfaces, ref count).ToCKR();
+        return call.Table.C_GetInterfaceList(interfaces, ref count).ToCKR();
     }
 
     /// <summary>
@@ -88,14 +94,14 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
     public CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_GetInterface)
+        if (!call.Table.HasC_GetInterface)
         {
             iface = default;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        return _delegates.C_GetInterface(interfaceName, flags, out iface).ToCKR();
+        return call.Table.C_GetInterface(interfaceName, flags, out iface).ToCKR();
     }
 }

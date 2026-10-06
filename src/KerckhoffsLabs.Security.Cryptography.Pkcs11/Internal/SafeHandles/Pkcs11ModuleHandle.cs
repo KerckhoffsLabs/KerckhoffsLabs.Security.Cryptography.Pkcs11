@@ -1,42 +1,308 @@
 using System.Runtime.InteropServices;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 /// <summary>
-/// <see cref="SafeHandle"/> wrapper for a PKCS#11 native module loaded via
-/// <see cref="NativeLibrary.Load(string)"/>. Releases via <see cref="NativeLibrary.Free(IntPtr)"/>.
+/// Owns a loaded PKCS#11 module: its function table, its <c>C_Finalize</c>, and the OS module handle.
+/// Every call into the module holds a use of this handle for its duration (see
+/// <see cref="Native.ModuleCall"/>), and every open session holds one for its lifetime, so the teardown —
+/// <c>C_Finalize</c>, then <see cref="NativeLibrary.Free(IntPtr)"/> — never runs under a call or a
+/// session that still needs the module.
 /// </summary>
 /// <remarks>
-/// SafeHandle inherits from <c>CriticalFinalizerObject</c>, so release runs even on
-/// <c>Environment.FailFast</c> and during AppDomain unload — better protection against
-/// native-handle leaks than a regular finalizer.
+/// <para>
+/// Finalizing and unmapping are separate steps. <c>C_Finalize</c> runs once it has been asked for, the
+/// handle is disposed, and no use that holds it off remains. A blocking <c>C_WaitForSlotEvent</c> is the
+/// one call that does not hold it off: PKCS#11 (v3.2 §5.4) has <c>C_Finalize</c> wake such a wait,
+/// which then returns <c>CKR_CRYPTOKI_NOT_INITIALIZED</c>, and it is the only way to end the wait without
+/// an event. The wait still holds a reference, so the module is unmapped only after the woken call
+/// has left it.
+/// </para>
+/// <para>
+/// Cryptoki state belongs to the module, not to one load of it: a second load of the same module sees
+/// <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c> and shares the first's state. So a requested
+/// <c>C_Finalize</c> runs only when no other load of the same module is live; otherwise it is handed to
+/// the last one, which runs it on release. Loads are matched on the OS module handle (the main program
+/// for a statically linked module), never on the path.
+/// </para>
+/// <para>
+/// <c>C_Finalize</c> runs on whichever thread releases the last use that held it off: the one disposing
+/// the library, a call finishing on another thread, or a session being disposed — rarely, the finalizer
+/// thread. A release never calls back into the caller's code, a logger included: what happened to
+/// <c>C_Finalize</c> is recorded (<see cref="FinalizeStatus"/>) for <c>Pkcs11Library.Dispose</c> to log
+/// on its own thread.
+/// </para>
+/// <para>
+/// <see cref="SafeHandle"/> is a <c>CriticalFinalizerObject</c>, so release also runs when the owner is
+/// abandoned. An abandoned module that this handle initialized is not unmapped: nothing asked for its
+/// <c>C_Finalize</c>, and unmapping an initialized module can pull code out from under threads it
+/// started. That is a deliberate leak of the mapping, for a caller who never disposed the library.
+/// </para>
+/// <para>
+/// Release never throws.
+/// </para>
 /// </remarks>
 internal sealed class Pkcs11ModuleHandle : SafeHandle
 {
-    /// <summary>Creates an invalid handle. Used as a sentinel before <see cref="NativeLibrary.Load(string)"/>.</summary>
-    public Pkcs11ModuleHandle() : base(IntPtr.Zero, ownsHandle: true) { }
+    // Stands in for the OS handle when there is none to free (a statically linked or test module), so
+    // the handle is valid and its release, which runs C_Finalize, still happens.
+    private static readonly IntPtr NotLoaded = -1;
 
-    /// <summary>Creates a handle that owns <paramref name="moduleHandle"/>.</summary>
-    public Pkcs11ModuleHandle(IntPtr moduleHandle) : base(IntPtr.Zero, ownsHandle: true)
+    // Every statically linked binding is the same module: the one linked into the main program.
+    internal static readonly object StaticallyLinked = new();
+
+    private static readonly Lock s_loadsLock = new();
+    private static readonly Dictionary<object, Loads> s_loads = [];
+
+    private readonly bool _freeOnRelease;
+    private readonly object _identity;
+    private Loads? _loads;
+    private volatile bool _initialized;
+    private volatile bool _finalizeOnRelease;
+
+    // Uses that hold off C_Finalize: calls in flight (bar a blocking wait) and open sessions.
+    private int _finalizeHolds;
+
+    // Set once C_Finalize has run, or been handed to another load, so it is never decided twice.
+    private int _finalizeDecided;
+
+    // Set by Dispose, before it releases. SafeHandle marks itself closed only when the last reference
+    // goes, so while a call is in flight IsClosed stays false and DangerousAddRef keeps succeeding: this
+    // is what turns new uses away, and what tells TryFinalize the handle was disposed.
+    private int _disposed;
+
+    /// <summary>The live loads of one module, and whether one of them owes it a <c>C_Finalize</c>.</summary>
+    private sealed class Loads
+    {
+        public int Live;
+        public bool FinalizeOwed;
+    }
+
+    private Pkcs11ModuleHandle(IntPtr moduleHandle, bool freeOnRelease, object identity)
+        : base(IntPtr.Zero, ownsHandle: true)
     {
         SetHandle(moduleHandle);
+        _freeOnRelease = freeOnRelease;
+        _identity = identity;
+    }
+
+    /// <summary>The module's function table. Only call through it while holding a use of this handle.</summary>
+    internal Delegates Table { get; private set; } = null!;
+
+    private FinalizeOutcome _finalizeOutcome;
+    private CKR _finalizeReturnValue;
+
+    /// <summary>
+    /// What has happened to a requested <c>C_Finalize</c> so far, and its return value once it has run
+    /// through this handle.
+    /// </summary>
+    internal (FinalizeOutcome Outcome, CKR ReturnValue) FinalizeStatus
+    {
+        get
+        {
+            lock (s_loadsLock)
+            {
+                if (_finalizeOnRelease && Volatile.Read(ref _finalizeDecided) == 0)
+                    return (FinalizeOutcome.Deferred, default);
+                return (_finalizeOutcome, _finalizeReturnValue);
+            }
+        }
+    }
+
+    /// <summary>Loads the module at <paramref name="libraryPath"/> and binds its function table.</summary>
+    internal static Pkcs11ModuleHandle Load(string libraryPath)
+    {
+        IntPtr loaded = NativeLibrary.Load(libraryPath);
+        return Bound(new Pkcs11ModuleHandle(loaded, freeOnRelease: true, identity: loaded), () => new Delegates(loaded));
+    }
+
+    /// <summary>
+    /// Binds a module this handle does not load, and so never frees: statically linked, or a test module.
+    /// </summary>
+    /// <param name="bind">Builds the function table.</param>
+    /// <param name="identity">
+    /// Which module this is, so two bindings of it share its Cryptoki state; <see langword="null"/> for a
+    /// binding that shares with nothing.
+    /// </param>
+    internal static Pkcs11ModuleHandle Bind(Func<Delegates> bind, object? identity = null)
+        => Bound(new Pkcs11ModuleHandle(NotLoaded, freeOnRelease: false, identity ?? new object()), bind);
+
+    private static Pkcs11ModuleHandle Bound(Pkcs11ModuleHandle module, Func<Delegates> bind)
+    {
+        try
+        {
+            module.Table = bind();
+        }
+        catch
+        {
+            module.Dispose();
+            throw;
+        }
+
+        lock (s_loadsLock)
+        {
+            if (!s_loads.TryGetValue(module._identity, out Loads? loads))
+                s_loads[module._identity] = loads = new Loads();
+            loads.Live++;
+            module._loads = loads;
+        }
+        return module;
+    }
+
+    /// <summary>
+    /// Takes a use of this handle; throws <see cref="ObjectDisposedException"/> once it is disposed.
+    /// </summary>
+    /// <param name="added">Set when the use was taken, and so must be returned with <see cref="ReleaseUse"/>.</param>
+    /// <param name="holdsOffFinalize">
+    /// <see langword="false"/> only for a blocking <c>C_WaitForSlotEvent</c>, which <c>C_Finalize</c> is
+    /// meant to wake (see remarks).
+    /// </param>
+    internal void AddUse(ref bool added, bool holdsOffFinalize = true)
+    {
+        DangerousAddRef(ref added);
+        if (!added)
+            return;
+        if (holdsOffFinalize)
+            Interlocked.Increment(ref _finalizeHolds);
+
+        // Read after taking the use, and Dispose writes before it reads the holds (both full fences): so
+        // either this sees the dispose and backs out, or TryFinalize sees this use and leaves C_Finalize
+        // to its release.
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            added = false;
+            ReleaseUse(holdsOffFinalize);
+            throw new ObjectDisposedException(GetType().FullName);
+        }
+    }
+
+    /// <summary>Returns a use taken by <see cref="AddUse"/>.</summary>
+    internal void ReleaseUse(bool holdsOffFinalize = true)
+    {
+        // Finalize first, while this use still keeps the module mapped.
+        if (holdsOffFinalize && Interlocked.Decrement(ref _finalizeHolds) == 0)
+            TryFinalize();
+        DangerousRelease();
+    }
+
+    /// <summary>Records that <c>C_Initialize</c> through this handle succeeded.</summary>
+    internal void MarkInitialized() => _initialized = true;
+
+    /// <summary>Records that <c>C_Finalize</c> through this handle succeeded.</summary>
+    internal void MarkFinalized()
+    {
+        _initialized = false;
+        _finalizeOnRelease = false;
+        lock (s_loadsLock)
+        {
+            if (_loads is not null)
+                _loads.FinalizeOwed = false;
+        }
+    }
+
+    /// <summary>
+    /// Asks for <c>C_Finalize</c> once this handle is disposed and nothing holds it off any more, rather
+    /// than now, so it cannot run under a call or a session that still needs the module.
+    /// </summary>
+    internal void FinalizeOnRelease()
+    {
+        if (_initialized)
+            _finalizeOnRelease = true;
     }
 
     /// <inheritdoc/>
     public override bool IsInvalid => handle == IntPtr.Zero;
 
     /// <inheritdoc/>
-    protected override bool ReleaseHandle()
+    protected override void Dispose(bool disposing)
     {
-        if (handle == IntPtr.Zero) return true;
-        try
+        Interlocked.Exchange(ref _disposed, 1);
+        base.Dispose(disposing);
+        // Only blocking waits may still hold references: C_Finalize is due now, and wakes them.
+        TryFinalize();
+    }
+
+    private void TryFinalize()
+    {
+        if (!_finalizeOnRelease || Volatile.Read(ref _disposed) == 0 || Volatile.Read(ref _finalizeHolds) != 0)
+            return;
+        if (Interlocked.Exchange(ref _finalizeDecided, 1) != 0)
+            return;
+
+        // Under the lock, so a load of the same module cannot slip in between this decision and the
+        // C_Finalize: it either counts as live here, or initializes afresh once this has finalized.
+        lock (s_loadsLock)
         {
-            NativeLibrary.Free(handle);
-            return true;
-        }
-        catch
-        {
-            return false;
+            if (_loads is { Live: > 1 })
+            {
+                _loads.FinalizeOwed = true; // another load still uses the module; the last one finalizes
+                _finalizeOutcome = FinalizeOutcome.HandedOff;
+            }
+            else
+            {
+                RunFinalize();
+            }
         }
     }
+
+    /// <inheritdoc/>
+    protected override bool ReleaseHandle()
+    {
+        TryFinalize();
+
+        bool finalizedForOthers = false;
+        lock (s_loadsLock)
+        {
+            if (_loads is not null && --_loads.Live == 0)
+            {
+                if (_loads.FinalizeOwed)
+                {
+                    RunFinalize();
+                    finalizedForOthers = true;
+                }
+                s_loads.Remove(_identity);
+            }
+        }
+
+        if (_initialized && !_finalizeOnRelease && !finalizedForOthers)
+            return true; // abandoned while initialized: never unmap it (see remarks)
+
+        if (!_freeOnRelease)
+            return true;
+        // Documented to throw nothing: the runtime ignores what dlclose/FreeLibrary return.
+        NativeLibrary.Free(handle);
+        return true;
+    }
+
+    // Always under s_loadsLock.
+    private void RunFinalize()
+    {
+        // Nothing may escape a release, and the wrapper's only managed exception is the one for an
+        // unbound function, so check that instead of catching it.
+        if (!Table.HasC_Finalize)
+            return;
+        _finalizeReturnValue = Table.C_Finalize(IntPtr.Zero).ToCKR();
+        _finalizeOutcome = _finalizeReturnValue == CKR.CKR_OK ? FinalizeOutcome.Succeeded : FinalizeOutcome.Failed;
+    }
+}
+
+/// <summary>What has happened to a requested <c>C_Finalize</c>.</summary>
+internal enum FinalizeOutcome
+{
+    /// <summary>Not requested, or the module binds no <c>C_Finalize</c>.</summary>
+    None,
+
+    /// <summary>Waiting for a call in flight or an open session to release the module.</summary>
+    Deferred,
+
+    /// <summary>Left to another load of the same module, which is still live and finalizes when it goes.</summary>
+    HandedOff,
+
+    /// <summary>Ran and returned <c>CKR_OK</c>.</summary>
+    Succeeded,
+
+    /// <summary>Ran and returned an error.</summary>
+    Failed,
 }

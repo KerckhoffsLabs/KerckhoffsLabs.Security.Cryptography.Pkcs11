@@ -26,6 +26,11 @@ internal interface ILowLevelPkcs11Library : IDisposable
     void UnregisterSession(Pkcs11SessionHandle handle);
     /// <summary>Closes every still-live tracked session before C_Finalize / module unload.</summary>
     void CloseAllTrackedSessions();
+    /// <summary>
+    /// Finalizes the module once nothing uses it any more: no call in flight and no session open. A test
+    /// double has no such references to wait for, so by default it finalizes at once.
+    /// </summary>
+    void FinalizeOnLastRelease() => C_Finalize(IntPtr.Zero);
 
     // ---- Cryptoki dispatch ----
     CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs);

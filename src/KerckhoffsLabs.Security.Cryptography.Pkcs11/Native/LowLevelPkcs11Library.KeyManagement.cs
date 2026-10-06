@@ -12,15 +12,15 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template,
         Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_EncapsulateKey)
+        if (!call.Table.HasC_EncapsulateKey)
         {
             ciphertextLen = (NativeCULong)0;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        return _delegates.C_EncapsulateKey(session, ref mechanism, publicKey, template, ciphertext, out ciphertextLen, ref derivedKey).ToCKR();
+        return call.Table.C_EncapsulateKey(session, ref mechanism, publicKey, template, ciphertext, out ciphertextLen, ref derivedKey).ToCKR();
     }
 
     /// <summary>
@@ -30,12 +30,12 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template,
         ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_DecapsulateKey)
+        if (!call.Table.HasC_DecapsulateKey)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_DecapsulateKey(session, ref mechanism, privateKey, template, ciphertext, ref derivedKey).ToCKR();
+        return call.Table.C_DecapsulateKey(session, ref mechanism, privateKey, template, ciphertext, ref derivedKey).ToCKR();
     }
 
     /// <summary>
@@ -45,15 +45,15 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key,
         ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_WrapKeyAuthenticated)
+        if (!call.Table.HasC_WrapKeyAuthenticated)
         {
             wrappedKeyLen = (NativeCULong)0;
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
         }
 
-        return _delegates.C_WrapKeyAuthenticated(session, ref mechanism, wrappingKey, key, associatedData, wrappedKey, out wrappedKeyLen).ToCKR();
+        return call.Table.C_WrapKeyAuthenticated(session, ref mechanism, wrappingKey, key, associatedData, wrappedKey, out wrappedKeyLen).ToCKR();
     }
 
     /// <summary>
@@ -63,12 +63,12 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey,
         ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> associatedData, ref NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        if (!_delegates.HasC_UnwrapKeyAuthenticated)
+        if (!call.Table.HasC_UnwrapKeyAuthenticated)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return _delegates.C_UnwrapKeyAuthenticated(session, ref mechanism, unwrappingKey, wrappedKey, template, associatedData, ref key).ToCKR();
+        return call.Table.C_UnwrapKeyAuthenticated(session, ref mechanism, unwrappingKey, wrappedKey, template, associatedData, ref key).ToCKR();
     }
 
     /// <summary>
@@ -81,9 +81,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_ATTRIBUTE_READ_ONLY, CKR_ATTRIBUTE_TYPE_INVALID, CKR_ATTRIBUTE_VALUE_INVALID, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_CURVE_NOT_SUPPORTED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_SESSION_READ_ONLY, CKR_TEMPLATE_INCOMPLETE, CKR_TEMPLATE_INCONSISTENT, CKR_TOKEN_WRITE_PROTECTED, CKR_USER_NOT_LOGGED_IN</returns>
     public CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GenerateKey(session, ref mechanism, template, ref key).ToCKR();
+        return call.Table.C_GenerateKey(session, ref mechanism, template, ref key).ToCKR();
     }
 
     /// <summary>
@@ -99,9 +99,9 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate,
         ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_GenerateKeyPair(session, ref mechanism, publicKeyTemplate, privateKeyTemplate, ref publicKey, ref privateKey).ToCKR();
+        return call.Table.C_GenerateKeyPair(session, ref mechanism, publicKeyTemplate, privateKeyTemplate, ref publicKey, ref privateKey).ToCKR();
     }
 
     /// <summary>
@@ -120,9 +120,9 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, Span<byte> wrappedKey,
         out NativeCULong wrappedKeyLen)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_WrapKey(session, ref mechanism, wrappingKey, key, wrappedKey, out wrappedKeyLen).ToCKR();
+        return call.Table.C_WrapKey(session, ref mechanism, wrappingKey, key, wrappedKey, out wrappedKeyLen).ToCKR();
     }
 
     /// <summary>
@@ -138,9 +138,9 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey,
         ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_UnwrapKey(session, ref mechanism, unwrappingKey, wrappedKey, template, ref key).ToCKR();
+        return call.Table.C_UnwrapKey(session, ref mechanism, unwrappingKey, wrappedKey, template, ref key).ToCKR();
     }
 
     /// <summary>
@@ -155,8 +155,8 @@ internal sealed partial class LowLevelPkcs11Library
     public CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template,
         ref NativeCULong key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        using ModuleCall call = EnterModule();
 
-        return _delegates.C_DeriveKey(session, ref mechanism, baseKey, template, ref key).ToCKR();
+        return call.Table.C_DeriveKey(session, ref mechanism, baseKey, template, ref key).ToCKR();
     }
 }

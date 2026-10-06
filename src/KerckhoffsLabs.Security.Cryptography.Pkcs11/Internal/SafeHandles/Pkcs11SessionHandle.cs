@@ -59,7 +59,8 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         if (!IsInvalid && library is LowLevelPkcs11Library real)
         {
             _moduleHandle = real.ModuleHandle;
-            _moduleHandle.DangerousAddRef(ref _moduleHandleRefAdded);
+            // A use that holds off C_Finalize: the module is not finalized under an open session.
+            _moduleHandle.AddUse(ref _moduleHandleRefAdded);
         }
 
         // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
@@ -81,7 +82,12 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
             if (IsInvalid) return true;
             try
             {
-                CKR rv = _library.C_CloseSession(SessionId);
+                // Straight through the table when this handle holds a module reference: the library may
+                // already be disposed (an abandoned session's finalizer runs in any order relative to
+                // the library's), but the reference keeps the module mapped for this call.
+                CKR rv = _moduleHandle is not null
+                    ? _moduleHandle.Table.C_CloseSession(SessionId).ToCKR()
+                    : _library.C_CloseSession(SessionId);
                 return rv == CKR.CKR_OK;
             }
             catch
@@ -99,7 +105,7 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         {
             // Release last: only after C_CloseSession has had its chance to run does the module
             // become eligible for its own SafeHandle release.
-            if (_moduleHandleRefAdded) _moduleHandle!.DangerousRelease();
+            if (_moduleHandleRefAdded) _moduleHandle!.ReleaseUse();
         }
     }
 }
