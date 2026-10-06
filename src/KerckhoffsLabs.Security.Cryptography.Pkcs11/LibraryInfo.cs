@@ -10,10 +10,11 @@ public sealed record LibraryInfo
 {
     /// <summary>
     /// Version of the Cryptoki interface this library is compatible with — the datum that decides
-    /// which of v2.40 / v3.0 / v3.1 / v3.2 you are talking to. <c>CK_VERSION</c>'s minor field is the
-    /// hundredths portion, so a module the vendor documents as "3.01" reports
-    /// <see cref="Version.Minor"/> <c>1</c> and one documented as "3.10" reports <c>10</c>; comparing
-    /// <see cref="Version"/> values orders them correctly either way.
+    /// which of v2.40 / v3.0 / v3.1 / v3.2 you are talking to. The two <c>CK_VERSION</c> bytes are
+    /// carried verbatim, and a module fills them from the headers' <c>CRYPTOKI_VERSION_MAJOR</c> and
+    /// <c>CRYPTOKI_VERSION_MINOR</c>: v2.40 reports <c>2.40</c>, but v3.0, v3.1 and v3.2 report
+    /// <c>3.0</c>, <c>3.1</c> and <c>3.2</c>. Compare against <c>new Version(3, 1)</c>, not
+    /// <c>(3, 10)</c>; comparing <see cref="Version"/> values then orders them correctly.
     /// </summary>
     public Version CryptokiVersion { get; }
 

@@ -231,7 +231,7 @@ internal partial class Delegates
         // CK_FUNCTION_LIST_3_0 (v3.0+). The CK_VERSION header at offset 0 distinguishes
         // them. Read just the version first to decide.
         version = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
-        if (version.Major < 3)
+        if (version.ToVersion() < CryptokiVersions.V3_0)
             return false;
 
         functionList = iface.FunctionList;
