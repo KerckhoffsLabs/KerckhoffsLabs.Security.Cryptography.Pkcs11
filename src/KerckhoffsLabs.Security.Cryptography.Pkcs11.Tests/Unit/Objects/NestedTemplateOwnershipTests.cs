@@ -4,10 +4,9 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Objects;
 
 /// <summary>
-/// The nested attribute array holds flat copies of its children's CK_ATTRIBUTE structs, pointers
-/// included. These tests pin the ownership chain that keeps those pointers valid: the builder owns
-/// the children until Build, the produced template owns them afterwards, and nothing the caller
-/// does in between can strand them.
+/// A nested attribute array (<c>CKA_WRAP_TEMPLATE</c> and friends) owns one block holding its
+/// members and their values. These tests pin that it never points at memory owned by anyone else:
+/// the children it was built from can go away, and the builder can be disposed, without touching it.
 /// </summary>
 public sealed class NestedTemplateOwnershipTests
 {
@@ -21,20 +20,52 @@ public sealed class NestedTemplateOwnershipTests
         ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
         ObjectAttribute[] children = parent.GetValueAsAttributeArray();
 
-        // Only Type is safe to read: each child wraps a fresh CK_ATTRIBUTE pointing at the same
-        // unmanaged buffer the parent owns.
+        // The values are inside the parent's own block, so they are readable after the builder and
+        // its child template are long gone.
         Assert.Equal(2, children.Length);
-        Assert.Contains(CKA.CKA_CLASS, children.Select(c => c.Type));
-        Assert.Contains(CKA.CKA_SENSITIVE, children.Select(c => c.Type));
+        Assert.Equal((ulong)CKO.CKO_SECRET_KEY, children.Single(c => c.Type == CKA.CKA_CLASS).GetValueAsUlong());
+        Assert.True(children.Single(c => c.Type == CKA.CKA_SENSITIVE).GetValueAsBool());
     }
 
     /// <summary>
-    /// Smoke test only: the read path still works after the builder that produced the template is
-    /// disposed. It does NOT prove ownership transferred - <c>GetValueAsAttributeArray</c> reads only
-    /// the parent's own flat buffer and never dereferences the children's <c>pValue</c> pointers, so
-    /// this would pass even if the builder still owned (and could free) the nested children.
-    /// <see cref="Build_TransfersOwnershipOfNestedChildren"/> is what actually pins the transfer.
+    /// The public constructor used to copy the children's <c>CK_ATTRIBUTE</c> structs, pointers
+    /// included, without keeping the children: once they were disposed or collected, the parent
+    /// pointed at freed memory, and a token reading the template read it.
     /// </summary>
+    [Fact]
+    public void Constructor_CopiesTheChildrenValues_SoTheChildrenCanBeDisposed()
+    {
+        var label = new ObjectAttribute(CKA.CKA_LABEL, "wrapped");
+        var cls = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
+        using var parent = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [label, cls]);
+
+        label.Dispose();
+        cls.Dispose();
+
+        ObjectAttribute[] members = parent.GetValueAsAttributeArray();
+        Assert.Equal("wrapped", members[0].GetValueAsString());
+        Assert.Equal((ulong)CKO.CKO_SECRET_KEY, members[1].GetValueAsUlong());
+    }
+
+    [Fact]
+    public void Constructor_RefusesADisposedChild()
+    {
+        var child = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
+        child.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [child]));
+    }
+
+    [Fact]
+    public void Constructor_CopiesANestedArrayMember_Recursively()
+    {
+        using var inner = new ObjectAttribute(CKA.CKA_DERIVE_TEMPLATE, [new ObjectAttribute(CKA.CKA_LABEL, "deep")]);
+        using var outer = new ObjectAttribute(CKA.CKA_WRAP_TEMPLATE, [inner]);
+
+        ObjectAttribute member = outer.GetValueAsAttributeArray().Single();
+        Assert.Equal("deep", member.GetValueAsAttributeArray().Single().GetValueAsString());
+    }
+
     [Fact]
     public void NestedChildren_SurviveDisposingTheBuilderAfterBuild()
     {
@@ -45,47 +76,7 @@ public sealed class NestedTemplateOwnershipTests
         builder.Dispose();
 
         ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
-        Assert.Single(parent.GetValueAsAttributeArray());
-    }
-
-    /// <summary>
-    /// Ownership must transfer at Build rather than be shared. Both halves are asserted, because
-    /// each alone is satisfiable by a broken implementation: the builder letting go proves nothing
-    /// if nobody catches, and a template holding children proves nothing if the builder also kept
-    /// them. Dropping the nested list from the <c>ObjectTemplate</c> the builder returns leaves
-    /// the children unreferenced, so a later GC finalizes them and frees the buffers the parent's
-    /// flat <c>CK_ATTRIBUTE</c> copy still points at, mid token call.
-    /// </summary>
-    [Fact]
-    public void Build_TransfersOwnershipOfNestedChildren()
-    {
-        using var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
-        builder.WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY));
-
-        Assert.Single(builder.NestedTemplates);
-
-        using ObjectTemplate template = builder.Build();
-
-        Assert.Empty(builder.NestedTemplates);      // the builder let go...
-        Assert.Single(template.NestedChildren);     // ...and the template caught
-    }
-
-    /// <summary>
-    /// Setting the same nested attribute twice must release the displaced child, not orphan it.
-    /// The displaced parent attribute is freed by <c>Set</c>; its children are this builder's to
-    /// release.
-    /// </summary>
-    [Fact]
-    public void WrapTemplate_CalledTwice_DisposesTheDisplacedChild()
-    {
-        using var builder = ObjectTemplate.ForSecretKey(CKK.CKK_AES);
-        builder.WrapTemplate(t => t.Class(CKO.CKO_SECRET_KEY));
-
-        ObjectAttribute displaced = builder.NestedTemplates.Single().Attributes.Single();
-
-        builder.WrapTemplate(t => t.Sensitive());
-
-        Assert.Throws<ObjectDisposedException>(() => displaced.GetValueAsUlong());
+        Assert.Equal((ulong)CKO.CKO_SECRET_KEY, parent.GetValueAsAttributeArray().Single().GetValueAsUlong());
     }
 
     [Fact]
@@ -115,7 +106,6 @@ public sealed class NestedTemplateOwnershipTests
 
         ObjectAttribute parent = template.Attributes.Single(a => a.Type == CKA.CKA_WRAP_TEMPLATE);
         Assert.Equal(2, parent.GetValueAsAttributeArray().Length);
-        Assert.Single(template.NestedChildren);
     }
 
     [Fact]
@@ -181,8 +171,8 @@ public sealed class NestedTemplateOwnershipTests
     }
 
     /// <summary>
-    /// Two different nested templates on one builder are independent - setting the second must not
-    /// disturb the first, which the shared _nested dictionary keyed by CKA is what guarantees.
+    /// Two different nested templates on one builder are independent: setting the second must not
+    /// disturb the first.
     /// </summary>
     [Fact]
     public void TwoDifferentNestedTemplates_AreIndependent()

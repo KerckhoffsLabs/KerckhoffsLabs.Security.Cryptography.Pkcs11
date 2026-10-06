@@ -18,8 +18,8 @@ public sealed class ObjectAttribute : IDisposable
     /// <summary>
     /// Whether this instance owns the unmanaged buffer <c>_ckAttribute.value</c> points at, and so
     /// must free it. False for the read-only views <see cref="GetValueAsAttributeArray"/> hands back:
-    /// those point into buffers a nested template's children own, and freeing one from here would
-    /// release memory still described by a live attribute somewhere else.
+    /// those point inside the array attribute's own block, and freeing one from here would release
+    /// memory that attribute still owns.
     /// </summary>
     /// <remarks>Defaults to <c>true</c>: every value-constructing overload allocates its own buffer.
     /// Only the explicit view constructor opts out.</remarks>
@@ -180,40 +180,33 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute holding a list of nested attributes (encoded as a contiguous CK_ATTRIBUTE[] in unmanaged memory).</summary>
+    /// <remarks>
+    /// The children's values are copied in: this attribute owns its whole array, so the children may
+    /// be disposed, or collected, as soon as the constructor returns.
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if one of the children has been disposed.</exception>
     public ObjectAttribute(CKA type, IReadOnlyList<ObjectAttribute> value)
     {
         ArgumentNullException.ThrowIfNull(value);
         NativeCULong nativeType = type.ToCULong();
-        int stride = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
-        byte[] flat = new byte[stride * value.Count];
-        if (value.Count > 0)
+        if (value.Count == 0)
         {
-            // Marshal each child's CK_ATTRIBUTE (platform-correct, packed-aware layout) into an
-            // unmanaged scratch block, then copy it back into the managed flat buffer. Going through
-            // the UnmanagedMemory helpers keeps the pinning/pointer work — and the only `unsafe` — in
-            // the Native layer rather than here.
-            IntPtr scratch = UnmanagedMemory.Allocate(stride * value.Count);
-            try
-            {
-                for (int i = 0; i < value.Count; i++)
-                {
-                    // Read through CkAttribute, not the field: a disposed child would otherwise be
-                    // copied verbatim as {type, NULL, 0} — an attribute that is present but empty,
-                    // which in a CKA_WRAP_TEMPLATE is a different filter than the caller wrote and
-                    // would reach the token silently. The property's guard turns that into a throw.
-                    CK_ATTRIBUTE childAttribute = value[i].CkAttribute;
-                    UnmanagedMemory.Write(IntPtr.Add(scratch, i * stride), in childAttribute);
-                }
-                UnmanagedMemory.Read(scratch, flat);
-            }
-            finally
-            {
-                UnmanagedMemory.Free(ref scratch);
-            }
+            _ckAttribute = CreateAttribute(nativeType, []);
+            return;
         }
-        _ckAttribute = CreateAttribute(nativeType, flat);
+
+        // Read through CkAttribute, not the field: a disposed child would otherwise be copied as
+        // {type, NULL, 0}, an attribute that is present but empty, which in a CKA_WRAP_TEMPLATE is a
+        // different filter than the caller wrote. The property's guard turns that into a throw.
+        var members = new CK_ATTRIBUTE[value.Count];
+        for (int i = 0; i < members.Length; i++)
+            members[i] = value[i].CkAttribute;
+
+        IntPtr block = AttributeArrayBlock.Create(members, out NativeCULong arrayLength);
+        GC.KeepAlive(value); // the children's buffers are read until Create returns
+        _ckAttribute = new CK_ATTRIBUTE { type = nativeType, value = block, valueLen = arrayLength };
     }
 
     /// <summary>Creates an attribute holding a list of <c>CK_ULONG</c> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
@@ -371,8 +364,8 @@ public sealed class ObjectAttribute : IDisposable
         {
             IntPtr slot = new(_ckAttribute.value.ToInt64() + (long)i * stride);
             CK_ATTRIBUTE attr = UnmanagedMemory.Read<CK_ATTRIBUTE>(slot);
-            // Non-owning view: attr.value points at a buffer this attribute's nested children own.
-            // Freeing it from here would release memory a live ObjectAttribute still describes.
+            // Non-owning view: attr.value points inside this attribute's own block, which outlives
+            // the view only as long as this attribute is not disposed.
             result[i] = new ObjectAttribute(attr, ownsValue: false);
         }
         return result;

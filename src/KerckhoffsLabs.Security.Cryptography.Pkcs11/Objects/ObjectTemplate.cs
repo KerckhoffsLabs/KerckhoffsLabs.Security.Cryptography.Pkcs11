@@ -15,13 +15,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 public sealed class ObjectTemplate : IDisposable
 {
     private readonly List<ObjectAttribute> _attributes;
-    private readonly List<ObjectTemplate> _nested;
     private bool _disposed;
 
-    internal ObjectTemplate(List<ObjectAttribute> attributes, List<ObjectTemplate>? nested = null)
+    internal ObjectTemplate(List<ObjectAttribute> attributes)
     {
         _attributes = attributes;
-        _nested = nested ?? [];
     }
 
     /// <summary>Number of attributes in the template.</summary>
@@ -30,24 +28,12 @@ public sealed class ObjectTemplate : IDisposable
     /// <summary>Internal accessor used by call sites that marshal the template to PKCS#11.</summary>
     internal IReadOnlyList<ObjectAttribute> Attributes => _attributes;
 
-    /// <summary>
-    /// Test seam: the nested child templates this template owns. A nested attribute
-    /// (<c>CKA_WRAP_TEMPLATE</c> and friends) is a flat copy of these children's
-    /// <c>CK_ATTRIBUTE</c> structs, pointers included, so holding them here is what keeps those
-    /// pointers valid and their targets un-finalized for as long as this template lives.
-    /// </summary>
-    internal IReadOnlyList<ObjectTemplate> NestedChildren => _nested;
-
     /// <inheritdoc/>
     public void Dispose()
     {
         if (_disposed) return;
         foreach (var attr in _attributes) attr.Dispose();
         _attributes.Clear();
-        // Nested children come last: the parent's flat copy holds pointers into buffers these own,
-        // so they stay valid for as long as anything could still marshal the parent.
-        foreach (var child in _nested) child.Dispose();
-        _nested.Clear();
         _disposed = true;
     }
 

@@ -309,25 +309,8 @@ public sealed class ObjectTemplateTests
         Assert.Contains(template.Attributes, a => a.Type == CKA.CKA_SERIAL_NUMBER);
     }
 
-    /// <summary>
-    /// A nested wrap/unwrap template is marshalled as a flat copy of its children's CK_ATTRIBUTE
-    /// structs, pointers included, so the parent must keep those children alive and reachable for
-    /// exactly as long as it lives. Disposing the parent must release them too.
-    /// </summary>
     [Fact]
-    public void Dispose_ReleasesNestedChildTemplates()
-    {
-        var childAttr = new ObjectAttribute(CKA.CKA_SENSITIVE, true);
-        var child = new ObjectTemplate([childAttr]);
-        var parent = new ObjectTemplate([new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY)], [child]);
-
-        parent.Dispose();
-
-        Assert.Throws<ObjectDisposedException>(() => childAttr.GetValueAsBool());
-    }
-
-    [Fact]
-    public void Dispose_WithNoNestedChildren_StillWorks()
+    public void Dispose_Works()
     {
         var parent = new ObjectTemplate([new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY)]);
 
