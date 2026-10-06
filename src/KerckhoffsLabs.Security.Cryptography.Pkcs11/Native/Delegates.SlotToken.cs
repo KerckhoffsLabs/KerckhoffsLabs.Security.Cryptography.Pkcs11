@@ -15,6 +15,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
     "DelegatesLoaderTests, and the wrappers themselves by the full suite against SoftHSM2 and opencryptoki.")]
 internal partial class Delegates
 {
+    // CK_TOKEN_INFO.label and C_InitToken's pLabel: blank-padded, not NUL-terminated.
+    private const int TokenLabelLength = 32;
+
     /// <summary>Wrapper for <c>C_GetSlotList</c>. An empty <paramref name="slotList"/> is passed as NULL: a length query.</summary>
     /// <remarks><c>*pulCount</c> on entry is the span's length, so the module's idea of the buffer's
     /// capacity can never be larger than the buffer.</remarks>
@@ -95,9 +98,15 @@ internal partial class Delegates
         fixed (CK_MECHANISM_INFO* p = &info) return _fp.C_GetMechanismInfo(slotId, type, p);
     }
 
-    /// <summary>Wrapper for <c>C_InitToken</c>. Matches the prior delegate signature exactly.</summary>
+    /// <summary>Wrapper for <c>C_InitToken</c>.</summary>
+    /// <remarks><c>pLabel</c> has no length: the module reads exactly 32 bytes from it. A shorter span
+    /// would have it read past the pinned buffer, so anything but 32 bytes is refused here.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="label"/> is not 32 bytes long.</exception>
     public unsafe NativeCULong C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label)
     {
+        if (label.Length != TokenLabelLength)
+            throw new ArgumentOutOfRangeException(nameof(label), label.Length,
+                $"The token label must be exactly {TokenLabelLength} bytes (blank-padded): C_InitToken reads that many.");
         ThrowIfUnbound(_fp.C_InitToken);
         fixed (byte* pinPtr = pin)
         fixed (byte* labelPtr = label)
