@@ -152,7 +152,7 @@ public sealed class MechanismParamsMarshalTests
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_EDDSA_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.True(s.PhFlag);
+        Assert.Equal(CkBbool.True, s.PhFlag);
         Assert.Equal((ulong)ctx.Length, (ulong)s.ContextDataLen);
         Assert.Equal(ctx, UnmanagedMemory.Read(s.ContextData, ctx.Length));
     }
@@ -164,7 +164,7 @@ public sealed class MechanismParamsMarshalTests
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_EDDSA_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.False(s.PhFlag);
+        Assert.Equal(CkBbool.False, s.PhFlag);
         Assert.Equal(0UL, (ulong)s.ContextDataLen);
         Assert.Equal(IntPtr.Zero, s.ContextData);
     }

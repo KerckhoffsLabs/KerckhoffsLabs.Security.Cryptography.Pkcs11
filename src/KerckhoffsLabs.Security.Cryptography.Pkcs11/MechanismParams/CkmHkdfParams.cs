@@ -100,8 +100,8 @@ public sealed class CkmHkdfParams : MechanismParameters
     {
         return new CK_HKDF_PARAMS
         {
-            Extract = _extract,
-            Expand = _expand,
+            Extract = CkBbool.From(_extract),
+            Expand = CkBbool.From(_expand),
             PrfHashMechanism = CkULong.From((ulong)_prfHashMechanism, "prfHashMechanism"),
             SaltType = CkULong.From((ulong)_saltType, "saltType"),
             Salt = scope.Write(_saltBytes),

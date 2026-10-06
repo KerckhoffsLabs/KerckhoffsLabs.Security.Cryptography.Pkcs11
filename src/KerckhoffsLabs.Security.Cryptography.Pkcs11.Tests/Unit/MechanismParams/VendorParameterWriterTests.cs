@@ -111,7 +111,7 @@ public sealed class VendorParameterWriterTests
         var real = new CK_SP800_108_DKM_LENGTH_FORMAT
         {
             DkmLengthMethod = (NativeCULong)1,
-            LittleEndian = true,
+            LittleEndian = CkBbool.True,
             WidthInBits = (NativeCULong)64,
         };
 
@@ -128,7 +128,7 @@ public sealed class VendorParameterWriterTests
         var real = new CK_SP800_108_DKM_LENGTH_FORMAT
         {
             DkmLengthMethod = (NativeCULong)2,
-            LittleEndian = false,
+            LittleEndian = CkBbool.False,
             WidthInBits = (NativeCULong)32,
         };
 
@@ -183,7 +183,7 @@ public sealed class VendorParameterWriterTests
     {
         var real = new CK_EDDSA_PARAMS
         {
-            PhFlag = true,
+            PhFlag = CkBbool.True,
             ContextDataLen = (NativeCULong)0,
             ContextData = IntPtr.Zero,
         };
@@ -224,7 +224,7 @@ public sealed class VendorParameterWriterTests
     {
         var real = new CK_EDDSA_PARAMS
         {
-            PhFlag = false,
+            PhFlag = CkBbool.False,
             ContextDataLen = (NativeCULong)0,
             ContextData = IntPtr.Zero,
         };

@@ -12,7 +12,7 @@ internal partial struct CK_SP800_108_COUNTER_FORMAT
     /// <summary>
     /// True for little-endian byte order; false for big-endian.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool LittleEndian;
+    public byte LittleEndian;
 
     /// <summary>
     /// Counter width in bits (e.g. 32).

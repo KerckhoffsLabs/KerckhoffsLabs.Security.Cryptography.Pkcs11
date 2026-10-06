@@ -63,7 +63,7 @@ public sealed class MechanismSignalParamsTests
         Assert.Equal(1UL, (ulong)s.PeerPublicPrekey);
         Assert.Equal(2UL, (ulong)s.PeerPublicIdentity);
         Assert.Equal(3UL, (ulong)s.OwnPublicIdentity);
-        Assert.True(s.EncryptedHeader);
+        Assert.Equal(CkBbool.True, s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.KdfMechanism);
@@ -92,7 +92,7 @@ public sealed class MechanismSignalParamsTests
         Assert.Equal(1UL, (ulong)s.OwnPrekey);
         Assert.Equal(2UL, (ulong)s.InitiatorIdentity);
         Assert.Equal(3UL, (ulong)s.OwnPublicIdentity);
-        Assert.False(s.EncryptedHeader);
+        Assert.Equal(CkBbool.False, s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
         Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.KdfMechanism);

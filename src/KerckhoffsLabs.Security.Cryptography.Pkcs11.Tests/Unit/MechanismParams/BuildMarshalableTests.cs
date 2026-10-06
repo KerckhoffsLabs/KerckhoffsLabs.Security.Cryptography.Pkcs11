@@ -27,7 +27,7 @@ public sealed class BuildMarshalableTests
 
         var s = (CK_EDDSA_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.True(s.PhFlag);
+        Assert.Equal(CkBbool.True, s.PhFlag);
         Assert.Equal(3UL, (ulong)s.ContextDataLen);
         AssertBlockHolds(s.ContextData, [0xAA, 0xBB, 0xCC]);
     }
@@ -51,7 +51,7 @@ public sealed class BuildMarshalableTests
 
         var s = (CK_EDDSA_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.False(s.PhFlag);
+        Assert.Equal(CkBbool.False, s.PhFlag);
         Assert.Equal(IntPtr.Zero, s.ContextData);
         Assert.Equal(0UL, (ulong)s.ContextDataLen);
     }
@@ -128,7 +128,7 @@ public sealed class BuildMarshalableTests
         var s = (CK_IKE1_EXTENDED_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
-        Assert.True(s.HasKeygxy);
+        Assert.Equal(CkBbool.True, s.HasKeygxy);
         Assert.Equal(5UL, (ulong)s.Keygxy);
         Assert.Equal(2UL, (ulong)s.ExtraDataLen);
         AssertBlockHolds(s.ExtraData, [0xE1, 0xE2]);
@@ -145,7 +145,7 @@ public sealed class BuildMarshalableTests
         var s = (CK_IKE2_PRF_PLUS_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
-        Assert.True(s.HasSeedKey);
+        Assert.Equal(CkBbool.True, s.HasSeedKey);
         Assert.Equal(7UL, (ulong)s.SeedKey);
         Assert.Equal(3UL, (ulong)s.SeedDataLen);
         AssertBlockHolds(s.SeedData, [0x5E, 0x5D, 0x5C]);
@@ -197,7 +197,7 @@ public sealed class BuildMarshalableTests
         Assert.Equal(1UL, (ulong)s.PeerPublicPrekey);
         Assert.Equal(2UL, (ulong)s.PeerPublicIdentity);
         Assert.Equal(3UL, (ulong)s.OwnPublicIdentity);
-        Assert.True(s.EncryptedHeader);
+        Assert.Equal(CkBbool.True, s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.KdfMechanism);
@@ -220,7 +220,7 @@ public sealed class BuildMarshalableTests
         Assert.Equal(1UL, (ulong)s.OwnPrekey);
         Assert.Equal(2UL, (ulong)s.InitiatorIdentity);
         Assert.Equal(3UL, (ulong)s.OwnPublicIdentity);
-        Assert.False(s.EncryptedHeader);
+        Assert.Equal(CkBbool.False, s.EncryptedHeader);
         Assert.Equal(4UL, (ulong)s.Curve);
         Assert.Equal((ulong)CKM.CKM_AES_GCM, (ulong)s.AeadMechanism);
         Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.KdfMechanism);
@@ -324,8 +324,8 @@ public sealed class BuildMarshalableTests
 
         var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.True(s.Extract);
-        Assert.True(s.Expand);
+        Assert.Equal(CkBbool.True, s.Extract);
+        Assert.Equal(CkBbool.True, s.Expand);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfHashMechanism);
         Assert.Equal((ulong)HkdfSaltType.Data, (ulong)s.SaltType);
         Assert.Equal(3UL, (ulong)s.SaltLen);
@@ -345,8 +345,8 @@ public sealed class BuildMarshalableTests
 
         var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
 
-        Assert.True(s.Extract);
-        Assert.False(s.Expand);
+        Assert.Equal(CkBbool.True, s.Extract);
+        Assert.Equal(CkBbool.False, s.Expand);
         Assert.Equal((ulong)HkdfSaltType.Key, (ulong)s.SaltType);
         Assert.Equal(9UL, (ulong)s.SaltKey);
         Assert.Equal(0UL, (ulong)s.SaltLen);
@@ -367,7 +367,7 @@ public sealed class BuildMarshalableTests
         var s = (CK_IKE1_PRF_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
-        Assert.True(s.HasPrevKey);
+        Assert.Equal(CkBbool.True, s.HasPrevKey);
         Assert.Equal(11UL, (ulong)s.Keygxy);
         Assert.Equal(22UL, (ulong)s.PrevKey);
         Assert.Equal(4UL, (ulong)s.CkyILen);
@@ -390,8 +390,8 @@ public sealed class BuildMarshalableTests
         var s = (CK_IKE_PRF_DERIVE_PARAMS)p.BuildMarshalable(scope);
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
-        Assert.True(s.DataAsKey);
-        Assert.True(s.Rekey);
+        Assert.Equal(CkBbool.True, s.DataAsKey);
+        Assert.Equal(CkBbool.True, s.Rekey);
         Assert.Equal(3UL, (ulong)s.NiLen);
         Assert.Equal(4UL, (ulong)s.NrLen);
         Assert.Equal(42UL, (ulong)s.NewKey);
@@ -634,7 +634,7 @@ public sealed class BuildMarshalableTests
             Assert.NotEqual(IntPtr.Zero, entry.Value);
 
             var format = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(entry.Value);
-            Assert.Equal(littleEndian, format.LittleEndian);
+            Assert.Equal(CkBbool.From(littleEndian), format.LittleEndian);
             Assert.Equal(width, (ulong)format.WidthInBits);
         }
 
@@ -650,7 +650,7 @@ public sealed class BuildMarshalableTests
         Assert.Equal((ulong)UnmanagedMemory.SizeOf<CK_SP800_108_DKM_LENGTH_FORMAT>(), (ulong)dkm.ValueLen);
         var dkmFormat = UnmanagedMemory.Read<CK_SP800_108_DKM_LENGTH_FORMAT>(dkm.Value);
         Assert.Equal((ulong)Sp800108DkmLengthMethod.SumOfSegments, (ulong)dkmFormat.DkmLengthMethod);
-        Assert.True(dkmFormat.LittleEndian);
+        Assert.Equal(CkBbool.True, dkmFormat.LittleEndian);
         Assert.Equal(64UL, (ulong)dkmFormat.WidthInBits);
 
         // [4] key handle — the value block holds the spliced key's CK_OBJECT_HANDLE.

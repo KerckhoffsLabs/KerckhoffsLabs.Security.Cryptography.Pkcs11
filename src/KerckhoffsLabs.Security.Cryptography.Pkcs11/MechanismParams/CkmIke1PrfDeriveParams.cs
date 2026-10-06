@@ -51,7 +51,7 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
         return new CK_IKE1_PRF_DERIVE_PARAMS
         {
             PrfMechanism = CkULong.From((ulong)_prfMechanism, "prfMechanism"),
-            HasPrevKey = _prevKey is not null,
+            HasPrevKey = CkBbool.From(_prevKey is not null),
             Keygxy = scope.KeyHandle(_keygxy, KeyHandlePart.Private, "keygxy"),
             PrevKey = _prevKey is null ? default : scope.KeyHandle(_prevKey, KeyHandlePart.Private, "prevKey"),
             CkyI = scope.Write(_ckyIBytes),

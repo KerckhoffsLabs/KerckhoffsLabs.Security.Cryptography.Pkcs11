@@ -262,6 +262,23 @@ public sealed class NativeStructLayoutTests
     }
 
     /// <summary>
+    /// <c>CK_BBOOL</c> is a byte. A <see langword="bool"/> field only matches it through
+    /// <c>[MarshalAs(U1)]</c>, which disabled runtime marshalling ignores, and a module-written byte other
+    /// than 0 or 1 would be an invalid <see langword="bool"/>.
+    /// </summary>
+    [Fact]
+    public void NoCkStruct_HasABoolField()
+    {
+        var boolFields = CkStructsWithSiblings()
+            .SelectMany(t => t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            .Where(f => f.FieldType == typeof(bool))
+            .Select(f => $"{f.DeclaringType!.Name}.{f.Name}")
+            .ToList();
+
+        Assert.True(boolFields.Count == 0, "CK_BBOOL fields must be byte: " + string.Join(", ", boolFields));
+    }
+
+    /// <summary>
     /// Production dispatches on the <c>[PackedForPkcs11]</c> attribute (<c>Pkcs11Marshal.SizeOf</c>,
     /// <c>UnmanagedMemory.cs</c>), while the census above enumerates by namespace + <c>CK_</c> naming
     /// convention. Those two sets happen to agree today, but nothing forces them to: a struct marked

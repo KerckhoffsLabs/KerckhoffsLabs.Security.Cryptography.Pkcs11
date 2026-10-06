@@ -149,11 +149,11 @@ internal sealed partial class ManagedSoftToken
         }
         byte[] info = p.Info != IntPtr.Zero && (int)p.InfoLen > 0 ? UnmanagedMemory.Read(p.Info, (int)p.InfoLen) : [];
 
-        if (p.Extract && p.Expand)
+        if (p.Extract != 0 && p.Expand != 0)
             derived = HKDF.DeriveKey(hash, baseKey, valueLen, salt, info);
-        else if (p.Extract)
+        else if (p.Extract != 0)
             derived = HKDF.Extract(hash, baseKey, salt);
-        else if (p.Expand)
+        else if (p.Expand != 0)
             derived = HKDF.Expand(hash, baseKey, valueLen, info);
         else
             return false;

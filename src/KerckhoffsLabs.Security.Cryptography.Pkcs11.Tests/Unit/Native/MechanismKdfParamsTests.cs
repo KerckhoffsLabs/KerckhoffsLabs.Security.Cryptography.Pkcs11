@@ -17,8 +17,8 @@ public sealed class MechanismKdfParamsTests
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.True(s.Extract);
-        Assert.True(s.Expand);
+        Assert.Equal(CkBbool.True, s.Extract);
+        Assert.Equal(CkBbool.True, s.Expand);
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfHashMechanism);
         Assert.Equal((ulong)HkdfSaltType.Data, (ulong)s.SaltType);
         Assert.Equal((ulong)salt.Length, (ulong)s.SaltLen);
@@ -34,8 +34,8 @@ public sealed class MechanismKdfParamsTests
         using var scope = new MechanismParameterScope();
         var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
 
-        Assert.False(s.Extract);
-        Assert.True(s.Expand);
+        Assert.Equal(CkBbool.False, s.Extract);
+        Assert.Equal(CkBbool.True, s.Expand);
         Assert.Equal(IntPtr.Zero, s.Salt);
         Assert.Equal(0UL, (ulong)s.SaltLen);
         Assert.Equal(IntPtr.Zero, s.Info);

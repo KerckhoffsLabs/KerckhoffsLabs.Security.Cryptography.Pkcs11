@@ -32,7 +32,7 @@ internal partial struct CK_X2RATCHET_INITIALIZE_PARAMS
     /// <summary>
     /// True to enable header encryption.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool EncryptedHeader;
+    public byte EncryptedHeader;
 
     /// <summary>
     /// Elliptic curve identifier.

@@ -61,14 +61,14 @@ public sealed class Sp800108KdfTests
         var iter = Param(s.DataParams, 0);
         Assert.Equal(IterationVariable, (ulong)iter.Type);
         var icf = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(iter.Value);
-        Assert.True(icf.LittleEndian);
+        Assert.Equal(CkBbool.True, icf.LittleEndian);
         Assert.Equal(16UL, (ulong)icf.WidthInBits);
 
         // [1] optional counter — 8-bit big-endian
         var opt = Param(s.DataParams, 1);
         Assert.Equal(OptionalCounter, (ulong)opt.Type);
         var ocf = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(opt.Value);
-        Assert.False(ocf.LittleEndian);
+        Assert.Equal(CkBbool.False, ocf.LittleEndian);
         Assert.Equal(8UL, (ulong)ocf.WidthInBits);
 
         // [2] byte array
@@ -81,7 +81,7 @@ public sealed class Sp800108KdfTests
         Assert.Equal(DkmLengthTag, (ulong)dkm.Type);
         var df = UnmanagedMemory.Read<CK_SP800_108_DKM_LENGTH_FORMAT>(dkm.Value);
         Assert.Equal((ulong)Sp800108DkmLengthMethod.SumOfSegments, (ulong)df.DkmLengthMethod);
-        Assert.True(df.LittleEndian);
+        Assert.Equal(CkBbool.True, df.LittleEndian);
         Assert.Equal(64UL, (ulong)df.WidthInBits);
 
         // [4] key handle — value is a CK_OBJECT_HANDLE holding the spliced key's handle

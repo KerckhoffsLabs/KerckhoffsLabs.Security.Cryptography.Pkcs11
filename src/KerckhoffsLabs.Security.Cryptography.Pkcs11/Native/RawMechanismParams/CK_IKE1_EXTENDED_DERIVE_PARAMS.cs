@@ -17,7 +17,7 @@ internal partial struct CK_IKE1_EXTENDED_DERIVE_PARAMS
     /// <summary>
     /// True if Keygxy is valid.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool HasKeygxy;
+    public byte HasKeygxy;
 
     /// <summary>
     /// Handle of the shared-secret key g^xy.
