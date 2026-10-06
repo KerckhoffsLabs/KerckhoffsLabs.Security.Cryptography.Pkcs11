@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -10,15 +9,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// For the password of a password-based key derivation, use <see cref="SecurePassword"/>.
 /// </summary>
 /// <remarks>
-/// The buffer is pinned via <see cref="GCHandle.Alloc(object, GCHandleType)"/> so the
-/// garbage collector cannot move it and leave stale copies of the PIN scattered in memory.
+/// The buffer is allocated on the pinned object heap, so the garbage collector never moves it and
+/// cannot leave stale copies of the PIN scattered in memory.
 /// Always dispose this instance as soon as the PIN is no longer needed; the finalizer is a
 /// safety net, not a substitute for deterministic disposal.
 /// </remarks>
 public sealed class SecurePin : IDisposable
 {
     private byte[] _buffer;
-    private GCHandle _pin;
     private bool _disposed;
 
     // Strict UTF-8: a lone surrogate in a PIN is refused instead of being silently replaced with
@@ -35,17 +33,8 @@ public sealed class SecurePin : IDisposable
     public SecurePin(ReadOnlySpan<byte> utf8Pin)
     {
         if (utf8Pin.IsEmpty) throw new ArgumentException("PIN must not be empty.", nameof(utf8Pin));
-        _buffer = new byte[utf8Pin.Length];
-        _pin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
-        try
-        {
-            utf8Pin.CopyTo(_buffer);
-        }
-        catch
-        {
-            Dispose();
-            throw;
-        }
+        _buffer = GC.AllocateArray<byte>(utf8Pin.Length, pinned: true);
+        utf8Pin.CopyTo(_buffer);
     }
 
     /// <summary>Initializes a new <see cref="SecurePin"/> from characters, encoded as UTF-8.</summary>
@@ -73,17 +62,8 @@ public sealed class SecurePin : IDisposable
             throw new ArgumentException("PIN is not valid UTF-16 text (unpaired surrogate).", nameof(pin), ex);
         }
 
-        _buffer = new byte[byteCount];
-        _pin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
-        try
-        {
-            StrictUtf8.GetBytes(pin, _buffer);
-        }
-        catch
-        {
-            Dispose();
-            throw;
-        }
+        _buffer = GC.AllocateArray<byte>(byteCount, pinned: true);
+        StrictUtf8.GetBytes(pin, _buffer);
     }
 
     /// <summary>Initializes a new <see cref="SecurePin"/> from a string, encoded as UTF-8.</summary>
@@ -131,18 +111,17 @@ public sealed class SecurePin : IDisposable
         }
     }
 
-    /// <summary>Zeroes the underlying buffer and releases the GC pin.</summary>
+    /// <summary>Zeroes the underlying buffer.</summary>
     public void Dispose()
     {
         if (_disposed) return;
         CryptographicOperations.ZeroMemory(_buffer);
-        if (_pin.IsAllocated) _pin.Free();
         _buffer = [];
         _disposed = true;
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Finalizer safety net — release pin even if Dispose was not called.</summary>
+    /// <summary>Finalizer safety net — zeroes the buffer even if Dispose was not called.</summary>
     ~SecurePin() => Dispose();
 
     /// <summary>
