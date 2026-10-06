@@ -149,21 +149,21 @@ public sealed class ReportedLengthTests
         public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
             => Answer(data, out dataLen);
 
-        public override CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
+        public override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
         {
-            objectId.AsSpan().Fill((NativeCULong)7);
-            objectCount = FillReports ?? (NativeCULong)(ulong)objectId.Length;
+            objects.Fill((NativeCULong)7);
+            objectCount = FillReports ?? (NativeCULong)(ulong)objects.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
         {
-            if (mechanismList is null)
+            if (mechanismList.IsEmpty)
             {
                 count = ProbeReports ?? (NativeCULong)(ulong)Length;
                 return CKR.CKR_OK;
             }
-            mechanismList.AsSpan().Fill(CKM.CKM_AES_GCM);
+            mechanismList.Fill(CKM.CKM_AES_GCM);
             count = FillReports ?? (NativeCULong)(ulong)mechanismList.Length;
             return CKR.CKR_OK;
         }

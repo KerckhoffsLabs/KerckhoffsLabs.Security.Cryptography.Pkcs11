@@ -137,13 +137,15 @@ internal partial class Delegates
             return _fp.C_FindObjectsInit(session, t, (NativeCULong)template.Length);
     }
 
-    /// <summary>Wrapper for <c>C_FindObjects</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
+    /// <summary>Wrapper for <c>C_FindObjects</c>. <c>ulMaxObjectCount</c> is the span's length, so it
+    /// can never be larger than the buffer.</summary>
+    public unsafe NativeCULong C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
     {
         ThrowIfUnbound(_fp.C_FindObjects);
-        fixed (NativeCULong* objPtr = objectId)
+        objectCount = default;
+        fixed (NativeCULong* objPtr = objects)
         fixed (NativeCULong* countPtr = &objectCount)
-            return _fp.C_FindObjects(session, objPtr, maxObjectCount, countPtr);
+            return _fp.C_FindObjects(session, objPtr, (NativeCULong)(ulong)objects.Length, countPtr);
     }
 
     /// <summary>Wrapper for <c>C_FindObjectsFinal</c>. Matches the prior delegate signature exactly.</summary>

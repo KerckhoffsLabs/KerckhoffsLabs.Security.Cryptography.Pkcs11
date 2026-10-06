@@ -335,8 +335,7 @@ internal sealed class Pkcs11Session : IDisposable
             CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref info);
             if (rv != CKR.CKR_OK) return false;
 
-            NativeCULong count = new(0);
-            rv = _pkcs11Library.C_GetMechanismList(info.SlotId, null, ref count);
+            rv = _pkcs11Library.C_GetMechanismList(info.SlotId, [], out NativeCULong count);
             if (rv != CKR.CKR_OK || count.Value == 0)
             {
                 _supportedMechanisms = [];
@@ -344,7 +343,7 @@ internal sealed class Pkcs11Session : IDisposable
             }
 
             CKM[] list = new CKM[(int)count.Value];
-            rv = _pkcs11Library.C_GetMechanismList(info.SlotId, list, ref count);
+            rv = _pkcs11Library.C_GetMechanismList(info.SlotId, list, out count);
             // Only the first `count` entries were returned; the rest still hold default(CKM), which is a
             // real mechanism (CKM_RSA_PKCS_KEY_PAIR_GEN) the module never reported.
             _supportedMechanisms = rv == CKR.CKR_OK ? [.. list.AsSpan(0, (int)Math.Min(count.Value, (ulong)list.Length))] : [];
@@ -1297,8 +1296,7 @@ internal sealed class Pkcs11Session : IDisposable
         List<ObjectHandle> foundObjects = [];
 
         NativeCULong[] objects = new NativeCULong[objectCount];
-        NativeCULong foundObjectsCount = (NativeCULong)0;
-        CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, (NativeCULong)(objectCount), ref foundObjectsCount);
+        CKR rv = _pkcs11Library.C_FindObjects(_sessionId, objects, out NativeCULong foundObjectsCount);
         Pkcs11Exception.ThrowIfError(rv, OpFindObjects);
 
         int found = ReportedLength.Written(foundObjectsCount, objects.Length, OpFindObjects);
@@ -1344,18 +1342,18 @@ internal sealed class Pkcs11Session : IDisposable
 
         try
         {
-            NativeCULong objectsLength = (NativeCULong)256;
-            NativeCULong[] objects = new NativeCULong[(int)objectsLength];
-            NativeCULong objectCount = objectsLength;
-            while (objectCount == objectsLength)
+            Span<NativeCULong> objects = stackalloc NativeCULong[256];
+            int found;
+            do
             {
-                rv = _pkcs11Library.C_FindObjects(_sessionId, objects, objectsLength, ref objectCount);
+                rv = _pkcs11Library.C_FindObjects(_sessionId, objects, out NativeCULong objectCount);
                 Pkcs11Exception.ThrowIfError(rv, OpFindObjects);
 
-                int found = ReportedLength.Written(objectCount, objects.Length, OpFindObjects);
+                found = ReportedLength.Written(objectCount, objects.Length, OpFindObjects);
                 for (int i = 0; i < found; i++)
                     foundObjects.Add(new ObjectHandle((ulong)objects[i]));
             }
+            while (found == objects.Length);
         }
         finally
         {

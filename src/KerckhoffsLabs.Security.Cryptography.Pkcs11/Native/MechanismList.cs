@@ -21,7 +21,7 @@ internal static class MechanismList
     /// <param name="returned">The count the module reported; entries past it (or past either buffer) are ignored.</param>
     /// <param name="destination">Receives the kept values, from index 0.</param>
     /// <returns>The number of values written to <paramref name="destination"/>.</returns>
-    public static int Copy(ReadOnlySpan<NativeCULong> native, ulong returned, CKM[] destination)
+    public static int Copy(ReadOnlySpan<NativeCULong> native, ulong returned, Span<CKM> destination)
     {
         int available = (int)Math.Min(returned, (ulong)Math.Min(native.Length, destination.Length));
         for (int i = 0; i < available; i++)

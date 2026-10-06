@@ -18,9 +18,9 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
         public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
         public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
 
-        public override CKR C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
+        public override CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
         {
-            if (slotList is null) { count = (NativeCULong)1; return CKR.CKR_OK; }
+            if (slotList.IsEmpty) { count = (NativeCULong)1; return CKR.CKR_OK; }
             slotList[0] = (NativeCULong)7;
             count = (NativeCULong)1;
             return CKR.CKR_OK;

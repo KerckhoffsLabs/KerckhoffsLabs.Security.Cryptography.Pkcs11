@@ -10,16 +10,16 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="tokenPresent">Indicates whether the list obtained includes only those slots with a token present (true) or all slots (false)</param>
     /// <param name="slotList">
-    /// If set to null then the number of slots is returned in "count" parameter, without actually returning a list of slots.
-    /// If not set to null then "count" parameter must contain the lenght of slotList array and slot list is returned in "slotList" parameter.
+    /// Receives the slot list. When empty, it is passed as NULL and only the number of slots is returned in
+    /// <paramref name="count"/>. Its length is the capacity the module is told.
     /// </param>
-    /// <param name="count">Location that receives the number of slots</param>
+    /// <param name="count">Receives the number of slots</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
-    public CKR C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
+    public CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong rv = _delegates.C_GetSlotList(tokenPresent, slotList, ref count);
+        NativeCULong rv = _delegates.C_GetSlotList(tokenPresent, slotList, out count);
         return rv.ToCKR();
     }
 
@@ -54,21 +54,22 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="slotId">The ID of the token's slot</param>
     /// <param name="mechanismList">
-    /// If set to null then the number of mechanisms is returned in "count" parameter, without actually returning a list of mechanisms.
-    /// If not set to null then "count" parameter must contain the lenght of mechanismList array and mechanism list is returned in "mechanismList" parameter.
+    /// Receives the mechanism list. When empty, it is passed as NULL and only the number of mechanisms is
+    /// returned in <paramref name="count"/>. Its length is the capacity the module is told.
     /// </param>
-    /// <param name="count">Location that receives the number of mechanisms</param>
+    /// <param name="count">Receives the number of mechanisms</param>
     /// <returns>CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_ARGUMENTS_BAD</returns>
-    public CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+    public CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         // NULL_PTR form: the caller is probing for the mechanism count, so there is nothing to copy back.
-        if (mechanismList is null)
-            return _delegates.C_GetMechanismList(slotId, null, ref count).ToCKR();
+        if (mechanismList.IsEmpty)
+            return _delegates.C_GetMechanismList(slotId, default, out count).ToCKR();
 
+        // CKM is 64-bit and CK_ULONG is not everywhere, so the module writes into a CK_ULONG buffer.
         NativeCULong[] CULongList = new NativeCULong[mechanismList.Length];
-        CKR rv = _delegates.C_GetMechanismList(slotId, CULongList, ref count).ToCKR();
+        CKR rv = _delegates.C_GetMechanismList(slotId, CULongList, out count).ToCKR();
 
         // Vendor-defined and not-yet-named mechanisms survive as unnamed CKM values. count reports the
         // entries actually handed back, which the destination's length may cap.

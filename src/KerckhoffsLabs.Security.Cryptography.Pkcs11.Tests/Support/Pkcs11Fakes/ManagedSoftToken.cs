@@ -33,10 +33,10 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
     public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
 
-    public override CKR C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
+    public override CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
     {
-        if (slotList is null) { count = (NativeCULong)1; return CKR.CKR_OK; }
-        if ((int)count < 1) { count = (NativeCULong)1; return CKR.CKR_BUFFER_TOO_SMALL; }
+        if (slotList.IsEmpty) { count = (NativeCULong)1; return CKR.CKR_OK; }
+        if (slotList.Length < 1) { count = (NativeCULong)1; return CKR.CKR_BUFFER_TOO_SMALL; }
         slotList[0] = (NativeCULong)SlotId;
         count = (NativeCULong)1;
         return CKR.CKR_OK;
@@ -50,7 +50,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+    public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
     {
         CKM[] mechs =
         [
@@ -60,8 +60,8 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
             CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512,
             CKM.CKM_SHA256_HMAC, CKM.CKM_SHA384_HMAC, CKM.CKM_SHA512_HMAC,
         ];
-        if (mechanismList is null) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
-        if ((int)count < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+        if (mechanismList.IsEmpty) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
+        if (mechanismList.Length < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
         mechs.AsSpan(0, mechs.Length).CopyTo(mechanismList);
         count = (NativeCULong)mechs.Length;
         return CKR.CKR_OK;
@@ -182,11 +182,11 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
+    public override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
     {
         if (!_finds.TryGetValue((ulong)session, out var q)) { objectCount = (NativeCULong)0; return CKR.CKR_OK; }
-        int max = (int)maxObjectCount, i = 0;
-        while (i < max && q.Count > 0) objectId[i++] = (NativeCULong)q.Dequeue();
+        int i = 0;
+        while (i < objects.Length && q.Count > 0) objects[i++] = (NativeCULong)q.Dequeue();
         objectCount = (NativeCULong)(ulong)i;
         return CKR.CKR_OK;
     }

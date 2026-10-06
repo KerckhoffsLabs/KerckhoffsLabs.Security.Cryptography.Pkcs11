@@ -53,12 +53,12 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
         {
             if (_inFlight)
                 ProbedDuringNativeCall = true;
 
-            if (mechanismList is null)
+            if (mechanismList.IsEmpty)
             {
                 count = (NativeCULong)Mechanisms.Length;
                 return CKR.CKR_OK;

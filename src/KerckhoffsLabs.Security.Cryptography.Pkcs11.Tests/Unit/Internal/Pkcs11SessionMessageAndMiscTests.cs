@@ -270,10 +270,10 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
         { SessionInfoCalls++; info.SlotId = (NativeCULong)1; return SessionInfoRv; }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
         {
             MechListCalls++;
-            if (mechanismList is null) { count = (NativeCULong)Mechanisms.Length; return MechListRv; }
+            if (mechanismList.IsEmpty) { count = (NativeCULong)Mechanisms.Length; return MechListRv; }
             for (int i = 0; i < Mechanisms.Length; i++)
                 mechanismList[i] = Mechanisms[i];
             count = (NativeCULong)Mechanisms.Length;
