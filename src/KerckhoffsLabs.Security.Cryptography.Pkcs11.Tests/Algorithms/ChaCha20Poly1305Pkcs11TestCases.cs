@@ -211,7 +211,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
             tag[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => chacha.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_CHACHA20_POLY1305, () => chacha.Decrypt(nonce, ciphertext, tag, dest));
         });
 
     internal static void Assert_Decrypt_TamperedCiphertext_Throws(IPkcs11Backend backend) =>
@@ -226,7 +226,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
             ciphertext[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => chacha.Decrypt(nonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_CHACHA20_POLY1305, () => chacha.Decrypt(nonce, ciphertext, tag, dest));
         });
 
     internal static void Assert_Decrypt_WrongAad_Throws(IPkcs11Backend backend) =>
@@ -240,7 +240,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
             chacha.Encrypt(nonce, plaintext, ciphertext, tag, Encoding.UTF8.GetBytes("aad-A"));
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () =>
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_CHACHA20_POLY1305, () =>
                 chacha.Decrypt(nonce, ciphertext, tag, dest, Encoding.UTF8.GetBytes("aad-B")));
         });
 
@@ -257,7 +257,7 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
             wrongNonce[0] ^= 0xFF;
 
             byte[] dest = new byte[plaintext.Length];
-            AeadTestSupport.AssertAuthFailure(backend, () => chacha.Decrypt(wrongNonce, ciphertext, tag, dest));
+            AeadTestSupport.AssertAuthFailure(backend, CKM.CKM_CHACHA20_POLY1305, () => chacha.Decrypt(wrongNonce, ciphertext, tag, dest));
         });
 
     // Known-answer test: RFC 8439 §2.8.2 (also confirmed via the BCL ChaCha20Poly1305 primitive).

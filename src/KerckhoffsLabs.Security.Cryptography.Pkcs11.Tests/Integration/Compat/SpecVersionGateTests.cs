@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
@@ -40,7 +41,9 @@ internal static class SpecVersionGateTestSupport
 
         byte[] tamperedTag = [.. tag];
         tamperedTag[0] ^= 0xFF;
-        Assert.ThrowsAny<Pkcs11Exception>(() => gcm.Decrypt(nonce, ciphertext, tamperedTag, new byte[plaintext.Length], aad));
+        AeadTestSupport.AssertAuthFailure(
+            () => gcm.Decrypt(nonce, ciphertext, tamperedTag, new byte[plaintext.Length], aad),
+            CKR.CKR_ENCRYPTED_DATA_INVALID);
     }
 
     /// <summary>SHA-256 through the token must match the BCL over the same input.</summary>

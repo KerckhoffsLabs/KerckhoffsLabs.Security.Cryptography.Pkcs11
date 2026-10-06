@@ -40,7 +40,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
 
     // Same physical SoftHSM build underneath; SupportsMlDsa/MlKem/SlhDsa use the default interface
     // member (advertised mechanism list), same as SoftHsmBackendFixture.
-    public CKR? AeadAuthFailureCode => CKR.CKR_ENCRYPTED_DATA_INVALID;
+    public CKR? AeadAuthFailureCode(CKM mechanism) => CKR.CKR_ENCRYPTED_DATA_INVALID;
 
     private readonly string _gateDir;
     private readonly string _configPath;
