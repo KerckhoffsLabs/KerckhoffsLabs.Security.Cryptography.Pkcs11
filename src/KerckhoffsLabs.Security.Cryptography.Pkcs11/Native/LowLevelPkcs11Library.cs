@@ -38,7 +38,10 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
     /// Loads PKCS#11 library at <paramref name="libraryPath"/> and acquires function
     /// pointers via <c>C_GetFunctionList</c>.
     /// </summary>
-    /// <param name="libraryPath">Library name or path.</param>
+    /// <param name="libraryPath">
+    /// Path of the module. A bare name is searched for without the current directory or <c>PATH</c>; see
+    /// <see cref="ModulePath"/>.
+    /// </param>
     public LowLevelPkcs11Library(string libraryPath)
     {
         EnsureCkUlongWidthMatchesPlatform();

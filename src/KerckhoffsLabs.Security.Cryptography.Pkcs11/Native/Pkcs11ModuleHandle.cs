@@ -127,7 +127,8 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// <summary>Loads the module at <paramref name="libraryPath"/> and binds its function table.</summary>
     internal static Pkcs11ModuleHandle Load(string libraryPath)
     {
-        IntPtr loaded = NativeLibrary.Load(libraryPath);
+        // A bare name is never searched for in the current directory; see ModulePath.
+        IntPtr loaded = ModulePath.Load(libraryPath);
         return Bound(new Pkcs11ModuleHandle(loaded, freeOnRelease: true, identity: loaded), () => LowLevelPkcs11Library.LoadTable(loaded));
     }
 
