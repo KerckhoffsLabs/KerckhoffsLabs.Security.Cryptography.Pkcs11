@@ -69,23 +69,22 @@ public sealed class OperationCostGuardTests
         Assert.Equal(1, module.CallCount("C_Encrypt"));
     }
 
-    // Today's one buffer is Pkcs11Session's copy of the input (data.ToArray()); the wrappers already
-    // pin the caller's span, so the copy can go, and this bound with it.
+    // The caller's span is pinned and handed to the module as is: no copy of the input.
     [Fact]
-    public void Sign_AllocatesAtMostOneInputSizedBuffer()
-        => AssertAllocationSlope(maxBuffersPerInput: 1, (session, data) =>
+    public void Sign_AllocatesNoInputSizedBuffer()
+        => AssertAllocationSlope(maxBuffersPerInput: 0, (session, data) =>
             session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), data));
 
-    // As for Sign: the one buffer is the copy of the input.
+    // As for Sign.
     [Fact]
-    public void Digest_AllocatesAtMostOneInputSizedBuffer()
-        => AssertAllocationSlope(maxBuffersPerInput: 1, (session, data) =>
+    public void Digest_AllocatesNoInputSizedBuffer()
+        => AssertAllocationSlope(maxBuffersPerInput: 0, (session, data) =>
             session.Digest(new Mechanism(CKM.CKM_SHA256), data));
 
-    // The ciphertext itself, plus the copy of the input.
+    // The ciphertext itself, and no copy of the input.
     [Fact]
-    public void Encrypt_AllocatesAtMostTwoInputSizedBuffers()
-        => AssertAllocationSlope(maxBuffersPerInput: 2, (session, data) =>
+    public void Encrypt_AllocatesOneInputSizedBuffer()
+        => AssertAllocationSlope(maxBuffersPerInput: 1, (session, data) =>
             session.Encrypt(Gcm(), new ObjectHandle(1), data));
 
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));

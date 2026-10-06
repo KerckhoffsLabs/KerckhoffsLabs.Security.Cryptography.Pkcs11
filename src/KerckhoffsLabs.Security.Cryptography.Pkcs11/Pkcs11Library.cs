@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
@@ -304,18 +305,17 @@ public sealed class Pkcs11Library : IDisposable
 
         NativeCULong slotCount = new(0);
         CKR rv = LowLevel.C_GetSlotList(tokenPresent, null, ref slotCount);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetSlotList);
 
         if (slotCount.Value == 0)
             return [];
 
-        NativeCULong[] slotList = new NativeCULong[slotCount.Value];
+        NativeCULong[] slotList = new NativeCULong[ReportedLength.ForAllocation(slotCount, Pkcs11Operations.OpGetSlotList)];
         rv = LowLevel.C_GetSlotList(tokenPresent, slotList, ref slotCount);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetSlotList");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetSlotList);
 
-        // The token may report a different count on the second call; resize to match.
-        if (slotList.Length != (int)slotCount)
-            Array.Resize(ref slotList, (int)slotCount);
+        // A slot removed between the two calls lowers the count; one added is CKR_BUFFER_TOO_SMALL.
+        slotList = ReportedLength.Items(slotList, slotCount, Pkcs11Operations.OpGetSlotList);
 
         List<Pkcs11Slot> list = [];
         foreach (NativeCULong slot in slotList)
@@ -343,17 +343,16 @@ public sealed class Pkcs11Library : IDisposable
 
         NativeCULong count = new(0);
         CKR rv = LowLevel.C_GetInterfaceList(null, ref count);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetInterfaceList");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetInterfaceList);
 
         if (count.Value == 0)
             return [];
 
-        CK_INTERFACE[] raw = new CK_INTERFACE[(int)count];
+        CK_INTERFACE[] raw = new CK_INTERFACE[ReportedLength.ForAllocation(count, Pkcs11Operations.OpGetInterfaceList)];
         rv = LowLevel.C_GetInterfaceList(raw, ref count);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetInterfaceList");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetInterfaceList);
 
-        // The module may report fewer on the second call; never read past the buffer.
-        int n = Math.Min((int)count, raw.Length);
+        int n = ReportedLength.Written(count, raw.Length, Pkcs11Operations.OpGetInterfaceList);
         List<InterfaceInfo> list = new(n);
         for (int i = 0; i < n; i++)
         {
