@@ -244,7 +244,7 @@ public sealed class Pkcs11Library : IDisposable
             if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
         }
 
-        Pkcs11Exception.ThrowIfError(rv, "C_Initialize");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitialize);
         _ownsFinalize = true;
     }
 
@@ -262,7 +262,7 @@ public sealed class Pkcs11Library : IDisposable
 
         CK_INFO info = new();
         CKR rv = LowLevel.C_GetInfo(ref info);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetInfo");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetInfo);
 
         return new LibraryInfo(info);
     }
@@ -385,7 +385,7 @@ public sealed class Pkcs11Library : IDisposable
         // pInterfaceName is a NUL-terminated C string; null requests the module's default interface.
         byte[]? nameBytes = interfaceName is null ? null : Encoding.UTF8.GetBytes(interfaceName + '\0');
         CKR rv = LowLevel.C_GetInterface(nameBytes, new NativeCULong(0), out CK_INTERFACE iface);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetInterface");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetInterface);
 
         string name = iface.InterfaceName != IntPtr.Zero
             ? Marshal.PtrToStringUTF8(iface.InterfaceName) ?? string.Empty
@@ -421,7 +421,7 @@ public sealed class Pkcs11Library : IDisposable
         // CKR_NO_EVENT is expected in non-blocking mode when nothing's pending.
         if (nonBlocking && rv == CKR.CKR_NO_EVENT) return null;
 
-        throw Pkcs11Exception.Create(rv, "C_WaitForSlotEvent");
+        throw Pkcs11Exception.Create(rv, Pkcs11Operations.OpWaitForSlotEvent);
     }
 
     /// <summary>

@@ -75,7 +75,7 @@ public sealed class Pkcs11Slot
 
         CK_SLOT_INFO slotInfo = new();
         CKR rv = _pkcs11Library.C_GetSlotInfo(_slotId, ref slotInfo);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetSlotInfo");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetSlotInfo);
 
         return new SlotInfo(_slotId, slotInfo);
     }
@@ -91,7 +91,7 @@ public sealed class Pkcs11Slot
 
         CK_TOKEN_INFO tokenInfo = new();
         CKR rv = _pkcs11Library.C_GetTokenInfo(_slotId, ref tokenInfo);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetTokenInfo");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetTokenInfo);
 
         return new TokenInfo(_slotId, tokenInfo);
     }
@@ -141,7 +141,7 @@ public sealed class Pkcs11Slot
 
         CK_MECHANISM_INFO mechanismInfo = new();
         CKR rv = _pkcs11Library.C_GetMechanismInfo(_slotId, mechanism, ref mechanismInfo);
-        Pkcs11Exception.ThrowIfError(rv, "C_GetMechanismInfo");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetMechanismInfo);
 
         return new MechanismInfo(mechanism, mechanismInfo);
     }
@@ -184,7 +184,7 @@ public sealed class Pkcs11Slot
         // The PIN goes to the native call straight out of the pinned buffer SecurePin owns;
         // no transient copy to zero. Matches Pkcs11Session.Login's pattern.
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPin.Pin, tokenLabel);
-        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitToken);
     }
 
     /// <summary>
@@ -218,7 +218,7 @@ public sealed class Pkcs11Slot
         Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
 
         CKR rv = _pkcs11Library.C_InitToken(_slotId, default, tokenLabel);
-        Pkcs11Exception.ThrowIfError(rv, "C_InitToken");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitToken);
     }
 
     /// <summary>
@@ -242,7 +242,7 @@ public sealed class Pkcs11Slot
 
         NativeCULong sessionId = (NativeCULong)CK.CK_INVALID_HANDLE;
         CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);
-        Pkcs11Exception.ThrowIfError(rv, "C_OpenSession");
+        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
 
         if (_logger.IsEnabled(LogLevel.Information))
             _logger.LogInformation(
