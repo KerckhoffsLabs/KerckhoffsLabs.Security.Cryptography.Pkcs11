@@ -27,8 +27,7 @@ internal partial struct CK_TLS12_KEY_MAT_PARAMS
     /// <summary>
     /// Flag which must be set to false because export cipher suites must not be used in TLS 1.1 and later
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)]
-    public bool IsExport;
+    public byte IsExport;
 
     /// <summary>
     /// Client's and server's random data information

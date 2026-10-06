@@ -95,13 +95,13 @@ public sealed class KeyValuedParameterTests
 
         var ike1 = (CK_IKE1_PRF_DERIVE_PARAMS)new CkmIke1PrfDeriveParams(
             CKM.CKM_SHA256_HMAC, keys.Secret(11), prevKey: null, [0x01], [0x02], keyNumber: 1).BuildMarshalable(scope);
-        Assert.False(ike1.HasPrevKey);
+        Assert.Equal(CkBbool.False, ike1.HasPrevKey);
         Assert.Equal(0UL, (ulong)ike1.PrevKey);
         Assert.Equal(11UL, (ulong)ike1.Keygxy);
 
         var extended = (CK_IKE1_EXTENDED_DERIVE_PARAMS)new CkmIke1ExtendedDeriveParams(
             CKM.CKM_SHA256_HMAC, keygxy: null, [0x01]).BuildMarshalable(scope);
-        Assert.False(extended.HasKeygxy);
+        Assert.Equal(CkBbool.False, extended.HasKeygxy);
         Assert.Equal(0UL, (ulong)extended.Keygxy);
 
         var ike = (CK_IKE_PRF_DERIVE_PARAMS)new CkmIkePrfDeriveParams(

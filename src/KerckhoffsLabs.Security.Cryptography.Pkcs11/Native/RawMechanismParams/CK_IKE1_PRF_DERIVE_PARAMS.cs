@@ -17,7 +17,7 @@ internal partial struct CK_IKE1_PRF_DERIVE_PARAMS
     /// <summary>
     /// True if PrevKey is valid.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool HasPrevKey;
+    public byte HasPrevKey;
 
     /// <summary>
     /// Handle of the shared-secret key g^xy.

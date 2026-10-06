@@ -37,8 +37,7 @@ internal partial struct CK_WTLS_KEY_MAT_PARAMS
     /// <summary>
     /// Flag which indicates whether the keys have to be derived for an export version of the protocol
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)]
-    public bool IsExport;
+    public byte IsExport;
 
     /// <summary>
     /// Client's and server's random data information

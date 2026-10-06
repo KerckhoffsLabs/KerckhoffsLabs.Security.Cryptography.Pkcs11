@@ -12,7 +12,7 @@ internal partial struct CK_EDDSA_PARAMS
     /// <summary>
     /// True selects the prehash variant (Ed25519ph / Ed448ph). False selects pure Ed25519 / Ed448.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool PhFlag;
+    public byte PhFlag;
 
     /// <summary>
     /// Length of the context-data buffer in bytes.

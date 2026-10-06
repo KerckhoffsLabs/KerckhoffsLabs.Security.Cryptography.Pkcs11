@@ -12,8 +12,7 @@ internal partial struct CK_KEA_DERIVE_PARAMS
     /// <summary>
     /// Option for generating the key (called a TEK). True if the sender (originator) generates the TEK, false if the recipient is regenerating the TEK.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)]
-    public bool IsSender;
+    public byte IsSender;
 
     /// <summary>
     /// Size of random Ra and Rb, in bytes

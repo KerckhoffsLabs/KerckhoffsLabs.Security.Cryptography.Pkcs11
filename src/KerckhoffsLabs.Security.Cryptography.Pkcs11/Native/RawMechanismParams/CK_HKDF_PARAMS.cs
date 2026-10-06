@@ -12,12 +12,12 @@ internal partial struct CK_HKDF_PARAMS
     /// <summary>
     /// True to perform the HKDF-Extract step.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool Extract;
+    public byte Extract;
 
     /// <summary>
     /// True to perform the HKDF-Expand step.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool Expand;
+    public byte Expand;
 
     /// <summary>
     /// The PRF mechanism (typically a CKM_SHA*_HMAC variant).

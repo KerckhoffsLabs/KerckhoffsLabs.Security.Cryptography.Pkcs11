@@ -17,12 +17,12 @@ internal partial struct CK_IKE_PRF_DERIVE_PARAMS
     /// <summary>
     /// True to treat the input data as the key material.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool DataAsKey;
+    public byte DataAsKey;
 
     /// <summary>
     /// True to perform a rekey-style derivation.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool Rekey;
+    public byte Rekey;
 
     /// <summary>
     /// Pointer to the initiator nonce (Ni).

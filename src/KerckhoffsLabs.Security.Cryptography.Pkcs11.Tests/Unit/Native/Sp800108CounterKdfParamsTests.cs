@@ -43,7 +43,7 @@ public sealed class Sp800108CounterKdfParamsTests
         var iter = Param(0);
         Assert.Equal(IterationVariable, (ulong)iter.Type);
         var counter = UnmanagedMemory.Read<CK_SP800_108_COUNTER_FORMAT>(iter.Value);
-        Assert.False(counter.LittleEndian);
+        Assert.Equal(CkBbool.False, counter.LittleEndian);
         Assert.Equal(32UL, (ulong)counter.WidthInBits);
 
         // [1] Label.
@@ -69,7 +69,7 @@ public sealed class Sp800108CounterKdfParamsTests
         Assert.Equal(DkmLength, (ulong)dkm.Type);
         var dkmFormat = UnmanagedMemory.Read<CK_SP800_108_DKM_LENGTH_FORMAT>(dkm.Value);
         Assert.Equal(SumOfKeys, (ulong)dkmFormat.DkmLengthMethod);
-        Assert.False(dkmFormat.LittleEndian);
+        Assert.Equal(CkBbool.False, dkmFormat.LittleEndian);
         Assert.Equal(32UL, (ulong)dkmFormat.WidthInBits);
     }
 

@@ -85,15 +85,8 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private static void EmitField(StringBuilder sb, IFieldSymbol f,
                                    IReadOnlyDictionary<string, string> packedNames)
     {
-        // Forward any [MarshalAs] / [In] / [Out] attributes verbatim.
-        foreach (var a in f.GetAttributes())
-        {
-            var ac = a.AttributeClass;
-            if (ac is null) continue;
-            // Skip [PackedForPkcs11] (it's on the type, not fields, but defensive).
-            if (ac.ToDisplayString() == AttributeFullName) continue;
-            sb.Append("    [").Append(a).AppendLine("]");
-        }
+        // Field attributes are not forwarded: with runtime marshalling disabled, [MarshalAs] and
+        // [In]/[Out] have no effect, so a field's type alone has to carry its layout.
         var typeName = SubstituteFieldType(f.Type, packedNames);
         sb.Append("    public ").Append(typeName).Append(' ').Append(f.Name).AppendLine(";");
     }

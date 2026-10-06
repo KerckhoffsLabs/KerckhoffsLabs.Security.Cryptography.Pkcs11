@@ -233,7 +233,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
                     valueLen = UnmanagedMemory.SizeOf<CK_SP800_108_COUNTER_FORMAT>();
                     value = scope.WriteStruct(new CK_SP800_108_COUNTER_FORMAT
                     {
-                        LittleEndian = seg.LittleEndian,
+                        LittleEndian = CkBbool.From(seg.LittleEndian),
                         WidthInBits = (NativeCULong)seg.WidthInBits,
                     });
                     type = seg.Kind == Sp800108SegmentKind.IterationCounter
@@ -248,7 +248,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
                     value = scope.WriteStruct(new CK_SP800_108_DKM_LENGTH_FORMAT
                     {
                         DkmLengthMethod = CkULong.From((ulong)seg.DkmMethod, "method"),
-                        LittleEndian = seg.LittleEndian,
+                        LittleEndian = CkBbool.From(seg.LittleEndian),
                         WidthInBits = (NativeCULong)seg.WidthInBits,
                     });
                     type = CK_SP800_108_DKM_LENGTH;

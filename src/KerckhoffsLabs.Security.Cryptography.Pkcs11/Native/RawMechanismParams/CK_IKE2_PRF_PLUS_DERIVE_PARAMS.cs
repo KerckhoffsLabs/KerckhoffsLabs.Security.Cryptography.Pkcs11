@@ -17,7 +17,7 @@ internal partial struct CK_IKE2_PRF_PLUS_DERIVE_PARAMS
     /// <summary>
     /// True if SeedKey is a valid key handle.
     /// </summary>
-    [MarshalAs(UnmanagedType.U1)] public bool HasSeedKey;
+    public byte HasSeedKey;
 
     /// <summary>
     /// Handle of the seed key (when HasSeedKey is true).

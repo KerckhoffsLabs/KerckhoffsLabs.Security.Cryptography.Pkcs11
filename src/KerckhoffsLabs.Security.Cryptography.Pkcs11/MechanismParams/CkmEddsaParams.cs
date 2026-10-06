@@ -27,7 +27,7 @@ public sealed class CkmEddsaParams : MechanismParameters
     {
         return new CK_EDDSA_PARAMS
         {
-            PhFlag = _phFlag,
+            PhFlag = CkBbool.From(_phFlag),
             ContextData = scope.Write(_contextDataBytes),
             ContextDataLen = (NativeCULong)_contextDataBytes.Length,
         };
