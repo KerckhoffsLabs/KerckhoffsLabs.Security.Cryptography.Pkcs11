@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
@@ -13,7 +15,7 @@ public sealed class CryptokiVersionTests
     private sealed class InfoFake : NotSupportedPkcs11Library
     {
         public byte Major = 3;
-        public byte Minor = 20;
+        public byte Minor = 2;
 
         public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
         public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
@@ -75,27 +77,30 @@ public sealed class CryptokiVersionTests
     [Fact]
     public void GetInfo_ExposesBothVersionsAsComparableValues()
     {
-        using var fake = new InfoFake { Major = 3, Minor = 20 };
+        using var fake = new InfoFake { Major = 3, Minor = 2 };
         using var library = new Pkcs11Library(fake);
 
         LibraryInfo info = library.GetInfo();
 
-        Assert.Equal(new Version(3, 20), info.CryptokiVersion);
+        Assert.Equal(CryptokiVersions.V3_2, info.CryptokiVersion);
         Assert.Equal(new Version(1, 2), info.LibraryVersion);
     }
 
+    // A v3.2 module reports CK_VERSION {3, 2}, as the v3.2 header's CRYPTOKI_VERSION_MINOR defines it.
     [Theory]
     [InlineData(2, 40, true)]
     [InlineData(3, 0, true)]
-    [InlineData(3, 20, true)]   // exactly the reported version
-    [InlineData(3, 21, false)]  // one minor step past it
+    [InlineData(3, 1, true)]
+    [InlineData(3, 2, true)]    // exactly the reported version
+    [InlineData(3, 3, false)]   // one minor step past it
+    [InlineData(3, 10, false)]  // the hundredths reading of "3.1", which no header uses
     [InlineData(4, 0, false)]
     public void SupportsCryptokiVersion_ComparesAgainstTheReportedVersion(int major, int minor, bool expected)
     {
-        using var fake = new InfoFake { Major = 3, Minor = 20 };
+        using var fake = new InfoFake { Major = 3, Minor = 2 };
         using var library = new Pkcs11Library(fake);
 
-        Assert.Equal(expected, library.SupportsCryptokiVersion(major, minor));
+        Assert.Equal(expected, library.SupportsCryptokiVersion(new Version(major, minor)));
     }
 
     // A v2.40 module must not answer yes to a v3 question — the case the exception-driven
@@ -106,9 +111,51 @@ public sealed class CryptokiVersionTests
         using var fake = new InfoFake { Major = 2, Minor = 40 };
         using var library = new Pkcs11Library(fake);
 
-        Assert.True(library.SupportsCryptokiVersion(2, 40));
-        Assert.False(library.SupportsCryptokiVersion(3, 0));
+        Assert.True(library.SupportsCryptokiVersion(CryptokiVersions.V2_40));
+        Assert.False(library.SupportsCryptokiVersion(CryptokiVersions.V3_0));
     }
+
+    [Fact]
+    public void SupportsCryptokiVersion_Null_Throws()
+    {
+        using var fake = new InfoFake { Major = 3, Minor = 2 };
+        using var library = new Pkcs11Library(fake);
+
+        Assert.Throws<ArgumentNullException>("version", () => library.SupportsCryptokiVersion(null!));
+    }
+
+    // CK_VERSION has no build or revision, so the reported version never sets one, and Version orders
+    // an unset build (-1) below 0: new Version(3, 2, 0) would compare above the {3, 2} a v3.2 module
+    // reports and answer false. Refusing it beats that silent wrong answer.
+    [Theory]
+    [InlineData(3, 2, 0, -1)]
+    [InlineData(3, 2, 0, 0)]
+    public void SupportsCryptokiVersion_BuildOrRevision_IsRefused(int major, int minor, int build, int revision)
+    {
+        using var fake = new InfoFake { Major = 3, Minor = 2 };
+        using var library = new Pkcs11Library(fake);
+        Version version = revision < 0 ? new Version(major, minor, build) : new Version(major, minor, build, revision);
+
+        Assert.Throws<ArgumentException>("version", () => library.SupportsCryptokiVersion(version));
+        Assert.True(new Version(major, minor, build) > library.GetInfo().CryptokiVersion);
+    }
+
+    // The v3.2 header defines the version a v3.2 module reports; it is {3, 2}, not {3, 20}.
+    [Fact]
+    public void CryptokiVersions_V3_2_IsWhatTheV3_2HeaderDefines()
+    {
+        string path = Path.Join(AppContext.BaseDirectory, "pkcs11-v3.2", "pkcs11t.h");
+        Assert.True(File.Exists(path), $"The vendored PKCS#11 v3.2 header is missing at {path}; initialize the vendor/pkcs11 submodule.");
+        string header = File.ReadAllText(path);
+
+        var defined = new Version(Define(header, "CRYPTOKI_VERSION_MAJOR"), Define(header, "CRYPTOKI_VERSION_MINOR"));
+
+        Assert.Equal(CryptokiVersions.V3_2, defined);
+        Assert.True(CryptokiVersions.V2_40 < CryptokiVersions.V3_0);
+    }
+
+    private static int Define(string header, string name)
+        => int.Parse(Regex.Match(header, $@"#define\s+{name}\s+(\d+)").Groups[1].Value, CultureInfo.InvariantCulture);
 
     [Fact]
     public void SupportsCryptokiVersion_AfterDispose_Throws()
@@ -117,6 +164,6 @@ public sealed class CryptokiVersionTests
         var library = new Pkcs11Library(fake);
         library.Dispose();
 
-        Assert.Throws<ObjectDisposedException>(() => library.SupportsCryptokiVersion(3, 0));
+        Assert.Throws<ObjectDisposedException>(() => library.SupportsCryptokiVersion(CryptokiVersions.V3_0));
     }
 }

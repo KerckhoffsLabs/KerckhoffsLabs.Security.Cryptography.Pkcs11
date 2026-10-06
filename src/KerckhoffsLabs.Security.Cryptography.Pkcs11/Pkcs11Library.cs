@@ -268,23 +268,40 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Whether the module reports a Cryptoki interface version of at least <paramref name="major"/>.<paramref name="minor"/>
-    /// — the readable form of <c>GetInfo().CryptokiVersion &gt;= new Version(major, minor)</c>, and the
+    /// Whether the module reports a Cryptoki interface version of at least <paramref name="version"/>
+    /// — the readable form of <c>GetInfo().CryptokiVersion &gt;= version</c>, and the
     /// supported alternative to driving version detection off a <c>CKR_FUNCTION_NOT_SUPPORTED</c>
     /// exception from <see cref="GetInterfaces"/>.
     /// </summary>
     /// <remarks>
     /// This is what the module claims to be *compatible with*, not which function tables actually
-    /// bound: a module may report 3.2 and still refuse an individual v3.2 entry point. Remember that
-    /// <c>CK_VERSION</c>'s minor is the hundredths portion, so the v3.1 written on a datasheet is
-    /// <c>SupportsCryptokiVersion(3, 10)</c>, not <c>(3, 1)</c>. Queries the module on every call.
+    /// bound: a module may report 3.2 and still refuse an individual v3.2 entry point. Pass the version
+    /// as the PKCS#11 headers define it (<c>CRYPTOKI_VERSION_MAJOR</c>, <c>CRYPTOKI_VERSION_MINOR</c>):
+    /// v2.40 is <c>new Version(2, 40)</c>, but v3.0, v3.1 and v3.2 are <c>new Version(3, 0)</c>,
+    /// <c>(3, 1)</c> and <c>(3, 2)</c>, not <c>(3, 10)</c> or <c>(3, 20)</c>. Queries the module on
+    /// every call.
     /// </remarks>
-    /// <param name="major">Required major version.</param>
-    /// <param name="minor">Required minor version, as the raw <c>CK_VERSION</c> field.</param>
+    /// <param name="version">
+    /// Required version, major and minor only: <c>new Version(3, 1)</c> for v3.1. <c>CK_VERSION</c> has no
+    /// build or revision number.
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="version"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="version"/> sets a build or revision number. The reported version never has one, and
+    /// <see cref="Version"/> orders an unset build below <c>0</c>, so <c>new Version(3, 1, 0)</c> would read
+    /// as newer than every v3.1 module.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GetInfo</c> call.</exception>
-    public bool SupportsCryptokiVersion(int major, int minor)
-        => GetInfo().CryptokiVersion >= new Version(major, minor);
+    public bool SupportsCryptokiVersion(Version version)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        if (version.Build != -1 || version.Revision != -1)
+            throw new ArgumentException(
+                "CK_VERSION has only a major and a minor number; pass new Version(major, minor).", nameof(version));
+
+        return GetInfo().CryptokiVersion >= version;
+    }
 
     /// <summary>
     /// Obtains a list of slots in the system.

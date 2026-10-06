@@ -11,7 +11,8 @@ internal struct CK_VERSION
 {
     /// <summary>Major version number (integer portion).</summary>
     public byte Major;
-    /// <summary>Minor version number (hundredths portion).</summary>
+    /// <summary>Minor version number. The spec calls it the hundredths portion, but the headers define
+    /// v3.1 as minor <c>1</c>, not <c>10</c>; see <see cref="CryptokiVersions"/>.</summary>
     public byte Minor;
 
     /// <summary>

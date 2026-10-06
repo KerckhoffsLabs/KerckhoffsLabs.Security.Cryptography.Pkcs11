@@ -27,7 +27,7 @@ internal static class SmokeTestAssertions
         // here: every module this suite loads is Cryptoki 2 or later.
         Assert.True(info.CryptokiVersion >= new Version(2, 0),
             $"Cryptoki version should be >= 2.0, was '{info.CryptokiVersion}'.");
-        Assert.True(backend.Library.SupportsCryptokiVersion(2, 0));
+        Assert.True(backend.Library.SupportsCryptokiVersion(new Version(2, 0)));
 
         // The vendor's own library version is independent of the spec version, but is equally
         // required to be present rather than a default-constructed 0.0.
