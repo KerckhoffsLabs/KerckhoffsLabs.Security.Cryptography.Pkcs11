@@ -17,6 +17,7 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_GetInfo(ref CK_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_CloseSession(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
@@ -43,6 +44,8 @@ internal abstract unsafe partial class FakeModule
             list.C_GetSlotList = (IntPtr)(delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong>)&GetSlotList;
         if (Overrides(nameof(C_GetTokenInfo)))
             list.C_GetTokenInfo = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&GetTokenInfo;
+        if (Overrides(nameof(C_InitToken)))
+            list.C_InitToken = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong>)&InitToken;
         if (Overrides(nameof(C_OpenSession)))
             list.C_OpenSession = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, void*, NativeCULong*, NativeCULong>)&OpenSession;
         if (Overrides(nameof(C_CloseSession)))
@@ -164,6 +167,15 @@ internal abstract unsafe partial class FakeModule
     {
         if (Owner(hSession, nameof(C_Login)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
         try { return Rv(m.C_Login(hSession, userType, In(pPin, ulPinLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    // pLabel has no length: the spec fixes it at 32 bytes, so that is all the module may read.
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong InitToken(NativeCULong slotId, byte* pPin, NativeCULong ulPinLen, byte* pLabel)
+    {
+        if (Active(nameof(C_InitToken)) is not { } m) return Rv(CKR.CKR_CRYPTOKI_NOT_INITIALIZED);
+        try { return Rv(m.C_InitToken(slotId, In(pPin, ulPinLen), In(pLabel, (NativeCULong)32UL))); }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 

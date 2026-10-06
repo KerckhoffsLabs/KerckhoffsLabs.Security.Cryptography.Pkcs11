@@ -100,6 +100,7 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="slotId">The ID of the token's slot</param>
     /// <param name="pin">SO's initial PIN or null to use protected authentication path (pinpad)</param>
     /// <param name="label">32-byte long label of the token which must be padded with blank characters</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="label"/> is not 32 bytes long.</exception>
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_PIN_INCORRECT, CKR_PIN_LOCKED, CKR_SESSION_EXISTS, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_TOKEN_WRITE_PROTECTED, CKR_ARGUMENTS_BAD</returns>
     public CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label)
     {
