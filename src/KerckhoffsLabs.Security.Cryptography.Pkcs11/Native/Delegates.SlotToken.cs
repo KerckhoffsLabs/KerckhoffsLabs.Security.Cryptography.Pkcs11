@@ -15,10 +15,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
     "DelegatesLoaderTests, and the wrappers themselves by the full suite against SoftHSM2 and opencryptoki.")]
 internal partial class Delegates
 {
-    /// <summary>Wrapper for <c>C_GetSlotList</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
+    /// <summary>Wrapper for <c>C_GetSlotList</c>. An empty <paramref name="slotList"/> is passed as NULL: a length query.</summary>
+    /// <remarks><c>*pulCount</c> on entry is the span's length, so the module's idea of the buffer's
+    /// capacity can never be larger than the buffer.</remarks>
+    public unsafe NativeCULong C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
     {
         ThrowIfUnbound(_fp.C_GetSlotList);
+        count = (NativeCULong)(ulong)slotList.Length;
         fixed (NativeCULong* slotPtr = slotList)
         fixed (NativeCULong* countPtr = &count)
             return _fp.C_GetSlotList((byte)(tokenPresent ? 1 : 0), slotPtr, countPtr);
@@ -62,10 +65,12 @@ internal partial class Delegates
         fixed (CK_TOKEN_INFO* p = &info) return _fp.C_GetTokenInfo(slotId, p);
     }
 
-    /// <summary>Wrapper for <c>C_GetMechanismList</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetMechanismList(NativeCULong slotId, NativeCULong[]? mechanismList, ref NativeCULong count)
+    /// <summary>Wrapper for <c>C_GetMechanismList</c>. An empty <paramref name="mechanismList"/> is passed as NULL: a length query.</summary>
+    /// <remarks><c>*pulCount</c> on entry is the span's length, as for <see cref="C_GetSlotList"/>.</remarks>
+    public unsafe NativeCULong C_GetMechanismList(NativeCULong slotId, Span<NativeCULong> mechanismList, out NativeCULong count)
     {
         ThrowIfUnbound(_fp.C_GetMechanismList);
+        count = (NativeCULong)(ulong)mechanismList.Length;
         fixed (NativeCULong* mechPtr = mechanismList)
         fixed (NativeCULong* countPtr = &count)
             return _fp.C_GetMechanismList(slotId, mechPtr, countPtr);

@@ -32,10 +32,10 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_Finalize(IntPtr reserved);
     CKR C_GetInfo(ref CK_INFO info);
     CKR C_GetFunctionList(out IntPtr functionList);
-    CKR C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count);
+    CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count);
     CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info);
     CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info);
-    CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count);
+    CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count);
     CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, ref CK_MECHANISM_INFO info);
     CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label);
     CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin);
@@ -106,7 +106,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template);
     CKR C_SetAttributeValue(NativeCULong session, NativeCULong objectId, ReadOnlySpan<CK_ATTRIBUTE> template);
     CKR C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template);
-    CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount);
+    CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount);
     CKR C_FindObjectsFinal(NativeCULong session);
     CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen);

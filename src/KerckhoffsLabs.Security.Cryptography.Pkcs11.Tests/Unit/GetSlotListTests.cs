@@ -23,9 +23,9 @@ public sealed class GetSlotListTests
         public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
         public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
 
-        public override CKR C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count)
+        public override CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
         {
-            if (slotList is null)
+            if (slotList.IsEmpty)
             {
                 count = ProbeCount;
                 return CKR.CKR_OK;

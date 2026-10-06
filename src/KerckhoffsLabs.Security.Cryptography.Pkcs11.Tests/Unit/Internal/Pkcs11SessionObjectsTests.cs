@@ -98,12 +98,12 @@ public sealed class Pkcs11SessionObjectsTests
         public override CKR C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template) => InitRv;
         public override CKR C_FindObjectsFinal(NativeCULong session) { FinalCalls++; return FinalRv; }
 
-        public override CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
+        public override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
         {
             FindCalls++;
             int n = Pages.Count > 0 ? Pages.Dequeue() : 0;
             for (int i = 0; i < n; i++)
-                objectId[i] = (NativeCULong)(ulong)(FindCalls * 1000 + i);
+                objects[i] = (NativeCULong)(ulong)(FindCalls * 1000 + i);
             objectCount = (NativeCULong)n;
             return FindRv;
         }

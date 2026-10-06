@@ -21,9 +21,9 @@ public sealed class Pkcs11SessionSupportsMechanismListTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
         {
-            if (mechanismList is null)
+            if (mechanismList.IsEmpty)
             {
                 count = (NativeCULong)3;
                 return CKR.CKR_OK;

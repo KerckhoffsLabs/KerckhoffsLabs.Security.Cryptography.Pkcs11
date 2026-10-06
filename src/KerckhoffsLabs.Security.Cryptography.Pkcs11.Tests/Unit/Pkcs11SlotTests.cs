@@ -38,10 +38,10 @@ public sealed class Pkcs11SlotTests
         { LastSlotId = slotId; info = TokenInfo; return TokenInfoRv; }
         public override CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, ref CK_MECHANISM_INFO info)
         { LastSlotId = slotId; info = MechInfo; return MechInfoRv; }
-        public override CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count)
+        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
         {
-            if (mechanismList is null) { count = FirstCallCount ?? (NativeCULong)Mechs.Length; return MechListRv1; }
-            int n = Math.Min((int)count, Mechs.Length);
+            if (mechanismList.IsEmpty) { count = FirstCallCount ?? (NativeCULong)Mechs.Length; return MechListRv1; }
+            int n = Math.Min(mechanismList.Length, Mechs.Length);
             for (int i = 0; i < n; i++) mechanismList[i] = Mechs[i];
             count = (NativeCULong)Mechs.Length; // token may report fewer than the probe (shrink)
             return MechListRv2;

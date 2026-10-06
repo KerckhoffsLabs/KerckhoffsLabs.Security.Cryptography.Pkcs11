@@ -108,15 +108,14 @@ internal sealed partial class LowLevelPkcs11Library
     /// Continues a search for token and session objects that match a template, obtaining additional object handles
     /// </summary>
     /// <param name="session">The session's handle</param>
-    /// <param name="objectId">Location that receives the list (array) of additional object handles</param>
-    /// <param name="maxObjectCount">The maximum number of object handles to be returned</param>
-    /// <param name="objectCount">Location that receives the actual number of object handles returned</param>
+    /// <param name="objects">Receives the additional object handles; its length is the maximum number returned</param>
+    /// <param name="objectCount">Receives the actual number of object handles returned</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID</returns>
-    public CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount)
+    public CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong rv = _delegates.C_FindObjects(session, objectId, maxObjectCount, ref objectCount);
+        NativeCULong rv = _delegates.C_FindObjects(session, objects, out objectCount);
         return rv.ToCKR();
     }
 

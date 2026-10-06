@@ -115,15 +115,14 @@ public sealed class Pkcs11Slot
     {
         Log.SlotTrace(_logger, (ulong)_slotId, "GetMechanismList");
 
-        NativeCULong mechanismCount = (NativeCULong)0;
-        CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, null, ref mechanismCount);
+        CKR rv = _pkcs11Library.C_GetMechanismList(_slotId, [], out NativeCULong mechanismCount);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetMechanismList);
 
         if (mechanismCount < (NativeCULong)1)
             return [];
 
         CKM[] mechanismList = new CKM[ReportedLength.ForAllocation(mechanismCount, Pkcs11Operations.OpGetMechanismList)];
-        rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, ref mechanismCount);
+        rv = _pkcs11Library.C_GetMechanismList(_slotId, mechanismList, out mechanismCount);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetMechanismList);
 
         return ReportedLength.Items(mechanismList, mechanismCount, Pkcs11Operations.OpGetMechanismList);

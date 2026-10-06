@@ -34,10 +34,10 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => NotSupported(nameof(C_Initialize));
     public virtual CKR C_Finalize(IntPtr reserved) => NotSupported(nameof(C_Finalize));
     public virtual CKR C_GetInfo(ref CK_INFO info) => NotSupported(nameof(C_GetInfo));
-    public virtual CKR C_GetSlotList(bool tokenPresent, NativeCULong[]? slotList, ref NativeCULong count) => NotSupported(nameof(C_GetSlotList));
+    public virtual CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count) { count = (NativeCULong)0; return NotSupported(nameof(C_GetSlotList)); }
     public virtual CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info) => NotSupported(nameof(C_GetSlotInfo));
     public virtual CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info) => NotSupported(nameof(C_GetTokenInfo));
-    public virtual CKR C_GetMechanismList(NativeCULong slotId, CKM[]? mechanismList, ref NativeCULong count) => NotSupported(nameof(C_GetMechanismList));
+    public virtual CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count) { count = (NativeCULong)0; return NotSupported(nameof(C_GetMechanismList)); }
     public virtual CKR C_GetMechanismInfo(NativeCULong slotId, CKM type, ref CK_MECHANISM_INFO info) => NotSupported(nameof(C_GetMechanismInfo));
     public virtual CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label) => NotSupported(nameof(C_InitToken));
     public virtual CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin) => NotSupported(nameof(C_InitPIN));
@@ -93,7 +93,7 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template) => NotSupported(nameof(C_GetAttributeValue));
     public virtual CKR C_SetAttributeValue(NativeCULong session, NativeCULong objectId, ReadOnlySpan<CK_ATTRIBUTE> template) => NotSupported(nameof(C_SetAttributeValue));
     public virtual CKR C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template) => NotSupported(nameof(C_FindObjectsInit));
-    public virtual CKR C_FindObjects(NativeCULong session, NativeCULong[] objectId, NativeCULong maxObjectCount, ref NativeCULong objectCount) => NotSupported(nameof(C_FindObjects));
+    public virtual CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount) { objectCount = (NativeCULong)0; return NotSupported(nameof(C_FindObjects)); }
     public virtual CKR C_FindObjectsFinal(NativeCULong session) => NotSupported(nameof(C_FindObjectsFinal));
     public virtual CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_EncryptInit));
     public virtual CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen) { encryptedDataLen = (NativeCULong)0; return NotSupported(nameof(C_Encrypt)); }

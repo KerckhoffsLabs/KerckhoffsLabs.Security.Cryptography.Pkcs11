@@ -303,15 +303,14 @@ public sealed class Pkcs11Library : IDisposable
 
         Log.LibraryTrace(_logger, _libraryPath, "GetSlotList");
 
-        NativeCULong slotCount = new(0);
-        CKR rv = LowLevel.C_GetSlotList(tokenPresent, null, ref slotCount);
+        CKR rv = LowLevel.C_GetSlotList(tokenPresent, [], out NativeCULong slotCount);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetSlotList);
 
         if (slotCount.Value == 0)
             return [];
 
         NativeCULong[] slotList = new NativeCULong[ReportedLength.ForAllocation(slotCount, Pkcs11Operations.OpGetSlotList)];
-        rv = LowLevel.C_GetSlotList(tokenPresent, slotList, ref slotCount);
+        rv = LowLevel.C_GetSlotList(tokenPresent, slotList, out slotCount);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpGetSlotList);
 
         // A slot removed between the two calls lowers the count; one added is CKR_BUFFER_TOO_SMALL.
