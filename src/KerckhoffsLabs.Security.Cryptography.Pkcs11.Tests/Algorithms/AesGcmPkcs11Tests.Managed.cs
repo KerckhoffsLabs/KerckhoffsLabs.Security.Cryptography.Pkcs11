@@ -46,12 +46,9 @@ public sealed class AesGcmPkcs11Tests_Managed
     private static void WithAnyGcm(Action<AesGcmPkcs11> body) =>
         WithImportedGcm(RandomNumberGenerator.GetBytes(32), body);
 
-    // AES-GCM authentication failures surface from the token as CKR_ENCRYPTED_DATA_INVALID.
-    private static void AssertAuthFailure(Action decrypt)
-    {
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(decrypt);
-        Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, ex.ReturnValue);
-    }
+    // The managed token reports a AES-GCM tag failure as CKR_ENCRYPTED_DATA_INVALID.
+    private static void AssertAuthFailure(Action decrypt) =>
+        AeadTestSupport.AssertAuthFailure(decrypt, CKR.CKR_ENCRYPTED_DATA_INVALID);
 
     // === Real crypto: cross-checked against the BCL ======================================
 
@@ -384,4 +381,58 @@ public sealed class AesGcmPkcs11Tests_Managed
         Assert.Throws<ObjectDisposedException>(() =>
             gcm.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
     });
+
+    /// <summary>
+    /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a
+    /// caller that reuses buffers never reads stale data after a forgery.
+    /// </summary>
+    [Fact]
+    public void Decrypt_TagMismatch_ClearsPlaintext() => WithAnyGcm(gcm =>
+    {
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        gcm.Encrypt(nonce, pt, ct, tag);
+        tag[0] ^= 1;
+
+        byte[] destination = [.. Enumerable.Repeat((byte)0xAA, pt.Length)];
+        AssertAuthFailure(() => gcm.Decrypt(nonce, ct, tag, destination));
+        Assert.All(destination, b => Assert.Equal(0, b));
+    });
+
+    /// <summary>
+    /// Only a failed tag check becomes an <see cref="AuthenticationTagMismatchException"/>. Any other
+    /// token failure — here the key's object destroyed behind the adapter — stays the module's
+    /// <see cref="Pkcs11Exception"/>, and the destination is left alone.
+    /// </summary>
+    [Fact]
+    public void Decrypt_NonTagFailure_StaysPkcs11Exception()
+    {
+        using var library = ManagedToken.NewLibrary();
+        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
+            .Label("gcm-gone").Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
+        using var key = workspace.ImportKey(tpl);
+        using var gcm = new AesGcmPkcs11(key, 16);
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        gcm.Encrypt(nonce, pt, ct, tag);
+
+        using (var filter = ObjectTemplate.Empty().Label("gcm-gone").Build())
+        {
+            foreach (var other in workspace.FindKeys(filter))
+            {
+                other.Destroy();
+                other.Dispose();
+            }
+        }
+
+        byte[] destination = [.. Enumerable.Repeat((byte)0xAA, pt.Length)];
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => gcm.Decrypt(nonce, ct, tag, destination));
+        Assert.Equal(CKR.CKR_KEY_HANDLE_INVALID, ex.ReturnValue);
+        Assert.All(destination, b => Assert.Equal(0xAA, b));
+    }
 }

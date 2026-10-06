@@ -47,12 +47,9 @@ public sealed class AesCcmPkcs11Tests_Managed
     private static void WithAnyCcm(Action<AesCcmPkcs11> body) =>
         WithImportedCcm(RandomNumberGenerator.GetBytes(32), body);
 
-    // AES-CCM authentication failures surface from the token as CKR_ENCRYPTED_DATA_INVALID.
-    private static void AssertAuthFailure(Action decrypt)
-    {
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(decrypt);
-        Assert.Equal(CKR.CKR_ENCRYPTED_DATA_INVALID, ex.ReturnValue);
-    }
+    // The managed token reports a AES-CCM tag failure as CKR_ENCRYPTED_DATA_INVALID.
+    private static void AssertAuthFailure(Action decrypt) =>
+        AeadTestSupport.AssertAuthFailure(decrypt, CKR.CKR_ENCRYPTED_DATA_INVALID);
 
     // === Real crypto: cross-checked against the BCL ======================================
 
@@ -400,5 +397,24 @@ public sealed class AesCcmPkcs11Tests_Managed
         ccm.Dispose();
         Assert.Throws<ObjectDisposedException>(() =>
             ccm.Decrypt(new byte[12], new byte[8], new byte[16], new byte[8]));
+    });
+
+    /// <summary>
+    /// A failed tag check clears the plaintext destination before throwing, as the BCL does, so a
+    /// caller that reuses buffers never reads stale data after a forgery.
+    /// </summary>
+    [Fact(SkipUnless = nameof(AesCcm.IsSupported), SkipType = typeof(AesCcm), Skip = "Requires " + nameof(AesCcm.IsSupported))]
+    public void Decrypt_TagMismatch_ClearsPlaintext() => WithAnyCcm(ccm =>
+    {
+        byte[] nonce = Iota(12);
+        byte[] pt = Iota(24);
+        byte[] ct = new byte[pt.Length];
+        byte[] tag = new byte[16];
+        ccm.Encrypt(nonce, pt, ct, tag);
+        tag[0] ^= 1;
+
+        byte[] destination = [.. Enumerable.Repeat((byte)0xAA, pt.Length)];
+        AssertAuthFailure(() => ccm.Decrypt(nonce, ct, tag, destination));
+        Assert.All(destination, b => Assert.Equal(0, b));
     });
 }
