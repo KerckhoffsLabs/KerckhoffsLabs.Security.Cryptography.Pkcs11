@@ -108,9 +108,11 @@ public sealed class SecurePinTests
         Assert.Equal(source, pin.Pin.ToArray());
 
         // The interop layer takes this span straight to the native call, so it must be a view over
-        // the pinned buffer rather than a transient copy — two reads see the same address.
+        // the pinned buffer rather than a transient copy — two reads see the same address, even with
+        // a compacting collection between them.
         IntPtr first, second;
         fixed (byte* p = pin.Pin) first = (IntPtr)p;
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
         fixed (byte* p = pin.Pin) second = (IntPtr)p;
         Assert.Equal(first, second);
     }

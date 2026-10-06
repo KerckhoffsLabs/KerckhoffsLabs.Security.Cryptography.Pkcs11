@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <summary>
 /// Utility class that helps to manage unmanaged memory. Internal to the assembly —
 /// callers needing this surface should expose the relevant lifecycle through a
-/// high-level type (see <c>SecureBuffer</c>, <c>Mechanism</c>, <c>ObjectAttribute</c>).
+/// high-level type (see <c>Mechanism</c>, <c>ObjectAttribute</c>).
 /// Visible to the test assembly via <c>InternalsVisibleTo</c> for the leak-detection
 /// harness (<see cref="OutstandingAllocationCount"/>, <see cref="DebugModeEnabled"/>).
 /// </summary>
@@ -114,7 +114,7 @@ internal static class UnmanagedMemory
     /// it so that IVs, nonces, AAD, context bytes, attribute values, and CKA_VALUE reads
     /// (including the ML-KEM extract-and-destroy path) do not linger in the unmanaged
     /// heap after the allocator reuses the block. Mirrors the
-    /// <see cref="Internal.SecureBuffer"/> / <see cref="SecurePin"/> zeroize pattern.
+    /// <see cref="SecurePin"/> / <see cref="SecurePassword"/> zeroize pattern.
     /// </summary>
     /// <param name="memory">Pointer to the previously allocated unmanaged memory</param>
     public static void Free(ref IntPtr memory)
