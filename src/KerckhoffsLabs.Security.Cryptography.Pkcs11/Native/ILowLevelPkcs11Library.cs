@@ -40,7 +40,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label);
     CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin);
     CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin);
-    CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session);
+    CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session);
     CKR C_CloseSession(NativeCULong session);
     CKR C_CloseAllSessions(NativeCULong slotId);
     CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info);

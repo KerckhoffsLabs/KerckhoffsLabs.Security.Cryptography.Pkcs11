@@ -39,15 +39,14 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="slotId">The ID of the token's slot</param>
     /// <param name="flags">Flags indicating the type of session</param>
-    /// <param name="application">An application defined pointer to be passed to the notification callback</param>
-    /// <param name="notify">The address of the notification callback function</param>
+    /// <remarks>No notification callback is registered: <c>pApplication</c> and <c>Notify</c> are NULL.</remarks>
     /// <param name="session">Location that receives the handle for the new session</param>
     /// <returns>CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_SESSION_COUNT, CKR_SESSION_PARALLEL_NOT_SUPPORTED, CKR_SESSION_READ_WRITE_SO_EXISTS, CKR_SLOT_ID_INVALID, CKR_TOKEN_NOT_PRESENT, CKR_TOKEN_NOT_RECOGNIZED, CKR_TOKEN_WRITE_PROTECTED, CKR_ARGUMENTS_BAD</returns>
-    public CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+    public CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        NativeCULong rv = _delegates.C_OpenSession(slotId, flags, application, notify, ref session);
+        NativeCULong rv = _delegates.C_OpenSession(slotId, flags, ref session);
         return rv.ToCKR();
     }
 

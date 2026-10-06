@@ -18,7 +18,7 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-    protected virtual CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_CloseSession(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_Logout(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
@@ -147,7 +147,7 @@ internal abstract unsafe partial class FakeModule
         try
         {
             NativeCULong session = *phSession;
-            CKR rv = m.C_OpenSession(slotId, flags, ref session);
+            CKR rv = m.C_OpenSession(slotId, flags, (IntPtr)pApplication, (IntPtr)notify, ref session);
             *phSession = session;
             return Rv(rv);
         }

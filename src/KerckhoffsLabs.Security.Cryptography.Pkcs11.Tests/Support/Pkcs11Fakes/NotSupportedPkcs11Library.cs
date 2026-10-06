@@ -42,7 +42,7 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label) => NotSupported(nameof(C_InitToken));
     public virtual CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin) => NotSupported(nameof(C_InitPIN));
     public virtual CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin) => NotSupported(nameof(C_SetPIN));
-    public virtual CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session) => NotSupported(nameof(C_OpenSession));
+    public virtual CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session) => NotSupported(nameof(C_OpenSession));
     public virtual CKR C_CloseSession(NativeCULong session) => NotSupported(nameof(C_CloseSession));
     public virtual CKR C_CloseAllSessions(NativeCULong slotId) => NotSupported(nameof(C_CloseAllSessions));
     public virtual CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info) => NotSupported(nameof(C_GetSessionInfo));

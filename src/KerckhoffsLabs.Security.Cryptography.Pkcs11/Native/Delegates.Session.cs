@@ -33,12 +33,15 @@ internal partial class Delegates
             return _fp.C_SetPIN(session, oldPinPtr, (NativeCULong)oldPin.Length, newPinPtr, (NativeCULong)newPin.Length);
     }
 
-    /// <summary>Wrapper for <c>C_OpenSession</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+    /// <summary>Wrapper for <c>C_OpenSession</c>.</summary>
+    /// <remarks><c>pApplication</c> and <c>Notify</c> are always NULL. A <c>CK_NOTIFY</c> callback would
+    /// need an owner keeping it alive for as long as the module may call it, which nothing here is;
+    /// as with the <c>CK_C_INITIALIZE_ARGS</c> mutex callbacks, it is not supported.</remarks>
+    public unsafe NativeCULong C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
     {
         ThrowIfUnbound(_fp.C_OpenSession);
         fixed (NativeCULong* sessionPtr = &session)
-            return _fp.C_OpenSession(slotId, flags, application, notify, sessionPtr);
+            return _fp.C_OpenSession(slotId, flags, IntPtr.Zero, IntPtr.Zero, sessionPtr);
     }
 
     /// <summary>Wrapper for <c>C_CloseSession</c>. Matches the prior delegate signature exactly.</summary>
