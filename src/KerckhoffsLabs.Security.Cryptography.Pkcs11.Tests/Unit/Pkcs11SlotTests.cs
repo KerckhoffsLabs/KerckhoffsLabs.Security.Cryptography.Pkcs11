@@ -48,7 +48,7 @@ public sealed class Pkcs11SlotTests
         }
         public override CKR C_InitToken(NativeCULong slotId, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> label)
         { CapturedPin = pin.ToArray(); CapturedPinLen = (NativeCULong)pin.Length; CapturedLabel = label.ToArray(); return InitTokenRv; }
-        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
         { CapturedOpenFlags = flags; session = OpenSessionId; return OpenRv; }
         public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK; // let opened sessions dispose cleanly
     }

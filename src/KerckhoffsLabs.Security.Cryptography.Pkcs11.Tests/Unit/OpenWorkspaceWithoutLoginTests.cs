@@ -37,7 +37,7 @@ public sealed class OpenWorkspaceWithoutLoginTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
+        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
         {
             OpenSessionCalls++;
             session = (NativeCULong)42;

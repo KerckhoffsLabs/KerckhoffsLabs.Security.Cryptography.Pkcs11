@@ -241,7 +241,7 @@ public sealed class Pkcs11Slot
             flags |= CKF.CKF_RW_SESSION;
 
         NativeCULong sessionId = (NativeCULong)CK.CK_INVALID_HANDLE;
-        CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, IntPtr.Zero, IntPtr.Zero, ref sessionId);
+        CKR rv = _pkcs11Library.C_OpenSession(_slotId, (NativeCULong)flags, ref sessionId);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpOpenSession);
 
         // Owned before any consumer code (the logger) runs, so a throw there closes the session
