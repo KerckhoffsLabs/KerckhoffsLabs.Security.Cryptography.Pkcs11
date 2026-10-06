@@ -908,8 +908,10 @@ internal sealed class Pkcs11Session : IDisposable
 
         CK_ATTRIBUTE[] template = BuildTypeOnlyTemplate(attributes);
 
-        // The size actually allocated for each attribute, kept so the post-call length can be checked
-        // against it rather than trusted — see GuardReportedLength.
+        // The buffer handed to the module for each attribute, and its size. After every call the
+        // template's pointers are reset from here and its lengths checked against it: the module fills
+        // the buffers, it never chooses them.
+        IntPtr[] allocatedAt = new IntPtr[template.Length];
         NativeCULong[] allocatedLen = new NativeCULong[template.Length];
 
         // Every block handed to the module. Ownership passes to the ObjectAttributes only at the very
@@ -917,32 +919,33 @@ internal sealed class Pkcs11Session : IDisposable
         // fatal-return paths and the malformed-nested-template throw did before this.
         List<IntPtr> allocatedBlocks = [];
 
-        // Where each nested attribute sits inside its parent block, and the size allocated for it, so
-        // the third call's lengths can be checked the same way.
-        List<(IntPtr Pointer, NativeCULong Allocated)> nestedAllocations = [];
+        // Each member of an array attribute: where it sits in its parent's block, and the buffer and
+        // size given to it, so the third call is checked the same way.
+        List<NestedMember> nestedMembers = [];
 
         // First call: determine the size of each attribute value.
         ReadAttributeValues(objectHandle, template);
-        AllocateValueBuffers(template, allocatedLen, allocatedBlocks);
+        AllocateValueBuffers(template, allocatedAt, allocatedLen, allocatedBlocks);
 
         try
         {
             // Second call: read the values themselves.
             ReadAttributeValues(objectHandle, template);
-
-            for (int i = 0; i < template.Length; i++)
-                GuardReportedLength(in template[i], allocatedLen[i]);
+            RestoreAndGuard(template, allocatedAt, allocatedLen);
 
             // Third call, needed only if some attribute is an array attribute whose children still
-            // have no buffers.
-            if (AllocateNestedBuffers(template, allocatedBlocks, nestedAllocations))
+            // have no buffers. It rewrites the whole template, so the top level is checked again too.
+            if (AllocateNestedBuffers(template, allocatedBlocks, nestedMembers))
             {
                 ReadAttributeValues(objectHandle, template);
-
-                // The nested attributes are read back the same way and are equally able to lie.
-                foreach ((IntPtr pointer, NativeCULong allocated) in nestedAllocations)
-                    GuardReportedLength(UnmanagedMemory.Read<CK_ATTRIBUTE>(pointer), allocated);
+                RestoreAndGuard(template, allocatedAt, allocatedLen);
+                foreach (NestedMember member in nestedMembers)
+                    member.RestoreAndGuardSlot();
             }
+
+            // Each array attribute ends up as one block its ObjectAttribute owns outright, and every
+            // block not kept that way is freed (and zeroized) here rather than leaked.
+            FoldAttributeArrays(template, allocatedBlocks);
         }
         catch
         {
@@ -1003,7 +1006,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// Allocates a buffer for every attribute the module reported a length for, recording both the
     /// size allocated and the block, and leaves the unreadable ones alone.
     /// </summary>
-    private static void AllocateValueBuffers(CK_ATTRIBUTE[] template, NativeCULong[] allocatedLen, List<IntPtr> allocatedBlocks)
+    private static void AllocateValueBuffers(CK_ATTRIBUTE[] template, IntPtr[] allocatedAt, NativeCULong[] allocatedLen, List<IntPtr> allocatedBlocks)
     {
         for (int i = 0; i < template.Length; i++)
         {
@@ -1020,8 +1023,9 @@ internal sealed class Pkcs11Session : IDisposable
                 continue;
 
             allocatedLen[i] = template[i].valueLen;
-            template[i].value = UnmanagedMemory.Allocate((int)(template[i].valueLen));
-            allocatedBlocks.Add(template[i].value);
+            allocatedAt[i] = UnmanagedMemory.Allocate((int)(template[i].valueLen));
+            template[i].value = allocatedAt[i];
+            allocatedBlocks.Add(allocatedAt[i]);
         }
     }
 
@@ -1033,13 +1037,13 @@ internal sealed class Pkcs11Session : IDisposable
     private static bool AllocateNestedBuffers(
         CK_ATTRIBUTE[] template,
         List<IntPtr> allocatedBlocks,
-        List<(IntPtr Pointer, NativeCULong Allocated)> nestedAllocations)
+        List<NestedMember> nestedMembers)
     {
         bool thirdCallNeeded = false;
 
         for (int i = 0; i < template.Length; i++)
         {
-            if (!IsNestedAttributeTemplate(template[i].type))
+            if (!AttributeArrayBlock.IsAttributeArray(template[i].type))
                 continue;
 
             // PKCS#11 v2.20 page 133:
@@ -1050,7 +1054,7 @@ internal sealed class Pkcs11Session : IDisposable
             if (template[i].valueLen == NativeCULong.MaxValue)
                 continue;
 
-            thirdCallNeeded |= AllocateNestedChildBuffers(in template[i], allocatedBlocks, nestedAllocations);
+            thirdCallNeeded |= AllocateNestedChildBuffers(in template[i], allocatedBlocks, nestedMembers);
         }
 
         return thirdCallNeeded;
@@ -1067,7 +1071,7 @@ internal sealed class Pkcs11Session : IDisposable
     private static bool AllocateNestedChildBuffers(
         in CK_ATTRIBUTE parent,
         List<IntPtr> allocatedBlocks,
-        List<(IntPtr Pointer, NativeCULong Allocated)> nestedAllocations)
+        List<NestedMember> nestedMembers)
     {
         int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
 
@@ -1083,17 +1087,107 @@ internal sealed class Pkcs11Session : IDisposable
             IntPtr tempPointer = new(parent.value.ToInt64() + (j * ckAttributeSize));
             CK_ATTRIBUTE tempAttribute = UnmanagedMemory.Read<CK_ATTRIBUTE>(tempPointer);
 
+            // Recorded even when unreadable (no buffer): the module must not hand one back either.
+            IntPtr buffer = IntPtr.Zero;
+            NativeCULong allocated = default;
             if (tempAttribute.valueLen != NativeCULong.MaxValue)
             {
-                tempAttribute.value = UnmanagedMemory.Allocate((int)(tempAttribute.valueLen));
-                allocatedBlocks.Add(tempAttribute.value);
-                nestedAllocations.Add((tempPointer, tempAttribute.valueLen));
+                allocated = tempAttribute.valueLen;
+                buffer = UnmanagedMemory.Allocate((int)allocated);
+                allocatedBlocks.Add(buffer);
             }
+            nestedMembers.Add(new NestedMember(tempPointer, buffer, allocated));
 
+            tempAttribute.value = buffer;
             UnmanagedMemory.Write(tempPointer, in tempAttribute);
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Resets every attribute's <c>pValue</c> to the buffer this session gave it, then checks the
+    /// reported length against that buffer's size.
+    /// </summary>
+    /// <remarks>
+    /// The module writes into the template (directly on Unix, through the packed copy on Windows), so
+    /// it could hand back a different pointer. Restoring ours means the buffers read and freed later
+    /// are always the ones this session allocated, never an address the module chose.
+    /// </remarks>
+    private static void RestoreAndGuard(CK_ATTRIBUTE[] template, IntPtr[] allocatedAt, NativeCULong[] allocatedLen)
+    {
+        for (int i = 0; i < template.Length; i++)
+        {
+            template[i].value = allocatedAt[i];
+            GuardReportedLength(in template[i], allocatedLen[i]);
+        }
+    }
+
+    /// <summary>One member of an array attribute, as this session laid it out for the third call.</summary>
+    /// <param name="Slot">Where the member's <c>CK_ATTRIBUTE</c> sits in its parent's block.</param>
+    /// <param name="Buffer">The buffer given to the member, or <see cref="IntPtr.Zero"/> when unreadable.</param>
+    /// <param name="Allocated">The buffer's size.</param>
+    private readonly record struct NestedMember(IntPtr Slot, IntPtr Buffer, NativeCULong Allocated)
+    {
+        /// <summary>
+        /// The nested counterpart of the template-level <see cref="RestoreAndGuard"/>, applied to the
+        /// member's <c>CK_ATTRIBUTE</c> at <see cref="Slot"/>.
+        /// </summary>
+        public void RestoreAndGuardSlot()
+        {
+            CK_ATTRIBUTE member = UnmanagedMemory.Read<CK_ATTRIBUTE>(Slot);
+            member.value = Buffer;
+            GuardReportedLength(in member, Allocated);
+            UnmanagedMemory.Write(Slot, in member);
+        }
+    }
+
+    /// <summary>
+    /// Replaces each array attribute's parent and member buffers with one block laid out by
+    /// <see cref="AttributeArrayBlock"/>, then frees every allocated block that no attribute keeps.
+    /// </summary>
+    /// <remarks>
+    /// The members' buffers were separate allocations nobody would own once the read returned: the
+    /// <see cref="ObjectAttribute"/> owns only its own value, and the views
+    /// <see cref="ObjectAttribute.GetValueAsAttributeArray"/> returns own nothing. Folding them into
+    /// the parent's block gives every byte one owner. On success <paramref name="allocatedBlocks"/>
+    /// is emptied: what is not freed here belongs to the attributes.
+    /// </remarks>
+    private static void FoldAttributeArrays(CK_ATTRIBUTE[] template, List<IntPtr> allocatedBlocks)
+    {
+        List<IntPtr> created = [];
+        try
+        {
+            for (int i = 0; i < template.Length; i++)
+            {
+                CK_ATTRIBUTE attribute = template[i];
+                if (!AttributeArrayBlock.IsAttributeArray(attribute.type)
+                    || attribute.value == IntPtr.Zero
+                    || attribute.valueLen == NativeCULong.MaxValue
+                    || (ulong)attribute.valueLen == 0)
+                    continue;
+
+                CK_ATTRIBUTE[] members = AttributeArrayBlock.ReadMembers(attribute.type, attribute.value, attribute.valueLen);
+                IntPtr block = AttributeArrayBlock.Create(members, out NativeCULong arrayLength);
+                created.Add(block);
+                template[i].value = block;
+                template[i].valueLen = arrayLength;
+            }
+        }
+        catch
+        {
+            FreeAllocatedBlocks(created);
+            throw;
+        }
+
+        var kept = new HashSet<IntPtr>(template.Select(a => a.value));
+        Span<IntPtr> blocks = CollectionsMarshal.AsSpan(allocatedBlocks);
+        for (int i = 0; i < blocks.Length; i++)
+        {
+            if (!kept.Contains(blocks[i]))
+                UnmanagedMemory.Free(ref blocks[i]);
+        }
+        allocatedBlocks.Clear();
     }
 
     /// <summary>Releases every block allocated for a read that then failed.</summary>
@@ -1288,25 +1382,6 @@ internal sealed class Pkcs11Session : IDisposable
         => rv is not CKR.CKR_OK
         and not CKR.CKR_ATTRIBUTE_SENSITIVE
         and not CKR.CKR_ATTRIBUTE_TYPE_INVALID;
-
-    /// <summary>
-    /// True when the attribute type is one of the three PKCS#11 attributes whose
-    /// value is an array of nested <c>CK_ATTRIBUTE</c>s and therefore requires the
-    /// third <c>C_GetAttributeValue</c> pass to fill each inner buffer.
-    /// </summary>
-    /// <remarks>
-    /// The PKCS#11 <c>CKF_ARRAY_ATTRIBUTE</c> high bit (0x40000000) alone is not a
-    /// sufficient indicator — <c>CKA_ALLOWED_MECHANISMS</c> also carries that bit
-    /// but its value is an array of <c>CKM</c> ids, not nested attributes.
-    /// </remarks>
-    private static bool IsNestedAttributeTemplate(NativeCULong type)
-        => (CKA)(ulong)type switch
-        {
-            CKA.CKA_WRAP_TEMPLATE => true,
-            CKA.CKA_UNWRAP_TEMPLATE => true,
-            CKA.CKA_DERIVE_TEMPLATE => true,
-            _ => false,
-        };
 
     /// <summary>
     /// Generates a secret key or set of domain parameters, creating a new object

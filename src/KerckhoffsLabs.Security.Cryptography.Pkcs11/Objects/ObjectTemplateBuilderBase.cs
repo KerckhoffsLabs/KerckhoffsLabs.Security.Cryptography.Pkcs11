@@ -15,9 +15,6 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     // than appending — matches PKCS#11 v3.1 §5.5.6 semantics. We own the ObjectAttribute
     // values and must dispose the displaced one on replacement.
     private readonly Dictionary<CKA, ObjectAttribute> _attributes = [];
-    // Nested templates (CKA_WRAP_TEMPLATE and friends) whose children this builder owns until
-    // Build hands them to the ObjectTemplate. Keyed by CKA so a second call replaces cleanly.
-    private readonly Dictionary<CKA, ObjectTemplate> _nested = [];
     private bool _built;
     private bool _disposed;
 
@@ -90,12 +87,11 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     /// <c>CKA_DERIVE_TEMPLATE</c>) from a configuration callback.
     /// </summary>
     /// <remarks>
-    /// The children are marshalled as flat copies of their <c>CK_ATTRIBUTE</c> structs, pointers
-    /// included, so this builder keeps the child template alive and hands ownership to the
-    /// <see cref="ObjectTemplate"/> at <see cref="Build"/>. The caller never has to dispose a child:
-    /// the builder that <paramref name="configure"/> receives is created, consumed and released
-    /// here. (That builder does inherit <c>Build</c> and <c>Dispose</c>; calling either from inside
-    /// the callback is pointless but safe, since both leave this method's own copy unaffected.)
+    /// The nested attribute copies the children's values into its own block, so the builder that
+    /// <paramref name="configure"/> receives is created, consumed and released here; the caller never
+    /// disposes a child. (That builder does inherit <c>Build</c> and <c>Dispose</c>; calling either
+    /// from inside the callback is pointless but safe, since both leave this method's own copy
+    /// unaffected.)
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
@@ -111,23 +107,9 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
 
         using var inner = new NestedKeyTemplateBuilder();
         configure(inner);
-        ObjectTemplate child = inner.Build();
+        using ObjectTemplate child = inner.Build();
 
-        try
-        {
-            Set(new ObjectAttribute(attribute, [.. child.Attributes]));
-        }
-        catch
-        {
-            child.Dispose();
-            throw;
-        }
-
-        // Set has already disposed any displaced parent attribute; drop the children it pointed at.
-        if (_nested.Remove(attribute, out ObjectTemplate? displaced))
-            displaced.Dispose();
-        _nested[attribute] = child;
-
+        Set(new ObjectAttribute(attribute, [.. child.Attributes]));
         return (TSelf)this;
     }
 
@@ -157,19 +139,10 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
         if (_built) throw new InvalidOperationException("Builder has already produced an ObjectTemplate. Start a new builder.");
 
         List<ObjectAttribute> list = [.. _attributes.Values];
-        List<ObjectTemplate> nested = [.. _nested.Values];
         _attributes.Clear(); // ownership transferred to the ObjectTemplate
-        _nested.Clear();
         _built = true;
-        return new ObjectTemplate(list, nested);
+        return new ObjectTemplate(list);
     }
-
-    /// <summary>
-    /// Test seam: the nested templates this builder still owns. Empty once <see cref="Build"/>
-    /// has transferred them to the produced <see cref="ObjectTemplate"/>, whose own
-    /// <c>NestedChildren</c> seam is the receiving half of the same invariant.
-    /// </summary>
-    internal IReadOnlyCollection<ObjectTemplate> NestedTemplates => _nested.Values;
 
     /// <summary>Disposes any attributes the builder still owns. Safe to call before <see cref="Build"/>.</summary>
     public void Dispose()
@@ -179,7 +152,7 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
     }
 
     /// <summary>
-    /// Disposes the attributes and nested child templates the builder still owns. Cleanup runs only
+    /// Disposes the attributes the builder still owns. Cleanup runs only
     /// on the deterministic (<paramref name="disposing"/> = <see langword="true"/>) path.
     /// </summary>
     /// <remarks>
@@ -198,8 +171,6 @@ public abstract class ObjectTemplateBuilderBase<TSelf> : IDisposable
         {
             foreach (var attr in _attributes.Values) attr.Dispose();
             _attributes.Clear();
-            foreach (var child in _nested.Values) child.Dispose();
-            _nested.Clear();
         }
         _disposed = true;
     }
