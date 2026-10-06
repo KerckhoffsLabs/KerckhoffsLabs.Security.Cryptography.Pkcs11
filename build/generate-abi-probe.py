@@ -20,7 +20,11 @@ ROOT = pathlib.Path(__file__).resolve().parent
 HEADERS = ROOT.parent / "vendor" / "pkcs11" / "published" / "3-02"
 OUT = ROOT / "abi-probe.c"
 
-DECLARATOR = re.compile(r"[A-Za-z_]\w*\s+\**\s*(?P<name>[A-Za-z_]\w*)(\s*\[\s*\w+\s*\])?")
+# "CK_ULONG ulLen", "CK_BYTE_PTR pData", "CK_VOID *p", "CK_CHAR label[32]". One character class
+# separates type and name, so whitespace around a "*" cannot be matched more than one way.
+DECLARATOR = re.compile(r"[A-Za-z_]\w*[\s*]+(?P<name>[A-Za-z_]\w*)(?:\s*\[\s*\w+\s*\])?")
+
+ENDIF = "#endif"
 
 
 def parse_structs(text: str) -> list[tuple[str, list[str]]]:
@@ -70,16 +74,16 @@ def main() -> None:
         "#define CK_CALLBACK_FUNCTION(returnType, name) returnType (* name)",
         "#ifndef NULL_PTR",
         "#define NULL_PTR 0",
-        "#endif",
+        ENDIF,
         "",
         "/* Windows Cryptoki structures are 1-byte packed; the includer sets it (pkcs11.h). */",
         "#ifdef _WIN32",
         "#pragma pack(push, cryptoki, 1)",
-        "#endif",
+        ENDIF,
         '#include "pkcs11.h"',
         "#ifdef _WIN32",
         "#pragma pack(pop, cryptoki)",
-        "#endif",
+        ENDIF,
         "",
         "static unsigned idx;",
         '#define S(T) (printf("S %s %u\\n", #T, (unsigned)sizeof(T)), idx = 0)',

@@ -217,7 +217,7 @@ public sealed class AbiOracleTests(ITestOutputHelper output)
         return null!;
     }
 
-    private static IReadOnlyDictionary<string, CStruct>? LoadOracle()
+    private static Dictionary<string, CStruct>? LoadOracle()
     {
         string path = Path.Join(AppContext.BaseDirectory, "abi-oracle.txt");
         if (!File.Exists(path))
