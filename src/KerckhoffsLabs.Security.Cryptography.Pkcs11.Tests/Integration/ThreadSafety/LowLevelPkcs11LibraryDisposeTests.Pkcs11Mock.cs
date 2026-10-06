@@ -8,14 +8,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.ThreadSa
 /// Regression coverage for the two-part fix to <c>LowLevelPkcs11Library.Dispose</c>: the disposed
 /// flag must be set before the module is unmapped (not after), and it must be <c>volatile</c> so a
 /// write on the disposing thread is guaranteed visible to a thread about to dispatch a native call
-/// through <c>ObjectDisposedException.ThrowIf(_disposed, this)</c>. A true concurrent reproduction
-/// would need to park a real thread inside a native call while another thread disposes — not
-/// achievable here because, unlike <c>Pkcs11Session</c> (which delegates through the fakeable
-/// <c>ILowLevelPkcs11Library</c>), <c>LowLevelPkcs11Library</c> itself owns the real
-/// <c>NativeLibrary.Load</c>'d module with no injectable seam underneath it. These tests instead
-/// pin the two properties that make the race window as narrow as it can be: the flag really is
-/// <c>volatile</c>, and the guard still fires correctly after the reorder.
+/// through <c>ObjectDisposedException.ThrowIf(_disposed, this)</c>. These tests pin the two
+/// properties that make the race window as narrow as a flag can: it really is <c>volatile</c>, and
+/// the guard still fires after the reorder.
 /// </summary>
+/// <remarks>
+/// A flag narrows the window but cannot close it: a call that passed the check is still inside the
+/// module when Dispose tears it down. <see cref="LibraryDisposeRaceTests"/> reproduces that
+/// deterministically with a parked call; these tests stay until the fix those tests wait for replaces
+/// the flag.
+/// </remarks>
 [Collection("Mock")]
 public sealed class LowLevelPkcs11LibraryDisposeTests(MockBackendFixture f)
 {
