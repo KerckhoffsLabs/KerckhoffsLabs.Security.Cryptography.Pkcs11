@@ -21,11 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Lint builds managed code only; skip the native vendor builds so this job
-      # needs neither the submodules nor a C toolchain.
+      # Lint builds managed code only; skip the native vendor builds and the ABI probe so
+      # this job needs neither the submodules nor a C toolchain.
       SkipPkcs11MockBuild: true
       SkipSoftHsmV2Build: true
       SkipPkcs11GateBuild: true
+      SkipAbiProbeBuild: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -513,6 +514,8 @@ jobs:
           SkipPkcs11MockBuild: true
           SkipSoftHsmV2Build: true
           SkipPkcs11GateBuild: true
+          # The ABI oracle feeds the unit tests, which this job filters out (SoftHSM suite only).
+          SkipAbiProbeBuild: true
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Run the SoftHSM suite against the 2.5 module. The mechanism-list gates skip anything 2.5

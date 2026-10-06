@@ -74,6 +74,20 @@
     <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-pkcs11-mock.ps1&quot; -TestOutputDir &quot;$(_MockOutputDir)&quot; -Rid &quot;$(_MockRid)&quot;" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
+  <!-- ABI oracle (AbiOracleTests): compile build/abi-probe.c against the OASIS headers in the
+       vendor/pkcs11 submodule with this leg's own C toolchain, for the architecture the tests run as,
+       and write the sizeof/offsetof of every PKCS#11 struct next to the test assembly. A few hundred milliseconds, so it always runs;
+       SkipAbiProbeBuild=true opts out (jobs that build without running the unit tests). -->
+  <Target Name="BuildAbiOracle" BeforeTargets="PrepareForBuild" Condition="'$(SkipAbiProbeBuild)' != 'true'">
+    <PropertyGroup>
+      <_AbiOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_AbiOutputDir>
+      <_AbiRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_AbiRid>
+      <_AbiRid Condition="'$(_AbiRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</_AbiRid>
+    </PropertyGroup>
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" Command="bash &quot;$(MSBuildProjectDirectory)/../../build/build-abi-probe.sh&quot; &quot;$(_AbiOutputDir)&quot;" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\build\build-abi-probe.ps1&quot; -TestOutputDir &quot;$(_AbiOutputDir)&quot; -Rid &quot;$(_AbiRid)&quot;" />
+  </Target>
+
   <!-- Spec-version gate shims (Linux/macOS only): tiny C wrappers that restrict which
        PKCS#11 API version a consumer can negotiate against a real backend. Used by the
        SoftHsmGate* fixtures to validate v2.40 / v3.0 compatibility end to end. -->

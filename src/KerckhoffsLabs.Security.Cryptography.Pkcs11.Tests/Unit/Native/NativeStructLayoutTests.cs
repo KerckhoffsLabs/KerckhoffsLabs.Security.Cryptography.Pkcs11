@@ -304,14 +304,12 @@ public sealed class NativeStructLayoutTests
                 continue;
             }
 
-            var unified = FieldNames(t).ToHashSet();
-            var win = FieldNames(sibling).ToHashSet();
-            if (!unified.SetEquals(win))
-            {
-                string missing = string.Join(",", unified.Except(win));
-                string extra = string.Join(",", win.Except(unified));
-                failures.Add($"{t.Name}: field mismatch (sibling missing [{missing}], extra [{extra}])");
-            }
+            // Same names in the same order: the sibling is the layout that crosses the boundary on
+            // Windows, so a reordered member there would be a transposition on Windows only.
+            string[] unified = FieldNames(t);
+            string[] win = FieldNames(sibling);
+            if (!unified.SequenceEqual(win))
+                failures.Add($"{t.Name}: sibling members [{string.Join(",", win)}] differ from [{string.Join(",", unified)}]");
         }
 
         Assert.True(failures.Count == 0, string.Join("; ", failures));
