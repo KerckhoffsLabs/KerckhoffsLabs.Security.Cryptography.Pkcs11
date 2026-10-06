@@ -49,16 +49,6 @@ internal partial class Delegates
         fixed (CK_INFO* p = &info) return _fp.C_GetInfo(p);
     }
 
-    /// <summary>Wrapper for <c>C_GetFunctionList</c>. Matches the prior delegate signature exactly.</summary>
-    public unsafe NativeCULong C_GetFunctionList(out IntPtr functionList)
-    {
-        ThrowIfUnbound(_fp.C_GetFunctionList);
-        IntPtr local = IntPtr.Zero;
-        NativeCULong rv = _fp.C_GetFunctionList(&local);
-        functionList = local;
-        return rv;
-    }
-
     /// <summary>Returns <see langword="true"/> if the loaded library exported <c>C_GetInterfaceList</c> (PKCS#11 v3.0+).</summary>
     internal unsafe bool HasC_GetInterfaceList => _fp.C_GetInterfaceList is not null;
 

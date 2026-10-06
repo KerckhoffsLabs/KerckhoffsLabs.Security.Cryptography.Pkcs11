@@ -31,7 +31,6 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs);
     CKR C_Finalize(IntPtr reserved);
     CKR C_GetInfo(ref CK_INFO info);
-    CKR C_GetFunctionList(out IntPtr functionList);
     CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count);
     CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info);
     CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info);

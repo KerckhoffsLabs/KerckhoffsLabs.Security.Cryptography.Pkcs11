@@ -29,7 +29,6 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     /// as a <c>Pkcs11Exception</c> the test code might catch.</summary>
     protected virtual CKR NotSupported(string method) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-    public virtual CKR C_GetFunctionList(out IntPtr functionList) { functionList = IntPtr.Zero; return NotSupported(nameof(C_GetFunctionList)); }
 
     public virtual CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => NotSupported(nameof(C_Initialize));
     public virtual CKR C_Finalize(IntPtr reserved) => NotSupported(nameof(C_Finalize));
