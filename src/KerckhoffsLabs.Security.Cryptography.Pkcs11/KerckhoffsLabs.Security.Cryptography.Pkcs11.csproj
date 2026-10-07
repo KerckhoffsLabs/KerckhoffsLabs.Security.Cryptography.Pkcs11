@@ -51,6 +51,11 @@
     <PackageReference Include="KerckhoffsLabs.Runtime.InteropServices" Version="1.4.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
+    <!--
+      Every public member must be declared in PublicAPI.*.txt, so a surface change is a reviewable
+      diff. Until 1.0.0 ships, the whole surface lives in PublicAPI.Unshipped.txt.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

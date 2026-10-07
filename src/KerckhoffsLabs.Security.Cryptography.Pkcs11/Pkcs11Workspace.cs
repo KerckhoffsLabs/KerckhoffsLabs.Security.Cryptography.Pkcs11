@@ -657,6 +657,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="aesBitLength"/> is not 128, 192, or 256.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is not on the workspace's <see cref="Policy"/> KDF allow-list (under the default policy this includes <see cref="CKD.CKD_NULL"/> and the SHA-1 / SHA-224 KDFs).</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The two overloads differ in the required peer-key parameter's type (encoded point vs. ECParameters), so no call site is ambiguous.")]
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
         ReadOnlySpan<byte> peerPublicPoint,
@@ -710,6 +711,7 @@ public sealed class Pkcs11Workspace : IDisposable
     /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="kdf"/> is not on the workspace's <see cref="Policy"/> KDF allow-list (under the default policy this includes <see cref="CKD.CKD_NULL"/> and the SHA-1 / SHA-224 KDFs).</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="peerPublicKey"/>'s curve does not match <paramref name="ecPrivateKey"/>'s, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown if <paramref name="ecPrivateKey"/>'s <c>CKA_EC_PARAMS</c> cannot be read.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The two overloads differ in the required peer-key parameter's type (encoded point vs. ECParameters), so no call site is ambiguous.")]
     public Pkcs11Key DeriveSharedSecretEcdh(
         Pkcs11Key ecPrivateKey,
         ECParameters peerPublicKey,

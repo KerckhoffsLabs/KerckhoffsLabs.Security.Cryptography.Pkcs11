@@ -61,6 +61,7 @@ public static class HkdfPkcs11
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
     /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "Mirrors System.Security.Cryptography.HKDF's signatures one-for-one; the span overload binds only from span arguments, so no call site is ambiguous.")]
     public static byte[] DeriveKey(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, int outputLength, byte[]? salt = null, byte[]? info = null)
     {
         ArgumentNullException.ThrowIfNull(ikm);
@@ -115,6 +116,7 @@ public static class HkdfPkcs11
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
     /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses the template or the mechanism.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The template overload differs from the byte[]/span overloads in a required parameter's type (ObjectTemplate), so no call site is ambiguous.")]
     public static Pkcs11Key DeriveKey(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, ObjectTemplate template,
         ReadOnlySpan<byte> salt = default, ReadOnlySpan<byte> info = default)
     {
@@ -140,6 +142,7 @@ public static class HkdfPkcs11
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
     /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "Mirrors System.Security.Cryptography.HKDF's signatures one-for-one; the span overload binds only from span arguments, so no call site is ambiguous.")]
     public static byte[] Extract(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, byte[]? salt = null)
     {
         ArgumentNullException.ThrowIfNull(ikm);
@@ -223,6 +226,7 @@ public static class HkdfPkcs11
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
     /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "Mirrors System.Security.Cryptography.HKDF's signatures one-for-one; the span overload binds only from span arguments, so no call site is ambiguous.")]
     public static byte[] Expand(HashAlgorithmName hashAlgorithmName, Pkcs11Key prk, int outputLength, byte[]? info = null)
     {
         ArgumentNullException.ThrowIfNull(prk);

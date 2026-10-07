@@ -43,6 +43,7 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="password">Password to derive the key from. May be empty.</param>
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="iterations"/> is negative.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The two constructors differ in the required password parameter's type (owned span vs. borrowed SecurePassword), so no call site is ambiguous.")]
     public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, int iterations, CKP prf, ReadOnlySpan<byte> password, ReadOnlySpan<byte> prfData = default)
         : this(prf, iterations, salt, prfData)
     {
@@ -66,6 +67,7 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <param name="prfData">Additional data fed to the PRF alongside the salt; pass <c>default</c> if none.</param>
     /// <exception cref="ArgumentNullException"><paramref name="password"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="iterations"/> is negative.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The two constructors differ in the required password parameter's type (owned span vs. borrowed SecurePassword), so no call site is ambiguous.")]
     public CkmPkcs5Pbkd2Params(ReadOnlySpan<byte> salt, int iterations, CKP prf, SecurePassword password, ReadOnlySpan<byte> prfData = default)
         : this(prf, iterations, salt, prfData)
     {

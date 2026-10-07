@@ -30,6 +30,58 @@ public sealed class PublicSurfaceDependencyTests
         Assert.Empty(offenders);
     }
 
+    // The internal/native layer is free to change in any release only while nothing of it is visible
+    // to a consumer: no native struct or handle type, no raw pointer, no SafeHandle, nothing from the
+    // Native or Internal namespaces. The interop-package check above covers one assembly; this covers
+    // the rest of the marshalling layer, so a refactor of the dispatch code cannot quietly turn an
+    // internal type into public surface.
+    [Fact]
+    public void NoPublicApiMember_ExposesAMarshallingLayerType()
+    {
+        Assembly library = typeof(Pkcs11Library).Assembly;
+        var offenders = new List<string>();
+
+        foreach (Type type in library.GetExportedTypes())
+        {
+            if (IsMarshallingLayerType(type))
+                offenders.Add($"{type.FullName} : exported type");
+
+            foreach ((string member, Type signatureType) in SignatureTypes(type))
+            {
+                if (signatureType.IsPointer || signatureType.IsFunctionPointer
+                    || RootTypes(signatureType).Any(IsMarshallingLayerType))
+                    offenders.Add($"{type.FullName}.{member} : {signatureType.Name}");
+            }
+        }
+
+        Assert.Empty(offenders);
+    }
+
+    // Guards the predicate itself: each kind of type it must catch is still recognised, so an empty
+    // offender list above means "nothing leaks", not "the predicate stopped matching anything".
+    [Theory]
+    [InlineData(typeof(IntPtr))]
+    [InlineData(typeof(UIntPtr))]
+    [InlineData(typeof(Microsoft.Win32.SafeHandles.SafeFileHandle))]
+    [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.CK_ATTRIBUTE))]
+    [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle))]
+    [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles.Pkcs11SessionHandle))]
+    [InlineData(typeof(NativeCULong))]
+    public void MarshallingLayerPredicate_RecognisesEachKind(Type type)
+        => Assert.True(IsMarshallingLayerType(type), $"{type.FullName} should count as a marshalling-layer type.");
+
+    private static bool IsMarshallingLayerType(Type type)
+        => type.Assembly == _interop
+           || type == typeof(IntPtr) || type == typeof(UIntPtr)
+           || typeof(System.Runtime.InteropServices.SafeHandle).IsAssignableFrom(type)
+           || type.Namespace is { } ns && MarshallingNamespaces.Any(m => ns == m || ns.StartsWith(m + ".", StringComparison.Ordinal));
+
+    private static readonly string[] MarshallingNamespaces =
+    [
+        "KerckhoffsLabs.Security.Cryptography.Pkcs11.Native",
+        "KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal",
+    ];
+
     // Sanity check on the reflection above: the marshalling layer really does still use the type, so
     // an empty offender list means "kept internal", not "the package vanished from the build".
     [Fact]
