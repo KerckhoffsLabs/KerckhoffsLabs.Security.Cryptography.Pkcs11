@@ -37,6 +37,30 @@ public sealed class ModuleLoadsTests
     }
 
     /// <summary>
+    /// BL-083 as reported: the library that initialized the module is disposed while another library
+    /// of the same module has a session open. That session must stay open and usable, and the module
+    /// is finalized only after it and its library are gone.
+    /// </summary>
+    [Fact]
+    public void DisposingTheFirstLoad_LeavesTheSecondLoadsSessionOpenAndUsable()
+    {
+        using var module = new SharedStateModule();
+        Pkcs11Library first = module.Load();
+        Pkcs11Library second = module.Load();
+        var session = new Pkcs11Session(second.LowLevelLibrary!, (ulong)module.OpenSession());
+
+        first.Dispose();
+
+        Assert.Equal(64, session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), "data"u8).Length);
+        Assert.Empty(module.Teardown);
+
+        session.Dispose();
+        second.Dispose();
+
+        Assert.Equal(["C_CloseSession", "C_Finalize"], module.Teardown);
+    }
+
+    /// <summary>
     /// A load made while a disposed one still waits for a call in flight sees the old state as its own.
     /// The deferred <c>C_Finalize</c> must not then run under it.
     /// </summary>
@@ -144,6 +168,19 @@ public sealed class ModuleLoadsTests
         protected override CKR C_CloseSession(NativeCULong session)
         {
             Teardown.Add("C_CloseSession");
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
+            => Volatile.Read(ref _initialized) == 1 ? CKR.CKR_OK : CKR.CKR_CRYPTOKI_NOT_INITIALIZED;
+
+        protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
+        {
+            if (Volatile.Read(ref _initialized) != 1)
+                return CKR.CKR_CRYPTOKI_NOT_INITIALIZED;
+            signatureLen = (NativeCULong)64UL;
+            if (!signature.IsNull)
+                signature.Span[..64].Fill(0xA5);
             return CKR.CKR_OK;
         }
 
