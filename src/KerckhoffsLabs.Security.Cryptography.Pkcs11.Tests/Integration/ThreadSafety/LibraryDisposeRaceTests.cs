@@ -118,7 +118,34 @@ public sealed class LibraryDisposeRaceTests
     }
 
     /// <summary>
-    /// Parks the first <c>C_GetInfo</c> or <c>C_Sign</c> until <see cref="Release"/> is set, and records
+    /// A workspace's dispose logs out through <c>LogoutForDispose</c>, which waits for the session lock
+    /// rather than going through <c>AcquireExclusive</c>. It must still hold the session's handle, as every
+    /// other operation does, or a library disposed meanwhile closes the session under the logout.
+    /// </summary>
+    [Fact]
+    public async Task Dispose_DoesNotCloseASession_UnderItsLogoutForDispose()
+    {
+        using var module = new ParkingModule();
+        Pkcs11Library library = module.Load();
+        var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+
+        Task logout = Task.Run(session.LogoutForDispose, Token);
+        Assert.True(module.Entered.Wait(Generous, Token), "the logout never reached the module");
+
+        Task dispose = Task.Run(library.Dispose, Token);
+        await WaitBriefly(dispose);
+
+        module.Release.Set();
+        await logout.WaitAsync(Generous, Token);
+        await dispose.WaitAsync(Generous, Token);
+        session.Dispose();
+
+        Assert.False(module.ClosedWhileInFlight, "C_CloseSession ran while the session's logout was still inside the module.");
+        Assert.Equal(1, module.CallCount("C_CloseSession"));
+    }
+
+    /// <summary>
+    /// Parks the first <c>C_GetInfo</c>, <c>C_Sign</c> or <c>C_Logout</c> until <see cref="Release"/> is set, and records
     /// whether <c>C_Finalize</c> or <c>C_CloseSession</c> arrived while it was parked.
     /// </summary>
     private sealed class ParkingModule : FakeModule
@@ -152,6 +179,12 @@ public sealed class LibraryDisposeRaceTests
         }
 
         protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+
+        protected override CKR C_Logout(NativeCULong session)
+        {
+            Park();
+            return CKR.CKR_OK;
+        }
 
         protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
         {
