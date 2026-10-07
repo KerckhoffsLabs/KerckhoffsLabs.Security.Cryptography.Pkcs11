@@ -83,7 +83,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature);
     CKR C_MessageVerifyFinal(NativeCULong session);
     CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template,
-        Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey);
+        Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey);
     CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template,
         ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey);
     CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature);
@@ -95,7 +95,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_AsyncGetID(NativeCULong session, ReadOnlySpan<byte> functionName, ref NativeCULong id);
     CKR C_AsyncJoin(NativeCULong session, ReadOnlySpan<byte> functionName, NativeCULong id, ReadOnlySpan<byte> data);
     CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key,
-        ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen);
+        ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, bool lengthOnly, out NativeCULong wrappedKeyLen);
     CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey,
         ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> associatedData, ref NativeCULong key);
     CKR C_Logout(NativeCULong session);
@@ -141,7 +141,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate,
         ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey);
     CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, Span<byte> wrappedKey,
-        out NativeCULong wrappedKeyLen);
+        bool lengthOnly, out NativeCULong wrappedKeyLen);
     CKR C_UnwrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey,
         ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key);
     CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template,

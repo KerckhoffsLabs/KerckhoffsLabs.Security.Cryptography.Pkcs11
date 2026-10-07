@@ -30,11 +30,11 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     {
         public override bool IsV32ApiSupported => false;
 
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
         { ciphertextLen = (NativeCULong)0; return CKR.CKR_FUNCTION_NOT_SUPPORTED; }
         public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
             => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
+        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, bool lengthOnly, out NativeCULong wrappedKeyLen)
         { wrappedKeyLen = (NativeCULong)0; return CKR.CKR_FUNCTION_NOT_SUPPORTED; }
         public override CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> associatedData, ref NativeCULong key)
             => CKR.CKR_FUNCTION_NOT_SUPPORTED;

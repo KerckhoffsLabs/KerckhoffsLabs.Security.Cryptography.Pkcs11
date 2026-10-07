@@ -29,9 +29,9 @@ public sealed class Pkcs11SessionKeyManagementTests
         public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
         { publicKey = (NativeCULong)PublicId; privateKey = (NativeCULong)PrivateId; return GenPairRv; }
 
-        public override CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
+        public override CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, Span<byte> wrappedKey, bool lengthOnly, out NativeCULong wrappedKeyLen)
         {
-            if (wrappedKey.IsEmpty) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapRv; }
+            if (lengthOnly) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapRv; }
             int n = WrapSecondLen ?? Wrapped.Length;
             Wrapped.AsSpan(0, Math.Min(n, wrappedKey.Length)).CopyTo(wrappedKey);
             wrappedKeyLen = (NativeCULong)n;

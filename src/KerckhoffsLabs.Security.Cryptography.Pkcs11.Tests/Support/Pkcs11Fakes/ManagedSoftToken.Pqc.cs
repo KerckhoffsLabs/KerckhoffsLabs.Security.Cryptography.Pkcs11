@@ -75,14 +75,14 @@ internal sealed partial class ManagedSoftToken
 
     // === ML-KEM encapsulate / decapsulate ================================
 
-    public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
         ciphertextLen = (NativeCULong)0;
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!_asymKeys.TryGetValue((ulong)publicKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;
 
         int ctSize = kem.Algorithm.CiphertextSizeInBytes;
-        if (ciphertext.IsEmpty || ciphertext.Length < ctSize)
+        if (lengthOnly || ciphertext.Length < ctSize)
         {
             ciphertextLen = (NativeCULong)(ulong)ctSize; // length probe
             return CKR.CKR_BUFFER_TOO_SMALL;

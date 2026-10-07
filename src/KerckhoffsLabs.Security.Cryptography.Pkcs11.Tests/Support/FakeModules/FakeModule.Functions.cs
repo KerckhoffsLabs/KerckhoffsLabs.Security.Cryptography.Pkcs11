@@ -60,6 +60,15 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SignEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GenerateKey(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GenerateKeyPair(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, CK_ATTRIBUTE[] privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_WrapKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, NativeBuffer<byte> wrappedKey, ref NativeCULong wrappedKeyLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_UnwrapKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, CK_ATTRIBUTE[] template, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DeriveKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DecapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> ciphertext, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_WrapKeyAuthenticated(NativeCULong session, CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, NativeBuffer<byte> wrappedKey, ref NativeCULong wrappedKeyLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_UnwrapKeyAuthenticated(NativeCULong session, CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> associatedData, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -158,6 +167,24 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_SignEncryptUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignEncryptUpdate;
         if (Overrides(nameof(C_DecryptVerifyUpdate)))
             slots[nameof(CryptokiTable.C_DecryptVerifyUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&DecryptVerifyUpdate;
+        if (Overrides(nameof(C_GenerateKey)))
+            slots[nameof(CryptokiTable.C_GenerateKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, void*, NativeCULong, NativeCULong*, NativeCULong>)&GenerateKey;
+        if (Overrides(nameof(C_GenerateKeyPair)))
+            slots[nameof(CryptokiTable.C_GenerateKeyPair)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, void*, NativeCULong, void*, NativeCULong, NativeCULong*, NativeCULong*, NativeCULong>)&GenerateKeyPair;
+        if (Overrides(nameof(C_WrapKey)))
+            slots[nameof(CryptokiTable.C_WrapKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong, byte*, NativeCULong*, NativeCULong>)&WrapKey;
+        if (Overrides(nameof(C_UnwrapKey)))
+            slots[nameof(CryptokiTable.C_UnwrapKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, byte*, NativeCULong, void*, NativeCULong, NativeCULong*, NativeCULong>)&UnwrapKey;
+        if (Overrides(nameof(C_DeriveKey)))
+            slots[nameof(CryptokiTable.C_DeriveKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, void*, NativeCULong, NativeCULong*, NativeCULong>)&DeriveKey;
+        if (Overrides(nameof(C_EncapsulateKey)))
+            slots[nameof(CryptokiTable.C_EncapsulateKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, void*, NativeCULong, byte*, NativeCULong*, NativeCULong*, NativeCULong>)&EncapsulateKey;
+        if (Overrides(nameof(C_DecapsulateKey)))
+            slots[nameof(CryptokiTable.C_DecapsulateKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, void*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)&DecapsulateKey;
+        if (Overrides(nameof(C_WrapKeyAuthenticated)))
+            slots[nameof(CryptokiTable.C_WrapKeyAuthenticated)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&WrapKeyAuthenticated;
+        if (Overrides(nameof(C_UnwrapKeyAuthenticated)))
+            slots[nameof(CryptokiTable.C_UnwrapKeyAuthenticated)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, byte*, NativeCULong, void*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)&UnwrapKeyAuthenticated;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -684,6 +711,139 @@ internal abstract unsafe partial class FakeModule
             NativeCULong length = *pulOutLen;
             CKR rv = m.C_DecryptVerifyUpdate(hSession, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
             *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GenerateKey(NativeCULong hSession, void* pMechanism, void* pTemplate, NativeCULong ulCount, NativeCULong* phKey)
+    {
+        if (Owner(hSession, nameof(C_GenerateKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong key = *phKey;
+            CKR rv = m.C_GenerateKey(hSession, ReadStruct<CK_MECHANISM>(pMechanism), ReadTemplate(pTemplate, ulCount), ref key);
+            *phKey = key;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GenerateKeyPair(NativeCULong hSession, void* pMechanism, void* pPublicKeyTemplate, NativeCULong ulPublicKeyAttributeCount, void* pPrivateKeyTemplate, NativeCULong ulPrivateKeyAttributeCount, NativeCULong* phPublicKey, NativeCULong* phPrivateKey)
+    {
+        if (Owner(hSession, nameof(C_GenerateKeyPair)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong publicKey = *phPublicKey, privateKey = *phPrivateKey;
+            CKR rv = m.C_GenerateKeyPair(hSession, ReadStruct<CK_MECHANISM>(pMechanism),
+                ReadTemplate(pPublicKeyTemplate, ulPublicKeyAttributeCount), ReadTemplate(pPrivateKeyTemplate, ulPrivateKeyAttributeCount),
+                ref publicKey, ref privateKey);
+            *phPublicKey = publicKey;
+            *phPrivateKey = privateKey;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong WrapKey(NativeCULong hSession, void* pMechanism, NativeCULong hWrappingKey, NativeCULong hKey, byte* pWrappedKey, NativeCULong* pulWrappedKeyLen)
+    {
+        if (Owner(hSession, nameof(C_WrapKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulWrappedKeyLen;
+            CKR rv = m.C_WrapKey(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hWrappingKey, hKey, new NativeBuffer<byte>(pWrappedKey, length), ref length);
+            *pulWrappedKeyLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong UnwrapKey(NativeCULong hSession, void* pMechanism, NativeCULong hUnwrappingKey, byte* pWrappedKey, NativeCULong ulWrappedKeyLen, void* pTemplate, NativeCULong ulAttributeCount, NativeCULong* phKey)
+    {
+        if (Owner(hSession, nameof(C_UnwrapKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong key = *phKey;
+            CKR rv = m.C_UnwrapKey(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hUnwrappingKey, In(pWrappedKey, ulWrappedKeyLen), ReadTemplate(pTemplate, ulAttributeCount), ref key);
+            *phKey = key;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DeriveKey(NativeCULong hSession, void* pMechanism, NativeCULong hBaseKey, void* pTemplate, NativeCULong ulAttributeCount, NativeCULong* phKey)
+    {
+        if (Owner(hSession, nameof(C_DeriveKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong key = *phKey;
+            CKR rv = m.C_DeriveKey(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hBaseKey, ReadTemplate(pTemplate, ulAttributeCount), ref key);
+            *phKey = key;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong EncapsulateKey(NativeCULong hSession, void* pMechanism, NativeCULong hPublicKey, void* pTemplate, NativeCULong ulAttributeCount, byte* pCiphertext, NativeCULong* pulCiphertextLen, NativeCULong* phKey)
+    {
+        if (Owner(hSession, nameof(C_EncapsulateKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulCiphertextLen, key = *phKey;
+            CKR rv = m.C_EncapsulateKey(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hPublicKey, ReadTemplate(pTemplate, ulAttributeCount),
+                new NativeBuffer<byte>(pCiphertext, length), ref length, ref key);
+            *pulCiphertextLen = length;
+            *phKey = key;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DecapsulateKey(NativeCULong hSession, void* pMechanism, NativeCULong hPrivateKey, void* pTemplate, NativeCULong ulAttributeCount, byte* pCiphertext, NativeCULong ulCiphertextLen, NativeCULong* phKey)
+    {
+        if (Owner(hSession, nameof(C_DecapsulateKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong key = *phKey;
+            CKR rv = m.C_DecapsulateKey(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hPrivateKey, ReadTemplate(pTemplate, ulAttributeCount), In(pCiphertext, ulCiphertextLen), ref key);
+            *phKey = key;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong WrapKeyAuthenticated(NativeCULong hSession, void* pMechanism, NativeCULong hWrappingKey, NativeCULong hKey, byte* pAssociatedData, NativeCULong ulAssociatedDataLen, byte* pWrappedKey, NativeCULong* pulWrappedKeyLen)
+    {
+        if (Owner(hSession, nameof(C_WrapKeyAuthenticated)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulWrappedKeyLen;
+            CKR rv = m.C_WrapKeyAuthenticated(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hWrappingKey, hKey, In(pAssociatedData, ulAssociatedDataLen),
+                new NativeBuffer<byte>(pWrappedKey, length), ref length);
+            *pulWrappedKeyLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong UnwrapKeyAuthenticated(NativeCULong hSession, void* pMechanism, NativeCULong hUnwrappingKey, byte* pWrappedKey, NativeCULong ulWrappedKeyLen, void* pTemplate, NativeCULong ulAttributeCount, byte* pAssociatedData, NativeCULong ulAssociatedDataLen, NativeCULong* phKey)
+    {
+        if (Owner(hSession, nameof(C_UnwrapKeyAuthenticated)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong key = *phKey;
+            CKR rv = m.C_UnwrapKeyAuthenticated(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hUnwrappingKey, In(pWrappedKey, ulWrappedKeyLen),
+                ReadTemplate(pTemplate, ulAttributeCount), In(pAssociatedData, ulAssociatedDataLen), ref key);
+            *phKey = key;
             return Rv(rv);
         }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
