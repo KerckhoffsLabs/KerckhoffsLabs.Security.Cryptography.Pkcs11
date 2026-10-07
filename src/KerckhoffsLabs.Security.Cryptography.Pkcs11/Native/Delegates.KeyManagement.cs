@@ -24,12 +24,12 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GenerateKey_Windows);
+            ThrowIfUnbound(_fp.C_GenerateKey);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_GenerateKey_Windows(session, &winMech, t, (NativeCULong)template.Length, kPtr);
+                return _fp.C_GenerateKey(session, &winMech, t, (NativeCULong)template.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_GenerateKey);
@@ -48,7 +48,7 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GenerateKeyPair_Windows);
+            ThrowIfUnbound(_fp.C_GenerateKeyPair);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winPub = ToWindowsTemplate(publicKeyTemplate);
             CK_ATTRIBUTE_Windows[]? winPriv = ToWindowsTemplate(privateKeyTemplate);
@@ -56,7 +56,7 @@ internal partial class Delegates
             fixed (CK_ATTRIBUTE_Windows* priv = winPriv)
             fixed (NativeCULong* pubK = &publicKey)
             fixed (NativeCULong* privK = &privateKey)
-                return _fp.C_GenerateKeyPair_Windows(session, &winMech, pub, (NativeCULong)publicKeyTemplate.Length, priv, (NativeCULong)privateKeyTemplate.Length, pubK, privK);
+                return _fp.C_GenerateKeyPair(session, &winMech, pub, (NativeCULong)publicKeyTemplate.Length, priv, (NativeCULong)privateKeyTemplate.Length, pubK, privK);
         }
 
         ThrowIfUnbound(_fp.C_GenerateKeyPair);
@@ -78,11 +78,11 @@ internal partial class Delegates
         wrappedKeyLen = (NativeCULong)wrappedKey.Length;
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_WrapKey_Windows);
+            ThrowIfUnbound(_fp.C_WrapKey);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             fixed (byte* wkPtr = wrappedKey)
             fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-                return _fp.C_WrapKey_Windows(session, &winMech, wrappingKey, key, wkPtr, lenPtr);
+                return _fp.C_WrapKey(session, &winMech, wrappingKey, key, wkPtr, lenPtr);
         }
 
         ThrowIfUnbound(_fp.C_WrapKey);
@@ -101,13 +101,13 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_UnwrapKey_Windows);
+            ThrowIfUnbound(_fp.C_UnwrapKey);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (byte* wkPtr = wrappedKey)
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_UnwrapKey_Windows(session, &winMech, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, kPtr);
+                return _fp.C_UnwrapKey(session, &winMech, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_UnwrapKey);
@@ -127,12 +127,12 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_DeriveKey_Windows);
+            ThrowIfUnbound(_fp.C_DeriveKey);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_DeriveKey_Windows(session, &winMech, baseKey, t, (NativeCULong)template.Length, kPtr);
+                return _fp.C_DeriveKey(session, &winMech, baseKey, t, (NativeCULong)template.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_DeriveKey);
@@ -166,14 +166,14 @@ internal partial class Delegates
         ciphertextLen = (NativeCULong)ciphertext.Length;
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_EncapsulateKey_Windows);
+            ThrowIfUnbound(_fp.C_EncapsulateKey);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (byte* ctPtr = ciphertext)
             fixed (NativeCULong* ctLenPtr = &ciphertextLen)
             fixed (NativeCULong* dkPtr = &derivedKey)
-                return _fp.C_EncapsulateKey_Windows(session, &winMech, publicKey, t, (NativeCULong)template.Length, ctPtr, ctLenPtr, dkPtr);
+                return _fp.C_EncapsulateKey(session, &winMech, publicKey, t, (NativeCULong)template.Length, ctPtr, ctLenPtr, dkPtr);
         }
 
         ThrowIfUnbound(_fp.C_EncapsulateKey);
@@ -194,13 +194,13 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_DecapsulateKey_Windows);
+            ThrowIfUnbound(_fp.C_DecapsulateKey);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (byte* ctPtr = ciphertext)
             fixed (NativeCULong* dkPtr = &derivedKey)
-                return _fp.C_DecapsulateKey_Windows(session, &winMech, privateKey, t, (NativeCULong)template.Length, ctPtr, (NativeCULong)ciphertext.Length, dkPtr);
+                return _fp.C_DecapsulateKey(session, &winMech, privateKey, t, (NativeCULong)template.Length, ctPtr, (NativeCULong)ciphertext.Length, dkPtr);
         }
 
         ThrowIfUnbound(_fp.C_DecapsulateKey);
@@ -221,12 +221,12 @@ internal partial class Delegates
         wrappedKeyLen = (NativeCULong)wrappedKey.Length;
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_WrapKeyAuthenticated_Windows);
+            ThrowIfUnbound(_fp.C_WrapKeyAuthenticated);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             fixed (byte* adPtr = associatedData)
             fixed (byte* wkPtr = wrappedKey)
             fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-                return _fp.C_WrapKeyAuthenticated_Windows(session, &winMech, wrappingKey, key, adPtr, (NativeCULong)associatedData.Length, wkPtr, lenPtr);
+                return _fp.C_WrapKeyAuthenticated(session, &winMech, wrappingKey, key, adPtr, (NativeCULong)associatedData.Length, wkPtr, lenPtr);
         }
 
         ThrowIfUnbound(_fp.C_WrapKeyAuthenticated);
@@ -246,14 +246,14 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_UnwrapKeyAuthenticated_Windows);
+            ThrowIfUnbound(_fp.C_UnwrapKeyAuthenticated);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (byte* wkPtr = wrappedKey)
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (byte* adPtr = associatedData)
             fixed (NativeCULong* kPtr = &key)
-                return _fp.C_UnwrapKeyAuthenticated_Windows(session, &winMech, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, adPtr, (NativeCULong)associatedData.Length, kPtr);
+                return _fp.C_UnwrapKeyAuthenticated(session, &winMech, unwrappingKey, wkPtr, (NativeCULong)wrappedKey.Length, t, (NativeCULong)template.Length, adPtr, (NativeCULong)associatedData.Length, kPtr);
         }
 
         ThrowIfUnbound(_fp.C_UnwrapKeyAuthenticated);

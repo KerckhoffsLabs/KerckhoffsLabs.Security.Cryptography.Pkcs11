@@ -35,50 +35,50 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-    private void BindFunctions(ref CK_FUNCTION_LIST list)
+    private void BindFunctions(Dictionary<string, IntPtr> slots)
     {
-        list.C_Initialize = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&Initialize;
-        list.C_Finalize = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&FinalizeLibrary;
+        slots[nameof(CryptokiTable.C_Initialize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&Initialize;
+        slots[nameof(CryptokiTable.C_Finalize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&FinalizeLibrary;
         if (Overrides(nameof(C_GetInfo)))
-            list.C_GetInfo = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&GetInfo;
+            slots[nameof(CryptokiTable.C_GetInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&GetInfo;
         if (Overrides(nameof(C_GetSlotList)))
-            list.C_GetSlotList = (IntPtr)(delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong>)&GetSlotList;
+            slots[nameof(CryptokiTable.C_GetSlotList)] = (IntPtr)(delegate* unmanaged[Cdecl]<byte, NativeCULong*, NativeCULong*, NativeCULong>)&GetSlotList;
         if (Overrides(nameof(C_WaitForSlotEvent)))
-            list.C_WaitForSlotEvent = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, IntPtr, NativeCULong>)&WaitForSlotEvent;
+            slots[nameof(CryptokiTable.C_WaitForSlotEvent)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, IntPtr, NativeCULong>)&WaitForSlotEvent;
         if (Overrides(nameof(C_GetTokenInfo)))
-            list.C_GetTokenInfo = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&GetTokenInfo;
+            slots[nameof(CryptokiTable.C_GetTokenInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&GetTokenInfo;
         if (Overrides(nameof(C_InitToken)))
-            list.C_InitToken = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong>)&InitToken;
+            slots[nameof(CryptokiTable.C_InitToken)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong>)&InitToken;
         if (Overrides(nameof(C_OpenSession)))
-            list.C_OpenSession = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, void*, NativeCULong*, NativeCULong>)&OpenSession;
+            slots[nameof(CryptokiTable.C_OpenSession)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, void*, NativeCULong*, NativeCULong>)&OpenSession;
         if (Overrides(nameof(C_CloseSession)))
-            list.C_CloseSession = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&CloseSession;
+            slots[nameof(CryptokiTable.C_CloseSession)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&CloseSession;
         if (Overrides(nameof(C_Login)))
-            list.C_Login = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, NativeCULong>)&Login;
+            slots[nameof(CryptokiTable.C_Login)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, NativeCULong>)&Login;
         if (Overrides(nameof(C_Logout)))
-            list.C_Logout = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&Logout;
+            slots[nameof(CryptokiTable.C_Logout)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&Logout;
         if (Overrides(nameof(C_FindObjectsInit)))
-            list.C_FindObjectsInit = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&FindObjectsInit;
+            slots[nameof(CryptokiTable.C_FindObjectsInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&FindObjectsInit;
         if (Overrides(nameof(C_FindObjects)))
-            list.C_FindObjects = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong, NativeCULong*, NativeCULong>)&FindObjects;
+            slots[nameof(CryptokiTable.C_FindObjects)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong, NativeCULong*, NativeCULong>)&FindObjects;
         if (Overrides(nameof(C_FindObjectsFinal)))
-            list.C_FindObjectsFinal = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&FindObjectsFinal;
+            slots[nameof(CryptokiTable.C_FindObjectsFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&FindObjectsFinal;
         if (Overrides(nameof(C_GetAttributeValue)))
-            list.C_GetAttributeValue = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong, NativeCULong>)&GetAttributeValue;
+            slots[nameof(CryptokiTable.C_GetAttributeValue)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong, NativeCULong>)&GetAttributeValue;
         if (Overrides(nameof(C_EncryptInit)))
-            list.C_EncryptInit = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&EncryptInit;
+            slots[nameof(CryptokiTable.C_EncryptInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&EncryptInit;
         if (Overrides(nameof(C_Encrypt)))
-            list.C_Encrypt = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Encrypt;
+            slots[nameof(CryptokiTable.C_Encrypt)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Encrypt;
         if (Overrides(nameof(C_DigestInit)))
-            list.C_DigestInit = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&DigestInit;
+            slots[nameof(CryptokiTable.C_DigestInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&DigestInit;
         if (Overrides(nameof(C_Digest)))
-            list.C_Digest = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Digest;
+            slots[nameof(CryptokiTable.C_Digest)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Digest;
         if (Overrides(nameof(C_SignInit)))
-            list.C_SignInit = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&SignInit;
+            slots[nameof(CryptokiTable.C_SignInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&SignInit;
         if (Overrides(nameof(C_Sign)))
-            list.C_Sign = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Sign;
+            slots[nameof(CryptokiTable.C_Sign)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Sign;
         if (Overrides(nameof(C_GenerateRandom)))
-            list.C_GenerateRandom = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
+            slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
 
     // --- thunks --------------------------------------------------------------------------------

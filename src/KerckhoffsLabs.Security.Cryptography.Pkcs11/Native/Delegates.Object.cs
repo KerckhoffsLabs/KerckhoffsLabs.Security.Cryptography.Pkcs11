@@ -23,11 +23,11 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_CreateObject_Windows);
+            ThrowIfUnbound(_fp.C_CreateObject);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* idPtr = &objectId)
-                return _fp.C_CreateObject_Windows(session, t, (NativeCULong)template.Length, idPtr);
+                return _fp.C_CreateObject(session, t, (NativeCULong)template.Length, idPtr);
         }
 
         ThrowIfUnbound(_fp.C_CreateObject);
@@ -45,11 +45,11 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_CopyObject_Windows);
+            ThrowIfUnbound(_fp.C_CopyObject);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
             fixed (NativeCULong* idPtr = &newObjectId)
-                return _fp.C_CopyObject_Windows(session, objectId, t, (NativeCULong)template.Length, idPtr);
+                return _fp.C_CopyObject(session, objectId, t, (NativeCULong)template.Length, idPtr);
         }
 
         ThrowIfUnbound(_fp.C_CopyObject);
@@ -81,11 +81,11 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetAttributeValue_Windows);
+            ThrowIfUnbound(_fp.C_GetAttributeValue);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             NativeCULong winRv;
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
-                winRv = _fp.C_GetAttributeValue_Windows(session, objectId, t, (NativeCULong)template.Length);
+                winRv = _fp.C_GetAttributeValue(session, objectId, t, (NativeCULong)template.Length);
             // The token writes the value and its length back into the packed copy, so
             // mirror the result into the caller's template before returning.
             if (winTpl is not null)
@@ -107,10 +107,10 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_SetAttributeValue_Windows);
+            ThrowIfUnbound(_fp.C_SetAttributeValue);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
-                return _fp.C_SetAttributeValue_Windows(session, objectId, t, (NativeCULong)template.Length);
+                return _fp.C_SetAttributeValue(session, objectId, t, (NativeCULong)template.Length);
         }
 
         ThrowIfUnbound(_fp.C_SetAttributeValue);
@@ -126,10 +126,10 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_FindObjectsInit_Windows);
+            ThrowIfUnbound(_fp.C_FindObjectsInit);
             CK_ATTRIBUTE_Windows[]? winTpl = ToWindowsTemplate(template);
             fixed (CK_ATTRIBUTE_Windows* t = winTpl)
-                return _fp.C_FindObjectsInit_Windows(session, t, (NativeCULong)template.Length);
+                return _fp.C_FindObjectsInit(session, t, (NativeCULong)template.Length);
         }
 
         ThrowIfUnbound(_fp.C_FindObjectsInit);

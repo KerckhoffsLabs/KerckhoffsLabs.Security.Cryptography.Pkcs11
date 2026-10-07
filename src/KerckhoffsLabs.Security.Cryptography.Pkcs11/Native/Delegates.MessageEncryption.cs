@@ -40,9 +40,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_MessageEncryptInit_Windows);
+            ThrowIfUnbound(_fp.C_MessageEncryptInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return _fp.C_MessageEncryptInit_Windows(session, &winMech, key);
+            return _fp.C_MessageEncryptInit(session, &winMech, key);
         }
 
         ThrowIfUnbound(_fp.C_MessageEncryptInit);

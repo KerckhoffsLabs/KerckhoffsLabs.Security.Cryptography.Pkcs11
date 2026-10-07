@@ -66,9 +66,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetSessionInfo_Windows);
+            ThrowIfUnbound(_fp.C_GetSessionInfo);
             CK_SESSION_INFO_Windows win = default;
-            NativeCULong winRv = _fp.C_GetSessionInfo_Windows(session, &win);
+            NativeCULong winRv = _fp.C_GetSessionInfo(session, &win);
             info = win.ToUnified();
             return winRv;
         }

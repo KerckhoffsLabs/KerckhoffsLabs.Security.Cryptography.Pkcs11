@@ -13,15 +13,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// to be reachable only through a real PKCS#11 module. These tests drive it with no native
 /// module at all: an export resolver hands the loader <c>[UnmanagedCallersOnly]</c> managed
 /// stubs for <c>C_GetFunctionList</c>/<c>C_GetInterface</c>, whose tables live in unmanaged
-/// memory with a unique sentinel pointer in every slot. After construction, reflection maps
-/// each <c>CK_FUNCTION_LIST*</c> field to its same-named <see cref="FunctionPointers"/> field
-/// (and <c>_Windows</c> sibling) and asserts the sentinel landed in the right slot — a
-/// mis-wired binding line fails by name.
+/// memory with a unique sentinel pointer in every slot. After construction, reflection reads each
+/// same-named <see cref="CryptokiTable"/> slot and asserts the sentinel landed there — a slot copied
+/// from the wrong place fails by name.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The tables are written through the same <c>CK_FUNCTION_LIST*</c> structs the loader reads, so a
-/// transposition inside those structs round-trips unnoticed here. The struct order itself is checked
+/// The tables are written at the offsets <see cref="CryptokiTable"/> reads (see <see cref="NativeFunctionList"/>),
+/// so a wrong offset would round-trip unnoticed here. Those offsets, and the slot order, are checked
 /// against the C compiler's layout of the OASIS headers by <see cref="AbiOracleTests"/>.
 /// </para>
 /// <para>
@@ -117,40 +116,20 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     }
 
     /// <summary>
-    /// Builds a <typeparamref name="T"/> function-list table in unmanaged memory, assigning a
-    /// unique sentinel pointer to every <see cref="IntPtr"/> slot (offset by
-    /// <paramref name="sentinelBase"/> so distinct tables never share a sentinel), and returns
-    /// the table pointer plus the slot-name → sentinel map. Written through the same
-    /// packed-struct dispatch the loader reads with, so the round-trip holds on every platform.
+    /// Builds a function-list table of <paramref name="slotCount"/> slots in unmanaged memory, assigning a
+    /// unique sentinel pointer to every slot (offset by <paramref name="sentinelBase"/> so distinct tables
+    /// never share a sentinel), and returns the table pointer plus the slot-name → sentinel map.
     /// </summary>
-    private (IntPtr Table, Dictionary<string, IntPtr> Sentinels) BuildTable<T>(byte major, byte minor, long sentinelBase)
-        where T : unmanaged
+    private (IntPtr Table, Dictionary<string, IntPtr> Sentinels) BuildTable(byte major, byte minor, int slotCount, long sentinelBase)
     {
-        object boxed = default(T);
         var sentinels = new Dictionary<string, IntPtr>();
-        int i = 0;
-        foreach (FieldInfo field in typeof(T).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
-        {
-            if (field.FieldType == typeof(IntPtr))
-            {
-                IntPtr sentinel = (IntPtr)(sentinelBase + ++i * 0x10);
-                field.SetValue(boxed, sentinel);
-                sentinels[field.Name] = sentinel;
-            }
-            else if (field.FieldType == typeof(CK_VERSION))
-            {
-                field.SetValue(boxed, new CK_VERSION { Major = major, Minor = minor });
-            }
-        }
-        Assert.NotEmpty(sentinels); // the table type must actually carry function-pointer slots
+        for (int i = 0; i < slotCount; i++)
+            sentinels[NativeFunctionList.SlotNames[i]] = (IntPtr)(sentinelBase + (i + 1) * 0x10);
 
-        IntPtr table = Alloc(Marshal.SizeOf<T>() + 64); // slack: packed size never exceeds Marshal size
-        WriteTable(table, (T)boxed);
+        IntPtr table = Alloc(NativeFunctionList.SizeOf(slotCount));
+        NativeFunctionList.Write(table, major, minor, slotCount, sentinels);
         return (table, sentinels);
     }
-
-    private static void WriteTable<T>(IntPtr memory, in T value) where T : unmanaged
-        => UnmanagedMemory.Write(memory, in value);
 
     /// <summary>Builds the CK_INTERFACE descriptor C_GetInterface hands back.</summary>
     private IntPtr BuildInterface(IntPtr functionList)
@@ -165,45 +144,39 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         => name => exports.TryGetValue(name, out IntPtr p) ? p : IntPtr.Zero;
 
     // ---------------------------------------------------------------------------
-    // Reflection bridge to the FunctionPointers table
+    // Reflection bridge to the CryptokiTable
     // ---------------------------------------------------------------------------
 
     private static IntPtr Fp(Delegates delegates, string name)
     {
-        FieldInfo? field = typeof(FunctionPointers).GetField(name, BindingFlags.Instance | BindingFlags.Public);
+        FieldInfo? field = typeof(CryptokiTable).GetField(name, BindingFlags.Instance | BindingFlags.Public);
         Assert.NotNull(field);
         // Function-pointer fields box as IntPtr under reflection.
         return (IntPtr)field!.GetValue(delegates._fp)!;
     }
 
     private static bool FpFieldExists(string name)
-        => typeof(FunctionPointers).GetField(name, BindingFlags.Instance | BindingFlags.Public) is not null;
+        => typeof(CryptokiTable).GetField(name, BindingFlags.Instance | BindingFlags.Public) is not null;
 
-    private static IEnumerable<string> SlotNames<T>() where T : unmanaged
-        => typeof(T).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-            .Where(f => f.FieldType == typeof(IntPtr))
-            .Select(f => f.Name);
+    private static IEnumerable<string> SlotNames(int slotCount) => NativeFunctionList.SlotNames.Take(slotCount);
 
     private static IEnumerable<string> V30AdditionNames()
-        => SlotNames<CK_FUNCTION_LIST_3_0>().Except(SlotNames<CK_FUNCTION_LIST>());
+        => SlotNames(CryptokiTable.V30SlotCount).Skip(CryptokiTable.V240SlotCount);
 
     private static IEnumerable<string> V32AdditionNames()
-        => SlotNames<CK_FUNCTION_LIST_3_2>().Except(SlotNames<CK_FUNCTION_LIST_3_0>());
+        => SlotNames(CryptokiTable.V32SlotCount).Skip(CryptokiTable.V30SlotCount);
 
     /// <summary>
     /// Asserts that for every slot in <paramref name="expected"/> (minus <paramref name="skip"/>),
-    /// the same-named <see cref="FunctionPointers"/> field — and its <c>_Windows</c> sibling when
-    /// one exists — carries exactly that table's sentinel.
+    /// the same-named <see cref="CryptokiTable"/> slot carries exactly that table's sentinel.
     /// </summary>
     private static void AssertBoundTo(Delegates delegates, Dictionary<string, IntPtr> expected, params string[] skip)
     {
         foreach ((string name, IntPtr sentinel) in expected)
         {
             if (skip.Contains(name)) continue;
-            Assert.True(FpFieldExists(name), $"FunctionPointers has no field for table slot '{name}'.");
+            Assert.True(FpFieldExists(name), $"CryptokiTable has no slot '{name}'.");
             Assert.True(Fp(delegates, name) == sentinel, $"Slot '{name}' bound to 0x{Fp(delegates, name):X}, expected sentinel 0x{sentinel:X}.");
-            if (FpFieldExists(name + "_Windows"))
-                Assert.True(Fp(delegates, name + "_Windows") == sentinel, $"Slot '{name}_Windows' not bound to its unified sentinel.");
         }
     }
 
@@ -222,10 +195,9 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void ModuleWithoutC_Finalize_IsReleasedWithoutThrowing()
     {
-        var (table, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        CK_FUNCTION_LIST list = UnmanagedMemory.Read<CK_FUNCTION_LIST>(table);
-        list.C_Finalize = IntPtr.Zero;
-        WriteTable(table, in list);
+        var (table, sentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        sentinels.Remove("C_Finalize");
+        NativeFunctionList.Write(table, 2, 40, CryptokiTable.V240SlotCount, sentinels);
         InstallModule(table);
 
         var module = Pkcs11ModuleHandle.Bind(() => new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
@@ -241,12 +213,12 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void V240Module_BindsEveryBaseSlot_AndLeavesV3SurfaceNull()
     {
-        var (table, sentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (table, sentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
         InstallModule(table);
 
         var delegates = new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub }));
 
-        // Every v2.40 slot must land in the same-named dispatch field (and _Windows sibling).
+        // Every v2.40 slot must land in the same-named table slot.
         AssertBoundTo(delegates, sentinels);
         // No v3.0/v3.2 surface: there is no interface table to take it from.
         AssertAllZero(delegates, V30AdditionNames());
@@ -258,7 +230,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void V240Module_PerSymbolExports_AreNotBound()
     {
-        var (table, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (table, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
         InstallModule(table);
         IntPtr loginUser = (IntPtr)0x0BAD_0010;
         IntPtr encapsulate = (IntPtr)0x0BAD_0020;
@@ -278,8 +250,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void V30Interface_BindsV30Additions_FromInterfaceTable()
     {
-        var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v30Table, v30Sentinels) = BuildTable<CK_FUNCTION_LIST_3_0>(3, 0, 0x0B00_0000);
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v30Table, v30Sentinels) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
         InstallModule(baseTable, BuildInterface(v30Table));  // getInterfaceRv defaults to CKR_OK
 
         var delegates = new Delegates(Resolver(new()
@@ -288,14 +260,10 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        // v3.0 additions come from the interface table. C_GetInterface itself is bound to the
-        // bootstrap stub (the loader binds the export, not the table slot) — skip it.
+        // v3.0 additions come from the interface table — C_GetInterface's slot included: the export
+        // is only the bootstrap that found the table.
         var v30Additions = V30AdditionNames().ToHashSet();
-        AssertBoundTo(
-            delegates,
-            v30Sentinels.Where(kv => v30Additions.Contains(kv.Key)).ToDictionary(),
-            "C_GetInterface");
-        Assert.Equal(GetInterfaceStub, Fp(delegates, "C_GetInterface"));
+        AssertBoundTo(delegates, v30Sentinels.Where(kv => v30Additions.Contains(kv.Key)).ToDictionary());
 
         // One table source: the base slots come from the interface table too, not C_GetFunctionList's.
         AssertBoundTo(delegates, v30Sentinels, "C_GetInterface");
@@ -308,8 +276,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void V32Interface_BindsV30AndV32Additions_FromInterfaceTable()
     {
-        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v32Table, v32Sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v32Table));
 
         var delegates = new Delegates(Resolver(new()
@@ -332,9 +300,9 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void DefaultInterfaceIs30_ButServes32OnRequest_Binds32()
     {
-        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v30Table, _) = BuildTable<CK_FUNCTION_LIST_3_0>(3, 0, 0x0B00_0000);
-        var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v30Table, _) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
+        var (v32Table, v32Sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v30Table), versioned: new()
         {
             [(3, 0)] = BuildInterface(v30Table),
@@ -355,8 +323,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void TableWhoseHeaderIsNotTheRequestedVersion_IsNotReadAsThatVersion()
     {
-        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v30Table, v30Sentinels) = BuildTable<CK_FUNCTION_LIST_3_0>(3, 0, 0x0B00_0000);
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v30Table, v30Sentinels) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
         InstallModule(baseTable, versioned: new()
         {
             [(3, 2)] = BuildInterface(v30Table), // lies: header says {3,0}
@@ -377,8 +345,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void EveryExactRequestRefused_DefaultInterfaceIsBoundByItsHeader()
     {
-        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v32Table, v32Sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v32Table), versioned: []);
 
         var delegates = new Delegates(Resolver(new()
@@ -394,8 +362,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void DefaultInterfaceOfAnUnknown3x_BindsOnlyThe30Prefix()
     {
-        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v33Table, v33Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 3, 0x0C00_0000);
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v33Table, v33Sentinels) = BuildTable(3, 3, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v33Table), versioned: []);
 
         var delegates = new Delegates(Resolver(new()
@@ -404,7 +372,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        var v30Slots = SlotNames<CK_FUNCTION_LIST_3_0>().ToHashSet();
+        var v30Slots = SlotNames(CryptokiTable.V30SlotCount).ToHashSet();
         AssertBoundTo(delegates, v33Sentinels.Where(kv => v30Slots.Contains(kv.Key)).ToDictionary(), "C_GetInterface");
         AssertAllZero(delegates, V32AdditionNames());
     }
@@ -412,7 +380,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void InterfaceWithANullFunctionList_FallsBackToGetFunctionList()
     {
-        var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
         InstallModule(baseTable, BuildInterface(IntPtr.Zero));
 
         var delegates = new Delegates(Resolver(new()
@@ -428,8 +396,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void Interface_ReportingV240Version_BindsNoV3Surface()
     {
-        var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        var (v30Table, _) = BuildTable<CK_FUNCTION_LIST_3_0>(2, 40, 0x0B00_0000); // header says 2.40
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        var (v30Table, _) = BuildTable(2, 40, CryptokiTable.V30SlotCount, 0x0B00_0000); // header says 2.40
         InstallModule(baseTable, BuildInterface(v30Table));
         IntPtr sessionCancel = (IntPtr)0x0BAD_0030;
 
@@ -448,7 +416,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void Interface_ReturningError_BindsNoV3Surface()
     {
-        var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
         InstallModule(baseTable, getInterfaceRv: 0x00000006);  // CKR_FUNCTION_FAILED
         IntPtr loginUser = (IntPtr)0x0BAD_0040;
 
@@ -466,12 +434,11 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void NullSlotsInV32Table_StayUnbound()
     {
-        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
-        // A v3.2 table with EVERY slot null: the bind guards must leave every fp null rather
-        // than overwrite with zero-adjacent garbage or throw.
-        var empty = new CK_FUNCTION_LIST_3_2 { version = new CK_VERSION { Major = 3, Minor = 2 } };
-        IntPtr v32Table = Alloc(Marshal.SizeOf<CK_FUNCTION_LIST_3_2>() + 64);
-        WriteTable(v32Table, in empty);
+        var (baseTable, _) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
+        // A v3.2 table with EVERY slot null: every slot must copy as null, not as garbage, and nothing
+        // may throw.
+        IntPtr v32Table = Alloc(NativeFunctionList.SizeOf(CryptokiTable.V32SlotCount));
+        NativeFunctionList.Write(v32Table, 3, 2, CryptokiTable.V32SlotCount, new Dictionary<string, IntPtr>());
         InstallModule(baseTable, BuildInterface(v32Table));
 
         var delegates = new Delegates(Resolver(new()
@@ -491,10 +458,10 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void SlotName_Coverage_SanityCheck()
     {
-        // Guards the test harness itself: the struct definitions must expose the expected
-        // slot populations, or the reflection sweep would silently assert nothing.
-        Assert.True(SlotNames<CK_FUNCTION_LIST>().Count() >= 60, "v2.40 table lost slots");
-        Assert.True(V30AdditionNames().Count() >= 20, "v3.0 additions lost slots");
+        // Guards the test harness itself: the table must expose the expected slot populations, or the
+        // reflection sweep would silently assert nothing.
+        Assert.Equal(CryptokiTable.V32SlotCount, NativeFunctionList.SlotNames.Count);
+        Assert.Equal(24, V30AdditionNames().Count());
         Assert.Equal(12, V32AdditionNames().Count());
     }
 }

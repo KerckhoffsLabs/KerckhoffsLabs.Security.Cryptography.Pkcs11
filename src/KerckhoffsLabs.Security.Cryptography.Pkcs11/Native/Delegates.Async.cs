@@ -23,11 +23,11 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_AsyncComplete_Windows);
+            ThrowIfUnbound(_fp.C_AsyncComplete);
             CK_ASYNC_DATA_Windows win = default;
             NativeCULong winRv;
             fixed (byte* fnPtr = functionName)
-                winRv = _fp.C_AsyncComplete_Windows(session, fnPtr, &win);
+                winRv = _fp.C_AsyncComplete(session, fnPtr, &win);
             result = win.ToUnified();
             return winRv;
         }

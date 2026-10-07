@@ -203,6 +203,37 @@ public sealed class AbiOracleTests(ITestOutputHelper output)
     private sealed record CMember(string Name, int Offset, int Size);
     private sealed record CStruct(int Size, List<CMember> Members);
 
+    /// <summary>
+    /// The library reads a module's function list into <see cref="CryptokiTable"/> slot by slot
+    /// (<see cref="CryptokiTable.Read"/>): the first slot at <see cref="CryptokiTable.FirstSlotOffset"/>, each
+    /// next one a pointer further on, in <see cref="CryptokiTable"/>'s field order. All three C tables must
+    /// have exactly that layout, with as many slots as the count the loader reads for that version.
+    /// </summary>
+    [Theory]
+    [InlineData("CK_FUNCTION_LIST", CryptokiTable.V240SlotCount)]
+    [InlineData("CK_FUNCTION_LIST_3_0", CryptokiTable.V30SlotCount)]
+    [InlineData("CK_FUNCTION_LIST_3_2", CryptokiTable.V32SlotCount)]
+    public void CryptokiTable_ReadsEveryFunctionListAtItsCompilerLayout(string table, int slotCount)
+    {
+        CStruct c = RequireOracle()[table];
+        string[] slotNames = [.. typeof(CryptokiTable).GetFields(BindingFlags.Instance | BindingFlags.Public).Select(f => f.Name)];
+
+        Assert.Equal(slotCount + 1, c.Members.Count); // the CK_VERSION header, then the slots
+        Assert.Equal(new CMember("version", 0, Unsafe.SizeOf<CK_VERSION>()), c.Members[0]);
+        for (int i = 0; i < slotCount; i++)
+        {
+            CMember slot = c.Members[i + 1];
+            Assert.Equal(slotNames[i], slot.Name);
+            Assert.Equal(CryptokiTable.FirstSlotOffset + i * IntPtr.Size, slot.Offset);
+            Assert.Equal(IntPtr.Size, slot.Size);
+        }
+        Assert.Equal(CryptokiTable.FirstSlotOffset + slotCount * IntPtr.Size, c.Size);
+    }
+
+    [Fact]
+    public void CryptokiTable_IsOnePointerPerSlot()
+        => Assert.Equal(CryptokiTable.V32SlotCount * IntPtr.Size, Unsafe.SizeOf<CryptokiTable>());
+
     private static IReadOnlyDictionary<string, CStruct> RequireOracle()
     {
         IReadOnlyDictionary<string, CStruct>? oracle = Oracle.Value;

@@ -105,8 +105,7 @@ public sealed class NativeStructLayoutTests
     /// size identical while corrupting every call — so the full name:offset sequence is pinned
     /// instead. Covers the pointer-bearing param structs plus the pointer-free ones whose fields are
     /// interchangeable by width (the CTR/RC2 params, CK_INFO, CK_TOKEN_INFO).
-    /// The five structs with hand-written Lp64_Offsets_* methods above are excluded, as are the
-    /// CK_FUNCTION_LIST variants, which are covered by absolute size pins instead.
+    /// The five structs with hand-written Lp64_Offsets_* methods above are excluded.
     /// </summary>
     /// <remarks>
     /// Rows are probed from the built assembly on Linux x64, so they are regression tripwires rather

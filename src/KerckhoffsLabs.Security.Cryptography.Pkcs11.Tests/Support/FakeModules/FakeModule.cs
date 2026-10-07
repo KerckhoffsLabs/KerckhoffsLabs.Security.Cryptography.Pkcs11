@@ -183,14 +183,11 @@ internal abstract unsafe partial class FakeModule : IDisposable
 
     private IntPtr BuildFunctionList()
     {
-        var list = new CK_FUNCTION_LIST { version = new CK_VERSION { Major = 2, Minor = 40 } };
-        BindFunctions(ref list);
+        var slots = new Dictionary<string, IntPtr>();
+        BindFunctions(slots);
 
-        // Written through the library's own packed-struct dispatch, so on Windows the table has the
-        // Pack=1 layout a native module would export.
-        IntPtr memory = Marshal.AllocHGlobal(UnmanagedMemory.SizeOf<CK_FUNCTION_LIST>());
-        UnmanagedMemory.Write(memory, in list);
-        return memory;
+        // A v2.40 table, in the layout a native module exports (Pack=1 on Windows).
+        return NativeFunctionList.Allocate(2, 40, CryptokiTable.V240SlotCount, slots);
     }
 
     // --- marshalling helpers for the thunks --------------------------------------------------
