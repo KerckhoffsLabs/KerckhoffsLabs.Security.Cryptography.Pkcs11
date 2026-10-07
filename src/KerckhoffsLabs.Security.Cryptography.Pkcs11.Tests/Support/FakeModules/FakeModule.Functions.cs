@@ -33,6 +33,10 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> digest, ref NativeCULong digestLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignFinal(NativeCULong session, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignRecoverInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -77,6 +81,14 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_SignInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&SignInit;
         if (Overrides(nameof(C_Sign)))
             slots[nameof(CryptokiTable.C_Sign)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&Sign;
+        if (Overrides(nameof(C_SignUpdate)))
+            slots[nameof(CryptokiTable.C_SignUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&SignUpdate;
+        if (Overrides(nameof(C_SignFinal)))
+            slots[nameof(CryptokiTable.C_SignFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignFinal;
+        if (Overrides(nameof(C_SignRecoverInit)))
+            slots[nameof(CryptokiTable.C_SignRecoverInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&SignRecoverInit;
+        if (Overrides(nameof(C_SignRecover)))
+            slots[nameof(CryptokiTable.C_SignRecover)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignRecover;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -308,6 +320,50 @@ internal abstract unsafe partial class FakeModule
         {
             NativeCULong length = *pulSignatureLen;
             CKR rv = m.C_Sign(hSession, In(pData, ulDataLen), new NativeBuffer<byte>(pSignature, length), ref length);
+            *pulSignatureLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignUpdate(NativeCULong hSession, byte* pPart, NativeCULong ulPartLen)
+    {
+        if (Owner(hSession, nameof(C_SignUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_SignUpdate(hSession, In(pPart, ulPartLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignFinal(NativeCULong hSession, byte* pSignature, NativeCULong* pulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_SignFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulSignatureLen;
+            CKR rv = m.C_SignFinal(hSession, new NativeBuffer<byte>(pSignature, length), ref length);
+            *pulSignatureLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignRecoverInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_SignRecoverInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_SignRecoverInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignRecover(NativeCULong hSession, byte* pData, NativeCULong ulDataLen, byte* pSignature, NativeCULong* pulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_SignRecover)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulSignatureLen;
+            CKR rv = m.C_SignRecover(hSession, In(pData, ulDataLen), new NativeBuffer<byte>(pSignature, length), ref length);
             *pulSignatureLen = length;
             return Rv(rv);
         }

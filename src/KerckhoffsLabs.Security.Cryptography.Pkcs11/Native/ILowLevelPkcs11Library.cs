@@ -122,11 +122,11 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_DigestKey(NativeCULong session, NativeCULong key);
     CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen);
     CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-    CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen);
+    CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen);
     CKR C_SignUpdate(NativeCULong session, ReadOnlySpan<byte> part);
-    CKR C_SignFinal(NativeCULong session, Span<byte> signature, out NativeCULong signatureLen);
+    CKR C_SignFinal(NativeCULong session, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen);
     CKR C_SignRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-    CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen);
+    CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen);
     CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature);
     CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part);

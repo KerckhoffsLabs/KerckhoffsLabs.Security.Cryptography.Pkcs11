@@ -47,13 +47,13 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
                 Assert.Equal(CKR.CKR_OK, rv);
             }
 
-            // Two-pass probe, per the standard PKCS#11 idiom: null buffer reports the length first.
-            CKR probeRv = lowLevel.C_SignRecover(sessionId, data, null, out NativeCULong sigLen);
+            // Two-pass probe, per the standard PKCS#11 idiom: a length query reports the length first.
+            CKR probeRv = lowLevel.C_SignRecover(sessionId, data, default, lengthOnly: true, out NativeCULong sigLen);
             Assert.Equal(CKR.CKR_OK, probeRv);
             Assert.Equal((NativeCULong)data.Length, sigLen);
 
             byte[] signature = new byte[(int)sigLen];
-            CKR signRv = lowLevel.C_SignRecover(sessionId, data, signature, out sigLen);
+            CKR signRv = lowLevel.C_SignRecover(sessionId, data, signature, lengthOnly: false, out sigLen);
             Assert.Equal(CKR.CKR_OK, signRv);
 
             byte[] expectedSignature = new byte[data.Length];

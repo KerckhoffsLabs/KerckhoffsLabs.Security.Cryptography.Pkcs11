@@ -531,7 +531,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetOperationState");
 
         return CallWithLengthProbe(
-            (Span<byte> buffer, out NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, out len),
+            (Span<byte> buffer, bool _, out NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, out len),
             OpGetOperationState);
     }
 
@@ -1708,7 +1708,7 @@ internal sealed class Pkcs11Session : IDisposable
             : null;
 
         wrappedKey ??= CallWithLengthProbe(
-            (Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
+            (Span<byte> buf, bool _, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
             OpWrapKey);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -1964,24 +1964,24 @@ internal sealed class Pkcs11Session : IDisposable
         throw Pkcs11Exception.Create(rv, operation);
     }
 
-    /// <summary>One step of a Cryptoki two-call length probe: invoke with an empty buffer to learn
-    /// the size, then again with the allocated one. Capacity comes from the buffer itself, so the
-    /// two can never disagree.</summary>
-    private delegate CKR LengthProbedCall(Span<byte> buffer, out NativeCULong length);
+    /// <summary>One step of a Cryptoki two-call length probe: invoke with <paramref name="lengthOnly"/> to
+    /// learn the size, then again with the allocated buffer. Capacity comes from the buffer itself, so
+    /// the two can never disagree.</summary>
+    private delegate CKR LengthProbedCall(Span<byte> buffer, bool lengthOnly, out NativeCULong length);
 
     /// <summary>
     /// A <see cref="LengthProbedCall"/> that also takes the operation's input. The input is passed in
     /// rather than captured, because a lambda cannot capture a span, and copying it into an array to
     /// capture would leave a plaintext copy on the heap.
     /// </summary>
-    private delegate CKR InputLengthProbedCall(ReadOnlySpan<byte> input, Span<byte> buffer, out NativeCULong length);
+    private delegate CKR InputLengthProbedCall(ReadOnlySpan<byte> input, Span<byte> buffer, bool lengthOnly, out NativeCULong length);
 
     /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string)"/>
     private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation)
-        => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, out NativeCULong length) => call(buffer, out length), operation);
+        => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(buffer, lengthOnly, out length), operation);
 
     /// <summary>
-    /// Runs the PKCS#11 two-call pattern: query the output length with a NULL buffer, allocate, fill,
+    /// Runs the PKCS#11 two-call pattern: query the output length, allocate, fill,
     /// and return exactly what the module reports writing.
     /// </summary>
     /// <remarks>
@@ -1993,15 +1993,15 @@ internal sealed class Pkcs11Session : IDisposable
     /// </remarks>
     private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation)
     {
-        CKR rv = call(input, default, out NativeCULong reported);
+        CKR rv = call(input, default, lengthOnly: true, out NativeCULong reported);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
-        rv = call(input, buffer, out reported);
+        rv = call(input, buffer, lengthOnly: false, out reported);
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
             buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
-            rv = call(input, buffer, out reported);
+            rv = call(input, buffer, lengthOnly: false, out reported);
         }
         Pkcs11Exception.ThrowIfError(rv, operation);
 
@@ -2126,7 +2126,7 @@ internal sealed class Pkcs11Session : IDisposable
             outputStream.Write(lastPart, 0, lastPart.Length);
 
         byte[] digest = CallWithLengthProbe(
-            (Span<byte> buffer, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, out length),
+            (Span<byte> buffer, bool _, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, out length),
             OpDigestFinal);
         operation.Completed();
 
@@ -2612,7 +2612,7 @@ internal sealed class Pkcs11Session : IDisposable
         operation.Begin(CKF.CKF_SIGN, rv, OpSignInit);
 
         byte[] signature = CallWithLengthProbe(data,
-            (ReadOnlySpan<byte> input, Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, out len),
+            (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, lengthOnly, out len),
             OpSign);
         operation.Completed();
 
@@ -3012,7 +3012,7 @@ internal sealed class Pkcs11Session : IDisposable
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         byte[] digest = CallWithLengthProbe(data,
-            (ReadOnlySpan<byte> input, Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, out len),
+            (ReadOnlySpan<byte> input, Span<byte> buf, bool _, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, out len),
             OpDigest);
         operation.Completed();
 
@@ -3208,7 +3208,7 @@ internal sealed class Pkcs11Session : IDisposable
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                     => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, output, out outputLen),
                 UpdateOperation: OpDigestEncryptUpdate,
-                Final: (Span<byte> buffer, out NativeCULong length)
+                Final: (Span<byte> buffer, bool _, out NativeCULong length)
                     => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, out length),
                 FinalOperation: OpEncryptFinal,
                 CancelFlag: CKF.CKF_ENCRYPT),
@@ -3317,7 +3317,7 @@ internal sealed class Pkcs11Session : IDisposable
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                     => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, output, out outputLen),
                 UpdateOperation: OpDecryptDigestUpdate,
-                Final: (Span<byte> buffer, out NativeCULong length)
+                Final: (Span<byte> buffer, bool _, out NativeCULong length)
                     => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, out length),
                 FinalOperation: OpDecryptFinal,
                 CancelFlag: CKF.CKF_DECRYPT),

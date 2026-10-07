@@ -260,7 +260,7 @@ public sealed class Pkcs11SessionTests
         public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => InitRv;
         public override CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen) => TwoCall(digest, out digestLen);
         public override CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen) => TwoCall(signature, out signatureLen);
+        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen) => TwoCall(lengthOnly ? default : signature, out signatureLen);
         public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
         public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen) => TwoCall(encryptedData, out encryptedDataLen);
         public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;

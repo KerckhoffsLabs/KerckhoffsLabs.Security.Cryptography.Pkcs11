@@ -41,7 +41,7 @@ internal sealed partial class ManagedSoftToken
             ? UnmanagedMemory.Read(p.Context, (int)p.ContextLen) : [];
     }
 
-    public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
+    public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen)
     {
         signatureLen = (NativeCULong)0;
         if (!_signOps.TryGetValue((ulong)session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
@@ -64,7 +64,7 @@ internal sealed partial class ManagedSoftToken
         }
         catch (CryptographicException) { _signOps.Remove((ulong)session); return CKR.CKR_FUNCTION_FAILED; }
 
-        if (signature.IsEmpty) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
+        if (lengthOnly) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
         if (signature.Length < sig.Length) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
         sig.AsSpan(0, sig.Length).CopyTo(signature);

@@ -144,8 +144,8 @@ public sealed class OperationScopeTests
         public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => DecryptInitRv;
 
-        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen)
-            => Answer(signature, out signatureLen, 64);
+        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen)
+            => Answer(lengthOnly ? default : signature, out signatureLen, 64);
 
         public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
             => Answer(data, out dataLen, encryptedData.Length + DecryptGrowsBy);
