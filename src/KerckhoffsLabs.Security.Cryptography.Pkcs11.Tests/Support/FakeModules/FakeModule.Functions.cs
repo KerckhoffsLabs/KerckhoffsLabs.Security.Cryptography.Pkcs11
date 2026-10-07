@@ -56,6 +56,10 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_DigestKey(NativeCULong session, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -146,6 +150,14 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_DigestKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)&DigestKey;
         if (Overrides(nameof(C_DigestFinal)))
             slots[nameof(CryptokiTable.C_DigestFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&DigestFinal;
+        if (Overrides(nameof(C_DigestEncryptUpdate)))
+            slots[nameof(CryptokiTable.C_DigestEncryptUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&DigestEncryptUpdate;
+        if (Overrides(nameof(C_DecryptDigestUpdate)))
+            slots[nameof(CryptokiTable.C_DecryptDigestUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&DecryptDigestUpdate;
+        if (Overrides(nameof(C_SignEncryptUpdate)))
+            slots[nameof(CryptokiTable.C_SignEncryptUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignEncryptUpdate;
+        if (Overrides(nameof(C_DecryptVerifyUpdate)))
+            slots[nameof(CryptokiTable.C_DecryptVerifyUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&DecryptVerifyUpdate;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -615,6 +627,62 @@ internal abstract unsafe partial class FakeModule
         {
             NativeCULong length = *pulOutLen;
             CKR rv = m.C_DigestFinal(hSession, new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DigestEncryptUpdate(NativeCULong hSession, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_DigestEncryptUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_DigestEncryptUpdate(hSession, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DecryptDigestUpdate(NativeCULong hSession, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_DecryptDigestUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_DecryptDigestUpdate(hSession, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignEncryptUpdate(NativeCULong hSession, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_SignEncryptUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_SignEncryptUpdate(hSession, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DecryptVerifyUpdate(NativeCULong hSession, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_DecryptVerifyUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_DecryptVerifyUpdate(hSession, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
             *pulOutLen = length;
             return Rv(rv);
         }

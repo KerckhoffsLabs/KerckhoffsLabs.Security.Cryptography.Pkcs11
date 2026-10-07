@@ -2921,7 +2921,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, output, out outputLen),
+                => _pkcs11Library.C_DecryptVerifyUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
             OpDecryptVerifyUpdate);
 
         byte[]? lastPart = null;
@@ -3206,7 +3206,7 @@ internal sealed class Pkcs11Session : IDisposable
                     => _pkcs11Library.C_EncryptInit(_sessionId, ref mechanism, key),
                 InitOperation: OpEncryptInit,
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                    => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, output, out outputLen),
+                    => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
                 UpdateOperation: OpDigestEncryptUpdate,
                 Final: (Span<byte> buffer, bool lengthOnly, out NativeCULong length)
                     => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, lengthOnly, out length),
@@ -3315,7 +3315,7 @@ internal sealed class Pkcs11Session : IDisposable
                     => _pkcs11Library.C_DecryptInit(_sessionId, ref mechanism, key),
                 InitOperation: OpDecryptInit,
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                    => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, output, out outputLen),
+                    => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
                 UpdateOperation: OpDecryptDigestUpdate,
                 Final: (Span<byte> buffer, bool lengthOnly, out NativeCULong length)
                     => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, lengthOnly, out length),
