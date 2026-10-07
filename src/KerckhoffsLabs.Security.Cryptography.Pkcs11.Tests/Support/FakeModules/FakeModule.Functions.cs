@@ -69,6 +69,7 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_DecapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> ciphertext, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_WrapKeyAuthenticated(NativeCULong session, CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, NativeBuffer<byte> wrappedKey, ref NativeCULong wrappedKeyLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_UnwrapKeyAuthenticated(NativeCULong session, CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> associatedData, ref NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -185,6 +186,8 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_WrapKeyAuthenticated)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&WrapKeyAuthenticated;
         if (Overrides(nameof(C_UnwrapKeyAuthenticated)))
             slots[nameof(CryptokiTable.C_UnwrapKeyAuthenticated)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, byte*, NativeCULong, void*, NativeCULong, byte*, NativeCULong, NativeCULong*, NativeCULong>)&UnwrapKeyAuthenticated;
+        if (Overrides(nameof(C_SeedRandom)))
+            slots[nameof(CryptokiTable.C_SeedRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&SeedRandom;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -846,6 +849,14 @@ internal abstract unsafe partial class FakeModule
             *phKey = key;
             return Rv(rv);
         }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SeedRandom(NativeCULong hSession, byte* pIn, NativeCULong ulInLen)
+    {
+        if (Owner(hSession, nameof(C_SeedRandom)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_SeedRandom(hSession, In(pIn, ulInLen))); }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
