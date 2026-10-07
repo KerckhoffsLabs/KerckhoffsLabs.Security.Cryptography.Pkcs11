@@ -50,7 +50,9 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey) => NotSupported(nameof(C_SetOperationState));
     public virtual CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin) => NotSupported(nameof(C_Login));
     public virtual CKR C_LoginUser(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username) => NotSupported(nameof(C_LoginUser));
-    public virtual CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => NotSupported(nameof(C_SessionCancel));
+    // Not NotSupported(): the session calls this while unwinding another failure, and the real library
+    // answers a module without C_SessionCancel (any v2.40 one) with this return code, never a throw.
+    public virtual CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     public virtual CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count) => NotSupported(nameof(C_GetInterfaceList));
     public virtual CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface) { iface = default; return NotSupported(nameof(C_GetInterface)); }
     public virtual CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_MessageEncryptInit));

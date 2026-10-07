@@ -658,30 +658,126 @@ internal sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Best-effort cancel of one or more in-flight operations. Intended for the unwind path
-    /// of multi-part stream methods so a mid-operation exception cannot leave the session
-    /// wedged in active-operation state. Tries <c>C_SessionCancel</c> (PKCS#11 v3.0+); on
-    /// v2.40 modules that return <c>CKR_FUNCTION_NOT_SUPPORTED</c> the operation may stay
-    /// active, but the caller's exception is the appropriate signal to the consumer.
-    /// Errors are logged and swallowed so the original exception is never masked on unwind.
+    /// Operations (<c>CKF_SIGN</c>, <c>CKF_DECRYPT</c>, ...) begun on this session and not yet ended. Kept
+    /// here rather than in <see cref="OperationScope"/>: a <c>using</c> struct local is read-only, so the
+    /// scope could not record anything in itself. The session lease makes this field exclusive.
     /// </summary>
-    private void TryCancelOperation(ulong flags, string operationName)
+    private ulong _operationsInProgress;
+
+    /// <summary>
+    /// Operations this session abandoned after an error without being able to cancel them (no
+    /// <c>C_SessionCancel</c> before v3.0): the module may still hold them active. Cleared by the next
+    /// successful <c>C_*Init</c> of the same kind.
+    /// </summary>
+    private ulong _operationsAbandoned;
+
+    /// <summary>
+    /// Ends whatever operations it saw begin, on any exit: an exception between <c>C_*Init</c> and the
+    /// call that finishes the operation would otherwise leave it active, and every later
+    /// <c>C_*Init</c> of that kind on the session would fail with <c>CKR_OPERATION_ACTIVE</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Usage: declare it after the <see cref="MechanismParameterScope"/>, so it is disposed first and the
+    /// cancel runs while the mechanism's parameter block is still allocated. Report each
+    /// <c>C_*Init</c> through <see cref="Begin"/>, and call <see cref="Completed"/> once the call that
+    /// finishes the operation has returned. A return code other than <c>CKR_OK</c> or
+    /// <c>CKR_BUFFER_TOO_SMALL</c> already ends an operation (PKCS#11 v3.2 §5.2), so the cancel only
+    /// matters when this library's own code throws between two calls; one that finds nothing to cancel
+    /// is expected.
+    /// </para>
+    /// <para>
+    /// The cancel is <c>C_SessionCancel</c> (v3.0+). On a module without it the operation may stay
+    /// active, so the session remembers it, and the next <c>C_*Init</c> of that kind that fails with
+    /// <c>CKR_OPERATION_ACTIVE</c> says why instead of leaving the caller to guess.
+    /// </para>
+    /// </remarks>
+    private readonly ref struct OperationScope : IDisposable
     {
+        private readonly Pkcs11Session _session;
+        private readonly string _name;
+
+        // What was in progress before this scope: an operation begun by a caller re-entering on this
+        // thread is that caller's to end.
+        private readonly ulong _outer;
+
+        internal OperationScope(Pkcs11Session session, string name)
+        {
+            _session = session;
+            _name = name;
+            _outer = session._operationsInProgress;
+        }
+
+        /// <summary>Checks a <c>C_*Init</c>'s return; on success, <paramref name="operation"/> is in progress.</summary>
+        public void Begin(ulong operation, CKR rv, string initFunction)
+        {
+            _session.ThrowIfInitFailed(operation, rv, initFunction);
+            _session._operationsInProgress |= operation;
+        }
+
+        /// <summary>Records that the call finishing <paramref name="operation"/> has returned.</summary>
+        public void End(ulong operation) => _session._operationsInProgress &= ~operation;
+
+        /// <summary>Records that every operation this scope began has ended.</summary>
+        public void Completed() => _session._operationsInProgress = _outer;
+
+        public void Dispose()
+        {
+            ulong unfinished = _session._operationsInProgress & ~_outer;
+            _session._operationsInProgress = _outer;
+            if (unfinished != 0)
+                _session.CancelAbandoned(unfinished, _name);
+        }
+    }
+
+    private OperationScope BeginOperation(string name) => new(this, name);
+
+    private void ThrowIfInitFailed(ulong operation, CKR rv, string initFunction)
+    {
+        if (rv == CKR.CKR_OK)
+        {
+            _operationsAbandoned &= ~operation;
+            return;
+        }
+        if (rv == CKR.CKR_OPERATION_ACTIVE && (_operationsAbandoned & operation) != 0)
+        {
+            throw new Pkcs11UnclassifiedException(rv, initFunction,
+                "An earlier operation of this kind on this session failed partway through, and this module " +
+                "cannot cancel it (it has no C_SessionCancel), so it is still active. Open a new session.");
+        }
+        Pkcs11Exception.ThrowIfError(rv, initFunction);
+    }
+
+    /// <summary>
+    /// Cancels operations abandoned on an exception. Never throws: it runs while that exception unwinds,
+    /// and must not replace it.
+    /// </summary>
+    private void CancelAbandoned(ulong operations, string operationName)
+    {
+        CKR rv;
         try
         {
-            CKR rv = _pkcs11Library.C_SessionCancel(_sessionId, (NativeCULong)flags);
-            if (rv is not CKR.CKR_OK and not CKR.CKR_FUNCTION_NOT_SUPPORTED)
-            {
+            rv = _pkcs11Library.C_SessionCancel(_sessionId, (NativeCULong)operations);
+        }
+        catch (ObjectDisposedException)
+        {
+            return; // the library is gone, and the session with it
+        }
+
+        switch (rv)
+        {
+            case CKR.CKR_OK:
+            case CKR.CKR_OPERATION_NOT_INITIALIZED: // the error that started the unwind had already ended it
+                return;
+            case CKR.CKR_FUNCTION_NOT_SUPPORTED:
+                _operationsAbandoned |= operations;
+                return;
+            default:
+                _operationsAbandoned |= operations;
                 _logger.LogWarning(
                     "Session({SessionId})::{Operation}: C_SessionCancel returned {Rv} during cleanup",
                     _sessionId, operationName, rv);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "Session({SessionId})::{Operation}: C_SessionCancel threw during cleanup",
-                _sessionId, operationName);
+                return;
         }
     }
 
@@ -1980,49 +2076,33 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out object? digestParams);
 
+        using var operation = BeginOperation(operationName);
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
+        operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
-        bool transformInited = false;
-        bool transformFinalized = false;
-        bool digestFinalized = false;
-        try
-        {
-            CK_MECHANISM ckTransformMechanism = transformMechanism.Marshal(scope, out object? transformParams);
+        CK_MECHANISM ckTransformMechanism = transformMechanism.Marshal(scope, out object? transformParams);
 
-            rv = transform.Init(ref ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
-            Pkcs11Exception.ThrowIfError(rv, transform.InitOperation);
-            transformInited = true;
+        rv = transform.Init(ref ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
+        operation.Begin(transform.CancelFlag, rv, transform.InitOperation);
 
-            PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation);
+        PumpStreamThrough(inputStream, outputStream, bufferLength, transform.Update, transform.UpdateOperation);
 
-            // Whatever the transform held back — a partial block, or an AEAD tag.
-            byte[] lastPart = CallWithLengthProbe(transform.Final, transform.FinalOperation);
-            transformFinalized = true;
+        // Whatever the transform held back — a partial block, or an AEAD tag.
+        byte[] lastPart = CallWithLengthProbe(transform.Final, transform.FinalOperation);
+        operation.End(transform.CancelFlag);
 
-            if (lastPart.Length > 0)
-                outputStream.Write(lastPart, 0, lastPart.Length);
+        if (lastPart.Length > 0)
+            outputStream.Write(lastPart, 0, lastPart.Length);
 
-            byte[] digest = CallWithLengthProbe(
-                (Span<byte> buffer, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, out length),
-                OpDigestFinal);
-            digestFinalized = true;
+        byte[] digest = CallWithLengthProbe(
+            (Span<byte> buffer, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, out length),
+            OpDigestFinal);
+        operation.Completed();
 
-            digestingMechanism.AbsorbOutput(digestParams);
-            transformMechanism.AbsorbOutput(transformParams);
+        digestingMechanism.AbsorbOutput(digestParams);
+        transformMechanism.AbsorbOutput(transformParams);
 
-            return digest;
-        }
-        finally
-        {
-            // Cancel whichever sub-operations are still live. The transform's init may not have
-            // succeeded; both are independent active operations on the session per v3.0+.
-            ulong cancelFlags = 0;
-            if (!digestFinalized) cancelFlags |= CKF.CKF_DIGEST;
-            if (transformInited && !transformFinalized) cancelFlags |= transform.CancelFlag;
-            if (cancelFlags != 0)
-                TryCancelOperation(cancelFlags, operationName);
-        }
+        return digest;
     }
 
     /// <summary>
@@ -2048,8 +2128,9 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Encrypt");
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
+        operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
 
         // Size the output for the largest single-block expansion a symmetric mechanism adds — a full
         // block of PKCS padding (AES block = 16) or a 16-byte AEAD tag — so block and AEAD ciphers
@@ -2086,6 +2167,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
+        operation.Completed();
 
         // Inside the scope's lifetime: the parameter block the token may have written into (an AEAD
         // IV, say) is still allocated. After `scope` is disposed the bytes are zeroized and freed.
@@ -2163,35 +2245,27 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Encrypt");
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
+        operation.Begin(CKF.CKF_ENCRYPT, rv, OpEncryptInit);
 
-        bool finalized = false;
-        try
-        {
-            PumpStreamThrough(inputStream, outputStream, bufferLength,
-                (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                    => _pkcs11Library.C_EncryptUpdate(_sessionId, input, output, out outputLen),
-                OpEncryptUpdate);
+        PumpStreamThrough(inputStream, outputStream, bufferLength,
+            (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                => _pkcs11Library.C_EncryptUpdate(_sessionId, input, output, out outputLen),
+            OpEncryptUpdate);
 
-            byte[]? lastEncryptedPart = null;
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out NativeCULong lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
+        byte[]? lastEncryptedPart = null;
+        rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out NativeCULong lastEncryptedPartLen);
+        Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
-            lastEncryptedPart = new byte[ReportedLength.ForAllocation(lastEncryptedPartLen, OpEncryptFinal)];
-            rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, out lastEncryptedPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
-            finalized = true;
+        lastEncryptedPart = new byte[ReportedLength.ForAllocation(lastEncryptedPartLen, OpEncryptFinal)];
+        rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, out lastEncryptedPartLen);
+        Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
+        operation.Completed();
 
-            mechanism.AbsorbOutput(mechParams);
+        mechanism.AbsorbOutput(mechParams);
 
-            outputStream.Write(lastEncryptedPart, 0, ReportedLength.Written(lastEncryptedPartLen, lastEncryptedPart.Length, OpEncryptFinal));
-        }
-        finally
-        {
-            if (!finalized)
-                TryCancelOperation(CKF.CKF_ENCRYPT, "Encrypt");
-        }
+        outputStream.Write(lastEncryptedPart, 0, ReportedLength.Written(lastEncryptedPartLen, lastEncryptedPart.Length, OpEncryptFinal));
     }
 
     /// <summary>
@@ -2300,8 +2374,9 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Decrypt");
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
+        operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
         // Use input length as the initial output buffer size — avoids a null-probe call
         // that causes AEAD tokens (e.g. SoftHSM2) to run full tag verification and return
@@ -2318,6 +2393,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
+        operation.Completed();
 
         mechanism.AbsorbOutput(mechParams);
 
@@ -2389,36 +2465,28 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Decrypt");
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
+        operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
-        bool finalized = false;
-        try
-        {
-            PumpStreamThrough(inputStream, outputStream, bufferLength,
-                (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                    => _pkcs11Library.C_DecryptUpdate(_sessionId, input, output, out outputLen),
-                OpDecryptUpdate);
+        PumpStreamThrough(inputStream, outputStream, bufferLength,
+            (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+                => _pkcs11Library.C_DecryptUpdate(_sessionId, input, output, out outputLen),
+            OpDecryptUpdate);
 
-            byte[]? lastPart = null;
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
+        byte[]? lastPart = null;
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
-            lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
-            rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
-            finalized = true;
+        lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
+        Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
+        operation.Completed();
 
-            mechanism.AbsorbOutput(mechParams);
+        mechanism.AbsorbOutput(mechParams);
 
-            outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
-            CryptographicOperations.ZeroMemory(lastPart);
-        }
-        finally
-        {
-            if (!finalized)
-                TryCancelOperation(CKF.CKF_DECRYPT, "Decrypt");
-        }
+        outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
+        CryptographicOperations.ZeroMemory(lastPart);
     }
 
     /// <summary>
@@ -2514,12 +2582,14 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Sign");
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
-        Pkcs11Exception.ThrowIfError(rv, OpSignInit);
+        operation.Begin(CKF.CKF_SIGN, rv, OpSignInit);
 
         byte[] signature = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, out len),
             OpSign);
+        operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
         mechanism.AbsorbOutput(mechParams);
@@ -2551,10 +2621,12 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Verify");
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
+        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         rv = _pkcs11Library.C_Verify(_sessionId, data, signature);
+        operation.Completed(); // C_Verify ends the operation whatever it returns
         isValid = IsVerified(rv, OpVerify);
 
         mechanism.AbsorbOutput(mechParams);
@@ -2631,34 +2703,26 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Verify");
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
+        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
-        bool finalized = false;
-        try
+        byte[] part = new byte[bufferLength];
+        int bytesRead = 0;
+
+        while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            byte[] part = new byte[bufferLength];
-            int bytesRead = 0;
-
-            while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
-            {
-                rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part.AsSpan(0, bytesRead));
-                Pkcs11Exception.ThrowIfError(rv, OpVerifyUpdate);
-            }
-
-            rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
-            // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
-            // the call failed with any other CKR — the verify operation is consumed.
-            finalized = true;
-            isValid = IsVerified(rv, OpVerifyFinal);
-
-            mechanism.AbsorbOutput(mechParams);
+            rv = _pkcs11Library.C_VerifyUpdate(_sessionId, part.AsSpan(0, bytesRead));
+            Pkcs11Exception.ThrowIfError(rv, OpVerifyUpdate);
         }
-        finally
-        {
-            if (!finalized)
-                TryCancelOperation(CKF.CKF_VERIFY, "Verify");
-        }
+
+        rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
+        // C_VerifyFinal always finalizes — whether the signature was valid, invalid, or
+        // the call failed with any other CKR — the verify operation is consumed.
+        operation.Completed();
+        isValid = IsVerified(rv, OpVerifyFinal);
+
+        mechanism.AbsorbOutput(mechParams);
     }
 
     /// <summary>
@@ -2685,14 +2749,16 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("VerifyRecover");
         CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpVerifyRecoverInit);
+        operation.Begin(CKF.CKF_VERIFY_RECOVER, rv, OpVerifyRecoverInit);
 
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, null, out NativeCULong dataLen);
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
 
         byte[] data = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
         rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, data, out dataLen);
+        operation.Completed(); // the call with a buffer ends the operation whatever it returns
         isValid = IsVerified(rv, OpVerifyRecover);
 
         mechanism.AbsorbOutput(mechParams);
@@ -2819,13 +2885,14 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckVerificationMechanism = verificationMechanism.Marshal(scope, out object? verifyParams);
 
+        using var operation = BeginOperation("DecryptVerify");
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpVerifyInit);
+        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
         CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope, out object? decryptParams);
 
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
-        Pkcs11Exception.ThrowIfError(rv, OpDecryptInit);
+        operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
@@ -2839,11 +2906,13 @@ internal sealed class Pkcs11Session : IDisposable
         lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
         rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
+        operation.End(CKF.CKF_DECRYPT);
 
         outputStream.Write(lastPart, 0, ReportedLength.Written(lastPartLen, lastPart.Length, OpDecryptFinal));
         CryptographicOperations.ZeroMemory(lastPart);
 
         rv = _pkcs11Library.C_VerifyFinal(_sessionId, signature);
+        operation.Completed(); // C_VerifyFinal ends the operation whatever it returns
         isValid = IsVerified(rv, OpVerifyFinal);
 
         verificationMechanism.AbsorbOutput(verifyParams);
@@ -2872,32 +2941,24 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("DigestKey");
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
+        operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
-        bool finalized = false;
-        try
-        {
-            rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
-            Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
+        rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
+        Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
 
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
+        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
-            byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-            finalized = true;
+        byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
+        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+        operation.Completed();
 
-            mechanism.AbsorbOutput(mechParams);
+        mechanism.AbsorbOutput(mechParams);
 
-            return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
-        }
-        finally
-        {
-            if (!finalized)
-                TryCancelOperation(CKF.CKF_DIGEST, "DigestKey");
-        }
+        return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
     }
 
     /// <summary>
@@ -2921,12 +2982,14 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Digest");
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
+        operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         byte[] digest = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, out len),
             OpDigest);
+        operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
         mechanism.AbsorbOutput(mechParams);
@@ -2992,38 +3055,30 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("Digest");
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestInit);
+        operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
-        bool finalized = false;
-        try
+        byte[] part = new byte[bufferLength];
+        int bytesRead = 0;
+
+        while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
         {
-            byte[] part = new byte[bufferLength];
-            int bytesRead = 0;
-
-            while ((bytesRead = inputStream.Read(part, 0, part.Length)) > 0)
-            {
-                rv = _pkcs11Library.C_DigestUpdate(_sessionId, part.AsSpan(0, bytesRead));
-                Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
-            }
-
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-
-            byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
-            rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-            finalized = true;
-
-            mechanism.AbsorbOutput(mechParams);
-
-            return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
+            rv = _pkcs11Library.C_DigestUpdate(_sessionId, part.AsSpan(0, bytesRead));
+            Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
         }
-        finally
-        {
-            if (!finalized)
-                TryCancelOperation(CKF.CKF_DIGEST, "Digest");
-        }
+
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
+        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+
+        byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
+        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+        operation.Completed();
+
+        mechanism.AbsorbOutput(mechParams);
+
+        return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
     }
 
     /// <summary>
@@ -3656,12 +3711,14 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("VerifySignature");
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
             _sessionId, ref ckMechanism, (NativeCULong)verificationKey.ObjectId,
             signature);
-        Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
+        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifySignatureInit);
 
         rv = _pkcs11Library.C_VerifySignature(_sessionId, data);
+        operation.Completed(); // C_VerifySignature ends the operation whatever it returns
         bool verified = IsVerified(rv, OpVerifySignature);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -3696,38 +3753,30 @@ internal sealed class Pkcs11Session : IDisposable
         using var scope = new MechanismParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
 
+        using var operation = BeginOperation("VerifySignature");
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
             _sessionId, ref ckMechanism, (NativeCULong)verificationKey.ObjectId,
             signature);
-        Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureInit);
+        operation.Begin(CKF.CKF_VERIFY, rv, OpVerifySignatureInit);
 
-        bool finalized = false;
-        try
+        byte[] buffer = new byte[bufferLength];
+        int read;
+        while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
         {
-            byte[] buffer = new byte[bufferLength];
-            int read;
-            while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
-            {
-                rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer.AsSpan(0, read));
-                Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureUpdate);
-            }
-
-            rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
-            // C_VerifySignatureFinal always finalizes — whether the signature was valid, invalid, or
-            // the call failed with any other CKR — the verify operation is consumed.
-            finalized = true;
-            bool verified = IsVerified(rv, OpVerifySignatureFinal);
-
-            // Absorbed before returning, so the scope that owns the parameter block is still alive.
-            mechanism.AbsorbOutput(mechParams);
-
-            return verified;
+            rv = _pkcs11Library.C_VerifySignatureUpdate(_sessionId, buffer.AsSpan(0, read));
+            Pkcs11Exception.ThrowIfError(rv, OpVerifySignatureUpdate);
         }
-        finally
-        {
-            if (!finalized)
-                TryCancelOperation(CKF.CKF_VERIFY, "VerifySignature");
-        }
+
+        rv = _pkcs11Library.C_VerifySignatureFinal(_sessionId);
+        // C_VerifySignatureFinal always finalizes — whether the signature was valid, invalid, or
+        // the call failed with any other CKR — the verify operation is consumed.
+        operation.Completed();
+        bool verified = IsVerified(rv, OpVerifySignatureFinal);
+
+        // Absorbed before returning, so the scope that owns the parameter block is still alive.
+        mechanism.AbsorbOutput(mechParams);
+
+        return verified;
     }
 
     // === Validation flags ==================================================
