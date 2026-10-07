@@ -319,12 +319,14 @@ internal static class OperationStateMixingTestCases
                     CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_AES_CBC_PAD, iv));
                     AssertOk(lowLevel.C_DecryptInit(sid, ref mech, (NativeCULong)key.ObjectId), "DecryptInit");
                 }
-                AssertOk(lowLevel.C_DecryptUpdate(sid, validCiphertext.AsSpan(0, 16), new byte[64], out NativeCULong _), "DecryptUpdate");
+                AssertOk(lowLevel.C_DecryptUpdate(sid, validCiphertext.AsSpan(0, 16), new byte[64], lengthOnly: false, out NativeCULong _), "DecryptUpdate");
 
-                CKR rv = lowLevel.C_Decrypt(sid, validCiphertext, new byte[64], out NativeCULong _);
+                CKR rv = lowLevel.C_Decrypt(sid, validCiphertext, new byte[64], lengthOnly: false, out NativeCULong _);
                 Assert.NotEqual(CKR.CKR_OK, rv);
 
-                try { lowLevel.C_DecryptFinal(sid, new byte[64], out NativeCULong _); } catch { /* best-effort cleanup */ }
+                // Ends the operation if it is still active. Its return code does not matter (the operation
+                // may already have ended); a failure comes back as one, not as an exception.
+                _ = lowLevel.C_DecryptFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
             }
             finally { session.DestroyObject(key); }
         });

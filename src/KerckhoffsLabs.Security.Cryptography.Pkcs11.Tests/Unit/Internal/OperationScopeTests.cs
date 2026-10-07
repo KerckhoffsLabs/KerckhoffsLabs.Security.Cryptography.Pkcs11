@@ -147,8 +147,8 @@ public sealed class OperationScopeTests
         public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen)
             => Answer(lengthOnly ? default : signature, out signatureLen, 64);
 
-        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
-            => Answer(data, out dataLen, encryptedData.Length + DecryptGrowsBy);
+        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
+            => Answer(lengthOnly ? default : data, out dataLen, encryptedData.Length + DecryptGrowsBy);
 
         public override CKR C_SessionCancel(NativeCULong session, NativeCULong flags)
         {

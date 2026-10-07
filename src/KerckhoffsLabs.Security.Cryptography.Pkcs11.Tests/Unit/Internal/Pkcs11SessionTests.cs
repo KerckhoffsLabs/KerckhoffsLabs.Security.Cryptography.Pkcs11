@@ -264,7 +264,7 @@ public sealed class Pkcs11SessionTests
         public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
         public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen) => TwoCall(lengthOnly ? default : encryptedData, out encryptedDataLen);
         public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen) => TwoCall(data, out dataLen);
+        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen) => TwoCall(lengthOnly ? default : data, out dataLen);
         public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
         { key = (NativeCULong)GeneratedKeyId; return GenerateKeyRv; }
         public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)

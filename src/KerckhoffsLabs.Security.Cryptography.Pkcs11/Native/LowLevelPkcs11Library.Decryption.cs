@@ -1,4 +1,3 @@
-// <auto-split-from LowLevelPkcs11Library.cs>
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -12,11 +11,20 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="mechanism">The decryption mechanism</param>
     /// <param name="key">The handle of the decryption key</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_KEY_FUNCTION_NOT_PERMITTED, CKR_KEY_HANDLE_INVALID, CKR_KEY_SIZE_RANGE, CKR_KEY_TYPE_INCONSISTENT, CKR_MECHANISM_INVALID, CKR_MECHANISM_PARAM_INVALID, CKR_OK, CKR_OPERATION_ACTIVE, CKR_PIN_EXPIRED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
+        var decryptInit = call.Functions.C_DecryptInit;
+        if (decryptInit is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return call.Table.C_DecryptInit(session, ref mechanism, key).ToCKR();
+        if (Pkcs11Marshal.IsWindows)
+        {
+            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return decryptInit(session, &packed, key).ToCKR();
+        }
+        fixed (CK_MECHANISM* m = &mechanism)
+            return decryptInit(session, m, key).ToCKR();
     }
 
     /// <summary>
@@ -24,18 +32,24 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="session">The session's handle</param>
     /// <param name="encryptedData">Encrypted data</param>
-    /// <param name="data">
-    /// If set to null then the length of decrypted data is returned in "dataLen" parameter, without actually returning decrypted data.
-    /// If not set to null then "dataLen" parameter must contain the lenght of data array and decrypted data is returned in "data" parameter.
-    /// </param>
+    /// <param name="data">Receives the decrypted data; ignored when <paramref name="lengthOnly"/>.</param>
+    /// <param name="lengthOnly">Asks only for the length of the decrypted data: the module receives a NULL buffer.</param>
     /// <param name="dataLen">Location that holds the length of the decrypted data</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_ENCRYPTED_DATA_INVALID, CKR_ENCRYPTED_DATA_LEN_RANGE, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
+    public unsafe CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
     {
         using ModuleCall call = EnterModule();
+        var decrypt = call.Functions.C_Decrypt;
+        dataLen = (NativeCULong)data.Length;
+        if (decrypt is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = call.Table.C_Decrypt(session, encryptedData, data, out dataLen);
-        return rv.ToCKR();
+        CKR rv;
+        fixed (byte* inPtr = encryptedData)
+        fixed (byte* outPtr = &NonNullPinnable(data))
+        fixed (NativeCULong* lenPtr = &dataLen)
+            rv = decrypt(session, inPtr, (NativeCULong)encryptedData.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
+        return CheckedOutput(rv, lengthOnly, dataLen, data.Length);
     }
 
     /// <summary>
@@ -43,35 +57,46 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="session">The session's handle</param>
     /// <param name="encryptedPart">Encrypted data part</param>
-    /// <param name="part">
-    /// If set to null then the length of decrypted data part is returned in "partLen" parameter, without actually returning decrypted data part.
-    /// If not set to null then "partLen" parameter must contain the lenght of part array and decrypted data part is returned in "part" parameter.
-    /// </param>
+    /// <param name="part">Receives the decrypted part; ignored when <paramref name="lengthOnly"/>.</param>
+    /// <param name="lengthOnly">Asks only for the length of the decrypted part: the module receives a NULL buffer.</param>
     /// <param name="partLen">Location that holds the length of the decrypted data part</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_ENCRYPTED_DATA_INVALID, CKR_ENCRYPTED_DATA_LEN_RANGE, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
+    public unsafe CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
     {
         using ModuleCall call = EnterModule();
+        var decryptUpdate = call.Functions.C_DecryptUpdate;
+        partLen = (NativeCULong)part.Length;
+        if (decryptUpdate is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = call.Table.C_DecryptUpdate(session, encryptedPart, part, out partLen);
-        return rv.ToCKR();
+        CKR rv;
+        fixed (byte* inPtr = encryptedPart)
+        fixed (byte* outPtr = &NonNullPinnable(part))
+        fixed (NativeCULong* lenPtr = &partLen)
+            rv = decryptUpdate(session, inPtr, (NativeCULong)encryptedPart.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
+        return CheckedOutput(rv, lengthOnly, partLen, part.Length);
     }
 
     /// <summary>
     /// Finishes a multi-part decryption operation
     /// </summary>
     /// <param name="session">The session's handle</param>
-    /// <param name="lastPart">
-    /// If set to null then the length of last decrypted data part is returned in "lastPartLen" parameter, without actually returning last decrypted data part.
-    /// If not set to null then "lastPartLen" parameter must contain the lenght of lastPart array and last decrypted data part is returned in "lastPart" parameter.
-    /// </param>
+    /// <param name="lastPart">Receives the last decrypted part; ignored when <paramref name="lengthOnly"/>.</param>
+    /// <param name="lengthOnly">Asks only for the length of the last decrypted part: the module receives a NULL buffer.</param>
     /// <param name="lastPartLen">Location that holds the length of the last decrypted data part</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_BUFFER_TOO_SMALL, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_DEVICE_ERROR, CKR_DEVICE_MEMORY, CKR_DEVICE_REMOVED, CKR_ENCRYPTED_DATA_INVALID, CKR_ENCRYPTED_DATA_LEN_RANGE, CKR_FUNCTION_CANCELED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK, CKR_OPERATION_NOT_INITIALIZED, CKR_SESSION_CLOSED, CKR_SESSION_HANDLE_INVALID, CKR_USER_NOT_LOGGED_IN</returns>
-    public CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen)
+    public unsafe CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen)
     {
         using ModuleCall call = EnterModule();
+        var decryptFinal = call.Functions.C_DecryptFinal;
+        lastPartLen = (NativeCULong)lastPart.Length;
+        if (decryptFinal is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = call.Table.C_DecryptFinal(session, lastPart, out lastPartLen);
-        return rv.ToCKR();
+        CKR rv;
+        fixed (byte* outPtr = &NonNullPinnable(lastPart))
+        fixed (NativeCULong* lenPtr = &lastPartLen)
+            rv = decryptFinal(session, lengthOnly ? null : outPtr, lenPtr).ToCKR();
+        return CheckedOutput(rv, lengthOnly, lastPartLen, lastPart.Length);
     }
 }
