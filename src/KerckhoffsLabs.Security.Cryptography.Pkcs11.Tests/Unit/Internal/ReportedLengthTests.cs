@@ -143,8 +143,8 @@ public sealed class ReportedLengthTests
             return Answer(lengthOnly ? default : signature, out signatureLen);
         }
 
-        public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen)
-            => Answer(encryptedData, out encryptedDataLen);
+        public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen)
+            => Answer(lengthOnly ? default : encryptedData, out encryptedDataLen);
 
         public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
             => Answer(data, out dataLen);

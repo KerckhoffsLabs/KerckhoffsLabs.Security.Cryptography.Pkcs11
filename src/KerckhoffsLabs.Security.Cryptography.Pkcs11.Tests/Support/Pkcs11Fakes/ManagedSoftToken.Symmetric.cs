@@ -35,10 +35,10 @@ internal sealed partial class ManagedSoftToken
             ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
             : InitSym((ulong)session, ref mechanism, (ulong)key);
 
-    public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen)
+    public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen)
         => _rsaEncOps.ContainsKey((ulong)session)
-            ? RsaTransform((ulong)session, data, encryptedData, out encryptedDataLen, encrypt: true)
-            : TransformSym((ulong)session, data, encryptedData, out encryptedDataLen, encrypt: true);
+            ? RsaTransform((ulong)session, data, lengthOnly ? default : encryptedData, out encryptedDataLen, encrypt: true)
+            : TransformSym((ulong)session, data, lengthOnly ? default : encryptedData, out encryptedDataLen, encrypt: true);
 
     public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
         => _rsaEncOps.ContainsKey((ulong)session)

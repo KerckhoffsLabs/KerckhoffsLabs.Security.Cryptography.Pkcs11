@@ -72,12 +72,12 @@ public sealed class Pkcs11SessionStreamTests
         public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
         public override CKR C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
 
-        public override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen)
-            => Update(part, encryptedPart, out encryptedPartLen);
+        public override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen)
+            => Update(part, lengthOnly ? default : encryptedPart, out encryptedPartLen);
         public override CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
             => Update(encryptedPart, part, out partLen);
-        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, out NativeCULong lastEncryptedPartLen)
-            => Final(lastEncryptedPart, out lastEncryptedPartLen);
+        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen)
+            => Final(lengthOnly ? default : lastEncryptedPart, out lastEncryptedPartLen);
         public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen)
             => Final(lastPart, out lastPartLen);
 

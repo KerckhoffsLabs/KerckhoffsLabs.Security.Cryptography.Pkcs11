@@ -109,9 +109,9 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount);
     CKR C_FindObjectsFinal(NativeCULong session);
     CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-    CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen);
-    CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen);
-    CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, out NativeCULong lastEncryptedPartLen);
+    CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen);
+    CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen);
+    CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen);
     CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen);
     CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen);

@@ -2171,17 +2171,17 @@ internal sealed class Pkcs11Session : IDisposable
         // report the required length. RSA and other output-larger-than-input mechanisms still grow via
         // the CKR_BUFFER_TOO_SMALL retry below.
         byte[] encryptedData = new byte[data.Length + 16];
-        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out NativeCULong encryptedDataLen);
+        rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out NativeCULong encryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
             encryptedData = new byte[ReportedLength.ForAllocation(encryptedDataLen, OpEncrypt)];
-            rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
+            rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
 
             // PKCS#11 v3.2 §5.2 requires CKR_BUFFER_TOO_SMALL to leave the operation active for a retry.
             // NSS softoken's classic C_Encrypt violates this — it terminates the operation, so the retry
-            // above returns CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, probing the length
-            // with a NULL buffer, then encrypting once. Reachable only for output-larger-than-input
+            // above returns CKR_OPERATION_NOT_INITIALIZED. Recover by re-initializing, querying the length,
+            // then encrypting once. Reachable only for output-larger-than-input
             // mechanisms (e.g. RSA) that exceed the padded buffer above; unreachable on spec-compliant
             // tokens, whose retry already returned CKR_OK.
             if (rv == CKR.CKR_OPERATION_NOT_INITIALIZED)
@@ -2189,11 +2189,11 @@ internal sealed class Pkcs11Session : IDisposable
                 rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
                 Pkcs11Exception.ThrowIfError(rv, OpEncryptInit);
 
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, null, out NativeCULong probeLen);
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, default, lengthOnly: true, out NativeCULong probeLen);
                 Pkcs11Exception.ThrowIfError(rv, OpEncrypt);
 
                 encryptedData = new byte[ReportedLength.ForAllocation(probeLen, OpEncrypt)];
-                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, out encryptedDataLen);
+                rv = _pkcs11Library.C_Encrypt(_sessionId, data, encryptedData, lengthOnly: false, out encryptedDataLen);
             }
         }
 
@@ -2282,15 +2282,15 @@ internal sealed class Pkcs11Session : IDisposable
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                => _pkcs11Library.C_EncryptUpdate(_sessionId, input, output, out outputLen),
+                => _pkcs11Library.C_EncryptUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
             OpEncryptUpdate);
 
         byte[]? lastEncryptedPart = null;
-        rv = _pkcs11Library.C_EncryptFinal(_sessionId, null, out NativeCULong lastEncryptedPartLen);
+        rv = _pkcs11Library.C_EncryptFinal(_sessionId, default, lengthOnly: true, out NativeCULong lastEncryptedPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
 
         lastEncryptedPart = new byte[ReportedLength.ForAllocation(lastEncryptedPartLen, OpEncryptFinal)];
-        rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, out lastEncryptedPartLen);
+        rv = _pkcs11Library.C_EncryptFinal(_sessionId, lastEncryptedPart, lengthOnly: false, out lastEncryptedPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpEncryptFinal);
         operation.Completed();
 
@@ -3208,8 +3208,8 @@ internal sealed class Pkcs11Session : IDisposable
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                     => _pkcs11Library.C_DigestEncryptUpdate(_sessionId, input, output, out outputLen),
                 UpdateOperation: OpDigestEncryptUpdate,
-                Final: (Span<byte> buffer, bool _, out NativeCULong length)
-                    => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, out length),
+                Final: (Span<byte> buffer, bool lengthOnly, out NativeCULong length)
+                    => _pkcs11Library.C_EncryptFinal(_sessionId, buffer, lengthOnly, out length),
                 FinalOperation: OpEncryptFinal,
                 CancelFlag: CKF.CKF_ENCRYPT),
             "DigestEncrypt");

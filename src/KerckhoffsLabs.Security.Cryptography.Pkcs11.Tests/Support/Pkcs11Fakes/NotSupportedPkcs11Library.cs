@@ -98,9 +98,9 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount) { objectCount = (NativeCULong)0; return NotSupported(nameof(C_FindObjects)); }
     public virtual CKR C_FindObjectsFinal(NativeCULong session) => NotSupported(nameof(C_FindObjectsFinal));
     public virtual CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_EncryptInit));
-    public virtual CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, out NativeCULong encryptedDataLen) { encryptedDataLen = (NativeCULong)0; return NotSupported(nameof(C_Encrypt)); }
-    public virtual CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen) { encryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_EncryptUpdate)); }
-    public virtual CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, out NativeCULong lastEncryptedPartLen) { lastEncryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_EncryptFinal)); }
+    public virtual CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen) { encryptedDataLen = (NativeCULong)0; return NotSupported(nameof(C_Encrypt)); }
+    public virtual CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen) { encryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_EncryptUpdate)); }
+    public virtual CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen) { lastEncryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_EncryptFinal)); }
     public virtual CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_DecryptInit));
     public virtual CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen) { dataLen = (NativeCULong)0; return NotSupported(nameof(C_Decrypt)); }
     public virtual CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen) { partLen = (NativeCULong)0; return NotSupported(nameof(C_DecryptUpdate)); }

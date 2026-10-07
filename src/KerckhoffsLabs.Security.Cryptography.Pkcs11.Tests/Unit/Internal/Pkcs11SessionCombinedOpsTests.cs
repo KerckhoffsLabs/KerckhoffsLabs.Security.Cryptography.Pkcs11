@@ -64,7 +64,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
         public override CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
             => Update(encryptedPart, part, out partLen);
 
-        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, out NativeCULong lastEncryptedPartLen)
+        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen)
         { lastEncryptedPartLen = (NativeCULong)0; return CKR.CKR_OK; }
         public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen)
         { lastPartLen = (NativeCULong)0; return CKR.CKR_OK; }

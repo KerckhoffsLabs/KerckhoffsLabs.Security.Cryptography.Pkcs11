@@ -47,6 +47,8 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_VerifySignature(NativeCULong session, ReadOnlySpan<byte> data) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_VerifySignatureFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_EncryptFinal(NativeCULong session, NativeBuffer<byte> lastEncryptedPart, ref NativeCULong lastEncryptedPartLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -119,6 +121,10 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_VerifySignatureUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifySignatureUpdate;
         if (Overrides(nameof(C_VerifySignatureFinal)))
             slots[nameof(CryptokiTable.C_VerifySignatureFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&VerifySignatureFinal;
+        if (Overrides(nameof(C_EncryptUpdate)))
+            slots[nameof(CryptokiTable.C_EncryptUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&EncryptUpdate;
+        if (Overrides(nameof(C_EncryptFinal)))
+            slots[nameof(CryptokiTable.C_EncryptFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&EncryptFinal;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -483,6 +489,34 @@ internal abstract unsafe partial class FakeModule
     {
         if (Owner(hSession, nameof(C_VerifySignatureFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
         try { return Rv(m.C_VerifySignatureFinal(hSession)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong EncryptUpdate(NativeCULong hSession, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_EncryptUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_EncryptUpdate(hSession, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong EncryptFinal(NativeCULong hSession, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_EncryptFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_EncryptFinal(hSession, new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
