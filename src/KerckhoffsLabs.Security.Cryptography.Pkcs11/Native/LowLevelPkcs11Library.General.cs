@@ -24,6 +24,11 @@ internal sealed partial class LowLevelPkcs11Library
     // pInitArgs is only read during the call (PKCS#11 v3.2 §5.4.1), so the block lives on the stack. It is
     // written through Pkcs11Marshal, never passed as the address of a local: CK_C_INITIALIZE_ARGS is
     // packed differently on Windows, and only the marshaller lays it out the way the module reads it.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
+        Justification = "A stack block needs a pointer, which C# only hands out in unsafe code. The block is " +
+        "sized by Pkcs11Marshal.SizeOf for the platform layout and written only through " +
+        "Pkcs11Marshal.WriteStructure, so nothing is written past it, and the module reads it only during " +
+        "the call. Covered on every leg by InitializeArgsTests, which reads the block back in a fake module.")]
     private unsafe CKR Initialize(CK_C_INITIALIZE_ARGS? initArgs)
     {
         using ModuleCall call = EnterModule();
