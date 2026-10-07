@@ -120,7 +120,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <remarks>
     /// A blocking wait does not hold off <c>C_Finalize</c>: PKCS#11 has <c>C_Finalize</c> wake it with
     /// <c>CKR_CRYPTOKI_NOT_INITIALIZED</c>, the only way to end it without an event, so disposing the
-    /// library while a thread waits ends the wait instead of waiting for it.
+    /// library while a thread waits ends the wait instead of waiting for it. On a module that may not be
+    /// called concurrently the wait holds the module's call lock like any call, so nothing else reaches
+    /// the module until it returns; <c>Pkcs11Library.WaitForSlotEvent</c> refuses to block there.
     /// </remarks>
     public CKR C_WaitForSlotEvent(NativeCULong flags, ref NativeCULong slot, IntPtr reserved)
     {

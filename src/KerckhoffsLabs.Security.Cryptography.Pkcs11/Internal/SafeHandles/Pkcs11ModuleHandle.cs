@@ -86,6 +86,13 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     {
         public int Live;
         public bool FinalizeOwed;
+
+        // How the module was initialized, for every load of it: a ConcurrencyMode, written by the load
+        // whose C_Initialize succeeded. Not under s_loadsLock: it is set from inside a call.
+        public int Mode;
+
+        // Serializes every call into a module that may not be called concurrently (see EnterCall).
+        public readonly Lock CallLock = new();
     }
 
     private Pkcs11ModuleHandle(IntPtr moduleHandle, bool freeOnRelease, object identity)
@@ -210,7 +217,51 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
 
     /// <summary>Closes <paramref name="session"/>. The caller holds a reference on this handle.</summary>
     internal CKR CloseSession(NativeCULong session)
-        => _detached is not null ? _detached.C_CloseSession(session) : Table.C_CloseSession(session).ToCKR();
+    {
+        if (_detached is not null)
+            return _detached.C_CloseSession(session);
+        bool serialized = EnterCall();
+        try
+        {
+            return Table.C_CloseSession(session).ToCKR();
+        }
+        finally
+        {
+            if (serialized)
+                ExitCall();
+        }
+    }
+
+    /// <summary>
+    /// Whether the module may be called from several threads at once: it was initialized with
+    /// <c>CKF_OS_LOCKING_OK</c>, by this load or another load of it. <see langword="false"/> when it
+    /// refused OS locking (<c>CKR_CANT_LOCK</c>) and was initialized without it — a promise, under
+    /// PKCS#11 v3.2 §5.4, that it will not be — and also when it was initialized by something other than
+    /// this library, in a way that is not known.
+    /// </summary>
+    internal bool SupportsConcurrentAccess
+        => _detached is not null
+           || (_loads is not null && (ConcurrencyMode)Volatile.Read(ref _loads.Mode) == ConcurrencyMode.OsLocking);
+
+    /// <summary>
+    /// Takes the module-wide call lock unless the module may be called concurrently; returns whether
+    /// it did, for <see cref="ExitCall"/>. Every call into the module goes through here, from every load
+    /// of it, which is what keeps the promise a single-threaded <c>C_Initialize</c> makes.
+    /// </summary>
+    /// <remarks>
+    /// Lock order: s_loadsLock, then the call lock, never the reverse. Nothing that holds the call lock
+    /// takes s_loadsLock.
+    /// </remarks>
+    internal bool EnterCall()
+    {
+        if (SupportsConcurrentAccess || _loads is null)
+            return false;
+        _loads.CallLock.Enter();
+        return true;
+    }
+
+    /// <summary>Releases the call lock taken by <see cref="EnterCall"/>.</summary>
+    internal void ExitCall() => _loads!.CallLock.Exit();
 
     /// <summary>Count of still-live tracked sessions (test/diagnostic seam).</summary>
     internal int TrackedSessionCount
@@ -263,8 +314,16 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
             session.Dispose();
     }
 
-    /// <summary>Records that <c>C_Initialize</c> through this handle succeeded.</summary>
-    internal void MarkInitialized() => _initialized = true;
+    /// <summary>
+    /// Records that <c>C_Initialize</c> through this handle succeeded, and whether it asked for OS locking
+    /// (<c>CKF_OS_LOCKING_OK</c>), for every load of the module to see.
+    /// </summary>
+    internal void MarkInitialized(bool osLocking)
+    {
+        _initialized = true;
+        if (_loads is not null)
+            Volatile.Write(ref _loads.Mode, (int)(osLocking ? ConcurrencyMode.OsLocking : ConcurrencyMode.SingleThreaded));
+    }
 
     /// <summary>Records that <c>C_Finalize</c> through this handle succeeded.</summary>
     internal void MarkFinalized()
@@ -274,7 +333,10 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         lock (s_loadsLock)
         {
             if (_loads is not null)
+            {
                 _loads.FinalizeOwed = false;
+                Volatile.Write(ref _loads.Mode, (int)ConcurrencyMode.Unknown);
+            }
         }
     }
 
@@ -359,9 +421,31 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         // unbound function, so check that instead of catching it.
         if (!Table.HasC_Finalize)
             return;
-        _finalizeReturnValue = Table.C_Finalize(IntPtr.Zero).ToCKR();
+        bool serialized = EnterCall();
+        try
+        {
+            _finalizeReturnValue = Table.C_Finalize(IntPtr.Zero).ToCKR();
+        }
+        finally
+        {
+            if (serialized)
+                ExitCall();
+        }
         _finalizeOutcome = _finalizeReturnValue == CKR.CKR_OK ? FinalizeOutcome.Succeeded : FinalizeOutcome.Failed;
     }
+}
+
+/// <summary>How a module was initialized, as far as its calls' concurrency goes.</summary>
+internal enum ConcurrencyMode
+{
+    /// <summary>Not initialized by this library: its threading mode is not known, so calls are serialized.</summary>
+    Unknown,
+
+    /// <summary>Initialized with <c>CKF_OS_LOCKING_OK</c>: the module locks for itself.</summary>
+    OsLocking,
+
+    /// <summary>Initialized without OS locking, after <c>CKR_CANT_LOCK</c>: it must never be called concurrently.</summary>
+    SingleThreaded,
 }
 
 /// <summary>What has happened to a requested <c>C_Finalize</c>.</summary>

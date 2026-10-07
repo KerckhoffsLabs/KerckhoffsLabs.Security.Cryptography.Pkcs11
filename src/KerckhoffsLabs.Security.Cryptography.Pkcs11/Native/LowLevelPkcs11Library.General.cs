@@ -12,32 +12,33 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CANT_LOCK, CKR_CRYPTOKI_ALREADY_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_NEED_TO_CREATE_THREADS, CKR_OK</returns>
     public CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs)
     {
+        CKR rv = Initialize(initArgs);
+
+        // The module handle owes C_Finalize only for an initialization it performed itself, and
+        // serializes calls unless that initialization asked for OS locking.
+        if (rv == CKR.CKR_OK)
+            _module.MarkInitialized(osLocking: initArgs is { } args && ((ulong)args.Flags & CKF.CKF_OS_LOCKING_OK) != 0);
+        return rv;
+    }
+
+    private CKR Initialize(CK_C_INITIALIZE_ARGS? initArgs)
+    {
         using ModuleCall call = EnterModule();
 
-        CKR rv;
         if (initArgs == null)
-        {
-            rv = call.Table.C_Initialize(IntPtr.Zero).ToCKR();
-        }
-        else
-        {
-            IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf<CK_C_INITIALIZE_ARGS>());
-            try
-            {
-                CK_C_INITIALIZE_ARGS initArgsValue = initArgs.Value;
-                UnmanagedMemory.Write(pInitArgs, in initArgsValue);
-                rv = call.Table.C_Initialize(pInitArgs).ToCKR();
-            }
-            finally
-            {
-                UnmanagedMemory.Free(ref pInitArgs);
-            }
-        }
+            return call.Table.C_Initialize(IntPtr.Zero).ToCKR();
 
-        // The module handle owes C_Finalize only for an initialization it performed itself.
-        if (rv == CKR.CKR_OK)
-            _module.MarkInitialized();
-        return rv;
+        IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf<CK_C_INITIALIZE_ARGS>());
+        try
+        {
+            CK_C_INITIALIZE_ARGS initArgsValue = initArgs.Value;
+            UnmanagedMemory.Write(pInitArgs, in initArgsValue);
+            return call.Table.C_Initialize(pInitArgs).ToCKR();
+        }
+        finally
+        {
+            UnmanagedMemory.Free(ref pInitArgs);
+        }
     }
 
     /// <summary>
@@ -47,9 +48,11 @@ internal sealed partial class LowLevelPkcs11Library
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
     public CKR C_Finalize(IntPtr reserved)
     {
-        using ModuleCall call = EnterModule();
+        CKR rv;
+        using (ModuleCall call = EnterModule())
+            rv = call.Table.C_Finalize(reserved).ToCKR();
 
-        CKR rv = call.Table.C_Finalize(reserved).ToCKR();
+        // After the call has released the call lock: MarkFinalized takes the registry lock.
         if (rv == CKR.CKR_OK)
             _module.MarkFinalized();
         return rv;
