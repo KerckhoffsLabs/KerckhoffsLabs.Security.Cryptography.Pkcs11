@@ -71,16 +71,27 @@ internal sealed class Pkcs11Session : IDisposable
     /// </remarks>
     private readonly object _busyLock = new();
 
-    /// <summary>Disposable token returned by <see cref="AcquireExclusive"/>. Releases the busy lock on dispose.</summary>
+    /// <summary>
+    /// Disposable token returned by <see cref="AcquireExclusive"/>. Holds the busy lock and a reference
+    /// on the session handle, and releases both on dispose.
+    /// </summary>
     /// <remarks>
+    /// <para>
+    /// The reference is what keeps the session open for a whole operation, from <c>C_*Init</c> to the
+    /// last call: closing the handle elsewhere (<c>Pkcs11Library.Dispose</c> closes every tracked
+    /// session) only marks it closed, and its <c>C_CloseSession</c> waits until this lease lets go.
+    /// </para>
+    /// <para>
     /// Implemented as <c>internal sealed class</c> (not <c>ref struct</c>) so the test suite can
     /// invoke <see cref="AcquireExclusive"/> via <c>[InternalsVisibleTo]</c> and hold the lease
     /// across a thread boundary. The one extra heap allocation per public method call is
     /// negligible against the cost of crossing the P/Invoke boundary that follows.
+    /// </para>
     /// </remarks>
     internal sealed class ExclusiveLease : IDisposable
     {
         private readonly object _lock;
+        private Pkcs11SessionHandle? _handle;
         private bool _released;
 
         internal ExclusiveLease(object lockObj)
@@ -89,10 +100,22 @@ internal sealed class Pkcs11Session : IDisposable
             _released = false;
         }
 
+        /// <summary>Takes a reference on <paramref name="handle"/>; throws <see cref="ObjectDisposedException"/> if it is already closed.</summary>
+        internal void Hold(Pkcs11SessionHandle handle)
+        {
+            bool added = false;
+            handle.DangerousAddRef(ref added);
+            if (added)
+                _handle = handle;
+        }
+
         public void Dispose()
         {
             if (_released) return;
             _released = true;
+            // The reference first: a deferred C_CloseSession then runs while this thread still holds
+            // the lock, so no other operation can start on the session it is closing.
+            _handle?.DangerousRelease();
             Monitor.Exit(_lock);
         }
     }
@@ -126,6 +149,7 @@ internal sealed class Pkcs11Session : IDisposable
             // flag while holding it. Every operation needs this, so it lives here rather than being
             // restated at each call site, where the omission of one line would be invisible.
             ObjectDisposedException.ThrowIf(_disposed, this);
+            lease.Hold(_sessionHandle);
             return lease;
         }
         catch
