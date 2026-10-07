@@ -220,8 +220,8 @@ public sealed class Pkcs11Library : IDisposable
     /// spec calls out <c>CKR_CANT_LOCK</c> as the expected return code in that
     /// case. The fallback path uses <c>pInitArgs = NULL</c>, which declares the
     /// application will not access the library from multiple threads
-    /// concurrently — callers in that mode are responsible for serializing
-    /// access at the C# level.
+    /// concurrently. This library keeps that promise itself: every call into such a
+    /// module is serialized (see <see cref="SupportsConcurrentAccess"/>).
     /// </remarks>
     private void Initialize()
     {
@@ -234,12 +234,12 @@ public sealed class Pkcs11Library : IDisposable
         // leave _ownsFinalize = false so Dispose doesn't tear down their state.
         if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
 
-        // Token refused OS locking. Retry without — application is single-threaded
-        // from the library's perspective; caller must serialize at the C# layer.
+        // Token refused OS locking. Retry without: that promises the module it is never called
+        // concurrently, and the module handle serializes every call to keep the promise.
         if (rv == CKR.CKR_CANT_LOCK)
         {
             _logger.LogWarning(
-                "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking",
+                "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
                 _libraryPath);
             rv = LowLevel.C_Initialize(null);
             if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
@@ -411,6 +411,34 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
+    /// Whether the module may be called from several threads at once: it accepted OS locking
+    /// (<c>CKF_OS_LOCKING_OK</c>) when it was initialized, by this instance or another instance loaded from
+    /// the same module.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see langword="false"/> when the module refused OS locking (<c>CKR_CANT_LOCK</c>) and was initialized
+    /// without it, which promises it is never called concurrently (PKCS#11 v3.2 §5.4). This library keeps
+    /// that promise: every call into the module, from every instance and session using it, is serialized,
+    /// so it stays correct to use from several threads, but those calls run one at a time. Also
+    /// <see langword="false"/> when the module was initialized by something other than this library, whose
+    /// threading mode cannot be known.
+    /// </para>
+    /// <para>
+    /// A blocking <see cref="WaitForSlotEvent"/> is refused when this is <see langword="false"/>.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    public bool SupportsConcurrentAccess
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return LowLevel.Module.SupportsConcurrentAccess;
+        }
+    }
+
+    /// <summary>
     /// Waits for a slot event, such as token insertion or token removal, to occur.
     /// </summary>
     /// <param name="nonBlocking">
@@ -421,11 +449,22 @@ public sealed class Pkcs11Library : IDisposable
     /// The PKCS#11 handle of the slot the event occurred in, or <see langword="null"/> if no event
     /// occurred — only possible when <paramref name="nonBlocking"/> is <see langword="true"/>.
     /// </returns>
+    /// <remarks>
+    /// A blocking wait needs a module that may be called concurrently (<see cref="SupportsConcurrentAccess"/>):
+    /// otherwise it would hold the module's only lock until an event came, keeping out every other call,
+    /// and <see cref="Dispose"/> could not wake it. Poll with <paramref name="nonBlocking"/> there instead.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if <paramref name="nonBlocking"/> is <see langword="false"/>
+    /// and <see cref="SupportsConcurrentAccess"/> is <see langword="false"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_WaitForSlotEvent</c> call.</exception>
     public ulong? WaitForSlotEvent(bool nonBlocking)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!nonBlocking && !SupportsConcurrentAccess)
+            throw new InvalidOperationException(
+                "A blocking WaitForSlotEvent needs a module that may be called concurrently, and this one may not " +
+                "(see SupportsConcurrentAccess). Poll with nonBlocking: true instead.");
 
         Log.LibraryTrace(_logger, _libraryPath, "WaitForSlotEvent");
 

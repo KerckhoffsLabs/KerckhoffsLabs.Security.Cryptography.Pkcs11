@@ -213,7 +213,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
 
         var module = Pkcs11ModuleHandle.Bind(() => new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
         Assert.False(module.Table.HasC_Finalize);
-        module.MarkInitialized();
+        module.MarkInitialized(osLocking: true);
         module.FinalizeOnRelease();
 
         module.Dispose();
