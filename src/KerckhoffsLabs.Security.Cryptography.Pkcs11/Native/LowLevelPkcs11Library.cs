@@ -4,9 +4,16 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
+    Justification = "This type is the cryptoki dispatch boundary. Its unsafe regions do only what C# permits " +
+    "nowhere else: invoke a module function pointer, pin a buffer for the duration of one call, and pass the " +
+    "address of a struct as a CK_*_PTR. Every function pointer is checked for NULL before it is invoked, every " +
+    "pointer is pinned by a fixed statement scoped to the call or is the address of a local, and every output " +
+    "length the module reports is checked against the buffer before a caller sees it. Suppressed at the type " +
+    "so that an unsafe block outside this boundary is still reported. Each wrapper is exercised through the " +
+    "real function table by the FakeModule smoke tests and LowLevelPkcs11LibraryWrapperContractTests.")]
 internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
 {
-
     /// <summary>
     /// The loaded module. It owns the function table, so a call can reach the module only while it holds
     /// a reference on this handle (<see cref="EnterModule"/>), and <c>C_Finalize</c> and the unmap wait

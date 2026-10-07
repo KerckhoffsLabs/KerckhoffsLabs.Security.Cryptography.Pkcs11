@@ -183,10 +183,12 @@ internal static class OperationStateMixingTestCases
                 }
                 AssertOk(lowLevel.C_SignUpdate(sid, Data1), "SignUpdate");
 
-                CKR rv = lowLevel.C_Sign(sid, Data2, new byte[64], out NativeCULong _);
+                CKR rv = lowLevel.C_Sign(sid, Data2, new byte[64], lengthOnly: false, out NativeCULong _);
                 Assert.NotEqual(CKR.CKR_OK, rv);
 
-                try { lowLevel.C_SignFinal(sid, new byte[64], out NativeCULong _); } catch { /* best-effort cleanup */ }
+                // Ends the operation if it is still active. Its return code does not matter (the operation
+                // may already have ended); a failure comes back as one, not as an exception.
+                _ = lowLevel.C_SignFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
             }
             finally { session.DestroyObject(key); }
         });
@@ -207,7 +209,7 @@ internal static class OperationStateMixingTestCases
                 AssertOk(lowLevel.C_SignUpdate(sid, Data1), "SignUpdate");
 
                 byte[] buf = new byte[64];
-                CKR rv = lowLevel.C_Sign(sid, Data2, buf, out NativeCULong len);
+                CKR rv = lowLevel.C_Sign(sid, Data2, buf, lengthOnly: false, out NativeCULong len);
                 AssertOk(rv, "Sign (illegal single-part call)");
 
                 byte[] got = buf.AsSpan(0, (int)len).ToArray();
@@ -215,7 +217,9 @@ internal static class OperationStateMixingTestCases
                 byte[] expected = hmac.ComputeHash([.. Data1, .. Data2]);
                 Assert.Equal(expected, got);
 
-                try { lowLevel.C_SignFinal(sid, new byte[64], out NativeCULong _); } catch { /* best-effort cleanup */ }
+                // Ends the operation if it is still active. Its return code does not matter (the operation
+                // may already have ended); a failure comes back as one, not as an exception.
+                _ = lowLevel.C_SignFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
             }
             finally { session.DestroyObject(key); }
         });

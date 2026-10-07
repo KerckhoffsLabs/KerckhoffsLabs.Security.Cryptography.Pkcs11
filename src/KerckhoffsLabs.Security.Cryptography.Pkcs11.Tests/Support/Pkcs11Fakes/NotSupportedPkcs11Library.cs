@@ -111,11 +111,11 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_DigestKey(NativeCULong session, NativeCULong key) => NotSupported(nameof(C_DigestKey));
     public virtual CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen) { digestLen = (NativeCULong)0; return NotSupported(nameof(C_DigestFinal)); }
     public virtual CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_SignInit));
-    public virtual CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen) { signatureLen = (NativeCULong)0; return NotSupported(nameof(C_Sign)); }
+    public virtual CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen) { signatureLen = (NativeCULong)0; return NotSupported(nameof(C_Sign)); }
     public virtual CKR C_SignUpdate(NativeCULong session, ReadOnlySpan<byte> part) => NotSupported(nameof(C_SignUpdate));
-    public virtual CKR C_SignFinal(NativeCULong session, Span<byte> signature, out NativeCULong signatureLen) { signatureLen = (NativeCULong)0; return NotSupported(nameof(C_SignFinal)); }
+    public virtual CKR C_SignFinal(NativeCULong session, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen) { signatureLen = (NativeCULong)0; return NotSupported(nameof(C_SignFinal)); }
     public virtual CKR C_SignRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_SignRecoverInit));
-    public virtual CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, out NativeCULong signatureLen) { signatureLen = (NativeCULong)0; return NotSupported(nameof(C_SignRecover)); }
+    public virtual CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen) { signatureLen = (NativeCULong)0; return NotSupported(nameof(C_SignRecover)); }
     public virtual CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_VerifyInit));
     public virtual CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => NotSupported(nameof(C_Verify));
     public virtual CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) => NotSupported(nameof(C_VerifyUpdate));

@@ -27,6 +27,9 @@ internal ref struct ModuleCall
     /// <summary>The module's function table.</summary>
     public readonly Delegates Table => _module.Table;
 
+    /// <summary>The module's function slots. A slot is NULL for a function the module does not provide.</summary>
+    public readonly ref readonly CryptokiTable Functions => ref _module.Table._fp;
+
     public void Dispose()
     {
         // The call lock first: releasing the use can run C_Finalize, which takes the registry lock.
