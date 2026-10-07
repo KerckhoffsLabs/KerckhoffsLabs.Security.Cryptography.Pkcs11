@@ -21,24 +21,19 @@ internal sealed partial class LowLevelPkcs11Library
         return rv;
     }
 
-    private CKR Initialize(CK_C_INITIALIZE_ARGS? initArgs)
+    // pInitArgs is only read during the call (PKCS#11 v3.2 §5.4.1), so the block lives on the stack. It is
+    // written through Pkcs11Marshal, never passed as the address of a local: CK_C_INITIALIZE_ARGS is
+    // packed differently on Windows, and only the marshaller lays it out the way the module reads it.
+    private unsafe CKR Initialize(CK_C_INITIALIZE_ARGS? initArgs)
     {
         using ModuleCall call = EnterModule();
 
-        if (initArgs == null)
+        if (initArgs is not { } args)
             return call.Table.C_Initialize(IntPtr.Zero).ToCKR();
 
-        IntPtr pInitArgs = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf<CK_C_INITIALIZE_ARGS>());
-        try
-        {
-            CK_C_INITIALIZE_ARGS initArgsValue = initArgs.Value;
-            UnmanagedMemory.Write(pInitArgs, in initArgsValue);
-            return call.Table.C_Initialize(pInitArgs).ToCKR();
-        }
-        finally
-        {
-            UnmanagedMemory.Free(ref pInitArgs);
-        }
+        byte* block = stackalloc byte[Pkcs11Marshal.SizeOf<CK_C_INITIALIZE_ARGS>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)block, in args);
+        return call.Table.C_Initialize((IntPtr)block).ToCKR();
     }
 
     /// <summary>
