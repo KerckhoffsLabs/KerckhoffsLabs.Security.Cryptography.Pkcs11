@@ -93,19 +93,19 @@ public sealed class KeyValuedParameterTests
         using var keys = new ParameterKeys();
         using var scope = keys.NewScope();
 
-        var ike1 = (CK_IKE1_PRF_DERIVE_PARAMS)new CkmIke1PrfDeriveParams(
-            CKM.CKM_SHA256_HMAC, keys.Secret(11), prevKey: null, [0x01], [0x02], keyNumber: 1).BuildMarshalable(scope);
+        var ike1 = new CkmIke1PrfDeriveParams(
+            CKM.CKM_SHA256_HMAC, keys.Secret(11), prevKey: null, [0x01], [0x02], keyNumber: 1).BuildMarshalable(scope).Read<CK_IKE1_PRF_DERIVE_PARAMS>();
         Assert.Equal(CkBbool.False, ike1.HasPrevKey);
         Assert.Equal(0UL, (ulong)ike1.PrevKey);
         Assert.Equal(11UL, (ulong)ike1.Keygxy);
 
-        var extended = (CK_IKE1_EXTENDED_DERIVE_PARAMS)new CkmIke1ExtendedDeriveParams(
-            CKM.CKM_SHA256_HMAC, keygxy: null, [0x01]).BuildMarshalable(scope);
+        var extended = new CkmIke1ExtendedDeriveParams(
+            CKM.CKM_SHA256_HMAC, keygxy: null, [0x01]).BuildMarshalable(scope).Read<CK_IKE1_EXTENDED_DERIVE_PARAMS>();
         Assert.Equal(CkBbool.False, extended.HasKeygxy);
         Assert.Equal(0UL, (ulong)extended.Keygxy);
 
-        var ike = (CK_IKE_PRF_DERIVE_PARAMS)new CkmIkePrfDeriveParams(
-            CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, [0x01], [0x02]).BuildMarshalable(scope);
+        var ike = new CkmIkePrfDeriveParams(
+            CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, [0x01], [0x02]).BuildMarshalable(scope).Read<CK_IKE_PRF_DERIVE_PARAMS>();
         Assert.Equal(0UL, (ulong)ike.NewKey);
     }
 
@@ -132,8 +132,8 @@ public sealed class KeyValuedParameterTests
     {
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_HKDF_PARAMS)CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC)
-            .BuildMarshalable(scope);
+        var s = CkmHkdfParams.WithoutSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC)
+            .BuildMarshalable(scope).Read<CK_HKDF_PARAMS>();
 
         Assert.Equal((ulong)HkdfSaltType.Null, (ulong)s.SaltType);
         Assert.Equal(IntPtr.Zero, s.Salt);

@@ -32,13 +32,13 @@ public sealed class CkmRc2CbcParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
 
         // The IV is an inline buffer, which an object initializer cannot assign from a span,
         // so construct first and copy into the field afterwards.
         var lowLevel = new CK_RC2_CBC_PARAMS { EffectiveBits = (NativeCULong)(ulong)_effectiveBits };
         _iv.CopyTo(lowLevel.Iv);
-        return lowLevel;
+        return scope.WriteParameter(lowLevel);
     }
 }

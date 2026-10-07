@@ -28,7 +28,7 @@ public sealed class Sp800108CounterKdfParamsTests
 
         var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, label, context);
         using var scope = new MechanismParameterScope();
-        var kdf = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+        var kdf = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)kdf.PrfType);
         Assert.Equal(5UL, (ulong)kdf.NumberOfDataParams);
@@ -78,7 +78,7 @@ public sealed class Sp800108CounterKdfParamsTests
     {
         var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA384_HMAC, label: default, context: default);
         using var scope = new MechanismParameterScope();
-        var kdf = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+        var kdf = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
         Assert.Equal(5UL, (ulong)kdf.NumberOfDataParams);
 
         int elem = UnmanagedMemory.SizeOf<CK_PRF_DATA_PARAM>();

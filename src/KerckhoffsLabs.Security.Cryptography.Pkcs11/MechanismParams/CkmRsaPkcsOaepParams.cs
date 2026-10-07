@@ -29,16 +29,16 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_RSA_PKCS_OAEP_PARAMS
+        return scope.WriteParameter(new CK_RSA_PKCS_OAEP_PARAMS
         {
             HashAlg = CkULong.From((ulong)_hashAlg, "hashAlg"),
             Mgf = CkULong.From((ulong)_mgf, "mgf"),
             Source = (NativeCULong)CKZ.CKZ_DATA_SPECIFIED,
             SourceData = scope.Write(_sourceDataBytes),
             SourceDataLen = (NativeCULong)_sourceDataBytes.Length,
-        };
+        });
     }
 
     /// <summary>Hash algorithm used in the OAEP encoding.</summary>

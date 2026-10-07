@@ -90,13 +90,14 @@ public sealed class MessageParamsCopyTagTests
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_GCM_MESSAGE_PARAMS>();
 
         // Stand in for the token writing the tag into the block it was handed.
         byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 1))];
         UnmanagedMemory.Write(s.Tag, produced);
 
-        p.AbsorbOutput(s);
+        p.AbsorbOutput(block);
 
         // The public accessor must serve what was absorbed, not the buffer the wrapper started
         // with — reading the wrong one returns an all-zeros tag on every encrypt.
@@ -111,12 +112,13 @@ public sealed class MessageParamsCopyTagTests
         var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, new byte[13], macBytes: 16);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_CCM_MESSAGE_PARAMS>();
 
         byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 0x20))];
         UnmanagedMemory.Write(s.Mac, produced);
 
-        p.AbsorbOutput(s);
+        p.AbsorbOutput(block);
 
         byte[] readBack = new byte[16];
         p.CopyMacTo(readBack);
@@ -129,12 +131,13 @@ public sealed class MessageParamsCopyTagTests
         var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(new byte[12]);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>();
 
         byte[] produced = [.. Enumerable.Range(0, 16).Select(i => (byte)(i + 0x40))];
         UnmanagedMemory.Write(s.Tag, produced);
 
-        p.AbsorbOutput(s);
+        p.AbsorbOutput(block);
 
         byte[] readBack = new byte[16];
         p.CopyTagTo(readBack);

@@ -14,7 +14,7 @@ public sealed class MechanismStreamParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8];
         var p = new CkmSalsa20Params(blockCounter, nonce, nonceBits: 64);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_PARAMS>();
 
         Assert.Equal(blockCounter, UnmanagedMemory.Read(s.BlockCounter, blockCounter.Length));
         Assert.Equal(nonce, UnmanagedMemory.Read(s.Nonce, nonce.Length));
@@ -59,7 +59,7 @@ public sealed class MechanismStreamParamsTests
         byte[] aad = [0xAA, 0xBB];
         var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_CHACHA20_POLY1305_PARAMS>();
 
         Assert.Equal((ulong)nonce.Length, (ulong)s.NonceLen);
         Assert.Equal(nonce, UnmanagedMemory.Read(s.Nonce, nonce.Length));
@@ -73,7 +73,7 @@ public sealed class MechanismStreamParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, default);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_CHACHA20_POLY1305_PARAMS>();
 
         Assert.Equal(0UL, (ulong)s.AADLen);
         Assert.Equal(IntPtr.Zero, s.AAD);

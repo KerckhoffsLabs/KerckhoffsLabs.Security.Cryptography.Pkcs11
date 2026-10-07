@@ -60,9 +60,9 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_X2RATCHET_INITIALIZE_PARAMS
+        return scope.WriteParameter(new CK_X2RATCHET_INITIALIZE_PARAMS
         {
             Sk = scope.Write(_skBytes),
             PeerPublicPrekey = scope.KeyHandle(_peerPublicPrekey, KeyHandlePart.Public, "peerPublicPrekey"),
@@ -72,6 +72,6 @@ public sealed class CkmX2RatchetInitializeParams : MechanismParameters
             Curve = CkULong.From(_curve, "curve"),
             AeadMechanism = CkULong.From((ulong)_aeadMechanism, "aeadMechanism"),
             KdfMechanism = CkULong.From((ulong)_kdfMechanism, "kdfMechanism"),
-        };
+        });
     }
 }

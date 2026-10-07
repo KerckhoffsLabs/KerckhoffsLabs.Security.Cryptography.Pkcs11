@@ -34,15 +34,15 @@ public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
+        return scope.WriteParameter(new CK_IKE2_PRF_PLUS_DERIVE_PARAMS
         {
             PrfMechanism = CkULong.From((ulong)_prfMechanism, "prfMechanism"),
             HasSeedKey = CkBbool.From(_seedKey is not null),
             SeedKey = _seedKey is null ? default : scope.KeyHandle(_seedKey, KeyHandlePart.Private, "seedKey"),
             SeedData = scope.Write(_seedDataBytes),
             SeedDataLen = (NativeCULong)_seedDataBytes.Length,
-        };
+        });
     }
 }

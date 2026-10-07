@@ -37,7 +37,7 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
             var m = new Mechanism(CKM.CKM_AES_KEY_GEN);
             using (var scope = new MechanismParameterScope())
             {
-                CK_MECHANISM marshalled = m.Marshal(scope, out object? mechParams);
+                CK_MECHANISM marshalled = m.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
                 Assert.Equal(IntPtr.Zero, marshalled.Parameter);
                 Assert.Null(mechParams);
             }
@@ -60,7 +60,7 @@ public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
 
             using (var scope = new MechanismParameterScope())
             {
-                CK_MECHANISM marshalled = m.Marshal(scope, out object? mechParams);
+                CK_MECHANISM marshalled = m.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
                 // CkmAesGcmParams has no output fields, so this absorb is a no-op; it is here because
                 // the cycle under test is the session's, and the session always absorbs.
                 m.AbsorbOutput(mechParams);

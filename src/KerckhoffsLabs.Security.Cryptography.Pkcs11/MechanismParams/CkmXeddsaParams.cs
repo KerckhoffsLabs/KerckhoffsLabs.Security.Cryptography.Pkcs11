@@ -21,6 +21,6 @@ public sealed class CkmXeddsaParams : MechanismParameters
     public CkmXeddsaParams(CKM hashType) => _hashType = hashType;
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
-        => new CK_XEDDSA_PARAMS { Hash = CkULong.From((ulong)_hashType, "hashType") };
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
+        => scope.WriteParameter(new CK_XEDDSA_PARAMS { Hash = CkULong.From((ulong)_hashType, "hashType") });
 }

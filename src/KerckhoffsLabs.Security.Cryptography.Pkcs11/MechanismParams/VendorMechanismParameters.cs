@@ -45,7 +45,7 @@ public abstract class VendorMechanismParameters : MechanismParameters
     /// <param name="writer">Collects the fields; see <see cref="Pkcs11ParameterWriter"/>.</param>
     protected abstract void Describe(Pkcs11ParameterWriter writer);
 
-    internal sealed override object BuildMarshalable(MechanismParameterScope scope)
+    internal sealed override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
         var writer = new Pkcs11ParameterWriter(scope);
         Describe(writer);

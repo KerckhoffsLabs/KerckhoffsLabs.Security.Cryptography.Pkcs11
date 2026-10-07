@@ -96,9 +96,9 @@ public sealed class CkmHkdfParams : MechanismParameters
     internal CKM PrfHashMechanism => _prfHashMechanism;
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_HKDF_PARAMS
+        return scope.WriteParameter(new CK_HKDF_PARAMS
         {
             Extract = CkBbool.From(_extract),
             Expand = CkBbool.From(_expand),
@@ -109,6 +109,6 @@ public sealed class CkmHkdfParams : MechanismParameters
             SaltKey = _saltKey is null ? default : scope.KeyHandle(_saltKey, KeyHandlePart.Private, "saltKey"),
             Info = scope.Write(_infoBytes),
             InfoLen = (NativeCULong)_infoBytes.Length,
-        };
+        });
     }
 }

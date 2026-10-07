@@ -18,7 +18,7 @@ public sealed class MechanismSignalParamsTests
         var p = new CkmX3dhInitiateParams(kdf: CKM.CKM_SHA256_HMAC, peerIdentity: keys.PublicOnly(2), peerPrekey: keys.PublicOnly(3), sig, otk,
             ownIdentity: keys.Pair(4, 0x40), ownEphemeral: keys.Pair(5, 0x50));
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_X3DH_INITIATE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_X3DH_INITIATE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.Kdf);
         Assert.Equal(2UL, (ulong)s.PeerIdentity);
@@ -39,7 +39,7 @@ public sealed class MechanismSignalParamsTests
         using var keys = new ParameterKeys();
         var p = new CkmX3dhRespondParams(kdf: CKM.CKM_SHA384_HMAC, id, pre, otp, initiatorIdentity: keys.PublicOnly(8), eph);
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_X3DH_RESPOND_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_X3DH_RESPOND_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.Kdf);
         Assert.Equal(8UL, (ulong)s.InitiatorIdentity);
@@ -57,7 +57,7 @@ public sealed class MechanismSignalParamsTests
         var p = new CkmX2RatchetInitializeParams(sk, peerPublicPrekey: keys.PublicOnly(1), peerPublicIdentity: keys.PublicOnly(2),
             ownPublicIdentity: keys.Pair(0x30, 3), encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC);
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_X2RATCHET_INITIALIZE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_X2RATCHET_INITIALIZE_PARAMS>();
 
         Assert.Equal(sk, UnmanagedMemory.Read(s.Sk, sk.Length));
         Assert.Equal(1UL, (ulong)s.PeerPublicPrekey);
@@ -86,7 +86,7 @@ public sealed class MechanismSignalParamsTests
         var p = new CkmX2RatchetRespondParams(sk, ownPrekey: keys.Pair(1, 0x10), initiatorIdentity: keys.PublicOnly(2),
             ownPublicIdentity: keys.Pair(0x30, 3), encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC);
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_X2RATCHET_RESPOND_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_X2RATCHET_RESPOND_PARAMS>();
 
         Assert.Equal(sk, UnmanagedMemory.Read(s.Sk, sk.Length));
         Assert.Equal(1UL, (ulong)s.OwnPrekey);

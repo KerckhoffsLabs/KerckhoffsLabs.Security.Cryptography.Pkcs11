@@ -17,7 +17,7 @@ public sealed class MechanismIkeDeriveParamsTests
         using var keys = new ParameterKeys();
         var p = new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: false, ni, nr, newKey: keys.Secret(7));
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_IKE_PRF_DERIVE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_IKE_PRF_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.Equal(CkBbool.True, s.DataAsKey);
@@ -36,7 +36,7 @@ public sealed class MechanismIkeDeriveParamsTests
         var p = new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC,
             keygxy: keys.Secret(1), prevKey: keys.Secret(2), ckyI, ckyR, keyNumber: 9);
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_IKE1_PRF_DERIVE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_IKE1_PRF_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.Equal(CkBbool.True, s.HasPrevKey);
@@ -52,7 +52,7 @@ public sealed class MechanismIkeDeriveParamsTests
         using var keys = new ParameterKeys();
         var p = new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: keys.Secret(5), extra);
         using var scope = keys.NewScope();
-        var s = ParamMarshal.RoundTrip<CK_IKE1_EXTENDED_DERIVE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_IKE1_EXTENDED_DERIVE_PARAMS>();
 
         Assert.Equal(CkBbool.True, s.HasKeygxy);
         Assert.Equal(5UL, (ulong)s.Keygxy);
@@ -66,7 +66,7 @@ public sealed class MechanismIkeDeriveParamsTests
         byte[] seed = [0xBE, 0xEF, 0x01];
         var p = new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, seedKey: null, seed);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_IKE2_PRF_PLUS_DERIVE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_IKE2_PRF_PLUS_DERIVE_PARAMS>();
 
         Assert.Equal(CkBbool.False, s.HasSeedKey);
         Assert.Equal(0UL, (ulong)s.SeedKey);

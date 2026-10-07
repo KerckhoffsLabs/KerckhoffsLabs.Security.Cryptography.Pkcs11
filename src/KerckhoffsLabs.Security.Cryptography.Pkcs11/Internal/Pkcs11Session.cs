@@ -1585,7 +1585,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
 
@@ -1649,7 +1649,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes);
         CK_ATTRIBUTE[]? privateKeyTemplate = BuildTemplate(privateKeyAttributes);
@@ -1701,7 +1701,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         byte[]? wrappedKey = mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
             ? TryWrapKeyKwp(ref ckMechanism, wrappingKeyHandle, keyHandle)
@@ -1773,7 +1773,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Unwrapping decrypts a key blob into a new token object. Without secure defaults a caller
         // could land an extractable, non-sensitive key — silently downgrading the posture the key
@@ -2105,13 +2105,13 @@ internal sealed class Pkcs11Session : IDisposable
         // Both mechanisms marshal into the same scope: the two operations run interleaved, so both
         // parameter blocks have to stay alive until the last native call returns.
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out object? digestParams);
+        CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out Pkcs11ParameterBlock? digestParams);
 
         using var operation = BeginOperation(operationName);
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckDigestingMechanism);
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
-        CK_MECHANISM ckTransformMechanism = transformMechanism.Marshal(scope, out object? transformParams);
+        CK_MECHANISM ckTransformMechanism = transformMechanism.Marshal(scope, out Pkcs11ParameterBlock? transformParams);
 
         rv = transform.Init(ref ckTransformMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(transform.CancelFlag, rv, transform.InitOperation);
@@ -2157,7 +2157,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Encrypt");
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2274,7 +2274,7 @@ internal sealed class Pkcs11Session : IDisposable
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Encrypt");
         CKR rv = _pkcs11Library.C_EncryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2341,7 +2341,7 @@ internal sealed class Pkcs11Session : IDisposable
         // One scope for the whole operation: it owns the mechanism's parameter block and the
         // per-message block below, and outlives every native call that reads or writes them.
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageEncryptInit);
 
@@ -2349,13 +2349,10 @@ internal sealed class Pkcs11Session : IDisposable
 
         try
         {
-            object paramsStruct = messageParams.BuildMarshalable(scope);
-            int paramsSize = UnmanagedMemory.SizeOf(paramsStruct.GetType());
-            IntPtr paramsPtr = scope.Allocate(paramsSize);
-            UnmanagedMemory.Write(paramsPtr, paramsStruct);
+            Pkcs11ParameterBlock messageBlock = messageParams.BuildMarshalable(scope);
 
             rv = _pkcs11Library.C_EncryptMessage(
-                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 plaintext,
                 null, out NativeCULong ctLen);
@@ -2363,7 +2360,7 @@ internal sealed class Pkcs11Session : IDisposable
 
             byte[] ct = new byte[ReportedLength.ForAllocation(ctLen, OpEncryptMessage)];
             rv = _pkcs11Library.C_EncryptMessage(
-                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 plaintext,
                 ct, out ctLen);
@@ -2371,7 +2368,7 @@ internal sealed class Pkcs11Session : IDisposable
 
             // The token wrote the authentication tag into the scope-owned block; copy it back into
             // the wrapper before `scope` is disposed and the bytes are zeroized.
-            messageParams.AbsorbOutput(paramsStruct);
+            messageParams.AbsorbOutput(messageBlock);
 
             return ReportedLength.Trim(ct, ctLen, OpEncryptMessage);
         }
@@ -2403,7 +2400,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2494,7 +2491,7 @@ internal sealed class Pkcs11Session : IDisposable
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
         CKR rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2552,7 +2549,7 @@ internal sealed class Pkcs11Session : IDisposable
         // One scope for the whole operation: it owns the mechanism's parameter block and the
         // per-message block below, and outlives every native call that reads or writes them.
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageDecryptInit);
 
@@ -2560,13 +2557,10 @@ internal sealed class Pkcs11Session : IDisposable
 
         try
         {
-            object paramsStruct = messageParams.BuildMarshalable(scope);
-            int paramsSize = UnmanagedMemory.SizeOf(paramsStruct.GetType());
-            IntPtr paramsPtr = scope.Allocate(paramsSize);
-            UnmanagedMemory.Write(paramsPtr, paramsStruct);
+            Pkcs11ParameterBlock messageBlock = messageParams.BuildMarshalable(scope);
 
             rv = _pkcs11Library.C_DecryptMessage(
-                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 ciphertext,
                 null, out NativeCULong ptLen);
@@ -2574,13 +2568,13 @@ internal sealed class Pkcs11Session : IDisposable
 
             byte[] pt = new byte[ReportedLength.ForAllocation(ptLen, OpDecryptMessage)];
             rv = _pkcs11Library.C_DecryptMessage(
-                _sessionId, paramsPtr, (NativeCULong)paramsSize,
+                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 ciphertext,
                 pt, out ptLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
 
-            messageParams.AbsorbOutput(paramsStruct);
+            messageParams.AbsorbOutput(messageBlock);
 
             return ReportedLength.Trim(pt, ptLen, OpDecryptMessage);
         }
@@ -2611,7 +2605,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Sign");
         CKR rv = _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
@@ -2650,7 +2644,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Verify");
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2732,7 +2726,7 @@ internal sealed class Pkcs11Session : IDisposable
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Verify");
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2778,7 +2772,7 @@ internal sealed class Pkcs11Session : IDisposable
         ArgumentNullException.ThrowIfNull(signature);
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifyRecover");
         CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
@@ -2914,13 +2908,13 @@ internal sealed class Pkcs11Session : IDisposable
         // Both mechanisms marshal into the same scope: the two operations run interleaved, so both
         // parameter blocks have to stay alive until the last native call returns.
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckVerificationMechanism = verificationMechanism.Marshal(scope, out object? verifyParams);
+        CK_MECHANISM ckVerificationMechanism = verificationMechanism.Marshal(scope, out Pkcs11ParameterBlock? verifyParams);
 
         using var operation = BeginOperation("DecryptVerify");
         CKR rv = _pkcs11Library.C_VerifyInit(_sessionId, ref ckVerificationMechanism, (NativeCULong)(verificationKeyHandle.ObjectId));
         operation.Begin(CKF.CKF_VERIFY, rv, OpVerifyInit);
 
-        CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope, out object? decryptParams);
+        CK_MECHANISM ckDecryptionMechanism = decryptionMechanism.Marshal(scope, out Pkcs11ParameterBlock? decryptParams);
 
         rv = _pkcs11Library.C_DecryptInit(_sessionId, ref ckDecryptionMechanism, (NativeCULong)(decryptionKeyHandle.ObjectId));
         operation.Begin(CKF.CKF_DECRYPT, rv, OpDecryptInit);
@@ -2970,7 +2964,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("DigestKey");
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
@@ -3011,7 +3005,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Digest");
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
@@ -3084,7 +3078,7 @@ internal sealed class Pkcs11Session : IDisposable
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Digest");
         CKR rv = _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism);
@@ -3352,7 +3346,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
         // (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when the caller omitted them); an explicit insecure
@@ -3497,7 +3491,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
@@ -3593,7 +3587,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
         // defaults as UnwrapKey (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
@@ -3644,7 +3638,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
@@ -3687,7 +3681,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Authenticated unwrap lands a new key object on the token, exactly as UnwrapKey does. Apply the
         // same secure defaults (CKA_SENSITIVE=true / CKA_EXTRACTABLE=false when omitted); an explicit
@@ -3740,7 +3734,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifySignature");
         CKR rv = _pkcs11Library.C_VerifySignatureInit(
@@ -3782,7 +3776,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 
         using var scope = new MechanismParameterScope(this);
-        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out object? mechParams);
+        CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifySignature");
         CKR rv = _pkcs11Library.C_VerifySignatureInit(

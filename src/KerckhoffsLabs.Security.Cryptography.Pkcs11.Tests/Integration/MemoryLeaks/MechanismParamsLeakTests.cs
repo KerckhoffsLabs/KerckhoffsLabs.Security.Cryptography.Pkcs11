@@ -58,7 +58,7 @@ public sealed class MechanismParamsLeakTests : IDisposable
 
             using (var scope = new MechanismParameterScope())
             {
-                CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+                CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
                 mech.AbsorbOutput(mechParams);
 
                 Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);

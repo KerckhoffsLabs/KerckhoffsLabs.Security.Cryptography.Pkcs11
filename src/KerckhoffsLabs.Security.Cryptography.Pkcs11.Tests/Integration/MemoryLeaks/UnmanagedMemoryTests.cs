@@ -146,18 +146,6 @@ public sealed class UnmanagedMemoryTests
     public void SizeOf_Generic_Packed_UsesPackedSize() =>
         Assert.Equal(3 * UnmanagedMemory.NativeULongSize, UnmanagedMemory.SizeOf<CK_MECHANISM_INFO>());
 
-    [Fact]
-    public void SizeOf_Type_Packed_MatchesGeneric() =>
-        Assert.Equal(UnmanagedMemory.SizeOf<CK_MECHANISM_INFO>(), UnmanagedMemory.SizeOf(typeof(CK_MECHANISM_INFO)));
-
-    [Fact]
-    public void SizeOf_Type_NonPacked_Throws() =>
-        Assert.Throws<NotSupportedException>(() => UnmanagedMemory.SizeOf(typeof(CK_VERSION)));
-
-    [Fact]
-    public void SizeOf_Type_Null_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.SizeOf((Type)null!));
-
     // === Write<T> / Read<T> ==============================================
 
     [Fact]
@@ -202,46 +190,6 @@ public sealed class UnmanagedMemoryTests
     [Fact]
     public void Read_Generic_NullMemory_Throws() =>
         Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read<CK_VERSION>(IntPtr.Zero));
-
-    // === Write(object) / Read(Type) ======================================
-
-    [Fact]
-    public void WriteObject_ReadType_Packed_RoundTrips()
-    {
-        WithBuffer(UnmanagedMemory.SizeOf(typeof(CK_MECHANISM_INFO)), p =>
-        {
-            object boxed = new CK_MECHANISM_INFO { MinKeySize = (NativeCULong)1UL, MaxKeySize = (NativeCULong)2UL, Flags = (NativeCULong)3UL };
-            UnmanagedMemory.Write(p, boxed);
-            var back = (CK_MECHANISM_INFO)UnmanagedMemory.Read(p, typeof(CK_MECHANISM_INFO))!;
-            Assert.Equal(1UL, (ulong)back.MinKeySize);
-            Assert.Equal(2UL, (ulong)back.MaxKeySize);
-            Assert.Equal(3UL, (ulong)back.Flags);
-        });
-    }
-
-    [Fact]
-    public void WriteObject_NonPacked_Throws() =>
-        WithBuffer(4, p => Assert.Throws<NotSupportedException>(() => UnmanagedMemory.Write(p, (object)new CK_VERSION())));
-
-    [Fact]
-    public void WriteObject_NullMemory_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Write(IntPtr.Zero, (object)new CK_VERSION()));
-
-    [Fact]
-    public void WriteObject_NullStructure_Throws() =>
-        WithBuffer(4, p => Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Write(p, (object)null!)));
-
-    [Fact]
-    public void ReadType_NonPacked_Throws() =>
-        WithBuffer(4, p => Assert.Throws<NotSupportedException>(() => UnmanagedMemory.Read(p, typeof(CK_VERSION))));
-
-    [Fact]
-    public void ReadType_NullMemory_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read(IntPtr.Zero, typeof(CK_MECHANISM_INFO)));
-
-    [Fact]
-    public void ReadType_NullType_Throws() =>
-        WithBuffer(4, p => Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read(p, (Type)null!)));
 
     // === Zeroize ==========================================================
 

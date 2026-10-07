@@ -137,7 +137,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
 
         // Inner blocks first: every CK_PRF_DATA_PARAM stores the address of its format struct or
@@ -164,7 +164,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
         // Feedback mode has its own top-level struct; counter and double-pipeline share one.
         if (_feedback)
         {
-            return new CK_SP800_108_FEEDBACK_KDF_PARAMS
+            return scope.WriteParameter(new CK_SP800_108_FEEDBACK_KDF_PARAMS
             {
                 PrfType = CkULong.From((ulong)_prfType, "prfType"),
                 NumberOfDataParams = dataParamCount,
@@ -173,28 +173,27 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
                 IV = scope.Write(_iv),
                 AdditionalDerivedKeys = derivedKeyCount,
                 AdditionalDerivedKeysPtr = derivedKeys,
-            };
+            });
         }
 
-        return new CK_SP800_108_KDF_PARAMS
+        return scope.WriteParameter(new CK_SP800_108_KDF_PARAMS
         {
             PrfType = CkULong.From((ulong)_prfType, "prfType"),
             NumberOfDataParams = dataParamCount,
             DataParams = dataParams,
             AdditionalDerivedKeys = derivedKeyCount,
             AdditionalDerivedKeysPtr = derivedKeys,
-        };
+        });
     }
 
     /// <inheritdoc/>
     internal override bool AbsorbsTokenOutput => true;
 
-    internal override void AbsorbOutput(object marshalled)
+    internal override void AbsorbOutput(Pkcs11ParameterBlock block)
     {
-
         if (_retainedTemplates.Count == 0) return;
 
-        IntPtr array = ExtractAdditionalDerivedKeysPointer(marshalled);
+        IntPtr array = AdditionalDerivedKeysPointer(block);
         if (array == IntPtr.Zero) return;
 
         int size = UnmanagedMemory.SizeOf<CK_DERIVED_KEY>();
@@ -212,12 +211,9 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// Reads the <c>CK_DERIVED_KEY</c> array pointer out of whichever top-level struct the mode used.
     /// Counter and double-pipeline mode both marshal <see cref="CK_SP800_108_KDF_PARAMS"/>.
     /// </summary>
-    private static IntPtr ExtractAdditionalDerivedKeysPointer(object marshalled) => marshalled switch
-    {
-        CK_SP800_108_KDF_PARAMS p => p.AdditionalDerivedKeysPtr,
-        CK_SP800_108_FEEDBACK_KDF_PARAMS f => f.AdditionalDerivedKeysPtr,
-        _ => IntPtr.Zero,
-    };
+    private IntPtr AdditionalDerivedKeysPointer(Pkcs11ParameterBlock block) => _feedback
+        ? block.Read<CK_SP800_108_FEEDBACK_KDF_PARAMS>().AdditionalDerivedKeysPtr
+        : block.Read<CK_SP800_108_KDF_PARAMS>().AdditionalDerivedKeysPtr;
 
     private static CK_PRF_DATA_PARAM BuildPrfEntry(Sp800108Segment seg, MechanismParameterScope scope)
     {

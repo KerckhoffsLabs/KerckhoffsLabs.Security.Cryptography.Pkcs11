@@ -167,7 +167,7 @@ public sealed class VendorMlKemParamsTests
             new CkmIbmMlKemParams(0, ModeDecapsulate, 1, true, [1, 2, 3], [4], keys.Secret(5)));
 
         using var scope = keys.NewScope();
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? marshalledParams);
 
         Assert.Equal((ulong)CkmIbmMlKem, (ulong)marshalled.Mechanism);
         Assert.Equal((ulong)Expected.Total, (ulong)marshalled.ParameterLen);

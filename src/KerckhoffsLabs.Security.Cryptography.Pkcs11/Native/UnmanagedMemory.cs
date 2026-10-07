@@ -168,24 +168,6 @@ internal static class UnmanagedMemory
     public static int SizeOf<T>() where T : unmanaged => Pkcs11Marshal.SizeOf<T>();
 
     /// <summary>
-    /// Returns the unmanaged size of the structure type <paramref name="structureType"/> in bytes.
-    /// Only <c>[PackedForPkcs11]</c>-marked types are supported; use <see cref="SizeOf{T}"/> for
-    /// all other types.
-    /// </summary>
-    /// <param name="structureType">Type of structure whose size should be determined</param>
-    /// <returns>Unmanaged size of the structure in bytes</returns>
-    public static int SizeOf(Type structureType)
-    {
-        ArgumentNullException.ThrowIfNull(structureType);
-        if (!Pkcs11Marshal.IsPackedForPkcs11(structureType))
-            throw new NotSupportedException(
-                $"SizeOf(Type) is only supported for [PackedForPkcs11]-marked types. Use SizeOf<T>() for '{structureType.FullName}'.");
-        return Pkcs11Marshal.IsWindows
-            ? PackedDispatch.SizeOfWindows(structureType)
-            : PackedDispatch.SizeOfUnified(structureType);
-    }
-
-    /// <summary>
     /// Copies content of byte array to unmanaged memory
     /// </summary>
     /// <param name="memory">Previously allocated unmanaged memory to copy to</param>
@@ -224,28 +206,6 @@ internal static class UnmanagedMemory
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         Pkcs11Marshal.WriteStructure(memory, in structure);
-    }
-
-    /// <summary>
-    /// Copies content of structure to unmanaged memory.
-    /// Only <c>[PackedForPkcs11]</c>-marked types are supported; use <see cref="Write{T}"/> for
-    /// all other types.
-    /// </summary>
-    /// <param name="memory">Previously allocated unmanaged memory to copy to</param>
-    /// <param name="structure">Structure to copy from</param>
-    public static void Write(IntPtr memory, object structure)
-    {
-        if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
-        ArgumentNullException.ThrowIfNull(structure);
-
-        if (!Pkcs11Marshal.IsPackedForPkcs11(structure.GetType()))
-            throw new NotSupportedException(
-                $"Write(object) is only supported for [PackedForPkcs11]-marked types. Use Write<T>() for '{structure.GetType().FullName}'.");
-
-        if (Pkcs11Marshal.IsWindows)
-            PackedDispatch.WriteWindows(memory, structure);
-        else
-            PackedDispatch.WriteUnified(memory, structure);
     }
 
     /// <summary>
@@ -313,28 +273,6 @@ internal static class UnmanagedMemory
     {
         if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
         return Pkcs11Marshal.ReadStructure<T>(memory);
-    }
-
-    /// <summary>
-    /// Copies content of unmanaged memory to the newly allocated managed structure.
-    /// Only <c>[PackedForPkcs11]</c>-marked types are supported; use <see cref="Read{T}"/> for
-    /// all other types.
-    /// </summary>
-    /// <param name="memory">Memory that should be copied</param>
-    /// <param name="structureType">Type of structure that should be created</param>
-    /// <returns>Structure of requested type</returns>
-    public static object? Read(IntPtr memory, Type structureType)
-    {
-        if (memory == IntPtr.Zero) throw new ArgumentNullException(nameof(memory));
-        ArgumentNullException.ThrowIfNull(structureType);
-
-        if (!Pkcs11Marshal.IsPackedForPkcs11(structureType))
-            throw new NotSupportedException(
-                $"Read(Type) is only supported for [PackedForPkcs11]-marked types. Use Read<T>() for '{structureType.FullName}'.");
-
-        return Pkcs11Marshal.IsWindows
-            ? PackedDispatch.ReadWindows(memory, structureType)
-            : PackedDispatch.ReadUnified(memory, structureType);
     }
 
 }

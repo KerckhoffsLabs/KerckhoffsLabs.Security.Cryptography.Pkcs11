@@ -23,22 +23,23 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 public abstract class MechanismParameters
 {
     /// <summary>
-    /// Builds the <c>[PackedForPkcs11]</c> interop struct, allocating any buffers its pointer fields
-    /// need inside <paramref name="scope"/>. Internal: the concrete struct type is not part of the
-    /// public API.
+    /// Writes the <c>[PackedForPkcs11]</c> interop struct into <paramref name="scope"/>, along with any
+    /// buffers its pointer fields address, and returns the block. Internal: the concrete struct type
+    /// is not part of the public API.
     /// </summary>
     /// <remarks>
     /// The scope outlives this call and is released by the session once the native call returns, so
     /// implementations own nothing.
     /// </remarks>
-    internal abstract object BuildMarshalable(MechanismParameterScope scope);
+    internal abstract Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope);
 
     /// <summary>
-    /// Copies anything the token wrote into <paramref name="marshalled"/> back into managed state,
-    /// while the scope that owns it is still alive. The default does nothing; only the parameter
+    /// Copies anything the token wrote into <paramref name="block"/> back into managed state, while
+    /// the scope that owns it is still alive. It reads the native block, not a managed copy of the
+    /// struct, so it sees what the token left there. The default does nothing; only the parameter
     /// types with output fields override it.
     /// </summary>
-    internal virtual void AbsorbOutput(object marshalled) { }
+    internal virtual void AbsorbOutput(Pkcs11ParameterBlock block) { }
 
     /// <summary>
     /// Whether the token writes into this descriptor's block and <see cref="AbsorbOutput"/> copies the

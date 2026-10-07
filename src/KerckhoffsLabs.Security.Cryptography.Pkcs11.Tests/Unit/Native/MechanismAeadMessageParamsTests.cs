@@ -13,7 +13,7 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] iv = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         var p = CkmGcmMessageParams.ForEncrypt(iv, tagBytes: 16);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_GCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_GCM_MESSAGE_PARAMS>();
 
         Assert.Equal((ulong)iv.Length, (ulong)s.IvLen);
         Assert.Equal(iv, UnmanagedMemory.Read(s.Iv, iv.Length));
@@ -28,7 +28,7 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] tag = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         var p = CkmGcmMessageParams.ForDecrypt(iv, tag);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_GCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_GCM_MESSAGE_PARAMS>();
 
         Assert.Equal(tag, UnmanagedMemory.Read(s.Tag, tag.Length));
     }
@@ -49,7 +49,7 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7]; // 7..13
         var p = CkmCcmMessageParams.ForEncrypt(dataLen: 64, nonce, macBytes: 16);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_CCM_MESSAGE_PARAMS>();
 
         Assert.Equal(64UL, (ulong)s.DataLen);
         Assert.Equal((ulong)nonce.Length, (ulong)s.NonceLen);
@@ -65,7 +65,7 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] mac = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7];
         var p = CkmCcmMessageParams.ForDecrypt(dataLen: 32, nonce, mac);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_CCM_MESSAGE_PARAMS>();
 
         Assert.Equal((ulong)mac.Length, (ulong)s.MacLen);
         Assert.Equal(mac, UnmanagedMemory.Read(s.Mac, mac.Length));
@@ -86,7 +86,7 @@ public sealed class MechanismAeadMessageParamsTests
     {
         var p = CkmCcmMessageParams.ForEncrypt(dataLen, new byte[nonceLen], macBytes: 16);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_CCM_MESSAGE_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_CCM_MESSAGE_PARAMS>();
         Assert.Equal((ulong)dataLen, (ulong)s.DataLen);
     }
 
@@ -112,7 +112,7 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] nonce = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForEncrypt(nonce);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>();
 
         Assert.Equal((ulong)nonce.Length, (ulong)s.NonceLen);
         Assert.Equal(nonce, UnmanagedMemory.Read(s.Nonce, nonce.Length));
@@ -126,7 +126,7 @@ public sealed class MechanismAeadMessageParamsTests
         byte[] tag = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>();
 
         Assert.Equal(tag, UnmanagedMemory.Read(s.Tag, tag.Length));
     }

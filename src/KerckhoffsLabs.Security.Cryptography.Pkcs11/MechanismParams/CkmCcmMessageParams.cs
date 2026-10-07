@@ -64,9 +64,9 @@ public sealed class CkmCcmMessageParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_CCM_MESSAGE_PARAMS
+        return scope.WriteParameter(new CK_CCM_MESSAGE_PARAMS
         {
             DataLen = (NativeCULong)_dataLen,
             Nonce = scope.Write(_nonceBytes),
@@ -75,16 +75,15 @@ public sealed class CkmCcmMessageParams : MechanismParameters
             NonceGenerator = (NativeCULong)0, // CKG_NO_GENERATE
             Mac = scope.Write(_macBuffer),
             MacLen = (NativeCULong)_macLen,
-        };
+        });
     }
 
     /// <inheritdoc/>
     internal override bool AbsorbsTokenOutput => true;
 
-    internal override void AbsorbOutput(object marshalled)
+    internal override void AbsorbOutput(Pkcs11ParameterBlock block)
     {
-
-        var s = (CK_CCM_MESSAGE_PARAMS)marshalled;
+        var s = block.Read<CK_CCM_MESSAGE_PARAMS>();
         if (s.Mac == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Mac, _macBuffer.AsSpan(0, _macLen));
     }

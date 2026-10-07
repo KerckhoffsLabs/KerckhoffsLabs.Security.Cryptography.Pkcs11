@@ -38,7 +38,7 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
             {
                 Parameters.Add(p);
                 using var scope = new MechanismParameterScope();
-                var s = (CK_PKCS5_PBKD2_PARAMS2)p.BuildMarshalable(scope);
+                var s = p.BuildMarshalable(scope).Read<CK_PKCS5_PBKD2_PARAMS2>();
                 // An empty password marshals as a NULL pointer, the PKCS#11 encoding of an empty buffer.
                 int length = (int)(ulong)s.PasswordLen;
                 Passwords.Add(length == 0 ? [] : UnmanagedMemory.Read(s.Password, length));

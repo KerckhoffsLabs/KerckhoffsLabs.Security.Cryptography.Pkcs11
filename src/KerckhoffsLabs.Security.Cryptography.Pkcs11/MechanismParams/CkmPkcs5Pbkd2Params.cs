@@ -89,11 +89,11 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 
     /// <inheritdoc/>
     /// <exception cref="ObjectDisposedException">The borrowed <see cref="SecurePassword"/> has been disposed.</exception>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
         // Read straight from the caller's password into the scope, whose memory is zeroed when the call returns.
         ReadOnlySpan<byte> password = _borrowedPassword is { } borrowed ? borrowed.Password : _password;
-        return new CK_PKCS5_PBKD2_PARAMS2
+        return scope.WriteParameter(new CK_PKCS5_PBKD2_PARAMS2
         {
             SaltSource = (NativeCULong)CKZ.CKZ_SALT_SPECIFIED,
             SaltSourceData = scope.Write(_salt),
@@ -104,6 +104,6 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
             PrfDataLen = (NativeCULong)_prfData.Length,
             Password = scope.Write(password),
             PasswordLen = (NativeCULong)password.Length,
-        };
+        });
     }
 }
