@@ -72,6 +72,11 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetFunctionStatus(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_CancelFunction(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[] template, ref NativeCULong objectId) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_CopyObject(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template, ref NativeCULong newObjectId) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DestroyObject(NativeCULong session, NativeCULong objectId) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetObjectSize(NativeCULong session, NativeCULong objectId, ref NativeCULong size) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -194,6 +199,16 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_GetFunctionStatus)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&GetFunctionStatus;
         if (Overrides(nameof(C_CancelFunction)))
             slots[nameof(CryptokiTable.C_CancelFunction)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&CancelFunction;
+        if (Overrides(nameof(C_CreateObject)))
+            slots[nameof(CryptokiTable.C_CreateObject)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong*, NativeCULong>)&CreateObject;
+        if (Overrides(nameof(C_CopyObject)))
+            slots[nameof(CryptokiTable.C_CopyObject)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong, NativeCULong*, NativeCULong>)&CopyObject;
+        if (Overrides(nameof(C_DestroyObject)))
+            slots[nameof(CryptokiTable.C_DestroyObject)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)&DestroyObject;
+        if (Overrides(nameof(C_GetObjectSize)))
+            slots[nameof(CryptokiTable.C_GetObjectSize)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)&GetObjectSize;
+        if (Overrides(nameof(C_SetAttributeValue)))
+            slots[nameof(CryptokiTable.C_SetAttributeValue)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong, NativeCULong>)&SetAttributeValue;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -879,6 +894,70 @@ internal abstract unsafe partial class FakeModule
     {
         if (Owner(hSession, nameof(C_CancelFunction)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
         try { return Rv(m.C_CancelFunction(hSession)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong CreateObject(NativeCULong hSession, void* pTemplate, NativeCULong ulCount, NativeCULong* phObject)
+    {
+        if (Owner(hSession, nameof(C_CreateObject)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong objectId = *phObject;
+            CKR rv = m.C_CreateObject(hSession, ReadTemplate(pTemplate, ulCount), ref objectId);
+            *phObject = objectId;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong CopyObject(NativeCULong hSession, NativeCULong hObject, void* pTemplate, NativeCULong ulCount, NativeCULong* phNewObject)
+    {
+        if (Owner(hSession, nameof(C_CopyObject)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong newObjectId = *phNewObject;
+            CKR rv = m.C_CopyObject(hSession, hObject, ReadTemplate(pTemplate, ulCount), ref newObjectId);
+            *phNewObject = newObjectId;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DestroyObject(NativeCULong hSession, NativeCULong hObject)
+    {
+        if (Owner(hSession, nameof(C_DestroyObject)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_DestroyObject(hSession, hObject));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetObjectSize(NativeCULong hSession, NativeCULong hObject, NativeCULong* pulSize)
+    {
+        if (Owner(hSession, nameof(C_GetObjectSize)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong size = *pulSize;
+            CKR rv = m.C_GetObjectSize(hSession, hObject, ref size);
+            *pulSize = size;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SetAttributeValue(NativeCULong hSession, NativeCULong hObject, void* pTemplate, NativeCULong ulCount)
+    {
+        if (Owner(hSession, nameof(C_SetAttributeValue)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_SetAttributeValue(hSession, hObject, ReadTemplate(pTemplate, ulCount)));
+        }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
