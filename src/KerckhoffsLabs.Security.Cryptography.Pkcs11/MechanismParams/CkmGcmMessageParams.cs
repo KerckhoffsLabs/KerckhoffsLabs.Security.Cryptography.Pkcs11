@@ -55,9 +55,9 @@ public sealed class CkmGcmMessageParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_GCM_MESSAGE_PARAMS
+        return scope.WriteParameter(new CK_GCM_MESSAGE_PARAMS
         {
             Iv = scope.Write(_ivBytes),
             IvLen = (NativeCULong)_ivBytes.Length,
@@ -65,16 +65,15 @@ public sealed class CkmGcmMessageParams : MechanismParameters
             IvGenerator = (NativeCULong)0, // CKG_NO_GENERATE
             Tag = scope.Write(_tagBuffer),
             TagBits = (NativeCULong)(_tagLen * 8),
-        };
+        });
     }
 
     /// <inheritdoc/>
     internal override bool AbsorbsTokenOutput => true;
 
-    internal override void AbsorbOutput(object marshalled)
+    internal override void AbsorbOutput(Pkcs11ParameterBlock block)
     {
-
-        var s = (CK_GCM_MESSAGE_PARAMS)marshalled;
+        var s = block.Read<CK_GCM_MESSAGE_PARAMS>();
         if (s.Tag == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, _tagLen));
     }

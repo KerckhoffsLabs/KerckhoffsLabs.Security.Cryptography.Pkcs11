@@ -25,7 +25,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmEddsaParams(phFlag: true, [0xAA, 0xBB, 0xCC]);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_EDDSA_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_EDDSA_PARAMS>();
 
         Assert.Equal(CkBbool.True, s.PhFlag);
         Assert.Equal(3UL, (ulong)s.ContextDataLen);
@@ -38,7 +38,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmRc2Params(128);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_RC2_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_RC2_PARAMS>();
 
         Assert.Equal(128UL, (ulong)s.EffectiveBits);
     }
@@ -49,7 +49,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmEddsaParams(phFlag: false, default);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_EDDSA_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_EDDSA_PARAMS>();
 
         Assert.Equal(CkBbool.False, s.PhFlag);
         Assert.Equal(IntPtr.Zero, s.ContextData);
@@ -67,7 +67,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmRc2CbcParams(128, iv);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_RC2_CBC_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_RC2_CBC_PARAMS>();
 
         Assert.Equal(128UL, (ulong)s.EffectiveBits);
         // Iv is an inline CkChar8 buffer, not a pointer, so the bytes travel inside the struct.
@@ -80,7 +80,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmRsaPkcsPssParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, saltLength: 32);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_RSA_PKCS_PSS_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_RSA_PKCS_PSS_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256, (ulong)s.HashAlg);
         Assert.Equal((ulong)CKG.CKG_MGF1_SHA256, (ulong)s.Mgf);
@@ -93,7 +93,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmXeddsaParams(CKM.CKM_SHA512);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_XEDDSA_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_XEDDSA_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA512, (ulong)s.Hash);
     }
@@ -109,7 +109,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmHashPqcSignParams(CKM.CKM_SHA256, CkhHedge.CKH_HEDGE_REQUIRED, [0x01, 0x02]);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_HASH_SIGN_ADDITIONAL_CONTEXT)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_HASH_SIGN_ADDITIONAL_CONTEXT>();
 
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_REQUIRED, (ulong)s.HedgeVariant);
         Assert.Equal((ulong)CKM.CKM_SHA256, (ulong)s.Hash);
@@ -125,7 +125,7 @@ public sealed class BuildMarshalableTests
             CKM.CKM_SHA256_HMAC, keygxy: keys.Secret(5), [0xE1, 0xE2]);
         using var scope = keys.NewScope();
 
-        var s = (CK_IKE1_EXTENDED_DERIVE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_IKE1_EXTENDED_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.Equal(CkBbool.True, s.HasKeygxy);
@@ -142,7 +142,7 @@ public sealed class BuildMarshalableTests
             CKM.CKM_SHA256_HMAC, seedKey: keys.Secret(7), [0x5E, 0x5D, 0x5C]);
         using var scope = keys.NewScope();
 
-        var s = (CK_IKE2_PRF_PLUS_DERIVE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_IKE2_PRF_PLUS_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.Equal(CkBbool.True, s.HasSeedKey);
@@ -157,7 +157,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmPqcSignParams(CkhHedge.CKH_HEDGE_REQUIRED, [0xC0, 0xC1, 0xC2]);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_SIGN_ADDITIONAL_CONTEXT)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_SIGN_ADDITIONAL_CONTEXT>();
 
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_REQUIRED, (ulong)s.HedgeVariant);
         Assert.Equal(3UL, (ulong)s.ContextLen);
@@ -170,7 +170,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256, [0x0A, 0x0B]);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_RSA_PKCS_OAEP_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_RSA_PKCS_OAEP_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256, (ulong)s.HashAlg);
         Assert.Equal((ulong)CKG.CKG_MGF1_SHA256, (ulong)s.Mgf);
@@ -192,7 +192,7 @@ public sealed class BuildMarshalableTests
             encryptedHeader: true, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA256_HMAC);
         using var scope = keys.NewScope();
 
-        var s = (CK_X2RATCHET_INITIALIZE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_X2RATCHET_INITIALIZE_PARAMS>();
 
         Assert.Equal(1UL, (ulong)s.PeerPublicPrekey);
         Assert.Equal(2UL, (ulong)s.PeerPublicIdentity);
@@ -215,7 +215,7 @@ public sealed class BuildMarshalableTests
             encryptedHeader: false, curve: 4, CKM.CKM_AES_GCM, kdfMechanism: CKM.CKM_SHA384_HMAC);
         using var scope = keys.NewScope();
 
-        var s = (CK_X2RATCHET_RESPOND_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_X2RATCHET_RESPOND_PARAMS>();
 
         Assert.Equal(1UL, (ulong)s.OwnPrekey);
         Assert.Equal(2UL, (ulong)s.InitiatorIdentity);
@@ -240,7 +240,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_GCM_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_GCM_PARAMS>();
 
         Assert.Equal(12UL, (ulong)s.IvLen);
         Assert.Equal(2UL, (ulong)s.AADLen);
@@ -257,7 +257,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmAesGcmParams(new byte[12], default, tagBits: 128);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_GCM_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_GCM_PARAMS>();
 
         Assert.Equal(IntPtr.Zero, s.AAD);
         Assert.Equal(0UL, (ulong)s.AADLen);
@@ -271,7 +271,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmAesCcmParams(dataLen: 64, nonce, aad, macLen: 16);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_CCM_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_CCM_PARAMS>();
 
         Assert.Equal(64UL, (ulong)s.DataLen);
         Assert.Equal(7UL, (ulong)s.NonceLen);
@@ -289,7 +289,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmChaCha20Params(blockCounter, blockCounterBits: 32, nonce, nonceBits: 96);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_CHACHA20_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_CHACHA20_PARAMS>();
 
         Assert.Equal(32UL, (ulong)s.BlockCounterBits);
         Assert.Equal(96UL, (ulong)s.NonceBits);
@@ -305,7 +305,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, peerPublicPoint, sharedData);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_ECDH1_DERIVE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_ECDH1_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKD.CKD_SHA256_KDF, (ulong)s.Kdf);
         Assert.Equal(3UL, (ulong)s.SharedDataLen);
@@ -322,7 +322,7 @@ public sealed class BuildMarshalableTests
         var p = CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, salt, info);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_HKDF_PARAMS>();
 
         Assert.Equal(CkBbool.True, s.Extract);
         Assert.Equal(CkBbool.True, s.Expand);
@@ -343,7 +343,7 @@ public sealed class BuildMarshalableTests
         var p = CkmHkdfParams.WithSaltKey(HkdfOperation.ExtractOnly, CKM.CKM_SHA384_HMAC, keys.Secret(9), info);
         using var scope = keys.NewScope();
 
-        var s = (CK_HKDF_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_HKDF_PARAMS>();
 
         Assert.Equal(CkBbool.True, s.Extract);
         Assert.Equal(CkBbool.False, s.Expand);
@@ -364,7 +364,7 @@ public sealed class BuildMarshalableTests
             CKM.CKM_SHA256_HMAC, keygxy: keys.Secret(11), prevKey: keys.Secret(22), ckyI, ckyR, keyNumber: 3);
         using var scope = keys.NewScope();
 
-        var s = (CK_IKE1_PRF_DERIVE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_IKE1_PRF_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.Equal(CkBbool.True, s.HasPrevKey);
@@ -387,7 +387,7 @@ public sealed class BuildMarshalableTests
             CKM.CKM_SHA256_HMAC, dataAsKey: true, rekey: true, ni, nr, newKey: keys.Secret(42));
         using var scope = keys.NewScope();
 
-        var s = (CK_IKE_PRF_DERIVE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_IKE_PRF_DERIVE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfMechanism);
         Assert.Equal(CkBbool.True, s.DataAsKey);
@@ -407,7 +407,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmSalsa20Params(blockCounter, nonce, nonceBits: 64);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_SALSA20_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_PARAMS>();
 
         Assert.Equal(64UL, (ulong)s.NonceBits);
         AssertBlockHolds(s.BlockCounter, blockCounter);
@@ -422,7 +422,7 @@ public sealed class BuildMarshalableTests
         var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_SALSA20_CHACHA20_POLY1305_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_CHACHA20_POLY1305_PARAMS>();
 
         Assert.Equal(12UL, (ulong)s.NonceLen);
         Assert.Equal(2UL, (ulong)s.AADLen);
@@ -442,7 +442,7 @@ public sealed class BuildMarshalableTests
             ownIdentity: keys.Pair(4, 0x40), ownEphemeral: keys.Pair(5, 0x50));
         using var scope = keys.NewScope();
 
-        var s = (CK_X3DH_INITIATE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_X3DH_INITIATE_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.Kdf);
         Assert.Equal(2UL, (ulong)s.PeerIdentity);
@@ -465,7 +465,7 @@ public sealed class BuildMarshalableTests
             kdf: CKM.CKM_SHA384_HMAC, identityId, prekeyId, onetimeId, initiatorIdentity: keys.Pair(0x70, 7), initiatorEphemeral);
         using var scope = keys.NewScope();
 
-        var s = (CK_X3DH_RESPOND_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_X3DH_RESPOND_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.Kdf);
         Assert.Equal(7UL, (ulong)s.InitiatorIdentity);
@@ -489,7 +489,7 @@ public sealed class BuildMarshalableTests
         var p = CkmGcmMessageParams.ForDecrypt(iv, tag);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_GCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_GCM_MESSAGE_PARAMS>();
 
         Assert.Equal(12UL, (ulong)s.IvLen);
         // Hardcoded, not caller-supplied: both must stay 0 to keep declaring "caller-supplied IV",
@@ -509,7 +509,7 @@ public sealed class BuildMarshalableTests
         var p = CkmCcmMessageParams.ForDecrypt(dataLen: 48, nonce, mac);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_CCM_MESSAGE_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_CCM_MESSAGE_PARAMS>();
 
         Assert.Equal(48UL, (ulong)s.DataLen);
         Assert.Equal(9UL, (ulong)s.NonceLen);
@@ -530,7 +530,7 @@ public sealed class BuildMarshalableTests
         var p = CkmSalsa20ChaCha20Poly1305MsgParams.ForDecrypt(nonce, tag);
         using var scope = new MechanismParameterScope();
 
-        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>();
 
         Assert.Equal(12UL, (ulong)s.NonceLen);
         AssertBlockHolds(s.Nonce, nonce);
@@ -561,7 +561,7 @@ public sealed class BuildMarshalableTests
                 .Build();
             using var scope = keys.NewScope();
 
-            var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+            var s = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
 
             Assert.Equal((ulong)CKM.CKM_AES_CMAC, (ulong)s.PrfType);
             Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
@@ -592,7 +592,7 @@ public sealed class BuildMarshalableTests
             .Build();
         using var scope = keys.NewScope();
 
-        var s = (CK_SP800_108_FEEDBACK_KDF_PARAMS)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_SP800_108_FEEDBACK_KDF_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA384_HMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
@@ -705,8 +705,8 @@ public sealed class BuildMarshalableTests
         using var scopeA = new MechanismParameterScope();
         using var scopeB = new MechanismParameterScope();
 
-        var a = (CK_GCM_PARAMS)p.BuildMarshalable(scopeA);
-        var b = (CK_GCM_PARAMS)p.BuildMarshalable(scopeB);
+        var a = p.BuildMarshalable(scopeA).Read<CK_GCM_PARAMS>();
+        var b = p.BuildMarshalable(scopeB).Read<CK_GCM_PARAMS>();
 
         Assert.NotEqual(a.Iv, b.Iv);   // independent buffers
         Assert.Equal((ulong)a.IvLen, (ulong)b.IvLen);

@@ -28,14 +28,14 @@ public sealed class CkmSalsa20ChaCha20Poly1305Params : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_SALSA20_CHACHA20_POLY1305_PARAMS
+        return scope.WriteParameter(new CK_SALSA20_CHACHA20_POLY1305_PARAMS
         {
             Nonce = scope.Write(_nonceBytes),
             NonceLen = (NativeCULong)_nonceBytes.Length,
             AAD = scope.Write(_aadBytes),
             AADLen = (NativeCULong)_aadBytes.Length,
-        };
+        });
     }
 }

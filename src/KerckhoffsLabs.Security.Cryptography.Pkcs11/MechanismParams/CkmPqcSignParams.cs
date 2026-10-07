@@ -27,13 +27,13 @@ public sealed class CkmPqcSignParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_SIGN_ADDITIONAL_CONTEXT
+        return scope.WriteParameter(new CK_SIGN_ADDITIONAL_CONTEXT
         {
             HedgeVariant = CkULong.From((ulong)_hedgeVariant, "hedgeVariant"),
             Context = scope.Write(_contextBytes),
             ContextLen = (NativeCULong)_contextBytes.Length,
-        };
+        });
     }
 }

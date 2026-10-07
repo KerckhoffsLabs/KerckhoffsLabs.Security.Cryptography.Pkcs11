@@ -149,7 +149,7 @@ public sealed class VendorEthDeriveParamsTests
             new CkmIbmEthDeriveParams(version: 1, sigVersion: 1, type: Eip2333Prv2Prv, childKeyIndex: 7, keyInfo));
 
         using var scope = new MechanismParameterScope();
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? marshalledParams);
 
         Assert.Equal((ulong)CkmIbmEthDerive, (ulong)marshalled.Mechanism);
         Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);

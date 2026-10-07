@@ -1,7 +1,5 @@
 using System.Runtime.InteropServices;
-using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
@@ -174,74 +172,4 @@ public sealed class UnmanagedMemoryTests
     [Fact]
     public void SizeOf_Generic_NonPacked_MatchesMarshal() =>
         Assert.Equal(Marshal.SizeOf<Blittable>(), UnmanagedMemory.SizeOf<Blittable>());
-
-    [Fact]
-    public void SizeOf_Type_NonPacked_Throws() =>
-        Assert.Throws<NotSupportedException>(() => UnmanagedMemory.SizeOf(typeof(Blittable)));
-
-    [Fact]
-    public void SizeOf_Type_Null_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.SizeOf(null!));
-
-    [Fact]
-    public void SizeOf_Type_Packed_ReturnsPositive() =>
-        Assert.True(UnmanagedMemory.SizeOf(typeof(CK_RSA_PKCS_PSS_PARAMS)) > 0);
-
-    // === Object/Type overloads: packed dispatch + guards ====================
-
-    [Fact]
-    public void WriteObject_ReadType_Packed_RoundTrips()
-    {
-        IntPtr p = UnmanagedMemory.Allocate(UnmanagedMemory.SizeOf(typeof(CK_RSA_PKCS_PSS_PARAMS)));
-        try
-        {
-            var value = new CK_RSA_PKCS_PSS_PARAMS
-            {
-                HashAlg = (NativeCULong)1,
-                Mgf = (NativeCULong)2,
-                Len = (NativeCULong)32,
-            };
-            UnmanagedMemory.Write(p, (object)value);
-
-            var read = (CK_RSA_PKCS_PSS_PARAMS)UnmanagedMemory.Read(p, typeof(CK_RSA_PKCS_PSS_PARAMS))!;
-            Assert.Equal(1UL, (ulong)read.HashAlg);
-            Assert.Equal(2UL, (ulong)read.Mgf);
-            Assert.Equal(32UL, (ulong)read.Len);
-        }
-        finally { UnmanagedMemory.Free(ref p); }
-    }
-
-    [Fact]
-    public void WriteObject_NonPacked_Throws()
-    {
-        IntPtr p = UnmanagedMemory.Allocate(8);
-        try { Assert.Throws<NotSupportedException>(() => UnmanagedMemory.Write(p, (object)new Blittable())); }
-        finally { UnmanagedMemory.Free(ref p); }
-    }
-
-    [Fact]
-    public void WriteObject_NullArgs_Throw()
-    {
-        Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Write(IntPtr.Zero, (object)new Blittable()));
-        IntPtr p = UnmanagedMemory.Allocate(8);
-        try { Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Write(p, (object)null!)); }
-        finally { UnmanagedMemory.Free(ref p); }
-    }
-
-    [Fact]
-    public void ReadType_NonPacked_Throws()
-    {
-        IntPtr p = UnmanagedMemory.Allocate(8);
-        try { Assert.Throws<NotSupportedException>(() => UnmanagedMemory.Read(p, typeof(Blittable))); }
-        finally { UnmanagedMemory.Free(ref p); }
-    }
-
-    [Fact]
-    public void ReadType_NullArgs_Throw()
-    {
-        Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read(IntPtr.Zero, typeof(CK_RSA_PKCS_PSS_PARAMS)));
-        IntPtr p = UnmanagedMemory.Allocate(8);
-        try { Assert.Throws<ArgumentNullException>(() => UnmanagedMemory.Read(p, (Type)null!)); }
-        finally { UnmanagedMemory.Free(ref p); }
-    }
 }

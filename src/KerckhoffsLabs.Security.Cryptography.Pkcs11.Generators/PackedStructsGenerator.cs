@@ -20,7 +20,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
     private const string OpenBraceNested = "        {";           // dispatch if-block open
     private const string CloseBraceNested = "        }";          // dispatch if-block close
     private const string FieldIndent = "        ";               // 8-space indent for field assignments
-    private const string IfTypeEquals = "        if (t == typeof("; // non-generic type-equality test
+    private const string TypeDispatchArm = "        if (typeof(T) == typeof(";  // opens one arm of a typeof(T) dispatch chain
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -193,29 +193,17 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine("/// Generator-emitted dispatch table for every <c>[PackedForPkcs11]</c>-marked struct.");
         sb.AppendLine("/// The <c>typeof(T) == typeof(...)</c> chains are JIT/AOT-folded per generic instantiation,");
         sb.AppendLine("/// so callers pay one direct call — no reflection, no <c>[RequiresDynamicCode]</c>.");
-        sb.AppendLine("/// Non-generic overloads use <c>t == typeof(...)</c> type-equality and <c>is T</c> patterns");
-        sb.AppendLine("/// — also AOT-safe because no dynamic code is generated.");
         sb.AppendLine("/// </summary>");
         sb.AppendLine("internal static class PackedDispatch");
         sb.AppendLine("{");
 
+        EmitIsPacked(sb, syms);
+        sb.AppendLine();
         EmitGenericSizeOfWindows(sb, syms);
         sb.AppendLine();
         EmitGenericWriteWindows(sb, syms);
         sb.AppendLine();
         EmitGenericReadWindows(sb, syms);
-        sb.AppendLine();
-        EmitNonGenericSizeOfWindows(sb, syms);
-        sb.AppendLine();
-        EmitNonGenericSizeOfUnified(sb, syms);
-        sb.AppendLine();
-        EmitNonGenericWriteWindows(sb, syms);
-        sb.AppendLine();
-        EmitNonGenericWriteUnified(sb, syms);
-        sb.AppendLine();
-        EmitNonGenericReadWindows(sb, syms);
-        sb.AppendLine();
-        EmitNonGenericReadUnified(sb, syms);
 
         sb.AppendLine("}");
         return sb.ToString();
@@ -236,6 +224,22 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
 
     // ---- Generic dispatch methods ----
 
+    private static void EmitIsPacked(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
+    {
+        sb.AppendLine("    /// <summary>Whether <typeparamref name=\"T\"/> is <c>[PackedForPkcs11]</c>, i.e. has a Windows-packed sibling.</summary>");
+        // Inlined so the chain folds to a constant at each call site, as the Packed<T> cache it
+        // replaces did; left out of line, a ~100-arm method would be past the inliner's budget.
+        sb.AppendLine("    [MethodImpl(MethodImplOptions.AggressiveInlining)]");
+        sb.AppendLine("    public static bool IsPacked<T>() where T : unmanaged");
+        sb.AppendLine(OpenBrace);
+        foreach (var sym in syms)
+        {
+            sb.Append(TypeDispatchArm).Append(FqUnified(sym)).AppendLine(")) return true;");
+        }
+        sb.AppendLine("        return false;");
+        sb.AppendLine(CloseBrace);
+    }
+
     private static void EmitGenericSizeOfWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
     {
         sb.AppendLine("    /// <summary>Returns the unmanaged size of the Windows-packed sibling of <typeparamref name=\"T\"/>.</summary>");
@@ -243,7 +247,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
-            sb.Append("        if (typeof(T) == typeof(").Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
+            sb.Append(TypeDispatchArm).Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
               .Append(FqWindows(sym)).AppendLine(">();");
         }
         sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.SizeOfWindows<T>: type {typeof(T)} has no Windows sibling.\");");
@@ -257,7 +261,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
-            sb.Append("        if (typeof(T) == typeof(").Append(FqUnified(sym)).AppendLine("))");
+            sb.Append(TypeDispatchArm).Append(FqUnified(sym)).AppendLine("))");
             sb.AppendLine(OpenBraceNested);
             sb.Append("            var win = ").Append(FqWindows(sym))
               .Append(".FromUnified(in Unsafe.As<T, ").Append(FqUnified(sym))
@@ -278,7 +282,7 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
         sb.AppendLine(OpenBrace);
         foreach (var sym in syms)
         {
-            sb.Append("        if (typeof(T) == typeof(").Append(FqUnified(sym)).AppendLine("))");
+            sb.Append(TypeDispatchArm).Append(FqUnified(sym)).AppendLine("))");
             sb.AppendLine(OpenBraceNested);
             sb.Append("            var win = Unsafe.ReadUnaligned<").Append(FqWindows(sym)).AppendLine(">((void*)memory);");
             sb.AppendLine("            var u = win.ToUnified();");
@@ -286,105 +290,6 @@ public sealed class PackedStructsGenerator : IIncrementalGenerator
             sb.AppendLine(CloseBraceNested);
         }
         sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.ReadWindows<T>: type {typeof(T)} has no Windows sibling.\");");
-        sb.AppendLine(CloseBrace);
-    }
-
-    // ---- Non-generic dispatch methods (for object-based callers in UnmanagedMemory) ----
-
-    private static void EmitNonGenericSizeOfWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
-    {
-        sb.AppendLine("    /// <summary>Returns the unmanaged size of the Windows-packed sibling of <paramref name=\"t\"/>.</summary>");
-        sb.AppendLine("    public static int SizeOfWindows(System.Type t)");
-        sb.AppendLine(OpenBrace);
-        foreach (var sym in syms)
-        {
-            sb.Append(IfTypeEquals).Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
-              .Append(FqWindows(sym)).AppendLine(">();");
-        }
-        sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.SizeOfWindows(Type): type {t} has no Windows sibling.\");");
-        sb.AppendLine(CloseBrace);
-    }
-
-    private static void EmitNonGenericSizeOfUnified(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
-    {
-        sb.AppendLine("    /// <summary>Returns the unmanaged size of the unified (non-packed) type <paramref name=\"t\"/>.</summary>");
-        sb.AppendLine("    public static int SizeOfUnified(System.Type t)");
-        sb.AppendLine(OpenBrace);
-        foreach (var sym in syms)
-        {
-            sb.Append(IfTypeEquals).Append(FqUnified(sym)).Append(")) return Unsafe.SizeOf<")
-              .Append(FqUnified(sym)).AppendLine(">();");
-        }
-        sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.SizeOfUnified(Type): type {t} is not a known [PackedForPkcs11] type.\");");
-        sb.AppendLine(CloseBrace);
-    }
-
-    private static void EmitNonGenericWriteWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
-    {
-        sb.AppendLine("    /// <summary>Converts the boxed packed struct <paramref name=\"src\"/> to its Windows sibling and writes it to <paramref name=\"memory\"/>.</summary>");
-        sb.AppendLine("    public static unsafe void WriteWindows(System.IntPtr memory, object src)");
-        sb.AppendLine(OpenBrace);
-        foreach (var sym in syms)
-        {
-            sb.Append("        if (src is ").Append(FqUnified(sym)).AppendLine(" v" + sym.Name + ")");
-            sb.AppendLine(OpenBraceNested);
-            sb.Append("            var win = ").Append(FqWindows(sym)).Append(".FromUnified(in v").Append(sym.Name).AppendLine(");");
-            sb.Append("            Unsafe.WriteUnaligned((void*)memory, win);");
-            sb.AppendLine();
-            sb.AppendLine("            return;");
-            sb.AppendLine(CloseBraceNested);
-        }
-        sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.WriteWindows(object): type {src?.GetType()} has no Windows sibling.\");");
-        sb.AppendLine(CloseBrace);
-    }
-
-    private static void EmitNonGenericWriteUnified(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
-    {
-        sb.AppendLine("    /// <summary>Writes the boxed packed struct <paramref name=\"src\"/> (unified layout) to <paramref name=\"memory\"/>.</summary>");
-        sb.AppendLine("    public static unsafe void WriteUnified(System.IntPtr memory, object src)");
-        sb.AppendLine(OpenBrace);
-        foreach (var sym in syms)
-        {
-            sb.Append("        if (src is ").Append(FqUnified(sym)).AppendLine(" v" + sym.Name + ")");
-            sb.AppendLine(OpenBraceNested);
-            sb.Append("            Unsafe.WriteUnaligned((void*)memory, v").Append(sym.Name).AppendLine(");");
-            sb.AppendLine("            return;");
-            sb.AppendLine(CloseBraceNested);
-        }
-        sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.WriteUnified(object): type {src?.GetType()} is not a known [PackedForPkcs11] type.\");");
-        sb.AppendLine(CloseBrace);
-    }
-
-    private static void EmitNonGenericReadWindows(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
-    {
-        sb.AppendLine("    /// <summary>Reads the Windows-packed sibling from <paramref name=\"memory\"/> and returns the boxed unified struct.</summary>");
-        sb.AppendLine("    public static unsafe object ReadWindows(System.IntPtr memory, System.Type t)");
-        sb.AppendLine(OpenBrace);
-        foreach (var sym in syms)
-        {
-            sb.Append(IfTypeEquals).Append(FqUnified(sym)).AppendLine("))");
-            sb.AppendLine(OpenBraceNested);
-            sb.Append("            var win = Unsafe.ReadUnaligned<").Append(FqWindows(sym)).AppendLine(">((void*)memory);");
-            sb.AppendLine("            return win.ToUnified();");
-            sb.AppendLine(CloseBraceNested);
-        }
-        sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.ReadWindows(Type): type {t} has no Windows sibling.\");");
-        sb.AppendLine(CloseBrace);
-    }
-
-    private static void EmitNonGenericReadUnified(StringBuilder sb, ImmutableArray<INamedTypeSymbol> syms)
-    {
-        sb.AppendLine("    /// <summary>Reads the unified (non-packed) struct from <paramref name=\"memory\"/> and returns it boxed.</summary>");
-        sb.AppendLine("    public static unsafe object ReadUnified(System.IntPtr memory, System.Type t)");
-        sb.AppendLine(OpenBrace);
-        foreach (var sym in syms)
-        {
-            sb.Append(IfTypeEquals).Append(FqUnified(sym)).AppendLine("))");
-            sb.AppendLine(OpenBraceNested);
-            sb.Append("            return Unsafe.ReadUnaligned<").Append(FqUnified(sym)).AppendLine(">((void*)memory);");
-            sb.AppendLine(CloseBraceNested);
-        }
-        sb.AppendLine("        throw new System.InvalidOperationException($\"PackedDispatch.ReadUnified(Type): type {t} is not a known [PackedForPkcs11] type.\");");
         sb.AppendLine(CloseBrace);
     }
 }

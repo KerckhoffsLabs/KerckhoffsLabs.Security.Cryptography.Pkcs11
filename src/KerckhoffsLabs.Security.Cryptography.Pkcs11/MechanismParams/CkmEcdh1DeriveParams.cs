@@ -64,15 +64,15 @@ public sealed class CkmEcdh1DeriveParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_ECDH1_DERIVE_PARAMS
+        return scope.WriteParameter(new CK_ECDH1_DERIVE_PARAMS
         {
             Kdf = CkULong.From((ulong)_kdf, "kdf"),
             SharedData = scope.Write(_sharedDataBytes),
             SharedDataLen = (NativeCULong)_sharedDataBytes.Length,
             PublicData = scope.Write(_publicDataBytes),
             PublicDataLen = (NativeCULong)_publicDataBytes.Length,
-        };
+        });
     }
 }

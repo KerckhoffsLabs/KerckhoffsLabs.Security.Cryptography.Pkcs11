@@ -121,19 +121,19 @@ public sealed class Mechanism
     /// </summary>
     /// <param name="scope">Owns every byte allocated here; released by the caller once the call returns.</param>
     /// <param name="marshalledParams">
-    /// Receives the interop struct written into <paramref name="scope"/>, to be handed back to
+    /// Receives the parameter block written into <paramref name="scope"/>, to be handed back to
     /// <see cref="AbsorbOutput"/> once the native call returns, or <see langword="null"/> for a
     /// mechanism with no high-level parameters.
     /// </param>
     /// <returns>The structure to hand to the native entry point.</returns>
     /// <remarks>
-    /// Deliberately stateless: the marshalled struct is returned to the caller rather than cached on
+    /// Deliberately stateless: the block is returned to the caller rather than cached on
     /// this instance. One <c>Mechanism</c> may be used by two operations at once — different sessions,
     /// or the same instance passed as both arguments of <c>DecryptVerify</c> — and a cache would let
     /// the second marshal overwrite the first, so both absorbs would read the second block and the
     /// first operation's output would be silently lost.
     /// </remarks>
-    internal CK_MECHANISM Marshal(MechanismParameterScope scope, out object? marshalledParams)
+    internal CK_MECHANISM Marshal(MechanismParameterScope scope, out Pkcs11ParameterBlock? marshalledParams)
     {
         // No high-level parameters: either no parameter at all, or a raw byte[] one. Both are a
         // straight copy into the scope, and neither has output to absorb. `scope.Write` yields
@@ -150,30 +150,14 @@ public sealed class Mechanism
             };
         }
 
-        object lowLevel = _mechanismParams.BuildMarshalable(scope);
-        marshalledParams = lowLevel;
-
-        // A vendor block arrives already laid out: it has no [PackedForPkcs11] struct for
-        // UnmanagedMemory to marshal, because the generator never saw the vendor's type.
-        if (lowLevel is Pkcs11ParameterBlock prebuilt)
-        {
-            return new CK_MECHANISM
-            {
-                Mechanism = _type,
-                Parameter = prebuilt.Pointer,
-                ParameterLen = (NativeCULong)prebuilt.Length,
-            };
-        }
-
-        int size = UnmanagedMemory.SizeOf(lowLevel.GetType());
-        IntPtr block = scope.Allocate(size);
-        UnmanagedMemory.Write(block, lowLevel);
+        Pkcs11ParameterBlock block = _mechanismParams.BuildMarshalable(scope);
+        marshalledParams = block;
 
         return new CK_MECHANISM
         {
             Mechanism = _type,
-            Parameter = block,
-            ParameterLen = (NativeCULong)size,
+            Parameter = block.Pointer,
+            ParameterLen = (NativeCULong)block.Length,
         };
     }
 
@@ -186,11 +170,11 @@ public sealed class Mechanism
     /// The value <see cref="Marshal"/> produced for this operation. <see langword="null"/> is a no-op,
     /// which is what parameterless and <c>byte[]</c> mechanisms pass.
     /// </param>
-    internal void AbsorbOutput(object? marshalledParams)
+    internal void AbsorbOutput(Pkcs11ParameterBlock? marshalledParams)
     {
-        if (_mechanismParams is null || marshalledParams is null)
+        if (_mechanismParams is null || marshalledParams is not { } block)
             return;
 
-        _mechanismParams.AbsorbOutput(marshalledParams);
+        _mechanismParams.AbsorbOutput(block);
     }
 }

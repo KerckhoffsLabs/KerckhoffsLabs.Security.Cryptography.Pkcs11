@@ -17,17 +17,9 @@ public sealed class Rc2ParamsMarshalTests
     {
         var p = new CkmRc2Params(64);
         using var scope = new MechanismParameterScope();
-        var s = (CK_RC2_PARAMS)p.BuildMarshalable(scope);
+        var back = p.BuildMarshalable(scope).Read<CK_RC2_PARAMS>();
 
-        int size = UnmanagedMemory.SizeOf<CK_RC2_PARAMS>();
-        IntPtr mem = UnmanagedMemory.Allocate(size);
-        try
-        {
-            UnmanagedMemory.Write(mem, (object)s);
-            var back = UnmanagedMemory.Read<CK_RC2_PARAMS>(mem);
-            Assert.Equal(64UL, (ulong)back.EffectiveBits);
-        }
-        finally { UnmanagedMemory.Free(ref mem); }
+        Assert.Equal(64UL, (ulong)back.EffectiveBits);
     }
 
     [Fact]
@@ -36,18 +28,10 @@ public sealed class Rc2ParamsMarshalTests
         byte[] iv = [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80];
         var p = new CkmRc2CbcParams(128, iv);
         using var scope = new MechanismParameterScope();
-        var s = (CK_RC2_CBC_PARAMS)p.BuildMarshalable(scope);
+        var back = p.BuildMarshalable(scope).Read<CK_RC2_CBC_PARAMS>();
 
-        int size = UnmanagedMemory.SizeOf<CK_RC2_CBC_PARAMS>();
-        IntPtr mem = UnmanagedMemory.Allocate(size);
-        try
-        {
-            UnmanagedMemory.Write(mem, (object)s);
-            var back = UnmanagedMemory.Read<CK_RC2_CBC_PARAMS>(mem);
-            Assert.Equal(128UL, (ulong)back.EffectiveBits);
-            Assert.True(iv.AsSpan().SequenceEqual(back.Iv), "8-byte inline IV did not round-trip");
-        }
-        finally { UnmanagedMemory.Free(ref mem); }
+        Assert.Equal(128UL, (ulong)back.EffectiveBits);
+        Assert.True(iv.AsSpan().SequenceEqual(back.Iv), "8-byte inline IV did not round-trip");
     }
 
     [Fact]

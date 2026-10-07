@@ -49,9 +49,9 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_X3DH_RESPOND_PARAMS
+        return scope.WriteParameter(new CK_X3DH_RESPOND_PARAMS
         {
             Kdf = CkULong.From((ulong)_kdf, "kdf"),
             IdentityId = scope.Write(_identityIdBytes),
@@ -59,6 +59,6 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
             OnetimeId = scope.Write(_onetimeIdBytes),
             InitiatorIdentity = scope.KeyHandle(_initiatorIdentity, KeyHandlePart.Public, "initiatorIdentity"),
             InitiatorEphemeral = scope.Write(_initiatorEphemeralBytes),
-        };
+        });
     }
 }

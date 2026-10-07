@@ -77,6 +77,13 @@ internal sealed class MechanismParameterScope : IDisposable
         return p;
     }
 
+    /// <summary>
+    /// Writes a mechanism's parameter struct into a new block owned by this scope, in the platform's
+    /// layout, and returns it with its length.
+    /// </summary>
+    public Pkcs11ParameterBlock WriteParameter<T>(in T value) where T : unmanaged
+        => new(WriteStruct(in value), UnmanagedMemory.SizeOf<T>());
+
     /// <summary>Marshals a contiguous array of structs into a new block owned by this scope.</summary>
     public IntPtr WriteStructArray<T>(ReadOnlySpan<T> values) where T : unmanaged
     {

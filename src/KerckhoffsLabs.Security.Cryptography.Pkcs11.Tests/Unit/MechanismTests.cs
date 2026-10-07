@@ -38,7 +38,7 @@ public sealed class MechanismTests
         var mech = new Mechanism(CkmIbmEthDerive, block);
         using var scope = new MechanismParameterScope();
 
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         Assert.Equal(CkmIbmEthDerive, mech.Type);
         Assert.Equal((ulong)CkmIbmEthDerive, (ulong)marshalled.Mechanism);
@@ -82,7 +82,7 @@ public sealed class MechanismTests
     // Marshal must stay a pure function of (mechanism, scope). One instance can be marshalled twice
     // for two live operations — two sessions, or the same instance passed as both arguments of
     // DecryptVerify — and each needs its own block, so that absorbing one cannot read the other's
-    // output. Returning the struct rather than caching it on the mechanism is what makes that hold;
+    // output. Returning the block rather than caching it on the mechanism is what makes that hold;
     // the signature itself prevents a regression to a cache, and this pins the independence the
     // caller's per-operation locals rely on.
     [Fact]
@@ -92,15 +92,16 @@ public sealed class MechanismTests
         var mech = new Mechanism(CKM.CKM_AES_GCM, p);
         using var scope = new MechanismParameterScope();
 
-        CK_MECHANISM first = mech.Marshal(scope, out object? firstParams);
-        CK_MECHANISM second = mech.Marshal(scope, out object? secondParams);
+        CK_MECHANISM first = mech.Marshal(scope, out Pkcs11ParameterBlock? firstParams);
+        CK_MECHANISM second = mech.Marshal(scope, out Pkcs11ParameterBlock? secondParams);
 
-        Assert.NotNull(firstParams);
-        Assert.NotNull(secondParams);
+        // Assert.NotNull on a nullable struct returns the value it checked.
+        Pkcs11ParameterBlock firstBlock = Assert.NotNull(firstParams);
+        Pkcs11ParameterBlock secondBlock = Assert.NotNull(secondParams);
         Assert.NotEqual(first.Parameter, second.Parameter);
         Assert.NotEqual(
-            ((CK_GCM_MESSAGE_PARAMS)firstParams).Tag,
-            ((CK_GCM_MESSAGE_PARAMS)secondParams).Tag);
+            firstBlock.Read<CK_GCM_MESSAGE_PARAMS>().Tag,
+            secondBlock.Read<CK_GCM_MESSAGE_PARAMS>().Tag);
     }
 
     // A byte[] reaches the raw-block constructor through its implicit conversion to a span. A block that
@@ -113,7 +114,7 @@ public sealed class MechanismTests
         var mech = new Mechanism(CKM.CKM_AES_CBC, iv);
         using var scope = new MechanismParameterScope();
 
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         Assert.Equal((ulong)CKM.CKM_AES_CBC, (ulong)marshalled.Mechanism);
         Assert.Equal((ulong)iv.Length, (ulong)marshalled.ParameterLen);
@@ -172,7 +173,7 @@ public sealed class MechanismTests
         using var scope = new MechanismParameterScope();
 
         CryptographicOperations.ZeroMemory(source);
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         Assert.Equal((ulong)CKM.CKM_AES_CBC, (ulong)marshalled.Mechanism);
         Assert.Equal((ulong)expected.Length, (ulong)marshalled.ParameterLen);
@@ -205,7 +206,7 @@ public sealed class MechanismTests
         using var scope = new MechanismParameterScope();
 
         CryptographicOperations.ZeroMemory(source);
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? mechParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         Assert.Equal(CkmIbmEthDerive, mech.Type);
         Assert.Equal((ulong)CkmIbmEthDerive, (ulong)marshalled.Mechanism);
@@ -255,7 +256,7 @@ public sealed class MechanismTests
         var mech = new Mechanism(CKM.CKM_AES_KEY_GEN);
         using var scope = new MechanismParameterScope();
 
-        mech.Marshal(scope, out object? mechParams);
+        mech.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Parameterless mechanisms marshal to a null struct; absorbing it must do nothing rather
         // than throw, because every converted session site absorbs unconditionally.

@@ -39,9 +39,9 @@ public sealed class CkmAesGcmParams : MechanismParameters
     internal int TagBits => _tagBits;
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_GCM_PARAMS
+        return scope.WriteParameter(new CK_GCM_PARAMS
         {
             Iv = scope.Write(_ivBytes),
             IvLen = (NativeCULong)_ivBytes.Length,
@@ -54,6 +54,6 @@ public sealed class CkmAesGcmParams : MechanismParameters
             AAD = scope.Write(_aadBytes),
             AADLen = (NativeCULong)_aadBytes.Length,
             TagBits = (NativeCULong)_tagBits,
-        };
+        });
     }
 }

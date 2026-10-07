@@ -31,14 +31,14 @@ public sealed class CkmRsaPkcsPssParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_RSA_PKCS_PSS_PARAMS
+        return scope.WriteParameter(new CK_RSA_PKCS_PSS_PARAMS
         {
             HashAlg = CkULong.From((ulong)_hashAlg, "hashAlg"),
             Mgf = CkULong.From((ulong)_mgf, "mgf"),
             Len = (NativeCULong)_saltLength,
-        };
+        });
     }
 
     /// <summary>Hash algorithm used in the PSS encoding.</summary>

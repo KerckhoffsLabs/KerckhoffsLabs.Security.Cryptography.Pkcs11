@@ -15,7 +15,7 @@ public sealed class Pkcs5Pbkd2ParamsTests
     private static byte[] MarshalledPassword(CkmPkcs5Pbkd2Params p)
     {
         using var scope = new MechanismParameterScope();
-        var s = (CK_PKCS5_PBKD2_PARAMS2)p.BuildMarshalable(scope);
+        var s = p.BuildMarshalable(scope).Read<CK_PKCS5_PBKD2_PARAMS2>();
         int length = (int)(ulong)s.PasswordLen;
         return length == 0 ? [] : UnmanagedMemory.Read(s.Password, length);
     }

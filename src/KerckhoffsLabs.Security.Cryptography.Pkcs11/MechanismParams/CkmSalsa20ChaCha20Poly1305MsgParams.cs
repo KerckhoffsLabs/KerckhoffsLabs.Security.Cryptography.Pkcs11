@@ -51,23 +51,22 @@ public sealed class CkmSalsa20ChaCha20Poly1305MsgParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
+        return scope.WriteParameter(new CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS
         {
             Nonce = scope.Write(_nonceBytes),
             NonceLen = (NativeCULong)_nonceBytes.Length,
             Tag = scope.Write(_tagBuffer),
-        };
+        });
     }
 
     /// <inheritdoc/>
     internal override bool AbsorbsTokenOutput => true;
 
-    internal override void AbsorbOutput(object marshalled)
+    internal override void AbsorbOutput(Pkcs11ParameterBlock block)
     {
-
-        var s = (CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS)marshalled;
+        var s = block.Read<CK_SALSA20_CHACHA20_POLY1305_MSG_PARAMS>();
         if (s.Tag == IntPtr.Zero) return;
         UnmanagedMemory.Read(s.Tag, _tagBuffer.AsSpan(0, Poly1305TagLen));
     }

@@ -243,7 +243,7 @@ public sealed class VendorParameterWriterTests
         var mech = new Mechanism(CkmIbmMlDsa, new Described(w => w.CkULong(7).CkBBool(true)));
         using var scope = new MechanismParameterScope();
 
-        CK_MECHANISM marshalled = mech.Marshal(scope, out object? marshalledParams);
+        CK_MECHANISM marshalled = mech.Marshal(scope, out Pkcs11ParameterBlock? marshalledParams);
 
         Assert.Equal((ulong)CkmIbmMlDsa, (ulong)marshalled.Mechanism);
         Assert.NotEqual(IntPtr.Zero, marshalled.Parameter);

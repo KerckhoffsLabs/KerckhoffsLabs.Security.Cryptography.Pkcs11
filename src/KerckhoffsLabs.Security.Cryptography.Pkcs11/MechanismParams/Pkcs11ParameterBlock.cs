@@ -1,15 +1,18 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// A parameter block that has already been laid out and written into the call's scope, rather than a
-/// <c>[PackedForPkcs11]</c> struct waiting to be marshalled.
+/// A mechanism parameter block already written into a call's scope: what <c>CK_MECHANISM.pParameter</c>
+/// and <c>ulParameterLen</c> receive.
 /// </summary>
-/// <remarks>
-/// <see cref="Mechanism.Marshal"/> normally receives an interop struct and marshals it, which relies
-/// on the generator-emitted dispatch table and therefore only works for types compiled into this
-/// assembly. A vendor parameter block has no such struct — <see cref="Pkcs11ParameterWriter"/>
-/// produced its bytes directly — so it is handed over pre-marshalled instead.
-/// </remarks>
-/// <param name="Pointer">Address of the block, owned by the call's scope.</param>
+/// <param name="Pointer">Address of the block, owned by the call's scope. <see cref="IntPtr.Zero"/> when there is none.</param>
 /// <param name="Length">Length of the block in bytes.</param>
-internal sealed record Pkcs11ParameterBlock(IntPtr Pointer, int Length);
+internal readonly record struct Pkcs11ParameterBlock(IntPtr Pointer, int Length)
+{
+    /// <summary>
+    /// Reads the block back as <typeparamref name="T"/>, as the token left it. Only valid while the
+    /// scope that owns it is alive.
+    /// </summary>
+    public T Read<T>() where T : unmanaged => UnmanagedMemory.Read<T>(Pointer);
+}

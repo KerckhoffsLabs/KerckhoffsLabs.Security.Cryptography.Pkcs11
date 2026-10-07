@@ -15,7 +15,7 @@ public sealed class MechanismKdfParamsTests
         byte[] info = [9, 8, 7];
         var p = CkmHkdfParams.WithSalt(HkdfOperation.ExtractAndExpand, CKM.CKM_SHA256_HMAC, salt, info);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_HKDF_PARAMS>();
 
         Assert.Equal(CkBbool.True, s.Extract);
         Assert.Equal(CkBbool.True, s.Expand);
@@ -32,7 +32,7 @@ public sealed class MechanismKdfParamsTests
     {
         var p = CkmHkdfParams.WithoutSalt(HkdfOperation.ExpandOnly, CKM.CKM_SHA256_HMAC);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_HKDF_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_HKDF_PARAMS>();
 
         Assert.Equal(CkBbool.False, s.Extract);
         Assert.Equal(CkBbool.True, s.Expand);
@@ -49,7 +49,7 @@ public sealed class MechanismKdfParamsTests
             .IterationCounter().ByteArray([1, 2, 3]).ByteArray([0x00]).ByteArray([4, 5])
             .DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SP800_108_KDF_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SP800_108_KDF_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
@@ -63,7 +63,7 @@ public sealed class MechanismKdfParamsTests
             .IterationCounter().ByteArray([9]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys)
             .WithIV(iv).Build();
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SP800_108_FEEDBACK_KDF_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(3UL, (ulong)s.NumberOfDataParams);
@@ -77,7 +77,7 @@ public sealed class MechanismKdfParamsTests
         var p = CkmSp800108KdfParams.Feedback(CKM.CKM_SHA256_HMAC)
             .IterationCounter().ByteArray([9]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SP800_108_FEEDBACK_KDF_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SP800_108_FEEDBACK_KDF_PARAMS>();
 
         Assert.Equal(0UL, (ulong)s.IVLen);
         Assert.Equal(IntPtr.Zero, s.IV);

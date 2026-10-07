@@ -34,15 +34,15 @@ public sealed class CkmIke1ExtendedDeriveParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_IKE1_EXTENDED_DERIVE_PARAMS
+        return scope.WriteParameter(new CK_IKE1_EXTENDED_DERIVE_PARAMS
         {
             PrfMechanism = CkULong.From((ulong)_prfMechanism, "prfMechanism"),
             HasKeygxy = CkBbool.From(_keygxy is not null),
             Keygxy = _keygxy is null ? default : scope.KeyHandle(_keygxy, KeyHandlePart.Private, "keygxy"),
             ExtraData = scope.Write(_extraDataBytes),
             ExtraDataLen = (NativeCULong)_extraDataBytes.Length,
-        };
+        });
     }
 }

@@ -51,14 +51,14 @@ public sealed class CkmChaCha20Params : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_CHACHA20_PARAMS
+        return scope.WriteParameter(new CK_CHACHA20_PARAMS
         {
             BlockCounter = scope.Write(_blockCounterBytes),
             BlockCounterBits = (NativeCULong)_blockCounterBits,
             Nonce = scope.Write(_nonceBytes),
             NonceBits = (NativeCULong)_nonceBits,
-        };
+        });
     }
 }

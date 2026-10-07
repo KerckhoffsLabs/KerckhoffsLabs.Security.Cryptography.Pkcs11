@@ -52,7 +52,8 @@ public sealed class Sp800108KdfTests
             .Build();
 
         using var scope = keys.NewScope();
-        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_SP800_108_KDF_PARAMS>();
         Assert.Equal((ulong)CKM.CKM_AES_CMAC, (ulong)s.PrfType);
         Assert.Equal(5UL, (ulong)s.NumberOfDataParams);
         Assert.NotEqual(IntPtr.Zero, s.DataParams);
@@ -98,7 +99,8 @@ public sealed class Sp800108KdfTests
             .IterationCounter().ByteArray([1, 2]).DkmLength(Sp800108DkmLengthMethod.SumOfKeys).Build();
 
         using var scope = new MechanismParameterScope();
-        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_SP800_108_KDF_PARAMS>();
         Assert.Equal((ulong)CKM.CKM_SHA256_HMAC, (ulong)s.PrfType);
         Assert.Equal(3UL, (ulong)s.NumberOfDataParams);
     }
@@ -120,7 +122,8 @@ public sealed class Sp800108KdfTests
         var p = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, [1], [2]);
         Assert.Empty(p.RawAdditionalDerivedKeyHandles);
         using var scope = new MechanismParameterScope();
-        var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+        Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+        var s = block.Read<CK_SP800_108_KDF_PARAMS>();
         Assert.Equal(0UL, (ulong)s.AdditionalDerivedKeys);
         Assert.Equal(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
     }
@@ -139,7 +142,8 @@ public sealed class Sp800108KdfTests
                 .Build();
 
             using var scope = new MechanismParameterScope();
-            var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+            Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+            var s = block.Read<CK_SP800_108_KDF_PARAMS>();
             Assert.Equal(2UL, (ulong)s.AdditionalDerivedKeys);
             Assert.NotEqual(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
 
@@ -153,13 +157,13 @@ public sealed class Sp800108KdfTests
 
             // Slots start zero-filled, so absorbing before the token has written reports
             // CK_INVALID_HANDLE rather than garbage.
-            p.AbsorbOutput(s);
+            p.AbsorbOutput(block);
             Assert.Equal([0, 0], p.RawAdditionalDerivedKeyHandles);
 
             // Simulate the token writing the derived handles into the phKey slots.
             WriteHandle(dk0.Key, 0x111);
             WriteHandle(dk1.Key, 0x222);
-            p.AbsorbOutput(s);
+            p.AbsorbOutput(block);
             Assert.Equal([0x111, 0x222], p.RawAdditionalDerivedKeyHandles);
         }
         finally
@@ -192,7 +196,8 @@ public sealed class Sp800108KdfTests
 
             using (var scope = new MechanismParameterScope())
             {
-                var s = (CK_SP800_108_KDF_PARAMS)p.BuildMarshalable(scope);
+                Pkcs11ParameterBlock block = p.BuildMarshalable(scope);
+                var s = block.Read<CK_SP800_108_KDF_PARAMS>();
                 Assert.Equal(2UL, (ulong)s.AdditionalDerivedKeys);
                 Assert.NotEqual(IntPtr.Zero, s.AdditionalDerivedKeysPtr);
 
@@ -204,7 +209,7 @@ public sealed class Sp800108KdfTests
 
                 WriteHandle(dk0.Key, 0xDEAD);
                 WriteHandle(dk1.Key, 0xBEEF);
-                p.AbsorbOutput(s);
+                p.AbsorbOutput(block);
             }
 
             // Read after the scope is gone: the handles must have been copied out, not re-read.

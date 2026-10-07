@@ -14,7 +14,7 @@ public sealed class MechanismPqcSignParamsTests
         byte[] context = [0x01, 0x02, 0x03];
         var p = new CkmPqcSignParams(CkhHedge.CKH_HEDGE_REQUIRED, context);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SIGN_ADDITIONAL_CONTEXT>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SIGN_ADDITIONAL_CONTEXT>();
 
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_REQUIRED, (ulong)s.HedgeVariant);
         Assert.Equal((ulong)context.Length, (ulong)s.ContextLen);
@@ -26,7 +26,7 @@ public sealed class MechanismPqcSignParamsTests
     {
         var p = new CkmPqcSignParams();
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_SIGN_ADDITIONAL_CONTEXT>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_SIGN_ADDITIONAL_CONTEXT>();
 
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_PREFERRED, (ulong)s.HedgeVariant);
         Assert.Equal(0UL, (ulong)s.ContextLen);
@@ -43,7 +43,7 @@ public sealed class MechanismPqcSignParamsTests
         byte[] context = [0xAA];
         var p = new CkmHashPqcSignParams(CKM.CKM_SHA256, CkhHedge.CKH_HEDGE_REQUIRED, context);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_HASH_SIGN_ADDITIONAL_CONTEXT>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_HASH_SIGN_ADDITIONAL_CONTEXT>();
 
         Assert.Equal((ulong)CKM.CKM_SHA256, (ulong)s.Hash);
         Assert.Equal((ulong)CkhHedge.CKH_HEDGE_REQUIRED, (ulong)s.HedgeVariant);
@@ -60,7 +60,7 @@ public sealed class MechanismPqcSignParamsTests
     {
         var p = new CkmXeddsaParams(CKM.CKM_SHA512);
         using var scope = new MechanismParameterScope();
-        var s = ParamMarshal.RoundTrip<CK_XEDDSA_PARAMS>(p.BuildMarshalable(scope));
+        var s = p.BuildMarshalable(scope).Read<CK_XEDDSA_PARAMS>();
 
         Assert.Equal((ulong)CKM.CKM_SHA512, (ulong)s.Hash);
     }

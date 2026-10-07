@@ -23,13 +23,13 @@ public sealed class CkmEddsaParams : MechanismParameters
     }
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_EDDSA_PARAMS
+        return scope.WriteParameter(new CK_EDDSA_PARAMS
         {
             PhFlag = CkBbool.From(_phFlag),
             ContextData = scope.Write(_contextDataBytes),
             ContextDataLen = (NativeCULong)_contextDataBytes.Length,
-        };
+        });
     }
 }

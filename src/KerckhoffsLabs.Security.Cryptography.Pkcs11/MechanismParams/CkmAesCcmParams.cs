@@ -52,9 +52,9 @@ public sealed class CkmAesCcmParams : MechanismParameters
     internal int MacLength => _macLen;
 
     /// <inheritdoc/>
-    internal override object BuildMarshalable(MechanismParameterScope scope)
+    internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
     {
-        return new CK_CCM_PARAMS
+        return scope.WriteParameter(new CK_CCM_PARAMS
         {
             DataLen = (NativeCULong)_dataLen,
             Nonce = scope.Write(_nonceBytes),
@@ -62,6 +62,6 @@ public sealed class CkmAesCcmParams : MechanismParameters
             AAD = scope.Write(_aadBytes),
             AADLen = (NativeCULong)_aadBytes.Length,
             MACLen = (NativeCULong)_macLen,
-        };
+        });
     }
 }
