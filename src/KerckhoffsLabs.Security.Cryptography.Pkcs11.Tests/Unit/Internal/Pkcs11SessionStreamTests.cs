@@ -93,9 +93,9 @@ public sealed class Pkcs11SessionStreamTests
         public override CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
         public override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
 
-        public override CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, out NativeCULong dataLen)
+        public override CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
         {
-            if (data.IsEmpty) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
+            if (lengthOnly) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
             RecoveredData.AsSpan(0, RecoveredData.Length).CopyTo(data);
             dataLen = (NativeCULong)RecoveredData.Length;
             return VerifyRecoverRv;

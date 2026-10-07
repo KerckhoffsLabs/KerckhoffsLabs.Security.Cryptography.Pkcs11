@@ -135,13 +135,13 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// encapsulate/decapsulate, authenticated wrap/unwrap, signature-only verify, and
     /// validation-flags inspection). False on v2.40 / v3.0 / v3.1 libraries.
     /// </summary>
-    public bool IsV32ApiSupported
+    public unsafe bool IsV32ApiSupported
         => _module.Table.HasC_EncapsulateKey
            && _module.Table.HasC_DecapsulateKey
            && _module.Table.HasC_WrapKeyAuthenticated
            && _module.Table.HasC_UnwrapKeyAuthenticated
-           && _module.Table.HasC_VerifySignatureInit
-           && _module.Table.HasC_VerifySignature
+           && _module.Table._fp.C_VerifySignatureInit is not null
+           && _module.Table._fp.C_VerifySignature is not null
            && _module.Table.HasC_GetSessionValidationFlags;
 
     /// <summary>

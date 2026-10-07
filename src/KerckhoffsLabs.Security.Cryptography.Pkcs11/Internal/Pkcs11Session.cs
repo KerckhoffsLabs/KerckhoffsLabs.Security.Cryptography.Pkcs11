@@ -2778,11 +2778,11 @@ internal sealed class Pkcs11Session : IDisposable
         CKR rv = _pkcs11Library.C_VerifyRecoverInit(_sessionId, ref ckMechanism, (NativeCULong)(keyHandle.ObjectId));
         operation.Begin(CKF.CKF_VERIFY_RECOVER, rv, OpVerifyRecoverInit);
 
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, null, out NativeCULong dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, default, lengthOnly: true, out NativeCULong dataLen);
         Pkcs11Exception.ThrowIfError(rv, OpVerifyRecover);
 
         byte[] data = new byte[ReportedLength.ForAllocation(dataLen, OpVerifyRecover)];
-        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, data, out dataLen);
+        rv = _pkcs11Library.C_VerifyRecover(_sessionId, signature, data, lengthOnly: false, out dataLen);
         operation.Completed(); // the call with a buffer ends the operation whatever it returns
         isValid = IsVerified(rv, OpVerifyRecover);
 

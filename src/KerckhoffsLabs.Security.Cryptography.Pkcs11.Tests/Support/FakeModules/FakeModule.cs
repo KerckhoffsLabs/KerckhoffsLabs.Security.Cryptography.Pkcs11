@@ -18,10 +18,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The module exports <c>C_GetFunctionList</c> only (a v2.40 table). A function the subclass does not
-/// override leaves its slot NULL, exactly like a module that does not implement it, so the library's
-/// own "function not supported" handling runs. <c>C_Initialize</c> and <c>C_Finalize</c> are always
-/// bound and succeed unless overridden.
+/// The module exports <c>C_GetFunctionList</c> with a v2.40 table. One that implements a v3.x function also
+/// exports <c>C_GetInterface</c>, which hands out a v3.2 table, so the loader binds it as a v3.2 module. A
+/// function the subclass does not override leaves its slot NULL, exactly like a module that does not
+/// implement it, so the library's own "function not supported" handling runs. <c>C_Initialize</c> and
+/// <c>C_Finalize</c> are always bound and succeed unless overridden.
 /// </para>
 /// <para>
 /// The table's functions are static <c>[UnmanagedCallersOnly]</c> thunks, so they find their instance
@@ -49,6 +50,9 @@ internal abstract unsafe partial class FakeModule : IDisposable
     private readonly uint _id;
     private readonly ConcurrentDictionary<string, int> _calls = new(StringComparer.Ordinal);
     private IntPtr _functionList;
+    private IntPtr _interfaceTable;
+    private IntPtr _interfaceName;
+    private IntPtr _interface;
     private ExceptionDispatchInfo? _fault;
     private ulong _nextHandle;
     private bool _disposed;
@@ -56,7 +60,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
     protected FakeModule()
     {
         _id = Register(this);
-        _functionList = BuildFunctionList();
+        BuildFunctionLists();
     }
 
     /// <summary>How many times each <c>C_*</c> function was called, by name.</summary>
@@ -87,7 +91,10 @@ internal abstract unsafe partial class FakeModule : IDisposable
         Unregister(this);
 
         Marshal.FreeHGlobal(_functionList);
-        _functionList = IntPtr.Zero;
+        Marshal.FreeHGlobal(_interfaceTable);
+        Marshal.FreeHGlobal(_interfaceName);
+        Marshal.FreeHGlobal(_interface);
+        _functionList = _interfaceTable = _interfaceName = _interface = IntPtr.Zero;
         _fault?.Throw();
     }
 
@@ -122,8 +129,26 @@ internal abstract unsafe partial class FakeModule : IDisposable
 
     // --- export resolution and routing -------------------------------------------------------
 
-    private IntPtr ResolveExport(string name)
-        => name == "C_GetFunctionList" ? (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)&GetFunctionList : IntPtr.Zero;
+    private IntPtr ResolveExport(string name) => name switch
+    {
+        "C_GetFunctionList" => (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)&GetFunctionList,
+        "C_GetInterface" when _interface != IntPtr.Zero => GetInterfaceAddress,
+        _ => IntPtr.Zero,
+    };
+
+    private static IntPtr GetInterfaceAddress => (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)&GetInterface;
+
+    // Hands out the one interface this module has, whatever name and version were asked for: it is the
+    // v3.2 table, the version the loader asks for first.
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static NativeCULong GetInterface(byte* pInterfaceName, IntPtr pVersion, IntPtr* ppInterface, NativeCULong flags)
+    {
+        FakeModule? m = Active("C_GetInterface");
+        if (m is null || m._interface == IntPtr.Zero)
+            return Rv(CKR.CKR_GENERAL_ERROR);
+        *ppInterface = m._interface;
+        return Rv(CKR.CKR_OK);
+    }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     private static NativeCULong GetFunctionList(IntPtr* ppFunctionList)
@@ -181,13 +206,24 @@ internal abstract unsafe partial class FakeModule : IDisposable
     private bool Overrides(string function)
         => GetType().GetMethod(function, BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType != typeof(FakeModule);
 
-    private IntPtr BuildFunctionList()
+    // The tables are in the layout a native module exports (Pack=1 on Windows).
+    private void BuildFunctionLists()
     {
         var slots = new Dictionary<string, IntPtr>();
         BindFunctions(slots);
 
-        // A v2.40 table, in the layout a native module exports (Pack=1 on Windows).
-        return NativeFunctionList.Allocate(2, 40, CryptokiTable.V240SlotCount, slots);
+        HashSet<string> v240 = [.. NativeFunctionList.SlotNames.Take(CryptokiTable.V240SlotCount)];
+        _functionList = NativeFunctionList.Allocate(2, 40, CryptokiTable.V240SlotCount,
+            slots.Where(slot => v240.Contains(slot.Key)).ToDictionary());
+
+        if (slots.Keys.All(v240.Contains))
+            return;
+
+        slots[nameof(CryptokiTable.C_GetInterface)] = GetInterfaceAddress;
+        _interfaceTable = NativeFunctionList.Allocate(3, 2, CryptokiTable.V32SlotCount, slots);
+        _interfaceName = Marshal.StringToHGlobalAnsi("PKCS 11");
+        _interface = Marshal.AllocHGlobal(UnmanagedMemory.SizeOf<CK_INTERFACE>());
+        UnmanagedMemory.Write(_interface, new CK_INTERFACE { InterfaceName = _interfaceName, FunctionList = _interfaceTable, Flags = (NativeCULong)0 });
     }
 
     // --- marshalling helpers for the thunks --------------------------------------------------
