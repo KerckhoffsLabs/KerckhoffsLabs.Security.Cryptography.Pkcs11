@@ -117,10 +117,10 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen);
     CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen);
     CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism);
-    CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen);
+    CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen);
     CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part);
     CKR C_DigestKey(NativeCULong session, NativeCULong key);
-    CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen);
+    CKR C_DigestFinal(NativeCULong session, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen);
     CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen);
     CKR C_SignUpdate(NativeCULong session, ReadOnlySpan<byte> part);

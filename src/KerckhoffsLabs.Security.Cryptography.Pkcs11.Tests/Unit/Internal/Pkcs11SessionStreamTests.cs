@@ -82,9 +82,9 @@ public sealed class Pkcs11SessionStreamTests
             => Final(lengthOnly ? default : lastPart, out lastPartLen);
 
         public override CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
-        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen)
+        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen)
         {
-            if (digest.IsEmpty) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            if (lengthOnly) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
             DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;

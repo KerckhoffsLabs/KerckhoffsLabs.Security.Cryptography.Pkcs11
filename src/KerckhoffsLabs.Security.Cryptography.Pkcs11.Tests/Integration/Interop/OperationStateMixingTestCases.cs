@@ -116,7 +116,7 @@ internal static class OperationStateMixingTestCases
     // === Digest ==============================================================
 
     internal static void Assert_Digest_SinglePartAfterUpdate_Throws(IPkcs11Backend backend) =>
-        WithRawSession(backend, (lowLevel, sid, _) =>
+        WithRawSession(backend, (lowLevel, sid, session) =>
         {
             using (var scope = new MechanismParameterScope())
             {
@@ -125,14 +125,16 @@ internal static class OperationStateMixingTestCases
             }
             AssertOk(lowLevel.C_DigestUpdate(sid, Data1), "DigestUpdate");
 
-            CKR rv = lowLevel.C_Digest(sid, Data2, new byte[64], out NativeCULong _);
+            CKR rv = lowLevel.C_Digest(sid, Data2, new byte[64], lengthOnly: false, out NativeCULong _);
             Assert.NotEqual(CKR.CKR_OK, rv);
 
-            try { lowLevel.C_DigestFinal(sid, new byte[64], out NativeCULong _); } catch { /* best-effort cleanup */ }
+            // Ends the operation if it is still active. Its return code does not matter (the operation
+            // may already have ended); a failure comes back as one, not as an exception.
+            _ = lowLevel.C_DigestFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
         });
 
     internal static void Assert_Digest_SinglePartAfterUpdate_TreatsAsContinuation(IPkcs11Backend backend) =>
-        WithRawSession(backend, (lowLevel, sid, _) =>
+        WithRawSession(backend, (lowLevel, sid, session) =>
         {
             using (var scope = new MechanismParameterScope())
             {
@@ -142,14 +144,16 @@ internal static class OperationStateMixingTestCases
             AssertOk(lowLevel.C_DigestUpdate(sid, Data1), "DigestUpdate");
 
             byte[] buf = new byte[64];
-            CKR rv = lowLevel.C_Digest(sid, Data2, buf, out NativeCULong len);
+            CKR rv = lowLevel.C_Digest(sid, Data2, buf, lengthOnly: false, out NativeCULong len);
             AssertOk(rv, "Digest (illegal single-part call)");
 
             byte[] got = buf.AsSpan(0, (int)len).ToArray();
             byte[] expected = System.Security.Cryptography.SHA256.HashData([.. Data1, .. Data2]);
             Assert.Equal(expected, got);
 
-            try { lowLevel.C_DigestFinal(sid, new byte[64], out NativeCULong _); } catch { /* best-effort cleanup */ }
+            // Ends the operation if it is still active. Its return code does not matter (the operation
+            // may already have ended); a failure comes back as one, not as an exception.
+            _ = lowLevel.C_DigestFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
         });
 
     internal static void Assert_DigestUpdate_AfterCompletedDigest_Throws(IPkcs11Backend backend) =>
@@ -160,7 +164,7 @@ internal static class OperationStateMixingTestCases
                 CK_MECHANISM mech = Marshal(scope, new Mechanism(CKM.CKM_SHA256));
                 AssertOk(lowLevel.C_DigestInit(sid, ref mech), "DigestInit");
             }
-            AssertOk(lowLevel.C_Digest(sid, Data1, new byte[64], out NativeCULong _), "Digest");
+            AssertOk(lowLevel.C_Digest(sid, Data1, new byte[64], lengthOnly: false, out NativeCULong _), "Digest");
 
             CKR rv = lowLevel.C_DigestUpdate(sid, Data2);
             Assert.NotEqual(CKR.CKR_OK, rv);
