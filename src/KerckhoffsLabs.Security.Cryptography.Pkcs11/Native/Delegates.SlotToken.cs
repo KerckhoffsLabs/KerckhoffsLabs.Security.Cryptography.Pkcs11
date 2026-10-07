@@ -38,9 +38,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetSlotInfo_Windows);
+            ThrowIfUnbound(_fp.C_GetSlotInfo);
             CK_SLOT_INFO_Windows win = default;
-            NativeCULong winRv = _fp.C_GetSlotInfo_Windows(slotId, &win);
+            NativeCULong winRv = _fp.C_GetSlotInfo(slotId, &win);
             info = win.ToUnified();
             return winRv;
         }
@@ -57,9 +57,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetTokenInfo_Windows);
+            ThrowIfUnbound(_fp.C_GetTokenInfo);
             CK_TOKEN_INFO_Windows win = default;
-            NativeCULong winRv = _fp.C_GetTokenInfo_Windows(slotId, &win);
+            NativeCULong winRv = _fp.C_GetTokenInfo(slotId, &win);
             info = win.ToUnified();
             return winRv;
         }
@@ -87,9 +87,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetMechanismInfo_Windows);
+            ThrowIfUnbound(_fp.C_GetMechanismInfo);
             CK_MECHANISM_INFO_Windows win = default;
-            NativeCULong winRv = _fp.C_GetMechanismInfo_Windows(slotId, type, &win);
+            NativeCULong winRv = _fp.C_GetMechanismInfo(slotId, type, &win);
             info = win.ToUnified();
             return winRv;
         }

@@ -23,9 +23,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_DigestInit_Windows);
+            ThrowIfUnbound(_fp.C_DigestInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return _fp.C_DigestInit_Windows(session, &winMech);
+            return _fp.C_DigestInit(session, &winMech);
         }
 
         ThrowIfUnbound(_fp.C_DigestInit);

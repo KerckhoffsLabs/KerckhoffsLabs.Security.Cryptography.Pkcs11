@@ -23,9 +23,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_VerifyInit_Windows);
+            ThrowIfUnbound(_fp.C_VerifyInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return _fp.C_VerifyInit_Windows(session, &winMech, key);
+            return _fp.C_VerifyInit(session, &winMech, key);
         }
 
         ThrowIfUnbound(_fp.C_VerifyInit);
@@ -65,9 +65,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_VerifyRecoverInit_Windows);
+            ThrowIfUnbound(_fp.C_VerifyRecoverInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return _fp.C_VerifyRecoverInit_Windows(session, &winMech, key);
+            return _fp.C_VerifyRecoverInit(session, &winMech, key);
         }
 
         ThrowIfUnbound(_fp.C_VerifyRecoverInit);
@@ -105,10 +105,10 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_VerifySignatureInit_Windows);
+            ThrowIfUnbound(_fp.C_VerifySignatureInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
             fixed (byte* sigPtr = signature)
-                return _fp.C_VerifySignatureInit_Windows(session, &winMech, key, sigPtr, (NativeCULong)signature.Length);
+                return _fp.C_VerifySignatureInit(session, &winMech, key, sigPtr, (NativeCULong)signature.Length);
         }
 
         ThrowIfUnbound(_fp.C_VerifySignatureInit);

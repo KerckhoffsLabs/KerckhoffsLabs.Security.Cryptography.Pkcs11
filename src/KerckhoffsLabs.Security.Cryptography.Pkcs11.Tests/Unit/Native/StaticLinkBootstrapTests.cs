@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 public sealed class StaticLinkBootstrapTests
 {
     // The bootstrap was the assembly's only P/Invoke - everything else dispatches through the
-    // function-pointer table read out of CK_FUNCTION_LIST. Zero is therefore the invariant to hold:
+    // function-pointer table read out of the module's CK_FUNCTION_LIST. Zero is therefore the invariant to hold:
     // a new P/Invoke is the shape this defect would come back in, whatever library name it names.
     [Fact]
     public void TheAssembly_DeclaresNoPInvoke()

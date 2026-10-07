@@ -41,9 +41,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetInfo_Windows);
+            ThrowIfUnbound(_fp.C_GetInfo);
             CK_INFO_Windows win = default;
-            NativeCULong winRv = _fp.C_GetInfo_Windows(&win);
+            NativeCULong winRv = _fp.C_GetInfo(&win);
             info = win.ToUnified();
             return winRv;
         }
@@ -63,18 +63,18 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_GetInterfaceList_Windows);
+            ThrowIfUnbound(_fp.C_GetInterfaceList);
             if (interfaces is null)
             {
                 fixed (NativeCULong* c = &count)
-                    return _fp.C_GetInterfaceList_Windows(null, c);
+                    return _fp.C_GetInterfaceList(null, c);
             }
 
             var winList = new CK_INTERFACE_Windows[interfaces.Length];
             NativeCULong winRv;
             fixed (CK_INTERFACE_Windows* list = winList)
             fixed (NativeCULong* c = &count)
-                winRv = _fp.C_GetInterfaceList_Windows(list, c);
+                winRv = _fp.C_GetInterfaceList(list, c);
             if (winRv.ToCKR() == CKR.CKR_OK)
                 for (int i = 0; i < interfaces.Length; i++)
                     interfaces[i] = winList[i].ToUnified();

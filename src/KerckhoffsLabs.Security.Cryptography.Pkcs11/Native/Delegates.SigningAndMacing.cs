@@ -23,9 +23,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_SignInit_Windows);
+            ThrowIfUnbound(_fp.C_SignInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return _fp.C_SignInit_Windows(session, &winMech, key);
+            return _fp.C_SignInit(session, &winMech, key);
         }
 
         ThrowIfUnbound(_fp.C_SignInit);
@@ -69,9 +69,9 @@ internal partial class Delegates
     {
         if (Pkcs11Marshal.IsWindows)
         {
-            ThrowIfUnbound(_fp.C_SignRecoverInit_Windows);
+            ThrowIfUnbound(_fp.C_SignRecoverInit);
             CK_MECHANISM_Windows winMech = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return _fp.C_SignRecoverInit_Windows(session, &winMech, key);
+            return _fp.C_SignRecoverInit(session, &winMech, key);
         }
 
         ThrowIfUnbound(_fp.C_SignRecoverInit);

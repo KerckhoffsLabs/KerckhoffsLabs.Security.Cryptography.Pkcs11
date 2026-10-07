@@ -41,10 +41,9 @@ public sealed class MarshalSizeOfTests
 
     /// <summary>
     /// Pins the natural-alignment (Pack default) layout that PKCS#11 produces on
-    /// Linux/macOS x64. Any drift here means the unified <c>T</c> type changed shape.
-    /// CK_FUNCTION_LIST variants are included: each has a fixed function-pointer count, so its
-    /// LP64 size is deterministic (8-byte CK_VERSION slot + N * 8). These are the structs the
-    /// loader binds against, so drift here is the most consequential kind.
+    /// Linux/macOS x64. Any drift here means the unified <c>T</c> type changed shape. The
+    /// function lists are not structs here: their layout is pinned slot by slot against the C
+    /// compiler by <c>AbiOracleTests.CryptokiTable_ReadsEveryFunctionListAtItsCompilerLayout</c>.
     /// </summary>
     [Theory(SkipUnless = nameof(IsUnix), Skip = "Requires " + nameof(IsUnix))]
     // BEGIN PROBED InlineData — Linux x64, LP64
@@ -144,9 +143,6 @@ public sealed class MarshalSizeOfTests
     [InlineData(typeof(CK_X9_42_DH2_DERIVE_PARAMS), 72)]
     [InlineData(typeof(CK_X9_42_MQV_DERIVE_PARAMS), 80)]
     [InlineData(typeof(CK_XEDDSA_PARAMS), 8)]
-    [InlineData(typeof(CK_FUNCTION_LIST), 552)]
-    [InlineData(typeof(CK_FUNCTION_LIST_3_0), 744)]
-    [InlineData(typeof(CK_FUNCTION_LIST_3_2), 840)]
     // END PROBED InlineData
     public void UnifiedStructSize_OnUnix(Type t, int expectedSize) => Assert.Equal(expectedSize, Marshal.SizeOf(t));
 
@@ -164,9 +160,6 @@ public sealed class MarshalSizeOfTests
     [InlineData("CK_ASYNC_DATA_Windows", 24)]
     [InlineData("CK_ATTRIBUTE_Windows", 16)]
     [InlineData("CK_C_INITIALIZE_ARGS_Windows", 44)]
-    [InlineData("CK_FUNCTION_LIST_3_0_Windows", 738)]
-    [InlineData("CK_FUNCTION_LIST_3_2_Windows", 834)]
-    [InlineData("CK_FUNCTION_LIST_Windows", 546)]
     [InlineData("CK_INFO_Windows", 72)]
     [InlineData("CK_INTERFACE_Windows", 20)]
     [InlineData("CK_MECHANISM_INFO_Windows", 12)]
@@ -306,9 +299,6 @@ public sealed class MarshalSizeOfTests
     [InlineData("CK_ECMQV_DERIVE_PARAMS_Windows", 40)]
     [InlineData("CK_EDDSA_PARAMS_Windows", 9)]
     [InlineData("CK_EXTRACT_PARAMS_Windows", 4)]
-    [InlineData("CK_FUNCTION_LIST_3_0_Windows", 370)]
-    [InlineData("CK_FUNCTION_LIST_3_2_Windows", 418)]
-    [InlineData("CK_FUNCTION_LIST_Windows", 274)]
     [InlineData("CK_GCM_MESSAGE_PARAMS_Windows", 24)]
     [InlineData("CK_GCM_PARAMS_Windows", 24)]
     [InlineData("CK_GCM_WRAP_PARAMS_Windows", 28)]
