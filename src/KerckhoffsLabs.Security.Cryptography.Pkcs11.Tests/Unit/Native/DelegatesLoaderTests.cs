@@ -38,8 +38,9 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     // ---------------------------------------------------------------------------
 
     private static IntPtr s_functionListPtr;   // handed out by FakeGetFunctionList
-    private static IntPtr s_interfacePtr;      // handed out by FakeGetInterface
+    private static IntPtr s_interfacePtr;      // handed out by FakeGetInterface for the default interface
     private static uint s_getInterfaceRv;      // CKR FakeGetInterface returns
+    private static Dictionary<(byte Major, byte Minor), IntPtr>? s_versioned; // null: requested version ignored
 
     private readonly List<IntPtr> _allocations = [];
 
@@ -65,11 +66,19 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     /// <param name="functionList">Table <c>C_GetFunctionList</c> hands out.</param>
     /// <param name="interfaceTable">Table <c>C_GetInterface</c> hands out; none by default.</param>
     /// <param name="getInterfaceRv">CKR <c>C_GetInterface</c> returns; <c>CKR_OK</c> by default.</param>
-    private static void InstallModule(IntPtr functionList, IntPtr interfaceTable = default, uint getInterfaceRv = 0)
+    /// <param name="versioned">
+    /// Interfaces served for a requested version; any other requested version is refused
+    /// (<c>CKR_ARGUMENTS_BAD</c>). <see langword="null"/> (the default) models a module that ignores the
+    /// requested version and always hands back <paramref name="interfaceTable"/>.
+    /// </param>
+    private static void InstallModule(
+        IntPtr functionList, IntPtr interfaceTable = default, uint getInterfaceRv = 0,
+        Dictionary<(byte Major, byte Minor), IntPtr>? versioned = null)
     {
         s_functionListPtr = functionList;
         s_interfacePtr = interfaceTable;
         s_getInterfaceRv = getInterfaceRv;
+        s_versioned = versioned;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -82,6 +91,14 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static NativeCULong FakeGetInterface(byte* pInterfaceName, IntPtr pVersion, IntPtr* ppInterface, NativeCULong flags)
     {
+        if (pVersion != IntPtr.Zero && s_versioned is not null)
+        {
+            CK_VERSION wanted = *(CK_VERSION*)pVersion;
+            if (!s_versioned.TryGetValue((wanted.Major, wanted.Minor), out IntPtr served))
+                return new NativeCULong(0x00000007); // CKR_ARGUMENTS_BAD
+            *ppInterface = served;
+            return new NativeCULong(0);
+        }
         *ppInterface = s_interfacePtr;
         return new NativeCULong(s_getInterfaceRv);
     }
@@ -280,9 +297,9 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             "C_GetInterface");
         Assert.Equal(GetInterfaceStub, Fp(delegates, "C_GetInterface"));
 
-        // Base v2.40 slots stay bound from the C_GetFunctionList table (current, documented
-        // behavior: the base surface is deliberately not re-sourced from the interface table).
-        AssertBoundTo(delegates, baseSentinels);
+        // One table source: the base slots come from the interface table too, not C_GetFunctionList's.
+        AssertBoundTo(delegates, v30Sentinels, "C_GetInterface");
+        Assert.NotEqual(baseSentinels["C_Initialize"], Fp(delegates, "C_Initialize"));
 
         // version {3,0} must NOT trigger the v3.2 re-read.
         AssertAllZero(delegates, V32AdditionNames());
@@ -291,7 +308,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     [Fact]
     public void V32Interface_BindsV30AndV32Additions_FromInterfaceTable()
     {
-        var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v32Table));
 
@@ -306,7 +323,106 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             delegates,
             v32Sentinels.Where(kv => additions.Contains(kv.Key)).ToDictionary(),
             "C_GetInterface");
+        // One table source: base slots from the same v3.2 table.
+        AssertBoundTo(delegates, v32Sentinels, "C_GetInterface");
+    }
+
+    // A module whose default interface is 3.0 but which also offers 3.2 gets the 3.2 surface: each
+    // known version is requested before the default is taken.
+    [Fact]
+    public void DefaultInterfaceIs30_ButServes32OnRequest_Binds32()
+    {
+        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (v30Table, _) = BuildTable<CK_FUNCTION_LIST_3_0>(3, 0, 0x0B00_0000);
+        var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
+        InstallModule(baseTable, BuildInterface(v30Table), versioned: new()
+        {
+            [(3, 0)] = BuildInterface(v30Table),
+            [(3, 2)] = BuildInterface(v32Table),
+        });
+
+        var delegates = new Delegates(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        AssertBoundTo(delegates, v32Sentinels, "C_GetInterface");
+    }
+
+    // A table is believed only if its header is the version requested: a {3,0} table handed back for a
+    // {3,2} request must not be read as 3.2, which would read past its end.
+    [Fact]
+    public void TableWhoseHeaderIsNotTheRequestedVersion_IsNotReadAsThatVersion()
+    {
+        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (v30Table, v30Sentinels) = BuildTable<CK_FUNCTION_LIST_3_0>(3, 0, 0x0B00_0000);
+        InstallModule(baseTable, versioned: new()
+        {
+            [(3, 2)] = BuildInterface(v30Table), // lies: header says {3,0}
+            [(3, 0)] = BuildInterface(v30Table),
+        });
+
+        var delegates = new Delegates(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        AssertBoundTo(delegates, v30Sentinels, "C_GetInterface");
+        AssertAllZero(delegates, V32AdditionNames());
+    }
+
+    // Some modules answer only the NULL/NULL request: the default interface is then bound by its header.
+    [Fact]
+    public void EveryExactRequestRefused_DefaultInterfaceIsBoundByItsHeader()
+    {
+        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (v32Table, v32Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 2, 0x0C00_0000);
+        InstallModule(baseTable, BuildInterface(v32Table), versioned: []);
+
+        var delegates = new Delegates(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        AssertBoundTo(delegates, v32Sentinels, "C_GetInterface");
+    }
+
+    // A later 3.x than this library knows extends the 3.0 table; only that prefix is read.
+    [Fact]
+    public void DefaultInterfaceOfAnUnknown3x_BindsOnlyThe30Prefix()
+    {
+        var (baseTable, _) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        var (v33Table, v33Sentinels) = BuildTable<CK_FUNCTION_LIST_3_2>(3, 3, 0x0C00_0000);
+        InstallModule(baseTable, BuildInterface(v33Table), versioned: []);
+
+        var delegates = new Delegates(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        var v30Slots = SlotNames<CK_FUNCTION_LIST_3_0>().ToHashSet();
+        AssertBoundTo(delegates, v33Sentinels.Where(kv => v30Slots.Contains(kv.Key)).ToDictionary(), "C_GetInterface");
+        AssertAllZero(delegates, V32AdditionNames());
+    }
+
+    [Fact]
+    public void InterfaceWithANullFunctionList_FallsBackToGetFunctionList()
+    {
+        var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
+        InstallModule(baseTable, BuildInterface(IntPtr.Zero));
+
+        var delegates = new Delegates(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
         AssertBoundTo(delegates, baseSentinels);
+        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
     }
 
     [Fact]

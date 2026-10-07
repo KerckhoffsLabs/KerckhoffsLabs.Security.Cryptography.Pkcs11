@@ -100,73 +100,98 @@ internal partial class Delegates
     internal Delegates(Func<string, IntPtr> resolveExport) => Load(resolveExport);
 
     /// <summary>
-    /// Load sequence: the v2.40 table from <c>C_GetFunctionList</c>, then the v3.x additions from the
-    /// interface table <c>C_GetInterface</c> hands back, if the module has one.
+    /// Load sequence: the module's newest interface table this library knows, from <c>C_GetInterface</c>;
+    /// failing that, the v2.40 table from <c>C_GetFunctionList</c>. Every slot, base and v3.x alike, is
+    /// bound from the one table chosen.
     /// </summary>
     /// <remarks>
-    /// The v3.x functions come only from that table (PKCS#11 v3.0 §5.4), never from per-symbol exports:
-    /// <see cref="NativeLibrary.TryGetExport"/> searches the module's dependencies too (and the global
-    /// scope for a statically linked module), so it could bind another module's function, and it would
-    /// pair a v2.40 table with v3.x functions the module never offered as a set. A module without a
-    /// usable interface table has the v2.40 surface only; its v3.x calls report
+    /// The v3.x functions come only from an interface table (PKCS#11 v3.0 §5.4), never from per-symbol
+    /// exports: <see cref="NativeLibrary.TryGetExport"/> searches the module's dependencies too (and the
+    /// global scope for a statically linked module), so it could bind another module's function. A module
+    /// without a usable interface table has the v2.40 surface only; its v3.x calls report
     /// <c>CKR_FUNCTION_NOT_SUPPORTED</c>.
     /// </remarks>
     private void Load(Func<string, IntPtr> resolveExport)
     {
-        InitializeWithGetFunctionList(resolveExport);
-        LoadFromGetInterface(resolveExport);
+        if (!TryBindInterfaceTable(resolveExport))
+            InitializeWithGetFunctionList(resolveExport);
     }
 
     /// <summary>Export resolver over an OS library handle (returns Zero for missing exports).</summary>
     private static Func<string, IntPtr> ResolverFor(IntPtr libraryHandle)
         => name => NativeLibrary.TryGetExport(libraryHandle, name, out IntPtr address) ? address : IntPtr.Zero;
 
+    /// <summary>The interface versions this library binds, newest first (PKCS#11 v3.0 §5.4.4).</summary>
+    private static readonly CK_VERSION[] KnownInterfaceVersions =
+    [
+        new() { Major = 3, Minor = 2 },
+        new() { Major = 3, Minor = 1 },
+        new() { Major = 3, Minor = 0 },
+    ];
+
     /// <summary>
-    /// Calls C_GetInterface for the default "PKCS 11" interface, reads its function table as
-    /// <see cref="CK_FUNCTION_LIST_3_0"/>, and binds every v3.0 function from it (and the v3.2 ones from
-    /// a v3.2 table). Binds nothing if C_GetInterface is unavailable, fails, or returns a table that is
-    /// not v3.x: the module then has the v2.40 surface only.
+    /// Negotiates the module's interface through <c>C_GetInterface</c> and binds every slot from the table
+    /// it hands back. Returns <see langword="false"/>, binding nothing, when the module has no
+    /// <c>C_GetInterface</c> or offers no v3.x table this library can read.
     /// </summary>
-    private void LoadFromGetInterface(Func<string, IntPtr> resolveExport)
+    /// <remarks>
+    /// <para>
+    /// Each known version is requested by name and version, newest first, and a table is accepted only if
+    /// its own <c>CK_VERSION</c> header is the version asked for: a module that ignores the request and
+    /// hands back another table is not believed. Only when every exact request fails is the default
+    /// interface (<c>C_GetInterface(NULL, NULL)</c>) taken, and bound strictly by its header: {3,2} as a
+    /// v3.2 table; {3,0}, {3,1} and any later 3.x as a v3.0 table, which they all extend; any other
+    /// major version not at all.
+    /// </para>
+    /// <para>
+    /// The tables of every version extend one another (they are generated from one <c>pkcs11f.h</c>), so
+    /// the base v2.40 slots are read from the same table as the v3.x additions, and the slot count read
+    /// never exceeds what the verified version defines.
+    /// </para>
+    /// </remarks>
+    private bool TryBindInterfaceTable(Func<string, IntPtr> resolveExport)
     {
-        if (!TryResolve(resolveExport, "C_GetInterface", out IntPtr getInterfaceRawPtr))
-            return;
-        unsafe { _fp.C_GetInterface = (delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)getInterfaceRawPtr; }
+        if (!TryResolve(resolveExport, "C_GetInterface", out IntPtr getInterface))
+            return false;
+        unsafe { _fp.C_GetInterface = (delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)getInterface; }
 
-        if (!TryGetDefaultInterfaceFunctionList(out IntPtr functionList, out CK_VERSION version))
-            return;
+        foreach (CK_VERSION wanted in KnownInterfaceVersions)
+        {
+            if (TryGetInterfaceTable(wanted, out IntPtr table, out _))
+            {
+                BindTable(table, isV32: wanted.Minor == 2);
+                return true;
+            }
+        }
 
-        BindV30FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(functionList));
-
-        // v3.2 token: re-read the function table as CK_FUNCTION_LIST_3_2 and bind
-        // the 12 v3.2 additions on top of the v3.0 bindings.
-        if (version.Minor >= 2)
-            BindV32FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(functionList));
+        if (TryGetInterfaceTable(null, out IntPtr defaultTable, out CK_VERSION header) && header.Major == 3)
+        {
+            BindTable(defaultTable, isV32: header.Minor == 2);
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
-    /// Asks the already-bound C_GetInterface for the default interface (null name, null
-    /// version, flags = 0) and validates the table it hands back. Yields the function-list
-    /// pointer and its CK_VERSION header only for a v3.x table; returns false — with
-    /// <paramref name="functionList"/> left at <see cref="IntPtr.Zero"/> — when the call
-    /// throws, fails, or returns a v2.40 table the v3.0 binders must not read.
+    /// Calls <c>C_GetInterface</c> for the "PKCS 11" interface at <paramref name="wanted"/>, or for the
+    /// default interface when it is <see langword="null"/>, and yields its function table and that table's
+    /// version header. Fails on any error return, a NULL interface or table, and — for a requested version
+    /// — a table whose header is not that version.
     /// </summary>
-    private bool TryGetDefaultInterfaceFunctionList(out IntPtr functionList, out CK_VERSION version)
+    private unsafe bool TryGetInterfaceTable(CK_VERSION? wanted, out IntPtr table, out CK_VERSION header)
     {
-        functionList = IntPtr.Zero;
-        version = default;
+        table = IntPtr.Zero;
+        header = default;
 
-        IntPtr interfacePtr;
+        CK_VERSION requested = wanted.GetValueOrDefault();
+        IntPtr interfacePtr = IntPtr.Zero;
         NativeCULong rv;
-        try
+        fixed (byte* name = "PKCS 11\0"u8)
         {
-            unsafe { rv = _fp.C_GetInterface(null, IntPtr.Zero, &interfacePtr, new NativeCULong(0)); }
+            rv = wanted.HasValue
+                ? _fp.C_GetInterface(name, (IntPtr)(&requested), &interfacePtr, new NativeCULong(0))
+                : _fp.C_GetInterface(null, IntPtr.Zero, &interfacePtr, new NativeCULong(0));
         }
-        catch
-        {
-            return false;
-        }
-
         if (rv.ToCKR() != CKR.CKR_OK || interfacePtr == IntPtr.Zero)
             return false;
 
@@ -174,15 +199,21 @@ internal partial class Delegates
         if (iface.FunctionList == IntPtr.Zero)
             return false;
 
-        // The function-list pointer can be either CK_FUNCTION_LIST (v2.40) or
-        // CK_FUNCTION_LIST_3_0 (v3.0+). The CK_VERSION header at offset 0 distinguishes
-        // them. Read just the version first to decide.
-        version = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
-        if (version.ToVersion() < CryptokiVersions.V3_0)
+        header = UnmanagedMemory.Read<CK_VERSION>(iface.FunctionList);
+        if (wanted.HasValue && (header.Major != requested.Major || header.Minor != requested.Minor))
             return false;
 
-        functionList = iface.FunctionList;
+        table = iface.FunctionList;
         return true;
+    }
+
+    /// <summary>Binds every slot from one v3.x interface table: the base slots, the v3.0 additions, and the v3.2 ones.</summary>
+    private void BindTable(IntPtr table, bool isV32)
+    {
+        Initialize(UnmanagedMemory.Read<CK_FUNCTION_LIST>(table));
+        BindV30FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(table));
+        if (isV32)
+            BindV32FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(table));
     }
 
     /// <summary>
