@@ -231,13 +231,15 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
 
         // Every v2.40 slot must land in the same-named dispatch field (and _Windows sibling).
         AssertBoundTo(delegates, sentinels);
-        // No v3.0/v3.2 surface: neither the interface path nor the per-symbol fallback found anything.
+        // No v3.0/v3.2 surface: there is no interface table to take it from.
         AssertAllZero(delegates, V30AdditionNames());
         AssertAllZero(delegates, V32AdditionNames());
     }
 
+    // v3.x functions come only from the interface table: exports without one bind nothing, since a
+    // per-symbol lookup can resolve another module's function and mixes tables (PKCS#11 v3.0 §5.4).
     [Fact]
-    public void V240Module_PerSymbolExports_BindV30SurfaceWithoutGetInterface()
+    public void V240Module_PerSymbolExports_AreNotBound()
     {
         var (table, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         InstallModule(table);
@@ -252,12 +254,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         }));
 
         AssertBoundTo(delegates, baseSentinels);
-        Assert.Equal(loginUser, Fp(delegates, "C_LoginUser"));
-        Assert.Equal(encapsulate, Fp(delegates, "C_EncapsulateKey"));
-        Assert.Equal(encapsulate, Fp(delegates, "C_EncapsulateKey_Windows"));
-        // Fallback bound only what the resolver exposed.
-        AssertAllZero(delegates, V30AdditionNames(), "C_LoginUser");
-        AssertAllZero(delegates, V32AdditionNames(), "C_EncapsulateKey");
+        AssertAllZero(delegates, V30AdditionNames());
+        AssertAllZero(delegates, V32AdditionNames());
     }
 
     [Fact]
@@ -312,7 +310,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     }
 
     [Fact]
-    public void Interface_ReportingV240Version_FallsBackToPerSymbolLookup()
+    public void Interface_ReportingV240Version_BindsNoV3Surface()
     {
         var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         var (v30Table, _) = BuildTable<CK_FUNCTION_LIST_3_0>(2, 40, 0x0B00_0000); // header says 2.40
@@ -326,14 +324,13 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             ["C_SessionCancel"] = sessionCancel,
         }));
 
-        // The sub-3.0 version header rejects the interface table; per-symbol fallback runs.
-        Assert.Equal(sessionCancel, Fp(delegates, "C_SessionCancel"));
-        AssertAllZero(delegates, V30AdditionNames(), "C_SessionCancel", "C_GetInterface");
+        // The sub-3.0 version header rejects the interface table, and the export is not a substitute.
+        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
         AssertBoundTo(delegates, baseSentinels);
     }
 
     [Fact]
-    public void Interface_ReturningError_FallsBackToPerSymbolLookup()
+    public void Interface_ReturningError_BindsNoV3Surface()
     {
         var (baseTable, baseSentinels) = BuildTable<CK_FUNCTION_LIST>(2, 40, 0x0A00_0000);
         InstallModule(baseTable, getInterfaceRv: 0x00000006);  // CKR_FUNCTION_FAILED
@@ -346,7 +343,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             ["C_LoginUser"] = loginUser,
         }));
 
-        Assert.Equal(loginUser, Fp(delegates, "C_LoginUser"));
+        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
         AssertBoundTo(delegates, baseSentinels);
     }
 

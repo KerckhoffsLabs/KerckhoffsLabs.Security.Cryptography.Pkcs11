@@ -77,9 +77,8 @@ internal partial class Delegates
     // Per-function binders for the v3.0 / v3.2 additions. Each takes a raw entry-point
     // address — IntPtr.Zero means "the token doesn't provide this function", and binding
     // is then skipped so the pointer stays null and the wrapper reports
-    // CKR_FUNCTION_NOT_SUPPORTED. Both loader paths funnel through these, so the
-    // signature of a function is spelled out exactly once instead of once per path,
-    // and the interface-table and per-symbol routes cannot drift apart. Functions whose
+    // CKR_FUNCTION_NOT_SUPPORTED. The v3.0 and v3.2 table binders both funnel through
+    // these, so the signature of a function is spelled out exactly once. Functions whose
     // parameters embed a NativeCULong-sensitive struct bind the Linux and Windows
     // variants from the same address; the call site picks the layout at dispatch time.
 

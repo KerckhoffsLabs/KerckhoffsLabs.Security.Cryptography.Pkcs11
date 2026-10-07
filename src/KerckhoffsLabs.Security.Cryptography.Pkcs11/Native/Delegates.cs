@@ -99,13 +99,22 @@ internal partial class Delegates
     /// <param name="resolveExport">Maps an export name to its address, or <see cref="IntPtr.Zero"/> when absent.</param>
     internal Delegates(Func<string, IntPtr> resolveExport) => Load(resolveExport);
 
-    /// <summary>Dynamic-load sequence: v2.40 bootstrap, then best-effort v3.0/v3.2 binding.</summary>
+    /// <summary>
+    /// Load sequence: the v2.40 table from <c>C_GetFunctionList</c>, then the v3.x additions from the
+    /// interface table <c>C_GetInterface</c> hands back, if the module has one.
+    /// </summary>
+    /// <remarks>
+    /// The v3.x functions come only from that table (PKCS#11 v3.0 §5.4), never from per-symbol exports:
+    /// <see cref="NativeLibrary.TryGetExport"/> searches the module's dependencies too (and the global
+    /// scope for a statically linked module), so it could bind another module's function, and it would
+    /// pair a v2.40 table with v3.x functions the module never offered as a set. A module without a
+    /// usable interface table has the v2.40 surface only; its v3.x calls report
+    /// <c>CKR_FUNCTION_NOT_SUPPORTED</c>.
+    /// </remarks>
     private void Load(Func<string, IntPtr> resolveExport)
     {
         InitializeWithGetFunctionList(resolveExport);
-        // Best-effort load of v3.0 functions via direct symbol lookup. The full
-        // C_GetInterface-based loader path lives in Pkcs11Library / bucket E.
-        TryLoadV30Symbols(resolveExport);
+        LoadFromGetInterface(resolveExport);
     }
 
     /// <summary>Export resolver over an OS library handle (returns Zero for missing exports).</summary>
@@ -113,79 +122,19 @@ internal partial class Delegates
         => name => NativeLibrary.TryGetExport(libraryHandle, name, out IntPtr address) ? address : IntPtr.Zero;
 
     /// <summary>
-    /// Best-effort: bind v3.0 function pointers. Preferred path is C_GetInterface
-    /// (v3.0 §5.4.5) which yields a typed CK_FUNCTION_LIST_3_0 carrying every v2.40
-    /// pointer plus the v3.0 additions. Fallback path: per-symbol NativeLibrary lookup
-    /// against the dynamically loaded library — handles v2.40 tokens (delegates stay
-    /// <see langword="null"/>) and v3.0 tokens that export individual symbols but
-    /// don't publish the interface table.
+    /// Calls C_GetInterface for the default "PKCS 11" interface, reads its function table as
+    /// <see cref="CK_FUNCTION_LIST_3_0"/>, and binds every v3.0 function from it (and the v3.2 ones from
+    /// a v3.2 table). Binds nothing if C_GetInterface is unavailable, fails, or returns a table that is
+    /// not v3.x: the module then has the v2.40 surface only.
     /// </summary>
-    private void TryLoadV30Symbols(Func<string, IntPtr> resolveExport)
-    {
-        // Preferred: ask the library for its v3.0 interface table.
-        if (TryLoadFromGetInterface(resolveExport))
-            return;
-
-        // Fallback: per-symbol lookup. Works for libraries that export the v3.0
-        // functions as plain symbols even though they don't expose C_GetInterface.
-        // A missing export resolves to Zero, which each binder treats as "absent".
-        BindLoginUser(resolveExport("C_LoginUser"));
-        BindSessionCancel(resolveExport("C_SessionCancel"));
-        BindGetInterfaceList(resolveExport("C_GetInterfaceList"));
-
-        BindMessageEncryptInit(resolveExport("C_MessageEncryptInit"));
-        BindEncryptMessage(resolveExport("C_EncryptMessage"));
-        BindEncryptMessageBegin(resolveExport("C_EncryptMessageBegin"));
-        BindEncryptMessageNext(resolveExport("C_EncryptMessageNext"));
-        BindMessageEncryptFinal(resolveExport("C_MessageEncryptFinal"));
-
-        BindMessageDecryptInit(resolveExport("C_MessageDecryptInit"));
-        BindDecryptMessage(resolveExport("C_DecryptMessage"));
-        BindDecryptMessageBegin(resolveExport("C_DecryptMessageBegin"));
-        BindDecryptMessageNext(resolveExport("C_DecryptMessageNext"));
-        BindMessageDecryptFinal(resolveExport("C_MessageDecryptFinal"));
-
-        BindMessageSignInit(resolveExport("C_MessageSignInit"));
-        BindSignMessage(resolveExport("C_SignMessage"));
-        BindSignMessageBegin(resolveExport("C_SignMessageBegin"));
-        BindSignMessageNext(resolveExport("C_SignMessageNext"));
-        BindMessageSignFinal(resolveExport("C_MessageSignFinal"));
-
-        BindMessageVerifyInit(resolveExport("C_MessageVerifyInit"));
-        BindVerifyMessage(resolveExport("C_VerifyMessage"));
-        BindVerifyMessageBegin(resolveExport("C_VerifyMessageBegin"));
-        BindVerifyMessageNext(resolveExport("C_VerifyMessageNext"));
-        BindMessageVerifyFinal(resolveExport("C_MessageVerifyFinal"));
-
-        BindEncapsulateKey(resolveExport("C_EncapsulateKey"));
-        BindDecapsulateKey(resolveExport("C_DecapsulateKey"));
-        BindVerifySignatureInit(resolveExport("C_VerifySignatureInit"));
-        BindVerifySignature(resolveExport("C_VerifySignature"));
-        BindVerifySignatureUpdate(resolveExport("C_VerifySignatureUpdate"));
-        BindVerifySignatureFinal(resolveExport("C_VerifySignatureFinal"));
-        BindGetSessionValidationFlags(resolveExport("C_GetSessionValidationFlags"));
-        BindAsyncComplete(resolveExport("C_AsyncComplete"));
-        BindAsyncGetID(resolveExport("C_AsyncGetID"));
-        BindAsyncJoin(resolveExport("C_AsyncJoin"));
-        BindWrapKeyAuthenticated(resolveExport("C_WrapKeyAuthenticated"));
-        BindUnwrapKeyAuthenticated(resolveExport("C_UnwrapKeyAuthenticated"));
-    }
-
-    /// <summary>
-    /// Tries the preferred v3.0 loader path: call C_GetInterface to obtain the default
-    /// "PKCS 11" interface, then read its function table as <see cref="CK_FUNCTION_LIST_3_0"/>
-    /// and bind every v3.0 delegate from the table. Returns true on success, false if
-    /// C_GetInterface is unavailable / fails / returns a non-3.x version, leaving the
-    /// caller to use the per-symbol fallback.
-    /// </summary>
-    private bool TryLoadFromGetInterface(Func<string, IntPtr> resolveExport)
+    private void LoadFromGetInterface(Func<string, IntPtr> resolveExport)
     {
         if (!TryResolve(resolveExport, "C_GetInterface", out IntPtr getInterfaceRawPtr))
-            return false;
+            return;
         unsafe { _fp.C_GetInterface = (delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)getInterfaceRawPtr; }
 
         if (!TryGetDefaultInterfaceFunctionList(out IntPtr functionList, out CK_VERSION version))
-            return false;
+            return;
 
         BindV30FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_0>(functionList));
 
@@ -193,8 +142,6 @@ internal partial class Delegates
         // the 12 v3.2 additions on top of the v3.0 bindings.
         if (version.Minor >= 2)
             BindV32FunctionList(UnmanagedMemory.Read<CK_FUNCTION_LIST_3_2>(functionList));
-
-        return true;
     }
 
     /// <summary>
