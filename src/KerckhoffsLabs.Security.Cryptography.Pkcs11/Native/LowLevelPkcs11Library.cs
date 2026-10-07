@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
@@ -15,14 +14,8 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// </summary>
     private readonly Pkcs11ModuleHandle _module;
 
-    /// <summary>
-    /// The module handle, exposed so <see cref="Internal.SafeHandles.Pkcs11SessionHandle"/> can take
-    /// a <c>DangerousAddRef</c> on it for the session's lifetime — the CLR gives no ordering
-    /// guarantee between two independent <c>CriticalFinalizerObject</c>s, so without an explicit
-    /// SafeHandle ref count this module could be unmapped before an abandoned session's
-    /// <c>C_CloseSession</c> runs.
-    /// </summary>
-    internal Pkcs11ModuleHandle ModuleHandle => _module;
+    /// <inheritdoc/>
+    public Pkcs11ModuleHandle Module => _module;
 
     /// <summary>
     /// A use of the module for one call. Throws <see cref="ObjectDisposedException"/> once this
@@ -34,98 +27,6 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
 
     /// <summary>What has happened to a requested <c>C_Finalize</c> so far.</summary>
     internal (FinalizeOutcome Outcome, CKR ReturnValue) FinalizeStatus => _module.FinalizeStatus;
-
-    /// <summary>
-    /// Lock guarding <see cref="_trackedSessions"/>.
-    /// </summary>
-    private readonly Lock _sessionsLock = new();
-
-    /// <summary>
-    /// Weak references to every <see cref="Pkcs11SessionHandle"/> opened against this library.
-    /// Cleared by <see cref="CloseAllTrackedSessions"/> at <see cref="Pkcs11Library.Dispose()"/>
-    /// time so we can issue a graceful <c>C_CloseSession</c> while the function table is still
-    /// valid — without preventing GC of normally-disposed sessions.
-    /// </summary>
-    private readonly List<WeakReference<Pkcs11SessionHandle>> _trackedSessions = [];
-
-    /// <summary>
-    /// Test seam: current count of tracked (still-live) session handles. Prunes dead
-    /// weak refs on read so the count reflects what's actually reachable.
-    /// </summary>
-    public int TrackedSessionCount
-    {
-        get
-        {
-            lock (_sessionsLock)
-            {
-                _trackedSessions.RemoveAll(wr => !wr.TryGetTarget(out _));
-                return _trackedSessions.Count;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Registers a session handle for cleanup at library teardown. Called from the
-    /// <see cref="Pkcs11SessionHandle"/> constructor.
-    /// </summary>
-    public void RegisterSession(Pkcs11SessionHandle handle)
-    {
-        ArgumentNullException.ThrowIfNull(handle);
-        lock (_sessionsLock)
-        {
-            _trackedSessions.RemoveAll(wr => !wr.TryGetTarget(out _));
-            _trackedSessions.Add(new WeakReference<Pkcs11SessionHandle>(handle));
-        }
-    }
-
-    /// <summary>
-    /// Removes <paramref name="handle"/> from the tracker. Called from
-    /// <see cref="Pkcs11SessionHandle.ReleaseHandle"/> after a normal close so the
-    /// tracker doesn't grow unbounded.
-    /// </summary>
-    public void UnregisterSession(Pkcs11SessionHandle handle)
-    {
-        ArgumentNullException.ThrowIfNull(handle);
-        lock (_sessionsLock)
-        {
-            _trackedSessions.RemoveAll(wr =>
-                !wr.TryGetTarget(out var h) || ReferenceEquals(h, handle));
-        }
-    }
-
-    /// <summary>
-    /// Closes every still-live tracked session handle. Must run before <c>C_Finalize</c>
-    /// and before the module is unloaded — otherwise a stray <see cref="Pkcs11SessionHandle"/>
-    /// finalizer would call <c>C_CloseSession</c> through a function table whose backing
-    /// module has been unmapped. <see cref="SafeHandle.Dispose()"/> is reentrant and
-    /// thread-safe, so it's safe to invoke even if the user races us by disposing the same
-    /// session on another thread.
-    /// </summary>
-    public void CloseAllTrackedSessions()
-    {
-        Pkcs11SessionHandle[] live;
-        lock (_sessionsLock)
-        {
-            live = [.. _trackedSessions
-                .Select(wr => wr.TryGetTarget(out var h) ? h : null)
-                .Where(h => h is not null)
-                .Cast<Pkcs11SessionHandle>()];
-            _trackedSessions.Clear();
-        }
-
-        foreach (var handle in live)
-        {
-            try
-            {
-                if (handle.IsClosed || handle.IsInvalid) continue;
-                handle.Dispose();
-            }
-            catch
-            {
-                // Best-effort cleanup; never let one bad handle block another's close.
-            }
-        }
-    }
 
     /// <summary>
     /// Loads PKCS#11 library at <paramref name="libraryPath"/> and acquires function

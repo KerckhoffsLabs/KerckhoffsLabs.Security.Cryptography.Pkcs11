@@ -62,6 +62,14 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     private volatile bool _initialized;
     private volatile bool _finalizeOnRelease;
 
+    // A test double has no function table; its sessions close through the double itself.
+    private readonly ILowLevelPkcs11Library? _detached;
+
+    private readonly Lock _sessionsLock = new();
+
+    // Weak, so a session the caller disposed (or abandoned) is not kept alive by the tracker.
+    private readonly List<WeakReference<Pkcs11SessionHandle>> _sessions = [];
+
     // Uses that hold off C_Finalize: calls in flight (bar a blocking wait) and open sessions.
     private int _finalizeHolds;
 
@@ -86,6 +94,12 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         SetHandle(moduleHandle);
         _freeOnRelease = freeOnRelease;
         _identity = identity;
+    }
+
+    private Pkcs11ModuleHandle(IntPtr moduleHandle, bool freeOnRelease, ILowLevelPkcs11Library detached)
+        : this(moduleHandle, freeOnRelease, identity: detached)
+    {
+        _detached = detached;
     }
 
     /// <summary>The module's function table. Only call through it while holding a use of this handle.</summary>
@@ -185,6 +199,68 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         if (holdsOffFinalize && Interlocked.Decrement(ref _finalizeHolds) == 0)
             TryFinalize();
         DangerousRelease();
+    }
+
+    /// <summary>
+    /// A handle for a test double: no module to load, finalize or free, but sessions are tracked and
+    /// referenced exactly as for a real module, and close through <paramref name="library"/>.
+    /// </summary>
+    internal static Pkcs11ModuleHandle Detached(ILowLevelPkcs11Library library)
+        => new(NotLoaded, freeOnRelease: false, library);
+
+    /// <summary>Closes <paramref name="session"/>. The caller holds a reference on this handle.</summary>
+    internal CKR CloseSession(NativeCULong session)
+        => _detached is not null ? _detached.C_CloseSession(session) : Table.C_CloseSession(session).ToCKR();
+
+    /// <summary>Count of still-live tracked sessions (test/diagnostic seam).</summary>
+    internal int TrackedSessionCount
+    {
+        get
+        {
+            lock (_sessionsLock)
+            {
+                _sessions.RemoveAll(wr => !wr.TryGetTarget(out _));
+                return _sessions.Count;
+            }
+        }
+    }
+
+    /// <summary>Tracks <paramref name="session"/> so <see cref="CloseAllTrackedSessions"/> can close it.</summary>
+    internal void Track(Pkcs11SessionHandle session)
+    {
+        lock (_sessionsLock)
+        {
+            _sessions.RemoveAll(wr => !wr.TryGetTarget(out _));
+            _sessions.Add(new WeakReference<Pkcs11SessionHandle>(session));
+        }
+    }
+
+    /// <summary>Stops tracking <paramref name="session"/>, after it has closed.</summary>
+    internal void Untrack(Pkcs11SessionHandle session)
+    {
+        lock (_sessionsLock)
+            _sessions.RemoveAll(wr => !wr.TryGetTarget(out var h) || ReferenceEquals(h, session));
+    }
+
+    /// <summary>
+    /// Closes every still-live tracked session. A session with an operation in flight holds a reference
+    /// on its handle, so its <c>C_CloseSession</c> waits for that operation to finish.
+    /// <see cref="SafeHandle.Dispose()"/> is reentrant and thread-safe, so a caller disposing the same
+    /// session on another thread is harmless.
+    /// </summary>
+    internal void CloseAllTrackedSessions()
+    {
+        Pkcs11SessionHandle[] live;
+        lock (_sessionsLock)
+        {
+            live = [.. _sessions.Select(wr => wr.TryGetTarget(out var h) ? h : null).OfType<Pkcs11SessionHandle>()];
+            _sessions.Clear();
+        }
+
+        // A session's release never throws: a C_CloseSession that fails, or throws, is reported by its
+        // ReleaseHandle returning false, which Dispose ignores. So one bad handle cannot keep the others open.
+        foreach (var session in live.Where(s => !s.IsClosed && !s.IsInvalid))
+            session.Dispose();
     }
 
     /// <summary>Records that <c>C_Initialize</c> through this handle succeeded.</summary>

@@ -118,9 +118,10 @@ public sealed class Pkcs11Workspace : IDisposable
         {
             _session.Logout();
         }
-        catch (Pkcs11Exception)
+        catch (Exception ex) when (ex is Pkcs11Exception or ObjectDisposedException)
         {
-            // Already logged out, session/library already gone, or token rejected the logout
+            // Already logged out, session/library already gone (disposing the library closes every
+            // session it tracks, so the logout finds this one closed), or token rejected the logout
             // during teardown — disposal proceeds regardless.
         }
 

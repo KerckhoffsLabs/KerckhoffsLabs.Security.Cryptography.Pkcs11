@@ -574,7 +574,7 @@ public sealed class Pkcs11Library : IDisposable
             // function table whose backing module has been unmapped. The
             // ownership contract is: the library MUST outlive every session it
             // produced. This is the safety net for callers that violate it.
-            _pkcs11Library.CloseAllTrackedSessions();
+            _pkcs11Library.Module.CloseAllTrackedSessions();
 
             // Only finalize if THIS instance drove the C_Initialize to CKR_OK.
             // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is

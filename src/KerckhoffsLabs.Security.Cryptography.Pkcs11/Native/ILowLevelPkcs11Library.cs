@@ -17,15 +17,11 @@ internal interface ILowLevelPkcs11Library : IDisposable
     bool IsMessageApiSupported { get; }
     bool IsV32ApiSupported { get; }
 
-    // ---- Session tracking: registration + teardown seam ----
-    /// <summary>Count of still-live tracked session handles (test/diagnostic seam).</summary>
-    int TrackedSessionCount { get; }
-    /// <summary>Registers a session handle for cleanup at library teardown.</summary>
-    void RegisterSession(Pkcs11SessionHandle handle);
-    /// <summary>Removes a session handle from the tracker after a normal close.</summary>
-    void UnregisterSession(Pkcs11SessionHandle handle);
-    /// <summary>Closes every still-live tracked session before C_Finalize / module unload.</summary>
-    void CloseAllTrackedSessions();
+    /// <summary>
+    /// The module this library calls into. Sessions reference and are tracked by it, whichever
+    /// implementation sits behind this interface.
+    /// </summary>
+    Pkcs11ModuleHandle Module { get; }
     /// <summary>
     /// Finalizes the module once nothing uses it any more: no call in flight and no session open. A test
     /// double has no such references to wait for, so by default it finalizes at once.

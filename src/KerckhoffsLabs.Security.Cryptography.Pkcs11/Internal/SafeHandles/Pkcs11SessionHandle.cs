@@ -6,34 +6,23 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 
 /// <summary>
 /// <see cref="SafeHandle"/> wrapper around a PKCS#11 session handle. Calls
-/// <c>C_CloseSession</c> on release. Holds a reference to the owning
-/// <see cref="LowLevelPkcs11Library"/> so the library SafeHandle cannot be released
-/// while any session is still open.
+/// <c>C_CloseSession</c> on release, and holds a reference on its <see cref="Pkcs11ModuleHandle"/>
+/// for its whole lifetime so the module cannot be finalized or unmapped while the session is open.
 /// </summary>
 /// <remarks>
 /// Mere GC reachability does not order this: <see cref="SafeHandle"/> is a
 /// <c>CriticalFinalizerObject</c>, and the CLR gives no relative ordering guarantee between two
-/// independent critical finalizers — a strong reference to the library only stops it from being
-/// *collected*, not from having its own module handle finalized (and the native module unmapped)
-/// first if both this handle and the library become unreachable in the same GC. When the backing
-/// library is a real, natively-loaded <see cref="LowLevelPkcs11Library"/>, this handle instead takes
-/// an explicit <c>DangerousAddRef</c> on its <see cref="Pkcs11ModuleHandle"/> for its own lifetime and
-/// releases it in <see cref="ReleaseHandle"/> — SafeHandle's own ref-counting is what actually defers
-/// the module's release until this handle's <c>C_CloseSession</c> has run.
+/// independent critical finalizers. The explicit use of the module (<c>AddUse</c>), released last in
+/// <see cref="ReleaseHandle"/>, is what defers the module's release until this handle's
+/// <c>C_CloseSession</c> has run. It is taken whatever implementation sits behind
+/// <see cref="ILowLevelPkcs11Library"/>: a test double gets a detached module handle.
 /// </remarks>
 internal sealed class Pkcs11SessionHandle : SafeHandle
 {
-    private readonly ILowLevelPkcs11Library _library;
+    private readonly Pkcs11ModuleHandle _module;
 
-    /// <summary>
-    /// The real library's module handle, ref-counted for this session's lifetime — <c>null</c> when
-    /// <see cref="_library"/> is not a natively-loaded <see cref="LowLevelPkcs11Library"/> (a test
-    /// double has no native module to protect).
-    /// </summary>
-    private readonly Pkcs11ModuleHandle? _moduleHandle;
-
-    /// <summary>Whether <see cref="_moduleHandle"/>'s <c>DangerousAddRef</c> succeeded and must be released.</summary>
-    private readonly bool _moduleHandleRefAdded;
+    /// <summary>Whether the use of <see cref="_module"/> was taken and must be released.</summary>
+    private readonly bool _moduleRefAdded;
 
     /// <summary>
     /// The session id, held here rather than in the base handle field. <c>CK_SESSION_HANDLE</c> is
@@ -53,19 +42,16 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
         : base(IntPtr.Zero, ownsHandle: true)
     {
         ArgumentNullException.ThrowIfNull(library);
-        _library = library;
+        _module = library.Module;
         _sessionId = sessionId;
 
-        if (!IsInvalid && library is LowLevelPkcs11Library real)
+        if (!IsInvalid)
         {
-            _moduleHandle = real.ModuleHandle;
             // A use that holds off C_Finalize: the module is not finalized under an open session.
-            _moduleHandle.AddUse(ref _moduleHandleRefAdded);
+            _module.AddUse(ref _moduleRefAdded);
+            // Tracked so Pkcs11Library.Dispose can close it before asking for C_Finalize.
+            _module.Track(this);
         }
-
-        // Register with the library so Pkcs11Library.Dispose can close us before C_Finalize
-        // unloads the function table.
-        _library.RegisterSession(this);
     }
 
     /// <summary>The underlying PKCS#11 session handle.</summary>
@@ -82,13 +68,10 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
             if (IsInvalid) return true;
             try
             {
-                // Straight through the table when this handle holds a module reference: the library may
-                // already be disposed (an abandoned session's finalizer runs in any order relative to
-                // the library's), but the reference keeps the module mapped for this call.
-                CKR rv = _moduleHandle is not null
-                    ? _moduleHandle.Table.C_CloseSession(SessionId).ToCKR()
-                    : _library.C_CloseSession(SessionId);
-                return rv == CKR.CKR_OK;
+                // Through the module, not the library: the library may already be disposed (an
+                // abandoned session's finalizer runs in any order relative to the library's), but this
+                // handle's reference keeps the module mapped for the call.
+                return _module.CloseSession(SessionId) == CKR.CKR_OK;
             }
             catch
             {
@@ -96,16 +79,16 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
             }
             finally
             {
-                // Best-effort: prune our tracker entry so the library's tracker doesn't grow
-                // unbounded for long-running consumers that open/close many sessions.
-                try { _library.UnregisterSession(this); } catch { /* tracker may already be torn down */ }
+                // Prune the tracker entry so it does not grow for long-running consumers that open
+                // and close many sessions.
+                _module.Untrack(this);
             }
         }
         finally
         {
             // Release last: only after C_CloseSession has had its chance to run does the module
             // become eligible for its own SafeHandle release.
-            if (_moduleHandleRefAdded) _moduleHandle!.ReleaseUse();
+            if (_moduleRefAdded) _module.ReleaseUse();
         }
     }
 }
