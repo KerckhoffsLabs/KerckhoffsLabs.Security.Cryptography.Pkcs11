@@ -121,7 +121,7 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) => NotSupported(nameof(C_VerifyUpdate));
     public virtual CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => NotSupported(nameof(C_VerifyFinal));
     public virtual CKR C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_VerifyRecoverInit));
-    public virtual CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, out NativeCULong dataLen) { dataLen = (NativeCULong)0; return NotSupported(nameof(C_VerifyRecover)); }
+    public virtual CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, bool lengthOnly, out NativeCULong dataLen) { dataLen = (NativeCULong)0; return NotSupported(nameof(C_VerifyRecover)); }
     public virtual CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen) { encryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_DigestEncryptUpdate)); }
     public virtual CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen) { partLen = (NativeCULong)0; return NotSupported(nameof(C_DecryptDigestUpdate)); }
     public virtual CKR C_SignEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen) { encryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_SignEncryptUpdate)); }

@@ -72,7 +72,7 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
             }
 
             byte[] recovered = new byte[signature.Length];
-            CKR verifyRv = lowLevel.C_VerifyRecover(sessionId, signature, recovered, out NativeCULong recoveredLen);
+            CKR verifyRv = lowLevel.C_VerifyRecover(sessionId, signature, recovered, lengthOnly: false, out NativeCULong recoveredLen);
             Assert.Equal(CKR.CKR_OK, verifyRv);
             Assert.Equal((NativeCULong)data.Length, recoveredLen);
             Assert.Equal(data, recovered);

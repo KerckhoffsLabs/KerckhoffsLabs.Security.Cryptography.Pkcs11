@@ -37,6 +37,16 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_SignFinal(NativeCULong session, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SignRecoverInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SignRecover(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyRecoverInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, NativeBuffer<byte> data, ref NativeCULong dataLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifySignatureInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifySignature(NativeCULong session, ReadOnlySpan<byte> data) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifySignatureFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -89,6 +99,26 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_SignRecoverInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&SignRecoverInit;
         if (Overrides(nameof(C_SignRecover)))
             slots[nameof(CryptokiTable.C_SignRecover)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignRecover;
+        if (Overrides(nameof(C_VerifyInit)))
+            slots[nameof(CryptokiTable.C_VerifyInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&VerifyInit;
+        if (Overrides(nameof(C_Verify)))
+            slots[nameof(CryptokiTable.C_Verify)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&Verify;
+        if (Overrides(nameof(C_VerifyUpdate)))
+            slots[nameof(CryptokiTable.C_VerifyUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifyUpdate;
+        if (Overrides(nameof(C_VerifyFinal)))
+            slots[nameof(CryptokiTable.C_VerifyFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifyFinal;
+        if (Overrides(nameof(C_VerifyRecoverInit)))
+            slots[nameof(CryptokiTable.C_VerifyRecoverInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&VerifyRecoverInit;
+        if (Overrides(nameof(C_VerifyRecover)))
+            slots[nameof(CryptokiTable.C_VerifyRecover)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&VerifyRecover;
+        if (Overrides(nameof(C_VerifySignatureInit)))
+            slots[nameof(CryptokiTable.C_VerifySignatureInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifySignatureInit;
+        if (Overrides(nameof(C_VerifySignature)))
+            slots[nameof(CryptokiTable.C_VerifySignature)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifySignature;
+        if (Overrides(nameof(C_VerifySignatureUpdate)))
+            slots[nameof(CryptokiTable.C_VerifySignatureUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifySignatureUpdate;
+        if (Overrides(nameof(C_VerifySignatureFinal)))
+            slots[nameof(CryptokiTable.C_VerifySignatureFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&VerifySignatureFinal;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -367,6 +397,92 @@ internal abstract unsafe partial class FakeModule
             *pulSignatureLen = length;
             return Rv(rv);
         }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_VerifyInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifyInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong Verify(NativeCULong hSession, byte* pData, NativeCULong ulDataLen, byte* pSignature, NativeCULong ulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_Verify)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_Verify(hSession, In(pData, ulDataLen), In(pSignature, ulSignatureLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyUpdate(NativeCULong hSession, byte* pPart, NativeCULong ulPartLen)
+    {
+        if (Owner(hSession, nameof(C_VerifyUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifyUpdate(hSession, In(pPart, ulPartLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyFinal(NativeCULong hSession, byte* pSignature, NativeCULong ulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_VerifyFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifyFinal(hSession, In(pSignature, ulSignatureLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyRecoverInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_VerifyRecoverInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifyRecoverInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyRecover(NativeCULong hSession, byte* pSignature, NativeCULong ulSignatureLen, byte* pData, NativeCULong* pulDataLen)
+    {
+        if (Owner(hSession, nameof(C_VerifyRecover)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulDataLen;
+            CKR rv = m.C_VerifyRecover(hSession, In(pSignature, ulSignatureLen), new NativeBuffer<byte>(pData, length), ref length);
+            *pulDataLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifySignatureInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey, byte* pSignature, NativeCULong ulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_VerifySignatureInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifySignatureInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey, In(pSignature, ulSignatureLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifySignature(NativeCULong hSession, byte* pData, NativeCULong ulDataLen)
+    {
+        if (Owner(hSession, nameof(C_VerifySignature)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifySignature(hSession, In(pData, ulDataLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifySignatureUpdate(NativeCULong hSession, byte* pPart, NativeCULong ulPartLen)
+    {
+        if (Owner(hSession, nameof(C_VerifySignatureUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifySignatureUpdate(hSession, In(pPart, ulPartLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifySignatureFinal(NativeCULong hSession)
+    {
+        if (Owner(hSession, nameof(C_VerifySignatureFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_VerifySignatureFinal(hSession)); }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
