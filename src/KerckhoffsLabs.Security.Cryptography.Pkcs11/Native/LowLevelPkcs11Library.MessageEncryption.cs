@@ -1,4 +1,3 @@
-// <auto-split-from LowLevelPkcs11Library.cs>
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -9,81 +8,97 @@ internal sealed partial class LowLevelPkcs11Library
     /// Begins an AEAD encrypt-message sequence (PKCS#11 v3.0 §5.9.4). Pair with C_EncryptMessage or C_EncryptMessageBegin/Next + C_MessageEncryptFinal.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    public unsafe CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_MessageEncryptInit)
+        var messageEncryptInit = call.Functions.C_MessageEncryptInit;
+        if (messageEncryptInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return call.Table.C_MessageEncryptInit(session, ref mechanism, key).ToCKR();
+        if (Pkcs11Marshal.IsWindows)
+        {
+            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
+            return messageEncryptInit(session, &packed, key).ToCKR();
+        }
+        fixed (CK_MECHANISM* m = &mechanism)
+            return messageEncryptInit(session, m, key).ToCKR();
     }
 
     /// <summary>
     /// One-shot AEAD encrypt of a message (PKCS#11 v3.0 §5.9.5). parameter holds the per-message nonce/IV.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen)
+    public unsafe CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
+        ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_EncryptMessage)
-        {
-            ciphertextLen = (NativeCULong)0;
+        var encryptMessage = call.Functions.C_EncryptMessage;
+        ciphertextLen = (NativeCULong)ciphertext.Length;
+        if (encryptMessage is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        }
 
-        NativeCULong rv = call.Table.C_EncryptMessage(session, parameter, parameterLen, associatedData, plaintext, ciphertext, out ciphertextLen);
-        return rv.ToCKR();
+        CKR rv;
+        fixed (byte* adPtr = &NonNullPinnable(associatedData))
+        fixed (byte* ptPtr = &NonNullPinnable(plaintext))
+        fixed (byte* ctPtr = &NonNullPinnable(ciphertext))
+        fixed (NativeCULong* lenPtr = &ciphertextLen)
+        {
+            rv = encryptMessage(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length,
+                ptPtr, (NativeCULong)plaintext.Length, lengthOnly ? null : ctPtr, lenPtr).ToCKR();
+        }
+        return CheckedOutput(rv, lengthOnly, ciphertextLen, ciphertext.Length);
     }
 
     /// <summary>
     /// Begins a streaming AEAD encrypt (PKCS#11 v3.0 §5.9.6); follow with C_EncryptMessageNext calls.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData)
+    public unsafe CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_EncryptMessageBegin)
+        var encryptMessageBegin = call.Functions.C_EncryptMessageBegin;
+        if (encryptMessageBegin is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = call.Table.C_EncryptMessageBegin(session, parameter, parameterLen, associatedData);
-        return rv.ToCKR();
+        fixed (byte* adPtr = associatedData)
+            return encryptMessageBegin(session, parameter, parameterLen, adPtr, (NativeCULong)associatedData.Length).ToCKR();
     }
 
     /// <summary>
     /// Encrypts a plaintext chunk in a streaming AEAD encrypt (PKCS#11 v3.0 §5.9.7). Pass CKF_END_OF_MESSAGE in flags on the final chunk.
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> plaintextPart,
-        Span<byte> ciphertextPart, out NativeCULong ciphertextPartLen, NativeCULong flags)
+    public unsafe CKR C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> plaintextPart,
+        Span<byte> ciphertextPart, bool lengthOnly, out NativeCULong ciphertextPartLen, NativeCULong flags)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_EncryptMessageNext)
-        {
-            ciphertextPartLen = (NativeCULong)0;
+        var encryptMessageNext = call.Functions.C_EncryptMessageNext;
+        ciphertextPartLen = (NativeCULong)ciphertextPart.Length;
+        if (encryptMessageNext is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        }
 
-        NativeCULong rv = call.Table.C_EncryptMessageNext(session, parameter, parameterLen, plaintextPart, ciphertextPart, out ciphertextPartLen, flags);
-        return rv.ToCKR();
+        CKR rv;
+        fixed (byte* ptPtr = plaintextPart)
+        fixed (byte* ctPtr = &NonNullPinnable(ciphertextPart))
+        fixed (NativeCULong* lenPtr = &ciphertextPartLen)
+        {
+            rv = encryptMessageNext(session, parameter, parameterLen, ptPtr, (NativeCULong)plaintextPart.Length,
+                lengthOnly ? null : ctPtr, lenPtr, flags).ToCKR();
+        }
+        return CheckedOutput(rv, lengthOnly, ciphertextPartLen, ciphertextPart.Length);
     }
 
     /// <summary>
     /// Ends an AEAD encrypt-message sequence on the session (PKCS#11 v3.0 §5.9.8).
     /// </summary>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_MessageEncryptFinal(NativeCULong session)
+    public unsafe CKR C_MessageEncryptFinal(NativeCULong session)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_MessageEncryptFinal)
+        var messageEncryptFinal = call.Functions.C_MessageEncryptFinal;
+        if (messageEncryptFinal is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        NativeCULong rv = call.Table.C_MessageEncryptFinal(session);
-        return rv.ToCKR();
+        return messageEncryptFinal(session).ToCKR();
     }
 }

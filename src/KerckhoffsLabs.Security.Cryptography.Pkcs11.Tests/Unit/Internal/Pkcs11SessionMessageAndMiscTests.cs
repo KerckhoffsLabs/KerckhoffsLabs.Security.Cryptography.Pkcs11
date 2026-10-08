@@ -43,9 +43,9 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         public override CKR C_MessageDecryptFinal(NativeCULong session) { DecryptFinalCalls++; return CKR.CKR_OK; }
 
-        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, byte[]? ciphertext, out NativeCULong ciphertextLen)
+        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen)
         {
-            if (ciphertext is null) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
+            if (lengthOnly) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
             OnEncryptMessageParams?.Invoke(parameter);
             Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
