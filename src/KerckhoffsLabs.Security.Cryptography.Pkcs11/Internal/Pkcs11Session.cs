@@ -2411,13 +2411,13 @@ internal sealed class Pkcs11Session : IDisposable
         // an opaque error instead of the plaintext length. Resize via CKR_BUFFER_TOO_SMALL
         // if the token needs more space (e.g. padding expansion on some mechanisms).
         byte[] decryptedData = new byte[encryptedData.Length];
-        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out NativeCULong decryptedDataLen);
+        rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out NativeCULong decryptedDataLen);
 
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
             CryptographicOperations.ZeroMemory(decryptedData);
             decryptedData = new byte[ReportedLength.ForAllocation(decryptedDataLen, OpDecrypt)];
-            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, out decryptedDataLen);
+            rv = _pkcs11Library.C_Decrypt(_sessionId, encryptedData, decryptedData, lengthOnly: false, out decryptedDataLen);
         }
 
         Pkcs11Exception.ThrowIfError(rv, OpDecrypt);
@@ -2499,15 +2499,15 @@ internal sealed class Pkcs11Session : IDisposable
 
         PumpStreamThrough(inputStream, outputStream, bufferLength,
             (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
-                => _pkcs11Library.C_DecryptUpdate(_sessionId, input, output, out outputLen),
+                => _pkcs11Library.C_DecryptUpdate(_sessionId, input, output, lengthOnly: false, out outputLen),
             OpDecryptUpdate);
 
         byte[]? lastPart = null;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, default, lengthOnly: true, out NativeCULong lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
         operation.Completed();
 
@@ -2925,11 +2925,11 @@ internal sealed class Pkcs11Session : IDisposable
             OpDecryptVerifyUpdate);
 
         byte[]? lastPart = null;
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, null, out NativeCULong lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, default, lengthOnly: true, out NativeCULong lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
 
         lastPart = new byte[ReportedLength.ForAllocation(lastPartLen, OpDecryptFinal)];
-        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, out lastPartLen);
+        rv = _pkcs11Library.C_DecryptFinal(_sessionId, lastPart, lengthOnly: false, out lastPartLen);
         Pkcs11Exception.ThrowIfError(rv, OpDecryptFinal);
         operation.End(CKF.CKF_DECRYPT);
 
@@ -3317,8 +3317,8 @@ internal sealed class Pkcs11Session : IDisposable
                 Update: (ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
                     => _pkcs11Library.C_DecryptDigestUpdate(_sessionId, input, output, out outputLen),
                 UpdateOperation: OpDecryptDigestUpdate,
-                Final: (Span<byte> buffer, bool _, out NativeCULong length)
-                    => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, out length),
+                Final: (Span<byte> buffer, bool lengthOnly, out NativeCULong length)
+                    => _pkcs11Library.C_DecryptFinal(_sessionId, buffer, lengthOnly, out length),
                 FinalOperation: OpDecryptFinal,
                 CancelFlag: CKF.CKF_DECRYPT),
             "DecryptDigest");

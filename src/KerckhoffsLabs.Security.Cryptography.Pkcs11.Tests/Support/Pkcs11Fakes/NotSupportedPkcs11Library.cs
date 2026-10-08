@@ -102,9 +102,9 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen) { encryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_EncryptUpdate)); }
     public virtual CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen) { lastEncryptedPartLen = (NativeCULong)0; return NotSupported(nameof(C_EncryptFinal)); }
     public virtual CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => NotSupported(nameof(C_DecryptInit));
-    public virtual CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen) { dataLen = (NativeCULong)0; return NotSupported(nameof(C_Decrypt)); }
-    public virtual CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen) { partLen = (NativeCULong)0; return NotSupported(nameof(C_DecryptUpdate)); }
-    public virtual CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen) { lastPartLen = (NativeCULong)0; return NotSupported(nameof(C_DecryptFinal)); }
+    public virtual CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen) { dataLen = (NativeCULong)0; return NotSupported(nameof(C_Decrypt)); }
+    public virtual CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen) { partLen = (NativeCULong)0; return NotSupported(nameof(C_DecryptUpdate)); }
+    public virtual CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen) { lastPartLen = (NativeCULong)0; return NotSupported(nameof(C_DecryptFinal)); }
     public virtual CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => NotSupported(nameof(C_DigestInit));
     public virtual CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, out NativeCULong digestLen) { digestLen = (NativeCULong)0; return NotSupported(nameof(C_Digest)); }
     public virtual CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) => NotSupported(nameof(C_DigestUpdate));

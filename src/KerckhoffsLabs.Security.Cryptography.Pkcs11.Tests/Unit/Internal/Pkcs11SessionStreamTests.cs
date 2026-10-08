@@ -74,12 +74,12 @@ public sealed class Pkcs11SessionStreamTests
 
         public override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen)
             => Update(part, lengthOnly ? default : encryptedPart, out encryptedPartLen);
-        public override CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
-            => Update(encryptedPart, part, out partLen);
+        public override CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
+            => Update(encryptedPart, lengthOnly ? default : part, out partLen);
         public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen)
             => Final(lengthOnly ? default : lastEncryptedPart, out lastEncryptedPartLen);
-        public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, out NativeCULong lastPartLen)
-            => Final(lastPart, out lastPartLen);
+        public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen)
+            => Final(lengthOnly ? default : lastPart, out lastPartLen);
 
         public override CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
         public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen)

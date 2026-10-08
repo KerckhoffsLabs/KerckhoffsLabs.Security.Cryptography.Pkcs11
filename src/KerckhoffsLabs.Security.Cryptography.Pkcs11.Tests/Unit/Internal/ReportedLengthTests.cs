@@ -146,8 +146,8 @@ public sealed class ReportedLengthTests
         public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen)
             => Answer(lengthOnly ? default : encryptedData, out encryptedDataLen);
 
-        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, out NativeCULong dataLen)
-            => Answer(data, out dataLen);
+        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
+            => Answer(lengthOnly ? default : data, out dataLen);
 
         public override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
         {
