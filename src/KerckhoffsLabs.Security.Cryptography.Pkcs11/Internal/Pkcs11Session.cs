@@ -1975,6 +1975,12 @@ internal sealed class Pkcs11Session : IDisposable
     /// </summary>
     private delegate CKR InputLengthProbedCall(ReadOnlySpan<byte> input, Span<byte> buffer, bool lengthOnly, out NativeCULong length);
 
+    /// <summary>
+    /// An <see cref="InputLengthProbedCall"/> with two inputs, such as a message's associated data and
+    /// payload, passed in for the same reason.
+    /// </summary>
+    private delegate CKR TwoInputLengthProbedCall(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second, Span<byte> buffer, bool lengthOnly, out NativeCULong length);
+
     /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string, int?, Func{CKR})"/>
     private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation, int? guess = null)
         => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(buffer, lengthOnly, out length), operation, guess);
@@ -2005,11 +2011,18 @@ internal sealed class Pkcs11Session : IDisposable
     /// </param>
     private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation,
         int? guess = null, Func<CKR>? restart = null)
+        => CallWithLengthProbe(input, [],
+            (ReadOnlySpan<byte> first, ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(first, buffer, lengthOnly, out length),
+            operation, guess, restart);
+
+    /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string, int?, Func{CKR})"/>
+    private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second, TwoInputLengthProbedCall call, string operation,
+        int? guess = null, Func<CKR>? restart = null)
     {
         if (guess is int guessed)
         {
             byte[] guessBuffer = new byte[guessed];
-            CKR filled = call(input, guessBuffer, lengthOnly: false, out NativeCULong written);
+            CKR filled = call(first, second, guessBuffer, lengthOnly: false, out NativeCULong written);
             if (filled == CKR.CKR_OK)
                 return ReportedLength.Trim(guessBuffer, written, operation);
             CryptographicOperations.ZeroMemory(guessBuffer);
@@ -2017,7 +2030,7 @@ internal sealed class Pkcs11Session : IDisposable
                 throw Pkcs11Exception.Create(filled, operation);
 
             byte[] sized = new byte[ReportedLength.ForAllocation(written, operation)];
-            filled = call(input, sized, lengthOnly: false, out written);
+            filled = call(first, second, sized, lengthOnly: false, out written);
             if (filled != CKR.CKR_OPERATION_NOT_INITIALIZED || restart is null)
             {
                 Pkcs11Exception.ThrowIfError(filled, operation);
@@ -2026,20 +2039,28 @@ internal sealed class Pkcs11Session : IDisposable
             Pkcs11Exception.ThrowIfError(restart(), operation);
         }
 
-        CKR rv = call(input, default, lengthOnly: true, out NativeCULong reported);
+        CKR rv = call(first, second, default, lengthOnly: true, out NativeCULong reported);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         byte[] buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
-        rv = call(input, buffer, lengthOnly: false, out reported);
+        rv = call(first, second, buffer, lengthOnly: false, out reported);
         if (rv == CKR.CKR_BUFFER_TOO_SMALL)
         {
             buffer = new byte[ReportedLength.ForAllocation(reported, operation)];
-            rv = call(input, buffer, lengthOnly: false, out reported);
+            rv = call(first, second, buffer, lengthOnly: false, out reported);
         }
         Pkcs11Exception.ThrowIfError(rv, operation);
 
         return ReportedLength.Trim(buffer, reported, operation);
     }
+
+    /// <summary>
+    /// Whether a message-based AEAD keeps its tag in the per-message parameter, so its output is exactly as
+    /// long as its input and can be sized without a length query. Some tokens run the whole AEAD on a query,
+    /// tag check included, so skipping it also saves that work.
+    /// </summary>
+    private static bool KeepsTagInTheParameter(CKM mechanism)
+        => mechanism is CKM.CKM_AES_GCM or CKM.CKM_AES_CCM or CKM.CKM_CHACHA20_POLY1305;
 
     /// <summary>
     /// One <c>C_*Update</c> call of a multi-part transform. Every such entry point in Cryptoki has
@@ -2385,26 +2406,17 @@ internal sealed class Pkcs11Session : IDisposable
         {
             Pkcs11ParameterBlock messageBlock = messageParams.BuildMarshalable(scope);
 
-            rv = _pkcs11Library.C_EncryptMessage(
-                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
-                associatedData,
-                plaintext,
-                default, lengthOnly: true, out NativeCULong ctLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
-
-            byte[] ct = new byte[ReportedLength.ForAllocation(ctLen, OpEncryptMessage)];
-            rv = _pkcs11Library.C_EncryptMessage(
-                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
-                associatedData,
-                plaintext,
-                ct, lengthOnly: false, out ctLen);
-            Pkcs11Exception.ThrowIfError(rv, OpEncryptMessage);
+            byte[] ct = CallWithLengthProbe(associatedData, plaintext,
+                (ReadOnlySpan<byte> ad, ReadOnlySpan<byte> pt, Span<byte> buf, bool lengthOnly, out NativeCULong len)
+                    => _pkcs11Library.C_EncryptMessage(_sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length, ad, pt, buf, lengthOnly, out len),
+                OpEncryptMessage,
+                KeepsTagInTheParameter(mechanism.Type) ? plaintext.Length : null);
 
             // The token wrote the authentication tag into the scope-owned block; copy it back into
             // the wrapper before `scope` is disposed and the bytes are zeroized.
             messageParams.AbsorbOutput(messageBlock);
 
-            return ReportedLength.Trim(ct, ctLen, OpEncryptMessage);
+            return ct;
         }
         finally
         {
@@ -2593,24 +2605,15 @@ internal sealed class Pkcs11Session : IDisposable
         {
             Pkcs11ParameterBlock messageBlock = messageParams.BuildMarshalable(scope);
 
-            rv = _pkcs11Library.C_DecryptMessage(
-                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
-                associatedData,
-                ciphertext,
-                default, lengthOnly: true, out NativeCULong ptLen);
-            Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
-
-            byte[] pt = new byte[ReportedLength.ForAllocation(ptLen, OpDecryptMessage)];
-            rv = _pkcs11Library.C_DecryptMessage(
-                _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
-                associatedData,
-                ciphertext,
-                pt, lengthOnly: false, out ptLen);
-            Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
+            byte[] pt = CallWithLengthProbe(associatedData, ciphertext,
+                (ReadOnlySpan<byte> ad, ReadOnlySpan<byte> ct, Span<byte> buf, bool lengthOnly, out NativeCULong len)
+                    => _pkcs11Library.C_DecryptMessage(_sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length, ad, ct, buf, lengthOnly, out len),
+                OpDecryptMessage,
+                KeepsTagInTheParameter(mechanism.Type) ? ciphertext.Length : null);
 
             messageParams.AbsorbOutput(messageBlock);
 
-            return ReportedLength.Trim(pt, ptLen, OpDecryptMessage);
+            return pt;
         }
         finally
         {
