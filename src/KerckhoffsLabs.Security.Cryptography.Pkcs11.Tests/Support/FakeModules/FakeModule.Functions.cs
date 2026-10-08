@@ -86,6 +86,9 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_LoginUser(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -236,6 +239,12 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_SessionCancel)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)&SessionCancel;
         if (Overrides(nameof(C_GetSessionValidationFlags)))
             slots[nameof(CryptokiTable.C_GetSessionValidationFlags)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)&GetSessionValidationFlags;
+        if (Overrides(nameof(C_GetSlotInfo)))
+            slots[nameof(CryptokiTable.C_GetSlotInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&GetSlotInfo;
+        if (Overrides(nameof(C_GetMechanismList)))
+            slots[nameof(CryptokiTable.C_GetMechanismList)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong*, NativeCULong>)&GetMechanismList;
+        if (Overrides(nameof(C_GetMechanismInfo)))
+            slots[nameof(CryptokiTable.C_GetMechanismInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong>)&GetMechanismInfo;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -1088,6 +1097,48 @@ internal abstract unsafe partial class FakeModule
             NativeCULong flags = *pFlags;
             CKR rv = m.C_GetSessionValidationFlags(hSession, type, ref flags);
             *pFlags = flags;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetSlotInfo(NativeCULong slotId, void* pInfo)
+    {
+        if (Owner(slotId, nameof(C_GetSlotInfo)) is not { } m) return Rv(CKR.CKR_SLOT_ID_INVALID);
+        try
+        {
+            CK_SLOT_INFO info = ReadStruct<CK_SLOT_INFO>(pInfo);
+            CKR rv = m.C_GetSlotInfo(slotId, ref info);
+            WriteStruct(pInfo, in info);
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetMechanismList(NativeCULong slotId, NativeCULong* pMechanismList, NativeCULong* pulCount)
+    {
+        if (Owner(slotId, nameof(C_GetMechanismList)) is not { } m) return Rv(CKR.CKR_SLOT_ID_INVALID);
+        try
+        {
+            NativeCULong count = *pulCount;
+            CKR rv = m.C_GetMechanismList(slotId, new NativeBuffer<NativeCULong>(pMechanismList, count), ref count);
+            *pulCount = count;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetMechanismInfo(NativeCULong slotId, NativeCULong type, void* pInfo)
+    {
+        if (Owner(slotId, nameof(C_GetMechanismInfo)) is not { } m) return Rv(CKR.CKR_SLOT_ID_INVALID);
+        try
+        {
+            CK_MECHANISM_INFO info = ReadStruct<CK_MECHANISM_INFO>(pInfo);
+            CKR rv = m.C_GetMechanismInfo(slotId, type, ref info);
+            WriteStruct(pInfo, in info);
             return Rv(rv);
         }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
