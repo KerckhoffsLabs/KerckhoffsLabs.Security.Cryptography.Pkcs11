@@ -101,7 +101,8 @@ internal sealed partial class LowLevelPkcs11Library
         }
 
         // An empty list is a real address the module is told holds no entries, not the NULL of a count query.
-        using var list = new NativeStructArray<CK_INTERFACE>(interfaces, nullWhenEmpty: false);
+        Span<byte> listStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var list = new NativeStructArray<CK_INTERFACE>(interfaces, nullWhenEmpty: false, listStack);
         fixed (NativeCULong* c = &count)
             rv = CheckedOutput(getInterfaceList(list.Pointer, c).ToCKR(), lengthOnly: false, count, interfaces.Length);
         if (rv == CKR.CKR_OK)

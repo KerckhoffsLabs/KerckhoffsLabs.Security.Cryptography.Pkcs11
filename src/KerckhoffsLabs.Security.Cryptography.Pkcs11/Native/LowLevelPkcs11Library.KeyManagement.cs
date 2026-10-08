@@ -19,7 +19,8 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         CKR rv;
         fixed (byte* outPtr = &NonNullPinnable(ciphertext))
         fixed (NativeCULong* lenPtr = &ciphertextLen)
@@ -45,7 +46,8 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (byte* ctPtr = ciphertext)
         fixed (NativeCULong* keyPtr = &derivedKey)
         {
@@ -94,7 +96,8 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (byte* wrappedPtr = wrappedKey)
         fixed (byte* adPtr = associatedData)
         fixed (NativeCULong* keyPtr = &key)
@@ -122,7 +125,8 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (NativeCULong* keyPtr = &key)
             return generateKey(session, m, templateBlock.Pointer, templateBlock.Count, keyPtr).ToCKR();
     }
@@ -147,8 +151,10 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var publicKeyTemplateBlock = new NativeStructArray<CK_ATTRIBUTE>(publicKeyTemplate, nullWhenEmpty: true);
-        using var privateKeyTemplateBlock = new NativeStructArray<CK_ATTRIBUTE>(privateKeyTemplate, nullWhenEmpty: true);
+        Span<byte> publicKeyTemplateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var publicKeyTemplateBlock = new NativeStructArray<CK_ATTRIBUTE>(publicKeyTemplate, nullWhenEmpty: true, publicKeyTemplateStack);
+        Span<byte> privateKeyTemplateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var privateKeyTemplateBlock = new NativeStructArray<CK_ATTRIBUTE>(privateKeyTemplate, nullWhenEmpty: true, privateKeyTemplateStack);
         fixed (NativeCULong* pubKey = &publicKey)
         fixed (NativeCULong* privKey = &privateKey)
         {
@@ -208,7 +214,8 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (byte* wrappedPtr = wrappedKey)
         fixed (NativeCULong* keyPtr = &key)
         {
@@ -236,7 +243,8 @@ internal sealed partial class LowLevelPkcs11Library
 
         byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
         Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (NativeCULong* keyPtr = &key)
             return deriveKey(session, m, baseKey, templateBlock.Pointer, templateBlock.Count, keyPtr).ToCKR();
     }

@@ -18,7 +18,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (createObject is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (NativeCULong* idPtr = &objectId)
             return createObject(session, templateBlock.Pointer, templateBlock.Count, idPtr).ToCKR();
     }
@@ -38,7 +39,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (copyObject is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         fixed (NativeCULong* idPtr = &newObjectId)
             return copyObject(session, objectId, templateBlock.Pointer, templateBlock.Count, idPtr).ToCKR();
     }
@@ -94,7 +96,8 @@ internal sealed partial class LowLevelPkcs11Library
         // The module writes each value's length back into the laid-out copy, whatever it returns
         // (CKR_ATTRIBUTE_SENSITIVE and CKR_BUFFER_TOO_SMALL report per attribute), so the copy is
         // mirrored into the caller's template afterwards.
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         CKR rv = getAttributeValue(session, objectId, templateBlock.Pointer, templateBlock.Count).ToCKR();
         templateBlock.CopyTo(template);
         return rv;
@@ -114,7 +117,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (setAttributeValue is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         return setAttributeValue(session, objectId, templateBlock.Pointer, templateBlock.Count).ToCKR();
     }
 
@@ -131,7 +135,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (findObjectsInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        Span<byte> templateStack = stackalloc byte[NativeStructArray.StackBytes];
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true, templateStack);
         return findObjectsInit(session, templateBlock.Pointer, templateBlock.Count).ToCKR();
     }
 
