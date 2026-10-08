@@ -57,12 +57,12 @@ public sealed class Pkcs11SessionCombinedOpsTests
         public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => VerifyInitRv;
 
-        public override CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, out NativeCULong encryptedPartLen)
-            => Update(part, encryptedPart, out encryptedPartLen);
-        public override CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
-            => Update(encryptedPart, part, out partLen);
-        public override CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, out NativeCULong partLen)
-            => Update(encryptedPart, part, out partLen);
+        public override CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen)
+            => Update(part, lengthOnly ? default : encryptedPart, out encryptedPartLen);
+        public override CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
+            => Update(encryptedPart, lengthOnly ? default : part, out partLen);
+        public override CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
+            => Update(encryptedPart, lengthOnly ? default : part, out partLen);
 
         public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen)
         { lastEncryptedPartLen = (NativeCULong)0; return CKR.CKR_OK; }
