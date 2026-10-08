@@ -23,9 +23,24 @@ internal static class CkULong
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is wider than <c>CK_ULONG</c> here.</exception>
     public static NativeCULong From(ulong value, string? paramName)
     {
-        if (value > (ulong)NativeCULong.MaxValue)
-            throw new ArgumentOutOfRangeException(paramName, value,
-                $"0x{value:X} does not fit in CK_ULONG, which is {UnmanagedMemory.NativeULongSize * 8} bits on this platform.");
+        ThrowIfWider(value, paramName, UnmanagedMemory.NativeULongSize);
         return unchecked((NativeCULong)value);
+    }
+
+    /// <summary>
+    /// Refuses <paramref name="value"/> if it is wider than a <c>CK_ULONG</c> of
+    /// <paramref name="ckULongBytes"/> bytes. Only the check takes the width, so both answers can be tested
+    /// on any platform; converting is left to <see cref="From"/>, which always uses this platform's width.
+    /// </summary>
+    /// <param name="value">The value to check.</param>
+    /// <param name="paramName">The public argument the value came from, reported if it does not fit.</param>
+    /// <param name="ckULongBytes">The width of <c>CK_ULONG</c>: 4 or 8.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is wider than <c>CK_ULONG</c>.</exception>
+    internal static void ThrowIfWider(ulong value, string? paramName, int ckULongBytes)
+    {
+        ulong max = ckULongBytes == sizeof(uint) ? uint.MaxValue : ulong.MaxValue;
+        if (value > max)
+            throw new ArgumentOutOfRangeException(paramName, value,
+                $"0x{value:X} does not fit in CK_ULONG, which is {ckULongBytes * 8} bits on this platform.");
     }
 }
