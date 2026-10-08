@@ -6,7 +6,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// CI-health guard: makes missing pkcs11-gate shims fail loudly instead of letting the whole
 /// <c>SpecVersionGateTests</c> suite skip silently while CI stays green. The gates are built by
 /// the BuildPkcs11Gate target on every non-Windows CI leg, so availability is enforced there;
-/// Windows gets its spec-version coverage from the hermetic <c>DelegatesLoaderTests</c>.
+/// Windows gets its spec-version coverage from the hermetic <c>TableLoaderTests</c>.
 /// </summary>
 [NoBackendCollection("Reads the gate fixtures' static File.Exists probes only — it constructs no " +
                      "fixture, so none of the env-var mutation the SoftHsm collection serializes can happen here.")]

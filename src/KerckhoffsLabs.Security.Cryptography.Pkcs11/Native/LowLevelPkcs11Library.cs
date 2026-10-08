@@ -53,7 +53,7 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// returned function-pointer table, same as the dynamic-load path.
     /// </summary>
     internal LowLevelPkcs11Library()
-        : this(() => new Delegates(IntPtr.Zero), Pkcs11ModuleHandle.StaticallyLinked)
+        : this(() => LoadTable(IntPtr.Zero), Pkcs11ModuleHandle.StaticallyLinked)
     {
     }
 
@@ -65,13 +65,13 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// </summary>
     /// <param name="resolveExport">Maps an export name to its address, or <see cref="IntPtr.Zero"/> when absent.</param>
     internal LowLevelPkcs11Library(Func<string, IntPtr> resolveExport)
-        : this(() => new Delegates(resolveExport), resolveExport.Target ?? resolveExport)
+        : this(() => LoadTable(resolveExport), resolveExport.Target ?? resolveExport)
     {
     }
 
     // identity: which module this is, so two bindings of the same one share its Cryptoki state. A test
     // module is identified by the object whose method resolves its exports.
-    private LowLevelPkcs11Library(Func<Delegates> bind, object identity)
+    private LowLevelPkcs11Library(Func<CryptokiTable> bind, object identity)
     {
         EnsureCkUlongWidthMatchesPlatform();
         _module = Pkcs11ModuleHandle.Bind(bind, identity);
@@ -122,12 +122,12 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// matching Decrypt variants). False on v2.40 libraries.
     /// </summary>
     public unsafe bool IsMessageApiSupported
-        => _module.Table._fp.C_MessageEncryptInit is not null
-           && _module.Table._fp.C_EncryptMessage is not null
-           && _module.Table._fp.C_MessageEncryptFinal is not null
-           && _module.Table._fp.C_MessageDecryptInit is not null
-           && _module.Table._fp.C_DecryptMessage is not null
-           && _module.Table._fp.C_MessageDecryptFinal is not null;
+        => _module.Table.C_MessageEncryptInit is not null
+           && _module.Table.C_EncryptMessage is not null
+           && _module.Table.C_MessageEncryptFinal is not null
+           && _module.Table.C_MessageDecryptInit is not null
+           && _module.Table.C_DecryptMessage is not null
+           && _module.Table.C_MessageDecryptFinal is not null;
 
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
@@ -135,13 +135,13 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// validation-flags inspection). False on v2.40 / v3.0 / v3.1 libraries.
     /// </summary>
     public unsafe bool IsV32ApiSupported
-        => _module.Table._fp.C_EncapsulateKey is not null
-           && _module.Table._fp.C_DecapsulateKey is not null
-           && _module.Table._fp.C_WrapKeyAuthenticated is not null
-           && _module.Table._fp.C_UnwrapKeyAuthenticated is not null
-           && _module.Table._fp.C_VerifySignatureInit is not null
-           && _module.Table._fp.C_VerifySignature is not null
-           && _module.Table._fp.C_GetSessionValidationFlags is not null;
+        => _module.Table.C_EncapsulateKey is not null
+           && _module.Table.C_DecapsulateKey is not null
+           && _module.Table.C_WrapKeyAuthenticated is not null
+           && _module.Table.C_UnwrapKeyAuthenticated is not null
+           && _module.Table.C_VerifySignatureInit is not null
+           && _module.Table.C_VerifySignature is not null
+           && _module.Table.C_GetSessionValidationFlags is not null;
 
     /// <summary>
     /// Asks for <c>C_Finalize</c> on the module's last release instead of now. A call still in flight, or

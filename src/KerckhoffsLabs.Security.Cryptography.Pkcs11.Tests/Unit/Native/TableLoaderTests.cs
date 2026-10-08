@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// Hermetic tests for the real native function-list loader: the version dispatch and
-/// pointer binding in <c>Delegates</c> — the one code path that can corrupt the process — used
+/// table read in <see cref="LowLevelPkcs11Library.LoadTable(Func{string, IntPtr})"/> — the one code path that can corrupt the process — used
 /// to be reachable only through a real PKCS#11 module. These tests drive it with no native
 /// module at all: an export resolver hands the loader <c>[UnmanagedCallersOnly]</c> managed
 /// stubs for <c>C_GetFunctionList</c>/<c>C_GetInterface</c>, whose tables live in unmanaged
@@ -29,7 +29,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// functions, which are real managed stubs.
 /// </para>
 /// </remarks>
-public sealed unsafe class DelegatesLoaderTests : IDisposable
+public sealed unsafe class TableLoaderTests : IDisposable
 {
     // ---------------------------------------------------------------------------
     // Fake module: bootstrap stubs + synthetic tables
@@ -146,12 +146,12 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     // Reflection bridge to the CryptokiTable
     // ---------------------------------------------------------------------------
 
-    private static IntPtr Fp(Delegates delegates, string name)
+    private static IntPtr Fp(CryptokiTable loaded, string name)
     {
         FieldInfo? field = typeof(CryptokiTable).GetField(name, BindingFlags.Instance | BindingFlags.Public);
         Assert.NotNull(field);
         // Function-pointer fields box as IntPtr under reflection.
-        return (IntPtr)field!.GetValue(delegates._fp)!;
+        return (IntPtr)field!.GetValue(loaded)!;
     }
 
     private static bool FpFieldExists(string name)
@@ -169,20 +169,20 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
     /// Asserts that for every slot in <paramref name="expected"/> (minus <paramref name="skip"/>),
     /// the same-named <see cref="CryptokiTable"/> slot carries exactly that table's sentinel.
     /// </summary>
-    private static void AssertBoundTo(Delegates delegates, Dictionary<string, IntPtr> expected, params string[] skip)
+    private static void AssertBoundTo(CryptokiTable loaded, Dictionary<string, IntPtr> expected, params string[] skip)
     {
         foreach ((string name, IntPtr sentinel) in expected)
         {
             if (skip.Contains(name)) continue;
             Assert.True(FpFieldExists(name), $"CryptokiTable has no slot '{name}'.");
-            Assert.True(Fp(delegates, name) == sentinel, $"Slot '{name}' bound to 0x{Fp(delegates, name):X}, expected sentinel 0x{sentinel:X}.");
+            Assert.True(Fp(loaded, name) == sentinel, $"Slot '{name}' bound to 0x{Fp(loaded, name):X}, expected sentinel 0x{sentinel:X}.");
         }
     }
 
-    private static void AssertAllZero(Delegates delegates, IEnumerable<string> names, params string[] skip)
+    private static void AssertAllZero(CryptokiTable loaded, IEnumerable<string> names, params string[] skip)
     {
         foreach (string name in names.Where(n => !skip.Contains(n) && FpFieldExists(n)))
-            Assert.True(Fp(delegates, name) == IntPtr.Zero, $"Slot '{name}' should be unbound but is 0x{Fp(delegates, name):X}.");
+            Assert.True(Fp(loaded, name) == IntPtr.Zero, $"Slot '{name}' should be unbound but is 0x{Fp(loaded, name):X}.");
     }
 
     // ---------------------------------------------------------------------------
@@ -199,8 +199,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         NativeFunctionList.Write(table, 2, 40, CryptokiTable.V240SlotCount, sentinels);
         InstallModule(table);
 
-        var module = Pkcs11ModuleHandle.Bind(() => new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
-        Assert.True(module.Table._fp.C_Finalize is null);
+        var module = Pkcs11ModuleHandle.Bind(() => LowLevelPkcs11Library.LoadTable(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
+        Assert.True(module.Table.C_Finalize is null);
         module.MarkInitialized(osLocking: true);
         module.FinalizeOnRelease();
 
@@ -215,13 +215,13 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var (table, sentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
         InstallModule(table);
 
-        var delegates = new Delegates(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub }));
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub }));
 
         // Every v2.40 slot must land in the same-named table slot.
-        AssertBoundTo(delegates, sentinels);
+        AssertBoundTo(loaded, sentinels);
         // No v3.0/v3.2 surface: there is no interface table to take it from.
-        AssertAllZero(delegates, V30AdditionNames());
-        AssertAllZero(delegates, V32AdditionNames());
+        AssertAllZero(loaded, V30AdditionNames());
+        AssertAllZero(loaded, V32AdditionNames());
     }
 
     // v3.x functions come only from the interface table: exports without one bind nothing, since a
@@ -234,16 +234,16 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         IntPtr loginUser = (IntPtr)0x0BAD_0010;
         IntPtr encapsulate = (IntPtr)0x0BAD_0020;
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_LoginUser"] = loginUser,
             ["C_EncapsulateKey"] = encapsulate,
         }));
 
-        AssertBoundTo(delegates, baseSentinels);
-        AssertAllZero(delegates, V30AdditionNames());
-        AssertAllZero(delegates, V32AdditionNames());
+        AssertBoundTo(loaded, baseSentinels);
+        AssertAllZero(loaded, V30AdditionNames());
+        AssertAllZero(loaded, V32AdditionNames());
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var (v30Table, v30Sentinels) = BuildTable(3, 0, CryptokiTable.V30SlotCount, 0x0B00_0000);
         InstallModule(baseTable, BuildInterface(v30Table));  // getInterfaceRv defaults to CKR_OK
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
@@ -262,14 +262,14 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         // v3.0 additions come from the interface table — C_GetInterface's slot included: the export
         // is only the bootstrap that found the table.
         var v30Additions = V30AdditionNames().ToHashSet();
-        AssertBoundTo(delegates, v30Sentinels.Where(kv => v30Additions.Contains(kv.Key)).ToDictionary());
+        AssertBoundTo(loaded, v30Sentinels.Where(kv => v30Additions.Contains(kv.Key)).ToDictionary());
 
         // One table source: the base slots come from the interface table too, not C_GetFunctionList's.
-        AssertBoundTo(delegates, v30Sentinels, "C_GetInterface");
-        Assert.NotEqual(baseSentinels["C_Initialize"], Fp(delegates, "C_Initialize"));
+        AssertBoundTo(loaded, v30Sentinels, "C_GetInterface");
+        Assert.NotEqual(baseSentinels["C_Initialize"], Fp(loaded, "C_Initialize"));
 
         // version {3,0} must NOT trigger the v3.2 re-read.
-        AssertAllZero(delegates, V32AdditionNames());
+        AssertAllZero(loaded, V32AdditionNames());
     }
 
     /// <summary>
@@ -312,7 +312,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var (v32Table, v32Sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v32Table));
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
@@ -320,11 +320,11 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
 
         var additions = V30AdditionNames().Concat(V32AdditionNames()).ToHashSet();
         AssertBoundTo(
-            delegates,
+            loaded,
             v32Sentinels.Where(kv => additions.Contains(kv.Key)).ToDictionary(),
             "C_GetInterface");
         // One table source: base slots from the same v3.2 table.
-        AssertBoundTo(delegates, v32Sentinels, "C_GetInterface");
+        AssertBoundTo(loaded, v32Sentinels, "C_GetInterface");
     }
 
     // A module whose default interface is 3.0 but which also offers 3.2 gets the 3.2 surface: each
@@ -341,13 +341,13 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             [(3, 2)] = BuildInterface(v32Table),
         });
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        AssertBoundTo(delegates, v32Sentinels, "C_GetInterface");
+        AssertBoundTo(loaded, v32Sentinels, "C_GetInterface");
     }
 
     // A table is believed only if its header is the version requested: a {3,0} table handed back for a
@@ -363,14 +363,14 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
             [(3, 0)] = BuildInterface(v30Table),
         });
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        AssertBoundTo(delegates, v30Sentinels, "C_GetInterface");
-        AssertAllZero(delegates, V32AdditionNames());
+        AssertBoundTo(loaded, v30Sentinels, "C_GetInterface");
+        AssertAllZero(loaded, V32AdditionNames());
     }
 
     // Some modules answer only the NULL/NULL request: the default interface is then bound by its header.
@@ -381,13 +381,13 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var (v32Table, v32Sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v32Table), versioned: []);
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        AssertBoundTo(delegates, v32Sentinels, "C_GetInterface");
+        AssertBoundTo(loaded, v32Sentinels, "C_GetInterface");
     }
 
     // A later 3.x than this library knows extends the 3.0 table; only that prefix is read.
@@ -398,15 +398,15 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var (v33Table, v33Sentinels) = BuildTable(3, 3, CryptokiTable.V32SlotCount, 0x0C00_0000);
         InstallModule(baseTable, BuildInterface(v33Table), versioned: []);
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
         var v30Slots = SlotNames(CryptokiTable.V30SlotCount).ToHashSet();
-        AssertBoundTo(delegates, v33Sentinels.Where(kv => v30Slots.Contains(kv.Key)).ToDictionary(), "C_GetInterface");
-        AssertAllZero(delegates, V32AdditionNames());
+        AssertBoundTo(loaded, v33Sentinels.Where(kv => v30Slots.Contains(kv.Key)).ToDictionary(), "C_GetInterface");
+        AssertAllZero(loaded, V32AdditionNames());
     }
 
     [Fact]
@@ -415,14 +415,14 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         var (baseTable, baseSentinels) = BuildTable(2, 40, CryptokiTable.V240SlotCount, 0x0A00_0000);
         InstallModule(baseTable, BuildInterface(IntPtr.Zero));
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        AssertBoundTo(delegates, baseSentinels);
-        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
+        AssertBoundTo(loaded, baseSentinels);
+        AssertAllZero(loaded, V30AdditionNames(), "C_GetInterface");
     }
 
     [Fact]
@@ -433,7 +433,7 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         InstallModule(baseTable, BuildInterface(v30Table));
         IntPtr sessionCancel = (IntPtr)0x0BAD_0030;
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
@@ -441,8 +441,8 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         }));
 
         // The sub-3.0 version header rejects the interface table, and the export is not a substitute.
-        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
-        AssertBoundTo(delegates, baseSentinels);
+        AssertAllZero(loaded, V30AdditionNames(), "C_GetInterface");
+        AssertBoundTo(loaded, baseSentinels);
     }
 
     [Fact]
@@ -452,15 +452,15 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         InstallModule(baseTable, getInterfaceRv: 0x00000006);  // CKR_FUNCTION_FAILED
         IntPtr loginUser = (IntPtr)0x0BAD_0040;
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
             ["C_LoginUser"] = loginUser,
         }));
 
-        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
-        AssertBoundTo(delegates, baseSentinels);
+        AssertAllZero(loaded, V30AdditionNames(), "C_GetInterface");
+        AssertBoundTo(loaded, baseSentinels);
     }
 
     [Fact]
@@ -473,19 +473,19 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         NativeFunctionList.Write(v32Table, 3, 2, CryptokiTable.V32SlotCount, new Dictionary<string, IntPtr>());
         InstallModule(baseTable, BuildInterface(v32Table));
 
-        var delegates = new Delegates(Resolver(new()
+        CryptokiTable loaded = LowLevelPkcs11Library.LoadTable(Resolver(new()
         {
             ["C_GetFunctionList"] = GetFunctionListStub,
             ["C_GetInterface"] = GetInterfaceStub,
         }));
 
-        AssertAllZero(delegates, V30AdditionNames(), "C_GetInterface");
-        AssertAllZero(delegates, V32AdditionNames());
+        AssertAllZero(loaded, V30AdditionNames(), "C_GetInterface");
+        AssertAllZero(loaded, V32AdditionNames());
     }
 
     [Fact]
     public void MissingGetFunctionList_ThrowsEntryPointNotFound()
-        => Assert.Throws<EntryPointNotFoundException>(() => new Delegates(Resolver([])));
+        => Assert.Throws<EntryPointNotFoundException>(() => LowLevelPkcs11Library.LoadTable(Resolver([])));
 
     [Fact]
     public void SlotName_Coverage_SanityCheck()

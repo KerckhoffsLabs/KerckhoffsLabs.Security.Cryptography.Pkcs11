@@ -14,7 +14,7 @@
 # gate, mirroring how the SoftHSM fixture degrades.
 #
 # Linux/macOS only: the gate targets the dlopen-based loader path; the Windows legs
-# get their spec-version coverage from the hermetic DelegatesLoaderTests.
+# get their spec-version coverage from the hermetic TableLoaderTests.
 
 set -euo pipefail
 

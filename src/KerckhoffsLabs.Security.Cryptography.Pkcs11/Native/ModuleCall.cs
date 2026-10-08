@@ -23,11 +23,8 @@ internal ref struct ModuleCall
         _serialized = module.EnterCall();
     }
 
-    /// <summary>The module's function table.</summary>
-    public readonly Delegates Table => _module.Table;
-
     /// <summary>The module's function slots. A slot is NULL for a function the module does not provide.</summary>
-    public readonly ref readonly CryptokiTable Functions => ref _module.Table._fp;
+    public readonly ref readonly CryptokiTable Functions => ref _module.Table;
 
     public void Dispose()
     {

@@ -246,9 +246,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="table">The module's function table.</param>
     /// <param name="session">The session's handle.</param>
-    internal static unsafe CKR CloseSession(Delegates table, NativeCULong session)
+    internal static unsafe CKR CloseSession(in CryptokiTable table, NativeCULong session)
     {
-        var closeSession = table._fp.C_CloseSession;
+        var closeSession = table.C_CloseSession;
         return closeSession is null ? CKR.CKR_FUNCTION_NOT_SUPPORTED : closeSession(session).ToCKR();
     }
 }
