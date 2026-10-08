@@ -83,6 +83,58 @@ public sealed unsafe class NativeStructArrayTests
         }
     }
 
+    // The common template fits the caller's stack buffer: laid out there, with no native allocation.
+    [Theory]
+    [MemberData(nameof(Layouts))]
+    public void ArrayThatFitsTheStackBuffer_IsLaidOutThere_WithoutAllocating(bool windowsLayout)
+    {
+        Span<byte> stack = stackalloc byte[NativeStructArray.StackBytes];
+        int before = UnmanagedMemory.ThreadAllocationCount;
+
+        using (var block = new NativeStructArray<CK_ATTRIBUTE>(Template, nullWhenEmpty: true, windowsLayout, stack))
+        {
+            Assert.Equal((IntPtr)Unsafe.AsPointer(ref stack[0]), (IntPtr)block.Pointer);
+            CK_ATTRIBUTE[] back = new CK_ATTRIBUTE[Template.Length];
+            block.CopyTo(back);
+            for (int i = 0; i < Template.Length; i++)
+                AssertSame(Template[i], back[i]);
+        }
+
+        Assert.Equal(before, UnmanagedMemory.ThreadAllocationCount);
+    }
+
+    // A template too large for the stack buffer goes to the native heap, and is freed again.
+    [Fact]
+    public void ArrayLargerThanTheStackBuffer_GoesToTheHeap()
+    {
+        int fits = NativeStructArray.StackBytes / Pkcs11Marshal.SizeOf<CK_ATTRIBUTE>();
+        CK_ATTRIBUTE[] large = [.. Enumerable.Range(0, fits + 1).Select(i => new CK_ATTRIBUTE { type = (NativeCULong)(ulong)i })];
+        Span<byte> stack = stackalloc byte[NativeStructArray.StackBytes];
+        int before = UnmanagedMemory.ThreadAllocationCount;
+
+        using var block = new NativeStructArray<CK_ATTRIBUTE>(large, nullWhenEmpty: true, stack);
+
+        Assert.Equal(before + 1, UnmanagedMemory.ThreadAllocationCount);
+        Assert.NotEqual((IntPtr)Unsafe.AsPointer(ref stack[0]), (IntPtr)block.Pointer);
+        CK_ATTRIBUTE[] back = new CK_ATTRIBUTE[large.Length];
+        block.CopyTo(back);
+        Assert.Equal(large.Select(a => (ulong)a.type), back.Select(a => (ulong)a.type));
+    }
+
+    // The stack block held the template's value pointers and lengths; it is wiped like a heap block.
+    [Fact]
+    public void StackBlock_IsZeroizedOnDispose()
+    {
+        Span<byte> stack = stackalloc byte[NativeStructArray.StackBytes];
+        stack.Fill(0xEE);
+
+        using (new NativeStructArray<CK_ATTRIBUTE>(Template, nullWhenEmpty: true, stack))
+        {
+        }
+
+        Assert.All(stack[..(Template.Length * Pkcs11Marshal.SizeOf<CK_ATTRIBUTE>())].ToArray(), b => Assert.Equal(0, b));
+    }
+
     private static void AssertSame(CK_ATTRIBUTE expected, CK_ATTRIBUTE actual)
     {
         Assert.Equal(expected.type, actual.type);

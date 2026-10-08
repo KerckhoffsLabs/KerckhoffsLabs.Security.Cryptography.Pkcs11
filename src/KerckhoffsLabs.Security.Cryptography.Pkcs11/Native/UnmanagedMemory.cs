@@ -79,6 +79,15 @@ internal static class UnmanagedMemory
     /// </remarks>
     public static int OutstandingAllocationCount => _allocations.Count;
 
+    [ThreadStatic]
+    private static int t_allocationCount;
+
+    /// <summary>
+    /// How many blocks <see cref="Allocate"/> has handed out on the calling thread, ever. Tests compare it
+    /// before and after a call to prove the call allocated nothing, unaffected by other threads.
+    /// </summary>
+    internal static int ThreadAllocationCount => t_allocationCount;
+
     /// <summary>
     /// Allocates unmanaged zero-filled memory
     /// </summary>
@@ -92,6 +101,7 @@ internal static class UnmanagedMemory
         // Allocate then zero in place. NativeMemory.Clear avoids the throwaway managed
         // byte[] the old Write(memory, new byte[size]) path allocated on every call.
         IntPtr memory = Marshal.AllocHGlobal(size);
+        t_allocationCount++;
         if (size > 0)
             unsafe { NativeMemory.Clear((void*)memory, (nuint)size); }
 
