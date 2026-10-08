@@ -35,10 +35,10 @@ public sealed class Pkcs11SessionV32Tests
         public int VerifyUpdateCalls { get; private set; }
         public byte[]? CapturedAad;
 
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
         {
             derivedKey = (NativeCULong)SharedId;
-            if (ciphertext.IsEmpty)
+            if (lengthOnly)
             {
                 ciphertextLen = (NativeCULong)Ciphertext.Length;
                 return EncapsProbeBufferTooSmall ? CKR.CKR_BUFFER_TOO_SMALL : EncapsRv;
@@ -51,10 +51,10 @@ public sealed class Pkcs11SessionV32Tests
         public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
         { derivedKey = (NativeCULong)SharedId; return DecapsRv; }
 
-        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, out NativeCULong wrappedKeyLen)
+        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, bool lengthOnly, out NativeCULong wrappedKeyLen)
         {
             CapturedAad = associatedData.ToArray();
-            if (wrappedKey.IsEmpty) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapAuthRv; }
+            if (lengthOnly) { wrappedKeyLen = (NativeCULong)Wrapped.Length; return WrapAuthRv; }
             int n = WrapSecondLen ?? Wrapped.Length;
             Wrapped.AsSpan(0, Math.Min(n, wrappedKey.Length)).CopyTo(wrappedKey);
             wrappedKeyLen = (NativeCULong)n;

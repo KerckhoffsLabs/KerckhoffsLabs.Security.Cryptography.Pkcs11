@@ -273,6 +273,39 @@ public sealed unsafe class DelegatesLoaderTests : IDisposable
         AssertAllZero(delegates, V32AdditionNames());
     }
 
+    /// <summary>
+    /// <see cref="LowLevelPkcs11Library.IsV32ApiSupported"/> needs every one of the v3.2 functions it
+    /// names. A module whose v3.2 table leaves one of them out must not be reported as having the v3.2
+    /// surface, or a caller told it does would reach a function that is not there.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("C_EncapsulateKey")]
+    [InlineData("C_DecapsulateKey")]
+    [InlineData("C_WrapKeyAuthenticated")]
+    [InlineData("C_UnwrapKeyAuthenticated")]
+    [InlineData("C_VerifySignatureInit")]
+    [InlineData("C_VerifySignature")]
+    [InlineData("C_GetSessionValidationFlags")]
+    public void IsV32ApiSupported_RequiresEveryV32Function(string? missing)
+    {
+        var (table, sentinels) = BuildTable(3, 2, CryptokiTable.V32SlotCount, 0x0C00_0000);
+        if (missing is not null)
+        {
+            Assert.True(sentinels.Remove(missing), $"{missing} is not a slot of the v3.2 table");
+            NativeFunctionList.Write(table, 3, 2, CryptokiTable.V32SlotCount, sentinels);
+        }
+        InstallModule(table, BuildInterface(table));
+
+        using var lowLevel = new LowLevelPkcs11Library(Resolver(new()
+        {
+            ["C_GetFunctionList"] = GetFunctionListStub,
+            ["C_GetInterface"] = GetInterfaceStub,
+        }));
+
+        Assert.Equal(missing is null, lowLevel.IsV32ApiSupported);
+    }
+
     [Fact]
     public void V32Interface_BindsV30AndV32Additions_FromInterfaceTable()
     {

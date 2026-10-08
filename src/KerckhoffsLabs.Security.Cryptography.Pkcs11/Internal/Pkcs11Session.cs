@@ -1708,7 +1708,7 @@ internal sealed class Pkcs11Session : IDisposable
             : null;
 
         wrappedKey ??= CallWithLengthProbe(
-            (Span<byte> buf, bool _, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, out len),
+            (Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buf, lengthOnly, out len),
             OpWrapKey);
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -1745,7 +1745,7 @@ internal sealed class Pkcs11Session : IDisposable
         ulong wrappedLen = 8 + ((valueLen + 7) / 8 * 8);
 
         byte[] buffer = new byte[wrappedLen];
-        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, out NativeCULong len);
+        CKR rv = _pkcs11Library.C_WrapKey(_sessionId, ref ckMechanism, (NativeCULong)(wrappingKeyHandle.ObjectId), (NativeCULong)(keyHandle.ObjectId), buffer, lengthOnly: false, out NativeCULong len);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKey);
 
         return ReportedLength.Trim(buffer, len, OpWrapKey);
@@ -3519,7 +3519,7 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
-                ct, out ctLen, ref sharedHandle);
+                ct, lengthOnly: false, out ctLen, ref sharedHandle);
             Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
         }
         else
@@ -3528,7 +3528,7 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
-                null!, out ctLen, ref sharedHandle);
+                default, lengthOnly: true, out ctLen, ref sharedHandle);
             // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome: the token populated
             // ctLen even though the (null) output buffer was inadequate (PKCS#11 v3.2 §5.2).
             // Only a genuine error aborts the probe.
@@ -3549,7 +3549,7 @@ internal sealed class Pkcs11Session : IDisposable
             rv = _pkcs11Library.C_EncapsulateKey(
                 _sessionId, ref ckMechanism, (NativeCULong)encapsulatingPublicKey.ObjectId,
                 template,
-                ct, out ctLen, ref sharedHandle);
+                ct, lengthOnly: false, out ctLen, ref sharedHandle);
             Pkcs11Exception.ThrowIfError(rv, OpEncapsulateKey);
         }
 
@@ -3642,7 +3642,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            associatedData, null!, out NativeCULong wrappedLen);
+            associatedData, default, lengthOnly: true, out NativeCULong wrappedLen);
         // CKR_BUFFER_TOO_SMALL is a spec-valid length-probe outcome (PKCS#11 v3.2 §5.2):
         // the token populated wrappedLen despite the (null) output buffer. Only a genuine
         // error aborts the probe.
@@ -3652,7 +3652,7 @@ internal sealed class Pkcs11Session : IDisposable
         byte[] wrapped = new byte[ReportedLength.ForAllocation(wrappedLen, OpWrapKeyAuthenticated)];
         rv = _pkcs11Library.C_WrapKeyAuthenticated(
             _sessionId, ref ckMechanism, (NativeCULong)wrappingKey.ObjectId, (NativeCULong)keyToWrap.ObjectId,
-            associatedData, wrapped, out wrappedLen);
+            associatedData, wrapped, lengthOnly: false, out wrappedLen);
         Pkcs11Exception.ThrowIfError(rv, OpWrapKeyAuthenticated);
 
         mechanism.AbsorbOutput(mechParams);
