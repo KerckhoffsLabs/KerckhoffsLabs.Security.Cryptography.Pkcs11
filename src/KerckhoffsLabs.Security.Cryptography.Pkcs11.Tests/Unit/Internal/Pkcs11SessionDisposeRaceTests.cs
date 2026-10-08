@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -12,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// call on the same session — only the busy lock every operation holds can. These tests pin both
 /// halves of the contract: Dispose waits for an in-flight call, and it waits rather than throwing.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionDisposeRaceTests
 {
     private const ulong SessionId = 42;
@@ -21,9 +22,10 @@ public sealed class Pkcs11SessionDisposeRaceTests
 
     /// <summary>
     /// Parks inside <c>C_GenerateRandom</c> until released, and records whether
-    /// <c>C_CloseSession</c> was entered while that call was still on the stack.
+    /// <c>C_CloseSession</c> was entered while that call was still on the stack. The park happens inside
+    /// the module, so the caller's thread is blocked in the native call as it would be on a real token.
     /// </summary>
-    private sealed class ParkingFake : FakeLowLevelPkcs11Library
+    private sealed class ParkingFake : SessionTestModule
     {
         internal readonly ManualResetEventSlim Entered = new(false);
         internal readonly ManualResetEventSlim Release = new(false);
@@ -36,7 +38,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
         private int _closes;
         internal int Closes => Volatile.Read(ref _closes);
 
-        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
             _inFlight = true;
             Entered.Set();
@@ -45,7 +47,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_CloseSession(NativeCULong session)
+        protected override CKR C_CloseSession(NativeCULong session)
         {
             if (_inFlight)
                 ClosedDuringNativeCall = true;
@@ -54,8 +56,9 @@ public sealed class Pkcs11SessionDisposeRaceTests
         }
 
         /// <summary>Releases the two gates. Callers join every thread before disposing the fake.</summary>
-        public override void Dispose()
+        protected override void Disposing()
         {
+            base.Disposing();
             Entered.Dispose();
             Release.Dispose();
         }
@@ -70,7 +73,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
     private static RaceOutcome DisposeWhileACallIsInFlight()
     {
         using var fake = new ParkingFake();
-        var session = new Pkcs11Session(fake, SessionId);
+        var session = fake.CreateSession(SessionId);
 
         Exception? disposeFailure = null;
 
@@ -140,7 +143,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
     {
         using var fake = new ParkingFake();
         fake.Release.Set();
-        var session = new Pkcs11Session(fake, SessionId);
+        var session = fake.CreateSession(SessionId);
 
         using var completed = new ManualResetEventSlim(false);
         var thread = new Thread(() =>
