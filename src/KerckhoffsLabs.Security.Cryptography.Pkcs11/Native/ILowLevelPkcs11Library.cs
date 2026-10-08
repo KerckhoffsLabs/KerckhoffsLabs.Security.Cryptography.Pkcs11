@@ -58,12 +58,11 @@ internal interface ILowLevelPkcs11Library : IDisposable
         Span<byte> ciphertextPart, bool lengthOnly, out NativeCULong ciphertextPartLen, NativeCULong flags);
     CKR C_MessageEncryptFinal(NativeCULong session);
     CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
-    // plaintext is byte[]? for the same reason as C_EncryptMessage's ciphertext parameter above.
     CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData,
-        ReadOnlySpan<byte> ciphertext, byte[]? plaintext, out NativeCULong plaintextLen);
+        ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, bool lengthOnly, out NativeCULong plaintextLen);
     CKR C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData);
     CKR C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> ciphertextPart,
-        Span<byte> plaintextPart, out NativeCULong plaintextPartLen, NativeCULong flags);
+        Span<byte> plaintextPart, bool lengthOnly, out NativeCULong plaintextPartLen, NativeCULong flags);
     CKR C_MessageDecryptFinal(NativeCULong session);
     CKR C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, Span<byte> signature,

@@ -2562,7 +2562,7 @@ internal sealed class Pkcs11Session : IDisposable
                 _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 ciphertext,
-                null, out NativeCULong ptLen);
+                default, lengthOnly: true, out NativeCULong ptLen);
             Pkcs11Exception.ThrowIfError(rv, "C_DecryptMessage (length probe)");
 
             byte[] pt = new byte[ReportedLength.ForAllocation(ptLen, OpDecryptMessage)];
@@ -2570,7 +2570,7 @@ internal sealed class Pkcs11Session : IDisposable
                 _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 ciphertext,
-                pt, out ptLen);
+                pt, lengthOnly: false, out ptLen);
             Pkcs11Exception.ThrowIfError(rv, OpDecryptMessage);
 
             messageParams.AbsorbOutput(messageBlock);
