@@ -46,6 +46,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen)
         {
             if (lengthOnly) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
+            if (ciphertext.Length < Ciphertext.Length) { ciphertextLen = (NativeCULong)Ciphertext.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
             OnEncryptMessageParams?.Invoke(parameter);
             Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
@@ -55,6 +56,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, bool lengthOnly, out NativeCULong plaintextLen)
         {
             if (lengthOnly) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
+            if (plaintext.Length < Plaintext.Length) { plaintextLen = (NativeCULong)Plaintext.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
             OnDecryptMessageParams?.Invoke(parameter);
             Plaintext.AsSpan(0, Plaintext.Length).CopyTo(plaintext);
             plaintextLen = (NativeCULong)Plaintext.Length;
