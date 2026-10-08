@@ -2354,7 +2354,7 @@ internal sealed class Pkcs11Session : IDisposable
                 _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 plaintext,
-                null, out NativeCULong ctLen);
+                default, lengthOnly: true, out NativeCULong ctLen);
             Pkcs11Exception.ThrowIfError(rv, "C_EncryptMessage (length probe)");
 
             byte[] ct = new byte[ReportedLength.ForAllocation(ctLen, OpEncryptMessage)];
@@ -2362,7 +2362,7 @@ internal sealed class Pkcs11Session : IDisposable
                 _sessionId, messageBlock.Pointer, (NativeCULong)messageBlock.Length,
                 associatedData,
                 plaintext,
-                ct, out ctLen);
+                ct, lengthOnly: false, out ctLen);
             Pkcs11Exception.ThrowIfError(rv, OpEncryptMessage);
 
             // The token wrote the authentication tag into the scope-owned block; copy it back into

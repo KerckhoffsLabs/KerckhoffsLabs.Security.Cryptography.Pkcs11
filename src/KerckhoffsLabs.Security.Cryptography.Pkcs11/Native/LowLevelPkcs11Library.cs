@@ -125,10 +125,10 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// functions (C_MessageEncryptInit / C_EncryptMessage / C_MessageEncryptFinal +
     /// matching Decrypt variants). False on v2.40 libraries.
     /// </summary>
-    public bool IsMessageApiSupported
-        => _module.Table.HasC_MessageEncryptInit
-           && _module.Table.HasC_EncryptMessage
-           && _module.Table.HasC_MessageEncryptFinal
+    public unsafe bool IsMessageApiSupported
+        => _module.Table._fp.C_MessageEncryptInit is not null
+           && _module.Table._fp.C_EncryptMessage is not null
+           && _module.Table._fp.C_MessageEncryptFinal is not null
            && _module.Table.HasC_MessageDecryptInit
            && _module.Table.HasC_DecryptMessage
            && _module.Table.HasC_MessageDecryptFinal;

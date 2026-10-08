@@ -90,6 +90,11 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetInterfaceList(bool listIsNull, Span<CK_INTERFACE> interfaces, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_MessageEncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_EncryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_EncryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> plaintextPart, NativeBuffer<byte> ciphertextPart, ref NativeCULong ciphertextPartLen, NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_MessageEncryptFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -251,6 +256,16 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_GetMechanismInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong>)&GetMechanismInfo;
         if (Overrides(nameof(C_GetInterfaceList)))
             slots[nameof(CryptokiTable.C_GetInterfaceList)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong*, NativeCULong>)&GetInterfaceList;
+        if (Overrides(nameof(C_MessageEncryptInit)))
+            slots[nameof(CryptokiTable.C_MessageEncryptInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&MessageEncryptInit;
+        if (Overrides(nameof(C_EncryptMessage)))
+            slots[nameof(CryptokiTable.C_EncryptMessage)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&EncryptMessage;
+        if (Overrides(nameof(C_EncryptMessageBegin)))
+            slots[nameof(CryptokiTable.C_EncryptMessageBegin)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, NativeCULong>)&EncryptMessageBegin;
+        if (Overrides(nameof(C_EncryptMessageNext)))
+            slots[nameof(CryptokiTable.C_EncryptMessageNext)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)&EncryptMessageNext;
+        if (Overrides(nameof(C_MessageEncryptFinal)))
+            slots[nameof(CryptokiTable.C_MessageEncryptFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&MessageEncryptFinal;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -1166,6 +1181,61 @@ internal abstract unsafe partial class FakeModule
             *pulCount = count;
             return Rv(rv);
         }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong MessageEncryptInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_MessageEncryptInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_MessageEncryptInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong EncryptMessage(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pAssociatedData, NativeCULong ulAssociatedDataLen, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_EncryptMessage)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_EncryptMessage(hSession, pParameter, ulParameterLen, In(pAssociatedData, ulAssociatedDataLen), In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong EncryptMessageBegin(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pAssociatedData, NativeCULong ulAssociatedDataLen)
+    {
+        if (Owner(hSession, nameof(C_EncryptMessageBegin)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_EncryptMessageBegin(hSession, pParameter, ulParameterLen, In(pAssociatedData, ulAssociatedDataLen)));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong EncryptMessageNext(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pIn, NativeCULong ulInLen, byte* pOut, NativeCULong* pulOutLen, NativeCULong flags)
+    {
+        if (Owner(hSession, nameof(C_EncryptMessageNext)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_EncryptMessageNext(hSession, pParameter, ulParameterLen, In(pIn, ulInLen), new NativeBuffer<byte>(pOut, length), ref length, flags);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong MessageEncryptFinal(NativeCULong hSession)
+    {
+        if (Owner(hSession, nameof(C_MessageEncryptFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_MessageEncryptFinal(hSession)); }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 

@@ -21,6 +21,13 @@ internal sealed partial class LowLevelPkcs11Library
         => ref output.IsEmpty ? ref s_emptyOutput : ref MemoryMarshal.GetReference(output);
 
     /// <summary>
+    /// The same for an input, where an empty span is still real (empty) data. Only the message-mode
+    /// one-shot calls use it, which have always passed their associated data and payload this way.
+    /// </summary>
+    private static ref byte NonNullPinnable(ReadOnlySpan<byte> input)
+        => ref input.IsEmpty ? ref s_emptyOutput : ref MemoryMarshal.GetReference(input);
+
+    /// <summary>
     /// The reference to pin for a list of structs the module fills: its first entry, or
     /// <paramref name="empty"/> when it has none, so an empty list reaches the module as a real address
     /// rather than the NULL of a count query.
