@@ -2126,7 +2126,7 @@ internal sealed class Pkcs11Session : IDisposable
             outputStream.Write(lastPart, 0, lastPart.Length);
 
         byte[] digest = CallWithLengthProbe(
-            (Span<byte> buffer, bool _, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, out length),
+            (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, lengthOnly, out length),
             OpDigestFinal);
         operation.Completed();
 
@@ -2973,11 +2973,11 @@ internal sealed class Pkcs11Session : IDisposable
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
 
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, default, lengthOnly: true, out NativeCULong digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, lengthOnly: false, out digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
         operation.Completed();
 
@@ -3012,7 +3012,7 @@ internal sealed class Pkcs11Session : IDisposable
         operation.Begin(CKF.CKF_DIGEST, rv, OpDigestInit);
 
         byte[] digest = CallWithLengthProbe(data,
-            (ReadOnlySpan<byte> input, Span<byte> buf, bool _, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, out len),
+            (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, lengthOnly, out len),
             OpDigest);
         operation.Completed();
 
@@ -3093,11 +3093,11 @@ internal sealed class Pkcs11Session : IDisposable
             Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
         }
 
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, null, out NativeCULong digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, default, lengthOnly: true, out NativeCULong digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
 
         byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, out digestLen);
+        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, lengthOnly: false, out digestLen);
         Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
         operation.Completed();
 

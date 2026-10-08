@@ -69,9 +69,9 @@ public sealed class Pkcs11SessionCombinedOpsTests
         public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen)
         { lastPartLen = (NativeCULong)0; return CKR.CKR_OK; }
 
-        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, out NativeCULong digestLen)
+        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen)
         {
-            if (digest.IsEmpty) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            if (lengthOnly) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
             DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;

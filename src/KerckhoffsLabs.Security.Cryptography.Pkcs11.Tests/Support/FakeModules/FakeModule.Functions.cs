@@ -53,6 +53,9 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_DecryptFinal(NativeCULong session, NativeBuffer<byte> lastPart, ref NativeCULong lastPartLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DigestKey(NativeCULong session, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -137,6 +140,12 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_DecryptUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&DecryptUpdate;
         if (Overrides(nameof(C_DecryptFinal)))
             slots[nameof(CryptokiTable.C_DecryptFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&DecryptFinal;
+        if (Overrides(nameof(C_DigestUpdate)))
+            slots[nameof(CryptokiTable.C_DigestUpdate)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&DigestUpdate;
+        if (Overrides(nameof(C_DigestKey)))
+            slots[nameof(CryptokiTable.C_DigestKey)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)&DigestKey;
+        if (Overrides(nameof(C_DigestFinal)))
+            slots[nameof(CryptokiTable.C_DigestFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&DigestFinal;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -576,6 +585,36 @@ internal abstract unsafe partial class FakeModule
         {
             NativeCULong length = *pulOutLen;
             CKR rv = m.C_DecryptFinal(hSession, new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DigestUpdate(NativeCULong hSession, byte* pIn, NativeCULong ulInLen)
+    {
+        if (Owner(hSession, nameof(C_DigestUpdate)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_DigestUpdate(hSession, In(pIn, ulInLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DigestKey(NativeCULong hSession, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_DigestKey)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_DigestKey(hSession, hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong DigestFinal(NativeCULong hSession, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_DigestFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_DigestFinal(hSession, new NativeBuffer<byte>(pOut, length), ref length);
             *pulOutLen = length;
             return Rv(rv);
         }
