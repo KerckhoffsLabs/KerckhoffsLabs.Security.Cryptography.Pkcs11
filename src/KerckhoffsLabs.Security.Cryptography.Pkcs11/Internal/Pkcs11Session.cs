@@ -530,7 +530,7 @@ internal sealed class Pkcs11Session : IDisposable
         Log.SessionTrace(_logger, (ulong)_sessionId, "GetOperationState");
 
         return CallWithLengthProbe(
-            (Span<byte> buffer, bool _, out NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, out len),
+            (Span<byte> buffer, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_GetOperationState(_sessionId, buffer, lengthOnly, out len),
             OpGetOperationState);
     }
 

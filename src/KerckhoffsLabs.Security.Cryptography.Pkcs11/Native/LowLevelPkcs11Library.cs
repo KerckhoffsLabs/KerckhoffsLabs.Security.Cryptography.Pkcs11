@@ -141,7 +141,7 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
            && _module.Table._fp.C_UnwrapKeyAuthenticated is not null
            && _module.Table._fp.C_VerifySignatureInit is not null
            && _module.Table._fp.C_VerifySignature is not null
-           && _module.Table.HasC_GetSessionValidationFlags;
+           && _module.Table._fp.C_GetSessionValidationFlags is not null;
 
     /// <summary>
     /// Asks for <c>C_Finalize</c> on the module's last release instead of now. A call still in flight, or

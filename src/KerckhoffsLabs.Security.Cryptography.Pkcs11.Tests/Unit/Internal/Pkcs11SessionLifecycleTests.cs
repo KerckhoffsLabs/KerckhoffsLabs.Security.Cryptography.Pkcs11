@@ -60,9 +60,9 @@ public sealed class Pkcs11SessionLifecycleTests
         public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         { for (int i = 0; i < randomData.Length; i++) randomData[i] = (byte)(i + 1); return GenRandomRv; }
 
-        public override CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, out NativeCULong operationStateLen)
+        public override CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, bool lengthOnly, out NativeCULong operationStateLen)
         {
-            if (operationState.IsEmpty) { operationStateLen = (NativeCULong)OperationState.Length; return GetOpStateRv; }
+            if (lengthOnly) { operationStateLen = (NativeCULong)OperationState.Length; return GetOpStateRv; }
             OperationState.AsSpan(0, OperationState.Length).CopyTo(operationState);
             operationStateLen = (NativeCULong)OperationState.Length;
             return GetOpStateRv;

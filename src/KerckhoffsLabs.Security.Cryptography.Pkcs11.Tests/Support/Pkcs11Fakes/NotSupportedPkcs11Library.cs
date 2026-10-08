@@ -45,7 +45,7 @@ internal abstract class NotSupportedPkcs11Library : ILowLevelPkcs11Library
     public virtual CKR C_CloseSession(NativeCULong session) => NotSupported(nameof(C_CloseSession));
     public virtual CKR C_CloseAllSessions(NativeCULong slotId) => NotSupported(nameof(C_CloseAllSessions));
     public virtual CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info) => NotSupported(nameof(C_GetSessionInfo));
-    public virtual CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, out NativeCULong operationStateLen) { operationStateLen = (NativeCULong)0; return NotSupported(nameof(C_GetOperationState)); }
+    public virtual CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, bool lengthOnly, out NativeCULong operationStateLen) { operationStateLen = (NativeCULong)0; return NotSupported(nameof(C_GetOperationState)); }
     public virtual CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey) => NotSupported(nameof(C_SetOperationState));
     public virtual CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin) => NotSupported(nameof(C_Login));
     public virtual CKR C_LoginUser(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username) => NotSupported(nameof(C_LoginUser));
