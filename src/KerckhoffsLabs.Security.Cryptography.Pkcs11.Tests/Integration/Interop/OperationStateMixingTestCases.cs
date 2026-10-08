@@ -243,11 +243,11 @@ internal static class OperationStateMixingTestCases
                     AssertOk(lowLevel.C_EncryptInit(sid, ref mech, (NativeCULong)key.ObjectId), "EncryptInit");
                 }
                 byte[] updBuf = new byte[64];
-                AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, updBuf, out NativeCULong updLen), "EncryptUpdate");
+                AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, updBuf, lengthOnly: false, out NativeCULong updLen), "EncryptUpdate");
                 byte[] updOut = updBuf.AsSpan(0, (int)updLen).ToArray();
 
                 byte[] encBuf = new byte[64];
-                CKR rv = lowLevel.C_Encrypt(sid, Data2, encBuf, out NativeCULong len);
+                CKR rv = lowLevel.C_Encrypt(sid, Data2, encBuf, lengthOnly: false, out NativeCULong len);
                 AssertOk(rv, "Encrypt (illegal single-part call)");
                 byte[] got = encBuf.AsSpan(0, (int)len).ToArray();
 
@@ -260,7 +260,9 @@ internal static class OperationStateMixingTestCases
                     "More ciphertext was emitted than AES-CBC-PAD(data1||data2) would ever produce.");
                 Assert.Equal(expectedFull.AsSpan(0, combinedSoFar.Length).ToArray(), combinedSoFar);
 
-                try { lowLevel.C_EncryptFinal(sid, new byte[64], out NativeCULong _); } catch { /* best-effort cleanup */ }
+                // Ends the operation if it is still active. Its return code does not matter (the operation
+                // may already have ended); a failure comes back as one, not as an exception.
+                _ = lowLevel.C_EncryptFinal(sid, new byte[64], lengthOnly: false, out NativeCULong _);
             }
             finally { session.DestroyObject(key); }
         });
@@ -307,9 +309,9 @@ internal static class OperationStateMixingTestCases
                     AssertOk(lowLevel.C_EncryptInit(sid, ref mech, (NativeCULong)key.ObjectId), "EncryptInit(setup)");
                 }
                 byte[] part1 = new byte[64];
-                AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, part1, out NativeCULong part1Len), "EncryptUpdate(setup)");
+                AssertOk(lowLevel.C_EncryptUpdate(sid, Data1, part1, lengthOnly: false, out NativeCULong part1Len), "EncryptUpdate(setup)");
                 byte[] part2 = new byte[64];
-                AssertOk(lowLevel.C_EncryptFinal(sid, part2, out NativeCULong part2Len), "EncryptFinal(setup)");
+                AssertOk(lowLevel.C_EncryptFinal(sid, part2, lengthOnly: false, out NativeCULong part2Len), "EncryptFinal(setup)");
                 validCiphertext = [.. part1.AsSpan(0, (int)part1Len), .. part2.AsSpan(0, (int)part2Len)];
 
                 using (var scope = new MechanismParameterScope())
