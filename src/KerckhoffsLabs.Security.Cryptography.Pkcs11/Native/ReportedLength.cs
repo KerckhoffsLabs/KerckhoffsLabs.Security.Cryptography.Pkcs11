@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
 /// Where a length or count reported by the module becomes an <see cref="int"/>. The module is outside

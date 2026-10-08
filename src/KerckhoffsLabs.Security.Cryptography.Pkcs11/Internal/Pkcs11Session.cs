@@ -1583,7 +1583,7 @@ internal sealed class Pkcs11Session : IDisposable
             attributes.AddRange(generatedDefaults);
         }
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         CK_ATTRIBUTE[]? template = BuildTemplate(attributes);
@@ -1647,7 +1647,7 @@ internal sealed class Pkcs11Session : IDisposable
             privateKeyAttributes.AddRange(privateDefaults);
         }
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         CK_ATTRIBUTE[]? publicKeyTemplate = BuildTemplate(publicKeyAttributes);
@@ -1699,7 +1699,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKey");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         byte[]? wrappedKey = mechanism.Type == CKM.CKM_AES_KEY_WRAP_KWP
@@ -1771,7 +1771,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKey");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Unwrapping decrypts a key blob into a new token object. Without secure defaults a caller
@@ -2103,7 +2103,7 @@ internal sealed class Pkcs11Session : IDisposable
     {
         // Both mechanisms marshal into the same scope: the two operations run interleaved, so both
         // parameter blocks have to stay alive until the last native call returns.
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckDigestingMechanism = digestingMechanism.Marshal(scope, out Pkcs11ParameterBlock? digestParams);
 
         using var operation = BeginOperation(operationName);
@@ -2155,7 +2155,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Encrypt1");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Encrypt");
@@ -2272,7 +2272,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Encrypt");
@@ -2339,7 +2339,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         // One scope for the whole operation: it owns the mechanism's parameter block and the
         // per-message block below, and outlives every native call that reads or writes them.
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CKR rv = _pkcs11Library.C_MessageEncryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageEncryptInit);
@@ -2398,7 +2398,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Decrypt1");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
@@ -2489,7 +2489,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Decrypt");
@@ -2547,7 +2547,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         // One scope for the whole operation: it owns the mechanism's parameter block and the
         // per-message block below, and outlives every native call that reads or writes them.
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
         CKR rv = _pkcs11Library.C_MessageDecryptInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId);
         Pkcs11Exception.ThrowIfError(rv, OpMessageDecryptInit);
@@ -2603,7 +2603,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Sign");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Sign");
@@ -2642,7 +2642,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Verify1");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Verify");
@@ -2724,7 +2724,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Verify");
@@ -2770,7 +2770,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         ArgumentNullException.ThrowIfNull(signature);
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifyRecover");
@@ -2906,7 +2906,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         // Both mechanisms marshal into the same scope: the two operations run interleaved, so both
         // parameter blocks have to stay alive until the last native call returns.
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckVerificationMechanism = verificationMechanism.Marshal(scope, out Pkcs11ParameterBlock? verifyParams);
 
         using var operation = BeginOperation("DecryptVerify");
@@ -2962,7 +2962,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DigestKey");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("DigestKey");
@@ -3003,7 +3003,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Digest1");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Digest");
@@ -3076,7 +3076,7 @@ internal sealed class Pkcs11Session : IDisposable
         if (bufferLength < 1)
             throw new ArgumentException(ValueMustBePositive, nameof(bufferLength));
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("Digest");
@@ -3344,7 +3344,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DeriveKey");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Deriving produces a new key object on the token. Apply the same secure defaults as UnwrapKey
@@ -3489,7 +3489,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "EncapsulateKey");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // The encapsulated shared secret is a new key object on the token. Apply the same secure
@@ -3585,7 +3585,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "DecapsulateKey");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // The decapsulated shared secret is a new key object on the token. Apply the same secure
@@ -3636,7 +3636,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "WrapKeyAuthenticated");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         CKR rv = _pkcs11Library.C_WrapKeyAuthenticated(
@@ -3679,7 +3679,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "UnwrapKeyAuthenticated");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         // Authenticated unwrap lands a new key object on the token, exactly as UnwrapKey does. Apply the
@@ -3732,7 +3732,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifySignature");
@@ -3774,7 +3774,7 @@ internal sealed class Pkcs11Session : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "VerifySignature(stream)");
 
-        using var scope = new MechanismParameterScope(this);
+        using var scope = new SessionParameterScope(this);
         CK_MECHANISM ckMechanism = mechanism.Marshal(scope, out Pkcs11ParameterBlock? mechParams);
 
         using var operation = BeginOperation("VerifySignature");
