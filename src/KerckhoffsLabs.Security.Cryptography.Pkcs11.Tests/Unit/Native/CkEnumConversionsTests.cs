@@ -5,11 +5,11 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
-/// Round-trip tests for <c>ToCKR</c> and <c>ToCKM</c>, the conversions of module-controlled values.
-/// Vendor-defined and newer-than-this-enum codes are spec-legal there, so they must round-trip
-/// unvalidated.
+/// Round-trip tests for <see cref="CkEnumConversions"/>'s <c>ToCKR</c> and <c>ToCKM</c>, the
+/// conversions of module-controlled values. Vendor-defined and newer-than-this-enum codes are
+/// spec-legal there, so they must round-trip unvalidated.
 /// </summary>
-public sealed class EnumExtensionsTests
+public sealed class CkEnumConversionsTests
 {
     [Fact] public void CKR_RoundTrip() { CKR v = CKR.CKR_OK; Assert.Equal(v, v.ToCULong().ToCKR()); }
     [Fact] public void CKM_RoundTrip() { CKM v = CKM.CKM_AES_GCM; Assert.Equal(v, v.ToCULong().ToCKM()); }
