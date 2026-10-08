@@ -22,7 +22,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 /// exports <c>C_GetInterface</c>, which hands out a v3.2 table, so the loader binds it as a v3.2 module. A
 /// function the subclass does not override leaves its slot NULL, exactly like a module that does not
 /// implement it, so the library's own "function not supported" handling runs. <c>C_Initialize</c> and
-/// <c>C_Finalize</c> are always bound and succeed unless overridden.
+/// <c>C_Finalize</c> are bound unless the module is built without them, and succeed unless overridden.
 /// </para>
 /// <para>
 /// The table's functions are static <c>[UnmanagedCallersOnly]</c> thunks, so they find their instance
@@ -48,6 +48,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
     private static uint s_lastId;
 
     private readonly uint _id;
+    private readonly bool _bindsLifecycle;
     private readonly ConcurrentDictionary<string, int> _calls = new(StringComparer.Ordinal);
     private IntPtr _functionList;
     private IntPtr _interfaceTable;
@@ -58,7 +59,17 @@ internal abstract unsafe partial class FakeModule : IDisposable
     private bool _disposed;
 
     protected FakeModule()
+        : this(bindsLifecycle: true)
     {
+    }
+
+    /// <param name="bindsLifecycle">
+    /// <see langword="false"/> leaves <c>C_Initialize</c> and <c>C_Finalize</c> out of the table too, for a
+    /// module that lacks even those.
+    /// </param>
+    protected FakeModule(bool bindsLifecycle)
+    {
+        _bindsLifecycle = bindsLifecycle;
         _id = Register(this);
         BuildFunctionLists();
     }

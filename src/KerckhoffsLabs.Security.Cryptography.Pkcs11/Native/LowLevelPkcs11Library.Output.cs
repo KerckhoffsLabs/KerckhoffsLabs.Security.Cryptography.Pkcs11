@@ -21,6 +21,14 @@ internal sealed partial class LowLevelPkcs11Library
         => ref output.IsEmpty ? ref s_emptyOutput : ref MemoryMarshal.GetReference(output);
 
     /// <summary>
+    /// The reference to pin for a list of structs the module fills: its first entry, or
+    /// <paramref name="empty"/> when it has none, so an empty list reaches the module as a real address
+    /// rather than the NULL of a count query.
+    /// </summary>
+    private static ref T NonNullPinnable<T>(Span<T> items, ref T empty) where T : unmanaged
+        => ref items.IsEmpty ? ref empty : ref MemoryMarshal.GetReference(items);
+
+    /// <summary>
     /// Checks the length a module reported for an output before any caller sees it. A length query must
     /// report a length that can be allocated (never <c>CK_UNAVAILABLE_INFORMATION</c>); a fill must
     /// report no more than the buffer it was given. Either violation throws rather than letting a

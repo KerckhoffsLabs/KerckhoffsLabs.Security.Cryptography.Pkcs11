@@ -89,12 +89,16 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetMechanismInfo(NativeCULong slotId, NativeCULong type, ref CK_MECHANISM_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetInterfaceList(bool listIsNull, Span<CK_INTERFACE> interfaces, ref NativeCULong count) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
     {
-        slots[nameof(CryptokiTable.C_Initialize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&Initialize;
-        slots[nameof(CryptokiTable.C_Finalize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&FinalizeLibrary;
+        if (_bindsLifecycle)
+        {
+            slots[nameof(CryptokiTable.C_Initialize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&Initialize;
+            slots[nameof(CryptokiTable.C_Finalize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&FinalizeLibrary;
+        }
         if (Overrides(nameof(C_GetInfo)))
             slots[nameof(CryptokiTable.C_GetInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&GetInfo;
         if (Overrides(nameof(C_GetSlotList)))
@@ -245,6 +249,8 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_GetMechanismList)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong*, NativeCULong*, NativeCULong>)&GetMechanismList;
         if (Overrides(nameof(C_GetMechanismInfo)))
             slots[nameof(CryptokiTable.C_GetMechanismInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong>)&GetMechanismInfo;
+        if (Overrides(nameof(C_GetInterfaceList)))
+            slots[nameof(CryptokiTable.C_GetInterfaceList)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong*, NativeCULong>)&GetInterfaceList;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -1139,6 +1145,25 @@ internal abstract unsafe partial class FakeModule
             CK_MECHANISM_INFO info = ReadStruct<CK_MECHANISM_INFO>(pInfo);
             CKR rv = m.C_GetMechanismInfo(slotId, type, ref info);
             WriteStruct(pInfo, in info);
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetInterfaceList(void* pInterfacesList, NativeCULong* pulCount)
+    {
+        if (Active(nameof(C_GetInterfaceList)) is not { } m) return Rv(CKR.CKR_GENERAL_ERROR);
+        try
+        {
+            NativeCULong count = *pulCount;
+            // CK_INTERFACE is packed on Windows: decode into managed entries, then write each back.
+            var interfaces = new CK_INTERFACE[pInterfacesList is null ? 0 : checked((int)(ulong)count)];
+            CKR rv = m.C_GetInterfaceList(pInterfacesList is null, interfaces, ref count);
+            int stride = UnmanagedMemory.SizeOf<CK_INTERFACE>();
+            for (int i = 0; i < interfaces.Length; i++)
+                UnmanagedMemory.Write((IntPtr)((byte*)pInterfacesList + i * stride), in interfaces[i]);
+            *pulCount = count;
             return Rv(rv);
         }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }

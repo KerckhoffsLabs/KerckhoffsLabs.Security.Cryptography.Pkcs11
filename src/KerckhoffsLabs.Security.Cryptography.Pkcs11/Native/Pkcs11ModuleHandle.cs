@@ -416,20 +416,20 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     // Always under s_loadsLock.
     private void RunFinalize()
     {
-        // Nothing may escape a release, and the wrapper's only managed exception is the one for an
-        // unbound function, so check that instead of catching it.
-        if (!Table.HasC_Finalize)
-            return;
+        // Nothing may escape a release; a module without C_Finalize has nothing to finalize.
+        bool finalized;
         bool serialized = EnterCall();
         try
         {
-            _finalizeReturnValue = Table.C_Finalize(IntPtr.Zero).ToCKR();
+            finalized = LowLevelPkcs11Library.TryFinalize(Table, out _finalizeReturnValue);
         }
         finally
         {
             if (serialized)
                 ExitCall();
         }
+        if (!finalized)
+            return;
         _finalizeOutcome = _finalizeReturnValue == CKR.CKR_OK ? FinalizeOutcome.Succeeded : FinalizeOutcome.Failed;
     }
 }
