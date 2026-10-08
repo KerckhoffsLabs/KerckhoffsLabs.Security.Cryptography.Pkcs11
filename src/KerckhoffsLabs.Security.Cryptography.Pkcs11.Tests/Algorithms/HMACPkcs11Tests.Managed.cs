@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
@@ -19,8 +20,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// token does not enforce a per-mechanism minimum key size, so key material is sized freely.
 /// SHA-1 HMAC is insecure-by-default and runs only under <c>UsePolicy(CryptoPolicy.AllowInsecure)</c>.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class HMACPkcs11Tests_Managed
 {
     private static byte[] H(string hex) => Convert.FromHexString(hex);

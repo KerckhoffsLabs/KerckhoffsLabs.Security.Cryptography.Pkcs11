@@ -6,6 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // The obsolete instance constructors are the subject under test, and MD5 drives their
@@ -20,6 +21,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// <c>CKM_PKCS5_PBKD2</c>: the password is captured from the parameters while the policy judges the
 /// call, before the token refuses it.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
 {
     private static readonly byte[] Salt = new byte[16];

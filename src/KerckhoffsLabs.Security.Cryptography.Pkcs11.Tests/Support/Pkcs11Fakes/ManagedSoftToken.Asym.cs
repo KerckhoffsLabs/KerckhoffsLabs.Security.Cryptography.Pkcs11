@@ -16,15 +16,14 @@ internal sealed partial class ManagedSoftToken
 
     // Finish() stores the same key instance under both its public and private handle, so Distinct()
     // (default reference equality — none of these types override Equals) avoids a double-Dispose.
-    public override void Dispose()
+    protected override void Disposing()
     {
         foreach (object key in _asymKeys.Values.Distinct())
             (key as IDisposable)?.Dispose();
         _asymKeys.Clear();
-        base.Dispose();
     }
 
-    public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
+    protected override CKR C_GenerateKeyPair(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, CK_ATTRIBUTE[] privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
 

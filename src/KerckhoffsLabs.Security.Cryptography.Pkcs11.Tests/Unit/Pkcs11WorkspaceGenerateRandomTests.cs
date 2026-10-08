@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -7,6 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// the whole span, treats an empty span as a no-op the way <c>RandomNumberGenerator.Fill</c> does,
 /// and refuses a disposed workspace.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11WorkspaceGenerateRandomTests
 {
     [Fact]

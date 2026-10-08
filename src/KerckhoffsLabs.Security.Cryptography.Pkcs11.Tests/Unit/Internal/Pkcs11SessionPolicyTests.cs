@@ -164,7 +164,7 @@ public sealed class Pkcs11SessionPolicyTests
     public void FipsOnly_AesCbcEmptyInput_ShortCircuits_WithoutTouchingTheToken()
     {
         var token = new Support.Pkcs11Fakes.ManagedSoftToken();
-        using var library = new Pkcs11Library(token);
+        using var library = token.Load();
         using var workspace = Support.Pkcs11Fakes.ManagedToken.OpenWorkspace(library, CryptoPolicy.FipsOnly);
         using var key = workspace.GenerateAesKey(256);
         using var aes = new AesPkcs11(key);

@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // DESPkcs11 is [Obsolete] (single DES has a 56-bit key); the secure-defaults gate is the whole point
@@ -20,8 +21,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// The secure-defaults gate is still in force: each cipher op must run inside
 /// <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> and throws <see cref="CryptoPolicyViolationException"/> without it.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class DESPkcs11Tests_Managed
 {
     // Classic NBS DES test key (0x0123456789ABCDEF) — not weak/semi-weak, so the BCL DES key setter

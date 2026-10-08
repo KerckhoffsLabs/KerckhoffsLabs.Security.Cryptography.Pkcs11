@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -22,6 +23,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// the token afterwards — rather than counting calls into the module.
 /// </para>
 /// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class DisposeDoesNotDestroyTests
 {
     private static Pkcs11Workspace NewWorkspace(out Pkcs11Library library)

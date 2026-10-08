@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
@@ -14,6 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// address. The fixtures are deliberately non-degenerate — distinct values, no zeros where a zero
 /// could pass by accident — so a dropped or mistyped assignment cannot slip through.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class BuildMarshalableTests
 {
     // CK_PRF_DATA_TYPE tags (OASIS pkcs11t.h).

@@ -3,19 +3,19 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
-/// AesCcmPkcs11 over the in-process <c>ManagedSoftToken</c>. The managed token reports
-/// <c>IsMessageApiSupported=false</c>, so these exercise the adapter's PKCS#11 v2.40 single-part
+/// AesCcmPkcs11 over the in-process <c>ManagedSoftToken</c>. The managed token implements
+/// no message-API function, so these exercise the adapter's PKCS#11 v2.40 single-part
 /// path (ciphertext‖tag) — the AES-CCM path that actually runs in CI, since SoftHSM implements no
 /// AES-CCM and its rich behavioral tests skip. Real crypto is cross-checked against the BCL
 /// <see cref="AesCcm"/> primitive (independent NIST SP 800-38C reference).
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class AesCcmPkcs11Tests_Managed
 {
     // macOS BCL has no AES-CCM (AesCcm.IsSupported == false), so the managed token can't run

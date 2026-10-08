@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
@@ -11,14 +12,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 /// end-to-end without SoftHSM via an in-memory object store and per-family mechanism dispatchers.
 /// This core file holds the object/session model plus symmetric AES; sibling partials add the
 /// other families (<c>ManagedSoftToken.Digest.cs</c>, <c>ManagedSoftToken.Hmac.cs</c>, …).
+/// It is a <see cref="FakeModule"/>, so every call crosses the real loader and wrappers; a test reaches
+/// it through <see cref="FakeModule.Load"/>, and disposing that library finalizes and releases it.
 /// </summary>
-internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
+internal sealed partial class ManagedSoftToken : FakeModule
 {
     public const string TokenLabel = "managed-soft-token";
     private const ulong SlotId = 0;
 
     private ulong _nextHandle = 100;
-    private ulong _nextSession = 1;
     private readonly Dictionary<ulong, Dictionary<ulong, byte[]>> _objects = [];
     private readonly HashSet<ulong> _sessions = [];
     private readonly Dictionary<ulong, Queue<ulong>> _finds = [];
@@ -30,27 +32,26 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Lifecycle / discovery ===========================================
 
-    public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-    public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
+    protected override bool ReleasedByFinalize => true;
 
-    public override CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
+    protected override CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count)
     {
-        if (slotList.IsEmpty) { count = (NativeCULong)1; return CKR.CKR_OK; }
-        if (slotList.Length < 1) { count = (NativeCULong)1; return CKR.CKR_BUFFER_TOO_SMALL; }
-        slotList[0] = (NativeCULong)SlotId;
+        if (slotList.IsNull) { count = (NativeCULong)1; return CKR.CKR_OK; }
+        if (slotList.Span.Length < 1) { count = (NativeCULong)1; return CKR.CKR_BUFFER_TOO_SMALL; }
+        slotList.Span[0] = (NativeCULong)SlotId;
         count = (NativeCULong)1;
         return CKR.CKR_OK;
     }
 
-    public override CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info) => CKR.CKR_OK;
+    protected override CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info) => CKR.CKR_OK;
 
-    public override CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
+    protected override CKR C_GetTokenInfo(NativeCULong slotId, ref CK_TOKEN_INFO info)
     {
         NativeTestStructs.FillPadded(info.Label, TokenLabel);
         return CKR.CKR_OK;
     }
 
-    public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
+    protected override CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count)
     {
         CKM[] mechs =
         [
@@ -60,22 +61,23 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
             CKM.CKM_SHA3_256, CKM.CKM_SHA3_384, CKM.CKM_SHA3_512,
             CKM.CKM_SHA256_HMAC, CKM.CKM_SHA384_HMAC, CKM.CKM_SHA512_HMAC,
         ];
-        if (mechanismList.IsEmpty) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
-        if (mechanismList.Length < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
-        mechs.AsSpan(0, mechs.Length).CopyTo(mechanismList);
+        if (mechanismList.IsNull) { count = (NativeCULong)mechs.Length; return CKR.CKR_OK; }
+        if (mechanismList.Span.Length < mechs.Length) { count = (NativeCULong)mechs.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+        for (int i = 0; i < mechs.Length; i++)
+            mechanismList.Span[i] = (NativeCULong)(ulong)mechs[i];
         count = (NativeCULong)mechs.Length;
         return CKR.CKR_OK;
     }
 
-    public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
+    protected override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
     {
-        ulong id = _nextSession++;
+        ulong id = (ulong)NewSessionHandle();
         _sessions.Add(id);
         session = (NativeCULong)id;
         return CKR.CKR_OK;
     }
 
-    public override CKR C_CloseSession(NativeCULong session)
+    protected override CKR C_CloseSession(NativeCULong session)
     {
         ulong s = (ulong)session;
         _sessions.Remove(s);
@@ -84,13 +86,13 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
+    protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
     {
         info.SlotId = (NativeCULong)SlotId;
         return CKR.CKR_OK;
     }
 
-    public override CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin) => CKR.CKR_OK;
+    protected override CKR C_Login(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin) => CKR.CKR_OK;
 
     /// <summary>Number of times <c>C_Logout</c> has been invoked. Used to assert logout-on-dispose.</summary>
     public int LogoutCallCount { get; private set; }
@@ -99,7 +101,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     /// best-effort swallow path (e.g. <see cref="CKR.CKR_USER_NOT_LOGGED_IN"/>).</summary>
     public CKR LogoutResult { get; set; } = CKR.CKR_OK;
 
-    public override CKR C_Logout(NativeCULong session)
+    protected override CKR C_Logout(NativeCULong session)
     {
         LogoutCallCount++;
         return LogoutResult;
@@ -107,7 +109,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Objects =========================================================
 
-    public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
+    protected override CKR C_GenerateKey(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, ref NativeCULong key)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         var keyGen = (CKM)(ulong)mechanism.Mechanism;
@@ -125,7 +127,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_CreateObject(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong objectId)
+    protected override CKR C_CreateObject(NativeCULong session, CK_ATTRIBUTE[] template, ref NativeCULong objectId)
     {
         var attrs = ReadTemplate(template);
         ulong handle = Store(attrs);
@@ -138,14 +140,14 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
     /// in place — lets tests exercise the path where a token rejects the destroy.</summary>
     public CKR? DestroyObjectResultOverride { get; set; }
 
-    public override CKR C_DestroyObject(NativeCULong session, NativeCULong objectId)
+    protected override CKR C_DestroyObject(NativeCULong session, NativeCULong objectId)
     {
         if (DestroyObjectResultOverride is { } forced)
             return forced;
         return _objects.Remove((ulong)objectId) ? CKR.CKR_OK : CKR.CKR_OBJECT_HANDLE_INVALID;
     }
 
-    public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+    protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
         if (!_objects.TryGetValue((ulong)objectId, out var obj)) return CKR.CKR_OBJECT_HANDLE_INVALID;
 
@@ -172,7 +174,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Find ============================================================
 
-    public override CKR C_FindObjectsInit(NativeCULong session, ReadOnlySpan<CK_ATTRIBUTE> template)
+    protected override CKR C_FindObjectsInit(NativeCULong session, CK_ATTRIBUTE[] template)
     {
         var filter = ReadTemplate(template);
         var matches = _objects
@@ -182,7 +184,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
+    protected override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, ref NativeCULong objectCount)
     {
         if (!_finds.TryGetValue((ulong)session, out var q)) { objectCount = (NativeCULong)0; return CKR.CKR_OK; }
         int i = 0;
@@ -191,7 +193,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
         return CKR.CKR_OK;
     }
 
-    public override CKR C_FindObjectsFinal(NativeCULong session)
+    protected override CKR C_FindObjectsFinal(NativeCULong session)
     {
         _finds.Remove((ulong)session);
         return CKR.CKR_OK;
@@ -199,7 +201,7 @@ internal sealed partial class ManagedSoftToken : NotSupportedPkcs11Library
 
     // === Random ==========================================================
 
-    public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+    protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
     {
         RandomNumberGenerator.Fill(randomData);
         return CKR.CKR_OK;

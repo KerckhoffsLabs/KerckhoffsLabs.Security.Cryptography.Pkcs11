@@ -1,4 +1,5 @@
 using System.Reflection;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -104,38 +105,29 @@ public sealed class TestCollectionConventionTests
     }
 
     /// <summary>
-    /// A class named for the in-process managed fake joins no backend collection — <c>ManagedSoftToken</c>
-    /// loads no native module and holds no static state, so nothing serializes it — but must say so
-    /// explicitly. Neither of the two rules above catches this: the opt-out rule is scoped to
-    /// <c>Integration/</c> and the <c>_Managed</c> classes mostly live under <c>Algorithms/</c>, and the
-    /// backend-suffix rule only has entries for the backends that require a collection.
+    /// A class named for the in-process managed fake joins <see cref="FakeModuleCollection"/>:
+    /// <c>ManagedSoftToken</c> is a <see cref="FakeModule"/>, and at most one may be alive at a time.
+    /// Neither of the two rules above catches a miss: the opt-out rule is scoped to <c>Integration/</c>
+    /// and the <c>_Managed</c> classes mostly live under <c>Algorithms/</c>, and the backend-suffix rule
+    /// only has entries for the native backends.
     /// </summary>
     [Fact]
-    public void EveryManagedNamedTestClass_OptsOutOfABackendCollection()
+    public void EveryManagedNamedTestClass_JoinsTheFakeModuleCollection()
     {
         var offenders = new List<string>();
 
         foreach (Type type in TestClasses().Where(t => t.Name.EndsWith("_Managed", StringComparison.Ordinal)))
         {
             string? collection = CollectionOf(type);
-            var optOut = type.GetCustomAttribute<NoBackendCollectionAttribute>();
 
-            if (collection is not null)
+            if (collection != FakeModuleCollection.Name)
             {
                 offenders.Add(
-                    $"{type.FullName}: named for the in-process managed fake but joins " +
-                    $"[Collection(\"{collection}\")]. It drives no native module, so it must carry " +
-                    "[NoBackendCollection(reason)] instead.");
-            }
-            else if (optOut is null)
-            {
-                offenders.Add(
-                    $"{type.FullName}: named for the in-process managed fake but has no " +
-                    "[NoBackendCollection(reason)]. State why it needs no backend collection.");
-            }
-            else if (string.IsNullOrWhiteSpace(optOut.Reason))
-            {
-                offenders.Add($"{type.FullName}: [NoBackendCollection] with an empty reason.");
+                    $"{type.FullName}: named for the in-process managed fake but " +
+                    (collection is null
+                        ? "declares no [Collection]"
+                        : $"joins [Collection(\"{collection}\")]") +
+                    $". It must be [Collection(FakeModuleCollection.Name)].");
             }
         }
 

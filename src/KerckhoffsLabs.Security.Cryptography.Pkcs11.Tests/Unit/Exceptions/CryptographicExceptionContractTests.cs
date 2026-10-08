@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // Deliberately drives the PKCS#1 v1.5 path refused under the default SecureOnly policy: the refusal
@@ -18,6 +19,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Exceptions;
 /// outside that hierarchy would slip past the caller's error handling entirely. These tests hold the
 /// library to that contract from the caller's side, through the BCL-typed reference.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class CryptographicExceptionContractTests
 {
     // Note the ThrowsAny: xUnit's Assert.Throws<T> demands an *exact* type match, so it would reject

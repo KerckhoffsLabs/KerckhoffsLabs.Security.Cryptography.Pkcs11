@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // MLKem (FIPS 203) is an evaluation-only BCL API (SYSLIB5006); suppress here.
@@ -20,8 +21,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// (FIPS 203). Crypto cases are gated on <see cref="MLKem.IsSupported"/>; argument/ctor cases that throw
 /// before any native call stay <c>[Fact]</c>.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class MLKemPkcs11Tests_Managed
 {
     private static MLKemAlgorithm BclAlgorithm(CkpMlKem p) => p switch
@@ -163,7 +163,7 @@ public sealed class MLKemPkcs11Tests_Managed
     public void Encapsulate_WhenDestroyFails_SurfacesPkcs11Exception()
     {
         var token = new ManagedSoftToken();
-        using var library = new Pkcs11Library(token);
+        using var library = token.Load();
         using var workspace = ManagedToken.OpenWorkspace(library);
         using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
 

@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -9,6 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// order — public, then private — and refuses a template whose <c>CKA_CLASS</c> names the other
 /// half, since two <see cref="ObjectTemplate"/> arguments swap without a compile error.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11WorkspaceGenerateKeyPairTests
 {
     private static ObjectTemplate PublicTemplate() => ObjectTemplate.ForPublicKey(CKK.CKK_EC)

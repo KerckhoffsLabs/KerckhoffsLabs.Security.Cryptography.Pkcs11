@@ -1,23 +1,23 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 /// <summary>
-/// Minimal <see cref="ILowLevelPkcs11Library"/> fake that answers every <c>C_GetAttributeValue</c>
-/// query via a caller-supplied responder — including a fatal <see cref="CKR"/> a real backend
-/// cannot be coaxed into returning for a well-formed key object's required attributes. Everything
-/// else falls back to <see cref="NotSupportedPkcs11Library"/>'s <c>CKR_FUNCTION_NOT_SUPPORTED</c>,
-/// except <c>C_Initialize</c>/<c>C_Finalize</c>, which must succeed for <c>Pkcs11Library</c>'s
-/// constructor and <c>Dispose</c> to work. See <see cref="FakeKeys.Create"/>.
+/// Minimal <see cref="FakeModule"/> that answers every <c>C_GetAttributeValue</c> query via a
+/// caller-supplied responder — including a fatal <see cref="CKR"/> a real backend cannot be coaxed
+/// into returning for a well-formed key object's required attributes. Every other function is absent,
+/// so the library sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it; <c>C_Initialize</c>/<c>C_Finalize</c>
+/// succeed, and disposing the library from <see cref="FakeModule.Load"/> releases the module. See
+/// <see cref="FakeKeys.Create"/>.
 /// </summary>
-internal sealed class AttributeResponseFakeLibrary(Func<CKA, (CKR Rv, byte[]? Value)> respond) : NotSupportedPkcs11Library
+internal sealed class AttributeResponseModule(Func<CKA, (CKR Rv, byte[]? Value)> respond) : FakeModule
 {
-    public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-    public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
+    protected override bool ReleasedByFinalize => true;
 
-    public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+    protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
     {
         for (int i = 0; i < template.Length; i++)
         {

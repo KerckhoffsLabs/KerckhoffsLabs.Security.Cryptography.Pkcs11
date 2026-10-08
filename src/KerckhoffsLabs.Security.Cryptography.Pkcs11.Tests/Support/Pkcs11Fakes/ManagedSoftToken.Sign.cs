@@ -3,6 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
@@ -15,10 +16,10 @@ internal sealed partial class ManagedSoftToken
 
     private readonly record struct SignOp(ulong Mechanism, ulong Key, byte[] Context);
 
-    public override CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         => InitSignOp(_signOps, (ulong)session, ref mechanism, (ulong)key);
 
-    public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         => InitSignOp(_verifyOps, (ulong)session, ref mechanism, (ulong)key);
 
     private CKR InitSignOp(Dictionary<ulong, SignOp> store, ulong session, ref CK_MECHANISM mech, ulong key)
@@ -41,7 +42,7 @@ internal sealed partial class ManagedSoftToken
             ? UnmanagedMemory.Read(p.Context, (int)p.ContextLen) : [];
     }
 
-    public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen)
+    protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
     {
         signatureLen = (NativeCULong)0;
         if (!_signOps.TryGetValue((ulong)session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
@@ -64,16 +65,16 @@ internal sealed partial class ManagedSoftToken
         }
         catch (CryptographicException) { _signOps.Remove((ulong)session); return CKR.CKR_FUNCTION_FAILED; }
 
-        if (lengthOnly) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
-        if (signature.Length < sig.Length) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+        if (signature.IsNull) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_OK; }
+        if (signature.Span.Length < sig.Length) { signatureLen = (NativeCULong)(ulong)sig.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
-        sig.AsSpan(0, sig.Length).CopyTo(signature);
+        sig.AsSpan(0, sig.Length).CopyTo(signature.Span);
         signatureLen = (NativeCULong)(ulong)sig.Length;
         _signOps.Remove((ulong)session);
         return CKR.CKR_OK;
     }
 
-    public override CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
+    protected override CKR C_Verify(NativeCULong session, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
     {
         if (!_verifyOps.TryGetValue((ulong)session, out var op)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
         _verifyOps.Remove((ulong)session);

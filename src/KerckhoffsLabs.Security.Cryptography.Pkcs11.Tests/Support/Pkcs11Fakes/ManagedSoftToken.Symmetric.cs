@@ -3,12 +3,13 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // Symmetric family: single-part C_EncryptInit/C_Encrypt (+ Decrypt) over the BCL — block ciphers
-// (AES/DES/3DES/RC2, CBC/ECB) and AEAD (AES-GCM/CCM, ChaCha20-Poly1305). Because the token reports
-// IsMessageApiSupported=false, the AEAD adapters take their v2.40 single-part path where the output
+// (AES/DES/3DES/RC2, CBC/ECB) and AEAD (AES-GCM/CCM, ChaCha20-Poly1305). Because the token implements
+// no message-API function, the AEAD adapters take their v2.40 single-part path where the output
 // is ciphertext ‖ tag — which is exactly what this produces/consumes.
 internal sealed partial class ManagedSoftToken
 {
@@ -19,7 +20,7 @@ internal sealed partial class ManagedSoftToken
 
     // RSA encryption (CKM_RSA_PKCS / CKM_RSA_PKCS_OAEP) routes to the asymmetric path in
     // ManagedSoftToken.RsaCipher.cs; everything else is a symmetric cipher.
-    public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
     {
         EncryptInitCallCount++;
         return IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
@@ -30,20 +31,20 @@ internal sealed partial class ManagedSoftToken
     /// <summary>Number of times <c>C_EncryptInit</c> has been invoked. Lets tests prove a path never reached the token.</summary>
     public int EncryptInitCallCount { get; private set; }
 
-    public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+    protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         => IsRsaCipher((CKM)(ulong)mechanism.Mechanism)
             ? InitRsaCipher((ulong)session, ref mechanism, (ulong)key)
             : InitSym((ulong)session, ref mechanism, (ulong)key);
 
-    public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen)
+    protected override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> encryptedData, ref NativeCULong encryptedDataLen)
         => _rsaEncOps.ContainsKey((ulong)session)
-            ? RsaTransform((ulong)session, data, lengthOnly ? default : encryptedData, out encryptedDataLen, encrypt: true)
-            : TransformSym((ulong)session, data, lengthOnly ? default : encryptedData, out encryptedDataLen, encrypt: true);
+            ? RsaTransform((ulong)session, data, encryptedData.Span, out encryptedDataLen, encrypt: true)
+            : TransformSym((ulong)session, data, encryptedData.Span, out encryptedDataLen, encrypt: true);
 
-    public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
+    protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
         => _rsaEncOps.ContainsKey((ulong)session)
-            ? RsaTransform((ulong)session, encryptedData, lengthOnly ? default : data, out dataLen, encrypt: false)
-            : TransformSym((ulong)session, encryptedData, lengthOnly ? default : data, out dataLen, encrypt: false);
+            ? RsaTransform((ulong)session, encryptedData, data.Span, out dataLen, encrypt: false)
+            : TransformSym((ulong)session, encryptedData, data.Span, out dataLen, encrypt: false);
 
     private CKR InitSym(ulong session, ref CK_MECHANISM mech, ulong key)
     {

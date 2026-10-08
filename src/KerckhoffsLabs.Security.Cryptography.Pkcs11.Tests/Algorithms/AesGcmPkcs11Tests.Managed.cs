@@ -3,18 +3,18 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
-/// AesGcmPkcs11 over the in-process <c>ManagedSoftToken</c>. The token reports
-/// <c>IsMessageApiSupported=false</c>, so the adapter uses its PKCS#11 v2.40 single-part path
+/// AesGcmPkcs11 over the in-process <c>ManagedSoftToken</c>. The token implements
+/// no message-API function, so the adapter uses its PKCS#11 v2.40 single-part path
 /// (ciphertext‖tag) — the path that always runs in CI. Real crypto is cross-checked against the BCL
 /// <see cref="AesGcm"/> primitive. AES-GCM fixes the nonce at 12 bytes and allows 12–16 byte tags.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class AesGcmPkcs11Tests_Managed
 {
     // macOS BCL AesGcm requires a 16-byte tag (TagByteSizes is 16..16), so the 12-15 byte cases in
