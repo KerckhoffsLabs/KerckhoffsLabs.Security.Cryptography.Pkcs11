@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.SafeHandles;
@@ -38,20 +38,6 @@ public sealed class Pkcs11SessionHandleModuleRefTests(MockBackendFixture f)
         Assert.Equal(0, library.Module.TrackedSessionCount);
     }
 
-    // A test double gets the same reference and tracking: there is no type test any more.
-    [Fact]
-    public void FakeLibrary_ValidSession_IsTracked_AndClosesAfterTheLibraryIsDisposed()
-    {
-        var fake = new ClosingFake();
-        var handle = new Pkcs11SessionHandle(fake, (NativeCULong)1);
-        Assert.Equal(1, fake.Module.TrackedSessionCount);
-
-        fake.Dispose();
-        handle.Dispose();
-
-        Assert.Equal(1, fake.CloseCalls);
-    }
-
     [Fact]
     public void RealLibrary_DisposingSessionHandle_ReleasesModuleRefExactlyOnce()
     {
@@ -67,12 +53,35 @@ public sealed class Pkcs11SessionHandleModuleRefTests(MockBackendFixture f)
         Assert.True(ok);
         library.Module.DangerousRelease();
     }
+}
 
-    private sealed class ClosingFake : FakeLowLevelPkcs11Library
+/// <summary>
+/// The same reference and tracking for a session on a <see cref="FakeModule"/>, in the fake-module
+/// collection: at most one such module may be active at a time.
+/// </summary>
+[Collection(FakeModuleCollection.Name)]
+public sealed class Pkcs11SessionHandleFakeModuleRefTests
+{
+    // A fake module's session gets the same reference and tracking as a real module's.
+    [Fact]
+    public void FakeLibrary_ValidSession_IsTracked_AndClosesAfterTheLibraryIsDisposed()
+    {
+        using var module = new ClosingFake();
+        var fake = module.LoadLowLevel();
+        var handle = new Pkcs11SessionHandle(fake, (NativeCULong)1);
+        Assert.Equal(1, fake.Module.TrackedSessionCount);
+
+        fake.Dispose();
+        handle.Dispose();
+
+        Assert.Equal(1, module.CloseCalls);
+    }
+
+    private sealed class ClosingFake : FakeModule
     {
         public int CloseCalls { get; private set; }
 
-        public override CKR C_CloseSession(NativeCULong session)
+        protected override CKR C_CloseSession(NativeCULong session)
         {
             CloseCalls++;
             return CKR.CKR_OK;

@@ -1,8 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -12,26 +11,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// (fill) C_GetSlotList call than the first (probe) call — the PKCS#11 spec allows this (a slot
 /// could disappear between calls), and the caller must resize down rather than read stale entries.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class GetSlotListTests
 {
-    private sealed class SlotListFake : NotSupportedPkcs11Library
+    private sealed class SlotListFake : FakeModule
     {
         public NativeCULong ProbeCount = (NativeCULong)0;
         public NativeCULong[] FillSlots = [];
         public NativeCULong FillCount = (NativeCULong)0;
 
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
-
-        public override CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
+        protected override CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count)
         {
-            if (slotList.IsEmpty)
+            if (slotList.IsNull)
             {
                 count = ProbeCount;
                 return CKR.CKR_OK;
             }
 
-            FillSlots.AsSpan().CopyTo(slotList);
+            FillSlots.AsSpan().CopyTo(slotList.Span);
             count = FillCount;
             return CKR.CKR_OK;
         }
@@ -40,8 +37,8 @@ public sealed class GetSlotListTests
     [Fact]
     public void ZeroSlots_ReturnsEmptyWithoutASecondCall()
     {
-        var fake = new SlotListFake { ProbeCount = (NativeCULong)0 };
-        using var library = new Pkcs11Library(fake);
+        using var fake = new SlotListFake { ProbeCount = (NativeCULong)0 };
+        using var library = fake.Load();
 
         Assert.Empty(library.GetSlotList());
     }
@@ -49,13 +46,13 @@ public sealed class GetSlotListTests
     [Fact]
     public void SecondCallReportsFewerSlots_ResizesToMatch()
     {
-        var fake = new SlotListFake
+        using var fake = new SlotListFake
         {
             ProbeCount = (NativeCULong)2,
             FillSlots = [(NativeCULong)7],
             FillCount = (NativeCULong)1,
         };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
 
         var slots = library.GetSlotList();
 
@@ -65,13 +62,13 @@ public sealed class GetSlotListTests
     [Fact]
     public void SecondCallReportsMoreSlotsThanTheBuffer_IsRefused_NotPaddedWithSlotZero()
     {
-        var fake = new SlotListFake
+        using var fake = new SlotListFake
         {
             ProbeCount = (NativeCULong)1,
             FillSlots = [(NativeCULong)7],
             FillCount = (NativeCULong)2,
         };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
 
         // Padding used to add slot 0, a slot the module never listed.
         Assert.Throws<Pkcs11UnclassifiedException>(() => library.GetSlotList());
@@ -80,8 +77,8 @@ public sealed class GetSlotListTests
     [Fact]
     public void ProbeReportsUnavailableInformation_IsRefused()
     {
-        var fake = new SlotListFake { ProbeCount = NativeCULong.MaxValue };
-        using var library = new Pkcs11Library(fake);
+        using var fake = new SlotListFake { ProbeCount = NativeCULong.MaxValue };
+        using var library = fake.Load();
 
         Assert.Throws<Pkcs11UnclassifiedException>(() => library.GetSlotList());
     }

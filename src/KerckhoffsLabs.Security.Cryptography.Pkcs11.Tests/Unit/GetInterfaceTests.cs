@@ -3,6 +3,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -13,15 +14,23 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// and the v2.40 not-supported path. The native <c>C_GetInterface</c> call itself is exercised by the
 /// Integration suite over pkcs11-mock.
 /// </summary>
+/// <remarks>
+/// The name and descriptor tests stay on an in-process double: a <see cref="FakeModule"/> answers
+/// <c>C_GetInterface</c> itself, with its one v3.2 interface whatever name is asked for, so it can
+/// neither report the name it received nor hand back another descriptor.
+/// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class GetInterfaceTests
 {
+    // A v2.40 module: it exports no C_GetInterface.
+    private sealed class V240Module : FakeModule;
+
     private sealed class InterfaceFake : NotSupportedPkcs11Library
     {
         public byte[]? CapturedName;
         public bool NameWasNull;
         public ulong Flags = 1; // CKF_INTERFACE_FORK_SAFE
         public string ReturnName = "PKCS 11";
-        public CKR Rv = CKR.CKR_OK;
         private IntPtr _namePtr;
 
         public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
@@ -31,8 +40,6 @@ public sealed class GetInterfaceTests
         {
             NameWasNull = interfaceName.IsEmpty;
             CapturedName = interfaceName.ToArray();
-            iface = default;
-            if (Rv != CKR.CKR_OK) return Rv;
 
             _namePtr = Marshal.StringToCoTaskMemUTF8(ReturnName);
             iface = new CK_INTERFACE { InterfaceName = _namePtr, FunctionList = 0x1234, Flags = (NativeCULong)Flags };
@@ -81,8 +88,8 @@ public sealed class GetInterfaceTests
     [Fact]
     public void GetInterface_NotSupported_Throws()
     {
-        using var fake = new InterfaceFake { Rv = CKR.CKR_FUNCTION_NOT_SUPPORTED };
-        using var lib = new Pkcs11Library(fake);
+        using var module = new V240Module();
+        using var lib = module.Load();
 
         Assert.ThrowsAny<Pkcs11Exception>(() => lib.GetInterface("PKCS 11"));
     }

@@ -1,7 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
@@ -9,19 +8,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
 /// <summary>
 /// Coverage for the per-instance <see cref="ILoggerFactory"/> a <see cref="Pkcs11Library"/> is
 /// constructed with — the only way the library logs. There is no process-wide logging state, so
-/// these tests can run in parallel with everything else without resetting anything.
+/// these tests reset nothing between them.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11LibraryInstanceLoggingTests
 {
-    private sealed class SlotFake : NotSupportedPkcs11Library
+    private sealed class SlotFake : FakeModule
     {
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
-
-        public override CKR C_GetSlotList(bool tokenPresent, Span<NativeCULong> slotList, out NativeCULong count)
+        protected override CKR C_GetSlotList(bool tokenPresent, NativeBuffer<NativeCULong> slotList, ref NativeCULong count)
         {
-            if (slotList.IsEmpty) { count = (NativeCULong)1; return CKR.CKR_OK; }
-            slotList[0] = (NativeCULong)7;
+            if (slotList.IsNull) { count = (NativeCULong)1; return CKR.CKR_OK; }
+            slotList.Span[0] = (NativeCULong)7;
             count = (NativeCULong)1;
             return CKR.CKR_OK;
         }
@@ -31,7 +28,8 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     public void ExplicitFactory_ReceivesTheLibrarysLogging()
     {
         var instanceCapture = new CapturingLogger();
-        using var library = new Pkcs11Library(new SlotFake(), new CapturingLoggerFactory(instanceCapture));
+        using var module = new SlotFake();
+        using var library = module.Load(new CapturingLoggerFactory(instanceCapture));
 
         Assert.Contains(instanceCapture.Entries, e => e.Message.Contains("Initialize"));
     }
@@ -41,7 +39,8 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     {
         // With no factory the library, and the slots it produces, use a null logger. Nothing can
         // capture that output, which is the point: there is no shared factory for it to fall back to.
-        using var library = new Pkcs11Library(new SlotFake());
+        using var module = new SlotFake();
+        using var library = module.Load();
 
         Assert.Single(library.GetSlotList());
     }
@@ -66,8 +65,10 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     {
         var captureA = new CapturingLogger();
         var captureB = new CapturingLogger();
-        using var libraryA = new Pkcs11Library(new SlotFake(), new CapturingLoggerFactory(captureA));
-        using var libraryB = new Pkcs11Library(new SlotFake(), new CapturingLoggerFactory(captureB));
+        // One module may be active at a time, so the two instances are two loads of the same module.
+        using var module = new SlotFake();
+        using var libraryA = module.Load(new CapturingLoggerFactory(captureA));
+        using var libraryB = module.Load(new CapturingLoggerFactory(captureB));
 
         Assert.Contains(captureA.Entries, e => e.Message.Contains("Initialize"));
         Assert.Contains(captureB.Entries, e => e.Message.Contains("Initialize"));
@@ -80,7 +81,8 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     public void GetSlotList_ProducedSlot_InheritsTheLibrarysFactory()
     {
         var capture = new CapturingLogger();
-        using var library = new Pkcs11Library(new SlotFake(), new CapturingLoggerFactory(capture));
+        using var module = new SlotFake();
+        using var library = module.Load(new CapturingLoggerFactory(capture));
         capture.Clear(); // isolate what the slot itself logs
 
         var slots = library.GetSlotList();
