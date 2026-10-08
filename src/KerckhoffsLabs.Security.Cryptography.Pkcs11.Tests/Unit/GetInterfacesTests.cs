@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -11,14 +11,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// <see cref="GetInterfaceTests"/>, which covers the single-interface lookup
 /// (<see cref="Pkcs11Library.GetInterface"/>) including its v2.40 not-supported path.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class GetInterfacesTests
 {
-    private sealed class NoInterfacesFake : NotSupportedPkcs11Library
+    private sealed class NoInterfacesFake : FakeModule
     {
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
-
-        public override CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
+        protected override CKR C_GetInterfaceList(bool listIsNull, Span<CK_INTERFACE> interfaces, ref NativeCULong count)
         {
             count = (NativeCULong)0;
             return CKR.CKR_OK;
@@ -28,7 +26,8 @@ public sealed class GetInterfacesTests
     [Fact]
     public void ZeroInterfaces_ReturnsEmptyWithoutASecondCall()
     {
-        using var library = new Pkcs11Library(new NoInterfacesFake());
+        using var module = new NoInterfacesFake();
+        using var library = module.Load();
 
         Assert.Empty(library.GetInterfaces());
     }

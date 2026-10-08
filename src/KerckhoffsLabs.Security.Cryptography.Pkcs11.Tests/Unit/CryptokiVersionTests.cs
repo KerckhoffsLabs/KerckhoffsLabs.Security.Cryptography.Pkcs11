@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -10,17 +10,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 // to reach the public API through was a trap: "3.02" and "3.2" are different modules that sort the
 // wrong way as text, and no consumer could compare or order versions without parsing. These pin the
 // comparable surface that replaced it, plus the spec-form rendering that stayed internal.
+[Collection(FakeModuleCollection.Name)]
 public sealed class CryptokiVersionTests
 {
-    private sealed class InfoFake : NotSupportedPkcs11Library
+    private sealed class InfoFake : FakeModule
     {
         public byte Major = 3;
         public byte Minor = 2;
 
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
-
-        public override CKR C_GetInfo(ref CK_INFO info)
+        protected override CKR C_GetInfo(ref CK_INFO info)
         {
             info.CryptokiVersion = new CK_VERSION { Major = Major, Minor = Minor };
             info.LibraryVersion = new CK_VERSION { Major = 1, Minor = 2 };
@@ -78,7 +76,7 @@ public sealed class CryptokiVersionTests
     public void GetInfo_ExposesBothVersionsAsComparableValues()
     {
         using var fake = new InfoFake { Major = 3, Minor = 2 };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
 
         LibraryInfo info = library.GetInfo();
 
@@ -98,7 +96,7 @@ public sealed class CryptokiVersionTests
     public void SupportsCryptokiVersion_ComparesAgainstTheReportedVersion(int major, int minor, bool expected)
     {
         using var fake = new InfoFake { Major = 3, Minor = 2 };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
 
         Assert.Equal(expected, library.SupportsCryptokiVersion(new Version(major, minor)));
     }
@@ -109,7 +107,7 @@ public sealed class CryptokiVersionTests
     public void SupportsCryptokiVersion_V240Module_RefusesV3()
     {
         using var fake = new InfoFake { Major = 2, Minor = 40 };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
 
         Assert.True(library.SupportsCryptokiVersion(CryptokiVersions.V2_40));
         Assert.False(library.SupportsCryptokiVersion(CryptokiVersions.V3_0));
@@ -119,7 +117,7 @@ public sealed class CryptokiVersionTests
     public void SupportsCryptokiVersion_Null_Throws()
     {
         using var fake = new InfoFake { Major = 3, Minor = 2 };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
 
         Assert.Throws<ArgumentNullException>("version", () => library.SupportsCryptokiVersion(null!));
     }
@@ -133,7 +131,7 @@ public sealed class CryptokiVersionTests
     public void SupportsCryptokiVersion_BuildOrRevision_IsRefused(int major, int minor, int build, int revision)
     {
         using var fake = new InfoFake { Major = 3, Minor = 2 };
-        using var library = new Pkcs11Library(fake);
+        using var library = fake.Load();
         Version version = revision < 0 ? new Version(major, minor, build) : new Version(major, minor, build, revision);
 
         Assert.Throws<ArgumentException>("version", () => library.SupportsCryptokiVersion(version));
@@ -160,8 +158,8 @@ public sealed class CryptokiVersionTests
     [Fact]
     public void SupportsCryptokiVersion_AfterDispose_Throws()
     {
-        var fake = new InfoFake();
-        var library = new Pkcs11Library(fake);
+        using var fake = new InfoFake();
+        var library = fake.Load();
         library.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => library.SupportsCryptokiVersion(CryptokiVersions.V3_0));

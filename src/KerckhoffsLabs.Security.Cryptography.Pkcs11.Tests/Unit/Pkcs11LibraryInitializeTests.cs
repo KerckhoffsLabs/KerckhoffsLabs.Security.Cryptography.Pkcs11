@@ -1,6 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -12,8 +13,34 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// test that constructs a Pkcs11Library; this covers the CKF_OS_LOCKING_OK-refused retry (and its
 /// own ALREADY_INITIALIZED variant) plus what happens when C_Initialize never succeeds.
 /// </summary>
+/// <remarks>
+/// The failure-path test stays on an in-process double: it asserts the constructor disposed the
+/// low-level library it was handed, which a module loaded through the real loader cannot observe.
+/// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11LibraryInitializeTests
 {
+    private sealed class InitializeModule : FakeModule
+    {
+        public int InitializeCalls { get; private set; }
+        public int FinalizeCalls { get; private set; }
+        public bool? LastCallUsedOsLocking { get; private set; }
+        public Func<int, CKR> RvForCall = _ => CKR.CKR_OK;
+
+        protected override CKR C_Initialize(IntPtr pInitArgs)
+        {
+            InitializeCalls++;
+            LastCallUsedOsLocking = pInitArgs != IntPtr.Zero;
+            return RvForCall(InitializeCalls);
+        }
+
+        protected override CKR C_Finalize(IntPtr pReserved)
+        {
+            FinalizeCalls++;
+            return CKR.CKR_OK;
+        }
+    }
+
     private sealed class InitializeFake : NotSupportedPkcs11Library
     {
         public int InitializeCalls { get; private set; }
@@ -41,8 +68,8 @@ public sealed class Pkcs11LibraryInitializeTests
     [Fact]
     public void CantLock_RetriesWithoutOsLocking_AndSucceeds()
     {
-        var fake = new InitializeFake { RvForCall = call => call == 1 ? CKR.CKR_CANT_LOCK : CKR.CKR_OK };
-        var library = new Pkcs11Library(fake);
+        using var fake = new InitializeModule { RvForCall = call => call == 1 ? CKR.CKR_CANT_LOCK : CKR.CKR_OK };
+        var library = fake.Load();
 
         Assert.Equal(2, fake.InitializeCalls);
         Assert.False(fake.LastCallUsedOsLocking); // retry passes null args, not CKF_OS_LOCKING_OK
@@ -54,11 +81,11 @@ public sealed class Pkcs11LibraryInitializeTests
     [Fact]
     public void CantLock_RetryReportsAlreadyInitialized_DisposeSkipsFinalize()
     {
-        var fake = new InitializeFake
+        using var fake = new InitializeModule
         {
             RvForCall = call => call == 1 ? CKR.CKR_CANT_LOCK : CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED,
         };
-        var library = new Pkcs11Library(fake);
+        var library = fake.Load();
 
         Assert.Equal(2, fake.InitializeCalls);
 
