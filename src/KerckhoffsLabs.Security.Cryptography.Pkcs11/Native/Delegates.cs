@@ -41,21 +41,6 @@ internal partial class Delegates
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, name);
     }
 
-    /// <summary>
-    /// Copies a unified attribute template into the Pack=1 Windows layout for the duration of a
-    /// single call. Null in, null out: a null template is a legitimate cryptoki argument.
-    /// </summary>
-    private static CK_ATTRIBUTE_Windows[]? ToWindowsTemplate(ReadOnlySpan<CK_ATTRIBUTE> template)
-    {
-        if (template.IsEmpty)
-            return null;
-
-        var packed = new CK_ATTRIBUTE_Windows[template.Length];
-        for (int i = 0; i < template.Length; i++)
-            packed[i] = CK_ATTRIBUTE_Windows.FromUnified(in template[i]);
-        return packed;
-    }
-
     // ── Message-AEAD family wrappers (v3.0) ──────────────────────────────────────
 
     /// <summary>
