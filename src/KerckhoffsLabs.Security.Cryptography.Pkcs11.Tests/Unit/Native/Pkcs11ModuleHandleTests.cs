@@ -201,6 +201,30 @@ public sealed class Pkcs11ModuleHandleTests
         lowLevel.Dispose();
     }
 
+    // A module without C_CloseSession: a session's release finds the slot empty and reports it unsupported
+    // instead of throwing, and still gives its use of the module back, so the module can be finalized.
+    [Fact]
+    public void SessionRelease_OnAModuleWithoutCloseSession_DoesNotThrow_AndReleasesTheModule()
+    {
+        using var module = new NoCloseSessionModule();
+        LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        lowLevel.C_Initialize(null);
+        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSession());
+
+        lowLevel.FinalizeOnLastRelease();
+        lowLevel.Dispose();
+        Assert.Null(Record.Exception(session.Dispose));
+
+        Assert.Equal(0, lowLevel.Module.TrackedSessionCount);
+        Assert.Equal(1, module.CallCount("C_Finalize"));
+    }
+
+    /// <summary>A module that opens sessions but has no <c>C_CloseSession</c>.</summary>
+    private sealed class NoCloseSessionModule : FakeModule
+    {
+        public NativeCULong OpenSession() => NewSessionHandle();
+    }
+
     /// <summary>
     /// One Cryptoki state shared by every load, as a real module has: the first <c>C_Initialize</c> succeeds,
     /// later ones see <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c> until <c>C_Finalize</c>.

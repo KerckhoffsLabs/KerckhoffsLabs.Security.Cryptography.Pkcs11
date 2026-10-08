@@ -43,6 +43,20 @@ public sealed class MessageEncryptionDispatchTests
 
     private delegate CKR OutputCall(LowLevelPkcs11Library lowLevel, Span<byte> output, bool lengthOnly, out NativeCULong length);
 
+    // The message API is the encryption and the decryption family together: a module with neither, or
+    // with encryption alone, does not offer it.
+    [Fact]
+    public void IsMessageApiSupported_RequiresBothFamilies()
+    {
+        using (var bare = new BareModule())
+        using (LowLevelPkcs11Library lowLevel = bare.LoadLowLevel())
+            Assert.False(lowLevel.IsMessageApiSupported);
+
+        using (var encryptionOnly = new MessageModule())
+        using (LowLevelPkcs11Library lowLevel = encryptionOnly.LoadLowLevel())
+            Assert.False(lowLevel.IsMessageApiSupported);
+    }
+
     [Theory]
     [MemberData(nameof(Functions))]
     public void Wrapper_ReachesTheModule_WithItsArguments(string function)
@@ -143,6 +157,9 @@ public sealed class MessageEncryptionDispatchTests
     private static CK_MECHANISM Mechanism() => new() { Mechanism = (NativeCULong)(ulong)CKM.CKM_AES_GCM };
 
     /// <summary>Implements the whole family, records what each call received, and answers output calls.</summary>
+    /// <summary>A module with none of the message functions.</summary>
+    private sealed class BareModule : FakeModule;
+
     private sealed class MessageModule : FakeModule
     {
         public byte[] Produces { get; init; } = Produced;
