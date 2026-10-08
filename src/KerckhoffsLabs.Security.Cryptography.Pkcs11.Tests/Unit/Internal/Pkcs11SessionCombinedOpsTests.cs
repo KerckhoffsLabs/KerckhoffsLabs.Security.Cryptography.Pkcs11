@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 // These tests drive the gated legacy mechanisms/hashes on purpose (the secure-defaults policy check is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
@@ -14,11 +14,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// <summary>
 /// Hermetic coverage for the PKCS#11 combined dual-function operations
 /// (<c>DigestEncrypt</c>, <c>DecryptDigest</c>, <c>DecryptVerify</c>). These are driven through
-/// the <see cref="ILowLevelPkcs11Library"/> seam because neither SoftHSM nor opencryptoki
+/// a <see cref="FakeModule"/> behind the real loader because neither SoftHSM nor opencryptoki
 /// implements the C_*Update combined entry points, so the Integration suite never reaches them —
 /// the multi-part loop, the CKR_BUFFER_TOO_SMALL retry, the two-call finals and the
 /// CKR_OK/CKR_SIGNATURE_INVALID/throw arm of the verify tail are only exercisable with a fake.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionCombinedOpsTests
 {
     private const ulong SessionId = 11;
@@ -28,7 +29,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
     /// round-trip's digest/encrypted/decrypted bytes are deterministic. The two-call finals report
     /// "no trailing bytes". <see cref="VerifyFinalRv"/> selects the verify outcome.
     /// </summary>
-    private sealed class CombinedFake : FakeLowLevelPkcs11Library
+    private sealed class CombinedFake : SessionTestModule
     {
         public byte[] DigestOutput = [0xD1, 0xD2, 0xD3];
         public CKR VerifyFinalRv = CKR.CKR_OK;
@@ -37,7 +38,7 @@ public sealed class Pkcs11SessionCombinedOpsTests
         public CKR VerifyInitRv = CKR.CKR_OK;
         private bool _retried;
 
-        private CKR Update(ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outputLen)
+        private CKR Update(ReadOnlySpan<byte> input, NativeBuffer<byte> output, ref NativeCULong outputLen)
         {
             int n = input.Length;
             // One-shot "buffer too small" probe: report the needed size without copying, then succeed.
@@ -47,41 +48,40 @@ public sealed class Pkcs11SessionCombinedOpsTests
                 outputLen = (NativeCULong)n;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
-            input[..n].CopyTo(output);
+            input[..n].CopyTo(output.Span);
             outputLen = (NativeCULong)n;
             return UpdateRv;
         }
 
-        public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => CKR.CKR_OK;
-        public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => VerifyInitRv;
+        protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => CKR.CKR_OK;
+        protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => VerifyInitRv;
 
-        public override CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen)
-            => Update(part, lengthOnly ? default : encryptedPart, out encryptedPartLen);
-        public override CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
-            => Update(encryptedPart, lengthOnly ? default : part, out partLen);
-        public override CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
-            => Update(encryptedPart, lengthOnly ? default : part, out partLen);
+        protected override CKR C_DigestEncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen)
+            => Update(part, encryptedPart, ref encryptedPartLen);
+        protected override CKR C_DecryptDigestUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen)
+            => Update(encryptedPart, part, ref partLen);
+        protected override CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen)
+            => Update(encryptedPart, part, ref partLen);
 
-        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen)
+        protected override CKR C_EncryptFinal(NativeCULong session, NativeBuffer<byte> lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
         { lastEncryptedPartLen = (NativeCULong)0; return CKR.CKR_OK; }
-        public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen)
+        protected override CKR C_DecryptFinal(NativeCULong session, NativeBuffer<byte> lastPart, ref NativeCULong lastPartLen)
         { lastPartLen = (NativeCULong)0; return CKR.CKR_OK; }
 
-        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen)
+        protected override CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen)
         {
-            if (lengthOnly) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
-            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
+            if (digest.IsNull) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest.Span);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
-        public override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_OK;
+        protected override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
+        protected override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_OK;
     }
 
-    private static Pkcs11Session NewSession(CombinedFake fake) => new(fake, SessionId);
 
     private static Mechanism Sha256() => new(CKM.CKM_SHA256);
     private static Mechanism AesGcm() => new(CKM.CKM_AES_GCM);
@@ -92,8 +92,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DigestEncrypt_Ok_ReturnsDigestAndEncryptedData()
     {
-        var fake = new CombinedFake { DigestOutput = [1, 2, 3, 4] };
-        var s = NewSession(fake);
+        using var fake = new CombinedFake { DigestOutput = [1, 2, 3, 4] };
+        using var s = fake.CreateSession(SessionId);
         Mechanism digestMech = Sha256(), encMech = AesGcm();
         byte[] data = [10, 20, 30];
 
@@ -106,8 +106,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DigestEncrypt_UpdateBufferTooSmall_RetriesAndSucceeds()
     {
-        var fake = new CombinedFake { FirstUpdateBufferTooSmall = true };
-        var s = NewSession(fake);
+        using var fake = new CombinedFake { FirstUpdateBufferTooSmall = true };
+        using var s = fake.CreateSession(SessionId);
         Mechanism digestMech = Sha256(), encMech = AesGcm();
         byte[] data = [9, 8, 7, 6, 5];
 
@@ -121,8 +121,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DecryptDigest_Ok_ReturnsDigestAndDecryptedData()
     {
-        var fake = new CombinedFake { DigestOutput = [0xAA] };
-        var s = NewSession(fake);
+        using var fake = new CombinedFake { DigestOutput = [0xAA] };
+        using var s = fake.CreateSession(SessionId);
         Mechanism digestMech = Sha256(), decMech = AesGcm();
         byte[] data = [42, 43];
 
@@ -137,7 +137,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DecryptVerify_Ok_SetsValidTrue()
     {
-        var s = NewSession(new CombinedFake { VerifyFinalRv = CKR.CKR_OK });
+        using var fake = new CombinedFake { VerifyFinalRv = CKR.CKR_OK };
+        using var s = fake.CreateSession(SessionId);
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
         byte[] data = [1, 2, 3];
 
@@ -151,7 +152,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DecryptVerify_SignatureInvalid_SetsValidFalse()
     {
-        var s = NewSession(new CombinedFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID });
+        using var fake = new CombinedFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
         s.DecryptVerify(verifyMech, new ObjectHandle(2), decMech, new ObjectHandle(1),
@@ -163,7 +165,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DecryptVerify_VerifyFinalOtherError_Throws()
     {
-        var s = NewSession(new CombinedFake { VerifyFinalRv = CKR.CKR_DEVICE_ERROR });
+        using var fake = new CombinedFake { VerifyFinalRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
@@ -174,7 +177,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DecryptVerify_VerifyInitError_Throws()
     {
-        var s = NewSession(new CombinedFake { VerifyInitRv = CKR.CKR_KEY_HANDLE_INVALID });
+        using var fake = new CombinedFake { VerifyInitRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         Mechanism verifyMech = HmacSha256(), decMech = AesGcm();
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
@@ -187,7 +191,8 @@ public sealed class Pkcs11SessionCombinedOpsTests
     [Fact]
     public void DigestEncrypt_InsecureEncryptionMechanism_IsRejected()
     {
-        var s = NewSession(new CombinedFake());
+        using var fake = new CombinedFake();
+        using var s = fake.CreateSession(SessionId);
         Mechanism digestMech = Sha256(), insecure = new(CKM.CKM_AES_ECB);
 
         Assert.Throws<CryptoPolicyViolationException>(() =>

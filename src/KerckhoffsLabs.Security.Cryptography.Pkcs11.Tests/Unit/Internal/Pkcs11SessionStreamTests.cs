@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -13,9 +13,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// the chunked update loop, the CKR_BUFFER_TOO_SMALL retry, the two-call finals with trailing
 /// blocks, the verify-tail (OK/SIGNATURE_INVALID/throw) arms, the cancel-on-error unwind path,
 /// and VerifyRecover. A backend exercises only the happy path and almost never returns
-/// CKR_BUFFER_TOO_SMALL from an update, so these branches are only reachable through the
-/// <see cref="ILowLevelPkcs11Library"/> seam.
+/// CKR_BUFFER_TOO_SMALL from an update, so these branches are only reachable through a
+/// <see cref="FakeModule"/> behind the real loader.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionStreamTests
 {
     private const ulong SessionId = 11;
@@ -24,7 +25,7 @@ public sealed class Pkcs11SessionStreamTests
     /// Identity-transform fake: each update copies input to output verbatim; the two-call finals
     /// emit <see cref="LastBlock"/>. Flags select the buffer-probe, error and verify outcomes.
     /// </summary>
-    private sealed class StreamFake : FakeLowLevelPkcs11Library
+    private sealed class StreamFake : SessionTestModule
     {
         public CKR InitRv = CKR.CKR_OK;
         public CKR UpdateRv = CKR.CKR_OK;
@@ -43,7 +44,7 @@ public sealed class Pkcs11SessionStreamTests
         public bool Canceled { get; private set; }
         private bool _retried;
 
-        private CKR Update(ReadOnlySpan<byte> input, Span<byte> output, out NativeCULong outLen)
+        private CKR Update(ReadOnlySpan<byte> input, NativeBuffer<byte> output, ref NativeCULong outLen)
         {
             UpdateCalls++;
             int n = input.Length;
@@ -53,64 +54,63 @@ public sealed class Pkcs11SessionStreamTests
                 outLen = (NativeCULong)n;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
-            input[..n].CopyTo(output);
+            input[..n].CopyTo(output.Span);
             outLen = (NativeCULong)n;
             return UpdateRv;
         }
 
-        private CKR Final(Span<byte> buffer, out NativeCULong len)
+        private CKR Final(NativeBuffer<byte> buffer, ref NativeCULong len)
         {
-            if (buffer.IsEmpty) { len = (NativeCULong)LastBlock.Length; return CKR.CKR_OK; }
-            LastBlock.AsSpan(0, LastBlock.Length).CopyTo(buffer);
+            if (buffer.IsNull) { len = (NativeCULong)LastBlock.Length; return CKR.CKR_OK; }
+            LastBlock.AsSpan(0, LastBlock.Length).CopyTo(buffer.Span);
             len = (NativeCULong)LastBlock.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => InitRv;
-        public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
-        public override CKR C_VerifyRecoverInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => InitRv;
+        protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => InitRv;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => InitRv;
+        protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => InitRv;
+        protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => InitRv;
+        protected override CKR C_VerifyRecoverInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => InitRv;
 
-        public override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, Span<byte> encryptedPart, bool lengthOnly, out NativeCULong encryptedPartLen)
-            => Update(part, lengthOnly ? default : encryptedPart, out encryptedPartLen);
-        public override CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, Span<byte> part, bool lengthOnly, out NativeCULong partLen)
-            => Update(encryptedPart, lengthOnly ? default : part, out partLen);
-        public override CKR C_EncryptFinal(NativeCULong session, Span<byte> lastEncryptedPart, bool lengthOnly, out NativeCULong lastEncryptedPartLen)
-            => Final(lengthOnly ? default : lastEncryptedPart, out lastEncryptedPartLen);
-        public override CKR C_DecryptFinal(NativeCULong session, Span<byte> lastPart, bool lengthOnly, out NativeCULong lastPartLen)
-            => Final(lengthOnly ? default : lastPart, out lastPartLen);
+        protected override CKR C_EncryptUpdate(NativeCULong session, ReadOnlySpan<byte> part, NativeBuffer<byte> encryptedPart, ref NativeCULong encryptedPartLen)
+            => Update(part, encryptedPart, ref encryptedPartLen);
+        protected override CKR C_DecryptUpdate(NativeCULong session, ReadOnlySpan<byte> encryptedPart, NativeBuffer<byte> part, ref NativeCULong partLen)
+            => Update(encryptedPart, part, ref partLen);
+        protected override CKR C_EncryptFinal(NativeCULong session, NativeBuffer<byte> lastEncryptedPart, ref NativeCULong lastEncryptedPartLen)
+            => Final(lastEncryptedPart, ref lastEncryptedPartLen);
+        protected override CKR C_DecryptFinal(NativeCULong session, NativeBuffer<byte> lastPart, ref NativeCULong lastPartLen)
+            => Final(lastPart, ref lastPartLen);
 
-        public override CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
-        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen)
+        protected override CKR C_DigestUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
+        protected override CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen)
         {
-            if (lengthOnly) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
-            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
+            if (digest.IsNull) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest.Span);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
-        public override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
+        protected override CKR C_VerifyUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return UpdateRv; }
+        protected override CKR C_VerifyFinal(NativeCULong session, ReadOnlySpan<byte> signature) => VerifyFinalRv;
 
-        public override CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
+        protected override CKR C_VerifyRecover(NativeCULong session, ReadOnlySpan<byte> signature, NativeBuffer<byte> data, ref NativeCULong dataLen)
         {
-            if (lengthOnly) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
-            RecoveredData.AsSpan(0, RecoveredData.Length).CopyTo(data);
+            if (data.IsNull) { dataLen = (NativeCULong)RecoveredData.Length; return CKR.CKR_OK; }
+            RecoveredData.AsSpan(0, RecoveredData.Length).CopyTo(data.Span);
             dataLen = (NativeCULong)RecoveredData.Length;
             return VerifyRecoverRv;
         }
 
-        public override CKR C_DigestKey(NativeCULong session, NativeCULong key) => DigestKeyRv;
+        protected override CKR C_DigestKey(NativeCULong session, NativeCULong key) => DigestKeyRv;
 
-        public override CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature) => VerifySignatureInitRv;
-        public override CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return VerifySignatureUpdateRv; }
-        public override CKR C_VerifySignatureFinal(NativeCULong session) => VerifySignatureFinalRv;
+        protected override CKR C_VerifySignatureInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature) => VerifySignatureInitRv;
+        protected override CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part) { UpdateCalls++; return VerifySignatureUpdateRv; }
+        protected override CKR C_VerifySignatureFinal(NativeCULong session) => VerifySignatureFinalRv;
 
-        public override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) { Canceled = true; return CKR.CKR_OK; }
+        protected override CKR C_SessionCancel(NativeCULong session, NativeCULong flags) { Canceled = true; return CKR.CKR_OK; }
     }
 
-    private static Pkcs11Session NewSession(StreamFake fake) => new(fake, SessionId);
     private static Mechanism AesGcm() => new(CKM.CKM_AES_GCM);
 
     // Raw PSS is allowed by the default policy only with explicit parameters.
@@ -121,7 +121,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Encrypt_Stream_Ok_WritesTransformedOutput()
     {
-        var s = NewSession(new StreamFake());
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([1, 2, 3]);
         using var output = new MemoryStream();
@@ -134,8 +135,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Encrypt_Stream_MultiChunk_ProcessesEveryChunk()
     {
-        var fake = new StreamFake();
-        var s = NewSession(fake);
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
         using var output = new MemoryStream();
@@ -149,7 +150,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Encrypt_Stream_BufferTooSmall_RetriesAndSucceeds()
     {
-        var s = NewSession(new StreamFake { FirstUpdateBufferTooSmall = true });
+        using var fake = new StreamFake { FirstUpdateBufferTooSmall = true };
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([7, 8, 9, 10]);
         using var output = new MemoryStream();
@@ -162,7 +164,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Encrypt_Stream_FinalEmitsTrailingBlock()
     {
-        var s = NewSession(new StreamFake { LastBlock = [0xFF] });
+        using var fake = new StreamFake { LastBlock = [0xFF] };
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([1, 2]);
         using var output = new MemoryStream();
@@ -175,8 +178,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Encrypt_Stream_UpdateError_ThrowsAndCancels()
     {
-        var fake = new StreamFake { UpdateRv = CKR.CKR_DEVICE_ERROR };
-        var s = NewSession(fake);
+        using var fake = new StreamFake { UpdateRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([1, 2, 3]);
         using var output = new MemoryStream();
@@ -188,7 +191,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Encrypt_Stream_InitError_Throws()
     {
-        var s = NewSession(new StreamFake { InitRv = CKR.CKR_KEY_HANDLE_INVALID });
+        using var fake = new StreamFake { InitRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([1]);
         using var output = new MemoryStream();
@@ -200,7 +204,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Decrypt_Stream_Ok_WritesTransformedOutput()
     {
-        var s = NewSession(new StreamFake());
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([4, 5, 6]);
         using var output = new MemoryStream();
@@ -213,7 +218,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Decrypt_Stream_BufferTooSmall_RetriesAndSucceeds()
     {
-        var s = NewSession(new StreamFake { FirstUpdateBufferTooSmall = true });
+        using var fake = new StreamFake { FirstUpdateBufferTooSmall = true };
+        using var s = fake.CreateSession(SessionId);
         var mech = AesGcm();
         using var input = new MemoryStream([9, 8, 7]);
         using var output = new MemoryStream();
@@ -228,7 +234,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Digest_Stream_Ok_ReturnsDigest()
     {
-        var s = NewSession(new StreamFake { DigestOutput = [0xAA, 0xBB] });
+        using var fake = new StreamFake { DigestOutput = [0xAA, 0xBB] };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -238,8 +245,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Digest_Stream_MultiChunk_FeedsEveryChunk()
     {
-        var fake = new StreamFake();
-        var s = NewSession(fake);
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
@@ -251,7 +258,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Digest_Stream_InitError_Throws()
     {
-        var s = NewSession(new StreamFake { InitRv = CKR.CKR_MECHANISM_INVALID });
+        using var fake = new StreamFake { InitRv = CKR.CKR_MECHANISM_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
         using var input = new MemoryStream([1]);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.Digest(mech, input));
@@ -262,7 +270,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Verify_Stream_Ok_SetsValidTrue()
     {
-        var s = NewSession(new StreamFake { VerifyFinalRv = CKR.CKR_OK });
+        using var fake = new StreamFake { VerifyFinalRv = CKR.CKR_OK };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -274,7 +283,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Verify_Stream_SignatureInvalid_SetsValidFalse()
     {
-        var s = NewSession(new StreamFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID });
+        using var fake = new StreamFake { VerifyFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -286,7 +296,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Verify_Stream_OtherError_Throws()
     {
-        var s = NewSession(new StreamFake { VerifyFinalRv = CKR.CKR_DEVICE_ERROR });
+        using var fake = new StreamFake { VerifyFinalRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -297,8 +308,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void Verify_Stream_MultiChunk_FeedsEveryChunk()
     {
-        var fake = new StreamFake();
-        var s = NewSession(fake);
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_HMAC);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
@@ -313,7 +324,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifyRecover_Ok_ReturnsDataAndValidTrue()
     {
-        var s = NewSession(new StreamFake { RecoveredData = [1, 2, 3], VerifyRecoverRv = CKR.CKR_OK });
+        using var fake = new StreamFake { RecoveredData = [1, 2, 3], VerifyRecoverRv = CKR.CKR_OK };
+        using var s = fake.CreateSession(SessionId);
         var mech = Pss();
 
         byte[] recovered = s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
@@ -325,7 +337,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifyRecover_SignatureInvalid_SetsValidFalse()
     {
-        var s = NewSession(new StreamFake { VerifyRecoverRv = CKR.CKR_SIGNATURE_INVALID });
+        using var fake = new StreamFake { VerifyRecoverRv = CKR.CKR_SIGNATURE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = Pss();
 
         s.VerifyRecover(mech, new ObjectHandle(1), [9, 9], out bool isValid);
@@ -336,7 +349,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifyRecover_OtherError_Throws()
     {
-        var s = NewSession(new StreamFake { VerifyRecoverRv = CKR.CKR_DEVICE_ERROR });
+        using var fake = new StreamFake { VerifyRecoverRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         var mech = Pss();
 
         Assert.ThrowsAny<Pkcs11Exception>(() =>
@@ -348,7 +362,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void DigestKey_Ok_ReturnsDigest()
     {
-        var s = NewSession(new StreamFake { DigestOutput = [0xAA, 0xBB] });
+        using var fake = new StreamFake { DigestOutput = [0xAA, 0xBB] };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
 
         Assert.Equal(new byte[] { 0xAA, 0xBB }, s.DigestKey(mech, new ObjectHandle(1)));
@@ -359,8 +374,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void DigestKey_Error_ThrowsAndCancels()
     {
-        var fake = new StreamFake { DigestKeyRv = CKR.CKR_KEY_HANDLE_INVALID };
-        var s = NewSession(fake);
+        using var fake = new StreamFake { DigestKeyRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
 
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DigestKey(mech, new ObjectHandle(1)));
@@ -372,7 +387,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifySignature_Stream_Ok_SetsValidTrue()
     {
-        var s = NewSession(new StreamFake { VerifySignatureFinalRv = CKR.CKR_OK });
+        using var fake = new StreamFake { VerifySignatureFinalRv = CKR.CKR_OK };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -384,7 +400,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifySignature_Stream_SignatureInvalid_SetsValidFalse()
     {
-        var s = NewSession(new StreamFake { VerifySignatureFinalRv = CKR.CKR_SIGNATURE_INVALID });
+        using var fake = new StreamFake { VerifySignatureFinalRv = CKR.CKR_SIGNATURE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -396,7 +413,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifySignature_Stream_OtherError_Throws()
     {
-        var s = NewSession(new StreamFake { VerifySignatureFinalRv = CKR.CKR_DEVICE_ERROR });
+        using var fake = new StreamFake { VerifySignatureFinalRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
         using var input = new MemoryStream([1, 2, 3]);
 
@@ -406,8 +424,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifySignature_Stream_MultiChunk_FeedsEveryChunk()
     {
-        var fake = new StreamFake();
-        var s = NewSession(fake);
+        using var fake = new StreamFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
         using var input = new MemoryStream([1, 2, 3, 4, 5]);
 
@@ -422,8 +440,8 @@ public sealed class Pkcs11SessionStreamTests
     [Fact]
     public void VerifySignature_Stream_UpdateError_ThrowsAndCancels()
     {
-        var fake = new StreamFake { VerifySignatureUpdateRv = CKR.CKR_DEVICE_ERROR };
-        var s = NewSession(fake);
+        using var fake = new StreamFake { VerifySignatureUpdateRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256_RSA_PKCS);
         using var input = new MemoryStream([1, 2, 3]);
 

@@ -1,9 +1,7 @@
-using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -12,45 +10,21 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// v3.2 method of <see cref="Pkcs11Session"/> must fail cleanly with a typed
 /// <see cref="Pkcs11Exception"/> carrying <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> — never
 /// a null-delegate NRE. <see cref="Pkcs11Session.SupportsV32Api"/> is informational, not a
-/// precondition guard, so the calls fall through to the dispatch layer; the fake below returns
-/// exactly what the real <c>LowLevelPkcs11Library</c> returns when a function pointer was never
-/// bound. (The same contract is exercised end to end against a real module by the
-/// spec-version-gate suite in <c>Integration/Compat</c>.)
+/// precondition guard, so the calls fall through to the dispatch layer, which the module below
+/// reaches with those function pointers never bound. (The same contract is exercised end to end
+/// against a real module by the spec-version-gate suite in <c>Integration/Compat</c>.)
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionV32NotSupportedTests
 {
     private const ulong SessionId = 12;
 
     /// <summary>
-    /// A sub-v3.2 module as the session sees it: the v3.2 surface reports unsupported and every
-    /// v3.2 entry point returns <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/>, mirroring the real
-    /// dispatch layer's null-function-pointer guard.
+    /// A sub-v3.2 module: it implements none of the v3.2 functions, so the loader leaves their
+    /// slots unbound and the real dispatch layer's null-function-pointer guard answers
+    /// <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/>.
     /// </summary>
-    private sealed class NotSupportedFake : FakeLowLevelPkcs11Library
-    {
-        public override bool IsV32ApiSupported => false;
-
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
-        { ciphertextLen = (NativeCULong)0; return CKR.CKR_FUNCTION_NOT_SUPPORTED; }
-        public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_WrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, ReadOnlySpan<byte> associatedData, Span<byte> wrappedKey, bool lengthOnly, out NativeCULong wrappedKeyLen)
-        { wrappedKeyLen = (NativeCULong)0; return CKR.CKR_FUNCTION_NOT_SUPPORTED; }
-        public override CKR C_UnwrapKeyAuthenticated(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong unwrappingKey, ReadOnlySpan<byte> wrappedKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> associatedData, ref NativeCULong key)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_VerifySignatureInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key, ReadOnlySpan<byte> signature)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_VerifySignature(NativeCULong session, ReadOnlySpan<byte> data)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_VerifySignatureUpdate(NativeCULong session, ReadOnlySpan<byte> part)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_VerifySignatureFinal(NativeCULong session)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        public override CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags)
-            => CKR.CKR_FUNCTION_NOT_SUPPORTED;
-    }
-
-    private static Pkcs11Session NewSession() => new(new NotSupportedFake(), SessionId);
+    private sealed class NotSupportedFake : SessionTestModule;
 
     private static void AssertNotSupported(Action call)
     {
@@ -60,12 +34,17 @@ public sealed class Pkcs11SessionV32NotSupportedTests
 
     [Fact]
     public void SupportsV32Api_ReportsFalse()
-        => Assert.False(NewSession().SupportsV32Api);
+    {
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
+        Assert.False(s.SupportsV32Api);
+    }
 
     [Fact]
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_ML_KEM);
         AssertNotSupported(() => s.EncapsulateKey(mech, new ObjectHandle(1), []));
     }
@@ -73,7 +52,8 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     [Fact]
     public void DecapsulateKey_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_ML_KEM);
         AssertNotSupported(() => s.DecapsulateKey(mech, new ObjectHandle(1), [1, 2, 3], []));
     }
@@ -81,7 +61,8 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     [Fact]
     public void WrapKeyAuthenticated_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         AssertNotSupported(() => s.WrapKeyAuthenticated(mech, new ObjectHandle(1), new ObjectHandle(2), [0xAA]));
     }
@@ -89,7 +70,8 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     [Fact]
     public void UnwrapKeyAuthenticated_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         AssertNotSupported(() => s.UnwrapKeyAuthenticated(mech, new ObjectHandle(1), [1, 2, 3], [0xCC], []));
     }
@@ -97,7 +79,8 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     [Fact]
     public void VerifySignature_OneShot_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_ML_DSA);
         AssertNotSupported(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], [1, 2, 3]));
     }
@@ -105,7 +88,8 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     [Fact]
     public void VerifySignature_Streaming_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_ML_DSA);
         using var input = new MemoryStream([1, 2, 3, 4]);
         AssertNotSupported(() => s.VerifySignature(mech, new ObjectHandle(1), [9, 9], input, bufferLength: 2));
@@ -114,7 +98,8 @@ public sealed class Pkcs11SessionV32NotSupportedTests
     [Fact]
     public void GetSessionValidationFlags_Throws_FunctionNotSupported()
     {
-        var s = NewSession();
+        using var fake = new NotSupportedFake();
+        using var s = fake.CreateSession(SessionId);
         AssertNotSupported(() => s.GetSessionValidationFlags(CksValidationFlagsType.CKS_LAST_VALIDATION_OK));
     }
 }
