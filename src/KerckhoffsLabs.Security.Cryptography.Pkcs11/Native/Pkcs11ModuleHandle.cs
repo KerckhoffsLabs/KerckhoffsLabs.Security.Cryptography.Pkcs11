@@ -108,8 +108,10 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         _detached = detached;
     }
 
+    private CryptokiTable _table;
+
     /// <summary>The module's function table. Only call through it while holding a use of this handle.</summary>
-    internal Delegates Table { get; private set; } = null!;
+    internal ref readonly CryptokiTable Table => ref _table;
 
     private FinalizeOutcome _finalizeOutcome;
     private CKR _finalizeReturnValue;
@@ -135,7 +137,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     internal static Pkcs11ModuleHandle Load(string libraryPath)
     {
         IntPtr loaded = NativeLibrary.Load(libraryPath);
-        return Bound(new Pkcs11ModuleHandle(loaded, freeOnRelease: true, identity: loaded), () => new Delegates(loaded));
+        return Bound(new Pkcs11ModuleHandle(loaded, freeOnRelease: true, identity: loaded), () => LowLevelPkcs11Library.LoadTable(loaded));
     }
 
     /// <summary>
@@ -146,14 +148,14 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// Which module this is, so two bindings of it share its Cryptoki state; <see langword="null"/> for a
     /// binding that shares with nothing.
     /// </param>
-    internal static Pkcs11ModuleHandle Bind(Func<Delegates> bind, object? identity = null)
+    internal static Pkcs11ModuleHandle Bind(Func<CryptokiTable> bind, object? identity = null)
         => Bound(new Pkcs11ModuleHandle(NotLoaded, freeOnRelease: false, identity ?? new object()), bind);
 
-    private static Pkcs11ModuleHandle Bound(Pkcs11ModuleHandle module, Func<Delegates> bind)
+    private static Pkcs11ModuleHandle Bound(Pkcs11ModuleHandle module, Func<CryptokiTable> bind)
     {
         try
         {
-            module.Table = bind();
+            module._table = bind();
         }
         catch
         {
@@ -222,7 +224,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         bool serialized = EnterCall();
         try
         {
-            return LowLevelPkcs11Library.CloseSession(Table, session);
+            return LowLevelPkcs11Library.CloseSession(in Table, session);
         }
         finally
         {
@@ -421,7 +423,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         bool serialized = EnterCall();
         try
         {
-            finalized = LowLevelPkcs11Library.TryFinalize(Table, out _finalizeReturnValue);
+            finalized = LowLevelPkcs11Library.TryFinalize(in Table, out _finalizeReturnValue);
         }
         finally
         {

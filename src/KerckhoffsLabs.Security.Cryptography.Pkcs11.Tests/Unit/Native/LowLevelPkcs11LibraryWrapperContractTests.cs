@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
@@ -40,10 +39,9 @@ public sealed class LowLevelPkcs11LibraryWrapperContractTests
     }
 
     /// <summary>
-    /// A v2.40 module that implements nothing: every wrapper still enters the module, then reports the
-    /// function unsupported, either as the <c>CKR_FUNCTION_NOT_SUPPORTED</c> a v3 wrapper returns for an
-    /// absent function or as the <see cref="Pkcs11Exception"/> an unbound v2.40 slot throws. Nothing reaches
-    /// the module.
+    /// A v2.40 module that implements nothing: every wrapper still enters the module, then returns
+    /// <c>CKR_FUNCTION_NOT_SUPPORTED</c> for the absent function, the one rule for every wrapper, v2.40 and
+    /// v3.x alike. Nothing reaches the module, and nothing calls through the NULL slot.
     /// </summary>
     [Fact]
     public void EveryWrapper_OfAFunctionTheModuleLacks_ReportsItUnsupported_WithoutReachingTheModule()
@@ -88,8 +86,7 @@ public sealed class LowLevelPkcs11LibraryWrapperContractTests
         return error ?? result ?? "returned nothing";
     }
 
-    private static bool IsUnsupported(object outcome)
-        => outcome is CKR.CKR_FUNCTION_NOT_SUPPORTED or Pkcs11Exception { ReturnValue: CKR.CKR_FUNCTION_NOT_SUPPORTED };
+    private static bool IsUnsupported(object outcome) => outcome is CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     // Loading the module calls C_GetFunctionList; nothing after that may reach it.
     private static IEnumerable<string> CallsMadeAfterLoading(FakeModule module)

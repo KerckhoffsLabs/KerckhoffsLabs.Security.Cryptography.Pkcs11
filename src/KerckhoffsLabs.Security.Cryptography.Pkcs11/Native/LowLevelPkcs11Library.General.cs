@@ -143,9 +143,9 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="table">The module's function table.</param>
     /// <param name="returnValue">What <c>C_Finalize</c> returned.</param>
     /// <returns><see langword="false"/>, calling nothing, for a module without <c>C_Finalize</c>.</returns>
-    internal static unsafe bool TryFinalize(Delegates table, out CKR returnValue)
+    internal static unsafe bool TryFinalize(in CryptokiTable table, out CKR returnValue)
     {
-        var finalize = table._fp.C_Finalize;
+        var finalize = table.C_Finalize;
         returnValue = default;
         if (finalize is null)
             return false;

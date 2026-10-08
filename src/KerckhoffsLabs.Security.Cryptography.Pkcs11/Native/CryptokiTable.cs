@@ -29,7 +29,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
     "the module's table slot by slot, never more slots than the table's verified version defines (and never " +
     "more than this struct holds), from the offset the slots start at. That layout, slot order and first-slot " +
     "offset on every platform, is checked against the C compiler's layout of the OASIS headers by " +
-    "AbiOracleTests, and the binding by DelegatesLoaderTests. Suppressed at the type, as for Delegates, so an " +
+    "AbiOracleTests, and the binding by TableLoaderTests. Suppressed at the type, as for LowLevelPkcs11Library, so an " +
     "unsafe block outside the cryptoki boundary is still reported.")]
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct CryptokiTable

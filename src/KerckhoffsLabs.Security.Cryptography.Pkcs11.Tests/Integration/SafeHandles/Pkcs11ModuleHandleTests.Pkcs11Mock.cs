@@ -13,10 +13,12 @@ public sealed class Pkcs11ModuleHandleTests(MockBackendFixture f)
     {
         var handle = Pkcs11ModuleHandle.Load(_backend.LibraryPath);
         Assert.False(handle.IsInvalid);
-        Assert.NotNull(handle.Table);
+        Assert.True(BindsInitialize(handle));
 
         handle.Dispose();
 
         Assert.True(handle.IsClosed);
     }
+
+    private static unsafe bool BindsInitialize(Pkcs11ModuleHandle handle) => handle.Table.C_Initialize is not null;
 }
