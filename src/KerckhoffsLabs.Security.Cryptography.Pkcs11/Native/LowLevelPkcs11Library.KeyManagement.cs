@@ -17,19 +17,16 @@ internal sealed partial class LowLevelPkcs11Library
         if (encapsulateKey is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         CKR rv;
-        fixed (CK_MECHANISM* m = &mechanism)
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
         fixed (byte* outPtr = &NonNullPinnable(ciphertext))
         fixed (NativeCULong* lenPtr = &ciphertextLen)
         fixed (NativeCULong* keyPtr = &derivedKey)
         {
-            rv = encapsulateKey(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, publicKey,
-                Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, lengthOnly ? null : outPtr, lenPtr, keyPtr).ToCKR();
+            rv = encapsulateKey(session, m, publicKey,
+                templateBlock.Pointer, templateBlock.Count, lengthOnly ? null : outPtr, lenPtr, keyPtr).ToCKR();
         }
         return CheckedOutput(rv, lengthOnly, ciphertextLen, ciphertext.Length);
     }
@@ -46,17 +43,14 @@ internal sealed partial class LowLevelPkcs11Library
         if (decapsulateKey is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_MECHANISM* m = &mechanism)
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (byte* ctPtr = ciphertext)
         fixed (NativeCULong* keyPtr = &derivedKey)
         {
-            return decapsulateKey(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, privateKey,
-                Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, ctPtr, (NativeCULong)ciphertext.Length, keyPtr).ToCKR();
+            return decapsulateKey(session, m, privateKey,
+                templateBlock.Pointer, templateBlock.Count, ctPtr, (NativeCULong)ciphertext.Length, keyPtr).ToCKR();
         }
     }
 
@@ -73,15 +67,14 @@ internal sealed partial class LowLevelPkcs11Library
         if (wrapKeyAuthenticated is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
         CKR rv;
-        fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* adPtr = associatedData)
         fixed (byte* outPtr = &NonNullPinnable(wrappedKey))
         fixed (NativeCULong* lenPtr = &wrappedKeyLen)
         {
-            rv = wrapKeyAuthenticated(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, wrappingKey, key,
+            rv = wrapKeyAuthenticated(session, m, wrappingKey, key,
                 adPtr, (NativeCULong)associatedData.Length, lengthOnly ? null : outPtr, lenPtr).ToCKR();
         }
         return CheckedOutput(rv, lengthOnly, wrappedKeyLen, wrappedKey.Length);
@@ -99,18 +92,15 @@ internal sealed partial class LowLevelPkcs11Library
         if (unwrapKeyAuthenticated is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_MECHANISM* m = &mechanism)
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (byte* wrappedPtr = wrappedKey)
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
         fixed (byte* adPtr = associatedData)
         fixed (NativeCULong* keyPtr = &key)
         {
-            return unwrapKeyAuthenticated(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, unwrappingKey,
-                wrappedPtr, (NativeCULong)wrappedKey.Length, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length,
+            return unwrapKeyAuthenticated(session, m, unwrappingKey,
+                wrappedPtr, (NativeCULong)wrappedKey.Length, templateBlock.Pointer, templateBlock.Count,
                 adPtr, (NativeCULong)associatedData.Length, keyPtr).ToCKR();
         }
     }
@@ -130,14 +120,11 @@ internal sealed partial class LowLevelPkcs11Library
         if (generateKey is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_MECHANISM* m = &mechanism)
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (NativeCULong* keyPtr = &key)
-            return generateKey(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, keyPtr).ToCKR();
+            return generateKey(session, m, templateBlock.Pointer, templateBlock.Count, keyPtr).ToCKR();
     }
 
     /// <summary>
@@ -158,21 +145,16 @@ internal sealed partial class LowLevelPkcs11Library
         if (generateKeyPair is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedPublicKeyTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(publicKeyTemplate) : null;
-        CK_ATTRIBUTE_Windows[]? packedPrivateKeyTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(privateKeyTemplate) : null;
-        fixed (CK_MECHANISM* m = &mechanism)
-        fixed (CK_ATTRIBUTE* pub = publicKeyTemplate)
-        fixed (CK_ATTRIBUTE* priv = privateKeyTemplate)
-        fixed (CK_ATTRIBUTE_Windows* pubW = packedPublicKeyTemplate)
-        fixed (CK_ATTRIBUTE_Windows* privW = packedPrivateKeyTemplate)
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var publicKeyTemplateBlock = new NativeStructArray<CK_ATTRIBUTE>(publicKeyTemplate, nullWhenEmpty: true);
+        using var privateKeyTemplateBlock = new NativeStructArray<CK_ATTRIBUTE>(privateKeyTemplate, nullWhenEmpty: true);
         fixed (NativeCULong* pubKey = &publicKey)
         fixed (NativeCULong* privKey = &privateKey)
         {
-            return generateKeyPair(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m,
-                Pkcs11Marshal.IsWindows ? pubW : pub, (NativeCULong)publicKeyTemplate.Length,
-                Pkcs11Marshal.IsWindows ? privW : priv, (NativeCULong)privateKeyTemplate.Length,
+            return generateKeyPair(session, m,
+                publicKeyTemplateBlock.Pointer, publicKeyTemplateBlock.Count,
+                privateKeyTemplateBlock.Pointer, privateKeyTemplateBlock.Count,
                 pubKey, privKey).ToCKR();
         }
     }
@@ -197,13 +179,12 @@ internal sealed partial class LowLevelPkcs11Library
         if (wrapKey is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
         CKR rv;
-        fixed (CK_MECHANISM* m = &mechanism)
         fixed (byte* outPtr = &NonNullPinnable(wrappedKey))
         fixed (NativeCULong* lenPtr = &wrappedKeyLen)
-            rv = wrapKey(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, wrappingKey, key, lengthOnly ? null : outPtr, lenPtr).ToCKR();
+            rv = wrapKey(session, m, wrappingKey, key, lengthOnly ? null : outPtr, lenPtr).ToCKR();
         return CheckedOutput(rv, lengthOnly, wrappedKeyLen, wrappedKey.Length);
     }
 
@@ -225,17 +206,14 @@ internal sealed partial class LowLevelPkcs11Library
         if (unwrapKey is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_MECHANISM* m = &mechanism)
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (byte* wrappedPtr = wrappedKey)
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
         fixed (NativeCULong* keyPtr = &key)
         {
-            return unwrapKey(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, unwrappingKey, wrappedPtr, (NativeCULong)wrappedKey.Length,
-                Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, keyPtr).ToCKR();
+            return unwrapKey(session, m, unwrappingKey, wrappedPtr, (NativeCULong)wrappedKey.Length,
+                templateBlock.Pointer, templateBlock.Count, keyPtr).ToCKR();
         }
     }
 
@@ -256,13 +234,10 @@ internal sealed partial class LowLevelPkcs11Library
         if (deriveKey is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layouts; elsewhere the structs are passed as they are.
-        CK_MECHANISM_Windows packedMechanism = Pkcs11Marshal.IsWindows ? CK_MECHANISM_Windows.FromUnified(in mechanism) : default;
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_MECHANISM* m = &mechanism)
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (NativeCULong* keyPtr = &key)
-            return deriveKey(session, Pkcs11Marshal.IsWindows ? &packedMechanism : m, baseKey, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, keyPtr).ToCKR();
+            return deriveKey(session, m, baseKey, templateBlock.Pointer, templateBlock.Count, keyPtr).ToCKR();
     }
 }

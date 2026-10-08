@@ -42,15 +42,11 @@ internal sealed partial class LowLevelPkcs11Library
         if (getSlotInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (!Pkcs11Marshal.IsWindows)
-        {
-            fixed (CK_SLOT_INFO* p = &info)
-                return getSlotInfo(slotId, p).ToCKR();
-        }
-
-        CK_SLOT_INFO_Windows packed = default;
-        CKR rv = getSlotInfo(slotId, &packed).ToCKR();
-        info = packed.ToUnified();
+        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_SLOT_INFO>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        CKR rv = getSlotInfo(slotId, p).ToCKR();
+        info = Pkcs11Marshal.ReadStructure<CK_SLOT_INFO>((IntPtr)p);
         return rv;
     }
 
@@ -67,15 +63,11 @@ internal sealed partial class LowLevelPkcs11Library
         if (getTokenInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (!Pkcs11Marshal.IsWindows)
-        {
-            fixed (CK_TOKEN_INFO* p = &info)
-                return getTokenInfo(slotId, p).ToCKR();
-        }
-
-        CK_TOKEN_INFO_Windows packed = default;
-        CKR rv = getTokenInfo(slotId, &packed).ToCKR();
-        info = packed.ToUnified();
+        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_TOKEN_INFO>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        CKR rv = getTokenInfo(slotId, p).ToCKR();
+        info = Pkcs11Marshal.ReadStructure<CK_TOKEN_INFO>((IntPtr)p);
         return rv;
     }
 
@@ -136,15 +128,11 @@ internal sealed partial class LowLevelPkcs11Library
         if (getMechanismInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (!Pkcs11Marshal.IsWindows)
-        {
-            fixed (CK_MECHANISM_INFO* p = &info)
-                return getMechanismInfo(slotId, type.ToCULong(), p).ToCKR();
-        }
-
-        CK_MECHANISM_INFO_Windows packed = default;
-        CKR rv = getMechanismInfo(slotId, type.ToCULong(), &packed).ToCKR();
-        info = packed.ToUnified();
+        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM_INFO>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        CKR rv = getMechanismInfo(slotId, type.ToCULong(), p).ToCKR();
+        info = Pkcs11Marshal.ReadStructure<CK_MECHANISM_INFO>((IntPtr)p);
         return rv;
     }
 

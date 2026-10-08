@@ -15,16 +15,10 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifySignatureInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
         fixed (byte* sigPtr = signature)
-        {
-            if (Pkcs11Marshal.IsWindows)
-            {
-                CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
-                return verifySignatureInit(session, &packed, key, sigPtr, (NativeCULong)signature.Length).ToCKR();
-            }
-            fixed (CK_MECHANISM* m = &mechanism)
-                return verifySignatureInit(session, m, key, sigPtr, (NativeCULong)signature.Length).ToCKR();
-        }
+            return verifySignatureInit(session, m, key, sigPtr, (NativeCULong)signature.Length).ToCKR();
     }
 
     /// <summary>
@@ -85,13 +79,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifyInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows)
-        {
-            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return verifyInit(session, &packed, key).ToCKR();
-        }
-        fixed (CK_MECHANISM* m = &mechanism)
-            return verifyInit(session, m, key).ToCKR();
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        return verifyInit(session, m, key).ToCKR();
     }
 
     /// <summary>
@@ -161,13 +151,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (verifyRecoverInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows)
-        {
-            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return verifyRecoverInit(session, &packed, key).ToCKR();
-        }
-        fixed (CK_MECHANISM* m = &mechanism)
-            return verifyRecoverInit(session, m, key).ToCKR();
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        return verifyRecoverInit(session, m, key).ToCKR();
     }
 
     /// <summary>

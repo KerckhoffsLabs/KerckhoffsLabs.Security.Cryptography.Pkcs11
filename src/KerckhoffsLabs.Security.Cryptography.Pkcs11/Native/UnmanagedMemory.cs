@@ -265,7 +265,7 @@ internal static class UnmanagedMemory
     /// <param name="memory">Pointer to unmanaged memory</param>
     /// <returns>The struct read from unmanaged memory</returns>
     /// <remarks>
-    /// The layout choice belongs to <see cref="Pkcs11Marshal.ReadStructure{T}"/>, which this
+    /// The layout choice belongs to <see cref="Pkcs11Marshal.ReadStructure{T}(IntPtr)"/>, which this
     /// forwards to once the null check has run — repeating the packed-type test here would only
     /// pay for the same lookup twice and reach the same branch.
     /// </remarks>

@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -71,20 +70,11 @@ internal sealed partial class LowLevelPkcs11Library
         if (getInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows)
-            return GetInfoWindows(getInfo, ref info);
-
-        fixed (CK_INFO* p = &info)
-            return getInfo(p).ToCKR();
-    }
-
-    // CK_INFO is packed on Windows: the module writes the packed layout, converted afterwards.
-    [ExcludeFromCodeCoverage(Justification = WindowsOnly)]
-    private static unsafe CKR GetInfoWindows(delegate* unmanaged[Cdecl]<void*, NativeCULong> getInfo, ref CK_INFO info)
-    {
-        CK_INFO_Windows packed = default;
-        CKR rv = getInfo(&packed).ToCKR();
-        info = packed.ToUnified();
+        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_INFO>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        CKR rv = getInfo(p).ToCKR();
+        info = Pkcs11Marshal.ReadStructure<CK_INFO>((IntPtr)p);
         return rv;
     }
 
@@ -110,31 +100,12 @@ internal sealed partial class LowLevelPkcs11Library
             return CheckedOutput(rv, lengthOnly: true, count, 0);
         }
 
-        if (Pkcs11Marshal.IsWindows)
-            return GetInterfaceListWindows(getInterfaceList, interfaces, ref count);
-
-        CK_INTERFACE none = default;
-        fixed (CK_INTERFACE* list = &NonNullPinnable(interfaces.AsSpan(), ref none))
+        // An empty list is a real address the module is told holds no entries, not the NULL of a count query.
+        using var list = new NativeStructArray<CK_INTERFACE>(interfaces, nullWhenEmpty: false);
         fixed (NativeCULong* c = &count)
-            rv = getInterfaceList(list, c).ToCKR();
-        return CheckedOutput(rv, lengthOnly: false, count, interfaces.Length);
-    }
-
-    // CK_INTERFACE is packed on Windows: the module fills a packed list, converted afterwards.
-    [ExcludeFromCodeCoverage(Justification = WindowsOnly)]
-    private static unsafe CKR GetInterfaceListWindows(
-        delegate* unmanaged[Cdecl]<void*, NativeCULong*, NativeCULong> getInterfaceList, CK_INTERFACE[] interfaces, ref NativeCULong count)
-    {
-        var packed = new CK_INTERFACE_Windows[interfaces.Length];
-        CK_INTERFACE_Windows none = default;
-        CKR rv;
-        fixed (CK_INTERFACE_Windows* list = &NonNullPinnable(packed.AsSpan(), ref none))
-        fixed (NativeCULong* c = &count)
-            rv = CheckedOutput(getInterfaceList(list, c).ToCKR(), lengthOnly: false, count, interfaces.Length,
-                nameof(C_GetInterfaceList));
+            rv = CheckedOutput(getInterfaceList(list.Pointer, c).ToCKR(), lengthOnly: false, count, interfaces.Length);
         if (rv == CKR.CKR_OK)
-            for (int i = 0; i < interfaces.Length; i++)
-                interfaces[i] = packed[i].ToUnified();
+            list.CopyTo(interfaces);
         return rv;
     }
 

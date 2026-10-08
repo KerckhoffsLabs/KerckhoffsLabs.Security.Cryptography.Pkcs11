@@ -13,10 +13,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
     "real function table by the FakeModule smoke tests and LowLevelPkcs11LibraryWrapperContractTests.")]
 internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
 {
-    // Why a Windows-layout path is left out of coverage: the reported coverage comes from the Linux
-    // test run, where Pkcs11Marshal.IsWindows is false. These paths run in the Windows CI test jobs.
-    private const string WindowsOnly = "Windows-only struct layout; exercised by the Windows CI test jobs, which collect no coverage.";
-
     /// <summary>
     /// The loaded module. It owns the function table, so a call can reach the module only while it holds
     /// a reference on this handle (<see cref="EnterModule"/>), and <c>C_Finalize</c> and the unmap wait
