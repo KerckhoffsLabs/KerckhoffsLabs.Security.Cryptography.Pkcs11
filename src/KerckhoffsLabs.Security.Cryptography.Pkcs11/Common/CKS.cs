@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -46,14 +44,4 @@ public enum CksValidationFlagsType : ulong
     /// accepted the operation.
     /// </summary>
     CKS_LAST_VALIDATION_OK = 1,
-}
-
-/// <summary>
-/// Utility class that helps with data type conversions.
-/// </summary>
-internal static class CKSExtensions
-{
-    /// <summary>Converts <see cref="CKS"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKS value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
-        => CkULong.From((ulong)value, paramName);
 }

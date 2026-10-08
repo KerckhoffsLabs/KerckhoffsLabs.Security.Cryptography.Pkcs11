@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -26,14 +24,4 @@ public enum CKH : ulong
     /// Permanently reserved for token vendors.
     /// </summary>
     CKH_VENDOR_DEFINED = 0x80000000
-}
-
-/// <summary>
-/// Utility class that helps with data type conversions.
-/// </summary>
-internal static class CKHExtensions
-{
-    /// <summary>Converts <see cref="CKH"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKH value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
-        => CkULong.From((ulong)value, paramName);
 }

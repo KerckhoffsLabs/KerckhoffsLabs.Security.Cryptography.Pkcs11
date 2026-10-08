@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -102,14 +100,4 @@ public enum CKD : ulong
 
     /// <summary>ANSI X9.63 KDF with BLAKE2b-512 (PKCS#11 v3.0)</summary>
     CKD_BLAKE2B_512_KDF = 0x0000001A
-}
-
-/// <summary>
-/// Utility class that helps with data type conversions.
-/// </summary>
-internal static class CKDExtensions
-{
-    /// <summary>Converts <see cref="CKD"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKD value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
-        => CkULong.From((ulong)value, paramName);
 }

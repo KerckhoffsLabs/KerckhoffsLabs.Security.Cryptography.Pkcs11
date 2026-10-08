@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -26,19 +24,4 @@ public enum CKC : ulong
     /// Permanently reserved for token vendors
     /// </summary>
     CKC_VENDOR_DEFINED = 0x80000000
-}
-
-/// <summary>
-/// Utility class that helps with data type conversions.
-/// </summary>
-internal static class CKCExtensions
-{
-    /// <summary>
-    /// Converts CKC to NativeCULong
-    /// </summary>
-    /// <param name="value">CKC that should be converted</param>
-    /// <param name="paramName">The argument name reported if the value does not fit; supplied by the compiler.</param>
-    /// <returns>NativeCULong with value from CKC</returns>
-    public static NativeCULong ToCULong(this CKC value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
-        => CkULong.From((ulong)value, paramName);
 }
