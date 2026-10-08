@@ -100,6 +100,11 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_DecryptMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_DecryptMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> ciphertextPart, NativeBuffer<byte> plaintextPart, ref NativeCULong plaintextPartLen, NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_MessageDecryptFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_MessageSignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_MessageSignFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -281,6 +286,16 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_DecryptMessageNext)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong, NativeCULong>)&DecryptMessageNext;
         if (Overrides(nameof(C_MessageDecryptFinal)))
             slots[nameof(CryptokiTable.C_MessageDecryptFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&MessageDecryptFinal;
+        if (Overrides(nameof(C_MessageSignInit)))
+            slots[nameof(CryptokiTable.C_MessageSignInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&MessageSignInit;
+        if (Overrides(nameof(C_SignMessage)))
+            slots[nameof(CryptokiTable.C_SignMessage)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignMessage;
+        if (Overrides(nameof(C_SignMessageBegin)))
+            slots[nameof(CryptokiTable.C_SignMessageBegin)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)&SignMessageBegin;
+        if (Overrides(nameof(C_SignMessageNext)))
+            slots[nameof(CryptokiTable.C_SignMessageNext)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignMessageNext;
+        if (Overrides(nameof(C_MessageSignFinal)))
+            slots[nameof(CryptokiTable.C_MessageSignFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&MessageSignFinal;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -1306,6 +1321,61 @@ internal abstract unsafe partial class FakeModule
     {
         if (Owner(hSession, nameof(C_MessageDecryptFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
         try { return Rv(m.C_MessageDecryptFinal(hSession)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong MessageSignInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_MessageSignInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_MessageSignInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignMessage(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pData, NativeCULong ulDataLen, byte* pSignature, NativeCULong* pulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_SignMessage)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulSignatureLen;
+            CKR rv = m.C_SignMessage(hSession, pParameter, ulParameterLen, In(pData, ulDataLen), new NativeBuffer<byte>(pSignature, length), ref length);
+            *pulSignatureLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignMessageBegin(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen)
+    {
+        if (Owner(hSession, nameof(C_SignMessageBegin)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_SignMessageBegin(hSession, pParameter, ulParameterLen));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SignMessageNext(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pData, NativeCULong ulDataLen, byte* pSignature, NativeCULong* pulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_SignMessageNext)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulSignatureLen;
+            CKR rv = m.C_SignMessageNext(hSession, pParameter, ulParameterLen, In(pData, ulDataLen), new NativeBuffer<byte>(pSignature, length), ref length);
+            *pulSignatureLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong MessageSignFinal(NativeCULong hSession)
+    {
+        if (Owner(hSession, nameof(C_MessageSignFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_MessageSignFinal(hSession)); }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 

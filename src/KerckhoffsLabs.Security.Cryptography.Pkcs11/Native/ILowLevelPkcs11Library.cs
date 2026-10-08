@@ -66,10 +66,10 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_MessageDecryptFinal(NativeCULong session);
     CKR C_MessageSignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_SignMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, Span<byte> signature,
-        out NativeCULong signatureLen);
+        bool lengthOnly, out NativeCULong signatureLen);
     CKR C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen);
     CKR C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, Span<byte> signature,
-        out NativeCULong signatureLen);
+        bool lengthOnly, out NativeCULong signatureLen);
     CKR C_MessageSignFinal(NativeCULong session);
     CKR C_MessageVerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key);
     CKR C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature);
