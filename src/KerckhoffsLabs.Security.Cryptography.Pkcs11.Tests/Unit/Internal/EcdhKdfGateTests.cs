@@ -6,6 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
@@ -15,18 +16,19 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// not only through <c>Pkcs11Workspace.DeriveSharedSecretEcdh</c>: <c>Pkcs11Key.Derive</c> and
 /// <c>EncapsulateKey</c> / <c>DecapsulateKey</c> reach the same session calls and meet the same allow-list.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class EcdhKdfGateTests
 {
     private static readonly byte[] PeerPoint = [0x04, 0x41, 0x04, .. new byte[64]];
 
-    private sealed class RecordingFake : FakeLowLevelPkcs11Library
+    private sealed class RecordingFake : SessionTestModule
     {
-        public int Calls { get; private set; }
+        public new int Calls { get; private set; }
 
-        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
             => KeyTypeAttribute.Answer(template, CKK.CKK_EC);
 
-        public override CKR C_DeriveKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong baseKey, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
+        protected override CKR C_DeriveKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, ref NativeCULong key)
         {
             Calls++;
             key = (NativeCULong)20UL;
@@ -34,14 +36,14 @@ public sealed class EcdhKdfGateTests
         }
 
         // Counted, then failed: only whether the call reached the token matters here.
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong key)
         {
             Calls++;
             ciphertextLen = (NativeCULong)0UL;
             return CKR.CKR_FUNCTION_FAILED;
         }
 
-        public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
+        protected override CKR C_DecapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> ciphertext, ref NativeCULong key)
         {
             Calls++;
             return CKR.CKR_FUNCTION_FAILED;
@@ -63,8 +65,8 @@ public sealed class EcdhKdfGateTests
     [InlineData(CKM.CKM_ECDH1_COFACTOR_DERIVE, CKD.CKD_SHA224_KDF)]
     public void RefusedKdf_IsRefusedBeforeReachingTheToken(CKM type, CKD kdf)
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() => Derive(session, Ecdh(kdf, type)));
         var request = Assert.IsType<KeyAgreementKdfRequest>(ex.Request);
@@ -79,8 +81,8 @@ public sealed class EcdhKdfGateTests
     [InlineData(CKD.CKD_SHA3_512_KDF)]
     public void AllowedKdf_Proceeds(CKD kdf)
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
 
         Derive(session, Ecdh(kdf));
         Assert.Equal(1, fake.Calls);
@@ -91,18 +93,22 @@ public sealed class EcdhKdfGateTests
     [Fact]
     public void TheKdfVerdictFollowsThePolicy()
     {
-        var secure = new RecordingFake();
-        using (var session = new Pkcs11Session(secure, sessionId: 1))
-            Assert.Throws<CryptoPolicyViolationException>(() => Derive(session, Ecdh(CKD.CKD_SHA224_KDF)));
-        Assert.Equal(0, secure.Calls);
+        using (var secure = new RecordingFake())
+        {
+            using (var session = secure.CreateSession(sessionId: 1))
+                Assert.Throws<CryptoPolicyViolationException>(() => Derive(session, Ecdh(CKD.CKD_SHA224_KDF)));
+            Assert.Equal(0, secure.Calls);
+        }
 
-        var fips = new RecordingFake();
-        using (var session = new Pkcs11Session(fips, sessionId: 1, policy: CryptoPolicy.FipsOnly))
-            Derive(session, Ecdh(CKD.CKD_SHA224_KDF));
-        Assert.Equal(1, fips.Calls);
+        using (var fips = new RecordingFake())
+        {
+            using (var session = fips.CreateSession(sessionId: 1, policy: CryptoPolicy.FipsOnly))
+                Derive(session, Ecdh(CKD.CKD_SHA224_KDF));
+            Assert.Equal(1, fips.Calls);
+        }
 
-        var insecure = new RecordingFake();
-        using (var session = new Pkcs11Session(insecure, sessionId: 1, policy: CryptoPolicy.AllowInsecure))
+        using var insecure = new RecordingFake();
+        using (var session = insecure.CreateSession(sessionId: 1, policy: CryptoPolicy.AllowInsecure))
             Derive(session, Ecdh(CKD.CKD_NULL));
         Assert.Equal(1, insecure.Calls);
     }
@@ -114,8 +120,8 @@ public sealed class EcdhKdfGateTests
     public void UntypedParameters_AreRefused(string policyName)
     {
         ICryptoPolicy policy = policyName == "FipsOnly" ? CryptoPolicy.FipsOnly : CryptoPolicy.SecureOnly;
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1, policy: policy);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1, policy: policy);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => Derive(session, new Mechanism(CKM.CKM_ECDH1_DERIVE, new byte[40])));
@@ -127,8 +133,8 @@ public sealed class EcdhKdfGateTests
     [Fact]
     public void Encapsulate_RefusesACkdNullKdf()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForEncapsulation(CKD.CKD_NULL));
 
@@ -141,8 +147,8 @@ public sealed class EcdhKdfGateTests
     [Fact]
     public void Decapsulate_RefusesACkdNullKdf()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForEncapsulation(CKD.CKD_NULL));
 
@@ -155,8 +161,8 @@ public sealed class EcdhKdfGateTests
     [Fact]
     public void Encapsulate_WithAnAllowedKdf_ReachesTheToken()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var mechanism = new Mechanism(CKM.CKM_ECDH1_DERIVE, CkmEcdh1DeriveParams.ForEncapsulation(CKD.CKD_SHA256_KDF));
 

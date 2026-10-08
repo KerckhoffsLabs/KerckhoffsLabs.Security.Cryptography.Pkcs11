@@ -1,9 +1,8 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -20,14 +19,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// nothing fails and the key is still created; it is just no longer sensitive. These tests read the
 /// template that actually reaches <c>C_GenerateKey</c>.
 /// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class SecureDefaultsAreAddedTests
 {
     /// <summary>Captures the template the session hands to the module.</summary>
-    private sealed class TemplateCapturingFake : FakeLowLevelPkcs11Library
+    private sealed class TemplateCapturingFake : SessionTestModule
     {
         public readonly List<(ulong Type, byte[] Value)> Captured = [];
 
-        public override CKR C_GenerateKey(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> template, ref NativeCULong key)
+        protected override CKR C_GenerateKey(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] template, ref NativeCULong key)
         {
             foreach (CK_ATTRIBUTE attribute in template)
             {
@@ -46,10 +46,10 @@ public sealed class SecureDefaultsAreAddedTests
     // stays the caller's to free, and each one owns an unmanaged buffer.
     private static List<(ulong Type, byte[] Value)> GenerateWith(params ObjectAttribute[] attributes)
     {
-        var fake = new TemplateCapturingFake();
+        using var fake = new TemplateCapturingFake();
         try
         {
-            using var session = new Pkcs11Session(fake, 1);
+            using var session = fake.CreateSession(1);
             session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. attributes]);
         }
         finally

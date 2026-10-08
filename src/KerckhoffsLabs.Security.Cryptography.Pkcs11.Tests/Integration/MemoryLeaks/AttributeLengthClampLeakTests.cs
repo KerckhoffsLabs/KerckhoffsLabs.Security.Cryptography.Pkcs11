@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLeaks;
 
@@ -22,18 +22,19 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLe
 /// <c>UnmanagedMemory.OutstandingAllocationCount</c> is process-global, so read from a parallel test
 /// it measures the whole run rather than this one. Written as a unit test it passed locally and on
 /// Linux CI, then failed on both Windows legs — and in opposite directions, the x86 count falling by
-/// exactly the loop count, which no leak in the code under test could cause.
+/// exactly the loop count, which no leak in the code under test could cause. Being non-parallel, the
+/// collection also keeps the test's <see cref="FakeModule"/> the only one alive.
 /// </para>
 /// </remarks>
 [Collection("MemoryLeaks")]
 public sealed class AttributeLengthClampLeakTests
 {
     /// <summary>Answers the sizing call honestly, then inflates the length on the fill call.</summary>
-    private sealed class LyingLengthFake : FakeLowLevelPkcs11Library
+    private sealed class LyingLengthFake : SessionTestModule
     {
         private int _calls;
 
-        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
             _calls++;
             for (int i = 0; i < template.Length; i++)
@@ -44,7 +45,8 @@ public sealed class AttributeLengthClampLeakTests
 
     private static void ReadAndExpectRefusal()
     {
-        using var session = new Pkcs11Session(new LyingLengthFake(), 1);
+        using var fake = new LyingLengthFake();
+        using var session = fake.CreateSession(1);
         Assert.Throws<Pkcs11AttributeException>(
             () => session.GetAttributeValue(new ObjectHandle(7), [(ulong)CKA.CKA_VALUE]));
     }
