@@ -1,6 +1,4 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
 /// A mechanism parameter block already written into a call's scope: what <c>CK_MECHANISM.pParameter</c>

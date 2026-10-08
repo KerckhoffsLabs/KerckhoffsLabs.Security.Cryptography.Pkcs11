@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// A length or count the module reports is checked against the buffer it was given. One the module

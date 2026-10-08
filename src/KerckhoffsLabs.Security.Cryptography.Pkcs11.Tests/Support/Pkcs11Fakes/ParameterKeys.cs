@@ -27,7 +27,7 @@ internal sealed class ParameterKeys : IDisposable
     public Pkcs11Workspace Workspace { get; }
 
     /// <summary>A scope for a call made on this workspace's session.</summary>
-    public MechanismParameterScope NewScope() => new(Workspace.Session);
+    public MechanismParameterScope NewScope() => new SessionParameterScope(Workspace.Session);
 
     /// <summary>A secret key whose single object has handle <paramref name="handle"/>.</summary>
     public Pkcs11Key Secret(ulong handle) => Key(handle, 0, CKK.CKK_GENERIC_SECRET);

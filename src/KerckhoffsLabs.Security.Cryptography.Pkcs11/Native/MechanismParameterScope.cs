@@ -1,6 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
@@ -13,37 +10,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// or a rule against sharing one instance across two mechanisms.
 /// Allocation goes through <see cref="UnmanagedMemory"/>, so every block is tracked by the leak
 /// harness and zeroized as it is freed.
+/// Key-valued parameters need the session performing the call; a call made on one uses the
+/// <c>SessionParameterScope</c> above this layer, which adds that.
 /// </remarks>
-internal sealed class MechanismParameterScope : IDisposable
+internal class MechanismParameterScope : IDisposable
 {
     private readonly List<IntPtr> _owned = [];
-    private readonly Pkcs11Session? _session;
     private bool _disposed;
 
-    /// <summary>Creates a scope for a call made on <paramref name="session"/>.</summary>
-    /// <param name="session">
-    /// The session performing the call. Needed only to resolve key-valued parameters; a scope without
-    /// one can marshal everything else.
-    /// </param>
-    public MechanismParameterScope(Pkcs11Session? session = null) => _session = session;
-
-    /// <summary>
-    /// The handle <paramref name="key"/> contributes to a parameter field, checked against the session
-    /// performing this call.
-    /// </summary>
-    /// <param name="key">The key the caller put in the parameter.</param>
-    /// <param name="part">Which of the key's objects the field refers to.</param>
-    /// <param name="paramName">The parameter-type argument the key was passed as, for the exception.</param>
-    /// <exception cref="ObjectDisposedException">The key has been disposed.</exception>
-    /// <exception cref="ArgumentException">The key belongs to another workspace, or lacks the requested object.</exception>
-    /// <exception cref="InvalidOperationException">The scope was created without a session.</exception>
-    public NativeCULong KeyHandle(Pkcs11Key key, KeyHandlePart part, string paramName)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_session is null)
-            throw new InvalidOperationException("Key-valued mechanism parameters can only be marshalled for a session.");
-        return (NativeCULong)key.ResolveParameterHandle(_session, part, paramName).ObjectId;
-    }
+    /// <exception cref="ObjectDisposedException">The scope has been disposed.</exception>
+    internal void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     /// <summary>Allocates <paramref name="size"/> zeroed bytes owned by this scope.</summary>
     public IntPtr Allocate(int size)
@@ -99,6 +75,14 @@ internal sealed class MechanismParameterScope : IDisposable
 
     /// <summary>Releases every block, newest first. <see cref="UnmanagedMemory.Free"/> zeroizes as it goes.</summary>
     public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Releases every block, newest first.</summary>
+    /// <param name="disposing">Always <see langword="true"/>: the scope has no finalizer.</param>
+    protected virtual void Dispose(bool disposing)
     {
         if (_disposed) return;
         for (int i = _owned.Count - 1; i >= 0; i--)
