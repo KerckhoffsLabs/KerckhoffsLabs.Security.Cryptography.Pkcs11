@@ -27,8 +27,8 @@ public sealed class Pkcs11LibraryAlreadyInitializedTests(MockBackendFixture f)
         Assert.False(string.IsNullOrWhiteSpace(_backend.Library.GetInfo().ManufacturerId));
         Assert.False(string.IsNullOrWhiteSpace(b.GetInfo().ManufacturerId));
 
-        // Dispose B. The fix means B did NOT drive C_Initialize → _ownsFinalize = false
-        // → Dispose does NOT call C_Finalize. Without the fix, B's Dispose would call
+        // Dispose B. The fix means B did NOT drive C_Initialize, so its module handle owes no
+        // C_Finalize and Dispose does NOT call it. Without the fix, B's Dispose would call
         // C_Finalize and tear down the library state shared with A.
         b.Dispose();
 

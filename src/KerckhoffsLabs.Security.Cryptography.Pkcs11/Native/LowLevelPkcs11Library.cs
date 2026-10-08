@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
     "length the module reports is checked against the buffer before a caller sees it. Suppressed at the type " +
     "so that an unsafe block outside this boundary is still reported. Each wrapper is exercised through the " +
     "real function table by the FakeModule smoke tests and LowLevelPkcs11LibraryWrapperContractTests.")]
-internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
+internal sealed partial class LowLevelPkcs11Library : IDisposable
 {
     /// <summary>
     /// The loaded module. It owns the function table, so a call can reach the module only while it holds
@@ -20,7 +20,7 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
     /// </summary>
     private readonly Pkcs11ModuleHandle _module;
 
-    /// <inheritdoc/>
+    /// <summary>The module this library calls into. Sessions reference and are tracked by it.</summary>
     public Pkcs11ModuleHandle Module => _module;
 
     /// <summary>

@@ -36,7 +36,7 @@ public sealed class SignVerifyRecoverTests(MockBackendFixture f)
             using var findPrivate = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
             ObjectHandle privateKey = Assert.Single(session.FindAllObjects([findPrivate]));
 
-            ILowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
             var sessionId = (NativeCULong)session.SessionId;
             byte[] data = "sign-recover round trip"u8.ToArray();
 

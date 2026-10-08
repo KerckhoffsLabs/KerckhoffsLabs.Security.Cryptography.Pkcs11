@@ -61,9 +61,6 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     private volatile bool _initialized;
     private volatile bool _finalizeOnRelease;
 
-    // A test double has no function table; its sessions close through the double itself.
-    private readonly ILowLevelPkcs11Library? _detached;
-
     private readonly Lock _sessionsLock = new();
 
     // Weak, so a session the caller disposed (or abandoned) is not kept alive by the tracker.
@@ -100,12 +97,6 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         SetHandle(moduleHandle);
         _freeOnRelease = freeOnRelease;
         _identity = identity;
-    }
-
-    private Pkcs11ModuleHandle(IntPtr moduleHandle, bool freeOnRelease, ILowLevelPkcs11Library detached)
-        : this(moduleHandle, freeOnRelease, identity: detached)
-    {
-        _detached = detached;
     }
 
     private CryptokiTable _table;
@@ -209,18 +200,9 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         DangerousRelease();
     }
 
-    /// <summary>
-    /// A handle for a test double: no module to load, finalize or free, but sessions are tracked and
-    /// referenced exactly as for a real module, and close through <paramref name="library"/>.
-    /// </summary>
-    internal static Pkcs11ModuleHandle Detached(ILowLevelPkcs11Library library)
-        => new(NotLoaded, freeOnRelease: false, library);
-
     /// <summary>Closes <paramref name="session"/>. The caller holds a reference on this handle.</summary>
     internal CKR CloseSession(NativeCULong session)
     {
-        if (_detached is not null)
-            return _detached.C_CloseSession(session);
         bool serialized = EnterCall();
         try
         {
@@ -241,8 +223,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
     /// this library, in a way that is not known.
     /// </summary>
     internal bool SupportsConcurrentAccess
-        => _detached is not null
-           || (_loads is not null && (ConcurrencyMode)Volatile.Read(ref _loads.Mode) == ConcurrencyMode.OsLocking);
+        => _loads is not null && (ConcurrencyMode)Volatile.Read(ref _loads.Mode) == ConcurrencyMode.OsLocking;
 
     /// <summary>
     /// Takes the module-wide call lock unless the module may be called concurrently; returns whether

@@ -34,7 +34,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private readonly ILowLevelPkcs11Library _pkcs11Library;
+    private readonly LowLevelPkcs11Library _pkcs11Library;
 
     /// <summary>
     /// SafeHandle wrapping the PKCS#11 session handle. Owns the session lifetime and
@@ -386,7 +386,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// <param name="policy">
     /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.SecureOnly"/>.
     /// </param>
-    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+    internal Pkcs11Session(LowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
         : this(pkcs11Library, OwnSession(pkcs11Library, sessionId), loggerFactory, policy)
     {
     }
@@ -395,7 +395,7 @@ internal sealed class Pkcs11Session : IDisposable
     /// Takes ownership of an open session's <paramref name="sessionHandle"/>: if construction throws, the
     /// handle is disposed and the session closed, so it can never be left open with no owner.
     /// </summary>
-    internal Pkcs11Session(ILowLevelPkcs11Library pkcs11Library, Pkcs11SessionHandle sessionHandle, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+    internal Pkcs11Session(LowLevelPkcs11Library pkcs11Library, Pkcs11SessionHandle sessionHandle, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(sessionHandle);
         _sessionHandle = sessionHandle;
@@ -419,7 +419,7 @@ internal sealed class Pkcs11Session : IDisposable
         }
     }
 
-    private static Pkcs11SessionHandle OwnSession(ILowLevelPkcs11Library pkcs11Library, ulong sessionId)
+    private static Pkcs11SessionHandle OwnSession(LowLevelPkcs11Library pkcs11Library, ulong sessionId)
     {
         ArgumentNullException.ThrowIfNull(pkcs11Library);
         if (sessionId == CK.CK_INVALID_HANDLE)

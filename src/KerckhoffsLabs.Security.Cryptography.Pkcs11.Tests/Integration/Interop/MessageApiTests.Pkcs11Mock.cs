@@ -103,7 +103,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
             using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
             ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            ILowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
             using var scope = new MechanismParameterScope();
             CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
 
@@ -126,7 +126,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
             using var findClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
             ObjectHandle key = Assert.Single(session.FindAllObjects([findClass]));
 
-            ILowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
             using var scope = new MechanismParameterScope();
             CK_MECHANISM ckMechanism = new Mechanism(CKM.CKM_SHA256_RSA_PKCS).Marshal(scope, out _);
 

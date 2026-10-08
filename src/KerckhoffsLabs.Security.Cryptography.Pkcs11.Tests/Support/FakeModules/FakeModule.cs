@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 /// A PKCS#11 module made of managed code, loaded through the library's real loader. A test derives
 /// from it and overrides the <c>C_*</c> functions its scenario needs; every call then crosses the
 /// same function table, wrappers, pinning, <c>CK_ULONG</c> widths and Windows struct packing as a
-/// native module would, which the <see cref="ILowLevelPkcs11Library"/> fakes skip entirely.
+/// native module would.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -54,6 +54,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
     private IntPtr _interfaceTable;
     private IntPtr _interfaceName;
     private IntPtr _interface;
+    private IntPtr _answer;
     private ExceptionDispatchInfo? _fault;
     private ulong _nextHandle;
     private bool _disposed;
@@ -122,7 +123,8 @@ internal abstract unsafe partial class FakeModule : IDisposable
         Marshal.FreeHGlobal(_interfaceTable);
         Marshal.FreeHGlobal(_interfaceName);
         Marshal.FreeHGlobal(_interface);
-        _functionList = _interfaceTable = _interfaceName = _interface = IntPtr.Zero;
+        Marshal.FreeHGlobal(_answer);
+        _functionList = _interfaceTable = _interfaceName = _interface = _answer = IntPtr.Zero;
         return true;
     }
 
@@ -171,8 +173,8 @@ internal abstract unsafe partial class FakeModule : IDisposable
 
     private static IntPtr GetInterfaceAddress => (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)&GetInterface;
 
-    // Hands out the one interface this module has, whatever name and version were asked for: it is the
-    // v3.2 table, the version the loader asks for first.
+    // The loader asks through the export, and gets the one interface this module has whatever name and
+    // version it asks for: the v3.2 table, the version the loader asks for first.
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     private static NativeCULong GetInterface(byte* pInterfaceName, IntPtr pVersion, IntPtr* ppInterface, NativeCULong flags)
     {
@@ -181,6 +183,35 @@ internal abstract unsafe partial class FakeModule : IDisposable
             return Rv(CKR.CKR_GENERAL_ERROR);
         *ppInterface = m._interface;
         return Rv(CKR.CKR_OK);
+    }
+
+    private static IntPtr TableGetInterfaceAddress => (IntPtr)(delegate* unmanaged[Cdecl]<byte*, IntPtr, IntPtr*, NativeCULong, NativeCULong>)&TableGetInterface;
+
+    /// <summary>
+    /// Answers <c>C_GetInterface</c> called through the module's v3.2 table, as <c>Pkcs11Library.GetInterface</c>
+    /// calls it. <paramref name="interfaceName"/> is the name as passed, terminator included, or
+    /// <see langword="null"/>; <paramref name="iface"/> arrives holding this module's own interface. A module
+    /// that overrides this exports <c>C_GetInterface</c> even if it implements no other v3.x function.
+    /// </summary>
+    protected virtual CKR C_GetInterface(byte[]? interfaceName, NativeCULong flags, ref CK_INTERFACE iface) => CKR.CKR_OK;
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static NativeCULong TableGetInterface(byte* pInterfaceName, IntPtr pVersion, IntPtr* ppInterface, NativeCULong flags)
+    {
+        if (Active(nameof(C_GetInterface)) is not { _interface: not 0 } m) return Rv(CKR.CKR_GENERAL_ERROR);
+        try
+        {
+            byte[]? name = pInterfaceName is null ? null : [.. MemoryMarshal.CreateReadOnlySpanFromNullTerminated(pInterfaceName), 0];
+            CK_INTERFACE answer = ReadStruct<CK_INTERFACE>((void*)m._interface);
+            CKR rv = m.C_GetInterface(name, flags, ref answer);
+            if (rv == CKR.CKR_OK)
+            {
+                UnmanagedMemory.Write(m._answer, answer);
+                *ppInterface = m._answer;
+            }
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
@@ -209,7 +240,8 @@ internal abstract unsafe partial class FakeModule : IDisposable
     /// </summary>
     private static FakeModule? Owner(NativeCULong handle, string function)
     {
-        uint id = (uint)((ulong)handle >> InstanceShift) & InstanceMask;
+        // Any CK_ULONG is a legal handle, so the narrowing must not trap on the high bits it discards.
+        uint id = unchecked((uint)((ulong)handle >> InstanceShift)) & InstanceMask;
         FakeModule? m;
         lock (s_lock)
             m = id != 0 && s_modules.TryGetValue(id, out FakeModule? owner) ? owner : id == 0 ? s_active : null;
@@ -249,13 +281,14 @@ internal abstract unsafe partial class FakeModule : IDisposable
         _functionList = NativeFunctionList.Allocate(2, 40, CryptokiTable.V240SlotCount,
             slots.Where(slot => v240.Contains(slot.Key)).ToDictionary());
 
-        if (slots.Keys.All(v240.Contains))
+        if (slots.Keys.All(v240.Contains) && !Overrides(nameof(C_GetInterface)))
             return;
 
-        slots[nameof(CryptokiTable.C_GetInterface)] = GetInterfaceAddress;
+        slots[nameof(CryptokiTable.C_GetInterface)] = TableGetInterfaceAddress;
         _interfaceTable = NativeFunctionList.Allocate(3, 2, CryptokiTable.V32SlotCount, slots);
         _interfaceName = Marshal.StringToHGlobalAnsi("PKCS 11");
         _interface = Marshal.AllocHGlobal(UnmanagedMemory.SizeOf<CK_INTERFACE>());
+        _answer = Marshal.AllocHGlobal(UnmanagedMemory.SizeOf<CK_INTERFACE>());
         UnmanagedMemory.Write(_interface, new CK_INTERFACE { InterfaceName = _interfaceName, FunctionList = _interfaceTable, Flags = (NativeCULong)0 });
     }
 

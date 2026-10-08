@@ -36,30 +36,20 @@ public sealed class Pkcs11Library : IDisposable
 
     private readonly string? _libraryPath;
 
-    private ILowLevelPkcs11Library? _pkcs11Library;
+    private LowLevelPkcs11Library? _pkcs11Library;
 
     /// <summary>
     /// The loaded low-level library. Set during construction and released on
     /// <see cref="Dispose()"/>; accessing it afterwards throws.
     /// </summary>
-    private ILowLevelPkcs11Library LowLevel => _pkcs11Library
+    private LowLevelPkcs11Library LowLevel => _pkcs11Library
         ?? throw new ObjectDisposedException(nameof(Pkcs11Library));
-
-    /// <summary>
-    /// True only when <see cref="Initialize"/> drove <c>C_Initialize</c> to <c>CKR_OK</c>, meaning
-    /// this instance owns the matching <c>C_Finalize</c>. Stays false when another
-    /// <see cref="Pkcs11Library"/> instance (or a different component in the same process) had
-    /// already initialized the library and we observed <c>CKR_CRYPTOKI_ALREADY_INITIALIZED</c>.
-    /// <see cref="Dispose()"/> gates <c>C_Finalize</c> on this flag so we never tear down another
-    /// owner's state.
-    /// </summary>
-    private bool _ownsFinalize;
 
     /// <summary>
     /// Test seam: access to the underlying low-level wrapper for regression checks on
     /// session tracking. Not exposed publicly.
     /// </summary>
-    internal ILowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
+    internal LowLevelPkcs11Library? LowLevelLibrary => _pkcs11Library;
 
     /// <summary>
     /// Cached per-token quirk for ML-KEM decapsulation: whether the shared-secret template must
@@ -147,8 +137,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// Test seam: binds to a module whose exports come from <paramref name="resolveExport"/> (a fake
     /// module built from managed <c>[UnmanagedCallersOnly]</c> functions), then initializes it exactly
-    /// as <see cref="Load(string, ILoggerFactory?)"/> does. Unlike the in-process
-    /// <see cref="ILowLevelPkcs11Library"/> seam below, every call crosses the real loader, wrappers,
+    /// as <see cref="Load(string, ILoggerFactory?)"/> does. Every call crosses the real loader, wrappers,
     /// pinning and struct packing.
     /// </summary>
     internal Pkcs11Library(Func<string, IntPtr> resolveExport, ILoggerFactory? loggerFactory = null)
@@ -184,32 +173,6 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Test seam: binds to an in-process <see cref="ILowLevelPkcs11Library"/> implementation
-    /// (e.g. a managed fake token) instead of a dynamically loaded native module, then drives
-    /// <c>C_Initialize</c> exactly as the production ctor does. Lets the high-level API and the
-    /// <c>Algorithms</c> adapters be exercised end-to-end without a native PKCS#11 library.
-    /// </summary>
-    internal Pkcs11Library(ILowLevelPkcs11Library lowLevel, ILoggerFactory? loggerFactory = null)
-    {
-        ArgumentNullException.ThrowIfNull(lowLevel);
-        _loggerFactory = loggerFactory;
-        _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
-        _libraryPath = "<in-process>";
-        _pkcs11Library = lowLevel;
-
-        try
-        {
-            Initialize();
-        }
-        catch
-        {
-            lowLevel.Dispose();
-            _pkcs11Library = null;
-            throw;
-        }
-    }
-
-    /// <summary>
     /// Initializes the PKCS#11 library. Probes with <c>CKF_OS_LOCKING_OK</c>
     /// first (the safe default for multi-threaded callers); falls back to a
     /// null-args call if the token returns <c>CKR_CANT_LOCK</c>.
@@ -229,8 +192,8 @@ public sealed class Pkcs11Library : IDisposable
         var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)CKF.CKF_OS_LOCKING_OK };
         CKR rv = LowLevel.C_Initialize(initArgs);
 
-        // Another component already initialized the library — treat as success but
-        // leave _ownsFinalize = false so Dispose doesn't tear down their state.
+        // Another component already initialized the library: treat as success. The module handle owes
+        // C_Finalize only for an initialization it performed, so Dispose leaves their state alone.
         if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
 
         // Token refused OS locking. Retry without: that promises the module it is never called
@@ -245,7 +208,6 @@ public sealed class Pkcs11Library : IDisposable
         }
 
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitialize);
-        _ownsFinalize = true;
     }
 
     /// <summary>
@@ -614,23 +576,21 @@ public sealed class Pkcs11Library : IDisposable
             // produced. This is the safety net for callers that violate it.
             _pkcs11Library.Module.CloseAllTrackedSessions();
 
-            // Only finalize if THIS instance drove the C_Initialize to CKR_OK.
-            // If we observed CKR_CRYPTOKI_ALREADY_INITIALIZED, another owner is
-            // responsible for finalization — doing it here would tear down their state.
-            // The finalize is deferred to the module's last release, so it cannot run
-            // under a call that is still in flight on another thread.
-            if (_ownsFinalize)
-                _pkcs11Library.FinalizeOnLastRelease();
+            // A no-op unless THIS instance drove C_Initialize to CKR_OK: after
+            // CKR_CRYPTOKI_ALREADY_INITIALIZED another owner is responsible for
+            // finalization, and doing it here would tear down their state. The finalize
+            // is deferred to the module's last release, so it cannot run under a call
+            // that is still in flight on another thread.
+            _pkcs11Library.FinalizeOnLastRelease();
 
             Log.UnloadingLibrary(_logger, _libraryPath);
-            _pkcs11Library.Dispose();
-            var loaded = _pkcs11Library as LowLevelPkcs11Library;
+            var loaded = _pkcs11Library;
+            loaded.Dispose();
             _pkcs11Library = null;
             _disposed = true;
 
             // After the state change, so a logger that throws cannot leave the library half disposed.
-            if (_ownsFinalize && loaded is not null)
-                LogFinalizeStatus(loaded.FinalizeStatus);
+            LogFinalizeStatus(loaded.FinalizeStatus);
         }
 
         _disposed = true;

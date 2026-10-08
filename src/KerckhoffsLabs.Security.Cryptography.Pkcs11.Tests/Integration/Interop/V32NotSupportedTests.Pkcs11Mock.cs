@@ -154,7 +154,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
-            ILowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
             var result = new CK_ASYNC_DATA();
             CKR rv = lowLevel.C_AsyncComplete((NativeCULong)session.SessionId, "C_GenerateRandom"u8, ref result);
             Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
@@ -172,7 +172,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
-            ILowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
             NativeCULong id = default;
             CKR rv = lowLevel.C_AsyncGetID((NativeCULong)session.SessionId, "C_GenerateRandom"u8, ref id);
             Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
@@ -190,7 +190,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
-            ILowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
+            LowLevelPkcs11Library lowLevel = _backend.Library.LowLevelLibrary!;
             CKR rv = lowLevel.C_AsyncJoin((NativeCULong)session.SessionId, "C_GenerateRandom"u8, (NativeCULong)1, []);
             Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, rv);
         }

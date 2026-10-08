@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
@@ -15,12 +15,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 // Failing that way is worse than it sounds. The throw lands in the constructor before the session is
 // registered, leaving handle zero, so IsInvalid reports true, ReleaseHandle no-ops, and the session
 // just opened on the token is never closed for the lifetime of the process.
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionHandleRangeTests
 {
-    private sealed class ClosingLibrary : NotSupportedPkcs11Library
+    private sealed class ClosingLibrary : SessionTestModule
     {
         public NativeCULong? Closed;
-        public override CKR C_CloseSession(NativeCULong session)
+        protected override CKR C_CloseSession(NativeCULong session)
         {
             Closed = session;
             return CKR.CKR_OK;
@@ -40,7 +41,7 @@ public sealed class Pkcs11SessionHandleRangeTests
     public void SessionId_RoundTripsAcrossTheWholeCkUlongRange(ulong sessionId)
     {
         using var library = new ClosingLibrary();
-        using var handle = new Pkcs11SessionHandle(library, (NativeCULong)sessionId);
+        using var handle = new Pkcs11SessionHandle(library.LowLevel, (NativeCULong)sessionId);
 
         Assert.Equal(sessionId, (ulong)handle.SessionId);
         Assert.False(handle.IsInvalid);
@@ -54,7 +55,7 @@ public sealed class Pkcs11SessionHandleRangeTests
         ulong highBit = (max >> 1) + 2;
 
         using var library = new ClosingLibrary();
-        var handle = new Pkcs11SessionHandle(library, (NativeCULong)highBit);
+        var handle = new Pkcs11SessionHandle(library.LowLevel, (NativeCULong)highBit);
 
         Assert.False(handle.IsInvalid);
         handle.Dispose();
@@ -67,7 +68,7 @@ public sealed class Pkcs11SessionHandleRangeTests
     public void InvalidHandle_ReportsInvalid_AndIsNeverClosed()
     {
         using var library = new ClosingLibrary();
-        var handle = new Pkcs11SessionHandle(library, (NativeCULong)CK.CK_INVALID_HANDLE);
+        var handle = new Pkcs11SessionHandle(library.LowLevel, (NativeCULong)CK.CK_INVALID_HANDLE);
 
         Assert.True(handle.IsInvalid);
         handle.Dispose();
