@@ -2,19 +2,19 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 
 /// <summary>
-/// ChaCha20Poly1305Pkcs11 over the in-process <c>ManagedSoftToken</c>. The token reports
-/// <c>IsMessageApiSupported=false</c>, so the adapter uses its PKCS#11 v2.40 single-part path
+/// ChaCha20Poly1305Pkcs11 over the in-process <c>ManagedSoftToken</c>. The token implements
+/// no message-API function, so the adapter uses its PKCS#11 v2.40 single-part path
 /// (ciphertext‖tag). Real crypto is cross-checked against the BCL <see cref="ChaCha20Poly1305"/>
 /// primitive (RFC 8439). ChaCha20-Poly1305 fixes the key at 32 bytes, the nonce at 12, and the tag
 /// at 16. The crypto cases are gated on platform support.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
 {
     private static byte[] H(string hex) => Convert.FromHexString(hex);

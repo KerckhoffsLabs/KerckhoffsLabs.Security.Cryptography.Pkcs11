@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
@@ -23,6 +24,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// defaults onto a public-key template.
 /// </para>
 /// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class SecureDefaultsGateCoverageTests
 {
     private static (Pkcs11Library Library, Pkcs11Workspace Workspace) New()

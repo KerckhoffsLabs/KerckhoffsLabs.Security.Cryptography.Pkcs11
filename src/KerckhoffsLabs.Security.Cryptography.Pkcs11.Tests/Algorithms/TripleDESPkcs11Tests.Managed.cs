@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // TripleDESPkcs11 is [Obsolete] (64-bit block / Sweet32, NIST-deprecated); the secure-defaults gate is
@@ -20,8 +21,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// secure-defaults gate is still in force: each cipher op must run inside <c>UsePolicy(CryptoPolicy.AllowInsecure)</c> and
 /// throws <see cref="CryptoPolicyViolationException"/> without it.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class TripleDESPkcs11Tests_Managed
 {
     // 24-byte three-key 3DES key with three distinct, non-weak DES subkeys, so the BCL TripleDES key

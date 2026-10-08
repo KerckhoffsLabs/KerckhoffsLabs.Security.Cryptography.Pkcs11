@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // CKM_RSA_PKCS is used deliberately here to hit MapRsaSignMechanism's "no managed equivalent" arm
@@ -28,6 +29,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// BCL-generated public key, and a real signature — produced independently by that same managed key
 /// — is verified through the fallback, so this is a genuine round trip, not just "doesn't throw".
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11KeyVerifyManagedFallbackTests
 {
     private static readonly byte[] Data = Encoding.UTF8.GetBytes("verify via synthesized public key");
@@ -79,12 +81,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         RSAParameters pub = rsa.ExportParameters(includePrivateParameters: false);
         byte[] signature = rsa.SignData(Data, hash, padding);
 
-        using var key = FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
         {
             CKA.CKA_MODULUS => (CKR.CKR_OK, pub.Modulus),
             CKA.CKA_PUBLIC_EXPONENT => (CKR.CKR_OK, pub.Exponent),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         }, Mechanics);
+        Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(mechanismType), Data, signature));
 
@@ -99,12 +102,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         using var rsa = RSA.Create(2048);
         RSAParameters pub = rsa.ExportParameters(includePrivateParameters: false);
 
-        using var key = FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
         {
             CKA.CKA_MODULUS => (CKR.CKR_OK, pub.Modulus),
             CKA.CKA_PUBLIC_EXPONENT => (CKR.CKR_OK, pub.Exponent),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         }, Mechanics);
+        Pkcs11Key key = fake;
 
         var ex = Assert.Throws<NotSupportedException>(
             () => key.Verify(new Mechanism(CKM.CKM_RSA_PKCS), Data, new byte[256]));
@@ -114,7 +118,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     [Fact]
     public void Verify_PrivateOnlyRsaKey_AttributesSensitive_ThrowsHandleInvalid()
     {
-        using var key = FakeKeys.Create(CKK.CKK_RSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null), Mechanics);
+        using var fake = FakeKeys.Create(CKK.CKK_RSA, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null), Mechanics);
+        Pkcs11Key key = fake;
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
             () => key.Verify(new Mechanism(CKM.CKM_SHA256_RSA_PKCS), Data, new byte[256]));
@@ -139,12 +144,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         byte[] hash = SHA256.HashData(Data);
         byte[] signature = ec.SignHash(hash);
 
-        using var key = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
         {
             CKA.CKA_EC_POINT => (CKR.CKR_OK, EncodeEcPoint(pub.Q)),
             CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         }, Mechanics);
+        Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(CKM.CKM_ECDSA), hash, signature));
 
@@ -166,12 +172,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         var hash = new HashAlgorithmName(hashName);
         byte[] signature = ec.SignData(Data, hash);
 
-        using var key = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
         {
             CKA.CKA_EC_POINT => (CKR.CKR_OK, EncodeEcPoint(pub.Q)),
             CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         }, Mechanics);
+        Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(mechanismType), Data, signature));
 
@@ -186,12 +193,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         ECParameters pub = ec.ExportParameters(includePrivateParameters: false);
 
-        using var key = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
         {
             CKA.CKA_EC_POINT => (CKR.CKR_OK, EncodeEcPoint(pub.Q)),
             CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         }, Mechanics);
+        Pkcs11Key key = fake;
 
         // CKM_ECDSA_SHA224 is used here only because Pkcs11Key's managed-verify fallback (MapEcdsaMechanism)
         // has no case for it; the key runs under AllowInsecure so the policy lets it through to that arm.
@@ -203,7 +211,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     [Fact]
     public void Verify_PrivateOnlyEcKey_AttributesUnreadable_ThrowsHandleInvalid()
     {
-        using var key = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null), Mechanics);
+        using var fake = FakeKeys.Create(CKK.CKK_EC, _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null), Mechanics);
+        Pkcs11Key key = fake;
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
             () => key.Verify(new Mechanism(CKM.CKM_ECDSA_SHA256), Data, new byte[64]));
@@ -214,7 +223,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     // A key with no public handle verifies in managed code. The workspace policy must judge that
     // verification exactly as it judges one done on the token.
 
-    private static Pkcs11Key PrivateOnlyRsaKey(RSAParameters pub, ICryptoPolicy? policy) =>
+    private static FakeKey PrivateOnlyRsaKey(RSAParameters pub, ICryptoPolicy? policy) =>
         FakeKeys.Create(CKK.CKK_RSA, ca => ca switch
         {
             CKA.CKA_MODULUS => (CKR.CKR_OK, pub.Modulus),
@@ -230,7 +239,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         var (hash, padding) = HashAndPaddingFor(mechanismType);
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, hash, padding);
-        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        Pkcs11Key key = fake;
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => key.Verify(new Mechanism(mechanismType), Data, signature));
@@ -243,7 +253,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     {
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
-        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(CKM.CKM_SHA256_RSA_PKCS_PSS), Data, signature));
     }
@@ -252,7 +263,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     public void ManagedFallback_UnderSecureOnly_RefusesAnUnlistedVendorMechanism()
     {
         using var rsa = RSA.Create(2048);
-        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), policy: null);
+        Pkcs11Key key = fake;
 
         Assert.Throws<CryptoPolicyViolationException>(
             () => key.Verify(new Mechanism((CKM)0x8000_1234UL), Data, new byte[256]));
@@ -265,7 +277,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     {
         using var rsa = RSA.Create(2048);
         byte[] signature = rsa.SignData(Data, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
-        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), CryptoPolicy.FipsOnly);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), CryptoPolicy.FipsOnly);
+        Pkcs11Key key = fake;
 
         Assert.True(key.Verify(new Mechanism(CKM.CKM_SHA1_RSA_PKCS), Data, signature));
     }
@@ -276,12 +289,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         ECParameters pub = ec.ExportParameters(includePrivateParameters: false);
         byte[] signature = ec.SignData(Data, HashAlgorithmName.SHA1);
-        using var key = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
         {
             CKA.CKA_EC_POINT => (CKR.CKR_OK, EncodeEcPoint(pub.Q)),
             CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         });
+        Pkcs11Key key = fake;
 
         Assert.Throws<CryptoPolicyViolationException>(
             () => key.Verify(new Mechanism(CKM.CKM_ECDSA_SHA1), Data, signature));
@@ -300,7 +314,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     public void ManagedFallback_RsaKey_WideVendorMechanism_IsNotSupported()
     {
         using var rsa = RSA.Create(2048);
-        using var key = PrivateOnlyRsaKey(rsa.ExportParameters(false), Mechanics);
+        using var fake = PrivateOnlyRsaKey(rsa.ExportParameters(false), Mechanics);
+        Pkcs11Key key = fake;
 
         Assert.Throws<NotSupportedException>(
             () => key.Verify(new Mechanism(WideVendorMechanism), Data, new byte[256]));
@@ -311,12 +326,13 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     {
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         ECParameters pub = ec.ExportParameters(includePrivateParameters: false);
-        using var key = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
+        using var fake = FakeKeys.Create(CKK.CKK_EC, ca => ca switch
         {
             CKA.CKA_EC_POINT => (CKR.CKR_OK, EncodeEcPoint(pub.Q)),
             CKA.CKA_EC_PARAMS => (CKR.CKR_OK, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams()),
             _ => (CKR.CKR_ATTRIBUTE_SENSITIVE, null),
         }, Mechanics);
+        Pkcs11Key key = fake;
 
         Assert.Throws<NotSupportedException>(
             () => key.Verify(new Mechanism(WideVendorMechanism), Data, new byte[64]));

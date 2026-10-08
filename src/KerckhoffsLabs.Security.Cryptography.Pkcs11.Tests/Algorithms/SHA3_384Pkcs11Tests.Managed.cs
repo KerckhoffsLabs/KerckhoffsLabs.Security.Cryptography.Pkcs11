@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
@@ -12,8 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// (FIPS 202). The managed token does provide <c>CKM_SHA3_384</c>, so the only gate left is host BCL
 /// SHA-3 availability (OpenSSL 3.x / Windows 11+), expressed via <see cref="SHA3_384.IsSupported"/>.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class SHA3_384Pkcs11Tests_Managed
 {
 

@@ -5,6 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 #pragma warning disable SYSLIB5006 // ML-DSA (and its external-mu / PKCS#8 export members) are evaluation-only BCL APIs.
@@ -21,8 +22,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// PQC support — OpenSSL 3.5+ or a recent Windows); construction / argument-validation cases that throw
 /// before any native call stay <c>[Fact]</c>.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class MLDsaPkcs11Tests_Managed
 {
     private static MLDsaAlgorithm MapAlgorithm(CkpMlDsa parameterSet) => parameterSet switch

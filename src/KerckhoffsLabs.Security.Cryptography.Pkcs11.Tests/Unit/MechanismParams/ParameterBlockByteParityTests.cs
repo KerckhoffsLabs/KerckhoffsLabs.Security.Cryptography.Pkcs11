@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
@@ -14,6 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// <see cref="MechanismParameters.BuildMarshalable"/> promises the native layer; before it, the
 /// same cases compared the typed write against the boxed <see cref="object"/> path it replaced.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed unsafe class ParameterBlockByteParityTests
 {
     private static readonly Dictionary<string, ParameterCase> Cases = new(StringComparer.Ordinal)

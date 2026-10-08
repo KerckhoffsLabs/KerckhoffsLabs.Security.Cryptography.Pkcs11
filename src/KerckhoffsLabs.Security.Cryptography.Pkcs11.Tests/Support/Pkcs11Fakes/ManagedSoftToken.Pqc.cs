@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 #pragma warning disable SYSLIB5006 // ML-DSA / SLH-DSA / ML-KEM are evaluation-only BCL APIs.
 
@@ -75,27 +76,27 @@ internal sealed partial class ManagedSoftToken
 
     // === ML-KEM encapsulate / decapsulate ================================
 
-    public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+    protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong derivedKey)
     {
         ciphertextLen = (NativeCULong)0;
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!_asymKeys.TryGetValue((ulong)publicKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;
 
         int ctSize = kem.Algorithm.CiphertextSizeInBytes;
-        if (lengthOnly || ciphertext.Length < ctSize)
+        if (ciphertext.IsNull || ciphertext.Span.Length < ctSize)
         {
             ciphertextLen = (NativeCULong)(ulong)ctSize; // length probe
             return CKR.CKR_BUFFER_TOO_SMALL;
         }
 
         kem.Encapsulate(out byte[] ct, out byte[] sharedSecret);
-        ct.AsSpan(0, ct.Length).CopyTo(ciphertext);
+        ct.AsSpan(0, ct.Length).CopyTo(ciphertext.Span);
         ciphertextLen = (NativeCULong)(ulong)ct.Length;
         derivedKey = (NativeCULong)StoreSharedSecret(template, sharedSecret);
         return CKR.CKR_OK;
     }
 
-    public override CKR C_DecapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong privateKey, ReadOnlySpan<CK_ATTRIBUTE> template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
+    protected override CKR C_DecapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong privateKey, CK_ATTRIBUTE[] template, ReadOnlySpan<byte> ciphertext, ref NativeCULong derivedKey)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!_asymKeys.TryGetValue((ulong)privateKey, out var k) || k is not MLKem kem) return CKR.CKR_KEY_HANDLE_INVALID;

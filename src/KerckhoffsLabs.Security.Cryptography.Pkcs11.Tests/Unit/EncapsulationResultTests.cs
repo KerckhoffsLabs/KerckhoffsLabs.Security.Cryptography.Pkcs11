@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -11,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// result's own logic does not depend on how the key was produced, and ML-KEM's own encapsulate/
 /// decapsulate correctness is covered separately in <c>Algorithms/MLKemPkcs11TestCases.cs</c>.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class EncapsulationResultTests
 {
     private static Pkcs11Workspace NewWorkspace(out Pkcs11Library library)

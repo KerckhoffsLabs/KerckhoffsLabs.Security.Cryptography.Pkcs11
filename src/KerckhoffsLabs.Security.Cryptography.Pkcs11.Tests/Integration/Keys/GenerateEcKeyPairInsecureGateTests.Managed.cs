@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
@@ -7,8 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 // SHA-1/DES secure-defaults gate. Runs on the in-process managed token (real keygen). P-224 is the
 // weak curve used here; the throws-path needs no keygen, but actually generating it needs BCL P-224
 // support — macOS's SecurityFramework lacks it, so the generate case is gated on a probe.
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class GenerateEcKeyPairInsecureGateTests
 {
     public static bool P224Supported { get; } = ProbeP224();

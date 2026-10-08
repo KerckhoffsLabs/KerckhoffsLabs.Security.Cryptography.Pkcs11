@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
@@ -10,7 +11,7 @@ internal sealed partial class ManagedSoftToken
 {
     private readonly Dictionary<ulong, ulong> _digestOps = [];
 
-    public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism)
+    protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
         if (!IsDigest((CKM)(ulong)mechanism.Mechanism)) return CKR.CKR_MECHANISM_INVALID;
@@ -18,7 +19,7 @@ internal sealed partial class ManagedSoftToken
         return CKR.CKR_OK;
     }
 
-    public override CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen)
+    protected override CKR C_Digest(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> digest, ref NativeCULong digestLen)
     {
         digestLen = (NativeCULong)0;
         if (!_digestOps.TryGetValue((ulong)session, out var mech)) return CKR.CKR_OPERATION_NOT_INITIALIZED;
@@ -27,10 +28,10 @@ internal sealed partial class ManagedSoftToken
         try { result = ComputeDigest((CKM)mech, data.ToArray()); }
         catch (PlatformNotSupportedException) { _digestOps.Remove((ulong)session); return CKR.CKR_MECHANISM_INVALID; }
 
-        if (lengthOnly) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
-        if (digest.Length < result.Length) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+        if (digest.IsNull) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_OK; }
+        if (digest.Span.Length < result.Length) { digestLen = (NativeCULong)(ulong)result.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
 
-        result.AsSpan(0, result.Length).CopyTo(digest);
+        result.AsSpan(0, result.Length).CopyTo(digest.Span);
         digestLen = (NativeCULong)(ulong)result.Length;
         _digestOps.Remove((ulong)session);
         return CKR.CKR_OK;

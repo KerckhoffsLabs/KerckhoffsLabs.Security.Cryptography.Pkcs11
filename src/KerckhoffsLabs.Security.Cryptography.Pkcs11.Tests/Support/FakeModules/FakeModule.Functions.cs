@@ -340,7 +340,13 @@ internal abstract unsafe partial class FakeModule
     private static NativeCULong FinalizeLibrary(void* pReserved)
     {
         if (Active(nameof(C_Finalize)) is not { } m) return Rv(CKR.CKR_CRYPTOKI_NOT_INITIALIZED);
-        try { return Rv(m.C_Finalize((IntPtr)pReserved)); }
+        try
+        {
+            CKR rv = m.C_Finalize((IntPtr)pReserved);
+            if (rv == CKR.CKR_OK && m.ReleasedByFinalize)
+                m.Release();
+            return Rv(rv);
+        }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 

@@ -2,6 +2,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams;
@@ -45,6 +46,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// serves this mechanism, so it cannot be exercised end to end in this repository.
 /// </para>
 /// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class VendorMlKemParamsTests
 {
     private const CKM CkmIbmMlKem = (CKM)0x80010037UL;   // CKM_VENDOR_DEFINED + 0x10037

@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Workspace;
@@ -8,14 +9,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Workspac
 /// (<c>C_Logout</c>) before closing the session, so the token's audit log records an explicit
 /// logout — and that a failing logout never makes disposal throw.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class WorkspaceDisposeTests
 {
     private static (Pkcs11Library library, ManagedSoftToken token) NewLibrary()
     {
         var token = new ManagedSoftToken();
-        return (new Pkcs11Library(token), token);
+        return (token.Load(), token);
     }
 
     [Fact]

@@ -95,8 +95,23 @@ internal abstract unsafe partial class FakeModule : IDisposable
 
     public void Dispose()
     {
+        if (Release())
+            _fault?.Throw();
+    }
+
+    /// <summary>
+    /// Whether a successful <c>C_Finalize</c> releases this module, for a module a test reaches only through
+    /// the <see cref="Pkcs11Library"/> from <see cref="Load"/>: disposing that library finalizes the module,
+    /// and so releases it. A fault such a module records is lost with it, so this suits a module that models
+    /// a token, not one that injects faults.
+    /// </summary>
+    protected virtual bool ReleasedByFinalize => false;
+
+    /// <summary>Unregisters the module and frees its tables, once; <see langword="false"/> if already done.</summary>
+    private bool Release()
+    {
         if (_disposed)
-            return;
+            return false;
         _disposed = true;
 
         Disposing();
@@ -108,7 +123,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
         Marshal.FreeHGlobal(_interfaceName);
         Marshal.FreeHGlobal(_interface);
         _functionList = _interfaceTable = _interfaceName = _interface = IntPtr.Zero;
-        _fault?.Throw();
+        return true;
     }
 
     /// <summary>Releases what a derived module holds before the module unregisters and frees its tables.</summary>

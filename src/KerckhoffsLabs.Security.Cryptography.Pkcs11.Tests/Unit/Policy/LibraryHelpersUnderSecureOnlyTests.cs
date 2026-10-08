@@ -3,6 +3,7 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // ML-KEM / ML-DSA are evaluation-only BCL APIs (SYSLIB5006).
@@ -16,8 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 /// <c>AllowInsecure</c>. Runs against the in-process <see cref="ManagedSoftToken"/>, with the workspace
 /// opened under the default policy (no <c>UsePolicy</c> lease anywhere in this class).
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class LibraryHelpersUnderSecureOnlyTests
 {
     private static readonly byte[] Message = Encoding.UTF8.GetBytes("secure-only helper payload");

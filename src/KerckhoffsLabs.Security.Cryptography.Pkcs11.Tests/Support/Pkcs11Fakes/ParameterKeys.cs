@@ -14,17 +14,33 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 internal sealed class ParameterKeys : IDisposable
 {
     private readonly Pkcs11Library _library;
+    private readonly bool _ownsLibrary;
+    private ulong _lastSessionId;
 
     public ParameterKeys(ICryptoPolicy? policy = null)
+        : this(new AttributeResponseModule(_ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null)).Load(), ownsLibrary: true, sessionId: 1, policy)
     {
-        var lowLevel = new AttributeResponseFakeLibrary(_ => (CKR.CKR_ATTRIBUTE_TYPE_INVALID, null));
-        _library = new Pkcs11Library(lowLevel);
+        _lastSessionId = 1;
+    }
+
+    private ParameterKeys(Pkcs11Library library, bool ownsLibrary, ulong sessionId, ICryptoPolicy? policy)
+    {
+        _library = library;
+        _ownsLibrary = ownsLibrary;
+        var lowLevel = library.LowLevelLibrary!;
         var slot = new Pkcs11Slot(lowLevel, slotId: 1);
-        var session = new Pkcs11Session(lowLevel, sessionId: 1, policy: policy);
-        Workspace = new Pkcs11Workspace(_library, slot, session);
+        var session = new Pkcs11Session(lowLevel, sessionId, policy: policy);
+        Workspace = new Pkcs11Workspace(library, slot, session);
     }
 
     public Pkcs11Workspace Workspace { get; }
+
+    /// <summary>
+    /// Another workspace, with its own session, on the same module (only one fake module may be alive at
+    /// a time), for keys that belong to a different workspace. Dispose it before this one.
+    /// </summary>
+    public ParameterKeys OtherWorkspace(ICryptoPolicy? policy = null)
+        => new(_library, ownsLibrary: false, sessionId: ++_lastSessionId, policy);
 
     /// <summary>A scope for a call made on this workspace's session.</summary>
     public MechanismParameterScope NewScope() => new SessionParameterScope(Workspace.Session);
@@ -49,6 +65,7 @@ internal sealed class ParameterKeys : IDisposable
     public void Dispose()
     {
         Workspace.Dispose();
-        _library.Dispose();
+        if (_ownsLibrary)
+            _library.Dispose();
     }
 }

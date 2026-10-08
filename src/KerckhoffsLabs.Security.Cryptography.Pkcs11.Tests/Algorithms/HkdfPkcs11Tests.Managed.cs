@@ -3,6 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 // SHA-1 and MD5 are passed on purpose: their refusal is the behaviour under test.
@@ -16,8 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <see cref="HKDF"/> for the same inputs, and every argument error with the exception <see cref="HKDF"/>
 /// throws for the same bad argument, so the adapter's contract is checked against the BCL's own.
 /// </summary>
-[NoBackendCollection("Drives a per-test ManagedSoftToken in process — no native module is loaded and " +
-                     "the token holds no static state, so this is safe alongside every backend collection.")]
+[Collection(FakeModuleCollection.Name)]
 public sealed class HkdfPkcs11Tests_Managed
 {
     // RFC 5869 appendix A.1 (SHA-256).
