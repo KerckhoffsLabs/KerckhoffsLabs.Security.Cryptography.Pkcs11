@@ -30,6 +30,7 @@ public sealed class OperationCostGuardTests
     private const int SmallInput = 1 << 20;
     private const int LargeInput = 2 << 20;
 
+    // An ECDSA signature's length depends on the key, which would cost an attribute read to learn.
     [Fact]
     public void Sign_MakesALengthProbeAndOneSignCall()
     {
@@ -43,8 +44,9 @@ public sealed class OperationCostGuardTests
         Assert.Equal(2, module.CallCount("C_Sign"));
     }
 
+    // A digest's length is fixed by its mechanism, so the output is sized up front: no length query.
     [Fact]
-    public void Digest_MakesALengthProbeAndOneDigestCall()
+    public void Digest_SizesTheOutputUpFront_AndMakesOneDigestCall()
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
@@ -53,7 +55,21 @@ public sealed class OperationCostGuardTests
         session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
         Assert.Equal(1, module.CallCount("C_DigestInit"));
-        Assert.Equal(2, module.CallCount("C_Digest"));
+        Assert.Equal(1, module.CallCount("C_Digest"));
+    }
+
+    // As for a digest: an HMAC's length is the hash's.
+    [Fact]
+    public void Sign_WithAnHmac_SizesTheOutputUpFront_AndMakesOneSignCall()
+    {
+        using var module = new EchoModule();
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+
+        session.Sign(new Mechanism(CKM.CKM_SHA512_HMAC), new ObjectHandle(1), "data"u8);
+
+        Assert.Equal(1, module.CallCount("C_SignInit"));
+        Assert.Equal(1, module.CallCount("C_Sign"));
     }
 
     [Fact]

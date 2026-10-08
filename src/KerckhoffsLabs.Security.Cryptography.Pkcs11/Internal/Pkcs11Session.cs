@@ -1975,9 +1975,9 @@ internal sealed class Pkcs11Session : IDisposable
     /// </summary>
     private delegate CKR InputLengthProbedCall(ReadOnlySpan<byte> input, Span<byte> buffer, bool lengthOnly, out NativeCULong length);
 
-    /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string)"/>
-    private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation)
-        => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(buffer, lengthOnly, out length), operation);
+    /// <inheritdoc cref="CallWithLengthProbe(ReadOnlySpan{byte}, InputLengthProbedCall, string, int?, Func{CKR})"/>
+    private static byte[] CallWithLengthProbe(LengthProbedCall call, string operation, int? guess = null)
+        => CallWithLengthProbe([], (ReadOnlySpan<byte> _, Span<byte> buffer, bool lengthOnly, out NativeCULong length) => call(buffer, lengthOnly, out length), operation, guess);
 
     /// <summary>
     /// Runs the PKCS#11 two-call pattern: query the output length, allocate, fill,
@@ -1990,8 +1990,42 @@ internal sealed class Pkcs11Session : IDisposable
     /// operation active (PKCS#11 v3.2 §5.2), so it is retried once with the size the module then asks
     /// for. A trimmed buffer is zeroized, since for a decryption it holds plaintext.
     /// </remarks>
-    private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation)
+    /// <param name="input">The operation's input, passed to every call.</param>
+    /// <param name="call">One call into the module.</param>
+    /// <param name="operation">The function, for errors.</param>
+    /// <param name="guess">
+    /// The output length when the mechanism fixes it (<see cref="KnownOutputLength"/>). The output is then
+    /// sized up front and filled in one call; a wrong guess is trimmed, or corrected through
+    /// <c>CKR_BUFFER_TOO_SMALL</c>.
+    /// </param>
+    /// <param name="restart">
+    /// Starts the operation again, for a module that ends it on <c>CKR_BUFFER_TOO_SMALL</c> against PKCS#11
+    /// v3.2 §5.2 (NSS does): the retry then fails with <c>CKR_OPERATION_NOT_INITIALIZED</c>, and the output
+    /// is found with a length query on the restarted operation instead.
+    /// </param>
+    private static byte[] CallWithLengthProbe(ReadOnlySpan<byte> input, InputLengthProbedCall call, string operation,
+        int? guess = null, Func<CKR>? restart = null)
     {
+        if (guess is int guessed)
+        {
+            byte[] guessBuffer = new byte[guessed];
+            CKR filled = call(input, guessBuffer, lengthOnly: false, out NativeCULong written);
+            if (filled == CKR.CKR_OK)
+                return ReportedLength.Trim(guessBuffer, written, operation);
+            CryptographicOperations.ZeroMemory(guessBuffer);
+            if (filled != CKR.CKR_BUFFER_TOO_SMALL)
+                throw Pkcs11Exception.Create(filled, operation);
+
+            byte[] sized = new byte[ReportedLength.ForAllocation(written, operation)];
+            filled = call(input, sized, lengthOnly: false, out written);
+            if (filled != CKR.CKR_OPERATION_NOT_INITIALIZED || restart is null)
+            {
+                Pkcs11Exception.ThrowIfError(filled, operation);
+                return ReportedLength.Trim(sized, written, operation);
+            }
+            Pkcs11Exception.ThrowIfError(restart(), operation);
+        }
+
         CKR rv = call(input, default, lengthOnly: true, out NativeCULong reported);
         Pkcs11Exception.ThrowIfError(rv, operation);
 
@@ -2126,7 +2160,8 @@ internal sealed class Pkcs11Session : IDisposable
 
         byte[] digest = CallWithLengthProbe(
             (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, lengthOnly, out length),
-            OpDigestFinal);
+            OpDigestFinal,
+            KnownOutputLength.Of(digestingMechanism.Type));
         operation.Completed();
 
         digestingMechanism.AbsorbOutput(digestParams);
@@ -2612,7 +2647,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         byte[] signature = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, lengthOnly, out len),
-            OpSign);
+            OpSign,
+            KnownOutputLength.Of(mechanism.Type),
+            () => _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId));
         operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -2972,17 +3009,15 @@ internal sealed class Pkcs11Session : IDisposable
         rv = _pkcs11Library.C_DigestKey(_sessionId, (NativeCULong)(keyHandle.ObjectId));
         Pkcs11Exception.ThrowIfError(rv, OpDigestKey);
 
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, default, lengthOnly: true, out NativeCULong digestLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-
-        byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, lengthOnly: false, out digestLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+        byte[] digest = CallWithLengthProbe(
+            (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, lengthOnly, out length),
+            OpDigestFinal,
+            KnownOutputLength.Of(mechanism.Type));
         operation.Completed();
 
         mechanism.AbsorbOutput(mechParams);
 
-        return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
+        return digest;
     }
 
     /// <summary>
@@ -3012,7 +3047,9 @@ internal sealed class Pkcs11Session : IDisposable
 
         byte[] digest = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Digest(_sessionId, input, buf, lengthOnly, out len),
-            OpDigest);
+            OpDigest,
+            KnownOutputLength.Of(mechanism.Type),
+            () => _pkcs11Library.C_DigestInit(_sessionId, ref ckMechanism));
         operation.Completed();
 
         // Absorbed before returning, so the scope that owns the parameter block is still alive.
@@ -3092,17 +3129,15 @@ internal sealed class Pkcs11Session : IDisposable
             Pkcs11Exception.ThrowIfError(rv, OpDigestUpdate);
         }
 
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, default, lengthOnly: true, out NativeCULong digestLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
-
-        byte[] digest = new byte[ReportedLength.ForAllocation(digestLen, OpDigestFinal)];
-        rv = _pkcs11Library.C_DigestFinal(_sessionId, digest, lengthOnly: false, out digestLen);
-        Pkcs11Exception.ThrowIfError(rv, OpDigestFinal);
+        byte[] digest = CallWithLengthProbe(
+            (Span<byte> buffer, bool lengthOnly, out NativeCULong length) => _pkcs11Library.C_DigestFinal(_sessionId, buffer, lengthOnly, out length),
+            OpDigestFinal,
+            KnownOutputLength.Of(mechanism.Type));
         operation.Completed();
 
         mechanism.AbsorbOutput(mechParams);
 
-        return ReportedLength.Trim(digest, digestLen, OpDigestFinal);
+        return digest;
     }
 
     /// <summary>
