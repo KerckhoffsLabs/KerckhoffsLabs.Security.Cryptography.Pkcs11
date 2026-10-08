@@ -325,9 +325,18 @@ public sealed class Pkcs11SessionTests
         Assert.Equal(new byte[] { 0xAA, 0xBB }, s.Digest(mech, [1]));
     }
 
+    // An ECDSA signature's length is not known up front, so it is asked for first; that query can fail.
+    [Fact]
+    public void Sign_LengthQueryError_Throws()
+    {
+        var fake = new CryptoFake { ProbeRv = CKR.CKR_FUNCTION_FAILED };
+        var s = NewSession(fake);
+        Assert.ThrowsAny<Pkcs11Exception>(() => s.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), [1]));
+    }
+
+    // A digest's length is known, so there is no probe to fail: the first call fills the output.
     [Theory]
     [InlineData("init")]
-    [InlineData("probe")]
     [InlineData("final")]
     public void Digest_NativeError_Throws(string failingCall)
     {
