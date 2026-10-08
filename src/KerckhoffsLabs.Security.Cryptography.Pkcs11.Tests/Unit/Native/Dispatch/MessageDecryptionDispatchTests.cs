@@ -120,6 +120,23 @@ public sealed class MessageDecryptionDispatchTests
         Assert.Equal(0UL, (ulong)length);
     }
 
+    // No associated data and an empty ciphertext are real (empty) inputs, such as an AEAD message whose
+    // tag travels in the parameter: the call goes through and the module sees them empty.
+    [Fact]
+    public void DecryptMessage_WithEmptyAssociatedDataAndCiphertext_ReachesTheModule()
+    {
+        using var module = new MessageModule { Produces = [] };
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+
+        CKR rv = lowLevel.C_DecryptMessage(DispatchSmoke.Session, Parameter, (NativeCULong)ParameterLength, [], [], [],
+            lengthOnly: false, out NativeCULong length);
+
+        Assert.Equal(CKR.CKR_OK, rv);
+        Assert.Empty(Assert.IsType<byte[]>(module.LastAssociatedData));
+        Assert.Empty(Assert.IsType<byte[]>(module.LastInput));
+        Assert.Equal(0UL, (ulong)length);
+    }
+
     [Theory]
     [MemberData(nameof(OutputFunctions))]
     public void Fill_ReportingMoreThanTheBuffer_IsRefused(string function)

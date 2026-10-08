@@ -54,6 +54,26 @@ public sealed class MechanismParameterScopeTests
     }
 
     [Fact]
+    public void Allocate_ZeroBytes_ReturnsZeroAndAllocatesNothing()
+    {
+        int before = UnmanagedMemory.OutstandingAllocationCount;
+        using var scope = new MechanismParameterScope();
+
+        Assert.Equal(IntPtr.Zero, scope.Allocate(0));
+        Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
+    }
+
+    [Fact]
+    public void WriteStructArray_Empty_ReturnsZeroAndAllocatesNothing()
+    {
+        int before = UnmanagedMemory.OutstandingAllocationCount;
+        using var scope = new MechanismParameterScope();
+
+        Assert.Equal(IntPtr.Zero, scope.WriteStructArray<CK_VERSION>([]));
+        Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
+    }
+
+    [Fact]
     public void WriteStructArray_LaysElementsOutContiguously()
     {
         using var scope = new MechanismParameterScope();
