@@ -1,8 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
@@ -13,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// made Dispose fail with "Concurrent access" before the session was ever closed, leaking it and
 /// replacing whatever exception a surrounding <c>using</c> was unwinding.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11WorkspaceDisposeRaceTests
 {
     private const ulong SessionId = 42;
@@ -24,7 +24,7 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
     /// Parks inside <c>C_GenerateRandom</c> until released, and records whether <c>C_Logout</c> or
     /// <c>C_CloseSession</c> was entered while that call was still on the stack.
     /// </summary>
-    private sealed class ParkingFake : FakeLowLevelPkcs11Library
+    private sealed class ParkingFake : FakeModule
     {
         internal readonly ManualResetEventSlim Entered = new(false);
         internal readonly ManualResetEventSlim Release = new(false);
@@ -40,10 +40,7 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
         private int _closes;
         internal int Closes => Volatile.Read(ref _closes);
 
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
-
-        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
             _inFlight = true;
             Entered.Set();
@@ -52,7 +49,7 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_Logout(NativeCULong session)
+        protected override CKR C_Logout(NativeCULong session)
         {
             if (_inFlight)
                 TouchedDuringNativeCall = true;
@@ -60,7 +57,7 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_CloseSession(NativeCULong session)
+        protected override CKR C_CloseSession(NativeCULong session)
         {
             if (_inFlight)
                 TouchedDuringNativeCall = true;
@@ -69,7 +66,7 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
         }
 
         /// <summary>Releases the two gates. Callers join every thread before disposing the fake.</summary>
-        public override void Dispose()
+        protected override void Disposing()
         {
             Entered.Dispose();
             Release.Dispose();
@@ -80,8 +77,9 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
     public async Task Dispose_WhileAnotherThreadIsMidCall_WaitsThenLogsOutAndClosesOnce()
     {
         using var fake = new ParkingFake();
-        using var library = new Pkcs11Library(fake);
-        var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(fake, slotId: 1), new Pkcs11Session(fake, SessionId));
+        using var library = fake.Load();
+        using var lowLevel = fake.LoadLowLevel();
+        var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11Session(lowLevel, SessionId));
 
         Task worker = OnItsOwnThread(() => _ = workspace.GenerateRandom(8));
         Assert.True(fake.Entered.Wait(Generous, TestContext.Current.CancellationToken), "the worker never reached the native call");
@@ -118,24 +116,22 @@ public sealed class Pkcs11WorkspaceDisposeRaceTests
     public void Dispose_WhenTheLogoutIsRejected_StillClosesTheSession()
     {
         using var fake = new RejectingLogoutFake();
-        using var library = new Pkcs11Library(fake);
-        var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(fake, slotId: 1), new Pkcs11Session(fake, SessionId));
+        using var library = fake.Load();
+        using var lowLevel = fake.LoadLowLevel();
+        var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11Session(lowLevel, SessionId));
 
         workspace.Dispose();
 
         Assert.Equal(1, fake.Closes);
     }
 
-    private sealed class RejectingLogoutFake : FakeLowLevelPkcs11Library
+    private sealed class RejectingLogoutFake : FakeModule
     {
         internal int Closes;
 
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
+        protected override CKR C_Logout(NativeCULong session) => CKR.CKR_USER_NOT_LOGGED_IN;
 
-        public override CKR C_Logout(NativeCULong session) => CKR.CKR_USER_NOT_LOGGED_IN;
-
-        public override CKR C_CloseSession(NativeCULong session)
+        protected override CKR C_CloseSession(NativeCULong session)
         {
             Closes++;
             return CKR.CKR_OK;

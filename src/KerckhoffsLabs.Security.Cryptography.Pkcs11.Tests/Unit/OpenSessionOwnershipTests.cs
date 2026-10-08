@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
@@ -11,6 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// factory) runs. If that code throws, the session is closed rather than left open with nothing to
 /// close it, which on a token with a small session limit is a denial of service.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class OpenSessionOwnershipTests
 {
     private const ulong SlotId = 3;
@@ -18,8 +19,8 @@ public sealed class OpenSessionOwnershipTests
     [Fact]
     public void LoggerThrowsOnTheOpenedLine_TheSessionIsClosed()
     {
-        var fake = new SessionFake();
-        var slot = new Pkcs11Slot(fake, SlotId, new ThrowingLoggerFactory(throwOnLog: "Opened"));
+        using var fake = new SessionFake();
+        var slot = new Pkcs11Slot(fake.LowLevel, SlotId, new ThrowingLoggerFactory(throwOnLog: "Opened"));
 
         Assert.Throws<LoggerFault>(() => slot.OpenSession());
 
@@ -29,8 +30,8 @@ public sealed class OpenSessionOwnershipTests
     [Fact]
     public void LoggerFactoryThrowsForTheSession_TheSessionIsClosed()
     {
-        var fake = new SessionFake();
-        var slot = new Pkcs11Slot(fake, SlotId, new ThrowingLoggerFactory(throwOnCategory: typeof(Pkcs11Session).FullName));
+        using var fake = new SessionFake();
+        var slot = new Pkcs11Slot(fake.LowLevel, SlotId, new ThrowingLoggerFactory(throwOnCategory: typeof(Pkcs11Session).FullName));
 
         Assert.Throws<LoggerFault>(() => slot.OpenSession());
 
@@ -40,9 +41,9 @@ public sealed class OpenSessionOwnershipTests
     [Fact]
     public void ModuleReturnsTheInvalidHandle_IsRefused_AndNothingIsClosed()
     {
-        var fake = new SessionFake { SessionId = (NativeCULong)CK.CK_INVALID_HANDLE };
+        using var fake = new SessionFake { SessionId = (NativeCULong)CK.CK_INVALID_HANDLE };
 
-        Assert.Throws<ArgumentException>(() => new Pkcs11Slot(fake, SlotId).OpenSession());
+        Assert.Throws<ArgumentException>(() => new Pkcs11Slot(fake.LowLevel, SlotId).OpenSession());
 
         Assert.Empty(fake.Closed);
     }
@@ -50,26 +51,26 @@ public sealed class OpenSessionOwnershipTests
     [Fact]
     public void NothingThrows_TheSessionStaysOpenUntilDisposed()
     {
-        var fake = new SessionFake();
+        using var fake = new SessionFake();
 
-        using (Pkcs11Session session = new Pkcs11Slot(fake, SlotId).OpenSession())
+        using (Pkcs11Session session = new Pkcs11Slot(fake.LowLevel, SlotId).OpenSession())
             Assert.Empty(fake.Closed);
 
         Assert.Equal([(NativeCULong)7UL], fake.Closed);
     }
 
-    private sealed class SessionFake : FakeLowLevelPkcs11Library
+    private sealed class SessionFake : SessionTestModule
     {
         public NativeCULong SessionId { get; init; } = (NativeCULong)7UL;
         public List<NativeCULong> Closed { get; } = [];
 
-        public override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, ref NativeCULong session)
+        protected override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
         {
             session = SessionId;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_CloseSession(NativeCULong session)
+        protected override CKR C_CloseSession(NativeCULong session)
         {
             Closed.Add(session);
             return CKR.CKR_OK;
