@@ -77,6 +77,15 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_DestroyObject(NativeCULong session, NativeCULong objectId) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GetObjectSize(NativeCULong session, NativeCULong objectId, ref NativeCULong size) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SetAttributeValue(NativeCULong session, NativeCULong objectId, CK_ATTRIBUTE[] template) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_InitPIN(NativeCULong session, ReadOnlySpan<byte> pin) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SetPIN(NativeCULong session, ReadOnlySpan<byte> oldPin, ReadOnlySpan<byte> newPin) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_CloseAllSessions(NativeCULong slotId) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetOperationState(NativeCULong session, NativeBuffer<byte> operationState, ref NativeCULong operationStateLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_LoginUser(NativeCULong session, NativeCULong userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_SessionCancel(NativeCULong session, NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_GetSessionValidationFlags(NativeCULong session, NativeCULong type, ref NativeCULong flags) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -209,6 +218,24 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_GetObjectSize)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)&GetObjectSize;
         if (Overrides(nameof(C_SetAttributeValue)))
             slots[nameof(CryptokiTable.C_SetAttributeValue)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, NativeCULong, NativeCULong>)&SetAttributeValue;
+        if (Overrides(nameof(C_InitPIN)))
+            slots[nameof(CryptokiTable.C_InitPIN)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&InitPIN;
+        if (Overrides(nameof(C_SetPIN)))
+            slots[nameof(CryptokiTable.C_SetPIN)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&SetPIN;
+        if (Overrides(nameof(C_CloseAllSessions)))
+            slots[nameof(CryptokiTable.C_CloseAllSessions)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&CloseAllSessions;
+        if (Overrides(nameof(C_GetSessionInfo)))
+            slots[nameof(CryptokiTable.C_GetSessionInfo)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong>)&GetSessionInfo;
+        if (Overrides(nameof(C_GetOperationState)))
+            slots[nameof(CryptokiTable.C_GetOperationState)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&GetOperationState;
+        if (Overrides(nameof(C_SetOperationState)))
+            slots[nameof(CryptokiTable.C_SetOperationState)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong, NativeCULong, NativeCULong>)&SetOperationState;
+        if (Overrides(nameof(C_LoginUser)))
+            slots[nameof(CryptokiTable.C_LoginUser)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&LoginUser;
+        if (Overrides(nameof(C_SessionCancel)))
+            slots[nameof(CryptokiTable.C_SessionCancel)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong>)&SessionCancel;
+        if (Overrides(nameof(C_GetSessionValidationFlags)))
+            slots[nameof(CryptokiTable.C_GetSessionValidationFlags)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, NativeCULong*, NativeCULong>)&GetSessionValidationFlags;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -957,6 +984,111 @@ internal abstract unsafe partial class FakeModule
         try
         {
             return Rv(m.C_SetAttributeValue(hSession, hObject, ReadTemplate(pTemplate, ulCount)));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong InitPIN(NativeCULong hSession, byte* pIn, NativeCULong ulInLen)
+    {
+        if (Owner(hSession, nameof(C_InitPIN)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_InitPIN(hSession, In(pIn, ulInLen))); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SetPIN(NativeCULong hSession, byte* pOldPin, NativeCULong ulOldLen, byte* pNewPin, NativeCULong ulNewLen)
+    {
+        if (Owner(hSession, nameof(C_SetPIN)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_SetPIN(hSession, In(pOldPin, ulOldLen), In(pNewPin, ulNewLen)));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong CloseAllSessions(NativeCULong slotId)
+    {
+        if (Owner(slotId, nameof(C_CloseAllSessions)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_CloseAllSessions(slotId));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetSessionInfo(NativeCULong hSession, void* pInfo)
+    {
+        if (Owner(hSession, nameof(C_GetSessionInfo)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            CK_SESSION_INFO info = ReadStruct<CK_SESSION_INFO>(pInfo);
+            CKR rv = m.C_GetSessionInfo(hSession, ref info);
+            WriteStruct(pInfo, in info);
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetOperationState(NativeCULong hSession, byte* pOut, NativeCULong* pulOutLen)
+    {
+        if (Owner(hSession, nameof(C_GetOperationState)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong length = *pulOutLen;
+            CKR rv = m.C_GetOperationState(hSession, new NativeBuffer<byte>(pOut, length), ref length);
+            *pulOutLen = length;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SetOperationState(NativeCULong hSession, byte* pState, NativeCULong ulStateLen, NativeCULong hEncryptionKey, NativeCULong hAuthenticationKey)
+    {
+        if (Owner(hSession, nameof(C_SetOperationState)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_SetOperationState(hSession, In(pState, ulStateLen), hEncryptionKey, hAuthenticationKey));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong LoginUser(NativeCULong hSession, NativeCULong userType, byte* pPin, NativeCULong ulPinLen, byte* pUsername, NativeCULong ulUsernameLen)
+    {
+        if (Owner(hSession, nameof(C_LoginUser)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_LoginUser(hSession, userType, In(pPin, ulPinLen), In(pUsername, ulUsernameLen)));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong SessionCancel(NativeCULong hSession, NativeCULong flags)
+    {
+        if (Owner(hSession, nameof(C_SessionCancel)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_SessionCancel(hSession, flags));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong GetSessionValidationFlags(NativeCULong hSession, NativeCULong type, NativeCULong* pFlags)
+    {
+        if (Owner(hSession, nameof(C_GetSessionValidationFlags)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong flags = *pFlags;
+            CKR rv = m.C_GetSessionValidationFlags(hSession, type, ref flags);
+            *pFlags = flags;
+            return Rv(rv);
         }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }

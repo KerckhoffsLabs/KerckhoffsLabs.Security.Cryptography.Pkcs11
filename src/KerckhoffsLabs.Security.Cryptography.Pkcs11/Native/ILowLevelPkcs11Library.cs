@@ -43,7 +43,7 @@ internal interface ILowLevelPkcs11Library : IDisposable
     CKR C_CloseSession(NativeCULong session);
     CKR C_CloseAllSessions(NativeCULong slotId);
     CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info);
-    CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, out NativeCULong operationStateLen);
+    CKR C_GetOperationState(NativeCULong session, Span<byte> operationState, bool lengthOnly, out NativeCULong operationStateLen);
     CKR C_SetOperationState(NativeCULong session, ReadOnlySpan<byte> operationState, NativeCULong encryptionKey, NativeCULong authenticationKey);
     CKR C_Login(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin);
     CKR C_LoginUser(NativeCULong session, CKU userType, ReadOnlySpan<byte> pin, ReadOnlySpan<byte> username);

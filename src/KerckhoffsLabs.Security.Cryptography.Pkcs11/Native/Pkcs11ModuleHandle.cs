@@ -222,7 +222,7 @@ internal sealed class Pkcs11ModuleHandle : SafeHandle
         bool serialized = EnterCall();
         try
         {
-            return Table.C_CloseSession(session).ToCKR();
+            return LowLevelPkcs11Library.CloseSession(Table, session);
         }
         finally
         {
