@@ -487,6 +487,37 @@ public sealed unsafe class TableLoaderTests : IDisposable
     public void MissingGetFunctionList_ThrowsEntryPointNotFound()
         => Assert.Throws<EntryPointNotFoundException>(() => LowLevelPkcs11Library.LoadTable(Resolver([])));
 
+    // CKR_OK with no table is a broken module, not an empty one: there is nothing to read the slots from.
+    [Fact]
+    public void GetFunctionList_SucceedingWithoutATable_IsRefused()
+    {
+        InstallModule(IntPtr.Zero);
+
+        var e = Assert.Throws<InvalidOperationException>(
+            () => LowLevelPkcs11Library.LoadTable(Resolver(new() { ["C_GetFunctionList"] = GetFunctionListStub })));
+        Assert.Contains("C_GetFunctionList", e.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A statically linked module (no library handle) is looked up in the host executable, through the
+    /// OS's own main-program symbol lookup. Run on every platform the suite runs on, this checks that path
+    /// agrees with the OS: it binds when the host exports <c>C_GetFunctionList</c>, and otherwise fails as
+    /// a missing entry point. Whether a test host exports it can vary (on some platforms the lookup also
+    /// sees libraries another test loaded), so the expectation follows the lookup rather than assuming it.
+    /// </summary>
+    [Fact]
+    public void StaticallyLinkedModule_IsResolvedInTheHostExecutable()
+    {
+        bool hostExports = NativeLibrary.TryGetExport(NativeLibrary.GetMainProgramHandle(), "C_GetFunctionList", out _);
+
+        Exception? error = Record.Exception(() => new LowLevelPkcs11Library().Dispose());
+
+        if (hostExports)
+            Assert.Null(error);
+        else
+            Assert.IsType<EntryPointNotFoundException>(error);
+    }
+
     [Fact]
     public void SlotName_Coverage_SanityCheck()
     {

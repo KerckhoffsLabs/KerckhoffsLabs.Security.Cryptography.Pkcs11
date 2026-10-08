@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
@@ -137,6 +139,86 @@ public sealed class ModuleLoadsTests
 
         Assert.Equal(["C_CloseSession", "C_Finalize"], module.Teardown);
         session.Dispose();
+    }
+
+    /// <summary>
+    /// A test module is identified by the object whose method resolves its exports, and a static method
+    /// has none: then the resolver itself is the identity. Two delegates for the same static method are
+    /// equal, so two loads through them are one module and share its Cryptoki state.
+    /// </summary>
+    [Fact]
+    public void LoadsThroughAStaticResolver_ShareTheModulesState()
+    {
+        StaticModule.Install();
+        try
+        {
+            Pkcs11Library first = new(new Func<string, IntPtr>(StaticModule.Resolve));
+            Pkcs11Library second = new(new Func<string, IntPtr>(StaticModule.Resolve));
+
+            first.Dispose();
+            Assert.Equal(0, StaticModule.Finalizes);
+
+            second.Dispose();
+            Assert.Equal(1, StaticModule.Finalizes);
+        }
+        finally
+        {
+            StaticModule.Uninstall();
+        }
+    }
+
+    /// <summary>
+    /// A v2.40 module whose exports come from a static method, so its resolver has no target. Like
+    /// <see cref="SharedStateModule"/>, its Cryptoki state is shared by every load.
+    /// </summary>
+    private static unsafe class StaticModule
+    {
+        private static IntPtr s_functionList;
+        private static int s_initialized;
+        private static int s_finalizes;
+
+        public static int Finalizes => Volatile.Read(ref s_finalizes);
+
+        public static void Install()
+        {
+            s_initialized = 0;
+            s_finalizes = 0;
+            s_functionList = NativeFunctionList.Allocate(2, 40, CryptokiTable.V240SlotCount, new Dictionary<string, IntPtr>
+            {
+                [nameof(CryptokiTable.C_Initialize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&Initialize,
+                [nameof(CryptokiTable.C_Finalize)] = (IntPtr)(delegate* unmanaged[Cdecl]<void*, NativeCULong>)&FinalizeLibrary,
+            });
+        }
+
+        public static void Uninstall()
+        {
+            Marshal.FreeHGlobal(s_functionList);
+            s_functionList = IntPtr.Zero;
+        }
+
+        public static IntPtr Resolve(string name)
+            => name == "C_GetFunctionList" ? (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr*, NativeCULong>)&GetFunctionList : IntPtr.Zero;
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        private static NativeCULong GetFunctionList(IntPtr* functionList)
+        {
+            *functionList = s_functionList;
+            return Rv(CKR.CKR_OK);
+        }
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        private static NativeCULong Initialize(void* initArgs)
+            => Rv(Interlocked.Exchange(ref s_initialized, 1) == 1 ? CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED : CKR.CKR_OK);
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        private static NativeCULong FinalizeLibrary(void* reserved)
+        {
+            Interlocked.Increment(ref s_finalizes);
+            Volatile.Write(ref s_initialized, 0);
+            return Rv(CKR.CKR_OK);
+        }
+
+        private static NativeCULong Rv(CKR rv) => (NativeCULong)(ulong)rv;
     }
 
     /// <summary>
