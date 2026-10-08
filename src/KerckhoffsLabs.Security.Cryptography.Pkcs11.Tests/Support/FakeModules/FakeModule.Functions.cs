@@ -105,6 +105,11 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_SignMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_SignMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_MessageSignFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_MessageVerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_MessageVerifyFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -296,6 +301,16 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_SignMessageNext)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong*, NativeCULong>)&SignMessageNext;
         if (Overrides(nameof(C_MessageSignFinal)))
             slots[nameof(CryptokiTable.C_MessageSignFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&MessageSignFinal;
+        if (Overrides(nameof(C_MessageVerifyInit)))
+            slots[nameof(CryptokiTable.C_MessageVerifyInit)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, void*, NativeCULong, NativeCULong>)&MessageVerifyInit;
+        if (Overrides(nameof(C_VerifyMessage)))
+            slots[nameof(CryptokiTable.C_VerifyMessage)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifyMessage;
+        if (Overrides(nameof(C_VerifyMessageBegin)))
+            slots[nameof(CryptokiTable.C_VerifyMessageBegin)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, NativeCULong>)&VerifyMessageBegin;
+        if (Overrides(nameof(C_VerifyMessageNext)))
+            slots[nameof(CryptokiTable.C_VerifyMessageNext)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifyMessageNext;
+        if (Overrides(nameof(C_MessageVerifyFinal)))
+            slots[nameof(CryptokiTable.C_MessageVerifyFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&MessageVerifyFinal;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -1376,6 +1391,55 @@ internal abstract unsafe partial class FakeModule
     {
         if (Owner(hSession, nameof(C_MessageSignFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
         try { return Rv(m.C_MessageSignFinal(hSession)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong MessageVerifyInit(NativeCULong hSession, void* pMechanism, NativeCULong hKey)
+    {
+        if (Owner(hSession, nameof(C_MessageVerifyInit)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_MessageVerifyInit(hSession, ReadStruct<CK_MECHANISM>(pMechanism), hKey)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyMessage(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pData, NativeCULong ulDataLen, byte* pSignature, NativeCULong ulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_VerifyMessage)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_VerifyMessage(hSession, pParameter, ulParameterLen, In(pData, ulDataLen), In(pSignature, ulSignatureLen)));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyMessageBegin(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen)
+    {
+        if (Owner(hSession, nameof(C_VerifyMessageBegin)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_VerifyMessageBegin(hSession, pParameter, ulParameterLen));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong VerifyMessageNext(NativeCULong hSession, IntPtr pParameter, NativeCULong ulParameterLen, byte* pData, NativeCULong ulDataLen, byte* pSignature, NativeCULong ulSignatureLen)
+    {
+        if (Owner(hSession, nameof(C_VerifyMessageNext)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_VerifyMessageNext(hSession, pParameter, ulParameterLen, In(pData, ulDataLen), In(pSignature, ulSignatureLen)));
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong MessageVerifyFinal(NativeCULong hSession)
+    {
+        if (Owner(hSession, nameof(C_MessageVerifyFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try { return Rv(m.C_MessageVerifyFinal(hSession)); }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
