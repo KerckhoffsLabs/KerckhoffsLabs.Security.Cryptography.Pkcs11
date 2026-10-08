@@ -110,6 +110,9 @@ internal abstract unsafe partial class FakeModule
     protected virtual CKR C_VerifyMessageBegin(NativeCULong session, IntPtr parameter, NativeCULong parameterLen) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_VerifyMessageNext(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_MessageVerifyFinal(NativeCULong session) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_AsyncComplete(NativeCULong session, string functionName, ref CK_ASYNC_DATA result) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_AsyncGetID(NativeCULong session, string functionName, ref NativeCULong id) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
+    protected virtual CKR C_AsyncJoin(NativeCULong session, string functionName, NativeCULong id, ReadOnlySpan<byte> data) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
     protected virtual CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData) => CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
     private void BindFunctions(Dictionary<string, IntPtr> slots)
@@ -311,6 +314,12 @@ internal abstract unsafe partial class FakeModule
             slots[nameof(CryptokiTable.C_VerifyMessageNext)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, IntPtr, NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&VerifyMessageNext;
         if (Overrides(nameof(C_MessageVerifyFinal)))
             slots[nameof(CryptokiTable.C_MessageVerifyFinal)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&MessageVerifyFinal;
+        if (Overrides(nameof(C_AsyncComplete)))
+            slots[nameof(CryptokiTable.C_AsyncComplete)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, void*, NativeCULong>)&AsyncComplete;
+        if (Overrides(nameof(C_AsyncGetID)))
+            slots[nameof(CryptokiTable.C_AsyncGetID)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong*, NativeCULong>)&AsyncGetID;
+        if (Overrides(nameof(C_AsyncJoin)))
+            slots[nameof(CryptokiTable.C_AsyncJoin)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong, NativeCULong>)&AsyncJoin;
         if (Overrides(nameof(C_GenerateRandom)))
             slots[nameof(CryptokiTable.C_GenerateRandom)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, NativeCULong>)&GenerateRandom;
     }
@@ -1440,6 +1449,45 @@ internal abstract unsafe partial class FakeModule
     {
         if (Owner(hSession, nameof(C_MessageVerifyFinal)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
         try { return Rv(m.C_MessageVerifyFinal(hSession)); }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong AsyncComplete(NativeCULong hSession, byte* pFunctionName, void* pResult)
+    {
+        if (Owner(hSession, nameof(C_AsyncComplete)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            CK_ASYNC_DATA result = ReadStruct<CK_ASYNC_DATA>(pResult);
+            CKR rv = m.C_AsyncComplete(hSession, Marshal.PtrToStringUTF8((IntPtr)pFunctionName) ?? "", ref result);
+            WriteStruct(pResult, in result);
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong AsyncGetID(NativeCULong hSession, byte* pFunctionName, NativeCULong* pulID)
+    {
+        if (Owner(hSession, nameof(C_AsyncGetID)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            NativeCULong id = *pulID;
+            CKR rv = m.C_AsyncGetID(hSession, Marshal.PtrToStringUTF8((IntPtr)pFunctionName) ?? "", ref id);
+            *pulID = id;
+            return Rv(rv);
+        }
+        catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static NativeCULong AsyncJoin(NativeCULong hSession, byte* pFunctionName, NativeCULong ulID, byte* pData, NativeCULong ulData)
+    {
+        if (Owner(hSession, nameof(C_AsyncJoin)) is not { } m) return Rv(CKR.CKR_SESSION_HANDLE_INVALID);
+        try
+        {
+            return Rv(m.C_AsyncJoin(hSession, Marshal.PtrToStringUTF8((IntPtr)pFunctionName) ?? "", ulID, In(pData, ulData)));
+        }
         catch (Exception ex) when (m.RecordFault(ex)) { return Rv(CKR.CKR_GENERAL_ERROR); }
     }
 
