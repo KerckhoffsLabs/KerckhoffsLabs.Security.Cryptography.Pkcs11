@@ -99,6 +99,8 @@ internal abstract unsafe partial class FakeModule : IDisposable
             return;
         _disposed = true;
 
+        Disposing();
+
         Unregister(this);
 
         Marshal.FreeHGlobal(_functionList);
@@ -107,6 +109,11 @@ internal abstract unsafe partial class FakeModule : IDisposable
         Marshal.FreeHGlobal(_interface);
         _functionList = _interfaceTable = _interfaceName = _interface = IntPtr.Zero;
         _fault?.Throw();
+    }
+
+    /// <summary>Releases what a derived module holds before the module unregisters and frees its tables.</summary>
+    protected virtual void Disposing()
+    {
     }
 
     // --- registry --------------------------------------------------------------------------------
