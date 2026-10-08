@@ -1,4 +1,4 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.SafeHandles;

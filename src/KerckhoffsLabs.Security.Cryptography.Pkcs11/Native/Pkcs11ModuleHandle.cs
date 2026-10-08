@@ -1,13 +1,12 @@
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
 /// Owns a loaded PKCS#11 module: its function table, its <c>C_Finalize</c>, and the OS module handle.
 /// Every call into the module holds a use of this handle for its duration (see
-/// <see cref="Native.ModuleCall"/>), and every open session holds one for its lifetime, so the teardown —
+/// <see cref="ModuleCall"/>), and every open session holds one for its lifetime, so the teardown —
 /// <c>C_Finalize</c>, then <see cref="NativeLibrary.Free(IntPtr)"/> — never runs under a call or a
 /// session that still needs the module.
 /// </summary>

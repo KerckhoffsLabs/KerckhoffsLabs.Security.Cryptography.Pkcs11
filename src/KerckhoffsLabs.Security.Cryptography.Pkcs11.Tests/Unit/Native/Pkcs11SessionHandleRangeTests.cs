@@ -1,10 +1,9 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 // CK_SESSION_HANDLE is an opaque CK_ULONG: every value in its unsigned range is legal, and modules
 // that derive handles from pointers or hash tables really do set the high bit. Nothing about the

@@ -1,8 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using System.Runtime.InteropServices;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 /// <summary>
 /// <see cref="SafeHandle"/> wrapper around a PKCS#11 session handle. Calls
