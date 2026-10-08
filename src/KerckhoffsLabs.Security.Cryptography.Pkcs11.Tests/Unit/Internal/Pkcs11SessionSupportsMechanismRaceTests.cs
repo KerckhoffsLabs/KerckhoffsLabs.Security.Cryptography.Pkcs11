@@ -1,8 +1,7 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -13,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// included, since an unsynchronized read of the cache reference is the unsafe publication half of
 /// the same race.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionSupportsMechanismRaceTests
 {
     private const ulong SessionId = 43;
@@ -22,9 +22,10 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
 
     /// <summary>
     /// Parks inside <c>C_GenerateRandom</c> until released, and records whether either of the
-    /// mechanism-probe calls was entered while that call was still on the stack.
+    /// mechanism-probe calls was entered while that call was still on the stack. The park happens inside
+    /// the module, so the caller's thread is blocked in the native call as it would be on a real token.
     /// </summary>
-    private sealed class ParkingMechListFake : FakeLowLevelPkcs11Library
+    private sealed class ParkingMechListFake : SessionTestModule
     {
         internal readonly ManualResetEventSlim Entered = new(false);
         internal readonly ManualResetEventSlim Release = new(false);
@@ -36,7 +37,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
 
         internal CKM[] Mechanisms = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
 
-        public override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        protected override CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
             _inFlight = true;
             Entered.Set();
@@ -45,7 +46,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
+        protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
         {
             if (_inFlight)
                 ProbedDuringNativeCall = true;
@@ -53,28 +54,27 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
+        protected override CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count)
         {
             if (_inFlight)
                 ProbedDuringNativeCall = true;
 
-            if (mechanismList.IsEmpty)
+            if (mechanismList.IsNull)
             {
                 count = (NativeCULong)Mechanisms.Length;
                 return CKR.CKR_OK;
             }
 
             for (int i = 0; i < Mechanisms.Length; i++)
-                mechanismList[i] = Mechanisms[i];
+                mechanismList.Span[i] = (NativeCULong)(ulong)Mechanisms[i];
             count = (NativeCULong)Mechanisms.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
-
         /// <summary>Releases the two gates. Callers join every thread before disposing the fake.</summary>
-        public override void Dispose()
+        protected override void Disposing()
         {
+            base.Disposing();
             Entered.Dispose();
             Release.Dispose();
         }
@@ -93,7 +93,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
     private static ProbeOutcome ProbeWhileACallIsInFlight(bool warmTheCacheFirst)
     {
         using var fake = new ParkingMechListFake();
-        using var session = new Pkcs11Session(fake, SessionId);
+        using var session = fake.CreateSession(SessionId);
 
         if (warmTheCacheFirst)
             Assert.True(session.SupportsMechanism(CKM.CKM_AES_GCM));
@@ -165,7 +165,7 @@ public sealed class Pkcs11SessionSupportsMechanismRaceTests
     public void SupportsMechanism_FromInsideAnExclusiveSection_OnTheSameThread_Succeeds()
     {
         using var fake = new ParkingMechListFake();
-        using var session = new Pkcs11Session(fake, SessionId);
+        using var session = fake.CreateSession(SessionId);
 
         using var lease = session.AcquireExclusive(
             nameof(SupportsMechanism_FromInsideAnExclusiveSection_OnTheSameThread_Succeeds));

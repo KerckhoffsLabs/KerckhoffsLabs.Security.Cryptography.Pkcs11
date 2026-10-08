@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 // This test drives a gated legacy mechanism on purpose (IsPermitted's false-verdict path is the
 // behaviour under test), so the compile-time warning is suppressed for this file only.
@@ -13,6 +13,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionPolicyTests
 {
     private sealed class RecordingPolicy(Func<PolicyRequest, PolicyDecision> verdict) : ICryptoPolicy
@@ -27,13 +28,15 @@ public sealed class Pkcs11SessionPolicyTests
         }
     }
 
-    private sealed class CountingFake : FakeLowLevelPkcs11Library
+    private sealed class BareModule : SessionTestModule;
+
+    private sealed class CountingFake : SessionTestModule
     {
         public int EncryptInits { get; private set; }
-        public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+        protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         {
             EncryptInits++;
-            return base.C_EncryptInit(session, ref mechanism, key);
+            return base.C_EncryptInit(session, mechanism, key);
         }
     }
 
@@ -42,7 +45,8 @@ public sealed class Pkcs11SessionPolicyTests
     [Fact]
     public void DefaultPolicy_IsSecureOnly()
     {
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1);
+        using var module = new BareModule();
+        using var session = module.CreateSession(1);
         Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
     }
 
@@ -50,7 +54,8 @@ public sealed class Pkcs11SessionPolicyTests
     public void CustomPolicy_IsConsulted_WithTheOperation()
     {
         var policy = new RecordingPolicy(_ => PolicyDecision.Allow);
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1, policy: policy);
+        using var module = new BareModule();
+        using var session = module.CreateSession(1, policy: policy);
 
         _ = Record.Exception(() => session.Encrypt(new Mechanism(CKM.CKM_AES_GCM), AnyKey, [1]));
 
@@ -62,9 +67,9 @@ public sealed class Pkcs11SessionPolicyTests
     [Fact]
     public void Denial_ThrowsWithPolicyDetails_AndNeverReachesTheToken()
     {
-        var fake = new CountingFake();
+        using var fake = new CountingFake();
         var policy = new RecordingPolicy(_ => PolicyDecision.Deny("nope"));
-        using var session = new Pkcs11Session(fake, 1, policy: policy);
+        using var session = fake.CreateSession(1, policy: policy);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => session.Encrypt(new Mechanism(CKM.CKM_AES_GCM), AnyKey, [1]));
@@ -78,7 +83,8 @@ public sealed class Pkcs11SessionPolicyTests
     [Fact]
     public void PolicyReturningDefault_IsADenial()
     {
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1, policy: new RecordingPolicy(_ => default));
+        using var module = new BareModule();
+        using var session = module.CreateSession(1, policy: new RecordingPolicy(_ => default));
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => session.Encrypt(new Mechanism(CKM.CKM_AES_GCM), AnyKey, [1]));
@@ -89,8 +95,8 @@ public sealed class Pkcs11SessionPolicyTests
     [Fact]
     public void PolicyThatThrows_AbortsWithItsOwnException()
     {
-        var fake = new CountingFake();
-        using var session = new Pkcs11Session(fake, 1,
+        using var fake = new CountingFake();
+        using var session = fake.CreateSession(1,
             policy: new RecordingPolicy(_ => throw new InvalidOperationException("policy bug")));
 
         var ex = Assert.Throws<InvalidOperationException>(
@@ -103,7 +109,8 @@ public sealed class Pkcs11SessionPolicyTests
     [Fact]
     public void IsPermitted_ReturnsTheVerdict_WithoutThrowing()
     {
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1);
+        using var module = new BareModule();
+        using var session = module.CreateSession(1);
         Assert.False(session.IsPermitted(new MechanismUseRequest(new Mechanism(CKM.CKM_DES_ECB), CryptoOperation.Encrypt)));
         Assert.True(session.IsPermitted(new MechanismUseRequest(new Mechanism(CKM.CKM_AES_GCM), CryptoOperation.Encrypt)));
     }
@@ -112,7 +119,8 @@ public sealed class Pkcs11SessionPolicyTests
     public void KeyTemplateRequest_CarriesTheKnownObjectClass()
     {
         var policy = new RecordingPolicy(_ => PolicyDecision.Allow);
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1, policy: policy);
+        using var module = new BareModule();
+        using var session = module.CreateSession(1, policy: policy);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
 
         _ = Record.Exception(() => session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), [.. tpl.Attributes]));
@@ -125,7 +133,8 @@ public sealed class Pkcs11SessionPolicyTests
     public void DenialLog_NamesPolicyAndRequest_ButNoAttributeValues()
     {
         var logger = new CapturingLogger();
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1, new CapturingLoggerFactory(logger));
+        using var module = new BareModule();
+        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger));
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("do-not-log-me").ValueLen(32).Sensitive(false).Build();
 
         Assert.Throws<CryptoPolicyViolationException>(
@@ -169,7 +178,8 @@ public sealed class Pkcs11SessionPolicyTests
     [Fact]
     public void IsPermitted_OnADisposedSession_Throws()
     {
-        var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1);
+        using var module = new BareModule();
+        var session = module.CreateSession(1);
         session.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => session.IsPermitted(
@@ -191,7 +201,8 @@ public sealed class Pkcs11SessionPolicyTests
     public void UsePolicy_LogsAWarningOnEntry_NamingBothPolicies()
     {
         var logger = new CapturingLogger();
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1, new CapturingLoggerFactory(logger), CryptoPolicy.SecureOnly);
+        using var module = new BareModule();
+        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger), CryptoPolicy.SecureOnly);
 
         using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
@@ -207,7 +218,8 @@ public sealed class Pkcs11SessionPolicyTests
     public void DisposingAnOverrideLease_LogsTheRestore()
     {
         var logger = new CapturingLogger();
-        using var session = new Pkcs11Session(new FakeLowLevelPkcs11Library(), 1, new CapturingLoggerFactory(logger), CryptoPolicy.SecureOnly);
+        using var module = new BareModule();
+        using var session = module.CreateSession(1, new CapturingLoggerFactory(logger), CryptoPolicy.SecureOnly);
 
         session.UsePolicy(CryptoPolicy.AllowInsecure).Dispose();
 

@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -12,6 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// driven through a fake that behaves the way the token does, since the backends the suite runs against
 /// either follow the spec or are not always available.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionTokenQuirkTests
 {
     private const ulong SessionId = 21;
@@ -23,8 +24,8 @@ public sealed class Pkcs11SessionTokenQuirkTests
     [Fact]
     public void Encrypt_WhenTheTokenEndsTheOperationOnBufferTooSmall_ReinitializesAndEncrypts()
     {
-        var fake = new EndsOnBufferTooSmallFake();
-        var session = new Pkcs11Session(fake, SessionId);
+        using var fake = new EndsOnBufferTooSmallFake();
+        using var session = fake.CreateSession(SessionId);
 
         byte[] ciphertext = session.Encrypt(new Mechanism(CKM.CKM_AES_GCM), Key, [1, 2, 3]);
 
@@ -38,8 +39,8 @@ public sealed class Pkcs11SessionTokenQuirkTests
     [Fact]
     public void WrapKey_Kwp_OfASecretKey_SizesTheBufferFromItsLength_WithoutAProbe()
     {
-        var fake = new KwpFake(CKO.CKO_SECRET_KEY, valueLen: 20);
-        var session = new Pkcs11Session(fake, SessionId);
+        using var fake = new KwpFake(CKO.CKO_SECRET_KEY, valueLen: 20);
+        using var session = fake.CreateSession(SessionId);
 
         byte[] wrapped = session.WrapKey(new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP), WrappingKey, Key);
 
@@ -52,8 +53,8 @@ public sealed class Pkcs11SessionTokenQuirkTests
     [Fact]
     public void WrapKey_Kwp_OfAPrivateKey_FallsBackToTheLengthProbe()
     {
-        var fake = new KwpFake(CKO.CKO_PRIVATE_KEY, valueLen: 0);
-        var session = new Pkcs11Session(fake, SessionId);
+        using var fake = new KwpFake(CKO.CKO_PRIVATE_KEY, valueLen: 0);
+        using var session = fake.CreateSession(SessionId);
 
         byte[] wrapped = session.WrapKey(new Mechanism(CKM.CKM_AES_KEY_WRAP_KWP), WrappingKey, Key);
 
@@ -65,7 +66,7 @@ public sealed class Pkcs11SessionTokenQuirkTests
     /// Produces more ciphertext than the session's first buffer holds and, like NSS, ends the operation when
     /// it reports <c>CKR_BUFFER_TOO_SMALL</c>.
     /// </summary>
-    private sealed class EndsOnBufferTooSmallFake : FakeLowLevelPkcs11Library
+    private sealed class EndsOnBufferTooSmallFake : SessionTestModule
     {
         public static readonly byte[] Ciphertext = [.. Enumerable.Range(0, 64).Select(i => (byte)i)];
 
@@ -73,40 +74,40 @@ public sealed class Pkcs11SessionTokenQuirkTests
 
         public int Inits { get; private set; }
 
-        public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+        protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         {
             Inits++;
             _active = true;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen)
+        protected override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> encryptedData, ref NativeCULong encryptedDataLen)
         {
             encryptedDataLen = (NativeCULong)Ciphertext.Length;
             if (!_active)
                 return CKR.CKR_OPERATION_NOT_INITIALIZED;
-            if (lengthOnly)
+            if (encryptedData.IsNull)
                 return CKR.CKR_OK;
-            if (encryptedData.Length < Ciphertext.Length)
+            if (encryptedData.Span.Length < Ciphertext.Length)
             {
                 _active = false;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
 
-            Ciphertext.CopyTo(encryptedData);
+            Ciphertext.CopyTo(encryptedData.Span);
             _active = false;
             return CKR.CKR_OK;
         }
     }
 
     /// <summary>A key of class <c>objectClass</c> and length <c>valueLen</c>, wrapped into whatever buffer it is given.</summary>
-    private sealed class KwpFake(CKO objectClass, ulong valueLen) : FakeLowLevelPkcs11Library
+    private sealed class KwpFake(CKO objectClass, ulong valueLen) : SessionTestModule
     {
         public const int ProbedLength = 40;
 
         public int LengthQueries { get; private set; }
 
-        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
             for (int i = 0; i < template.Length; i++)
             {
@@ -121,17 +122,17 @@ public sealed class Pkcs11SessionTokenQuirkTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_WrapKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, Span<byte> wrappedKey, bool lengthOnly, out NativeCULong wrappedKeyLen)
+        protected override CKR C_WrapKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong wrappingKey, NativeCULong key, NativeBuffer<byte> wrappedKey, ref NativeCULong wrappedKeyLen)
         {
-            if (lengthOnly)
+            if (wrappedKey.IsNull)
             {
                 LengthQueries++;
                 wrappedKeyLen = (NativeCULong)ProbedLength;
                 return CKR.CKR_OK;
             }
 
-            wrappedKey.Fill(0x5A);
-            wrappedKeyLen = (NativeCULong)(ulong)wrappedKey.Length;
+            wrappedKey.Span.Fill(0x5A);
+            wrappedKeyLen = (NativeCULong)(ulong)wrappedKey.Span.Length;
             return CKR.CKR_OK;
         }
     }

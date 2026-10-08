@@ -2,7 +2,7 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -11,13 +11,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// The interop layer takes spans, so the caller's buffer reaches the token untouched and there is
 /// no transient array to zero — but "no transient" is only observable by identity, so these tests
 /// capture the address the fake was handed and compare it with the caller's own pinned buffer.
-/// A copy anywhere in between would show a different address.
+/// A copy anywhere in between would show a different address. The fake is a <see cref="FakeModule"/>
+/// behind the real loader, so the address it sees is the one that crossed the function table.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionRandomZeroizationTests
 {
     private const ulong SessionId = 21;
 
-    private sealed class RngFake : FakeLowLevelPkcs11Library
+    private sealed class RngFake : SessionTestModule
     {
         /// <summary>Address of the buffer the session handed to the interop layer.</summary>
         public IntPtr SeenAddress { get; private set; }
@@ -27,12 +29,10 @@ public sealed class Pkcs11SessionRandomZeroizationTests
 
         public byte[] TokenOutput = [0xA1, 0xA2, 0xA3, 0xA4];
 
-        // Enough of a module for a Pkcs11Library and a Pkcs11Workspace to open and close over this fake.
-        public override CKR C_Initialize(CK_C_INITIALIZE_ARGS? initArgs) => CKR.CKR_OK;
-        public override CKR C_Finalize(IntPtr reserved) => CKR.CKR_OK;
-        public override CKR C_Logout(NativeCULong session) => CKR.CKR_OK;
+        // Enough of a module for a Pkcs11Workspace to close over this fake.
+        protected override CKR C_Logout(NativeCULong session) => CKR.CKR_OK;
 
-        public override unsafe CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
+        protected override unsafe CKR C_GenerateRandom(NativeCULong session, Span<byte> randomData)
         {
             fixed (byte* p = randomData)
                 SeenAddress = (IntPtr)p;
@@ -41,7 +41,7 @@ public sealed class Pkcs11SessionRandomZeroizationTests
             return CKR.CKR_OK;
         }
 
-        public override unsafe CKR C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed)
+        protected override unsafe CKR C_SeedRandom(NativeCULong session, ReadOnlySpan<byte> seed)
         {
             fixed (byte* p = seed)
                 SeenAddress = (IntPtr)p;
@@ -53,8 +53,8 @@ public sealed class Pkcs11SessionRandomZeroizationTests
     [Fact]
     public unsafe void GenerateRandom_Span_FillsTheCallersBufferWithNoTransientCopy()
     {
-        var fake = new RngFake { TokenOutput = [0xA1, 0xA2, 0xA3, 0xA4] };
-        using var session = new Pkcs11Session(fake, SessionId);
+        using var fake = new RngFake { TokenOutput = [0xA1, 0xA2, 0xA3, 0xA4] };
+        using var session = fake.CreateSession(SessionId);
         Span<byte> destination = stackalloc byte[4];
 
         int written = session.GenerateRandom(destination);
@@ -69,8 +69,8 @@ public sealed class Pkcs11SessionRandomZeroizationTests
     [Fact]
     public unsafe void SeedRandom_Span_PassesTheCallersEntropyStraightThrough()
     {
-        var fake = new RngFake();
-        using var session = new Pkcs11Session(fake, SessionId);
+        using var fake = new RngFake();
+        using var session = fake.CreateSession(SessionId);
         byte[] entropy = [0xE1, 0xE2, 0xE3, 0xE4];
 
         fixed (byte* p = entropy)
@@ -90,9 +90,10 @@ public sealed class Pkcs11SessionRandomZeroizationTests
     [Fact]
     public unsafe void Workspace_GenerateRandom_Span_FillsTheCallersBufferWithNoTransientCopy()
     {
-        var fake = new RngFake { TokenOutput = [0xB1, 0xB2, 0xB3, 0xB4] };
-        using var library = new Pkcs11Library(fake);
-        using var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(fake, slotId: 1), new Pkcs11Session(fake, SessionId));
+        using var fake = new RngFake { TokenOutput = [0xB1, 0xB2, 0xB3, 0xB4] };
+        using var library = fake.Load();
+        ILowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
+        using var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11Session(lowLevel, SessionId));
         Span<byte> destination = stackalloc byte[4];
 
         workspace.GenerateRandom(destination);

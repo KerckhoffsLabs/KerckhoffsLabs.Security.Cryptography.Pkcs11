@@ -1,7 +1,7 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -21,13 +21,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// reaches the fake has failed to reject something it should have.
 /// </para>
 /// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionSharedDescriptorTests
 {
     private const ulong SessionId = 42;
 
     // CKM_AES_GCM stands in for every half (digest and verify included) purely to carry a descriptor;
     // the policy is not under test, so it must not refuse that placeholder before the guard runs.
-    private static Pkcs11Session NewSession() => new(new FakeLowLevelPkcs11Library(), SessionId, policy: CryptoPolicy.AllowInsecure);
+    private static Pkcs11Session NewSession(BareModule module) => module.CreateSession(SessionId, policy: CryptoPolicy.AllowInsecure);
+
+    private sealed class BareModule : SessionTestModule;
 
     private static CkmGcmMessageParams OutputBearing() =>
         CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
@@ -40,7 +43,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void DecryptVerify_OneOutputDescriptorForBothHalves_Throws()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var shared = OutputBearing();
         var verify = new Mechanism(CKM.CKM_AES_GCM, shared);
         var decrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
@@ -58,7 +62,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void DigestEncrypt_OneOutputDescriptorForBothHalves_Throws()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var shared = OutputBearing();
         var digest = new Mechanism(CKM.CKM_AES_GCM, shared);
         var encrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
@@ -75,7 +80,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void DecryptDigest_OneOutputDescriptorForBothHalves_Throws()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var shared = OutputBearing();
         var digest = new Mechanism(CKM.CKM_AES_GCM, shared);
         var decrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
@@ -97,7 +103,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void ByteArrayOverloads_AreCoveredToo()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var shared = OutputBearing();
         var a = new Mechanism(CKM.CKM_AES_GCM, shared);
         var b = new Mechanism(CKM.CKM_AES_GCM, shared);
@@ -114,7 +121,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void SharingAnInputOnlyDescriptor_IsStillAllowed()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var shared = InputOnly();
         var digest = new Mechanism(CKM.CKM_AES_GCM, shared);
         var encrypt = new Mechanism(CKM.CKM_AES_GCM, shared);
@@ -134,7 +142,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void TwoDistinctOutputDescriptors_AreAllowed()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var digest = new Mechanism(CKM.CKM_AES_GCM, OutputBearing());
         var encrypt = new Mechanism(CKM.CKM_AES_GCM, OutputBearing());
 
@@ -151,7 +160,8 @@ public sealed class Pkcs11SessionSharedDescriptorTests
     [Fact]
     public void MechanismsWithoutParameters_AreAllowed()
     {
-        using var session = NewSession();
+        using var module = new BareModule();
+        using var session = NewSession(module);
         var digest = new Mechanism(CKM.CKM_SHA256);
         var encrypt = new Mechanism(CKM.CKM_AES_GCM);
 

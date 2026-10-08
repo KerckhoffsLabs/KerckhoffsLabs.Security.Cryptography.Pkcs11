@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
@@ -15,6 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// session is not left refusing every later <c>C_*Init</c> of that kind with
 /// <c>CKR_OPERATION_ACTIVE</c>; on a module that cannot cancel, that refusal says why.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class OperationScopeTests
 {
     private const ulong SessionId = 11;
@@ -23,9 +24,10 @@ public sealed class OperationScopeTests
     [Fact]
     public void Sign_ThrowingBetweenCalls_CancelsTheSignOperation_AndKeepsTheOriginalError()
     {
-        var fake = new OperationFake { ProbeReports = NativeCULong.MaxValue };
+        using var fake = new OperationFake { ProbeReports = NativeCULong.MaxValue };
+        using var session = Session(fake);
 
-        Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
+        Assert.Throws<Pkcs11UnclassifiedException>(() => session.Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
 
         Assert.Equal([CKF.CKF_SIGN], fake.Cancelled);
     }
@@ -33,9 +35,10 @@ public sealed class OperationScopeTests
     [Fact]
     public void Sign_Succeeding_CancelsNothing()
     {
-        var fake = new OperationFake();
+        using var fake = new OperationFake();
+        using var session = Session(fake);
 
-        Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8);
+        session.Sign(Ecdsa(), new ObjectHandle(1), "data"u8);
 
         Assert.Empty(fake.Cancelled);
     }
@@ -44,10 +47,11 @@ public sealed class OperationScopeTests
     [Fact]
     public void Sign_ModuleErrorOnTheFill_KeepsTheOriginalError_AndLogsNothing()
     {
-        var fake = new OperationFake { FillRv = CKR.CKR_DEVICE_ERROR, CancelRv = CKR.CKR_OPERATION_NOT_INITIALIZED };
+        using var fake = new OperationFake { FillRv = CKR.CKR_DEVICE_ERROR, CancelRv = CKR.CKR_OPERATION_NOT_INITIALIZED };
         var logger = new CapturingLogger();
+        using var session = Session(fake, logger);
 
-        var e = Assert.ThrowsAny<Pkcs11Exception>(() => Session(fake, logger).Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
+        var e = Assert.ThrowsAny<Pkcs11Exception>(() => session.Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
 
         Assert.Equal(CKR.CKR_DEVICE_ERROR, e.ReturnValue);
         Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
@@ -57,9 +61,10 @@ public sealed class OperationScopeTests
     [Fact]
     public void Decrypt_ThrowingBetweenCalls_CancelsTheDecryptOperation()
     {
-        var fake = new OperationFake { DecryptGrowsBy = 32, TooSmallReports = NativeCULong.MaxValue };
+        using var fake = new OperationFake { DecryptGrowsBy = 32, TooSmallReports = NativeCULong.MaxValue };
+        using var session = Session(fake);
 
-        Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Decrypt(Gcm(), new ObjectHandle(1), new byte[32]));
+        Assert.Throws<Pkcs11UnclassifiedException>(() => session.Decrypt(Gcm(), new ObjectHandle(1), new byte[32]));
 
         Assert.Equal([CKF.CKF_DECRYPT], fake.Cancelled);
     }
@@ -68,11 +73,12 @@ public sealed class OperationScopeTests
     [Fact]
     public void DecryptVerify_SecondInitFailing_CancelsTheFirstOperation()
     {
-        var fake = new OperationFake { DecryptInitRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var fake = new OperationFake { DecryptInitRv = CKR.CKR_KEY_HANDLE_INVALID };
+        using var session = Session(fake);
         using var input = new MemoryStream(new byte[16]);
         using var output = new MemoryStream();
 
-        Assert.ThrowsAny<Pkcs11Exception>(() => Session(fake).DecryptVerify(
+        Assert.ThrowsAny<Pkcs11Exception>(() => session.DecryptVerify(
             Ecdsa(), new ObjectHandle(1), Gcm(), new ObjectHandle(2), input, output, new byte[64], out _));
 
         Assert.Equal([CKF.CKF_VERIFY], fake.Cancelled);
@@ -85,8 +91,8 @@ public sealed class OperationScopeTests
     [Fact]
     public void ModuleThatCannotCancel_NextInitOfThatKind_ExplainsTheActiveOperation()
     {
-        var fake = new OperationFake { ProbeReports = NativeCULong.MaxValue, CancelRv = CKR.CKR_FUNCTION_NOT_SUPPORTED, KeepsAbandonedSignActive = true };
-        var session = Session(fake);
+        using var fake = new OperationFake { ProbeReports = NativeCULong.MaxValue, CancelRv = CKR.CKR_FUNCTION_NOT_SUPPORTED, KeepsAbandonedSignActive = true };
+        using var session = Session(fake);
         Assert.Throws<Pkcs11UnclassifiedException>(() => session.Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
 
         var e = Assert.Throws<Pkcs11UnclassifiedException>(() => session.Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
@@ -99,8 +105,8 @@ public sealed class OperationScopeTests
     [Fact]
     public void ModuleThatCannotCancel_ButEndedTheOperation_NextOperationSucceeds()
     {
-        var fake = new OperationFake { ProbeReports = NativeCULong.MaxValue, CancelRv = CKR.CKR_FUNCTION_NOT_SUPPORTED };
-        var session = Session(fake);
+        using var fake = new OperationFake { ProbeReports = NativeCULong.MaxValue, CancelRv = CKR.CKR_FUNCTION_NOT_SUPPORTED };
+        using var session = Session(fake);
         Assert.Throws<Pkcs11UnclassifiedException>(() => session.Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
 
         fake.ProbeReports = null;
@@ -110,7 +116,7 @@ public sealed class OperationScopeTests
     }
 
     private static Pkcs11Session Session(OperationFake fake, CapturingLogger? logger = null)
-        => new(fake, SessionId, logger is null ? null : new CapturingLoggerFactory(logger));
+        => fake.CreateSession(SessionId, logger is null ? null : new CapturingLoggerFactory(logger));
 
     private static Mechanism Ecdsa() => new(CKM.CKM_ECDSA_SHA256);
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
@@ -120,7 +126,7 @@ public sealed class OperationScopeTests
     /// a length the library refuses (so the library throws with the operation still active) or fail a
     /// call outright.
     /// </summary>
-    private sealed class OperationFake : FakeLowLevelPkcs11Library
+    private sealed class OperationFake : SessionTestModule
     {
         private bool _signActive;
 
@@ -133,7 +139,7 @@ public sealed class OperationScopeTests
         public bool KeepsAbandonedSignActive { get; init; }
         public List<ulong> Cancelled { get; } = [];
 
-        public override CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key)
+        protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
         {
             if (_signActive)
                 return CKR.CKR_OPERATION_ACTIVE;
@@ -141,16 +147,16 @@ public sealed class OperationScopeTests
             return CKR.CKR_OK;
         }
 
-        public override CKR C_VerifyInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => DecryptInitRv;
+        protected override CKR C_VerifyInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => DecryptInitRv;
 
-        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen)
-            => Answer(lengthOnly ? default : signature, out signatureLen, 64);
+        protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
+            => Answer(signature.Span, out signatureLen, 64);
 
-        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
-            => Answer(lengthOnly ? default : data, out dataLen, encryptedData.Length + DecryptGrowsBy);
+        protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
+            => Answer(data.Span, out dataLen, encryptedData.Length + DecryptGrowsBy);
 
-        public override CKR C_SessionCancel(NativeCULong session, NativeCULong flags)
+        protected override CKR C_SessionCancel(NativeCULong session, NativeCULong flags)
         {
             Cancelled.Add((ulong)flags);
             return CancelRv;
