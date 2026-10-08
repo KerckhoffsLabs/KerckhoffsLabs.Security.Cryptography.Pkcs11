@@ -1,4 +1,4 @@
-// <auto-split-from LowLevelPkcs11Library.cs>
+using System.Diagnostics.CodeAnalysis;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -24,21 +24,19 @@ internal sealed partial class LowLevelPkcs11Library
     // pInitArgs is only read during the call (PKCS#11 v3.2 §5.4.1), so the block lives on the stack. It is
     // written through Pkcs11Marshal, never passed as the address of a local: CK_C_INITIALIZE_ARGS is
     // packed differently on Windows, and only the marshaller lays it out the way the module reads it.
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
-        Justification = "A stack block needs a pointer, which C# only hands out in unsafe code. The block is " +
-        "sized by Pkcs11Marshal.SizeOf for the platform layout and written only through " +
-        "Pkcs11Marshal.WriteStructure, so nothing is written past it, and the module reads it only during " +
-        "the call. Covered on every leg by InitializeArgsTests, which reads the block back in a fake module.")]
     private unsafe CKR Initialize(CK_C_INITIALIZE_ARGS? initArgs)
     {
         using ModuleCall call = EnterModule();
+        var initialize = call.Functions.C_Initialize;
+        if (initialize is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
         if (initArgs is not { } args)
-            return call.Table.C_Initialize(IntPtr.Zero).ToCKR();
+            return initialize(IntPtr.Zero).ToCKR();
 
         byte* block = stackalloc byte[Pkcs11Marshal.SizeOf<CK_C_INITIALIZE_ARGS>()];
         Pkcs11Marshal.WriteStructure((IntPtr)block, in args);
-        return call.Table.C_Initialize((IntPtr)block).ToCKR();
+        return initialize((IntPtr)block).ToCKR();
     }
 
     /// <summary>
@@ -46,11 +44,14 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="reserved">Reserved for future versions. For this version, it should be set to null.</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
-    public CKR C_Finalize(IntPtr reserved)
+    public unsafe CKR C_Finalize(IntPtr reserved)
     {
         CKR rv;
         using (ModuleCall call = EnterModule())
-            rv = call.Table.C_Finalize(reserved).ToCKR();
+        {
+            var finalize = call.Functions.C_Finalize;
+            rv = finalize is null ? CKR.CKR_FUNCTION_NOT_SUPPORTED : finalize(reserved).ToCKR();
+        }
 
         // After the call has released the call lock: MarkFinalized takes the registry lock.
         if (rv == CKR.CKR_OK)
@@ -63,11 +64,28 @@ internal sealed partial class LowLevelPkcs11Library
     /// </summary>
     /// <param name="info">Structure that receives the information</param>
     /// <returns>CKR_ARGUMENTS_BAD, CKR_CRYPTOKI_NOT_INITIALIZED, CKR_FUNCTION_FAILED, CKR_GENERAL_ERROR, CKR_HOST_MEMORY, CKR_OK</returns>
-    public CKR C_GetInfo(ref CK_INFO info)
+    public unsafe CKR C_GetInfo(ref CK_INFO info)
     {
         using ModuleCall call = EnterModule();
+        var getInfo = call.Functions.C_GetInfo;
+        if (getInfo is null)
+            return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return call.Table.C_GetInfo(ref info).ToCKR();
+        if (Pkcs11Marshal.IsWindows)
+            return GetInfoWindows(getInfo, ref info);
+
+        fixed (CK_INFO* p = &info)
+            return getInfo(p).ToCKR();
+    }
+
+    // CK_INFO is packed on Windows: the module writes the packed layout, converted afterwards.
+    [ExcludeFromCodeCoverage(Justification = WindowsOnly)]
+    private static unsafe CKR GetInfoWindows(delegate* unmanaged[Cdecl]<void*, NativeCULong> getInfo, ref CK_INFO info)
+    {
+        CK_INFO_Windows packed = default;
+        CKR rv = getInfo(&packed).ToCKR();
+        info = packed.ToUnified();
+        return rv;
     }
 
     /// <summary>
@@ -77,14 +95,47 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="interfaces">Buffer to receive the interface descriptors, or <c>null</c> to query the count.</param>
     /// <param name="count">In/out count: receives the interface count on the null call.</param>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
+    public unsafe CKR C_GetInterfaceList(CK_INTERFACE[]? interfaces, ref NativeCULong count)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_GetInterfaceList)
+        var getInterfaceList = call.Functions.C_GetInterfaceList;
+        if (getInterfaceList is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        return call.Table.C_GetInterfaceList(interfaces, ref count).ToCKR();
+        CKR rv;
+        if (interfaces is null)
+        {
+            fixed (NativeCULong* c = &count)
+                rv = getInterfaceList(null, c).ToCKR();
+            return CheckedOutput(rv, lengthOnly: true, count, 0);
+        }
+
+        if (Pkcs11Marshal.IsWindows)
+            return GetInterfaceListWindows(getInterfaceList, interfaces, ref count);
+
+        CK_INTERFACE none = default;
+        fixed (CK_INTERFACE* list = &NonNullPinnable(interfaces.AsSpan(), ref none))
+        fixed (NativeCULong* c = &count)
+            rv = getInterfaceList(list, c).ToCKR();
+        return CheckedOutput(rv, lengthOnly: false, count, interfaces.Length);
+    }
+
+    // CK_INTERFACE is packed on Windows: the module fills a packed list, converted afterwards.
+    [ExcludeFromCodeCoverage(Justification = WindowsOnly)]
+    private static unsafe CKR GetInterfaceListWindows(
+        delegate* unmanaged[Cdecl]<void*, NativeCULong*, NativeCULong> getInterfaceList, CK_INTERFACE[] interfaces, ref NativeCULong count)
+    {
+        var packed = new CK_INTERFACE_Windows[interfaces.Length];
+        CK_INTERFACE_Windows none = default;
+        CKR rv;
+        fixed (CK_INTERFACE_Windows* list = &NonNullPinnable(packed.AsSpan(), ref none))
+        fixed (NativeCULong* c = &count)
+            rv = CheckedOutput(getInterfaceList(list, c).ToCKR(), lengthOnly: false, count, interfaces.Length,
+                nameof(C_GetInterfaceList));
+        if (rv == CKR.CKR_OK)
+            for (int i = 0; i < interfaces.Length; i++)
+                interfaces[i] = packed[i].ToUnified();
+        return rv;
     }
 
     /// <summary>
@@ -95,16 +146,39 @@ internal sealed partial class LowLevelPkcs11Library
     /// <param name="flags">Interface flags constraining the request (typically 0).</param>
     /// <param name="iface">Receives the token-owned interface descriptor on success.</param>
     /// <returns><see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> on v2.40 libraries; otherwise the underlying PKCS#11 return code.</returns>
-    public CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface)
+    public unsafe CKR C_GetInterface(ReadOnlySpan<byte> interfaceName, NativeCULong flags, out CK_INTERFACE iface)
     {
         using ModuleCall call = EnterModule();
-
-        if (!call.Table.HasC_GetInterface)
-        {
-            iface = default;
+        var getInterface = call.Functions.C_GetInterface;
+        iface = default;
+        if (getInterface is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
-        }
 
-        return call.Table.C_GetInterface(interfaceName, flags, out iface).ToCKR();
+        // An empty name reaches the module as NULL, which asks for its default interface.
+        IntPtr interfacePtr;
+        CKR rv;
+        fixed (byte* namePtr = interfaceName)
+            rv = getInterface(namePtr, IntPtr.Zero, &interfacePtr, flags).ToCKR();
+
+        if (rv == CKR.CKR_OK && interfacePtr != IntPtr.Zero)
+            iface = UnmanagedMemory.Read<CK_INTERFACE>(interfacePtr);
+        return rv;
+    }
+
+    /// <summary>
+    /// Calls <c>C_Finalize</c> from <paramref name="table"/> without entering the module, for the module
+    /// handle's own release.
+    /// </summary>
+    /// <param name="table">The module's function table.</param>
+    /// <param name="returnValue">What <c>C_Finalize</c> returned.</param>
+    /// <returns><see langword="false"/>, calling nothing, for a module without <c>C_Finalize</c>.</returns>
+    internal static unsafe bool TryFinalize(Delegates table, out CKR returnValue)
+    {
+        var finalize = table._fp.C_Finalize;
+        returnValue = default;
+        if (finalize is null)
+            return false;
+        returnValue = finalize(IntPtr.Zero).ToCKR();
+        return true;
     }
 }
