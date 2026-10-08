@@ -1,7 +1,8 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Common;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// Round-trip tests for <c>ToCKR</c> and <c>ToCKM</c>, the conversions of module-controlled values.

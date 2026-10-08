@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -51,14 +49,4 @@ public enum CKG : ulong
     /// Mask Generation Function with SHA3-512 digest algorithm (PKCS#11 v3.0)
     /// </summary>
     CKG_MGF1_SHA3_512 = 0x00000009
-}
-
-/// <summary>
-/// Utility class that helps with data type conversions.
-/// </summary>
-internal static class CKGExtensions
-{
-    /// <summary>Converts <see cref="CKG"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKG value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
-        => CkULong.From((ulong)value, paramName);
 }

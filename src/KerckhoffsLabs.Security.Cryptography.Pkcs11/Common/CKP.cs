@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -46,14 +44,4 @@ public enum CKP : ulong
     /// PKCS#5 PBKDF2 with HMAC-SHA-512/256 pseudorandom function
     /// </summary>
     CKP_PKCS5_PBKD2_HMAC_SHA512_256 = 0x00000008
-}
-
-/// <summary>
-/// Utility class that helps with data type conversions.
-/// </summary>
-internal static class CKPExtensions
-{
-    /// <summary>Converts <see cref="CKP"/> to <see cref="NativeCULong"/>.</summary>
-    public static NativeCULong ToCULong(this CKP value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
-        => CkULong.From((ulong)value, paramName);
 }

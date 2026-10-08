@@ -1,5 +1,3 @@
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
 /// <summary>
@@ -25,8 +23,7 @@ public static class CK
     /// this is the one constant here that cannot be a compile-time <c>const</c>. Prefer
     /// <see cref="IsCkInformationUnavailable(ulong)"/> over comparing by hand.
     /// </remarks>
-    public static readonly ulong CK_UNAVAILABLE_INFORMATION =
-        UnmanagedMemory.NativeULongSize == sizeof(uint) ? uint.MaxValue : ulong.MaxValue;
+    public static readonly ulong CK_UNAVAILABLE_INFORMATION = (ulong)NativeCULong.MaxValue;
 
     /// <summary>
     /// Checks whether provided number has value of CK_UNAVAILABLE_INFORMATION constant
