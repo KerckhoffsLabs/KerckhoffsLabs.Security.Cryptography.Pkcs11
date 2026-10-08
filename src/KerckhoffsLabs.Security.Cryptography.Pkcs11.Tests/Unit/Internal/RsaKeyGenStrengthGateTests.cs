@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -13,13 +13,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// policy — generating a sub-2048 RSA key pair must throw <see cref="CryptoPolicyViolationException"/>
 /// unless the policy permits it, mirroring the mechanism-level secure-defaults gate.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class RsaKeyGenStrengthGateTests
 {
-    private sealed class RecordingFake : FakeLowLevelPkcs11Library
+    private sealed class RecordingFake : SessionTestModule
     {
-        public int Calls { get; private set; }
+        public new int Calls { get; private set; }
 
-        public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
+        protected override CKR C_GenerateKeyPair(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, CK_ATTRIBUTE[] privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
         {
             Calls++;
             publicKey = (NativeCULong)10UL;
@@ -40,8 +41,8 @@ public sealed class RsaKeyGenStrengthGateTests
     [Fact]
     public void GenerateKeyPair_Rsa1024_GatedByDefault_Throws()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
         Assert.Throws<CryptoPolicyViolationException>(() => GenerateRsa(session, 1024));
         Assert.Equal(0, fake.Calls); // refused before reaching the token
     }
@@ -49,8 +50,8 @@ public sealed class RsaKeyGenStrengthGateTests
     [Fact]
     public void GenerateKeyPair_Rsa1024_AllowInsecure_Proceeds()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1, policy: CryptoPolicy.AllowInsecure);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1, policy: CryptoPolicy.AllowInsecure);
         GenerateRsa(session, 1024);
         Assert.Equal(1, fake.Calls);
     }
@@ -58,8 +59,8 @@ public sealed class RsaKeyGenStrengthGateTests
     [Fact]
     public void GenerateKeyPair_Rsa2048_Proceeds_WithoutAllowInsecure()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
         GenerateRsa(session, 2048);
         Assert.Equal(1, fake.Calls);
     }

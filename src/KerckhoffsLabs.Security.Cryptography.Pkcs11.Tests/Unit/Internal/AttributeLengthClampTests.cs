@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -22,22 +22,23 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// it only has to answer a question inconsistently, and it returns <c>CKR_OK</c> throughout.
 /// </para>
 /// <para>
-/// These tests drive that behaviour through the <c>ILowLevelPkcs11Library</c> seam, since no real
-/// module will misbehave on request. That refusing does not leak the buffers already handed out — the
+/// These tests drive that behaviour through a <see cref="FakeModule"/>, since no real module will
+/// misbehave on request. That refusing does not leak the buffers already handed out — the
 /// property that makes this guard safe to add to a path which had no cleanup before it — is asserted
 /// by <c>AttributeLengthClampLeakTests</c>, which has to be serialized and so lives apart.
 /// </para>
 /// </remarks>
+[Collection(FakeModuleCollection.Name)]
 public sealed class AttributeLengthClampTests
 {
     private const ulong ObjectId = 7;
 
     /// <summary>Answers the sizing call honestly, then inflates the length on the fill call.</summary>
-    private sealed class LyingLengthFake(int honestLen, int inflatedLen) : FakeLowLevelPkcs11Library
+    private sealed class LyingLengthFake(int honestLen, int inflatedLen) : SessionTestModule
     {
         private int _calls;
 
-        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
             _calls++;
             for (int i = 0; i < template.Length; i++)
@@ -50,9 +51,9 @@ public sealed class AttributeLengthClampTests
     }
 
     /// <summary>Consistent and well-behaved — the control for the tests below.</summary>
-    private sealed class HonestFake(int len) : FakeLowLevelPkcs11Library
+    private sealed class HonestFake(int len) : SessionTestModule
     {
-        public override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectId, Span<CK_ATTRIBUTE> template)
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
             for (int i = 0; i < template.Length; i++)
                 template[i].valueLen = (NativeCULong)len;
@@ -60,10 +61,14 @@ public sealed class AttributeLengthClampTests
         }
     }
 
-    private static ReadOnlyDisposableList<ObjectAttribute> Read(FakeLowLevelPkcs11Library fake)
+    /// <summary>Reads <c>CKA_VALUE</c> through <paramref name="fake"/>, then disposes it.</summary>
+    private static ReadOnlyDisposableList<ObjectAttribute> Read(SessionTestModule fake)
     {
-        using var session = new Pkcs11Session(fake, 1);
-        return session.GetAttributeValue(new ObjectHandle(ObjectId), [(ulong)CKA.CKA_VALUE]);
+        using (fake)
+        {
+            using var session = fake.CreateSession(1);
+            return session.GetAttributeValue(new ObjectHandle(ObjectId), [(ulong)CKA.CKA_VALUE]);
+        }
     }
 
     [Fact]

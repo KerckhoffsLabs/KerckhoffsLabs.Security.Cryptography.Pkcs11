@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
@@ -13,6 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 /// cannot have written, or <c>CK_UNAVAILABLE_INFORMATION</c> as a size, is refused: the result is never
 /// padded with zeros the module did not write, and never read past the buffer.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class ReportedLengthTests
 {
     private const ulong SessionId = 11;
@@ -21,7 +22,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Sign_FillReportsMoreThanTheBuffer_IsRefused()
     {
-        var fake = new LyingFake { Length = 64, FillReports = (NativeCULong)65UL };
+        using var fake = new LyingFake { Length = 64, FillReports = (NativeCULong)65UL };
 
         var e = Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
 
@@ -31,7 +32,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Sign_ProbeReportsUnavailableInformation_IsRefusedBeforeAllocating()
     {
-        var fake = new LyingFake { ProbeReports = Unavailable };
+        using var fake = new LyingFake { ProbeReports = Unavailable };
 
         Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
         Assert.Equal(1, fake.SignCalls);
@@ -40,7 +41,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Sign_ProbeReportsMoreThanAnArrayCanHold_IsRefused()
     {
-        var fake = new LyingFake { ProbeReports = (NativeCULong)((ulong)Array.MaxLength + 1) };
+        using var fake = new LyingFake { ProbeReports = (NativeCULong)((ulong)Array.MaxLength + 1) };
 
         Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8));
     }
@@ -52,7 +53,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Sign_FillSaysBufferTooSmall_IsRetriedAtTheNewSize()
     {
-        var fake = new LyingFake { Length = 72, ProbeReports = (NativeCULong)70UL };
+        using var fake = new LyingFake { Length = 72, ProbeReports = (NativeCULong)70UL };
 
         byte[] signature = Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8);
 
@@ -63,7 +64,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Sign_FillReportsLessThanTheBuffer_ReturnsWhatWasWritten()
     {
-        var fake = new LyingFake { Length = 64, ProbeReports = (NativeCULong)72UL };
+        using var fake = new LyingFake { Length = 64, ProbeReports = (NativeCULong)72UL };
 
         byte[] signature = Session(fake).Sign(Ecdsa(), new ObjectHandle(1), "data"u8);
 
@@ -73,7 +74,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Decrypt_ReportsMoreThanTheBuffer_IsRefused_NotPaddedWithZeros()
     {
-        var fake = new LyingFake { FillReports = (NativeCULong)4096UL };
+        using var fake = new LyingFake { FillReports = (NativeCULong)4096UL };
 
         var e = Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Decrypt(Gcm(), new ObjectHandle(1), new byte[32]));
 
@@ -83,7 +84,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void Encrypt_ReportsMoreThanTheBuffer_IsRefused()
     {
-        var fake = new LyingFake { FillReports = (NativeCULong)4096UL };
+        using var fake = new LyingFake { FillReports = (NativeCULong)4096UL };
 
         Assert.Throws<Pkcs11UnclassifiedException>(() => Session(fake).Encrypt(Gcm(), new ObjectHandle(1), new byte[32]));
     }
@@ -91,7 +92,7 @@ public sealed class ReportedLengthTests
     [Fact]
     public void FindObjects_ReportsMoreHandlesThanRequested_IsRefused()
     {
-        var fake = new LyingFake { FillReports = (NativeCULong)5UL };
+        using var fake = new LyingFake { FillReports = (NativeCULong)5UL };
         var session = Session(fake);
 
         var e = Assert.Throws<Pkcs11UnclassifiedException>(() => session.FindObjects(2));
@@ -102,8 +103,8 @@ public sealed class ReportedLengthTests
     [Fact]
     public void GetMechanismList_ReportsMoreThanTheBuffer_IsRefused_NotPaddedWithMechanismZero()
     {
-        var fake = new LyingFake { ProbeReports = (NativeCULong)2UL, FillReports = (NativeCULong)3UL };
-        var slot = new Pkcs11Slot(fake, 0);
+        using var fake = new LyingFake { ProbeReports = (NativeCULong)2UL, FillReports = (NativeCULong)3UL };
+        var slot = new Pkcs11Slot(fake.LowLevel, 0);
 
         // Padding used to add CKM 0, CKM_RSA_PKCS_KEY_PAIR_GEN, a mechanism the module never listed.
         Assert.Throws<Pkcs11UnclassifiedException>(() => slot.GetMechanismList());
@@ -112,12 +113,12 @@ public sealed class ReportedLengthTests
     [Fact]
     public void GetMechanismList_ProbeReportsUnavailableInformation_IsRefused()
     {
-        var fake = new LyingFake { ProbeReports = Unavailable };
+        using var fake = new LyingFake { ProbeReports = Unavailable };
 
-        Assert.Throws<Pkcs11UnclassifiedException>(() => new Pkcs11Slot(fake, 0).GetMechanismList());
+        Assert.Throws<Pkcs11UnclassifiedException>(() => new Pkcs11Slot(fake.LowLevel, 0).GetMechanismList());
     }
 
-    private static Pkcs11Session Session(LyingFake fake) => new(fake, SessionId);
+    private static Pkcs11Session Session(LyingFake fake) => fake.OpenSession();
     private static Mechanism Ecdsa() => new(CKM.CKM_ECDSA_SHA256);
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
 
@@ -126,61 +127,78 @@ public sealed class ReportedLengthTests
     /// <see cref="ProbeReports"/> replaces the length a NULL-buffer call reports, and
     /// <see cref="FillReports"/> the length a call with a buffer reports having written.
     /// </summary>
-    private sealed class LyingFake : FakeLowLevelPkcs11Library
+    private sealed class LyingFake : SessionTestModule
     {
+        private readonly List<Pkcs11Session> _sessions = [];
+
         public int Length { get; init; } = 32;
         public NativeCULong? ProbeReports { get; init; }
         public NativeCULong? FillReports { get; init; }
         public int SignCalls { get; private set; }
 
-        public override CKR C_SignInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_EncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_DecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-
-        public override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> signature, bool lengthOnly, out NativeCULong signatureLen)
+        /// <summary>A session on this module, disposed with it.</summary>
+        public Pkcs11Session OpenSession()
         {
-            SignCalls++;
-            return Answer(lengthOnly ? default : signature, out signatureLen);
+            Pkcs11Session session = CreateSession(SessionId);
+            _sessions.Add(session);
+            return session;
         }
 
-        public override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, Span<byte> encryptedData, bool lengthOnly, out NativeCULong encryptedDataLen)
-            => Answer(lengthOnly ? default : encryptedData, out encryptedDataLen);
+        protected override void Disposing()
+        {
+            foreach (Pkcs11Session session in _sessions)
+                session.Dispose();
+            base.Disposing();
+        }
 
-        public override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, Span<byte> data, bool lengthOnly, out NativeCULong dataLen)
-            => Answer(lengthOnly ? default : data, out dataLen);
+        protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
 
-        public override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, out NativeCULong objectCount)
+        protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
+        {
+            SignCalls++;
+            return Answer(signature, ref signatureLen);
+        }
+
+        protected override CKR C_Encrypt(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> encryptedData, ref NativeCULong encryptedDataLen)
+            => Answer(encryptedData, ref encryptedDataLen);
+
+        protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
+            => Answer(data, ref dataLen);
+
+        protected override CKR C_FindObjects(NativeCULong session, Span<NativeCULong> objects, ref NativeCULong count)
         {
             objects.Fill((NativeCULong)7);
-            objectCount = FillReports ?? (NativeCULong)(ulong)objects.Length;
+            count = FillReports ?? (NativeCULong)(ulong)objects.Length;
             return CKR.CKR_OK;
         }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
+        protected override CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count)
         {
-            if (mechanismList.IsEmpty)
+            if (mechanismList.IsNull)
             {
                 count = ProbeReports ?? (NativeCULong)(ulong)Length;
                 return CKR.CKR_OK;
             }
-            mechanismList.Fill(CKM.CKM_AES_GCM);
-            count = FillReports ?? (NativeCULong)(ulong)mechanismList.Length;
+            mechanismList.Span.Fill((NativeCULong)(ulong)CKM.CKM_AES_GCM);
+            count = FillReports ?? (NativeCULong)(ulong)mechanismList.Span.Length;
             return CKR.CKR_OK;
         }
 
-        private CKR Answer(Span<byte> output, out NativeCULong length)
+        private CKR Answer(NativeBuffer<byte> output, ref NativeCULong length)
         {
-            if (output.IsEmpty)
+            if (output.IsNull)
             {
                 length = ProbeReports ?? (NativeCULong)(ulong)Length;
                 return CKR.CKR_OK;
             }
-            if (output.Length < Length)
+            if (output.Span.Length < Length)
             {
                 length = (NativeCULong)(ulong)Length;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
-            output[..Length].Fill(0xA5);
+            output.Span[..Length].Fill(0xA5);
             length = FillReports ?? (NativeCULong)(ulong)Length;
             return CKR.CKR_OK;
         }

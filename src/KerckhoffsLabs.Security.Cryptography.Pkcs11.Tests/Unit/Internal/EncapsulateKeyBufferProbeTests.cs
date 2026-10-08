@@ -3,7 +3,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -11,34 +11,35 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// Regression: a conformant token may return <c>CKR_BUFFER_TOO_SMALL</c> from the
 /// two-call length probe (it has still populated the length output, per PKCS#11 v3.2 §5.2).
 /// <c>EncapsulateKey</c> must treat that as a successful probe, allocate, and make the real
-/// call — not throw. This is exercised through the <see cref="ILowLevelPkcs11Library"/> seam
-/// because pkcs11-mock/SoftHSM return <c>CKR_OK</c> from the probe and never hit this branch.
+/// call — not throw. This is exercised through a <see cref="FakeModule"/> because
+/// pkcs11-mock/SoftHSM return <c>CKR_OK</c> from the probe and never hit this branch.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class EncapsulateKeyBufferProbeTests
 {
     /// <summary>Fake whose C_EncapsulateKey probe returns CKR_BUFFER_TOO_SMALL, then succeeds.</summary>
-    private sealed class BufferTooSmallProbeFake : FakeLowLevelPkcs11Library
+    private sealed class BufferTooSmallProbeFake : SessionTestModule
     {
-        public int Calls { get; private set; }
+        public new int Calls { get; private set; }
         public const int CiphertextSize = 16;
 
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong key)
         {
             Calls++;
 
             // First (probe) call: the high-level wrapper passes a null buffer. A conformant
             // token may signal "I populated the length, your buffer was inadequate".
-            if (lengthOnly)
+            if (ciphertext.IsNull)
             {
                 ciphertextLen = (NativeCULong)CiphertextSize;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
 
             // Second (real) call: fill the buffer + hand back a shared-key handle.
-            for (int i = 0; i < CiphertextSize && i < ciphertext.Length; i++)
-                ciphertext[i] = (byte)(i + 1);
+            for (int i = 0; i < CiphertextSize && i < ciphertext.Span.Length; i++)
+                ciphertext.Span[i] = (byte)(i + 1);
             ciphertextLen = (NativeCULong)CiphertextSize;
-            derivedKey = (NativeCULong)42UL;
+            key = (NativeCULong)42UL;
             return CKR.CKR_OK;
         }
     }
@@ -46,23 +47,16 @@ public sealed class EncapsulateKeyBufferProbeTests
     [Fact]
     public void EncapsulateKey_ProbeReturnsBufferTooSmall_SucceedsWithoutThrowing()
     {
-        var fake = new BufferTooSmallProbeFake();
-        var session = new Pkcs11Session(fake, sessionId: 1);
-        try
-        {
-            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+        using var fake = new BufferTooSmallProbeFake();
+        using var session = fake.CreateSession(sessionId: 1);
+        var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
-            var (ciphertext, sharedKey) = session.EncapsulateKey(
-                mechanism, new ObjectHandle(2), []);
+        var (ciphertext, sharedKey) = session.EncapsulateKey(
+            mechanism, new ObjectHandle(2), []);
 
-            Assert.Equal(BufferTooSmallProbeFake.CiphertextSize, ciphertext.Length);
-            Assert.Equal(2, fake.Calls); // probe (BUFFER_TOO_SMALL) + real call
-            Assert.Equal(42UL, sharedKey.ObjectId);
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.Equal(BufferTooSmallProbeFake.CiphertextSize, ciphertext.Length);
+        Assert.Equal(2, fake.Calls); // probe (BUFFER_TOO_SMALL) + real call
+        Assert.Equal(42UL, sharedKey.ObjectId);
     }
 
     /// <summary>
@@ -71,28 +65,27 @@ public sealed class EncapsulateKeyBufferProbeTests
     /// full, side-effectful encapsulation (a fresh shared-secret handle). The two-call probe therefore
     /// cannot work against it; the caller must pass a pre-sized buffer via <c>expectedCiphertextLen</c>.
     /// </summary>
-    private sealed class SoftHsmLikeFake : FakeLowLevelPkcs11Library
+    private sealed class SoftHsmLikeFake : SessionTestModule
     {
-        public int Calls { get; private set; }
+        public new int Calls { get; private set; }
         public const int CiphertextSize = 1088; // ML-KEM-768
 
-        public override CKR C_EncapsulateKey(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong publicKey, ReadOnlySpan<CK_ATTRIBUTE> template, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen, ref NativeCULong derivedKey)
+        protected override CKR C_EncapsulateKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong publicKey, CK_ATTRIBUTE[] template, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen, ref NativeCULong key)
         {
-            // A native token that never writes *pulCiphertextLen leaves the caller looking at the
-            // capacity it passed in, which is what the interop layer seeds the out parameter with.
-            ciphertextLen = (NativeCULong)ciphertext.Length;
+            // Like SoftHSM, ciphertextLen is left as the caller passed it (the capacity) unless the
+            // ciphertext is written.
             Calls++;
-            derivedKey = (NativeCULong)42UL; // side-effect on every call, even the would-be "probe"
+            key = (NativeCULong)42UL; // side-effect on every call, even the would-be "probe"
 
             // SoftHSM ignores an empty (NULL) buffer entirely: it does not populate the length.
-            if (lengthOnly)
+            if (ciphertext.IsNull)
                 return CKR.CKR_OK;
 
-            if (ciphertext.Length < CiphertextSize)
+            if (ciphertext.Span.Length < CiphertextSize)
                 return CKR.CKR_BUFFER_TOO_SMALL; // note: length is NOT updated (matches SoftHSM)
 
             for (int i = 0; i < CiphertextSize; i++)
-                ciphertext[i] = (byte)((i + 1) & 0xFF);
+                ciphertext.Span[i] = (byte)((i + 1) & 0xFF);
             ciphertextLen = (NativeCULong)CiphertextSize;
             return CKR.CKR_OK;
         }
@@ -101,23 +94,16 @@ public sealed class EncapsulateKeyBufferProbeTests
     [Fact]
     public void EncapsulateKey_WithExpectedLength_SkipsProbe_SingleCall()
     {
-        var fake = new SoftHsmLikeFake();
-        var session = new Pkcs11Session(fake, sessionId: 1);
-        try
-        {
-            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+        using var fake = new SoftHsmLikeFake();
+        using var session = fake.CreateSession(sessionId: 1);
+        var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
-            var (ciphertext, sharedKey) = session.EncapsulateKey(
-                mechanism, new ObjectHandle(2), [], SoftHsmLikeFake.CiphertextSize);
+        var (ciphertext, sharedKey) = session.EncapsulateKey(
+            mechanism, new ObjectHandle(2), [], SoftHsmLikeFake.CiphertextSize);
 
-            Assert.Equal(SoftHsmLikeFake.CiphertextSize, ciphertext.Length);
-            Assert.Equal(1, fake.Calls); // pre-sized buffer => one call, no probe
-            Assert.Equal(42UL, sharedKey.ObjectId);
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.Equal(SoftHsmLikeFake.CiphertextSize, ciphertext.Length);
+        Assert.Equal(1, fake.Calls); // pre-sized buffer => one call, no probe
+        Assert.Equal(42UL, sharedKey.ObjectId);
     }
 
     [Fact]
@@ -127,18 +113,11 @@ public sealed class EncapsulateKeyBufferProbeTests
         // the probe fails loudly rather than returning an empty ciphertext for an encapsulation that
         // really happened — demonstrating why the hint path exists. (The library's ML-KEM surface
         // always supplies the hint.)
-        var fake = new SoftHsmLikeFake();
-        var session = new Pkcs11Session(fake, sessionId: 1);
-        try
-        {
-            var mechanism = new Mechanism(CKM.CKM_ML_KEM);
+        using var fake = new SoftHsmLikeFake();
+        using var session = fake.CreateSession(sessionId: 1);
+        var mechanism = new Mechanism(CKM.CKM_ML_KEM);
 
-            Assert.ThrowsAny<Pkcs11Exception>(() =>
-                session.EncapsulateKey(mechanism, new ObjectHandle(2), []));
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        Assert.ThrowsAny<Pkcs11Exception>(() =>
+            session.EncapsulateKey(mechanism, new ObjectHandle(2), []));
     }
 }

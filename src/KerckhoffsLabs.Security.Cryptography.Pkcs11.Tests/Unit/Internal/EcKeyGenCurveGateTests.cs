@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
 #pragma warning disable KLPKCS11007 // weak curves are the subject under test
@@ -16,13 +16,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/>: the generic <c>GenerateKeyPair(mechanism, public, private)</c>
 /// path reaches the same session call and must meet the same curve allow-list.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class EcKeyGenCurveGateTests
 {
-    private sealed class RecordingFake : FakeLowLevelPkcs11Library
+    private sealed class RecordingFake : SessionTestModule
     {
-        public int Calls { get; private set; }
+        public new int Calls { get; private set; }
 
-        public override CKR C_GenerateKeyPair(NativeCULong session, ref CK_MECHANISM mechanism, ReadOnlySpan<CK_ATTRIBUTE> publicKeyTemplate, ReadOnlySpan<CK_ATTRIBUTE> privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
+        protected override CKR C_GenerateKeyPair(NativeCULong session, CK_MECHANISM mechanism, CK_ATTRIBUTE[] publicKeyTemplate, CK_ATTRIBUTE[] privateKeyTemplate, ref NativeCULong publicKey, ref NativeCULong privateKey)
         {
             Calls++;
             publicKey = (NativeCULong)10UL;
@@ -45,8 +46,8 @@ public sealed class EcKeyGenCurveGateTests
     [Fact]
     public void WeakCurve_IsRefusedBeforeReachingTheToken()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => GenerateEc(session, Pkcs11ECCurve.NamedCurves.NistP192.GetEcParams()));
@@ -57,8 +58,8 @@ public sealed class EcKeyGenCurveGateTests
     [Fact]
     public void AllowedCurve_Proceeds()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
 
         GenerateEc(session, Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams());
         Assert.Equal(1, fake.Calls);
@@ -69,13 +70,15 @@ public sealed class EcKeyGenCurveGateTests
     {
         byte[] brainpool = Pkcs11ECCurve.NamedCurves.BrainpoolP256r1.GetEcParams();
 
-        var secure = new RecordingFake();
-        using (var session = new Pkcs11Session(secure, sessionId: 1))
-            GenerateEc(session, brainpool);
-        Assert.Equal(1, secure.Calls);
+        using (var secure = new RecordingFake())
+        {
+            using (var session = secure.CreateSession(sessionId: 1))
+                GenerateEc(session, brainpool);
+            Assert.Equal(1, secure.Calls);
+        }
 
-        var fips = new RecordingFake();
-        using (var session = new Pkcs11Session(fips, sessionId: 1, policy: CryptoPolicy.FipsOnly))
+        using var fips = new RecordingFake();
+        using (var session = fips.CreateSession(sessionId: 1, policy: CryptoPolicy.FipsOnly))
             Assert.Throws<CryptoPolicyViolationException>(() => GenerateEc(session, brainpool));
         Assert.Equal(0, fips.Calls);
     }
@@ -87,13 +90,15 @@ public sealed class EcKeyGenCurveGateTests
     {
         byte[] printableCurveName = [0x13, 0x0A, .. "prime256v1"u8];
 
-        var secure = new RecordingFake();
-        using (var session = new Pkcs11Session(secure, sessionId: 1))
-            Assert.Throws<CryptoPolicyViolationException>(() => GenerateEc(session, printableCurveName));
-        Assert.Equal(0, secure.Calls);
+        using (var secure = new RecordingFake())
+        {
+            using (var session = secure.CreateSession(sessionId: 1))
+                Assert.Throws<CryptoPolicyViolationException>(() => GenerateEc(session, printableCurveName));
+            Assert.Equal(0, secure.Calls);
+        }
 
-        var insecure = new RecordingFake();
-        using (var session = new Pkcs11Session(insecure, sessionId: 1, policy: CryptoPolicy.AllowInsecure))
+        using var insecure = new RecordingFake();
+        using (var session = insecure.CreateSession(sessionId: 1, policy: CryptoPolicy.AllowInsecure))
             GenerateEc(session, printableCurveName);
         Assert.Equal(1, insecure.Calls);
     }
@@ -102,8 +107,8 @@ public sealed class EcKeyGenCurveGateTests
     [Fact]
     public void NoEcParams_LeavesTheTemplateToTheToken()
     {
-        var fake = new RecordingFake();
-        using var session = new Pkcs11Session(fake, sessionId: 1);
+        using var fake = new RecordingFake();
+        using var session = fake.CreateSession(sessionId: 1);
 
         GenerateEc(session, ecParams: null);
         Assert.Equal(1, fake.Calls);
