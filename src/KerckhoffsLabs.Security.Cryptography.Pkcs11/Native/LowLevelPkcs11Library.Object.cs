@@ -18,12 +18,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (createObject is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layout; elsewhere the template is passed as it is.
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (NativeCULong* idPtr = &objectId)
-            return createObject(session, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, idPtr).ToCKR();
+            return createObject(session, templateBlock.Pointer, templateBlock.Count, idPtr).ToCKR();
     }
 
     /// <summary>
@@ -41,12 +38,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (copyObject is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layout; elsewhere the template is passed as it is.
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
         fixed (NativeCULong* idPtr = &newObjectId)
-            return copyObject(session, objectId, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length, idPtr).ToCKR();
+            return copyObject(session, objectId, templateBlock.Pointer, templateBlock.Count, idPtr).ToCKR();
     }
 
     /// <summary>
@@ -97,21 +91,12 @@ internal sealed partial class LowLevelPkcs11Library
         if (getAttributeValue is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (!Pkcs11Marshal.IsWindows)
-        {
-            fixed (CK_ATTRIBUTE* t = template)
-                return getAttributeValue(session, objectId, t, (NativeCULong)template.Length).ToCKR();
-        }
-
-        // The module writes each value's length back into the packed copy, so the copy is mirrored
-        // into the caller's template afterwards.
-        CK_ATTRIBUTE_Windows[]? packedTemplate = ToWindowsTemplate(template);
-        CKR rv;
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
-            rv = getAttributeValue(session, objectId, tw, (NativeCULong)template.Length).ToCKR();
-        if (packedTemplate is not null)
-            for (int i = 0; i < packedTemplate.Length; i++)
-                template[i] = packedTemplate[i].ToUnified();
+        // The module writes each value's length back into the laid-out copy, whatever it returns
+        // (CKR_ATTRIBUTE_SENSITIVE and CKR_BUFFER_TOO_SMALL report per attribute), so the copy is
+        // mirrored into the caller's template afterwards.
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        CKR rv = getAttributeValue(session, objectId, templateBlock.Pointer, templateBlock.Count).ToCKR();
+        templateBlock.CopyTo(template);
         return rv;
     }
 
@@ -129,11 +114,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (setAttributeValue is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layout; elsewhere the template is passed as it is.
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
-            return setAttributeValue(session, objectId, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length).ToCKR();
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        return setAttributeValue(session, objectId, templateBlock.Pointer, templateBlock.Count).ToCKR();
     }
 
     /// <summary>
@@ -149,11 +131,8 @@ internal sealed partial class LowLevelPkcs11Library
         if (findObjectsInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        // Windows modules read the Pack=1 layout; elsewhere the template is passed as it is.
-        CK_ATTRIBUTE_Windows[]? packedTemplate = Pkcs11Marshal.IsWindows ? ToWindowsTemplate(template) : null;
-        fixed (CK_ATTRIBUTE* t = template)
-        fixed (CK_ATTRIBUTE_Windows* tw = packedTemplate)
-            return findObjectsInit(session, Pkcs11Marshal.IsWindows ? tw : t, (NativeCULong)template.Length).ToCKR();
+        using var templateBlock = new NativeStructArray<CK_ATTRIBUTE>(template, nullWhenEmpty: true);
+        return findObjectsInit(session, templateBlock.Pointer, templateBlock.Count).ToCKR();
     }
 
     /// <summary>

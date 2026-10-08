@@ -102,15 +102,11 @@ internal sealed partial class LowLevelPkcs11Library
         if (getSessionInfo is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (!Pkcs11Marshal.IsWindows)
-        {
-            fixed (CK_SESSION_INFO* p = &info)
-                return getSessionInfo(session, p).ToCKR();
-        }
-
-        CK_SESSION_INFO_Windows packed = default;
-        CKR rv = getSessionInfo(session, &packed).ToCKR();
-        info = packed.ToUnified();
+        // Written first, so whatever the module leaves untouched keeps the caller's value.
+        byte* p = stackalloc byte[Pkcs11Marshal.SizeOf<CK_SESSION_INFO>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)p, in info);
+        CKR rv = getSessionInfo(session, p).ToCKR();
+        info = Pkcs11Marshal.ReadStructure<CK_SESSION_INFO>((IntPtr)p);
         return rv;
     }
 

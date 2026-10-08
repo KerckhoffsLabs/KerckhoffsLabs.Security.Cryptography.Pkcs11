@@ -15,13 +15,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (messageEncryptInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows)
-        {
-            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return messageEncryptInit(session, &packed, key).ToCKR();
-        }
-        fixed (CK_MECHANISM* m = &mechanism)
-            return messageEncryptInit(session, m, key).ToCKR();
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        return messageEncryptInit(session, m, key).ToCKR();
     }
 
     /// <summary>

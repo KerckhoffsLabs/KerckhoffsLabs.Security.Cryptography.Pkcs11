@@ -18,13 +18,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (signInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows)
-        {
-            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return signInit(session, &packed, key).ToCKR();
-        }
-        fixed (CK_MECHANISM* m = &mechanism)
-            return signInit(session, m, key).ToCKR();
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        return signInit(session, m, key).ToCKR();
     }
 
     /// <summary>
@@ -106,13 +102,9 @@ internal sealed partial class LowLevelPkcs11Library
         if (signRecoverInit is null)
             return CKR.CKR_FUNCTION_NOT_SUPPORTED;
 
-        if (Pkcs11Marshal.IsWindows)
-        {
-            CK_MECHANISM_Windows packed = CK_MECHANISM_Windows.FromUnified(in mechanism);
-            return signRecoverInit(session, &packed, key).ToCKR();
-        }
-        fixed (CK_MECHANISM* m = &mechanism)
-            return signRecoverInit(session, m, key).ToCKR();
+        byte* m = stackalloc byte[Pkcs11Marshal.SizeOf<CK_MECHANISM>()];
+        Pkcs11Marshal.WriteStructure((IntPtr)m, in mechanism);
+        return signRecoverInit(session, m, key).ToCKR();
     }
 
     /// <summary>

@@ -30,17 +30,27 @@ internal static class Pkcs11Marshal
     /// blittable layout is the one that governs under <c>[assembly: DisableRuntimeMarshalling]</c>
     /// and the one this type reads and writes.
     /// </remarks>
-    public static int SizeOf<T>() where T : unmanaged
-        => IsWindows && PackedDispatch.IsPacked<T>() ? PackedDispatch.SizeOfWindows<T>() : Unsafe.SizeOf<T>();
+    public static int SizeOf<T>() where T : unmanaged => SizeOf<T>(IsWindows);
+
+    /// <summary>
+    /// <see cref="SizeOf{T}()"/> for an explicit layout: the Windows-packed one when
+    /// <paramref name="windowsLayout"/> is set, the natural one otherwise. The layouts are plain bytes, so
+    /// either can be produced and checked on any OS; only a module decides which one it reads.
+    /// </summary>
+    internal static int SizeOf<T>(bool windowsLayout) where T : unmanaged
+        => windowsLayout && PackedDispatch.IsPacked<T>() ? PackedDispatch.SizeOfWindows<T>() : Unsafe.SizeOf<T>();
 
     /// <summary>
     /// Marshals <paramref name="value"/> into the unmanaged buffer at <paramref name="ptr"/>,
     /// using the Windows-packed sibling layout when running on Windows.
-    /// The buffer must already be allocated and at least <see cref="SizeOf{T}"/> bytes.
+    /// The buffer must already be allocated and at least <see cref="SizeOf{T}()"/> bytes.
     /// </summary>
-    public static void WriteStructure<T>(IntPtr ptr, in T value) where T : unmanaged
+    public static void WriteStructure<T>(IntPtr ptr, in T value) where T : unmanaged => WriteStructure(ptr, in value, IsWindows);
+
+    /// <summary><see cref="WriteStructure{T}(IntPtr, in T)"/> for an explicit layout (see <see cref="SizeOf{T}(bool)"/>).</summary>
+    internal static void WriteStructure<T>(IntPtr ptr, in T value, bool windowsLayout) where T : unmanaged
     {
-        if (IsWindows && PackedDispatch.IsPacked<T>())
+        if (windowsLayout && PackedDispatch.IsPacked<T>())
             PackedDispatch.WriteWindows(ptr, in value);
         else
             unsafe { Unsafe.WriteUnaligned((void*)ptr, value); }
@@ -57,9 +67,12 @@ internal static class Pkcs11Marshal
     /// <c>[DynamicallyAccessedMembers]</c> annotation because nothing reflects over
     /// <typeparamref name="T"/>.
     /// </remarks>
-    public static T ReadStructure<T>(IntPtr ptr) where T : unmanaged
+    public static T ReadStructure<T>(IntPtr ptr) where T : unmanaged => ReadStructure<T>(ptr, IsWindows);
+
+    /// <summary><see cref="ReadStructure{T}(IntPtr)"/> for an explicit layout (see <see cref="SizeOf{T}(bool)"/>).</summary>
+    internal static T ReadStructure<T>(IntPtr ptr, bool windowsLayout) where T : unmanaged
     {
-        if (IsWindows && PackedDispatch.IsPacked<T>())
+        if (windowsLayout && PackedDispatch.IsPacked<T>())
             return PackedDispatch.ReadWindows<T>(ptr);
 
         unsafe { return Unsafe.ReadUnaligned<T>((void*)ptr); }
