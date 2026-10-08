@@ -41,21 +41,6 @@ internal partial class Delegates
             throw Pkcs11Exception.Create(CKR.CKR_FUNCTION_NOT_SUPPORTED, name);
     }
 
-    // ── Message-AEAD family wrappers (v3.0) ──────────────────────────────────────
-
-    /// <summary>
-    /// Resolves the pointer to pass for a nullable, possibly-empty output buffer: <c>null</c> when
-    /// <paramref name="buffer"/> itself is <c>null</c> (the length-probe signal), the sentinel address
-    /// when it is real but empty (since <c>fixed</c> yields a null pointer for any empty array, and
-    /// null would be indistinguishable from the probe signal here), or <paramref name="raw"/> otherwise.
-    /// </summary>
-    private static unsafe byte* SentinelOrData(byte[]? buffer, byte* raw, byte* sentinel)
-    {
-        if (buffer is null)
-            return null;
-        return buffer.Length == 0 ? sentinel : raw;
-    }
-
     /// <summary>
     /// Initializes a new instance of <see cref="Delegates"/>. Function pointers are
     /// acquired via <c>C_GetFunctionList</c> against the dynamically loaded library

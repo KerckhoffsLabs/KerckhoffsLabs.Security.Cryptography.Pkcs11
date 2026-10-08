@@ -129,9 +129,9 @@ internal sealed partial class LowLevelPkcs11Library : ILowLevelPkcs11Library
         => _module.Table._fp.C_MessageEncryptInit is not null
            && _module.Table._fp.C_EncryptMessage is not null
            && _module.Table._fp.C_MessageEncryptFinal is not null
-           && _module.Table.HasC_MessageDecryptInit
-           && _module.Table.HasC_DecryptMessage
-           && _module.Table.HasC_MessageDecryptFinal;
+           && _module.Table._fp.C_MessageDecryptInit is not null
+           && _module.Table._fp.C_DecryptMessage is not null
+           && _module.Table._fp.C_MessageDecryptFinal is not null;
 
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM

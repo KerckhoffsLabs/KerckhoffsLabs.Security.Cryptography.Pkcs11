@@ -52,9 +52,9 @@ public sealed class Pkcs11SessionMessageAndMiscTests
             return EncMsgRv;
         }
 
-        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, byte[]? plaintext, out NativeCULong plaintextLen)
+        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, bool lengthOnly, out NativeCULong plaintextLen)
         {
-            if (plaintext is null) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
+            if (lengthOnly) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
             OnDecryptMessageParams?.Invoke(parameter);
             Plaintext.AsSpan(0, Plaintext.Length).CopyTo(plaintext);
             plaintextLen = (NativeCULong)Plaintext.Length;
