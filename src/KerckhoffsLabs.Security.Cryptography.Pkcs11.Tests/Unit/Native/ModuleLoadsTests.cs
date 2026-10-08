@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal.SafeHandles;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// Cryptoki state belongs to the module, not to one load of it. A second load shares the first's

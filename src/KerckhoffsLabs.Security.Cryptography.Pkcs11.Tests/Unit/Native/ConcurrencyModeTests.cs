@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal.SafeHandles;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
 
 /// <summary>
 /// A module that refuses OS locking (<c>CKR_CANT_LOCK</c>) is initialized without it, which promises it

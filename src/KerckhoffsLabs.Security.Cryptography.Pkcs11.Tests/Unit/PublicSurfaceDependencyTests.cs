@@ -65,7 +65,7 @@ public sealed class PublicSurfaceDependencyTests
     [InlineData(typeof(Microsoft.Win32.SafeHandles.SafeFileHandle))]
     [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.CK_ATTRIBUTE))]
     [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.ObjectHandle))]
-    [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles.Pkcs11SessionHandle))]
+    [InlineData(typeof(KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.Pkcs11SessionHandle))]
     [InlineData(typeof(NativeCULong))]
     public void MarshallingLayerPredicate_RecognisesEachKind(Type type)
         => Assert.True(IsMarshallingLayerType(type), $"{type.FullName} should count as a marshalling-layer type.");

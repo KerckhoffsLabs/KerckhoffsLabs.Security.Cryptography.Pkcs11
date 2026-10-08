@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using KerckhoffsLabs.Runtime.InteropServices;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal.SafeHandles;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Native;
