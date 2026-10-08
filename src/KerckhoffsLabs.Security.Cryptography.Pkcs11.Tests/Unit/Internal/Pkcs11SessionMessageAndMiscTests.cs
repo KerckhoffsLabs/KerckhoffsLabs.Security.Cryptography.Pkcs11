@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fakes;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
@@ -13,16 +13,17 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 /// Hermetic coverage for the v3.0 message-based AEAD API (<c>MessageEncrypt</c>/<c>MessageDecrypt</c>),
 /// the lazily-cached <c>SupportsMechanism</c> probe, and <c>DigestKey</c>. The message API is only
 /// reached through the high-level AEAD algorithm wrappers in the Integration suite, so the
-/// session-level length-probe and finalize paths are pinned here through the
-/// <see cref="ILowLevelPkcs11Library"/> seam.
+/// session-level length-probe and finalize paths are pinned here through a <see cref="FakeModule"/>
+/// behind the real loader.
 /// </summary>
+[Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11SessionMessageAndMiscTests
 {
     private const ulong SessionId = 11;
 
     // === Message AEAD =======================================================
 
-    private sealed class MessageFake : FakeLowLevelPkcs11Library
+    private sealed class MessageFake : SessionTestModule
     {
         public byte[] Ciphertext = [0xC0, 0xC1];
         public byte[] Plaintext = [0xB0, 0xB1]; // overwritten per test
@@ -38,41 +39,40 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         public Action<IntPtr>? OnEncryptMessageParams;
         public Action<IntPtr>? OnDecryptMessageParams;
 
-        public override CKR C_MessageEncryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_MessageEncryptFinal(NativeCULong session) { EncryptFinalCalls++; return CKR.CKR_OK; }
-        public override CKR C_MessageDecryptInit(NativeCULong session, ref CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
-        public override CKR C_MessageDecryptFinal(NativeCULong session) { DecryptFinalCalls++; return CKR.CKR_OK; }
+        protected override CKR C_MessageEncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_MessageEncryptFinal(NativeCULong session) { EncryptFinalCalls++; return CKR.CKR_OK; }
+        protected override CKR C_MessageDecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_MessageDecryptFinal(NativeCULong session) { DecryptFinalCalls++; return CKR.CKR_OK; }
 
-        public override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, Span<byte> ciphertext, bool lengthOnly, out NativeCULong ciphertextLen)
+        protected override CKR C_EncryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> plaintext, NativeBuffer<byte> ciphertext, ref NativeCULong ciphertextLen)
         {
-            if (lengthOnly) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
-            if (ciphertext.Length < Ciphertext.Length) { ciphertextLen = (NativeCULong)Ciphertext.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+            if (ciphertext.IsNull) { ciphertextLen = (NativeCULong)Ciphertext.Length; return EncMsgRv; }
+            if (ciphertext.Span.Length < Ciphertext.Length) { ciphertextLen = (NativeCULong)Ciphertext.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
             OnEncryptMessageParams?.Invoke(parameter);
-            Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext);
+            Ciphertext.AsSpan(0, Ciphertext.Length).CopyTo(ciphertext.Span);
             ciphertextLen = (NativeCULong)Ciphertext.Length;
             return EncMsgRv;
         }
 
-        public override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, Span<byte> plaintext, bool lengthOnly, out NativeCULong plaintextLen)
+        protected override CKR C_DecryptMessage(NativeCULong session, IntPtr parameter, NativeCULong parameterLen, ReadOnlySpan<byte> associatedData, ReadOnlySpan<byte> ciphertext, NativeBuffer<byte> plaintext, ref NativeCULong plaintextLen)
         {
-            if (lengthOnly) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
-            if (plaintext.Length < Plaintext.Length) { plaintextLen = (NativeCULong)Plaintext.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
+            if (plaintext.IsNull) { plaintextLen = (NativeCULong)Plaintext.Length; return DecMsgRv; }
+            if (plaintext.Span.Length < Plaintext.Length) { plaintextLen = (NativeCULong)Plaintext.Length; return CKR.CKR_BUFFER_TOO_SMALL; }
             OnDecryptMessageParams?.Invoke(parameter);
-            Plaintext.AsSpan(0, Plaintext.Length).CopyTo(plaintext);
+            Plaintext.AsSpan(0, Plaintext.Length).CopyTo(plaintext.Span);
             plaintextLen = (NativeCULong)Plaintext.Length;
             return DecMsgRv;
         }
     }
 
-    private static Pkcs11Session NewSession(FakeLowLevelPkcs11Library fake) => new(fake, SessionId);
 
     // The tag length of a message-based AEAD lives in the per-message parameters, not on the mechanism
     // C_MessageEncryptInit receives, so the session must show them to the policy for it to judge the tag.
     [Fact]
     public void MessageEncrypt_ShortGcmTag_IsRefusedByThePolicy_BeforeTheToken()
     {
-        var fake = new MessageFake();
-        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        using var fake = new MessageFake();
+        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.SecureOnly);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 8);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
@@ -85,8 +85,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void MessageDecrypt_ShortCcmMac_IsRefusedByThePolicy_BeforeTheToken()
     {
-        var fake = new MessageFake();
-        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        using var fake = new MessageFake();
+        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.SecureOnly);
         var p = CkmCcmMessageParams.ForDecrypt(2, new byte[12], new byte[4]);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(() =>
@@ -99,8 +99,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void MessageEncrypt_FullGcmTag_IsAllowedByThePolicy()
     {
-        var fake = new MessageFake { Ciphertext = [1, 2] };
-        var s = new Pkcs11Session(fake, SessionId, policy: CryptoPolicy.SecureOnly);
+        using var fake = new MessageFake { Ciphertext = [1, 2] };
+        using var s = fake.CreateSession(SessionId, policy: CryptoPolicy.SecureOnly);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
         Assert.Equal(new byte[] { 1, 2 },
@@ -110,8 +110,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void MessageEncrypt_Ok_ReturnsCiphertext_AndFinalizes()
     {
-        var fake = new MessageFake { Ciphertext = [1, 2, 3, 4] };
-        var s = NewSession(fake);
+        using var fake = new MessageFake { Ciphertext = [1, 2, 3, 4] };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
@@ -124,8 +124,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void MessageEncrypt_Error_ThrowsAndFinalizes()
     {
-        var fake = new MessageFake { EncMsgRv = CKR.CKR_DEVICE_ERROR };
-        var s = NewSession(fake);
+        using var fake = new MessageFake { EncMsgRv = CKR.CKR_DEVICE_ERROR };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
@@ -137,8 +137,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void MessageDecrypt_Ok_ReturnsPlaintext_AndFinalizes()
     {
-        var fake = new MessageFake { Plaintext = [7, 7, 7] };
-        var s = NewSession(fake);
+        using var fake = new MessageFake { Plaintext = [7, 7, 7] };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         var p = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
 
@@ -151,8 +151,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void MessageDecrypt_TagFailure_Throws()
     {
-        var fake = new MessageFake { DecMsgRv = CKR.CKR_AEAD_DECRYPT_FAILED };
-        var s = NewSession(fake);
+        using var fake = new MessageFake { DecMsgRv = CKR.CKR_AEAD_DECRYPT_FAILED };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         var p = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
 
@@ -176,7 +176,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         byte[] tokenTag = new byte[16];
         tokenTag.AsSpan().Fill(0xA7);
 
-        var fake = new MessageFake
+        using var fake = new MessageFake
         {
             Ciphertext = [1, 2, 3],
             // What a real module does on encrypt: locate the tag buffer via the block and fill it.
@@ -189,7 +189,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
             },
         };
 
-        var s = NewSession(fake);
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         var p = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
 
@@ -207,7 +207,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
                             0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F];
 
         byte[]? observed = null;
-        var fake = new MessageFake
+        using var fake = new MessageFake
         {
             Plaintext = [7, 7, 7],
             // What a real module does on decrypt: read the tag out of the block to verify against.
@@ -219,7 +219,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
             },
         };
 
-        var s = NewSession(fake);
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_GCM);
         var p = CkmGcmMessageParams.ForDecrypt(new byte[12], callerTag);
 
@@ -237,7 +237,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
         byte[] tokenMac = new byte[16];
         tokenMac.AsSpan().Fill(0x5C);
 
-        var fake = new MessageFake
+        using var fake = new MessageFake
         {
             Ciphertext = [4, 5, 6],
             OnEncryptMessageParams = block =>
@@ -249,7 +249,7 @@ public sealed class Pkcs11SessionMessageAndMiscTests
             },
         };
 
-        var s = NewSession(fake);
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_AES_CCM);
         var p = CkmCcmMessageParams.ForEncrypt(dataLen: 3, new byte[12], macBytes: 16);
 
@@ -262,48 +262,48 @@ public sealed class Pkcs11SessionMessageAndMiscTests
 
     // === SupportsMechanism (lazy cache) =====================================
 
-    private sealed class MechListFake : FakeLowLevelPkcs11Library
+    private sealed class MechListFake : SessionTestModule
     {
         public CKR SessionInfoRv = CKR.CKR_OK, MechListRv = CKR.CKR_OK;
         public CKM[] Mechanisms = [CKM.CKM_AES_GCM, CKM.CKM_SHA256];
         public int SessionInfoCalls { get; private set; }
         public int MechListCalls { get; private set; }
 
-        public override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
+        protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
         { SessionInfoCalls++; info.SlotId = (NativeCULong)1; return SessionInfoRv; }
 
-        public override CKR C_GetMechanismList(NativeCULong slotId, Span<CKM> mechanismList, out NativeCULong count)
+        protected override CKR C_GetMechanismList(NativeCULong slotId, NativeBuffer<NativeCULong> mechanismList, ref NativeCULong count)
         {
             MechListCalls++;
-            if (mechanismList.IsEmpty) { count = (NativeCULong)Mechanisms.Length; return MechListRv; }
+            if (mechanismList.IsNull) { count = (NativeCULong)Mechanisms.Length; return MechListRv; }
             for (int i = 0; i < Mechanisms.Length; i++)
-                mechanismList[i] = Mechanisms[i];
+                mechanismList.Span[i] = (NativeCULong)(ulong)Mechanisms[i];
             count = (NativeCULong)Mechanisms.Length;
             return MechListRv;
         }
-
-        public override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
     }
 
     [Fact]
     public void SupportsMechanism_Present_ReturnsTrue()
     {
-        var s = NewSession(new MechListFake());
+        using var fake = new MechListFake();
+        using var s = fake.CreateSession(SessionId);
         Assert.True(s.SupportsMechanism(CKM.CKM_AES_GCM));
     }
 
     [Fact]
     public void SupportsMechanism_Absent_ReturnsFalse()
     {
-        var s = NewSession(new MechListFake());
+        using var fake = new MechListFake();
+        using var s = fake.CreateSession(SessionId);
         Assert.False(s.SupportsMechanism(CKM.CKM_RSA_PKCS));
     }
 
     [Fact]
     public void SupportsMechanism_CachesAfterFirstSuccessfulProbe()
     {
-        var fake = new MechListFake();
-        var s = NewSession(fake);
+        using var fake = new MechListFake();
+        using var s = fake.CreateSession(SessionId);
 
         Assert.True(s.SupportsMechanism(CKM.CKM_AES_GCM));
         Assert.True(s.SupportsMechanism(CKM.CKM_SHA256));
@@ -315,14 +315,16 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void SupportsMechanism_GetSessionInfoFails_ReturnsFalse()
     {
-        var s = NewSession(new MechListFake { SessionInfoRv = CKR.CKR_SESSION_HANDLE_INVALID });
+        using var fake = new MechListFake { SessionInfoRv = CKR.CKR_SESSION_HANDLE_INVALID };
+        using var s = fake.CreateSession(SessionId);
         Assert.False(s.SupportsMechanism(CKM.CKM_AES_GCM));
     }
 
     [Fact]
     public void SupportsMechanism_EmptyList_ReturnsFalse()
     {
-        var s = NewSession(new MechListFake { Mechanisms = [] });
+        using var fake = new MechListFake { Mechanisms = [] };
+        using var s = fake.CreateSession(SessionId);
         Assert.False(s.SupportsMechanism(CKM.CKM_AES_GCM));
     }
 
@@ -334,8 +336,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void SupportsMechanism_AfterDispose_ThrowsEvenWhenTheAnswerIsCached()
     {
-        var fake = new MechListFake();
-        var s = NewSession(fake);
+        using var fake = new MechListFake();
+        using var s = fake.CreateSession(SessionId);
 
         Assert.True(s.SupportsMechanism(CKM.CKM_AES_GCM));   // populate the cache while still open
         s.Dispose();
@@ -346,17 +348,17 @@ public sealed class Pkcs11SessionMessageAndMiscTests
 
     // === DigestKey ==========================================================
 
-    private sealed class DigestKeyFake : FakeLowLevelPkcs11Library
+    private sealed class DigestKeyFake : SessionTestModule
     {
         public CKR InitRv = CKR.CKR_OK, KeyRv = CKR.CKR_OK;
         public byte[] DigestOutput = [0xAA, 0xBB];
 
-        public override CKR C_DigestInit(NativeCULong session, ref CK_MECHANISM mechanism) => InitRv;
-        public override CKR C_DigestKey(NativeCULong session, NativeCULong key) => KeyRv;
-        public override CKR C_DigestFinal(NativeCULong session, Span<byte> digest, bool lengthOnly, out NativeCULong digestLen)
+        protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => InitRv;
+        protected override CKR C_DigestKey(NativeCULong session, NativeCULong key) => KeyRv;
+        protected override CKR C_DigestFinal(NativeCULong session, NativeBuffer<byte> digest, ref NativeCULong digestLen)
         {
-            if (lengthOnly) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
-            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest);
+            if (digest.IsNull) { digestLen = (NativeCULong)DigestOutput.Length; return CKR.CKR_OK; }
+            DigestOutput.AsSpan(0, DigestOutput.Length).CopyTo(digest.Span);
             digestLen = (NativeCULong)DigestOutput.Length;
             return CKR.CKR_OK;
         }
@@ -365,7 +367,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void DigestKey_Ok_ReturnsDigest()
     {
-        var s = NewSession(new DigestKeyFake { DigestOutput = [1, 2, 3] });
+        using var fake = new DigestKeyFake { DigestOutput = [1, 2, 3] };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.Equal(new byte[] { 1, 2, 3 }, s.DigestKey(mech, new ObjectHandle(1)));
     }
@@ -373,7 +376,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void DigestKey_DigestKeyError_Throws()
     {
-        var s = NewSession(new DigestKeyFake { KeyRv = CKR.CKR_KEY_INDIGESTIBLE });
+        using var fake = new DigestKeyFake { KeyRv = CKR.CKR_KEY_INDIGESTIBLE };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DigestKey(mech, new ObjectHandle(1)));
     }
@@ -381,7 +385,8 @@ public sealed class Pkcs11SessionMessageAndMiscTests
     [Fact]
     public void DigestKey_InitError_Throws()
     {
-        var s = NewSession(new DigestKeyFake { InitRv = CKR.CKR_MECHANISM_INVALID });
+        using var fake = new DigestKeyFake { InitRv = CKR.CKR_MECHANISM_INVALID };
+        using var s = fake.CreateSession(SessionId);
         var mech = new Mechanism(CKM.CKM_SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.DigestKey(mech, new ObjectHandle(1)));
     }
