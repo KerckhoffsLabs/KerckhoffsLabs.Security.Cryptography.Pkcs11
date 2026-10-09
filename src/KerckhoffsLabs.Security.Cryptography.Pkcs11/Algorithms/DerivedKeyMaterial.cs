@@ -40,7 +40,7 @@ internal static class DerivedKeyMaterial
             // freeing it is what zeroizes it. Without this the secret stays in unmanaged memory
             // for the life of the process.
             using var attrs = derived.GetAttributeValue(CKA.CKA_VALUE);
-            if (attrs.Count == 0 || attrs[0].CannotBeRead)
+            if (attrs[0].CannotBeRead)
                 throw new InvalidOperationException(
                     "Derived key did not expose CKA_VALUE; the token may not permit reading derived key material.");
             byte[] value = attrs[0].GetValueAsByteArray();

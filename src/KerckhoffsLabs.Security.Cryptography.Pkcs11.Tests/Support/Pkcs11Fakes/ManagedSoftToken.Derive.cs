@@ -11,6 +11,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 // HMAC KDF and HKDF. Produces a new secret-key object whose CKA_VALUE is the derived material.
 internal sealed partial class ManagedSoftToken
 {
+    /// <summary>When set, <c>C_DeriveKey</c> stores the derived key without its <c>CKA_VALUE</c>, as
+    /// a token that keeps derived material on-token whatever the template asks would — lets tests
+    /// exercise the path where the value cannot be read back.</summary>
+    public bool DeriveWithholdsValue { get; set; }
+
     protected override CKR C_DeriveKey(NativeCULong session, CK_MECHANISM mechanism, NativeCULong baseKey, CK_ATTRIBUTE[] template, ref NativeCULong key)
     {
         if (!_sessions.Contains((ulong)session)) return CKR.CKR_SESSION_HANDLE_INVALID;
@@ -44,7 +49,8 @@ internal sealed partial class ManagedSoftToken
                 return CKR.CKR_MECHANISM_INVALID;
         }
 
-        attrs[(ulong)CKA.CKA_VALUE] = derived;
+        if (!DeriveWithholdsValue)
+            attrs[(ulong)CKA.CKA_VALUE] = derived;
         attrs.TryAdd((ulong)CKA.CKA_CLASS, UlongAttr((ulong)CKO.CKO_SECRET_KEY));
         key = (NativeCULong)Store(attrs);
         return CKR.CKR_OK;
