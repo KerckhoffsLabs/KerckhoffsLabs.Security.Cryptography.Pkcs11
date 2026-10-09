@@ -1,15 +1,25 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 
 /// <summary>
-/// High-level wrapper for <see cref="CK_PKCS5_PBKD2_PARAMS2"/>, the corrected (non-in/out) parameter
-/// structure for CKM_PKCS5_PBKD2. Always uses <see cref="CKZ.CKZ_SALT_SPECIFIED"/> as the salt source
-/// -- the only source the spec defines besides applying no salt at all, which PBKDF2 never does.
+/// High-level wrapper for the CKM_PKCS5_PBKD2 parameters. Always uses
+/// <see cref="CKZ.CKZ_SALT_SPECIFIED"/> as the salt source -- the only source the spec defines besides
+/// applying no salt at all, which PBKDF2 never does.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Marshalled as <see cref="CK_PKCS5_PBKD2_PARAMS2"/>, the corrected structure whose
+/// <c>ulPasswordLen</c> is a value — except for a session on a module bound only through its v2.40
+/// function list, which gets <see cref="CK_PKCS5_PBKD2_PARAMS"/>, whose <c>ulPasswordLen</c> is a
+/// <c>CK_ULONG_PTR</c>. The two have the same size, so a module cannot tell them apart: one that reads
+/// the v2.40 layout dereferences a length passed by value as an address and crashes the process
+/// (NSS softoken before 3.52 does). Every v2.40 module reads the original structure, while the
+/// corrected one, added by v2.40 Errata 01, is only guaranteed from v3.0.
+/// </para>
 /// <para>
 /// The password is a secret, and how it is held depends on the constructor. The
 /// <see cref="SecurePassword"/> constructor borrows the caller's password and keeps no copy: it is
@@ -95,6 +105,24 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     {
         // Read straight from the caller's password into the scope, whose memory is zeroed when the call returns.
         ReadOnlySpan<byte> password = _borrowedPassword is { } borrowed ? borrowed.Password : _password;
+
+        // A v2.40-only module reads ulPasswordLen through a pointer (see the type remarks).
+        if (scope is SessionParameterScope { Session.IsBoundThroughV3Interface: false })
+        {
+            return scope.WriteParameter(new CK_PKCS5_PBKD2_PARAMS
+            {
+                SaltSource = (NativeCULong)CKZ.CKZ_SALT_SPECIFIED,
+                SaltSourceData = scope.Write(_salt),
+                SaltSourceDataLen = (NativeCULong)_salt.Length,
+                Iterations = (NativeCULong)(ulong)_iterations,
+                Prf = CkULong.From((ulong)_prf, "prf"),
+                PrfData = scope.Write(_prfData),
+                PrfDataLen = (NativeCULong)_prfData.Length,
+                Password = scope.Write(password),
+                PasswordLen = scope.WriteStruct((NativeCULong)password.Length),
+            });
+        }
+
         return scope.WriteParameter(new CK_PKCS5_PBKD2_PARAMS2
         {
             SaltSource = (NativeCULong)CKZ.CKZ_SALT_SPECIFIED,
