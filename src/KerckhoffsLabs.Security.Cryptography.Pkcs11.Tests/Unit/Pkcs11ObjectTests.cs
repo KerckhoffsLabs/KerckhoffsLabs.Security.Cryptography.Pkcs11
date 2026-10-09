@@ -43,7 +43,7 @@ public sealed class Pkcs11ObjectTests
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
         byte[] marker = NewMarker();
-        CreateRaw(workspace, new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA), new ObjectAttribute(CKA.CKA_APPLICATION, marker));
+        CreateBareDataObject(workspace, marker);
 
         using var objects = FindByApplication(workspace, marker);
 
@@ -62,7 +62,7 @@ public sealed class Pkcs11ObjectTests
         using var library = ManagedToken.NewLibrary();
         using var workspace = ManagedToken.OpenWorkspace(library);
         byte[] marker = NewMarker();
-        CreateRaw(workspace, new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_DATA), new ObjectAttribute(CKA.CKA_APPLICATION, marker));
+        CreateBareDataObject(workspace, marker);
 
         using var objects = FindByApplication(workspace, marker);
 
@@ -158,16 +158,11 @@ public sealed class Pkcs11ObjectTests
 
     private static byte[] NewMarker() => Guid.NewGuid().ToByteArray();
 
-    private static void CreateRaw(Pkcs11Workspace workspace, params ObjectAttribute[] attributes)
+    // A data object with no label, id or value, tagged with CKA_APPLICATION so it can be found again.
+    private static void CreateBareDataObject(Pkcs11Workspace workspace, byte[] marker)
     {
-        try
-        {
-            workspace.Session.CreateObject([.. attributes]);
-        }
-        finally
-        {
-            foreach (var a in attributes) a.Dispose();
-        }
+        using var tpl = ObjectTemplate.ForData().Attribute(CKA.CKA_APPLICATION, marker).Build();
+        workspace.Session.CreateObject([.. tpl.Attributes]);
     }
 
     private static ReadOnlyDisposableList<Pkcs11Object> FindByLabel(Pkcs11Workspace workspace, string label)
