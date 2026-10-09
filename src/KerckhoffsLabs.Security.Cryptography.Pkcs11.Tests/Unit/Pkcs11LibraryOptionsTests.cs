@@ -7,9 +7,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
-/// <see cref="Pkcs11LibraryOptions.ModuleParameters"/>: what a module receives in
-/// <c>CK_C_INITIALIZE_ARGS.pReserved</c>, including on the <c>CKR_CANT_LOCK</c> retry, and the inputs
-/// refused before any call reaches the module. NSS softoken before 3.52 is the motivating module: it
+/// <see cref="Pkcs11LibraryOptions"/>: what a module receives in <c>CK_C_INITIALIZE_ARGS</c> —
+/// <c>pReserved</c> from <see cref="Pkcs11LibraryOptions.ModuleParameters"/> and the flags from
+/// <see cref="Pkcs11LibraryOptions.CantCreateOsThreads"/>, including on the <c>CKR_CANT_LOCK</c>
+/// retry — and the inputs refused before any call reaches the module. NSS softoken before 3.52 is the motivating module: it
 /// returns <c>CKR_ARGUMENTS_BAD</c> without its parameter string.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -39,7 +40,48 @@ public sealed class Pkcs11LibraryOptionsTests
         using var module = new ParametersModule();
 
         using (module.Load(new Pkcs11LibraryOptions()))
-            Assert.Null(Assert.Single(module.Received).Reserved);
+        {
+            var call = Assert.Single(module.Received);
+            Assert.Null(call.Reserved);
+            Assert.Equal(CKF.CKF_OS_LOCKING_OK, call.Flags); // nothing set: the same arguments as Load(path)
+        }
+    }
+
+    [Fact]
+    public void CantCreateOsThreads_IsSentAlongsideOsLocking()
+    {
+        using var module = new ParametersModule();
+
+        using (module.Load(new Pkcs11LibraryOptions { CantCreateOsThreads = true }))
+            Assert.Equal(CKF.CKF_OS_LOCKING_OK | CKF.CKF_LIBRARY_CANT_CREATE_OS_THREADS, Assert.Single(module.Received).Flags);
+    }
+
+    /// <summary>
+    /// The no-locking retry keeps the declaration: dropping it would let the module start threads the
+    /// host forbade. With the flag to carry, the retry passes arguments rather than <c>NULL</c>.
+    /// </summary>
+    [Fact]
+    public void CantCreateOsThreads_IsKeptOnTheNoLockingRetry_AndCallsAreSerialized()
+    {
+        using var module = new ParametersModule { CannotLock = true };
+
+        using var library = module.Load(new Pkcs11LibraryOptions { CantCreateOsThreads = true });
+
+        Assert.Equal(2, module.Received.Count);
+        Assert.NotNull(module.Received[1].Args);
+        Assert.Equal(CKF.CKF_LIBRARY_CANT_CREATE_OS_THREADS, module.Received[1].Flags);
+        Assert.Null(module.Received[1].Reserved);
+        Assert.False(library.SupportsConcurrentAccess);
+    }
+
+    [Fact]
+    public void CantCreateOsThreads_ModuleThatNeedsThreads_RefusesWithItsReturnCode()
+    {
+        using var module = new ParametersModule { NeedsThreads = true };
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => module.Load(new Pkcs11LibraryOptions { CantCreateOsThreads = true }));
+
+        Assert.Equal(CKR.CKR_NEED_TO_CREATE_THREADS, ex.ReturnValue);
     }
 
     /// <summary>
@@ -115,6 +157,13 @@ public sealed class Pkcs11LibraryOptionsTests
         => Assert.Equal("options",
             Assert.Throws<ArgumentNullException>(() => Pkcs11Library.Load("unused", (Pkcs11LibraryOptions)null!)).ParamName);
 
+    // Only the argument check: it throws before anything is bound. Binding the host process in-process
+    // is unsafe (see StaticLinkBootstrapTests); the AotSmoke `static` mode covers the real path.
+    [Fact]
+    public void LoadStaticallyLinked_RejectsNullOptions()
+        => Assert.Equal("options",
+            Assert.Throws<ArgumentNullException>(() => Pkcs11Library.LoadStaticallyLinked((Pkcs11LibraryOptions)null!)).ParamName);
+
     private sealed class ParametersModule : FakeModule
     {
         public sealed record Call(CK_C_INITIALIZE_ARGS? Args, string? Reserved)
@@ -124,6 +173,7 @@ public sealed class Pkcs11LibraryOptionsTests
 
         public bool CannotLock { get; init; }
         public bool RequireParameters { get; init; }
+        public bool NeedsThreads { get; init; }
 
         // Each C_Initialize's arguments and pReserved string, read while the call is in progress.
         public List<Call> Received { get; } = [];
@@ -136,6 +186,8 @@ public sealed class Pkcs11LibraryOptionsTests
 
             if (RequireParameters && reserved is null)
                 return CKR.CKR_ARGUMENTS_BAD;
+            if (NeedsThreads && args is { } t && ((ulong)t.Flags & CKF.CKF_LIBRARY_CANT_CREATE_OS_THREADS) != 0)
+                return CKR.CKR_NEED_TO_CREATE_THREADS;
             return CannotLock && args is { } a && ((ulong)a.Flags & CKF.CKF_OS_LOCKING_OK) != 0 ? CKR.CKR_CANT_LOCK : CKR.CKR_OK;
         }
     }
