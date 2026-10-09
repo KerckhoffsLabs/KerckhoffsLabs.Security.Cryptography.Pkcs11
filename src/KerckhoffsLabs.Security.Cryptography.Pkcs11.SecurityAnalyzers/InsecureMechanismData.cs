@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers;
 
 /// <summary>
 /// The mechanism/mode names <see cref="InsecureMechanismAnalyzer"/> reports on (KLPKCS11009).

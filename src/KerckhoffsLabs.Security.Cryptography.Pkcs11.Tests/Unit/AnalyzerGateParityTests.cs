@@ -1,5 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 

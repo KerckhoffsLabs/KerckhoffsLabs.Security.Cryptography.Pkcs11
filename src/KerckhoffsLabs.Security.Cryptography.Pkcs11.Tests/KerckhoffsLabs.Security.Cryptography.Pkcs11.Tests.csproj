@@ -35,7 +35,7 @@
       (KLPKCS11008) is proven to fire — and to be suppressible per-site — end to end.
     -->
     <ProjectReference
-      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj"
+      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="true" />
   </ItemGroup>

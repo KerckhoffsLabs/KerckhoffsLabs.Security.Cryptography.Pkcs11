@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot;IsAotCompatible">
+  <!--
+    The source generators the library builds itself with (the Windows-packed struct siblings). Never
+    packed: unlike the security analyzers, they only have work to do in the library's own compilation.
+  -->
+  <Import Project="..\RoslynComponent.props" />
+</Project>

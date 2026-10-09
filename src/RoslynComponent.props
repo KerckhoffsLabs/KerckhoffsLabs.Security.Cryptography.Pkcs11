@@ -1,0 +1,40 @@
+<Project>
+  <!--
+    Shared settings for this repository's Roslyn components: the security analyzers that ship to
+    consumers and the source generators the library builds itself with. Import it from each
+    component's project file, which must also declare
+    TreatAsLocalProperty="PublishAot;IsAotCompatible" on its <Project> element (see below).
+  -->
+  <PropertyGroup>
+    <!-- Roslyn loads compiler extensions into every compiler host, including Visual Studio's
+         .NET Framework MSBuild and design-time compiler, so they must target netstandard2.0 (RS1041). -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- netstandard2.0 does not support AOT publish. With TreatAsLocalProperty on the importing
+         project, these override any global PublishAot=true propagated by a consuming project, so
+         the SDK's ProcessFrameworkReferences task does not emit NETSDK1207 when the smoke project
+         (or any AOT-publish consumer) is built. -->
+    <PublishAot>false</PublishAot>
+    <IsAotCompatible>false</IsAotCompatible>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <!-- The authoring rules from Microsoft.CodeAnalysis.Analyzers below, notably RS1035: no file,
+         environment or clock access, which would break incremental and IDE builds. -->
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Never a package of its own: the library packs the security analyzers into its package. -->
+    <IsPackable>false</IsPackable>
+    <!-- GenerateDocumentationFile is on repo-wide (for IDE0005). Component types aren't
+         individually XML-documented (CS1591); other doc-comment diagnostics are fixed at the source. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- CSharp is capped below its latest: CS9057 rejects a compiler extension that references a
+         newer compiler AssemblyVersion than the one actually running the build. The .NET 10 SDK's
+         bundled compiler currently reports AssemblyVersion 5.0.0.0, so Microsoft.CodeAnalysis.CSharp
+         5.3.0+ (AssemblyVersion 5.3.0.0+) fails CS9057 on every consumer, not just docfx's own
+         metadata step. Raise this only once the SDK's bundled compiler catches up. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
