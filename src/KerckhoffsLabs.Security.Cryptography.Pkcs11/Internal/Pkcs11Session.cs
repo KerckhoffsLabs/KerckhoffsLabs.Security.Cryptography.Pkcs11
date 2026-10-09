@@ -2364,6 +2364,13 @@ internal sealed class Pkcs11Session : IDisposable
     public bool SupportsMessageApi => _pkcs11Library.IsMessageApiSupported;
 
     /// <summary>
+    /// True when the module was bound through a v3.x interface; false for a v2.40-only module, whose
+    /// structures follow the v2.40 layouts where the versions differ (see
+    /// <see cref="LowLevelPkcs11Library.IsBoundThroughV3Interface"/>).
+    /// </summary>
+    internal bool IsBoundThroughV3Interface => _pkcs11Library.IsBoundThroughV3Interface;
+
+    /// <summary>
     /// One-shot AEAD encrypt via the PKCS#11 v3.0 message-based API
     /// (C_MessageEncryptInit + C_EncryptMessage + C_MessageEncryptFinal). The per-message
     /// nonce / IV / tag flow lives entirely in <paramref name="messageParams"/>; the

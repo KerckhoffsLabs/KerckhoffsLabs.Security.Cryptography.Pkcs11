@@ -130,6 +130,18 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
            && _module.Table.C_MessageDecryptFinal is not null;
 
     /// <summary>
+    /// True when the module was bound through a v3.x interface table from <c>C_GetInterface</c>; false
+    /// when only its v2.40 <c>C_GetFunctionList</c> table was available.
+    /// </summary>
+    /// <remarks>
+    /// A v2.40 table is read only up to its last slot, so every v3.x slot — <c>C_GetInterface</c>'s own
+    /// included — is null; a v3.x table is handed out by <c>C_GetInterface</c>, so that slot is set.
+    /// Distinct from <see cref="IsMessageApiSupported"/>: a v3.x module may still leave optional
+    /// functions unimplemented. Use it where the two versions disagree on a structure's layout.
+    /// </remarks>
+    public unsafe bool IsBoundThroughV3Interface => _module.Table.C_GetInterface is not null;
+
+    /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
     /// encapsulate/decapsulate, authenticated wrap/unwrap, signature-only verify, and
     /// validation-flags inspection). False on v2.40 / v3.0 / v3.1 libraries.
