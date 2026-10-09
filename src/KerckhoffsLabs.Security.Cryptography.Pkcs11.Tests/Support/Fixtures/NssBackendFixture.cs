@@ -15,6 +15,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 /// the <c>BuildNss</c> MSBuild target; <see cref="Settings.NssLibraryPath"/> overrides the path for
 /// one-off local debugging (e.g. pointing at a system <c>libsoftokn3.so</c>).
 ///
+/// The fixture passes <see cref="Settings.NssModuleParameters"/> to <c>C_Initialize</c>: NSS before
+/// 3.52 — the v2.40-only releases the <c>pkcs11-v240</c> CI leg runs — refuses to initialize without
+/// a parameter string, and later releases accept the same one.
+///
 /// NSS softoken exposes a "NSS Generic Crypto Services" token whose <c>CKF_LOGIN_REQUIRED</c> flag is
 /// clear and that has no user PIN — <c>C_Login</c> on it is rejected with
 /// <see cref="CKR.CKR_USER_TYPE_INVALID"/>. The fixture therefore reports
@@ -79,6 +83,22 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// objects). Always false: NSS's generic token never persists token objects.</summary>
     public static bool TokenObjectsAvailable => false;
 
+    /// <summary>True when the loaded softoken exposes the v3.0 message API (NSS 3.52 and later); false
+    /// for the v2.40-only releases, and when NSS is unavailable.</summary>
+    public bool SupportsMessageApi { get; }
+
+    /// <summary>
+    /// Skips the calling test unless AES-GCM can run on this softoken. <c>AesGcmPkcs11</c> uses the
+    /// message API where the module has one and otherwise falls back to classic <c>C_EncryptInit</c>
+    /// with <c>CK_GCM_PARAMS</c>, which NSS does not accept (see <see cref="SupportsClassicAesGcm"/>):
+    /// NSS before 3.52 has no message API and fails that call with <see cref="CKR.CKR_HOST_MEMORY"/>.
+    /// </summary>
+    public void RequireAesGcm()
+    {
+        if (!SupportsMessageApi)
+            Assert.Skip("NSS before 3.52 has no message API, and AES-GCM's classic CK_GCM_PARAMS path does not work on NSS.");
+    }
+
     /// <summary>Gate for cases that exercise the classic <c>CK_GCM_PARAMS</c> AES-GCM path.</summary>
     public static bool ClassicAesGcmAvailable => NssAvailable && SupportsClassicAesGcm;
 
@@ -127,7 +147,7 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
         }
 
         LibraryPath = libPath;
-        Library = Pkcs11Library.Load(libPath);
+        Library = Pkcs11Library.Load(libPath, new Pkcs11LibraryOptions { ModuleParameters = Settings.NssModuleParameters });
         try
         {
             Pkcs11Slot found = Library.GetSlotList()
@@ -136,6 +156,7 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
                     $"NSS token '{TokenLabel}' did not appear in the slot list.");
             SlotId = (NativeCULong)found.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(found.GetMechanismList());
+            SupportsMessageApi = Library.LowLevelLibrary!.IsMessageApiSupported;
         }
         catch
         {

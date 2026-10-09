@@ -86,7 +86,11 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_Nss(NssBackendFixture backend)
     public void StaticPbkdf2_UnsupportedHash_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_UnsupportedHash_Throws(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Pbkdf2Key_UnderSecureOnly_MatchesBcl() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(_backend);
+    public void Pbkdf2Key_UnderSecureOnly_MatchesBcl()
+    {
+        _backend.RequireAesGcm(); // the case checks the derived key with AES-GCM
+        Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Pbkdf2Key_IsSensitiveAndNonExtractableByDefault() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Pbkdf2Key_IsSensitiveAndNonExtractableByDefault(_backend);

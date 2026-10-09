@@ -82,8 +82,10 @@ public sealed class NssBehindP11KitProxyTests
         try
         {
             string modules = Directory.CreateDirectory(Path.Join(home, ".config", "pkcs11", "modules")).FullName;
+            // x-init-reserved is what p11-kit hands the module in C_Initialize's pReserved: the same
+            // parameter string the NSS fixture passes, without which NSS before 3.52 refuses to start.
             File.WriteAllText(Path.Join(modules, "kl-nss-under-test.module"),
-                $"module: {Path.GetFullPath(NssPath!)}\ncritical: yes\n");
+                $"module: {Path.GetFullPath(NssPath!)}\ncritical: yes\nx-init-reserved: {Settings.NssModuleParameters}\n");
 
             SoftHsmBackendFixture.SetNativeEnv("HOME", home);
             try

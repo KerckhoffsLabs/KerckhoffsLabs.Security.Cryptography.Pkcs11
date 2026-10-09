@@ -66,6 +66,17 @@ public static class Settings
     public static string? NssLibraryPath =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_NSS_LIBRARY");
 
+    /// <summary>
+    /// Parameter string the NSS fixture passes to <c>C_Initialize</c> in <c>pReserved</c> (see
+    /// <see cref="Pkcs11LibraryOptions.ModuleParameters"/>). NSS softoken before 3.52 refuses to
+    /// initialize without one; later releases accept it too. The default opens no certificate or key
+    /// database — the same configuration later releases fall back to when given none — so only the
+    /// "NSS Generic Crypto Services" token the tests use is reachable.
+    /// </summary>
+    public static string NssModuleParameters =>
+        Environment.GetEnvironmentVariable("PKCS11_TEST_NSS_PARAMETERS")
+        ?? "configdir='' certPrefix='' keyPrefix='' secmod='' flags=readOnly,noCertDB,noModDB,forceOpen,optimizeSpace";
+
     /// <summary>Token label of NSS softoken's login-not-required crypto services token.</summary>
     public static string NssTokenLabel =>
         Environment.GetEnvironmentVariable("PKCS11_TEST_NSS_TOKEN") ?? "NSS Generic Crypto Services";

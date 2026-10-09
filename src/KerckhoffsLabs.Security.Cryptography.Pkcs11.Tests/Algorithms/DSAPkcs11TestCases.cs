@@ -165,7 +165,12 @@ internal static class DSAPkcs11TestCases
     // class's generic-hash-then-CreateSignature(hash) path. This drives the actual combined-mechanism
     // code this adapter exists for, via TrySignData directly and VerifyData with arguments explicitly
     // typed as ReadOnlySpan<byte> so the compiler picks the virtual overload.
-    internal static void Assert_TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(IPkcs11Backend backend, string hashName) =>
+    internal static void Assert_TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(IPkcs11Backend backend, string hashName)
+    {
+        // Without CKM_DSA_SHA224 the adapter hashes in managed code, which has no SHA-224 (nor does the
+        // BCL's DSA); NSS before 3.52 does not advertise it.
+        if (hashName == "SHA224")
+            backend.RequireMechanisms(CKM.CKM_DSA_SHA224);
         WithDsa(backend, dsa =>
         {
             var hash = new HashAlgorithmName(hashName);
@@ -185,6 +190,7 @@ internal static class DSAPkcs11TestCases
             badSig[0] ^= 0xFF;
             Assert.False(dsa.VerifyData((ReadOnlySpan<byte>)data, (ReadOnlySpan<byte>)badSig, hash));
         });
+    }
 
     internal static void Assert_SignData_VerifiesUnderBclWithExportedPublicKey(IPkcs11Backend backend)
     {
