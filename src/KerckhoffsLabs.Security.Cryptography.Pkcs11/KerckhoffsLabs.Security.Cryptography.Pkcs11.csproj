@@ -59,8 +59,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The analyzers, run on this library's own code too; PackAnalyzer below ships them. -->
     <ProjectReference
-      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj"
+      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+      GlobalPropertiesToRemove="PublishAot" />
+    <!-- The source generators this library builds itself with (the Windows-packed struct siblings). Build
+         time only: never packed, so consumers' builds do not load them. -->
+    <ProjectReference
+      Include="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGenerators\KerckhoffsLabs.Security.Cryptography.Pkcs11.SourceGenerators.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false"
       GlobalPropertiesToRemove="PublishAot" />
@@ -71,13 +79,14 @@
   </ItemGroup>
 
   <!--
-    Ship the analyzer to consumers. The ProjectReference above runs it while building this library;
-    packing it under analyzers/dotnet/cs is what makes KLPKCS11008 (RSA encryption without OAEP) fire
-    in a consumer's build too — the weak primitives that are types get their compile-time signal from
-    [Obsolete] + DiagnosticId, but a padding *value* has no symbol to mark.
+    Ship the security analyzers (KLPKCS11008-KLPKCS11010) to consumers. The SecurityAnalyzers
+    ProjectReference above runs them while building this library; packing them under
+    analyzers/dotnet/cs is what makes them fire in a consumer's build too. The weak primitives that
+    are types get their compile-time signal from [Obsolete] + DiagnosticId, but a padding or mechanism
+    *value* has no symbol to mark. The SourceGenerators project is deliberately not packed.
   -->
   <Target Name="PackAnalyzer" BeforeTargets="_GetPackageFiles">
-    <MSBuild Projects="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators\KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators.csproj"
+    <MSBuild Projects="..\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers\KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers.csproj"
              Targets="GetTargetPath"
              Properties="Configuration=$(Configuration)">
       <Output TaskParameter="TargetOutputs" ItemName="_AnalyzerAssembly" />

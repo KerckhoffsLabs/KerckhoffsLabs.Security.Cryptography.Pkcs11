@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Generators;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.SecurityAnalyzers;
 
 /// <summary>
 /// Reports a broken hash selected for a signature or MAC (KLPKCS11010).

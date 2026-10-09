@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="PublishAot;IsAotCompatible">
+  <!--
+    The security analyzers (KLPKCS11008-KLPKCS11010). The library packs this assembly under
+    analyzers/dotnet/cs, so they run in consumers' builds; the test project runs them on itself.
+  -->
+  <Import Project="..\RoslynComponent.props" />
+</Project>
