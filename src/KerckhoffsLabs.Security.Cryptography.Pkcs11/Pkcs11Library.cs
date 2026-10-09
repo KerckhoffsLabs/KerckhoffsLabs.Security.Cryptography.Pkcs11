@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
@@ -74,8 +75,26 @@ public sealed class Pkcs11Library : IDisposable
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "The options overload differs in the second parameter's type (Pkcs11LibraryOptions vs. ILoggerFactory) and has no optional parameters, so Load(path) binds only here and no call site binds ambiguously.")]
     public static Pkcs11Library Load(string libraryPath, ILoggerFactory? loggerFactory = null)
-        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), loggerFactory);
+        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), loggerFactory, options: null);
+
+    /// <summary>
+    /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/> with
+    /// <paramref name="options"/> — for a module that needs a configuration string in
+    /// <c>C_Initialize</c>, such as NSS softoken before 3.52.
+    /// </summary>
+    /// <param name="libraryPath">Library name or path.</param>
+    /// <param name="options">Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.</param>
+    /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><see cref="Pkcs11LibraryOptions.ModuleParameters"/> is not valid UTF-16, so cannot be encoded as UTF-8.</exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
+    public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), options.LoggerFactory, options);
+    }
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -132,7 +151,7 @@ public sealed class Pkcs11Library : IDisposable
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library LoadStaticallyLinked(ILoggerFactory? loggerFactory = null)
-        => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), loggerFactory);
+        => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), loggerFactory, options: null);
 
     /// <summary>
     /// Test seam: binds to a module whose exports come from <paramref name="resolveExport"/> (a fake
@@ -140,12 +159,12 @@ public sealed class Pkcs11Library : IDisposable
     /// as <see cref="Load(string, ILoggerFactory?)"/> does. Every call crosses the real loader, wrappers,
     /// pinning and struct packing.
     /// </summary>
-    internal Pkcs11Library(Func<string, IntPtr> resolveExport, ILoggerFactory? loggerFactory = null)
-        : this(libraryPath: "<fake module>", () => new LowLevelPkcs11Library(resolveExport), loggerFactory)
+    internal Pkcs11Library(Func<string, IntPtr> resolveExport, ILoggerFactory? loggerFactory = null, Pkcs11LibraryOptions? options = null)
+        : this(libraryPath: "<fake module>", () => new LowLevelPkcs11Library(resolveExport), loggerFactory, options)
     {
     }
 
-    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, ILoggerFactory? loggerFactory)
+    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, ILoggerFactory? loggerFactory, Pkcs11LibraryOptions? options)
     {
         _loggerFactory = loggerFactory;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
@@ -157,7 +176,7 @@ public sealed class Pkcs11Library : IDisposable
         {
             Log.LoadingLibrary(_logger, _libraryPath);
             _pkcs11Library = load();
-            Initialize();
+            Initialize(options?.ModuleParameters);
         }
         catch
         {
@@ -175,39 +194,92 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// Initializes the PKCS#11 library. Probes with <c>CKF_OS_LOCKING_OK</c>
     /// first (the safe default for multi-threaded callers); falls back to a
-    /// null-args call if the token returns <c>CKR_CANT_LOCK</c>.
+    /// call without it if the token returns <c>CKR_CANT_LOCK</c>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Per PKCS#11 v3.1 §5.4, a token may refuse <c>CKF_OS_LOCKING_OK</c>; the
     /// spec calls out <c>CKR_CANT_LOCK</c> as the expected return code in that
     /// case. The fallback path uses <c>pInitArgs = NULL</c>, which declares the
     /// application will not access the library from multiple threads
     /// concurrently. This library keeps that promise itself: every call into such a
     /// module is serialized (see <see cref="SupportsConcurrentAccess"/>).
+    /// </para>
+    /// <para>
+    /// With <paramref name="moduleParameters"/>, both calls carry them in <c>pReserved</c>, so the
+    /// fallback passes arguments with no flags and no mutex callbacks instead of <c>NULL</c> — which
+    /// the standard defines as the same single-threaded declaration.
+    /// </para>
     /// </remarks>
-    private void Initialize()
+    private void Initialize(string? moduleParameters)
     {
         Log.LibraryTrace(_logger, _libraryPath, "Initialize");
 
-        var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)CKF.CKF_OS_LOCKING_OK };
-        CKR rv = LowLevel.C_Initialize(initArgs);
-
-        // Another component already initialized the library: treat as success. The module handle owes
-        // C_Finalize only for an initialization it performed, so Dispose leaves their state alone.
-        if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
-
-        // Token refused OS locking. Retry without: that promises the module it is never called
-        // concurrently, and the module handle serializes every call to keep the promise.
-        if (rv == CKR.CKR_CANT_LOCK)
+        IntPtr reserved = AllocateModuleParameters(moduleParameters);
+        try
         {
-            _logger.LogWarning(
-                "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
-                _libraryPath);
-            rv = LowLevel.C_Initialize(null);
+            var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)CKF.CKF_OS_LOCKING_OK, Reserved = reserved };
+            CKR rv = LowLevel.C_Initialize(initArgs);
+
+            // Another component already initialized the library: treat as success. The module handle owes
+            // C_Finalize only for an initialization it performed, so Dispose leaves their state alone.
             if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
+
+            // Token refused OS locking. Retry without: that promises the module it is never called
+            // concurrently, and the module handle serializes every call to keep the promise.
+            if (rv == CKR.CKR_CANT_LOCK)
+            {
+                _logger.LogWarning(
+                    "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
+                    _libraryPath);
+                rv = LowLevel.C_Initialize(reserved == IntPtr.Zero ? null : new CK_C_INITIALIZE_ARGS { Reserved = reserved });
+                if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
+            }
+
+            Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitialize);
+        }
+        finally
+        {
+            // Zeroed on free: some modules take credentials in their parameter string.
+            UnmanagedMemory.Free(ref reserved);
+        }
+    }
+
+    // Strict UTF-8: a lone surrogate is refused rather than silently replaced with U+FFFD, which would
+    // hand the module a configuration string different from the one the caller wrote.
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    /// <summary>
+    /// Copies <paramref name="moduleParameters"/> into a NUL-terminated UTF-8 block for
+    /// <c>pReserved</c>, or returns <see cref="IntPtr.Zero"/> when there are none. The caller frees it.
+    /// </summary>
+    private static IntPtr AllocateModuleParameters(string? moduleParameters)
+    {
+        if (moduleParameters is null)
+            return IntPtr.Zero;
+
+        byte[] utf8;
+        try
+        {
+            utf8 = StrictUtf8.GetBytes(moduleParameters);
+        }
+        catch (EncoderFallbackException ex)
+        {
+            throw new ArgumentException("Module parameters are not valid UTF-16 and cannot be encoded as UTF-8.",
+                nameof(Pkcs11LibraryOptions.ModuleParameters), ex);
         }
 
-        Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitialize);
+        try
+        {
+            // Allocate zero-fills, so the extra byte is the terminator.
+            IntPtr block = UnmanagedMemory.Allocate(utf8.Length + 1);
+            UnmanagedMemory.Write(block, utf8);
+            return block;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(utf8);
+        }
     }
 
     /// <summary>

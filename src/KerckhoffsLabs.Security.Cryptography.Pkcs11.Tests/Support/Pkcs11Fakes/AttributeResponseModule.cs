@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 /// caller-supplied responder — including a fatal <see cref="CKR"/> a real backend cannot be coaxed
 /// into returning for a well-formed key object's required attributes. Every other function is absent,
 /// so the library sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it; <c>C_Initialize</c>/<c>C_Finalize</c>
-/// succeed, and disposing the library from <see cref="FakeModule.Load"/> releases the module. See
+/// succeed, and disposing the library from <see cref="FakeModule.Load(Microsoft.Extensions.Logging.ILoggerFactory?)"/> releases the module. See
 /// <see cref="FakeKeys.Create"/>.
 /// </summary>
 internal sealed class AttributeResponseModule(Func<CKA, (CKR Rv, byte[]? Value)> respond) : FakeModule
