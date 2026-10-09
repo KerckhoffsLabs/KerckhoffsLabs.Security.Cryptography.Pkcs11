@@ -88,7 +88,6 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="options">Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.</param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><see cref="Pkcs11LibraryOptions.ModuleParameters"/> is not valid UTF-16, so cannot be encoded as UTF-8.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions options)
     {
@@ -164,7 +163,6 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="options">Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.</param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><see cref="Pkcs11LibraryOptions.ModuleParameters"/> is not valid UTF-16, so cannot be encoded as UTF-8.</exception>
     /// <exception cref="EntryPointNotFoundException">
     /// The host executable does not export <c>C_GetFunctionList</c>.
     /// </exception>
@@ -216,7 +214,8 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// Initializes the PKCS#11 library. Probes with <c>CKF_OS_LOCKING_OK</c>
     /// first (the safe default for multi-threaded callers); falls back to a
-    /// call without it if the token returns <c>CKR_CANT_LOCK</c>.
+    /// call without it if the token returns <c>CKR_CANT_LOCK</c>. With
+    /// <see cref="Pkcs11LibraryOptions.UseOsLocking"/> off, makes only the call without it.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -230,9 +229,9 @@ public sealed class Pkcs11Library : IDisposable
     /// <para>
     /// <paramref name="options"/> adds to both calls: <see cref="Pkcs11LibraryOptions.ModuleParameters"/>
     /// in <c>pReserved</c>, and <c>CKF_LIBRARY_CANT_CREATE_OS_THREADS</c> for
-    /// <see cref="Pkcs11LibraryOptions.CantCreateOsThreads"/>. Either makes the fallback pass arguments
-    /// without <c>CKF_OS_LOCKING_OK</c> and with no mutex callbacks instead of <c>NULL</c> — which the
-    /// standard defines as the same single-threaded declaration.
+    /// <see cref="Pkcs11LibraryOptions.CantCreateOsThreads"/>. Either makes the call without OS locking
+    /// pass arguments without <c>CKF_OS_LOCKING_OK</c> and with no mutex callbacks instead of
+    /// <c>NULL</c> — which the standard defines as the same single-threaded declaration.
     /// </para>
     /// </remarks>
     private void Initialize(Pkcs11LibraryOptions? options)
@@ -243,25 +242,35 @@ public sealed class Pkcs11Library : IDisposable
         IntPtr reserved = AllocateModuleParameters(options?.ModuleParameters);
         try
         {
-            var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)(CKF.CKF_OS_LOCKING_OK | threadFlags), Reserved = reserved };
-            CKR rv = LowLevel.C_Initialize(initArgs);
+            // Without OS locking: NULL when there is nothing else to pass, which every module must accept.
+            // Either way it promises the module it is never called concurrently, and the module handle
+            // serializes every call to keep the promise.
+            CK_C_INITIALIZE_ARGS? withoutOsLocking = reserved == IntPtr.Zero && threadFlags == 0
+                ? null
+                : new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)threadFlags, Reserved = reserved };
+
+            CKR rv;
+            if (options is { UseOsLocking: false })
+            {
+                rv = LowLevel.C_Initialize(withoutOsLocking);
+            }
+            else
+            {
+                rv = LowLevel.C_Initialize(new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)(CKF.CKF_OS_LOCKING_OK | threadFlags), Reserved = reserved });
+
+                // Token refused OS locking. Retry without.
+                if (rv == CKR.CKR_CANT_LOCK)
+                {
+                    _logger.LogWarning(
+                        "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
+                        _libraryPath);
+                    rv = LowLevel.C_Initialize(withoutOsLocking);
+                }
+            }
 
             // Another component already initialized the library: treat as success. The module handle owes
             // C_Finalize only for an initialization it performed, so Dispose leaves their state alone.
             if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
-
-            // Token refused OS locking. Retry without: that promises the module it is never called
-            // concurrently, and the module handle serializes every call to keep the promise.
-            if (rv == CKR.CKR_CANT_LOCK)
-            {
-                _logger.LogWarning(
-                    "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
-                    _libraryPath);
-                rv = LowLevel.C_Initialize(reserved == IntPtr.Zero && threadFlags == 0
-                    ? null
-                    : new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)threadFlags, Reserved = reserved });
-                if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
-            }
 
             Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitialize);
         }
@@ -272,10 +281,6 @@ public sealed class Pkcs11Library : IDisposable
         }
     }
 
-    // Strict UTF-8: a lone surrogate is refused rather than silently replaced with U+FFFD, which would
-    // hand the module a configuration string different from the one the caller wrote.
-    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
     /// <summary>
     /// Copies <paramref name="moduleParameters"/> into a NUL-terminated UTF-8 block for
     /// <c>pReserved</c>, or returns <see cref="IntPtr.Zero"/> when there are none. The caller frees it.
@@ -285,17 +290,8 @@ public sealed class Pkcs11Library : IDisposable
         if (moduleParameters is null)
             return IntPtr.Zero;
 
-        byte[] utf8;
-        try
-        {
-            utf8 = StrictUtf8.GetBytes(moduleParameters);
-        }
-        catch (EncoderFallbackException ex)
-        {
-            throw new ArgumentException("Module parameters are not valid UTF-16 and cannot be encoded as UTF-8.",
-                nameof(Pkcs11LibraryOptions.ModuleParameters), ex);
-        }
-
+        // Pkcs11LibraryOptions refused anything that does not encode exactly, so this cannot substitute.
+        byte[] utf8 = Encoding.UTF8.GetBytes(moduleParameters);
         try
         {
             // Allocate zero-fills, so the extra byte is the terminator.
