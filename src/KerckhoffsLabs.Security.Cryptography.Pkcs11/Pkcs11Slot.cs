@@ -31,7 +31,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// Low level PKCS#11 wrapper
     /// </summary>
-    private readonly ILowLevelPkcs11Library _pkcs11Library;
+    private readonly LowLevelPkcs11Library _pkcs11Library;
 
     /// <summary>
     /// PKCS#11 handle of slot
@@ -52,7 +52,7 @@ public sealed class Pkcs11Slot
     /// Logger factory inherited from the owning <see cref="Pkcs11Library"/>; <see langword="null"/>
     /// for no logging.
     /// </param>
-    internal Pkcs11Slot(ILowLevelPkcs11Library pkcs11Library, ulong slotId, ILoggerFactory? loggerFactory = null)
+    internal Pkcs11Slot(LowLevelPkcs11Library pkcs11Library, ulong slotId, ILoggerFactory? loggerFactory = null)
     {
         _loggerFactory = loggerFactory;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Slot>();

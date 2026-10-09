@@ -103,7 +103,7 @@ internal static class OperationStateMixingTestCases
         return enc.TransformFinalBlock(data, 0, data.Length);
     }
 
-    private static void WithRawSession(IPkcs11Backend backend, Action<ILowLevelPkcs11Library, NativeCULong, Pkcs11Session> body)
+    private static void WithRawSession(IPkcs11Backend backend, Action<LowLevelPkcs11Library, NativeCULong, Pkcs11Session> body)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try

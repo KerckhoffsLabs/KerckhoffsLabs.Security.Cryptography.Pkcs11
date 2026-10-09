@@ -5,7 +5,7 @@ where a new test goes:
 
 | Folder | What goes here | Backend |
 |--------|----------------|---------|
-| `Unit/` | Tests of a single type's contract — pure logic or driven by `FakeLowLevelPkcs11Library`. | none (hermetic) |
+| `Unit/` | Tests of a single type's contract — pure logic or driven by a `FakeModule`. | none (hermetic) |
 | `Integration/` | Tests that exercise a real operation over **SoftHSM** or **pkcs11-mock**. | SoftHSM / mock |
 | `Support/` | Shared test infrastructure (not tests themselves). | — |
 
@@ -29,7 +29,7 @@ dotnet test -- --filter-query "/*/*.Tests.Integration*/*/*"
 ## Conventions & exceptions
 
 - **`Support/`** holds `Fixtures/` (SoftHSM + mock backends, xUnit collection definitions),
-  `Fakes/` (`FakeLowLevelPkcs11Library`), and the ambient helpers `TestKeys`, `Settings`, and
+  `FakeModules/` (`FakeModule`, managed PKCS#11 modules loaded through the real loader), and the ambient helpers `TestKeys`, `Settings`, and
   `CapturingLogger`. The ambient helpers intentionally keep the **assembly-root namespace**
   (`…Tests`) so any test can use them without an extra `using`.
 - **`Integration/MemoryLeaks/`** is kept as one group even though some of its tests are hermetic:

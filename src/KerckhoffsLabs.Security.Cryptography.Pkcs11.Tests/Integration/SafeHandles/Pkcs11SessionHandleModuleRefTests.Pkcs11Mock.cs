@@ -8,8 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.SafeHand
 
 /// <summary>
 /// Every valid <see cref="Pkcs11SessionHandle"/> takes a reference on its <see cref="Pkcs11ModuleHandle"/>
-/// and is tracked by it, whatever implementation sits behind <see cref="ILowLevelPkcs11Library"/>: the
-/// CLR gives no relative ordering between two critical finalizers, so only that reference keeps the
+/// and is tracked by it: the CLR gives no relative ordering between two critical finalizers, so only that reference keeps the
 /// module usable until the session's <c>C_CloseSession</c> has run.
 /// </summary>
 [Collection("Mock")]

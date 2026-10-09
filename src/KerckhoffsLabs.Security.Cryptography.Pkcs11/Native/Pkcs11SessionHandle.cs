@@ -13,8 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// <c>CriticalFinalizerObject</c>, and the CLR gives no relative ordering guarantee between two
 /// independent critical finalizers. The explicit use of the module (<c>AddUse</c>), released last in
 /// <see cref="ReleaseHandle"/>, is what defers the module's release until this handle's
-/// <c>C_CloseSession</c> has run. It is taken whatever implementation sits behind
-/// <see cref="ILowLevelPkcs11Library"/>: a test double gets a detached module handle.
+/// <c>C_CloseSession</c> has run.
 /// </remarks>
 internal sealed class Pkcs11SessionHandle : SafeHandle
 {
@@ -37,7 +36,7 @@ internal sealed class Pkcs11SessionHandle : SafeHandle
 
     /// <summary>Creates a session handle. The handle is invalid if <paramref name="sessionId"/> is <see cref="CK.CK_INVALID_HANDLE"/>.</summary>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="library"/> is null.</exception>
-    public Pkcs11SessionHandle(ILowLevelPkcs11Library library, NativeCULong sessionId)
+    public Pkcs11SessionHandle(LowLevelPkcs11Library library, NativeCULong sessionId)
         : base(IntPtr.Zero, ownsHandle: true)
     {
         ArgumentNullException.ThrowIfNull(library);

@@ -92,7 +92,7 @@ public sealed class Pkcs11SessionRandomZeroizationTests
     {
         using var fake = new RngFake { TokenOutput = [0xB1, 0xB2, 0xB3, 0xB4] };
         using var library = fake.Load();
-        ILowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
+        LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
         using var workspace = new Pkcs11Workspace(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11Session(lowLevel, SessionId));
         Span<byte> destination = stackalloc byte[4];
 
