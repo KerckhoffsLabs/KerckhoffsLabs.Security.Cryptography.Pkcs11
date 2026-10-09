@@ -8,9 +8,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// <see cref="Pkcs11LibraryOptions"/>: what a module receives in <c>CK_C_INITIALIZE_ARGS</c> —
-/// <c>pReserved</c> from <see cref="Pkcs11LibraryOptions.ModuleParameters"/> and the flags from
-/// <see cref="Pkcs11LibraryOptions.CantCreateOsThreads"/>, including on the <c>CKR_CANT_LOCK</c>
-/// retry — and the inputs refused before any call reaches the module. NSS softoken before 3.52 is the motivating module: it
+/// <c>pReserved</c> from <see cref="Pkcs11LibraryOptions.ModuleParameters"/>, the flags from
+/// <see cref="Pkcs11LibraryOptions.UseOsLocking"/> and <see cref="Pkcs11LibraryOptions.CantCreateOsThreads"/>,
+/// including on the <c>CKR_CANT_LOCK</c> retry, or no arguments at all — and the inputs refused
+/// before any call reaches the module. NSS softoken before 3.52 is the motivating module: it
 /// returns <c>CKR_ARGUMENTS_BAD</c> without its parameter string.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -124,15 +125,64 @@ public sealed class Pkcs11LibraryOptionsTests
         Assert.Equal(nameof(Pkcs11LibraryOptions.ModuleParameters), ex.ParamName);
     }
 
+    /// <summary>A lone surrogate would be encoded as U+FFFD, handing the module a string other than the
+    /// one written, so it is refused when the options are built, before any module is involved.</summary>
     [Fact]
-    public void ModuleParameters_ThatAreNotValidUtf16_AreRefused_BeforeReachingTheModule()
+    public void ModuleParameters_ThatAreNotValidUtf16_AreRefused()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new Pkcs11LibraryOptions { ModuleParameters = "flags=\uD800" });
+
+        Assert.Equal(nameof(Pkcs11LibraryOptions.ModuleParameters), ex.ParamName);
+        Assert.IsType<System.Text.EncoderFallbackException>(ex.InnerException);
+    }
+
+    /// <summary>With OS locking off and nothing else set, the module gets no arguments at all — the one
+    /// form the standard requires every module to accept — and every call is serialized.</summary>
+    [Fact]
+    public void UseOsLockingOff_InitializesOnceWithNullArguments_AndSerializes()
     {
         using var module = new ParametersModule();
 
-        var ex = Assert.Throws<ArgumentException>(() => module.Load(new Pkcs11LibraryOptions { ModuleParameters = "flags=\uD800" }));
+        using var library = module.Load(new Pkcs11LibraryOptions { UseOsLocking = false });
 
-        Assert.Equal(nameof(Pkcs11LibraryOptions.ModuleParameters), ex.ParamName);
-        Assert.Empty(module.Received);
+        Assert.Null(Assert.Single(module.Received).Args);
+        Assert.False(library.SupportsConcurrentAccess);
+    }
+
+    [Fact]
+    public void UseOsLockingOff_WithOtherSettings_PassesThemWithoutOsLocking()
+    {
+        using var module = new ParametersModule();
+
+        using var library = module.Load(new Pkcs11LibraryOptions
+        {
+            UseOsLocking = false,
+            ModuleParameters = NssParameters,
+            CantCreateOsThreads = true,
+        });
+
+        var call = Assert.Single(module.Received);
+        Assert.Equal(CKF.CKF_LIBRARY_CANT_CREATE_OS_THREADS, call.Flags);
+        Assert.Equal(NssParameters, call.Reserved);
+        Assert.False(library.SupportsConcurrentAccess);
+    }
+
+    /// <summary>
+    /// The case the setting exists for: a module that rejects <c>CKF_OS_LOCKING_OK</c> with something
+    /// other than <c>CKR_CANT_LOCK</c> gets no fallback, so by default it cannot be loaded at all.
+    /// </summary>
+    [Fact]
+    public void ModuleRejectingOsLockingWithoutCantLock_LoadsOnlyWithUseOsLockingOff()
+    {
+        using (var byDefault = new ParametersModule { RejectOsLockingWith = CKR.CKR_ARGUMENTS_BAD })
+        {
+            Assert.Equal(CKR.CKR_ARGUMENTS_BAD, Assert.ThrowsAny<Pkcs11Exception>(() => byDefault.Load()).ReturnValue);
+            Assert.Single(byDefault.Received); // no retry: only CKR_CANT_LOCK triggers one
+        }
+
+        using var module = new ParametersModule { RejectOsLockingWith = CKR.CKR_ARGUMENTS_BAD };
+        using var library = module.Load(new Pkcs11LibraryOptions { UseOsLocking = false });
+        Assert.Null(Assert.Single(module.Received).Args);
     }
 
     /// <summary>Some modules take credentials in their parameter string, so it never reaches a log —
@@ -174,6 +224,7 @@ public sealed class Pkcs11LibraryOptionsTests
         public bool CannotLock { get; init; }
         public bool RequireParameters { get; init; }
         public bool NeedsThreads { get; init; }
+        public CKR? RejectOsLockingWith { get; init; }
 
         // Each C_Initialize's arguments and pReserved string, read while the call is in progress.
         public List<Call> Received { get; } = [];
@@ -186,6 +237,8 @@ public sealed class Pkcs11LibraryOptionsTests
 
             if (RequireParameters && reserved is null)
                 return CKR.CKR_ARGUMENTS_BAD;
+            if (RejectOsLockingWith is { } rejection && args is { } l && ((ulong)l.Flags & CKF.CKF_OS_LOCKING_OK) != 0)
+                return rejection;
             if (NeedsThreads && args is { } t && ((ulong)t.Flags & CKF.CKF_LIBRARY_CANT_CREATE_OS_THREADS) != 0)
                 return CKR.CKR_NEED_TO_CREATE_THREADS;
             return CannotLock && args is { } a && ((ulong)a.Flags & CKF.CKF_OS_LOCKING_OK) != 0 ? CKR.CKR_CANT_LOCK : CKR.CKR_OK;

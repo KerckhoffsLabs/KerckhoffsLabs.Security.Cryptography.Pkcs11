@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -15,13 +16,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// How this maps onto <c>CK_C_INITIALIZE_ARGS</c>:
 /// </para>
 /// <list type="bullet">
+/// <item><description>
+/// No arguments at all (<c>pInitArgs = NULL_PTR</c>): <see cref="UseOsLocking"/> off with nothing
+/// else set.
+/// </description></item>
 /// <item><description><c>pReserved</c>: <see cref="ModuleParameters"/>.</description></item>
 /// <item><description><c>CKF_LIBRARY_CANT_CREATE_OS_THREADS</c>: <see cref="CantCreateOsThreads"/>.</description></item>
-/// <item><description>
-/// <c>CKF_OS_LOCKING_OK</c>: not a setting. The library always asks for OS locking first, and if the
-/// module refuses with <c>CKR_CANT_LOCK</c>, initializes it again without and serializes every call
-/// into it (see <see cref="Pkcs11Library.SupportsConcurrentAccess"/>).
-/// </description></item>
+/// <item><description><c>CKF_OS_LOCKING_OK</c>: <see cref="UseOsLocking"/>.</description></item>
 /// <item><description>
 /// <c>CreateMutex</c>, <c>DestroyMutex</c>, <c>LockMutex</c>, <c>UnlockMutex</c>: deliberately
 /// unsupported, always <c>NULL_PTR</c>. Those callbacks would be managed code the module calls back
@@ -39,6 +40,27 @@ public sealed class Pkcs11LibraryOptions
     /// produces, or <see langword="null"/> (the default) for no logging.
     /// </summary>
     public ILoggerFactory? LoggerFactory { get; init; }
+
+    /// <summary>
+    /// Whether <c>C_Initialize</c> asks the module to use OS locking (<c>CKF_OS_LOCKING_OK</c>), so it
+    /// can be called from several threads at once. Defaults to <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// On, the library asks for OS locking first, and if the module refuses with <c>CKR_CANT_LOCK</c>,
+    /// initializes it again without. Off, it initializes without from the start: with
+    /// <c>pInitArgs = NULL_PTR</c> when nothing else is set, which the standard requires every module
+    /// to accept, and otherwise with arguments that carry the other settings but neither
+    /// <c>CKF_OS_LOCKING_OK</c> nor mutex callbacks.
+    /// </para>
+    /// <para>
+    /// Without OS locking, the library serializes every call into the module (see
+    /// <see cref="Pkcs11Library.SupportsConcurrentAccess"/>). Turn it off for a module that rejects
+    /// <c>CKF_OS_LOCKING_OK</c> with something other than <c>CKR_CANT_LOCK</c>, which would otherwise
+    /// fail to load, or one that misbehaves under it.
+    /// </para>
+    /// </remarks>
+    public bool UseOsLocking { get; init; } = true;
 
     /// <summary>
     /// Sets <c>CKF_LIBRARY_CANT_CREATE_OS_THREADS</c> in <c>C_Initialize</c>: declares that the module
@@ -77,15 +99,33 @@ public sealed class Pkcs11LibraryOptions
     /// modules accept credentials here. It is never logged.
     /// </para>
     /// </remarks>
-    /// <exception cref="ArgumentException">The value contains a NUL character, which would silently truncate it.</exception>
+    /// <exception cref="ArgumentException">
+    /// The value contains a NUL character, which would silently truncate it, or is not valid UTF-16 (a
+    /// lone surrogate), so cannot be encoded as UTF-8 without altering it.
+    /// </exception>
     public string? ModuleParameters
     {
         get => _moduleParameters;
         init
         {
-            if (value is not null && value.Contains('\0', StringComparison.Ordinal))
-                throw new ArgumentException("Module parameters cannot contain a NUL character.", nameof(ModuleParameters));
+            if (value is not null)
+            {
+                if (value.Contains('\0', StringComparison.Ordinal))
+                    throw new ArgumentException("Module parameters cannot contain a NUL character.", nameof(ModuleParameters));
+                try
+                {
+                    _ = StrictUtf8.GetByteCount(value);
+                }
+                catch (EncoderFallbackException ex)
+                {
+                    throw new ArgumentException("Module parameters are not valid UTF-16 and cannot be encoded as UTF-8.", nameof(ModuleParameters), ex);
+                }
+            }
             _moduleParameters = value;
         }
     }
+
+    // Strict UTF-8: a lone surrogate is refused rather than silently replaced with U+FFFD, which would
+    // hand the module a configuration string different from the one the caller wrote.
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 }

@@ -2044,3 +2044,5 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Load(string! li
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CantCreateOsThreads.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CantCreateOsThreads.init -> void
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.LoadStaticallyLinked(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions! options) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.get -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.init -> void
