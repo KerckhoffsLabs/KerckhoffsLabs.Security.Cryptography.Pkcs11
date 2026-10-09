@@ -150,8 +150,30 @@ public sealed class Pkcs11Library : IDisposable
     /// The host executable does not export <c>C_GetFunctionList</c>.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "The options overload differs in the parameter's type (Pkcs11LibraryOptions vs. ILoggerFactory) and has no optional parameters, so LoadStaticallyLinked() binds only here and no call site binds ambiguously.")]
     public static Pkcs11Library LoadStaticallyLinked(ILoggerFactory? loggerFactory = null)
         => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), loggerFactory, options: null);
+
+    /// <summary>
+    /// Binds to the PKCS#11 implementation statically linked into the host executable, as
+    /// <see cref="LoadStaticallyLinked(ILoggerFactory?)"/> does, and initializes it with
+    /// <paramref name="options"/> — for a linked-in module that needs, say, a configuration string in
+    /// <c>C_Initialize</c>.
+    /// </summary>
+    /// <remarks>Every requirement and caveat of <see cref="LoadStaticallyLinked(ILoggerFactory?)"/> applies.</remarks>
+    /// <param name="options">Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.</param>
+    /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><see cref="Pkcs11LibraryOptions.ModuleParameters"/> is not valid UTF-16, so cannot be encoded as UTF-8.</exception>
+    /// <exception cref="EntryPointNotFoundException">
+    /// The host executable does not export <c>C_GetFunctionList</c>.
+    /// </exception>
+    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
+    public static Pkcs11Library LoadStaticallyLinked(Pkcs11LibraryOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), options.LoggerFactory, options);
+    }
 
     /// <summary>
     /// Test seam: binds to a module whose exports come from <paramref name="resolveExport"/> (a fake
@@ -176,7 +198,7 @@ public sealed class Pkcs11Library : IDisposable
         {
             Log.LoadingLibrary(_logger, _libraryPath);
             _pkcs11Library = load();
-            Initialize(options?.ModuleParameters);
+            Initialize(options);
         }
         catch
         {
@@ -206,19 +228,22 @@ public sealed class Pkcs11Library : IDisposable
     /// module is serialized (see <see cref="SupportsConcurrentAccess"/>).
     /// </para>
     /// <para>
-    /// With <paramref name="moduleParameters"/>, both calls carry them in <c>pReserved</c>, so the
-    /// fallback passes arguments with no flags and no mutex callbacks instead of <c>NULL</c> — which
-    /// the standard defines as the same single-threaded declaration.
+    /// <paramref name="options"/> adds to both calls: <see cref="Pkcs11LibraryOptions.ModuleParameters"/>
+    /// in <c>pReserved</c>, and <c>CKF_LIBRARY_CANT_CREATE_OS_THREADS</c> for
+    /// <see cref="Pkcs11LibraryOptions.CantCreateOsThreads"/>. Either makes the fallback pass arguments
+    /// without <c>CKF_OS_LOCKING_OK</c> and with no mutex callbacks instead of <c>NULL</c> — which the
+    /// standard defines as the same single-threaded declaration.
     /// </para>
     /// </remarks>
-    private void Initialize(string? moduleParameters)
+    private void Initialize(Pkcs11LibraryOptions? options)
     {
         Log.LibraryTrace(_logger, _libraryPath, "Initialize");
 
-        IntPtr reserved = AllocateModuleParameters(moduleParameters);
+        ulong threadFlags = options is { CantCreateOsThreads: true } ? CKF.CKF_LIBRARY_CANT_CREATE_OS_THREADS : 0;
+        IntPtr reserved = AllocateModuleParameters(options?.ModuleParameters);
         try
         {
-            var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)CKF.CKF_OS_LOCKING_OK, Reserved = reserved };
+            var initArgs = new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)(CKF.CKF_OS_LOCKING_OK | threadFlags), Reserved = reserved };
             CKR rv = LowLevel.C_Initialize(initArgs);
 
             // Another component already initialized the library: treat as success. The module handle owes
@@ -232,7 +257,9 @@ public sealed class Pkcs11Library : IDisposable
                 _logger.LogWarning(
                     "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
                     _libraryPath);
-                rv = LowLevel.C_Initialize(reserved == IntPtr.Zero ? null : new CK_C_INITIALIZE_ARGS { Reserved = reserved });
+                rv = LowLevel.C_Initialize(reserved == IntPtr.Zero && threadFlags == 0
+                    ? null
+                    : new CK_C_INITIALIZE_ARGS { Flags = (NativeCULong)threadFlags, Reserved = reserved });
                 if (rv == CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED) return;
             }
 
