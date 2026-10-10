@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 /// This core file holds the object/session model plus symmetric AES; sibling partials add the
 /// other families (<c>ManagedSoftToken.Digest.cs</c>, <c>ManagedSoftToken.Hmac.cs</c>, …).
 /// It is a <see cref="FakeModule"/>, so every call crosses the real loader and wrappers; a test reaches
-/// it through <see cref="FakeModule.Load"/>, and disposing that library finalizes and releases it.
+/// it through <see cref="FakeModule.Load(Pkcs11LibraryOptions?)"/>, and disposing that library finalizes and releases it.
 /// </summary>
 internal sealed partial class ManagedSoftToken : FakeModule
 {

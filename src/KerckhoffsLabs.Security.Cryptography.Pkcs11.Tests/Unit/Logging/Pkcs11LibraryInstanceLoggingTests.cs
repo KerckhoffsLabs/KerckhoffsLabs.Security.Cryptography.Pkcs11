@@ -29,7 +29,7 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     {
         var instanceCapture = new CapturingLogger();
         using var module = new SlotFake();
-        using var library = module.Load(new CapturingLoggerFactory(instanceCapture));
+        using var library = module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(instanceCapture) });
 
         Assert.Contains(instanceCapture.Entries, e => e.Message.Contains("Initialize"));
     }
@@ -67,8 +67,8 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
         var captureB = new CapturingLogger();
         // One module may be active at a time, so the two instances are two loads of the same module.
         using var module = new SlotFake();
-        using var libraryA = module.Load(new CapturingLoggerFactory(captureA));
-        using var libraryB = module.Load(new CapturingLoggerFactory(captureB));
+        using var libraryA = module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(captureA) });
+        using var libraryB = module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(captureB) });
 
         Assert.Contains(captureA.Entries, e => e.Message.Contains("Initialize"));
         Assert.Contains(captureB.Entries, e => e.Message.Contains("Initialize"));
@@ -82,7 +82,7 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     {
         var capture = new CapturingLogger();
         using var module = new SlotFake();
-        using var library = module.Load(new CapturingLoggerFactory(capture));
+        using var library = module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(capture) });
         capture.Clear(); // isolate what the slot itself logs
 
         var slots = library.GetSlotList();

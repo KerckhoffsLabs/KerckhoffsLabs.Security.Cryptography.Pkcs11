@@ -534,15 +534,36 @@ jobs:
           fi
           "$AOTSMOKE_BIN" static
 
-  # Real v2.40-only backend: SoftHSM 2.5, which predates the v3.0 C_GetInterface API. This exercises
-  # the wrapper's v2.40 negotiation and single-part fallback paths against a genuine old module — the
-  # authentic counterpart of the synthetic gate-240 shim on the build-and-test legs. 2.5 is staged
-  # from the Ubuntu focal archive (it does not build against modern OpenSSL), so no submodules or
-  # vendored native builds are needed here.
-  softhsm-v240:
-    name: SoftHSM 2.5 (PKCS11 v2.40)
+  # Real pre-v3.0 backends: modules that predate the v3.0 C_GetInterface API, so they exercise the
+  # wrapper's v2.40 negotiation, single-part fallback and v2.40 struct layouts against genuine old
+  # modules — the authentic counterpart of the synthetic gate-240 shim on the build-and-test legs.
+  # Each is staged from pinned Debian snapshot binaries (neither builds against a modern toolchain),
+  # so no submodules or vendored native builds are needed here.
+  # - SoftHSM 2.5: reports Cryptoki 2.40.
+  # - NSS 3.51: the last release before 3.52 added C_GetInterface. Reports Cryptoki 2.20 while
+  #   implementing v2.40 mechanisms, and needs its parameter string in C_Initialize (the NSS fixture
+  #   passes one). Unlike SoftHSM it implements CKM_PKCS5_PBKD2, so it covers the v2.40
+  #   CK_PKCS5_PBKD2_PARAMS layout.
+  pkcs11-v240:
+    name: PKCS11 v2.40 (${{ matrix.backend }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: SoftHSM 2.5
+            setup: build/setup-softhsm25.sh
+            library-var: PKCS11_TEST_SOFTHSM_LIBRARY
+            library: libsofthsm2.so
+            expect-var: PKCS11_TEST_EXPECT_SOFTHSM_V240
+            filter: /*/*/*SoftHsm*/*
+          - backend: NSS 3.51
+            setup: build/setup-nss351.sh
+            library-var: PKCS11_TEST_NSS_LIBRARY
+            library: libsoftokn3.so
+            expect-var: PKCS11_TEST_EXPECT_NSS_V240
+            filter: /*/*/*Nss*/*
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -553,28 +574,40 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Stage SoftHSM 2.5 (v2.40)
-        id: stage
-        run: echo "native=$(bash build/setup-softhsm25.sh "$RUNNER_TEMP/softhsm25")" >> "$GITHUB_OUTPUT"
+      # Points the backend's fixture at the staged module, and arms its compliance tests, which fail
+      # the leg if the module is not actually pre-v3.0.
+      - name: Stage ${{ matrix.backend }}
+        env:
+          SETUP: ${{ matrix.setup }}
+          LIBRARY_VAR: ${{ matrix.library-var }}
+          LIBRARY: ${{ matrix.library }}
+          EXPECT_VAR: ${{ matrix.expect-var }}
+        run: |
+          set -euo pipefail
+          native="$(bash "$SETUP" "$RUNNER_TEMP/pkcs11-v240")"
+          {
+            echo "${LIBRARY_VAR}=${native}/${LIBRARY}"
+            echo "LD_LIBRARY_PATH=${native}"
+            echo "${EXPECT_VAR}=1"
+          } >> "$GITHUB_ENV"
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
 
-      # The staged 2.5 module is used directly, so skip every vendored native build.
+      # The staged module is used directly, so skip every vendored native build.
       - name: Build
         env:
           SkipPkcs11MockBuild: true
           SkipSoftHsmV2Build: true
           SkipPkcs11GateBuild: true
-          # The ABI oracle feeds the unit tests, which this job filters out (SoftHSM suite only).
+          # The ABI oracle feeds the unit tests, which this job filters out (one backend's suite only).
           SkipAbiProbeBuild: true
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
-      # Run the SoftHSM suite against the 2.5 module. The mechanism-list gates skip anything 2.5
-      # predates (EdDSA); SoftHsmV240ComplianceTests fails the leg if the module is not actually v2.40.
-      - name: Test (SoftHSM 2.5 / PKCS11 v2.40)
+      # Run the backend's suite against the staged module. The mechanism-list and capability gates
+      # skip anything it predates (EdDSA on SoftHSM 2.5; the hashed RSA-PSS mechanisms, DSA-SHA224
+      # and the message API on NSS 3.51).
+      - name: Test (${{ matrix.backend }})
         env:
-          PKCS11_TEST_SOFTHSM_LIBRARY: ${{ steps.stage.outputs.native }}/libsofthsm2.so
-          LD_LIBRARY_PATH: ${{ steps.stage.outputs.native }}
-          PKCS11_TEST_EXPECT_SOFTHSM_V240: '1'
-        run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "/*/*/*SoftHsm*/*"
+          FILTER: ${{ matrix.filter }}
+        run: dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed -- --filter-query "$FILTER"

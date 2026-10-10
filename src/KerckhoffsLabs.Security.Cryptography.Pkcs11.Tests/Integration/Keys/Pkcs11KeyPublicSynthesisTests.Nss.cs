@@ -60,6 +60,8 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
+        // RSAPkcs11 signs PSS with the combined mechanism, which NSS before 3.52 does not advertise.
+        _backend.RequireMechanisms(CKM.CKM_SHA256_RSA_PKCS_PSS, CKM.CKM_SHA256_RSA_PKCS);
         using var workspace = OpenWorkspace();
         string label = $"octk-rsa-mverify-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
