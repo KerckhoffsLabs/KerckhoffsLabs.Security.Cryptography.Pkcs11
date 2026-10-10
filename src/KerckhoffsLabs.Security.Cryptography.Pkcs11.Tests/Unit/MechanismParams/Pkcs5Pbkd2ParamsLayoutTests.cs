@@ -56,7 +56,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         using var module = new V240Module();
         using var session = module.CreateSession(policy: CryptoPolicy.AllowInsecure);
 
-        GenerateKey(session, ReadOnlySpan<byte>.Empty);
+        GenerateKey(session, []);
 
         Assert.Empty(Assert.IsType<byte[]>(module.Password));
     }
