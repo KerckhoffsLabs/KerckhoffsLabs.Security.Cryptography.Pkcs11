@@ -66,7 +66,24 @@ public sealed class Pkcs11Library : IDisposable
     /// Function pointers are acquired via <c>C_GetFunctionList</c> (the PKCS#11
     /// v2.20+ recommended path).
     /// </summary>
-    /// <param name="libraryPath">Library name or path.</param>
+    /// <param name="libraryPath">
+    /// Path of the module. Prefer a fully qualified path from trusted configuration, such as
+    /// <c>/usr/lib/softhsm/libsofthsm2.so</c>: it is loaded exactly as given, and a module's initializers run
+    /// as soon as it is loaded. The other two forms load as the OS would load them, with one restriction:
+    /// <list type="bullet">
+    ///   <item><description>
+    ///     A bare name (<c>libsofthsm2.so</c>, <c>cryptoki.dll</c>) is searched for in this library's
+    ///     directory and the system's library directories, never in the current directory, where a planted
+    ///     module could win. On Windows <c>PATH</c> is excluded too. On macOS, whose loader would search the
+    ///     current directory, the name is resolved here against the application directory,
+    ///     <c>DYLD_LIBRARY_PATH</c>, <c>LD_LIBRARY_PATH</c> and dyld's fallback directories instead.
+    ///   </description></item>
+    ///   <item><description>
+    ///     A relative path with a directory part (<c>modules/libx.so</c>) is resolved against the current
+    ///     directory, so where the process starts decides what loads. It loads, and a warning is logged.
+    ///   </description></item>
+    /// </list>
+    /// </param>
     /// <param name="options">
     /// Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.
     /// Pass <see langword="null"/> (the default) for no logging and a standard initialization. Logging
@@ -76,7 +93,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
     public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions? options = null)
-        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), options);
+        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), options, isModulePath: true);
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -146,12 +163,16 @@ public sealed class Pkcs11Library : IDisposable
     {
     }
 
-    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, Pkcs11LibraryOptions? options)
+    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, Pkcs11LibraryOptions? options, bool isModulePath = false)
     {
         ILoggerFactory? loggerFactory = options?.LoggerFactory;
         _loggerFactory = loggerFactory;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
+
+        // Only Load passes a real path; the other constructors label the instance ("<fake module>", ...).
+        if (isModulePath && !string.IsNullOrEmpty(libraryPath) && ModulePath.Classify(libraryPath) == ModulePathKind.Relative)
+            Log.LoadingModuleFromRelativePath(_logger, libraryPath, Environment.CurrentDirectory);
 
         _libraryPath = libraryPath;
 
