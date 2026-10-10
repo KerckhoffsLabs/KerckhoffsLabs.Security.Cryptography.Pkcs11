@@ -67,33 +67,16 @@ public sealed class Pkcs11Library : IDisposable
     /// v2.20+ recommended path).
     /// </summary>
     /// <param name="libraryPath">Library name or path.</param>
-    /// <param name="loggerFactory">
-    /// Logger factory for this instance and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
-    /// produces. Pass <see langword="null"/> (the default) for no logging. This is the only way to
-    /// configure the library's logging, so independent consumers in the same process each configure
-    /// their own <see cref="Pkcs11Library"/> instance.
+    /// <param name="options">
+    /// Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.
+    /// Pass <see langword="null"/> (the default) for no logging and a standard initialization. Logging
+    /// is configured only here, per instance, so independent consumers in the same process each
+    /// configure their own <see cref="Pkcs11Library"/>.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "The options overload differs in the second parameter's type (Pkcs11LibraryOptions vs. ILoggerFactory) and has no optional parameters, so Load(path) binds only here and no call site binds ambiguously.")]
-    public static Pkcs11Library Load(string libraryPath, ILoggerFactory? loggerFactory = null)
-        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), loggerFactory, options: null);
-
-    /// <summary>
-    /// Loads and initializes the PKCS#11 library at <paramref name="libraryPath"/> with
-    /// <paramref name="options"/> — for a module that needs a configuration string in
-    /// <c>C_Initialize</c>, such as NSS softoken before 3.52.
-    /// </summary>
-    /// <param name="libraryPath">Library name or path.</param>
-    /// <param name="options">Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.</param>
-    /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the module at <paramref name="libraryPath"/>.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), options.LoggerFactory, options);
-    }
+    public static Pkcs11Library Load(string libraryPath, Pkcs11LibraryOptions? options = null)
+        => new(libraryPath, () => new LowLevelPkcs11Library(libraryPath), options);
 
     /// <summary>
     /// Binds to a PKCS#11 implementation that is statically linked into the host
@@ -137,55 +120,35 @@ public sealed class Pkcs11Library : IDisposable
     /// library's, and the platforms differ. A dynamically loaded module's symbols stay private to it
     /// on Linux, but macOS resolves more permissively: in a process that has already loaded a PKCS#11
     /// module by path, this method can bind <i>that</i> module rather than failing. Use
-    /// <see cref="Load(string, ILoggerFactory?)"/> when you mean a specific module.
+    /// <see cref="Load(string, Pkcs11LibraryOptions?)"/> when you mean a specific module.
     /// </para>
     /// </remarks>
-    /// <param name="loggerFactory">
-    /// Logger factory for this instance and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
-    /// produces. Pass <see langword="null"/> (the default) for no logging.
+    /// <param name="options">
+    /// Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.
+    /// Pass <see langword="null"/> (the default) for no logging and a standard initialization.
     /// </param>
     /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
     /// <exception cref="EntryPointNotFoundException">
     /// The host executable does not export <c>C_GetFunctionList</c>.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "The options overload differs in the parameter's type (Pkcs11LibraryOptions vs. ILoggerFactory) and has no optional parameters, so LoadStaticallyLinked() binds only here and no call site binds ambiguously.")]
-    public static Pkcs11Library LoadStaticallyLinked(ILoggerFactory? loggerFactory = null)
-        => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), loggerFactory, options: null);
-
-    /// <summary>
-    /// Binds to the PKCS#11 implementation statically linked into the host executable, as
-    /// <see cref="LoadStaticallyLinked(ILoggerFactory?)"/> does, and initializes it with
-    /// <paramref name="options"/> — for a linked-in module that needs, say, a configuration string in
-    /// <c>C_Initialize</c>.
-    /// </summary>
-    /// <remarks>Every requirement and caveat of <see cref="LoadStaticallyLinked(ILoggerFactory?)"/> applies.</remarks>
-    /// <param name="options">Logging and module-specific initialization settings; see <see cref="Pkcs11LibraryOptions"/>.</param>
-    /// <returns>A loaded, initialized <see cref="Pkcs11Library"/> bound to the statically linked module.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
-    /// <exception cref="EntryPointNotFoundException">
-    /// The host executable does not export <c>C_GetFunctionList</c>.
-    /// </exception>
-    /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Initialize</c> call.</exception>
-    public static Pkcs11Library LoadStaticallyLinked(Pkcs11LibraryOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), options.LoggerFactory, options);
-    }
+    public static Pkcs11Library LoadStaticallyLinked(Pkcs11LibraryOptions? options = null)
+        => new(libraryPath: "<statically-linked>", () => new LowLevelPkcs11Library(), options);
 
     /// <summary>
     /// Test seam: binds to a module whose exports come from <paramref name="resolveExport"/> (a fake
     /// module built from managed <c>[UnmanagedCallersOnly]</c> functions), then initializes it exactly
-    /// as <see cref="Load(string, ILoggerFactory?)"/> does. Every call crosses the real loader, wrappers,
+    /// as <see cref="Load(string, Pkcs11LibraryOptions?)"/> does. Every call crosses the real loader, wrappers,
     /// pinning and struct packing.
     /// </summary>
-    internal Pkcs11Library(Func<string, IntPtr> resolveExport, ILoggerFactory? loggerFactory = null, Pkcs11LibraryOptions? options = null)
-        : this(libraryPath: "<fake module>", () => new LowLevelPkcs11Library(resolveExport), loggerFactory, options)
+    internal Pkcs11Library(Func<string, IntPtr> resolveExport, Pkcs11LibraryOptions? options = null)
+        : this(libraryPath: "<fake module>", () => new LowLevelPkcs11Library(resolveExport), options)
     {
     }
 
-    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, ILoggerFactory? loggerFactory, Pkcs11LibraryOptions? options)
+    private Pkcs11Library(string libraryPath, Func<LowLevelPkcs11Library> load, Pkcs11LibraryOptions? options)
     {
+        ILoggerFactory? loggerFactory = options?.LoggerFactory;
         _loggerFactory = loggerFactory;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");

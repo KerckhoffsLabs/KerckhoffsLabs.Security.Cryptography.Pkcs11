@@ -202,17 +202,19 @@ public sealed class Pkcs11LibraryOptionsTests
         }
     }
 
+    /// <summary>No options means the defaults: the same arguments as an empty options object.</summary>
     [Fact]
-    public void Load_RejectsNullOptions()
-        => Assert.Equal("options",
-            Assert.Throws<ArgumentNullException>(() => Pkcs11Library.Load("unused", (Pkcs11LibraryOptions)null!)).ParamName);
+    public void NullOptions_InitializeAsDefaults()
+    {
+        using var module = new ParametersModule();
 
-    // Only the argument check: it throws before anything is bound. Binding the host process in-process
-    // is unsafe (see StaticLinkBootstrapTests); the AotSmoke `static` mode covers the real path.
-    [Fact]
-    public void LoadStaticallyLinked_RejectsNullOptions()
-        => Assert.Equal("options",
-            Assert.Throws<ArgumentNullException>(() => Pkcs11Library.LoadStaticallyLinked((Pkcs11LibraryOptions)null!)).ParamName);
+        using (module.Load(null))
+        {
+            var call = Assert.Single(module.Received);
+            Assert.Equal(CKF.CKF_OS_LOCKING_OK, call.Flags);
+            Assert.Null(call.Reserved);
+        }
+    }
 
     private sealed class ParametersModule : FakeModule
     {

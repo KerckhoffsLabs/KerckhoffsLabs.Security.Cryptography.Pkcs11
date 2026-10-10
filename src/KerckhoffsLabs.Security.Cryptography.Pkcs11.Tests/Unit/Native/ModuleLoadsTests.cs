@@ -92,7 +92,7 @@ public sealed class ModuleLoadsTests
     {
         using var module = new SharedStateModule { FinalizeRv = CKR.CKR_GENERAL_ERROR };
         var logger = new CapturingLogger();
-        Pkcs11Library library = module.Load(new CapturingLoggerFactory(logger));
+        Pkcs11Library library = module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(logger) });
 
         library.Dispose();
 
@@ -111,7 +111,7 @@ public sealed class ModuleLoadsTests
     {
         using var module = new SharedStateModule { ParkFirstGetInfo = true, FinalizeRv = CKR.CKR_GENERAL_ERROR };
         var logger = new CapturingLogger();
-        Pkcs11Library library = module.Load(new CapturingLoggerFactory(logger));
+        Pkcs11Library library = module.Load(new Pkcs11LibraryOptions { LoggerFactory = new CapturingLoggerFactory(logger) });
         Task call = Task.Run(() => library.GetInfo(), Token);
         Assert.True(module.Entered.Wait(Generous, Token), "the call never reached the module");
 

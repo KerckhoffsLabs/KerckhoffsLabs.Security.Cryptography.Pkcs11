@@ -4,13 +4,14 @@ using Microsoft.Extensions.Logging;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Settings for <see cref="Pkcs11Library.Load(string, Pkcs11LibraryOptions)"/>: logging, and anything
+/// Settings for <see cref="Pkcs11Library.Load(string, Pkcs11LibraryOptions?)"/> and
+/// <see cref="Pkcs11Library.LoadStaticallyLinked(Pkcs11LibraryOptions?)"/>: logging, and anything
 /// module-specific the PKCS#11 module needs to initialize.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Every setting defaults to the spec-standard behaviour, so an instance with nothing set initializes
-/// a module exactly as <see cref="Pkcs11Library.Load(string, Microsoft.Extensions.Logging.ILoggerFactory?)"/> does.
+/// a module exactly as passing no options does.
 /// </para>
 /// <para>
 /// How this maps onto <c>CK_C_INITIALIZE_ARGS</c>:
