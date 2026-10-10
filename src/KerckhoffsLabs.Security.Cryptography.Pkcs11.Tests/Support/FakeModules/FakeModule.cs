@@ -6,7 +6,6 @@ using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
-using Microsoft.Extensions.Logging;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
@@ -82,11 +81,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
     public int CallCount(string function) => _calls.GetValueOrDefault(function);
 
     /// <summary>Loads this module through the real loader and initializes it, as <c>Pkcs11Library.Load</c> would.</summary>
-    public Pkcs11Library Load(ILoggerFactory? loggerFactory = null) => new(ResolveExport, loggerFactory);
-
-    /// <summary>Loads this module and initializes it with <paramref name="options"/>, as
-    /// <c>Pkcs11Library.Load(path, options)</c> would.</summary>
-    public Pkcs11Library Load(Pkcs11LibraryOptions options) => new(ResolveExport, options.LoggerFactory, options);
+    public Pkcs11Library Load(Pkcs11LibraryOptions? options = null) => new(ResolveExport, options);
 
     /// <summary>Binds this module through the real loader without initializing it.</summary>
     public LowLevelPkcs11Library LoadLowLevel() => new(ResolveExport);
@@ -106,7 +101,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
 
     /// <summary>
     /// Whether a successful <c>C_Finalize</c> releases this module, for a module a test reaches only through
-    /// the <see cref="Pkcs11Library"/> from <see cref="Load(ILoggerFactory?)"/>: disposing that library finalizes the module,
+    /// the <see cref="Pkcs11Library"/> from <see cref="Load(Pkcs11LibraryOptions?)"/>: disposing that library finalizes the module,
     /// and so releases it. A fault such a module records is lost with it, so this suits a module that models
     /// a token, not one that injects faults.
     /// </summary>

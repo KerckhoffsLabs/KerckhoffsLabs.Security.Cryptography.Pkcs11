@@ -1977,8 +1977,6 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Sec
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.Sm2.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve right) -> bool
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve right) -> bool
-static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Load(string! libraryPath, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
-static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.LoadStaticallyLinked(Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy.AllowInsecure.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy.FipsOnly.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.ICryptoPolicy!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.CryptoPolicy.SecureOnly.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy.SecureOnlyPolicy!
@@ -2040,9 +2038,9 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.LoggerFactory.i
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.ModuleParameters.get -> string?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.ModuleParameters.init -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Pkcs11LibraryOptions() -> void
-static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Load(string! libraryPath, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions! options) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CantCreateOsThreads.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CantCreateOsThreads.init -> void
-static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.LoadStaticallyLinked(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions! options) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.init -> void
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Load(string! libraryPath, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions? options = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.LoadStaticallyLinked(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions? options = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
