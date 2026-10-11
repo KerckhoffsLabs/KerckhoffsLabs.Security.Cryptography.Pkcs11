@@ -66,16 +66,16 @@ static void Report(string mode, LibraryInfo info)
 
 static void RunSession(Pkcs11Library lib, string token, string pin)
 {
-    using Pkcs11Workspace workspace = lib.OpenWorkspaceWithPin(token, CKU.CKU_USER, new SecurePin(Encoding.UTF8.GetBytes(pin)));
+    using Pkcs11Session session = lib.OpenSessionWithPin(token, CKU.CKU_USER, new SecurePin(Encoding.UTF8.GetBytes(pin)));
     Console.WriteLine($"token={token}");
 
     // Attribute templates into C_GenerateKeyPair and C_FindObjectsInit, then the multi-pass read.
-    using Pkcs11Key generated = workspace.GenerateRsaSigningKeyPair(modulusBits: 2048, label: "aot-smoke-rsa");
+    using Pkcs11Key generated = session.GenerateRsaSigningKeyPair(modulusBits: 2048, label: "aot-smoke-rsa");
     using ObjectTemplate filter = ObjectTemplate.Empty()
         .Attribute(CKA.CKA_CLASS, (ulong)CKO.CKO_PRIVATE_KEY)
         .Label("aot-smoke-rsa")
         .Build();
-    using ReadOnlyDisposableList<Pkcs11Key> keys = workspace.FindKeys(filter);
+    using ReadOnlyDisposableList<Pkcs11Key> keys = session.FindKeys(filter);
     Pkcs11Key key = keys.Count == 1 ? keys[0] : throw new InvalidOperationException($"expected 1 key, found {keys.Count}");
     using (ReadOnlyDisposableList<ObjectAttribute> attributes = key.GetAttributeValue(CKA.CKA_LABEL, CKA.CKA_MODULUS))
         Console.WriteLine($"label={attributes[0].GetValueAsString()} modulus-bytes={attributes[1].GetValueAsByteArray().Length}");
@@ -85,10 +85,10 @@ static void RunSession(Pkcs11Library lib, string token, string pin)
     byte[] signature = key.Sign(pss, "AotSmoke"u8);
     Console.WriteLine($"pss-signature-bytes={signature.Length}");
 
-    byte[] digest = workspace.Digest(new Mechanism(CKM.CKM_SHA256), "AotSmoke"u8);
+    byte[] digest = session.Digest(new Mechanism(CKM.CKM_SHA256), "AotSmoke"u8);
     Console.WriteLine($"sha256-bytes={digest.Length}");
 
-    using Pkcs11Key aes = workspace.GenerateAesKey(256);
+    using Pkcs11Key aes = session.GenerateAesKey(256);
     try
     {
         var gcm = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);

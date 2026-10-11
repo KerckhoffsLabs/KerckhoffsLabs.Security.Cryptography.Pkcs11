@@ -118,7 +118,7 @@ public sealed class ReportedLengthTests
         Assert.Throws<Pkcs11UnclassifiedException>(() => new Pkcs11Slot(fake.LowLevel, 0).GetMechanismList());
     }
 
-    private static Pkcs11Session Session(LyingFake fake) => fake.OpenSession();
+    private static Pkcs11SessionCore Session(LyingFake fake) => fake.OpenSessionCore();
     private static Mechanism Ecdsa() => new(CKM.CKM_ECDSA_SHA256);
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
 
@@ -129,7 +129,7 @@ public sealed class ReportedLengthTests
     /// </summary>
     private sealed class LyingFake : SessionTestModule
     {
-        private readonly List<Pkcs11Session> _sessions = [];
+        private readonly List<Pkcs11SessionCore> _sessions = [];
 
         public int Length { get; init; } = 32;
         public NativeCULong? ProbeReports { get; init; }
@@ -137,16 +137,16 @@ public sealed class ReportedLengthTests
         public int SignCalls { get; private set; }
 
         /// <summary>A session on this module, disposed with it.</summary>
-        public Pkcs11Session OpenSession()
+        public Pkcs11SessionCore OpenSessionCore()
         {
-            Pkcs11Session session = CreateSession(SessionId);
+            Pkcs11SessionCore session = CreateSession(SessionId);
             _sessions.Add(session);
             return session;
         }
 
         protected override void Disposing()
         {
-            foreach (Pkcs11Session session in _sessions)
+            foreach (Pkcs11SessionCore session in _sessions)
                 session.Dispose();
             base.Disposing();
         }

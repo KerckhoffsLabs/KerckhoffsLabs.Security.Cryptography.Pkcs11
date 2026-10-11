@@ -29,7 +29,7 @@ public static class Pkcs11MechanismMap
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_RSA_PKCS</c>) has no <see cref="HashAlgorithmName"/> constant in the
-    /// BCL and is gated behind the workspace's crypto policy — same opt-in as SHA-1 — since
+    /// BCL and is gated behind the session's crypto policy — same opt-in as SHA-1 — since
     /// it is a deviation from the BCL-aligned hash set rather than a mechanism this API otherwise
     /// exposes by default. See <c>SecureOnlyPolicy</c>.
     /// </remarks>
@@ -55,7 +55,7 @@ public static class Pkcs11MechanismMap
     /// </param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_RSA_PKCS_PSS</c>) has no <see cref="HashAlgorithmName"/> constant in
-    /// the BCL and is gated behind the workspace's crypto policy — same opt-in as SHA-1. See
+    /// the BCL and is gated behind the session's crypto policy — same opt-in as SHA-1. See
     /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
@@ -79,7 +79,7 @@ public static class Pkcs11MechanismMap
     /// </summary>
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
-    /// SHA-1 and SHA-224 inner hashes are gated behind the workspace's crypto policy by
+    /// SHA-1 and SHA-224 inner hashes are gated behind the session's crypto policy by
     /// <c>SecureOnlyPolicy</c>, which inspects <see cref="CkmRsaPkcsOaepParams.HashAlg"/>
     /// since <c>CKM_RSA_PKCS_OAEP</c> is a single mechanism type for every hash choice.
     /// </remarks>
@@ -105,7 +105,7 @@ public static class Pkcs11MechanismMap
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_ECDSA_SHA224</c>) has no <see cref="HashAlgorithmName"/> constant in the BCL
-    /// and is gated behind the workspace's crypto policy — same opt-in as SHA-1. See
+    /// and is gated behind the session's crypto policy — same opt-in as SHA-1. See
     /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>
@@ -214,7 +214,7 @@ public static class Pkcs11MechanismMap
     /// <param name="hash">BCL hash algorithm name (SHA1, SHA224, SHA256, SHA384, SHA512).</param>
     /// <remarks>
     /// SHA-224 (<c>CKM_SHA224_HMAC</c>) has no <see cref="HashAlgorithmName"/> constant in the BCL
-    /// and is gated behind the workspace's crypto policy — same opt-in as SHA-1. See
+    /// and is gated behind the session's crypto policy — same opt-in as SHA-1. See
     /// <c>SecureOnlyPolicy</c>.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown for unsupported hash algorithms.</exception>

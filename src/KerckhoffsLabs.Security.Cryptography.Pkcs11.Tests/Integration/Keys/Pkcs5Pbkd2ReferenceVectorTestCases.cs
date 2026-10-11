@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
 /// Independent-reference proof for every <c>CKP_PKCS5_PBKD2_HMAC_*</c> PRF Kryoptic and NSS
-/// implement, going straight through <see cref="Pkcs11Session"/> and <see cref="CkmPkcs5Pbkd2Params"/>
+/// implement, going straight through <see cref="Pkcs11SessionCore"/> and <see cref="CkmPkcs5Pbkd2Params"/>
 /// rather than the <see cref="Rfc2898DeriveBytesPkcs11"/> façade (whose <c>PrfForHash</c> switch has no
 /// SHA-224 case to call through at all, and doesn't reach Kryoptic's two NSS-incompatible PRFs either).
 /// For SHA-1/256/384/512, <see cref="Algorithms.Rfc2898DeriveBytesPkcs11TestCases"/> already

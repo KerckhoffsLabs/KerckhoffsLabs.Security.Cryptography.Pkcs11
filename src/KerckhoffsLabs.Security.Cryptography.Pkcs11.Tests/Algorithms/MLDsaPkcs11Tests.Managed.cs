@@ -38,7 +38,7 @@ public sealed class MLDsaPkcs11Tests_Managed
     private static void WithMlDsa(CkpMlDsa parameterSet, Action<MLDsaPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
         string label = $"mldsa-{Guid.NewGuid():N}";
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_DSA)
@@ -47,7 +47,7 @@ public sealed class MLDsaPkcs11Tests_Managed
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Sign().Build();
 
-        using var key = workspace.GenerateKeyPair(
+        using var key = session.GenerateKeyPair(
             new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
@@ -183,10 +183,10 @@ public sealed class MLDsaPkcs11Tests_Managed
     public void Ctor_NonMlDsaKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes").ValueLen(32).Encrypt().Decrypt().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
         Assert.Equal("key", ex.ParamName);

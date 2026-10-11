@@ -18,7 +18,7 @@ public sealed class SecureOnlyCharacterizationTests
 {
     private static readonly ObjectHandle AnyKey = new(0);
 
-    private static Pkcs11Session NewSession(BareModule module) => module.CreateSession(sessionId: 1);
+    private static Pkcs11SessionCore NewSession(BareModule module) => module.CreateSession(sessionId: 1);
 
     private sealed class BareModule : SessionTestModule;
 

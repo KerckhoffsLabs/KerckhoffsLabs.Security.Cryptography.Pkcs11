@@ -36,7 +36,7 @@ dotnet test -- --filter-query "/*/*.Tests.Integration*/*/*"
   they share a single serialized xUnit collection (the `UnmanagedMemory.DebugModeEnabled` /
   allocation-tracker static state must not be toggled concurrently), and that cohesion outranks the
   unit/integration split.
-- A type can legitimately appear in both areas — e.g. `Pkcs11Session` has fake-driven unit tests
+- A type can legitimately appear in both areas — e.g. `Pkcs11SessionCore` has fake-driven unit tests
   *and* SoftHSM behavioral tests. That's expected: they're different kinds of test.
 
 ## Parallelization and backend collections

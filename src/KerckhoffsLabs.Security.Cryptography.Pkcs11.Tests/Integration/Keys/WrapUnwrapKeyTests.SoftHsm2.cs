@@ -11,7 +11,7 @@ internal static class WrapUnwrapKeyTestCases
     // CKM_AES_KEY_WRAP_PKCS7 is a SecureOnly documented refusal (non-standard padding, not RFC 5649), so its
     // cases opt in for the wrap / unwrap calls; the RFC 3394 / 5649 variants run under the default policy.
     // Secure key defaults on unwrap do not depend on the policy, so the opt-in does not mask them.
-    private static IDisposable? OptInIfRefusedByDefault(Pkcs11Session session, CKM wrapMechanism)
+    private static IDisposable? OptInIfRefusedByDefault(Pkcs11SessionCore session, CKM wrapMechanism)
         => wrapMechanism == CKM.CKM_AES_KEY_WRAP_PKCS7 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
 
     internal static void Assert_AesKeyWrap_RoundTrip(IPkcs11Backend backend, CKM wrapMechanism)
@@ -90,7 +90,7 @@ internal static class WrapUnwrapKeyTestCases
 
     // Sets up a logged-in session with a 256-bit KEK and an extractable AES data key wrapped under
     // it, runs <paramref name="body"/> with (session, kek, wrappedBytes), then tears everything down.
-    private static void WithWrappedAesKey(IPkcs11Backend backend, CKM wrapMechanism, Action<Pkcs11Session, ObjectHandle, byte[]> body)
+    private static void WithWrappedAesKey(IPkcs11Backend backend, CKM wrapMechanism, Action<Pkcs11SessionCore, ObjectHandle, byte[]> body)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try

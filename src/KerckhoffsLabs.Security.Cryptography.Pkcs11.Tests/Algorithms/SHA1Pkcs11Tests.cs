@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 public sealed class SHA1Pkcs11ArgumentTests
 {
     [Fact]
-    public void Ctor_NullWorkspace_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new SHA1Pkcs11(workspace: null!));
+    public void Ctor_NullSession_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => new SHA1Pkcs11(session: null!));
 }
 #pragma warning restore KLPKCS11002

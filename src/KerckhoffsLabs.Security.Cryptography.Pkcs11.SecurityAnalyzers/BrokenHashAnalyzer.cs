@@ -37,7 +37,7 @@ public sealed class BrokenHashAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description:
             "MD5 and SHA-1 are collision-broken (SHAttered), so signing or MACing with them is refused at " +
-            "runtime by the default SecureOnly crypto policy (Pkcs11Workspace.Policy). Note that verifying " +
+            "runtime by the default SecureOnly crypto policy (Pkcs11Session.Policy). Note that verifying " +
             "an existing SHA-1 signature is refused too: SecureOnly allows SHA-1 for no operation. " +
             "Suppress only alongside a documented interop reason.",
         helpLinkUri:

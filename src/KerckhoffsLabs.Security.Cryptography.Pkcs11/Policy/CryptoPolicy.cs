@@ -31,7 +31,7 @@ public static class CryptoPolicy
     /// (SP 800-38D §5.2.1.2: shorter tags need application conditions a policy cannot verify) and AES-CCM
     /// MACs at least 64 bits (SP 800-38C Appendix B.2). <b>Denies by default:</b> refuses every mechanism, hash, curve, KDF and PRF
     /// not on its allow-list, including every vendor-defined mechanism, whether or not it also appears in
-    /// the documented (but non-enforcing) deny list. A workspace opened under this policy refuses every
+    /// the documented (but non-enforcing) deny list. A session opened under this policy refuses every
     /// <c>UsePolicy</c> override.
     /// </summary>
     /// <remarks>
@@ -56,8 +56,8 @@ public static class CryptoPolicy
 
     /// <summary>
     /// Allows everything, including broken algorithms and plaintext key export. For legacy interop only;
-    /// prefer a scoped <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a
-    /// whole workspace under it.
+    /// prefer a scoped <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c> lease over opening a
+    /// whole session under it.
     /// </summary>
     public static ICryptoPolicy AllowInsecure { get; } = new AllowInsecurePolicy();
 }

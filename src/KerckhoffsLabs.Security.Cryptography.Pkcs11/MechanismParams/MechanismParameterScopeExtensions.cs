@@ -15,7 +15,7 @@ internal static class MechanismParameterScopeExtensions
     /// <param name="part">Which of the key's objects the field refers to.</param>
     /// <param name="paramName">The parameter-type argument the key was passed as, for the exception.</param>
     /// <exception cref="ObjectDisposedException">The scope or the key has been disposed.</exception>
-    /// <exception cref="ArgumentException">The key belongs to another workspace, or lacks the requested object.</exception>
+    /// <exception cref="ArgumentException">The key belongs to another session, or lacks the requested object.</exception>
     /// <exception cref="InvalidOperationException">The scope was created without a session.</exception>
     public static NativeCULong KeyHandle(this MechanismParameterScope scope, Pkcs11Key key, KeyHandlePart part, string paramName)
     {

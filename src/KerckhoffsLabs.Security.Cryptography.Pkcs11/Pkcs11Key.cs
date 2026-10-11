@@ -7,21 +7,21 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// Handle wrapper over a PKCS#11 key object. Carries the workspace it belongs to, the
+/// Handle wrapper over a PKCS#11 key object. Carries the session it belongs to, the
 /// private and/or public handles, and the cached identifying metadata (label, ID, key
 /// type). Mechanism-level operations (Sign, Verify, Encrypt, Decrypt, Wrap, Unwrap,
-/// Derive) delegate through the workspace's session.
+/// Derive) delegate through that session.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Instances are produced by <see cref="Pkcs11Workspace"/> factory methods
-/// (<c>OpenKey</c>, <c>GenerateKey</c>, <c>ImportKey</c>). A key never owns its workspace or
+/// Instances are produced by <see cref="Pkcs11Session"/> factory methods
+/// (<c>OpenKey</c>, <c>GenerateKey</c>, <c>ImportKey</c>). A key never owns its session or
 /// library: their lifetimes stay with whoever opened them. The <c>internal</c> constructor
 /// remains visible to the test assembly via <c>InternalsVisibleTo</c>.
 /// </para>
 /// <para>
 /// Asymmetric keys may carry both a private and a public handle (paired automatically
-/// via <c>CKA_ID</c> by <c>Pkcs11Workspace.OpenKey</c>) or only one. A
+/// via <c>CKA_ID</c> by <c>Pkcs11Session.OpenKey</c>) or only one. A
 /// public-only key has <c>privateHandle == ObjectHandle.Invalid</c>; a private-only
 /// key on a token without a stored <c>CKO_PUBLIC_KEY</c> companion has
 /// <c>publicHandle == ObjectHandle.Invalid</c>.
@@ -31,7 +31,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// <c>Destroy</c> is the only member that calls
 /// <c>C_DestroyObject</c>. The two are kept apart deliberately: whether a handle refers to a
 /// short-lived session object or to a persistent key is decided at creation by <c>CKA_TOKEN</c> —
-/// a runtime template attribute, or the <c>persistOnToken</c> argument of the workspace factories —
+/// a runtime template attribute, or the <c>persistOnToken</c> argument of the session factories —
 /// so the wrapper cannot tell the two apart. Destroying when it should not is irreversible loss of
 /// key material; failing to destroy a session object costs nothing, because PKCS#11 collects those
 /// at <c>C_CloseSession</c>. Given that asymmetry, disposal stays inert and destruction stays
@@ -40,7 +40,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </remarks>
 public sealed class Pkcs11Key : IDisposable
 {
-    private readonly Pkcs11Workspace _workspace;
+    private readonly Pkcs11Session _session;
     private readonly ObjectHandle _privateHandle;
     private readonly ObjectHandle _publicHandle;
     private readonly CKK _keyType;
@@ -48,20 +48,20 @@ public sealed class Pkcs11Key : IDisposable
     private bool _disposed;
 
     internal Pkcs11Key(
-        Pkcs11Workspace workspace,
+        Pkcs11Session session,
         ObjectHandle privateHandle,
         ObjectHandle publicHandle,
         CKK keyType,
         string? label,
         byte[] id)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(session);
         if (privateHandle.IsInvalid && publicHandle.IsInvalid)
             throw new ArgumentException(
                 "Pkcs11Key must carry at least one valid handle.",
                 nameof(privateHandle));
 
-        _workspace = workspace;
+        _session = session;
         _privateHandle = privateHandle;
         _publicHandle = publicHandle;
         _keyType = keyType;
@@ -85,13 +85,13 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown if another thread is currently inside an operation on the underlying session. The
-    /// probe is a session operation like any other; use a separate workspace per thread.
+    /// probe is a session operation like any other; use a separate session per thread.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// Thrown when the underlying session has been disposed — including when the answer is already
     /// cached, since a cached capability describes a session that no longer exists.
     /// </exception>
-    public bool SupportsMechanism(CKM mechanism) => _workspace.Session.SupportsMechanism(mechanism);
+    public bool SupportsMechanism(CKM mechanism) => _session.Core.SupportsMechanism(mechanism);
 
     /// <summary>
     /// <see cref="SupportsMechanism(CKM)"/> for a <see cref="Mechanism"/>, without casting its type to
@@ -126,11 +126,11 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.GetAttributeValue (no readable handle)");
 
-        return _workspace.Session.GetAttributeValue(handle, [.. types]);
+        return _session.Core.GetAttributeValue(handle, [.. types]);
     }
 
-    /// <summary>Internal accessor for the workspace this key belongs to.</summary>
-    internal Pkcs11Workspace Workspace => _workspace;
+    /// <summary>Internal accessor for the session this key belongs to.</summary>
+    internal Pkcs11Session Session => _session;
 
     /// <summary>Internal accessor for the private handle. <see cref="ObjectHandle.Invalid"/> for public-only keys.</summary>
     internal ObjectHandle PrivateHandle => _privateHandle;
@@ -155,22 +155,22 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <remarks>
     /// A handle only means something to the session and login it came from, so a key from another
-    /// workspace is refused rather than sent: its number could name an unrelated object — or nothing —
+    /// session is refused rather than sent: its number could name an unrelated object — or nothing —
     /// in the calling session.
     /// </remarks>
     /// <param name="session">The session performing the call.</param>
     /// <param name="part">Which object the parameter refers to.</param>
     /// <param name="paramName">The parameter-type argument the key was passed as, for the exception.</param>
     /// <exception cref="ObjectDisposedException">The key has been disposed.</exception>
-    /// <exception cref="ArgumentException">The key belongs to a different workspace, or has no object
+    /// <exception cref="ArgumentException">The key belongs to a different session, or has no object
     /// of the requested kind.</exception>
-    internal ObjectHandle ResolveParameterHandle(Pkcs11Session session, KeyHandlePart part, string paramName)
+    internal ObjectHandle ResolveParameterHandle(Pkcs11SessionCore session, KeyHandlePart part, string paramName)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!ReferenceEquals(_workspace.Session, session))
+        if (!ReferenceEquals(_session.Core, session))
             throw new ArgumentException(
-                "The key belongs to a different workspace than the operation. Mechanism parameters can only " +
-                "reference keys from the workspace that performs the call.",
+                "The key belongs to a different session than the operation. Mechanism parameters can only " +
+                "reference keys from the session that performs the call.",
                 paramName);
         return SelectParameterHandle(part, paramName);
     }
@@ -212,7 +212,7 @@ public sealed class Pkcs11Key : IDisposable
         if (!_publicHandle.IsInvalid) return null;
         if (_privateHandle.IsInvalid) return null;
 
-        return Pkcs11PublicKeyView.TrySynthesizeRsa(_workspace.Session, _privateHandle);
+        return Pkcs11PublicKeyView.TrySynthesizeRsa(_session.Core, _privateHandle);
     }
 
     /// <summary>
@@ -226,7 +226,7 @@ public sealed class Pkcs11Key : IDisposable
         if (_keyType != CKK.CKK_EC) return null;
         if (!_publicHandle.IsInvalid) return null;
         if (_privateHandle.IsInvalid) return null;
-        return Pkcs11PublicKeyView.TrySynthesizeEc(_workspace.Session, _privateHandle);
+        return Pkcs11PublicKeyView.TrySynthesizeEc(_session.Core, _privateHandle);
     }
 
     /// <summary>
@@ -247,8 +247,8 @@ public sealed class Pkcs11Key : IDisposable
     public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_privateHandle.IsInvalid) _workspace.Session.DestroyObject(_privateHandle);
-        if (!_publicHandle.IsInvalid) _workspace.Session.DestroyObject(_publicHandle);
+        if (!_privateHandle.IsInvalid) _session.Core.DestroyObject(_privateHandle);
+        if (!_publicHandle.IsInvalid) _session.Core.DestroyObject(_publicHandle);
     }
 
     /// <inheritdoc/>
@@ -268,7 +268,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>The signature bytes.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Sign</c> call.</exception>
     public byte[] Sign(Mechanism mechanism, ReadOnlySpan<byte> data)
     {
@@ -279,7 +279,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Sign (no private handle)");
 
-        return _workspace.Session.Sign(mechanism, _privateHandle, data);
+        return _session.Core.Sign(mechanism, _privateHandle, data);
     }
 
     /// <summary>
@@ -291,7 +291,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns><c>true</c> if the signature is valid, <c>false</c> if not.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="NotSupportedException">Thrown when the managed verification fallback is taken (no public handle on the token) and <paramref name="mechanism"/> has no managed RSA/ECDSA equivalent.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle exists and managed synthesis is unavailable; otherwise propagated from the underlying <c>C_Verify</c> call.</exception>
     public bool Verify(Mechanism mechanism, ReadOnlySpan<byte> data, ReadOnlySpan<byte> signature)
@@ -302,14 +302,14 @@ public sealed class Pkcs11Key : IDisposable
         // Prefer the real public handle.
         if (!_publicHandle.IsInvalid)
         {
-            _workspace.Session.Verify(mechanism, _publicHandle, data, signature, out bool isValid);
+            _session.Core.Verify(mechanism, _publicHandle, data, signature, out bool isValid);
             return isValid;
         }
 
         // Fall back to managed verify via synthesized public parameters. No session call happens on this
-        // path, so the workspace policy is consulted here — the same verdict the token path gets from
+        // path, so the session policy is consulted here — the same verdict the token path gets from
         // the session's own check.
-        _workspace.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
+        _session.Enforce(new MechanismUseRequest(mechanism, CryptoOperation.Verify));
 
         if (_keyType == CKK.CKK_RSA)
         {
@@ -335,7 +335,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_Encrypt</c> call.</exception>
     public byte[] Encrypt(Mechanism mechanism, ReadOnlySpan<byte> plaintext)
     {
@@ -350,7 +350,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Encrypt (handle unavailable)");
 
-        return _workspace.Session.Encrypt(mechanism, handle, plaintext);
+        return _session.Core.Encrypt(mechanism, handle, plaintext);
     }
 
     /// <summary>
@@ -359,7 +359,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_Decrypt</c> call.</exception>
     public byte[] Decrypt(Mechanism mechanism, ReadOnlySpan<byte> ciphertext)
     {
@@ -370,7 +370,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Decrypt (no private handle)");
 
-        return _workspace.Session.Decrypt(mechanism, _privateHandle, ciphertext);
+        return _session.Core.Decrypt(mechanism, _privateHandle, ciphertext);
     }
 
     /// <summary>
@@ -384,7 +384,7 @@ public sealed class Pkcs11Key : IDisposable
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            return _workspace.Session.SupportsMessageApi;
+            return _session.Core.SupportsMessageApi;
         }
     }
 
@@ -400,7 +400,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>Ciphertext (tag is in <paramref name="messageParams"/>).</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="messageParams"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the required public or symmetric handle is unavailable; otherwise propagated from the underlying <c>C_EncryptMessage</c> call.</exception>
     public byte[] MessageEncrypt(
         Mechanism mechanism,
@@ -417,7 +417,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.MessageEncrypt (handle unavailable)");
 
-        return _workspace.Session.MessageEncrypt(mechanism, handle, messageParams, associatedData, plaintext);
+        return _session.Core.MessageEncrypt(mechanism, handle, messageParams, associatedData, plaintext);
     }
 
     /// <summary>
@@ -426,7 +426,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="messageParams"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DecryptMessage</c> call — notably <see cref="CKR.CKR_AEAD_DECRYPT_FAILED"/> when authentication fails.</exception>
     public byte[] MessageDecrypt(
         Mechanism mechanism,
@@ -442,7 +442,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.MessageDecrypt (no private handle)");
 
-        return _workspace.Session.MessageDecrypt(mechanism, _privateHandle, messageParams, associatedData, ciphertext);
+        return _session.Core.MessageDecrypt(mechanism, _privateHandle, messageParams, associatedData, ciphertext);
     }
 
     /// <summary>
@@ -454,7 +454,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>The wrapped key bytes — opaque blob to be transported / stored.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="targetKey"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default and the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when this key's wrapping handle or <paramref name="targetKey"/>'s handle is unavailable; otherwise propagated from the underlying <c>C_WrapKey</c> call.</exception>
     public byte[] Wrap(Mechanism mechanism, Pkcs11Key targetKey)
     {
@@ -474,7 +474,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Wrap (target-key handle unavailable)");
 
-        return _workspace.Session.WrapKey(mechanism, wrapHandle, targetHandle);
+        return _session.Core.WrapKey(mechanism, wrapHandle, targetHandle);
     }
 
     /// <summary>
@@ -486,7 +486,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>A new <see cref="Pkcs11Key"/> wrapping the unwrapped object.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="template"/> requests an extractable or non-sensitive key, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_UnwrapKey</c> call.</exception>
     public Pkcs11Key Unwrap(Mechanism mechanism, ReadOnlySpan<byte> wrappedBytes, ObjectTemplate template)
     {
@@ -498,10 +498,10 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Unwrap (no private handle)");
 
-        ObjectHandle resulting = _workspace.Session.UnwrapKey(
+        ObjectHandle resulting = _session.Core.UnwrapKey(
             mechanism, _privateHandle, wrappedBytes, [.. template.Attributes]);
 
-        return _workspace.HydrateExistingHandleAsKey(resulting);
+        return _session.HydrateExistingHandleAsKey(resulting);
     }
 
     /// <summary>
@@ -522,7 +522,7 @@ public sealed class Pkcs11Key : IDisposable
     /// </returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="sharedSecretTemplate"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no public handle is reachable, or <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> from the underlying <c>C_EncapsulateKey</c> call on pre-v3.2 libraries.</exception>
     public EncapsulationResult EncapsulateKey(
         Mechanism mechanism,
@@ -537,9 +537,9 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.EncapsulateKey (no public handle)");
 
-        var (ct, sharedHandle) = _workspace.Session.EncapsulateKey(
+        var (ct, sharedHandle) = _session.Core.EncapsulateKey(
             mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
-        return new EncapsulationResult(ct, _workspace.HydrateExistingHandleAsKey(sharedHandle));
+        return new EncapsulationResult(ct, _session.HydrateExistingHandleAsKey(sharedHandle));
     }
 
     /// <summary>
@@ -549,7 +549,7 @@ public sealed class Pkcs11Key : IDisposable
     /// <returns>An on-token <see cref="Pkcs11Key"/> wrapping the recovered shared secret.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="sharedSecretTemplate"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if <paramref name="mechanism"/> is insecure-by-default, or <paramref name="sharedSecretTemplate"/> requests an extractable or non-sensitive key, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when no private handle is reachable, or <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> from the underlying <c>C_DecapsulateKey</c> call on pre-v3.2 libraries.</exception>
     public Pkcs11Key DecapsulateKey(
         Mechanism mechanism,
@@ -564,21 +564,21 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.DecapsulateKey (no private handle)");
 
-        ObjectHandle sharedHandle = _workspace.Session.DecapsulateKey(
+        ObjectHandle sharedHandle = _session.Core.DecapsulateKey(
             mechanism, _privateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
-        return _workspace.HydrateExistingHandleAsKey(sharedHandle);
+        return _session.HydrateExistingHandleAsKey(sharedHandle);
     }
 
     /// <summary>
     /// Derives a new key from this key. Secure defaults (<c>CKA_SENSITIVE=true</c> /
     /// <c>CKA_EXTRACTABLE=false</c>) are applied to the result template; deriving an extractable or
-    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
+    /// non-sensitive key requires a policy that permits reading key material off the token, e.g. <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. Symmetric
     /// uses the single handle; asymmetric uses the private handle (e.g. ECDH derives from the
     /// local private key — the peer's public point travels as a mechanism parameter, not a handle).
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the key has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="mechanism"/> or <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown if the result <paramref name="template"/> requests an extractable or non-sensitive key, or <paramref name="mechanism"/> is insecure-by-default, unless the session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key carries no private handle; otherwise propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key Derive(Mechanism mechanism, ObjectTemplate template)
         => DeriveCore(mechanism, template);
@@ -593,15 +593,15 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Derive (no private handle)");
 
-        ObjectHandle resulting = _workspace.Session.DeriveKey(
+        ObjectHandle resulting = _session.Core.DeriveKey(
             mechanism, _privateHandle, [.. template.Attributes]);
 
         // SP800-108 sibling keys: the params object absorbed their raw handles during the call
-        // above; turn them into usable Pkcs11Key instances now, while the workspace is at hand.
+        // above; turn them into usable Pkcs11Key instances now, while the session is at hand.
         if (mechanism.Parameters is CkmSp800108KdfParams sp800108)
-            sp800108.HydrateDerivedKeys(_workspace);
+            sp800108.HydrateDerivedKeys(_session);
 
-        return _workspace.HydrateExistingHandleAsKey(resulting);
+        return _session.HydrateExistingHandleAsKey(resulting);
     }
 
     private static bool IsAsymmetricKeyType(CKK keyType) => keyType switch

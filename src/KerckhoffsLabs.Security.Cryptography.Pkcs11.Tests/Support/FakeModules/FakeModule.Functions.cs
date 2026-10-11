@@ -133,7 +133,7 @@ internal abstract unsafe partial class FakeModule
         if (Overrides(nameof(C_InitToken)))
             slots[nameof(CryptokiTable.C_InitToken)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, byte*, NativeCULong, byte*, NativeCULong>)&InitToken;
         if (Overrides(nameof(C_OpenSession)))
-            slots[nameof(CryptokiTable.C_OpenSession)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, void*, NativeCULong*, NativeCULong>)&OpenSession;
+            slots[nameof(CryptokiTable.C_OpenSession)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong, void*, void*, NativeCULong*, NativeCULong>)&OpenSessionCore;
         if (Overrides(nameof(C_CloseSession)))
             slots[nameof(CryptokiTable.C_CloseSession)] = (IntPtr)(delegate* unmanaged[Cdecl]<NativeCULong, NativeCULong>)&CloseSession;
         if (Overrides(nameof(C_Login)))
@@ -407,7 +407,7 @@ internal abstract unsafe partial class FakeModule
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static NativeCULong OpenSession(NativeCULong slotId, NativeCULong flags, void* pApplication, void* notify, NativeCULong* phSession)
+    private static NativeCULong OpenSessionCore(NativeCULong slotId, NativeCULong flags, void* pApplication, void* notify, NativeCULong* phSession)
     {
         if (Owner(slotId, nameof(C_OpenSession)) is not { } m) return Rv(CKR.CKR_SLOT_ID_INVALID);
         try

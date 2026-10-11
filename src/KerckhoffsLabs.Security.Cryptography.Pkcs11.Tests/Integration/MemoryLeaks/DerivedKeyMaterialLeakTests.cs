@@ -45,11 +45,11 @@ public sealed class DerivedKeyMaterialLeakTests
     public void Sp800108Derive_LeavesNothingInUnmanagedMemory()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // reading derived bytes back is gated
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // reading derived bytes back is gated
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf-leak").Value(KeyBytes).Derive().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var kdf = new SP800108HmacCounterKdfPkcs11(key, HashAlgorithmName.SHA256);
 
         // Warm up first: the first call through a path allocates caches and one-time state that would
@@ -72,9 +72,9 @@ public sealed class DerivedKeyMaterialLeakTests
     public void EcdhRawSecret_LeavesNothingInUnmanagedMemory()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // DeriveRawSecretAgreement hands Z to the caller and is gated
-        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // DeriveRawSecretAgreement hands Z to the caller and is gated
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         using var peer = ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
 

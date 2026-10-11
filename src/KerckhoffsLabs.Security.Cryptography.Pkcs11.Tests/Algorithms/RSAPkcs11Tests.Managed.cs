@@ -26,22 +26,22 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 [Collection(FakeModuleCollection.Name)]
 public sealed class RSAPkcs11Tests_Managed
 {
-    private static void WithRsa(Action<Pkcs11Workspace, RSAPkcs11> body)
+    private static void WithRsa(Action<Pkcs11Session, RSAPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateRsaSigningKeyPair(modulusBits: 2048);
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateRsaSigningKeyPair(modulusBits: 2048);
         using var rsa = new RSAPkcs11(key);
-        body(workspace, rsa);
+        body(session, rsa);
     }
 
-    private static void WithTransportRsa(Action<Pkcs11Workspace, RSAPkcs11> body)
+    private static void WithTransportRsa(Action<Pkcs11Session, RSAPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
         using var rsa = new RSAPkcs11(key);
-        body(workspace, rsa);
+        body(session, rsa);
     }
 
     // === Construction =====================================================
@@ -50,10 +50,10 @@ public sealed class RSAPkcs11Tests_Managed
     public void Ctor_NonRsaKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes").ValueLen(32).Encrypt().Decrypt().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new RSAPkcs11(key));
         Assert.Equal("key", ex.ParamName);
@@ -71,10 +71,10 @@ public sealed class RSAPkcs11Tests_Managed
     public void SignVerifyData_AcrossKeySizes_RoundTrips(int modulusBits)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
-        using IDisposable? insecure = modulusBits < 2048 ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
-        using var key = workspace.GenerateRsaSigningKeyPair(modulusBits);
+        using IDisposable? insecure = modulusBits < 2048 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using var key = session.GenerateRsaSigningKeyPair(modulusBits);
         using var rsa = new RSAPkcs11(key);
 
         byte[] data = Encoding.UTF8.GetBytes($"rsa-{modulusBits} payload");
@@ -206,11 +206,11 @@ public sealed class RSAPkcs11Tests_Managed
     // it requires the AllowInsecure policy.
     [Theory]
     [MemberData(nameof(OaepHashes))]
-    public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithTransportRsa((workspace, rsa) =>
+    public void OaepEncryptDecrypt_RoundTrips_AndInteropsWithBcl(string oaepHash) => WithTransportRsa((session, rsa) =>
     {
         var oaep = oaepHash == "SHA256" ? RSAEncryptionPadding.OaepSHA256 : RSAEncryptionPadding.OaepSHA1;
         byte[] plaintext = RandomNumberGenerator.GetBytes(32);
-        using IDisposable? insecure = oaepHash == "SHA1" ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using IDisposable? insecure = oaepHash == "SHA1" ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
 
         // Encrypt + decrypt on the token.
         byte[] ciphertext = rsa.Encrypt(plaintext, oaep);
@@ -227,10 +227,10 @@ public sealed class RSAPkcs11Tests_Managed
 
     // PKCS#1 v1.5 encryption maps to the gated CKM_RSA_PKCS, so it requires the AllowInsecure policy.
     [Fact]
-    public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => WithTransportRsa((workspace, rsa) =>
+    public void EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips() => WithTransportRsa((session, rsa) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.Pkcs1);
             Assert.Equal(plaintext, rsa.Decrypt(ct, RSAEncryptionPadding.Pkcs1));

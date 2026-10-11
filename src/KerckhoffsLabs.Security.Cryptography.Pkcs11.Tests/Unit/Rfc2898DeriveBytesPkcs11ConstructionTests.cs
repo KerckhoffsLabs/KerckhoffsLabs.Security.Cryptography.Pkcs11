@@ -49,12 +49,12 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
         }
     }
 
-    private static byte[] PasswordSentBy(Func<Pkcs11Workspace, Rfc2898DeriveBytesPkcs11> create)
+    private static byte[] PasswordSentBy(Func<Pkcs11Session, Rfc2898DeriveBytesPkcs11> create)
     {
         var policy = new PasswordCapturingPolicy();
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library, policy);
-        using var kdf = create(workspace);
+        using var session = ManagedToken.OpenSession(library, policy);
+        using var kdf = create(session);
 
         var ex = Assert.IsType<Pkcs11Exception>(Record.Exception(() => kdf.GetBytes(16)), exactMatch: false);
         Assert.Equal(CKR.CKR_MECHANISM_INVALID, ex.ReturnValue);
@@ -94,21 +94,21 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     public void InvalidArguments_AreRejected()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
         Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(null!, "pw", Salt, 1000, HashAlgorithmName.SHA256));
-        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(workspace, (string)null!, Salt, 1000, HashAlgorithmName.SHA256));
-        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(workspace, "pw", null!, 1000, HashAlgorithmName.SHA256));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Rfc2898DeriveBytesPkcs11(workspace, "pw"u8, Salt, 0, HashAlgorithmName.SHA256));
-        Assert.Throws<NotSupportedException>(() => new Rfc2898DeriveBytesPkcs11(workspace, "pw"u8, Salt, 1000, HashAlgorithmName.MD5));
+        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(session, (string)null!, Salt, 1000, HashAlgorithmName.SHA256));
+        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(session, "pw", null!, 1000, HashAlgorithmName.SHA256));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Rfc2898DeriveBytesPkcs11(session, "pw"u8, Salt, 0, HashAlgorithmName.SHA256));
+        Assert.Throws<NotSupportedException>(() => new Rfc2898DeriveBytesPkcs11(session, "pw"u8, Salt, 1000, HashAlgorithmName.MD5));
     }
 
     [Fact]
     public void AfterDispose_GetBytesThrows_AndDisposeIsIdempotent()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        var kdf = new Rfc2898DeriveBytesPkcs11(workspace, "pw", Salt, 1000, HashAlgorithmName.SHA256);
+        using var session = ManagedToken.OpenSession(library);
+        var kdf = new Rfc2898DeriveBytesPkcs11(session, "pw", Salt, 1000, HashAlgorithmName.SHA256);
 
         kdf.Dispose();
         kdf.Dispose();
@@ -137,8 +137,8 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     {
         var policy = new PasswordCapturingPolicy();
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library, policy);
-        var kdf = new Rfc2898DeriveBytesPkcs11(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256);
+        using var session = ManagedToken.OpenSession(library, policy);
+        var kdf = new Rfc2898DeriveBytesPkcs11(session, "password", Salt, 1000, HashAlgorithmName.SHA256);
         Assert.ThrowsAny<Pkcs11Exception>(() => kdf.GetBytes(16));
         CkmPkcs5Pbkd2Params borrowed = Assert.Single(policy.Parameters);
 
@@ -152,16 +152,16 @@ public sealed class Rfc2898DeriveBytesPkcs11ConstructionTests
     {
         var policy = new PasswordCapturingPolicy();
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library, policy);
+        using var session = ManagedToken.OpenSession(library, policy);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
-        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password", Salt, 1000, HashAlgorithmName.SHA256, 16));
-        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
-        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password", Salt, 1000, HashAlgorithmName.SHA256, 16));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, "password"u8, Salt, new byte[16], 1000, HashAlgorithmName.SHA256));
+        Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, "password"u8, Salt, 1000, HashAlgorithmName.SHA256, template));
 
         using (var password = new SecurePassword("password"))
         {
-            Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, password, Salt, 1000, HashAlgorithmName.SHA256, template));
+            Assert.ThrowsAny<Pkcs11Exception>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, password, Salt, 1000, HashAlgorithmName.SHA256, template));
             Assert.True(StillMarshals(policy.Parameters[^1])); // borrowed from the caller, who has not disposed it yet
         }
 

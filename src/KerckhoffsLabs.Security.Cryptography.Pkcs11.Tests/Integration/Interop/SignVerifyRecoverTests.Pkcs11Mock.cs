@@ -7,7 +7,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 // pkcs11-mock's C_SignRecoverInit/C_VerifyRecoverInit only recognize CKM_RSA_PKCS (no OAEP
 // variant), and these tests drive the raw low-level dispatch directly rather than through
-// Pkcs11Session's runtime gate, so the compile-time warning is suppressed for this file only —
+// Pkcs11SessionCore's runtime gate, so the compile-time warning is suppressed for this file only —
 // the per-id suppression the diagnostic exists to enable.
 #pragma warning disable KLPKCS11008
 
@@ -15,8 +15,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 
 /// <summary>
 /// Coverage for <c>C_SignRecoverInit</c>/<c>C_SignRecover</c> — previously 0% covered, since
-/// <see cref="Pkcs11Session"/> has no high-level wrapper for the sign side (only
-/// <see cref="Pkcs11Session.VerifyRecover"/> exists). Driven directly through the internal
+/// <see cref="Pkcs11SessionCore"/> has no high-level wrapper for the sign side (only
+/// <see cref="Pkcs11SessionCore.VerifyRecover"/> exists). Driven directly through the internal
 /// low-level accessor instead. pkcs11-mock implements both for real: each does a deterministic
 /// <c>output[i] = input[i] ^ 0xAB</c> transform (verified against
 /// vendor/pkcs11-mock/src/pkcs11-mock.c), so <c>SignRecover</c> followed by <c>VerifyRecover</c>

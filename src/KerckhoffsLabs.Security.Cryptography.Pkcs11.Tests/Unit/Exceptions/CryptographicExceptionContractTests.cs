@@ -30,8 +30,8 @@ public sealed class CryptographicExceptionContractTests
     public void SecurityRefusal_FromABclTypedCall_IsCaughtAsCryptographicException()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
 
         // Held as the BCL base type, exactly as a consumer substituting this for an RSA would.
         using RSA rsa = new RSAPkcs11(key);
@@ -48,8 +48,8 @@ public sealed class CryptographicExceptionContractTests
     public void TokenFailure_FromABclTypedCall_IsCaughtAsCryptographicException()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateRsaKeyTransportKeyPair(modulusBits: 2048);
         using RSA rsa = new RSAPkcs11(key);
 
         byte[] ciphertext = rsa.Encrypt(RandomNumberGenerator.GetBytes(32), RSAEncryptionPadding.OaepSHA256);

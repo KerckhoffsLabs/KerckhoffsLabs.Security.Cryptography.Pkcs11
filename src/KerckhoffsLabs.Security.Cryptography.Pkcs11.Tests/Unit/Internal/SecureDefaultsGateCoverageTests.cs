@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// Every path that creates a token object refuses a deliberately weakened template unless the
-/// workspace has opted in.
+/// session has opted in.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,10 +27,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 [Collection(FakeModuleCollection.Name)]
 public sealed class SecureDefaultsGateCoverageTests
 {
-    private static (Pkcs11Library Library, Pkcs11Workspace Workspace) New()
+    private static (Pkcs11Library Library, Pkcs11Session Session) New()
     {
         var library = ManagedToken.NewLibrary();
-        return (library, ManagedToken.OpenWorkspace(library));
+        return (library, ManagedToken.OpenSession(library));
     }
 
     private static ObjectTemplate WeakSecretKey(bool viaExtractable) =>
@@ -45,14 +45,14 @@ public sealed class SecureDefaultsGateCoverageTests
     [Fact]
     public void WithAllowInsecure_TheSameTemplatesAreAccepted()
     {
-        var (library, workspace) = New();
+        var (library, session) = New();
         using (library)
-        using (workspace)
+        using (session)
         {
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
             using var tpl = WeakSecretKey(viaExtractable: true);
-            using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+            using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
             Assert.NotNull(key);
         }
     }
@@ -65,16 +65,16 @@ public sealed class SecureDefaultsGateCoverageTests
     [Fact]
     public void PublicKeyTemplate_IsNotGivenSecretKeyDefaults()
     {
-        var (library, workspace) = New();
+        var (library, session) = New();
         using (library)
-        using (workspace)
+        using (session)
         {
             using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
                 .Label("pubdefaults").EcParams(TestKeys.EcP256Oid).Build();
             using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Label("pubdefaults").Derive().Build();
 
             Assert.Null(Record.Exception(
-                () => workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl).Dispose()));
+                () => session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl).Dispose()));
         }
     }
 }

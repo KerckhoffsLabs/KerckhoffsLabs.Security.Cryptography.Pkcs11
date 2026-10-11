@@ -19,7 +19,7 @@ public sealed class UnwrapSecureDefaultsTests_Mock(MockBackendFixture f)
 
     // Opens a logged-in mock session, runs the body, and always closes it — leaking a session on
     // the shared Mock fixture would cascade into the other Mock-collection tests.
-    private void WithSession(Action<Pkcs11Session> body)
+    private void WithSession(Action<Pkcs11SessionCore> body)
     {
         var session = TestKeys.OpenLoggedInSession(_backend);
         try { body(session); }

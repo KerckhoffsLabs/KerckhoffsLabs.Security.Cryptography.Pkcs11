@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// High-level wrapper for <see cref="CK_IKE2_PRF_PLUS_DERIVE_PARAMS"/>. Used with CKM_IKE2_PRF_PLUS_DERIVE — IKEv2 PRF+ key derivation per RFC 7296 §2.13 (PKCS#11 v3.0).
 /// </summary>
 /// <remarks>
-/// A seed key must come from the workspace that performs the derive; it is resolved to its object
-/// handle when the operation runs, and a disposed key or one from another workspace is refused there.
+/// A seed key must come from the session that performs the derive; it is resolved to its object
+/// handle when the operation runs, and a disposed key or one from another session is refused there.
 /// </remarks>
 public sealed class CkmIke2PrfPlusDeriveParams : MechanismParameters
 {

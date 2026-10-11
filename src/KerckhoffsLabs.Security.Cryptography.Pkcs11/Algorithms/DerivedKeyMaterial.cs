@@ -14,12 +14,12 @@ internal static class DerivedKeyMaterial
     /// Derives an ephemeral, extractable generic secret of <paramref name="length"/> bytes from
     /// <paramref name="baseKey"/>, reads its value and destroys it.
     /// </summary>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading KDF output off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading KDF output off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from <c>C_DeriveKey</c> or <c>C_GetAttributeValue</c>.</exception>
     /// <exception cref="InvalidOperationException">The token did not expose the derived value.</exception>
     public static byte[] DeriveAndRead(Pkcs11Key baseKey, Mechanism mechanism, int length)
     {
-        baseKey.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
+        baseKey.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
 
         // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)

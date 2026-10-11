@@ -27,7 +27,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
 
         var slot = library.GetSlotList()[0];
         // Declared after the library so it is released first, as the nested finally did.
-        using var session = slot.OpenSession();
+        using var session = slot.OpenSessionCore();
 
         Assert.Equal(before + 1, library.LowLevelLibrary.Module.TrackedSessionCount);
     }
@@ -39,7 +39,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
         int before = library.LowLevelLibrary!.Module.TrackedSessionCount;
         var slot = library.GetSlotList()[0];
 
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         Assert.Equal(before + 1, library.LowLevelLibrary.Module.TrackedSessionCount);
 
         // Not a `using`: disposing the session at a chosen moment is what this test measures.
@@ -52,7 +52,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     {
         Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
         var slot = library.GetSlotList()[0];
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
 
         // Capture the low-level wrapper before disposing the library — after dispose the
         // accessor returns null. The wrapper itself is kept alive by the session SafeHandle's
@@ -78,7 +78,7 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
     {
         Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
         var slot = library.GetSlotList()[0];
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         session.Dispose();
 
         var lowLevel = library.LowLevelLibrary!;
@@ -89,18 +89,18 @@ public sealed class Pkcs11LibrarySessionTrackingTests(MockBackendFixture f)
         Assert.Equal(0, lowLevel.Module.TrackedSessionCount);
     }
 
-    // Disposing the library closes the workspace's session, so the workspace's own logout finds it
+    // Disposing the library closes the session's handle, so the session's own logout finds it
     // closed. Its disposal must still succeed: it used to throw ObjectDisposedException.
     [Fact]
-    public void DisposingTheLibraryFirst_ThenTheWorkspace_DoesNotThrow()
+    public void DisposingTheLibraryFirst_ThenTheSession_DoesNotThrow()
     {
         Pkcs11Library library = Pkcs11Library.Load(_backend.LibraryPath);
-        Pkcs11Workspace workspace = library.OpenWorkspaceWithPin(
+        Pkcs11Session session = library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         library.Dispose();
 
-        Assert.Null(Record.Exception(workspace.Dispose));
+        Assert.Null(Record.Exception(session.Dispose));
         Assert.Equal(0, library.LowLevelLibrary?.Module.TrackedSessionCount ?? 0);
     }
 }

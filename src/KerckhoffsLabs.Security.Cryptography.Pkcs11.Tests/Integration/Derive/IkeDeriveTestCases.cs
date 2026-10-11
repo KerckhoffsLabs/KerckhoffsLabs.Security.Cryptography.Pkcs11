@@ -60,22 +60,22 @@ internal static class IkeDeriveTestCases
     private const int Sha256Size = 32;
     private static readonly byte[] ProbeMessage = "ike-derive-sign-probe"u8.ToArray();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
         }
     }
 
-    private static Pkcs11Key ImportSecret(Pkcs11Workspace workspace, byte[] value, string label, bool derive,
+    private static Pkcs11Key ImportSecret(Pkcs11Session session, byte[] value, string label, bool derive,
         CKK keyType = CKK.CKK_GENERIC_SECRET)
     {
         var builder = ObjectTemplate.ForSecretKey(keyType).Label(label).Value(value);
         using var tpl = (derive ? builder.Derive() : builder).Build();
-        return workspace.ImportKey(tpl);
+        return session.ImportKey(tpl);
     }
 
     private static byte[] DeriveAndReadValue(Pkcs11Key baseKey, Mechanism mechanism, int outputLength)
@@ -111,10 +111,10 @@ internal static class IkeDeriveTestCases
     internal static void Assert_IkePrf_MatchesReference(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
         byte[] nr = RandomNumberGenerator.GetBytes(16);
@@ -128,23 +128,23 @@ internal static class IkeDeriveTestCases
         string label = $"ike-prf-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
                 new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, Sha256Size);
             Assert.Equal(expected, actual);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Ike1Prf_MatchesReference(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] gxy = RandomNumberGenerator.GetBytes(24);
         byte[] ckyI = RandomNumberGenerator.GetBytes(8);
@@ -159,8 +159,8 @@ internal static class IkeDeriveTestCases
         string gxyLabel = $"ike1-prf-gxy-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
-            using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
+            using var baseKey = ImportSecret(session, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var gxyKey = ImportSecret(session, gxy, gxyLabel, derive: false);
             var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
                 new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC,
                     gxyKey, prevKey: null, ckyI, ckyR, keyNumber));
@@ -170,18 +170,18 @@ internal static class IkeDeriveTestCases
         }
         finally
         {
-            DestroyByLabel(workspace, baseLabel);
-            DestroyByLabel(workspace, gxyLabel);
+            DestroyByLabel(session, baseLabel);
+            DestroyByLabel(session, gxyLabel);
         }
     }
 
     internal static void Assert_Ike1ExtendedDerive_MatchesReference(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] extraData = RandomNumberGenerator.GetBytes(20);
 
@@ -197,23 +197,23 @@ internal static class IkeDeriveTestCases
         string label = $"ike1-ext-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
                 new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: null, extraData));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, expected.Length);
             Assert.Equal(expected, actual);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Ike2PrfPlusDerive_MatchesReference(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // Reading the derived key's raw value back (Sensitive(false) in DeriveAndReadValue) is the
         // cross-check itself, so the AllowInsecure policy is required — same reasoning as HkdfTestCases.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] seedData = RandomNumberGenerator.GetBytes(24);
         const int outputLength = Sha256Size + 16; // between one and two PRF blocks: exercises truncation
@@ -230,14 +230,14 @@ internal static class IkeDeriveTestCases
         string label = $"ike2-prfplus-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
                 new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, seedKey: null, seedData));
 
             byte[] actual = DeriveAndReadValue(baseKey, mechanism, outputLength);
             Assert.Equal(expected, actual);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // === Sign-probe variants: prove the same derivations without ever reading CKA_VALUE ==========
@@ -246,9 +246,9 @@ internal static class IkeDeriveTestCases
     {
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
         byte[] nr = RandomNumberGenerator.GetBytes(16);
@@ -260,23 +260,23 @@ internal static class IkeDeriveTestCases
         string label = $"ike-prf-probe-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
                 new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, Sha256Size);
             Assert.Equal(expectedMac, actualMac);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Ike1Prf_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE1_PRF_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] gxy = RandomNumberGenerator.GetBytes(24);
         byte[] ckyI = RandomNumberGenerator.GetBytes(8);
@@ -291,8 +291,8 @@ internal static class IkeDeriveTestCases
         string gxyLabel = $"ike1-prf-probe-gxy-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
-            using var gxyKey = ImportSecret(workspace, gxy, gxyLabel, derive: false);
+            using var baseKey = ImportSecret(session, inKey, baseLabel, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var gxyKey = ImportSecret(session, gxy, gxyLabel, derive: false);
             var mechanism = new Mechanism(CKM.CKM_IKE1_PRF_DERIVE,
                 new CkmIke1PrfDeriveParams(CKM.CKM_SHA256_HMAC,
                     gxyKey, prevKey: null, ckyI, ckyR, keyNumber));
@@ -302,8 +302,8 @@ internal static class IkeDeriveTestCases
         }
         finally
         {
-            DestroyByLabel(workspace, baseLabel);
-            DestroyByLabel(workspace, gxyLabel);
+            DestroyByLabel(session, baseLabel);
+            DestroyByLabel(session, gxyLabel);
         }
     }
 
@@ -311,9 +311,9 @@ internal static class IkeDeriveTestCases
     {
         backend.RequireMechanism(CKM.CKM_IKE1_EXTENDED_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] extraData = RandomNumberGenerator.GetBytes(20);
 
@@ -326,23 +326,23 @@ internal static class IkeDeriveTestCases
         string label = $"ike1-ext-probe-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE1_EXTENDED_DERIVE,
                 new CkmIke1ExtendedDeriveParams(CKM.CKM_SHA256_HMAC, keygxy: null, extraData));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, expectedDerived.Length);
             Assert.Equal(expectedMac, actualMac);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Ike2PrfPlusDerive_MatchesBclViaSignProbe(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE);
         backend.RequireMechanism(CKM.CKM_SHA256_HMAC);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] seedData = RandomNumberGenerator.GetBytes(24);
         const int outputLength = Sha256Size + 16;
@@ -358,14 +358,14 @@ internal static class IkeDeriveTestCases
         string label = $"ike2-prfplus-probe-{Guid.NewGuid():N}";
         try
         {
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true, keyType: CKK.CKK_SHA256_HMAC);
             var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
                 new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, seedKey: null, seedData));
 
             byte[] actualMac = DeriveAndProbe(baseKey, mechanism, outputLength);
             Assert.Equal(expectedMac, actualMac);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // === Negative case: base-key-type enforcement =================================================
@@ -377,9 +377,9 @@ internal static class IkeDeriveTestCases
     internal static void Assert_IkePrf_RejectsGenericSecretBaseKey(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_IKE_PRF_DERIVE);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         // The IKE PRFs are not on the SecureOnly allow-list (documented refusal).
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] inKey = RandomNumberGenerator.GetBytes(32);
         byte[] ni = RandomNumberGenerator.GetBytes(16);
         byte[] nr = RandomNumberGenerator.GetBytes(16);
@@ -390,7 +390,7 @@ internal static class IkeDeriveTestCases
             // Deliberately CKK_GENERIC_SECRET (ImportSecret's default): PKCS#11 v3.0 §6.64.3
             // requires the base key's CKA_KEY_TYPE to match prfMechanism exactly when bDataAsKey
             // is false, and does not admit generic secret.
-            using var baseKey = ImportSecret(workspace, inKey, label, derive: true);
+            using var baseKey = ImportSecret(session, inKey, label, derive: true);
             var mechanism = new Mechanism(CKM.CKM_IKE_PRF_DERIVE,
                 new CkmIkePrfDeriveParams(CKM.CKM_SHA256_HMAC, dataAsKey: false, rekey: false, ni, nr));
             using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
@@ -399,6 +399,6 @@ internal static class IkeDeriveTestCases
             var ex = Assert.ThrowsAny<Pkcs11Exception>(() => baseKey.Derive(mechanism, template));
             Assert.Equal(CKR.CKR_KEY_TYPE_INCONSISTENT, ex.ReturnValue);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 }

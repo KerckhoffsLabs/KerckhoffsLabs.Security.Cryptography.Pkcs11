@@ -48,7 +48,7 @@ public sealed class HMACPkcs11 : HMAC
     /// </exception>
     /// <remarks>
     /// SHA-224 is accepted here (it merely determines the HMAC output size); the
-    /// workspace's crypto policy gate for it fires later, at the actual
+    /// session's crypto policy gate for it fires later, at the actual
     /// <c>CKM_SHA224_HMAC</c> sign call inside <see cref="HashFinal"/> — see
     /// <c>SecureOnlyPolicy</c>.
     /// </remarks>

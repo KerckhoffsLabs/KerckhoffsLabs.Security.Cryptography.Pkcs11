@@ -9,16 +9,16 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
 {
     private readonly MockBackendFixture _backend = backend;
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithPin(
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact]
-    public void Ctor_NullWorkspace_Throws()
+    public void Ctor_NullSession_Throws()
     {
         Assert.Throws<ArgumentNullException>(() =>
             new Pkcs11Key(
-                workspace: null!,
+                session: null!,
                 privateHandle: new ObjectHandle(1),
                 publicHandle: ObjectHandle.Invalid,
                 keyType: CKK.CKK_AES,
@@ -29,11 +29,11 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
     [Fact]
     public void Ctor_BothHandlesInvalid_Throws()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
 
         Assert.Throws<ArgumentException>(() =>
             new Pkcs11Key(
-                workspace,
+                session,
                 privateHandle: ObjectHandle.Invalid,
                 publicHandle: ObjectHandle.Invalid,
                 keyType: CKK.CKK_AES,
@@ -44,11 +44,11 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
     [Fact]
     public void Properties_AreExposed()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
         byte[] id = [0x01, 0x02];
 
         var key = new Pkcs11Key(
-            workspace,
+            session,
             privateHandle: new ObjectHandle(42),
             publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA,
@@ -63,12 +63,12 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
     }
 
     [Fact]
-    public void Dispose_NonOwningKey_DoesNotDisposeWorkspace()
+    public void Dispose_NonOwningKey_DoesNotDisposeSession()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
 
         var key = new Pkcs11Key(
-            workspace,
+            session,
             privateHandle: new ObjectHandle(1),
             publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES,
@@ -79,9 +79,9 @@ public sealed class Pkcs11KeyTests(MockBackendFixture backend)
         // Re-dispose is a no-op.
         key.Dispose();
 
-        // workspace should still be usable since key.Dispose didn't cascade.
-        // Just check that workspace.GenerateRandom doesn't throw — sanity check.
-        byte[] bytes = workspace.GenerateRandom(8);
+        // session should still be usable since key.Dispose didn't cascade.
+        // Just check that session.GenerateRandom doesn't throw — sanity check.
+        byte[] bytes = session.GenerateRandom(8);
         Assert.Equal(8, bytes.Length);
     }
 }

@@ -15,24 +15,24 @@ public sealed class DeleteKeyTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
-        using var workspace = _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
+        using var session = _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
 
         string label = $"octk-del-{Guid.NewGuid():N}";
         using (var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
-        using (workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl)) { }
+        using (session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl)) { }
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            var before = workspace.FindKeys(filter);
+            var before = session.FindKeys(filter);
             Assert.NotEmpty(before);
             foreach (var k in before) k.Dispose();
         }
 
-        using (var key = workspace.OpenKey(label))
+        using (var key = session.OpenKey(label))
             key.Destroy();
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
-            Assert.Empty(workspace.FindKeys(filter));
+            Assert.Empty(session.FindKeys(filter));
     }
 }

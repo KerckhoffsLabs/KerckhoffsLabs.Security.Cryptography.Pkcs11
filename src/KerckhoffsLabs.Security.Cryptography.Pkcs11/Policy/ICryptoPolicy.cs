@@ -1,14 +1,14 @@
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy;
 
 /// <summary>
-/// Decides whether a cryptographic operation may proceed. A workspace is opened under exactly one
+/// Decides whether a cryptographic operation may proceed. A session is opened under exactly one
 /// policy (see <see cref="CryptoPolicy"/> for the built-ins); every security-relevant operation is
 /// described as a <see cref="PolicyRequest"/> and evaluated before anything reaches the token.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Implementations must be side-effect free and thread-safe: the same instance may be shared by many
-/// workspaces. Throwing from <see cref="Evaluate"/> aborts the operation with that exception.
+/// sessions. Throwing from <see cref="Evaluate"/> aborts the operation with that exception.
 /// </para>
 /// <para>
 /// <see cref="PolicyRequest"/> is a closed hierarchy that later library versions may extend. End every
@@ -22,8 +22,8 @@ public interface ICryptoPolicy
     string Name { get; }
 
     /// <summary>
-    /// When <see langword="false"/>, a workspace opened under this policy refuses every
-    /// <c>UsePolicy</c> lease, so the policy holds for the workspace's whole lifetime.
+    /// When <see langword="false"/>, a session opened under this policy refuses every
+    /// <c>UsePolicy</c> lease, so the policy holds for the session's whole lifetime.
     /// </summary>
     bool AllowsOverride { get; }
 

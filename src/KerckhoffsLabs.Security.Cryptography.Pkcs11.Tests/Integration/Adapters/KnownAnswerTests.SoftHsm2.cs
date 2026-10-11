@@ -321,7 +321,7 @@ internal static class KnownAnswerTestCases
     private static readonly byte[] RsaModulus = H("e4daddcca4cc007891cc71c153c95f2c94407dc07ac0fffce5af7a35cea05d97475c764430289f697cfd7388440c601d50bde1a233e63ba0bc59e99549c226a503d9980e19af85a6252a75c05c3086a9b0f36965e6c672301baf69a4e9a9c85f926d434860551dccedde0f138d24a7c6058aaaa79506633000f5930e736b036739973c8ff975de17bc89fe43fb109bcce1f08a020671b1b5acb67a51a301b942d2e5d013f20ef83e4f2244da2b95d93d1ae377ac924a861c2689e2696f1d214634f6205ec3193bb2d17aafc3dcc50ddc5b7fe12ad6172e8ee3742dc5115c7114508d0acadd2730121d041959cc18775c3d3f2d1f863a33edf98d04d6d4f51737");
     private static readonly byte[] RsaPublicExponent = H("010001");
 
-    private static ObjectHandle ImportRsaPrivateKey(Pkcs11Session session) => TestKeys.ImportRsaPrivateKey(
+    private static ObjectHandle ImportRsaPrivateKey(Pkcs11SessionCore session) => TestKeys.ImportRsaPrivateKey(
         session,
         RsaModulus,
         RsaPublicExponent,

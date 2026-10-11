@@ -31,19 +31,19 @@ public sealed class DESPkcs11Tests_Managed
 
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
-    // Imports Key64 as a token DES key and hands a wrapping DESPkcs11 (and its workspace) to the body.
-    private static void WithImportedDes(Action<Pkcs11Workspace, DESPkcs11> body) =>
+    // Imports Key64 as a token DES key and hands a wrapping DESPkcs11 (and its session) to the body.
+    private static void WithImportedDes(Action<Pkcs11Session, DESPkcs11> body) =>
         WithImportedDes(Key64, body);
 
-    private static void WithImportedDes(byte[] keyBytes, Action<Pkcs11Workspace, DESPkcs11> body)
+    private static void WithImportedDes(byte[] keyBytes, Action<Pkcs11Session, DESPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_DES)
             .Label($"des-{Guid.NewGuid():N}").Value(keyBytes).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var des = new DESPkcs11(key);
-        body(workspace, des);
+        body(session, des);
     }
 
     private static DES BclDes()
@@ -66,10 +66,10 @@ public sealed class DESPkcs11Tests_Managed
     public void Ctor_NonDesKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new DESPkcs11(key));
         Assert.Equal("key", ex.ParamName);
@@ -96,13 +96,13 @@ public sealed class DESPkcs11Tests_Managed
     // === Known-answer round-trips vs the BCL (the managed token implements single DES) ==============
 
     [Fact]
-    public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedDes((workspace, des) =>
+    public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedDes((session, des) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("DES-CBC PKCS7 over a token key — variable length.");
 
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8); // default PaddingMode.PKCS7
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptCbc(plaintext, Iv8);
             Assert.Equal(expected, ct);
@@ -111,14 +111,14 @@ public sealed class DESPkcs11Tests_Managed
     });
 
     [Fact]
-    public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => WithImportedDes((workspace, des) =>
+    public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => WithImportedDes((session, des) =>
     {
         byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
         RandomNumberGenerator.Fill(plaintext);
 
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptCbc(plaintext, Iv8, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -127,14 +127,14 @@ public sealed class DESPkcs11Tests_Managed
     });
 
     [Fact]
-    public void EncryptEcb_AllowInsecure_MatchesBcl() => WithImportedDes((workspace, des) =>
+    public void EncryptEcb_AllowInsecure_MatchesBcl() => WithImportedDes((session, des) =>
     {
         byte[] plaintext = new byte[8];
         RandomNumberGenerator.Fill(plaintext);
 
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptEcb(plaintext, PaddingMode.None);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptEcb(plaintext, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -145,12 +145,12 @@ public sealed class DESPkcs11Tests_Managed
     // Fixed known-answer vector: NBS single-DES, ECB, key 0x0123456789ABCDEF,
     // plaintext 0x4E6F772069732074 ("Now is t") → ciphertext 0x3FA40E8A984D4815.
     [Fact]
-    public void EncryptEcb_KnownAnswer_MatchesReferenceVector() => WithImportedDes((workspace, des) =>
+    public void EncryptEcb_KnownAnswer_MatchesReferenceVector() => WithImportedDes((session, des) =>
     {
         byte[] plaintext = H("4E6F772069732074");
         byte[] expectedCt = H("3FA40E8A984D4815");
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptEcb(plaintext, PaddingMode.None);
             Assert.Equal(expectedCt, ct);
@@ -164,19 +164,19 @@ public sealed class DESPkcs11Tests_Managed
 
     // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
     [Fact]
-    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedDes((workspace, des) =>
+    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedDes((session, des) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("token decrypts BCL ciphertext");
         using var bcl = BclDes();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(plaintext, des.DecryptCbc(ct, Iv8));
     });
 
     // A wrong IV corrupts the leading block under CBC (no integrity, so it does not throw).
     [Fact]
-    public void DecryptCbc_WrongIv_ProducesDifferentPlaintext() => WithImportedDes((workspace, des) =>
+    public void DecryptCbc_WrongIv_ProducesDifferentPlaintext() => WithImportedDes((session, des) =>
     {
         byte[] plaintext = new byte[16];
         RandomNumberGenerator.Fill(plaintext);
@@ -185,7 +185,7 @@ public sealed class DESPkcs11Tests_Managed
 
         byte[] wrongIv = [.. Iv8];
         wrongIv[0] ^= 0xFF;
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] dec = des.DecryptCbc(ct, wrongIv, PaddingMode.None);
             Assert.NotEqual(plaintext, dec);
@@ -201,21 +201,21 @@ public sealed class DESPkcs11Tests_Managed
         Assert.Throws<CryptoPolicyViolationException>(() => des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
     [Fact]
-    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedDes((workspace, des) =>
+    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedDes((session, des) =>
     {
         // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Empty(des.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
     });
 
     [Fact]
-    public void EncryptCbc_Pkcs7_EmptyInput_AllowInsecure_EmitsPaddingBlock() => WithImportedDes((workspace, des) =>
+    public void EncryptCbc_Pkcs7_EmptyInput_AllowInsecure_EmitsPaddingBlock() => WithImportedDes((session, des) =>
     {
         // Empty plaintext with PKCS7 must still emit a full 8-byte padding block; that path goes to the
         // token rather than the empty-input fast path. Cross-check against the BCL.
         using var bcl = BclDes();
         byte[] expected = bcl.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = des.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
             Assert.Equal(8, ct.Length);
@@ -235,12 +235,12 @@ public sealed class DESPkcs11Tests_Managed
         Assert.Throws<NotSupportedException>(() => des.EncryptEcb(new byte[8], PaddingMode.PKCS7)));
 
     [Fact]
-    public void Cfb_NotSupported() => WithImportedDes((workspace, des) =>
+    public void Cfb_NotSupported() => WithImportedDes((session, des) =>
     {
-        // DESPkcs11 does not override the CFB cores: the secure-defaults gate in Pkcs11Session does
+        // DESPkcs11 does not override the CFB cores: the secure-defaults gate in Pkcs11SessionCore does
         // not cover single-DES CKM_DES_CFB*, so wiring it would bypass the AllowInsecure policy. The base
         // SymmetricAlgorithm therefore surfaces NotSupportedException — even under the AllowInsecure policy.
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Throws<NotSupportedException>(
                 () => des.EncryptCfb(new byte[8], Iv8, PaddingMode.None, feedbackSizeInBits: 8));
     });

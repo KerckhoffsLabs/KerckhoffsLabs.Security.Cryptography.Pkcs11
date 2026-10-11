@@ -26,25 +26,25 @@ public sealed class HMACPkcs11Tests_Managed
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     // Imports a generic-secret key with a known value and runs the body with it.
-    private static void WithImportedHmacKey(byte[] rawKey, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithImportedHmacKey(byte[] rawKey, Action<Pkcs11Session, Pkcs11Key> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label($"hmac-{Guid.NewGuid():N}").Value(rawKey).Sign().Verify().Build();
-        using var key = workspace.ImportKey(tpl);
-        body(workspace, key);
+        using var key = session.ImportKey(tpl);
+        body(session, key);
     }
 
     // Generates an ephemeral generic-secret key of the given length and runs the body with it.
-    private static void WithGeneratedHmacKey(int keyLen, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithGeneratedHmacKey(int keyLen, Action<Pkcs11Session, Pkcs11Key> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label($"hmac-{Guid.NewGuid():N}").ValueLen(keyLen).Sign().Verify().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
-        body(workspace, key);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        body(session, key);
     }
 
     private static byte[] BclHmac(string hashName, byte[] key, byte[] data) => hashName switch
@@ -153,12 +153,12 @@ public sealed class HMACPkcs11Tests_Managed
         byte[] keyBytes = RandomNumberGenerator.GetBytes(20);
         byte[] data = Encoding.UTF8.GetBytes("sha1 hmac");
 
-        WithImportedHmacKey(keyBytes, (workspace, key) =>
+        WithImportedHmacKey(keyBytes, (session, key) =>
         {
             using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA1);
             Assert.Equal(160, hmac.HashSize); // 20-byte digest reported in bits
 
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] mac = hmac.ComputeHash(data);
                 Assert.Equal(20, mac.Length);

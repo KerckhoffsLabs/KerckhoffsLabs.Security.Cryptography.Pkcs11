@@ -44,7 +44,7 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_Kryoptic(KryopticBackendFixtur
     public void Reset_RestartsStream() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Reset_RestartsStream(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void Ctor_NullWorkspace_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Ctor_NullWorkspace_Throws(_backend);
+    public void Ctor_NullSession_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Ctor_NullSession_Throws(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Ctor_NullPassword_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_Ctor_NullPassword_Throws(_backend);
@@ -77,7 +77,7 @@ public sealed class Rfc2898DeriveBytesPkcs11Tests_Kryoptic(KryopticBackendFixtur
     public void StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
-    public void StaticPbkdf2_NullWorkspace_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_NullWorkspace_Throws(_backend);
+    public void StaticPbkdf2_NullSession_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_NullSession_Throws(_backend);
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void StaticPbkdf2_NegativeOutputLength_Throws() => Rfc2898DeriveBytesPkcs11TestCases.Assert_StaticPbkdf2_NegativeOutputLength_Throws(_backend);

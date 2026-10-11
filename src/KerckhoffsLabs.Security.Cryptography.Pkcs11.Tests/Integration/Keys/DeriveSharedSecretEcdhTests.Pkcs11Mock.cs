@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// Hermetic coverage for <see cref="Pkcs11Workspace.DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/>'s
+/// Hermetic coverage for <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ReadOnlySpan{byte}, int, CKD)"/>'s
 /// <c>CKD_NULL</c> secure-defaults gate: <c>CKD_NULL</c> applies no KDF to the raw
 /// ECDH shared secret, so the derived AES key becomes the raw x-coordinate (or a token-chosen
 /// truncation of it) — NIST SP 800-56A forbids this. The gate runs before any native call (before
@@ -18,37 +18,37 @@ public sealed class DeriveSharedSecretEcdhTests_Mock(MockBackendFixture backend)
 {
     private readonly MockBackendFixture _backend = backend;
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithPin(
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    private static Pkcs11Key DummyEcKey(Pkcs11Workspace workspace) =>
-        new(workspace, privateHandle: new ObjectHandle(1), publicHandle: ObjectHandle.Invalid,
+    private static Pkcs11Key DummyEcKey(Pkcs11Session session) =>
+        new(session, privateHandle: new ObjectHandle(1), publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_EC, label: null, id: []);
 
     [Fact]
     public void CkdNull_GatedByDefault_Throws()
     {
-        using var workspace = OpenWorkspace();
-        using var key = DummyEcKey(workspace);
+        using var session = OpenSession();
+        using var key = DummyEcKey(session);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
-            () => workspace.DeriveSharedSecretEcdh(key, new byte[4], kdf: CKD.CKD_NULL));
+            () => session.DeriveSharedSecretEcdh(key, new byte[4], kdf: CKD.CKD_NULL));
         Assert.Equal(CKM.CKM_ECDH1_DERIVE, ex.Mechanism);
     }
 
     [Fact]
     public void CkdNull_UsePolicyAllowInsecure_BypassesGate()
     {
-        using var workspace = OpenWorkspace();
-        using var key = DummyEcKey(workspace);
+        using var session = OpenSession();
+        using var key = DummyEcKey(session);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             // The gate is bypassed; the call reaches CkmEcdh1DeriveParams / the native derive, which
             // fails on the dummy handle and malformed peer point — the point is it is NOT the gate.
             Exception? ex = Record.Exception(
-                () => workspace.DeriveSharedSecretEcdh(key, new byte[4], kdf: CKD.CKD_NULL));
+                () => session.DeriveSharedSecretEcdh(key, new byte[4], kdf: CKD.CKD_NULL));
             Assert.False(ex is CryptoPolicyViolationException, "The AllowInsecure policy should bypass the CKD_NULL gate.");
         }
     }
@@ -56,11 +56,11 @@ public sealed class DeriveSharedSecretEcdhTests_Mock(MockBackendFixture backend)
     [Fact]
     public void DefaultKdf_DoesNotTriggerTheGate()
     {
-        using var workspace = OpenWorkspace();
-        using var key = DummyEcKey(workspace);
+        using var session = OpenSession();
+        using var key = DummyEcKey(session);
 
         // Default CKD_SHA256_KDF must never trip the CKD_NULL gate, regardless of the crypto policy.
-        Exception? ex = Record.Exception(() => workspace.DeriveSharedSecretEcdh(key, new byte[4]));
+        Exception? ex = Record.Exception(() => session.DeriveSharedSecretEcdh(key, new byte[4]));
         Assert.False(ex is CryptoPolicyViolationException, "The default KDF must not trigger the CKD_NULL gate.");
     }
 }

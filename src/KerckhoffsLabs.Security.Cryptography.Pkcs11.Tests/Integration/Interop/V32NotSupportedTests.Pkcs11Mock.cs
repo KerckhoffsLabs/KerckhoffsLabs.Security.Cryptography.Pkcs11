@@ -146,7 +146,7 @@ public sealed class V32NotSupportedTests(MockBackendFixture f)
         }
     }
 
-    // Async* has no high-level Pkcs11Session wrapper at all, so it's driven through the internal
+    // Async* has no high-level Pkcs11SessionCore wrapper at all, so it's driven through the internal
     // low-level accessor directly — the raw API returns CKR rather than throwing.
     [Fact]
     public void AsyncComplete_ReturnsFunctionNotSupported()

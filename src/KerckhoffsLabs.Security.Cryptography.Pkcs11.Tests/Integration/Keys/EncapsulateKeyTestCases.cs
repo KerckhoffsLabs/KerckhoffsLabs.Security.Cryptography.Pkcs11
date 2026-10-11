@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// </summary>
 internal static class EncapsulateKeyTestCases
 {
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) => backend.OpenSession();
 
     private static ObjectTemplate SharedSecretTemplate(bool onToken, bool valueLen = true)
     {
@@ -53,10 +53,10 @@ internal static class EncapsulateKeyTestCases
 
     internal static void Assert_RsaOaep_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         // Reading the shared secret back to compare is the extract-and-destroy path, gated by the
         // secure-defaults policy.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"encap-rsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -67,7 +67,7 @@ internal static class EncapsulateKeyTestCases
             .Label(label).Id(id)
             .Attribute(CKA.CKA_DECAPSULATE, true).OnToken(backend.SupportsTokenObjects).Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_OAEP, new CkmRsaPkcsOaepParams(CKM.CKM_SHA256, CKG.CKG_MGF1_SHA256));
@@ -86,10 +86,10 @@ internal static class EncapsulateKeyTestCases
 
     internal static void Assert_Ecdh1_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         // Reading the shared secret back to compare is the extract-and-destroy path, gated by the
         // secure-defaults policy.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"encap-ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -100,7 +100,7 @@ internal static class EncapsulateKeyTestCases
             .Label(label).Id(id)
             .Attribute(CKA.CKA_DECAPSULATE, true).OnToken(backend.SupportsTokenObjects).Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             // pPublicData must be empty for this call shape (PKCS#11 v3.2 §5.18.10/.11): the token

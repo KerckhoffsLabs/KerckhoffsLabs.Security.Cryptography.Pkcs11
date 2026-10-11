@@ -49,13 +49,13 @@ public interface IPkcs11Backend
     /// run unchanged against both auth models.</summary>
     bool RequiresUserLogin => true;
 
-    /// <summary>Opens a workspace over the fixture's token using the backend's authentication model:
+    /// <summary>Opens a session over the fixture's token using the backend's authentication model:
     /// a normal-user login when <see cref="RequiresUserLogin"/> is set, otherwise no login. Shared,
     /// backend-agnostic test cases call this instead of hard-coding the login path.</summary>
-    Pkcs11Workspace OpenWorkspace() =>
+    Pkcs11Session OpenSession() =>
         RequiresUserLogin
-            ? Library.OpenWorkspaceWithPin(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span))
-            : Library.OpenWorkspaceWithoutLogin(TokenLabel);
+            ? Library.OpenSessionWithPin(TokenLabel, CKU.CKU_USER, new SecurePin(UserPin.Span))
+            : Library.OpenSessionWithoutLogin(TokenLabel);
 
     /// <summary>True if the backend can generate and operate ML-DSA (FIPS 204) keys. Defaults to the
     /// advertised <see cref="CKM.CKM_ML_DSA"/>; SoftHSM overrides this with a build marker because the

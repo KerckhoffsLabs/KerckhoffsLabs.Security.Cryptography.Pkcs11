@@ -23,8 +23,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// extraction step.</para>
 /// <para><b>Gating:</b> <see cref="EncapsulateCore(Span{byte}, Span{byte})"/> /
 /// <see cref="DecapsulateCore(ReadOnlySpan{byte}, Span{byte})"/> throw
-/// <see cref="CryptoPolicyViolationException"/> unless the owning workspace's
-/// <see cref="Pkcs11Workspace.Policy"/> permits it (e.g. <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>).
+/// <see cref="CryptoPolicyViolationException"/> unless the owning session's
+/// <see cref="Pkcs11Session.Policy"/> permits it (e.g. <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>).
 /// The gate is mechanism-agnostic — it gates the extract-and-destroy pattern itself, not <c>CKM_ML_KEM</c>.</para>
 /// <para><b>Private-key export</b> (<c>ExportDecapsulationKey</c>, seed, PKCS#8) is always
 /// refused. Public-key (<i>encapsulation key</i>) export reads <c>CKA_VALUE</c> from the
@@ -47,8 +47,8 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">
-    /// Thrown unless the owning workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.
-    /// Use <see cref="Pkcs11Workspace.UsePolicy"/> (e.g. with <c>CryptoPolicy.AllowInsecure</c>) to
+    /// Thrown unless the owning session's <see cref="Pkcs11Session.Policy"/> permits it.
+    /// Use <see cref="Pkcs11Session.UsePolicy"/> (e.g. with <c>CryptoPolicy.AllowInsecure</c>) to
     /// acknowledge that the shared secret will be extracted from the token, or use
     /// <see cref="Pkcs11Key.EncapsulateKey"/> for the on-token-only path.
     /// </exception>
@@ -97,7 +97,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
         // conventional form that includes CKA_VALUE_LEN, fall back to omitting it on SoftHSM's
         // rejection) and the answer is cached on the library — every later call goes straight to the
         // right form, so the probe's exception is one-time discovery, not steady-state control flow.
-        Pkcs11Library library = _key.Workspace.Library;
+        Pkcs11Library library = _key.Session.Library;
         using Pkcs11Key sharedKey = library.MlKemDecapsulateOmitsValueLen switch
         {
             bool omit => DecapsulateWith(mech, ciphertext, includeValueLen: !omit),
@@ -184,7 +184,7 @@ public sealed class MLKemPkcs11(Pkcs11Key key) : MLKem(ResolveAlgorithm(key))
     // -----------------------------------------------------------------------
 
     private void GuardExtraction()
-        => _key.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret));
+        => _key.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KemSharedSecret));
 
     private static MLKemAlgorithm ResolveAlgorithm(Pkcs11Key key)
     {

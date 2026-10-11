@@ -17,14 +17,14 @@ public sealed class Pkcs11KeyPublicSynthesisTests_OpenCryptoki(OpenCryptokiBacke
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithPin(
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
 
         string label = $"octk-rsa-synth-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -35,16 +35,16 @@ public sealed class Pkcs11KeyPublicSynthesisTests_OpenCryptoki(OpenCryptokiBacke
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Build();
 
-        workspace.Session.GenerateKeyPair(
+        session.Core.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
             [.. pubTpl.Attributes], [.. privTpl.Attributes],
             out var pubHandle, out var privHandle);
 
         try
         {
-            workspace.Session.DestroyObject(pubHandle); // leave only the private-side
+            session.Core.DestroyObject(pubHandle); // leave only the private-side
 
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             Assert.False(key.PrivateHandle.IsInvalid);
             Assert.True(key.PublicHandle.IsInvalid); // no CKO_PUBLIC_KEY companion left
 
@@ -54,14 +54,14 @@ public sealed class Pkcs11KeyPublicSynthesisTests_OpenCryptoki(OpenCryptokiBacke
         }
         finally
         {
-            workspace.Session.DestroyObject(privHandle);
+            session.Core.DestroyObject(privHandle);
         }
     }
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
         string label = $"octk-rsa-mverify-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -71,14 +71,14 @@ public sealed class Pkcs11KeyPublicSynthesisTests_OpenCryptoki(OpenCryptokiBacke
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Build();
 
-        workspace.Session.GenerateKeyPair(
+        session.Core.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
             [.. pubTpl.Attributes], [.. privTpl.Attributes],
             out var pubHandle, out var privHandle);
         try
         {
-            workspace.Session.DestroyObject(pubHandle); // leave only the private-side
-            using var key = workspace.OpenKey(label);
+            session.Core.DestroyObject(pubHandle); // leave only the private-side
+            using var key = session.OpenKey(label);
             Assert.True(key.PublicHandle.IsInvalid);
 
             using var rsa = new RSAPkcs11(key);
@@ -96,7 +96,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_OpenCryptoki(OpenCryptokiBacke
         }
         finally
         {
-            workspace.Session.DestroyObject(privHandle);
+            session.Core.DestroyObject(privHandle);
         }
     }
 }

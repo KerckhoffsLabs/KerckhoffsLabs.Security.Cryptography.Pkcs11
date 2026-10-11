@@ -249,13 +249,13 @@ public sealed class Pkcs11SlotTests
         Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).InitTokenWithPin(pin, "label"));
     }
 
-    // === OpenSession ======================================================
+    // === OpenSessionCore ======================================================
 
     [Fact]
     public void OpenSession_ReadWrite_SetsSerialAndRwFlags()
     {
         using var fake = new SlotFake();
-        var session = NewSlot(fake).OpenSession(readWrite: true);
+        var session = NewSlot(fake).OpenSessionCore(readWrite: true);
         Assert.NotNull(session);
         Assert.Equal(CKF.CKF_SERIAL_SESSION | CKF.CKF_RW_SESSION, (ulong)fake.CapturedOpenFlags);
         session.Dispose();
@@ -265,7 +265,7 @@ public sealed class Pkcs11SlotTests
     public void OpenSession_ReadOnly_SetsSerialFlagOnly()
     {
         using var fake = new SlotFake();
-        var session = NewSlot(fake).OpenSession(readWrite: false);
+        var session = NewSlot(fake).OpenSessionCore(readWrite: false);
         Assert.Equal(CKF.CKF_SERIAL_SESSION, (ulong)fake.CapturedOpenFlags);
         session.Dispose();
     }
@@ -274,7 +274,7 @@ public sealed class Pkcs11SlotTests
     public void OpenSession_Error_Throws()
     {
         using var fake = new SlotFake { OpenRv = CKR.CKR_SESSION_COUNT };
-        Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).OpenSession());
+        Assert.ThrowsAny<Pkcs11Exception>(() => NewSlot(fake).OpenSessionCore());
     }
 
     [Fact]
@@ -284,8 +284,8 @@ public sealed class Pkcs11SlotTests
         var logger = new CapturingLogger();
         var slot = new Pkcs11Slot(fake.LowLevel, SlotId, new CapturingLoggerFactory(logger));
 
-        using (slot.OpenSession(policy: CryptoPolicy.FipsOnly)) { }
-        using (slot.OpenSession()) { }
+        using (slot.OpenSessionCore(policy: CryptoPolicy.FipsOnly)) { }
+        using (slot.OpenSessionCore()) { }
 
         var opened = logger.Entries.Where(e => e.Level == Microsoft.Extensions.Logging.LogLevel.Information).ToList();
         Assert.Equal(2, opened.Count);

@@ -24,7 +24,7 @@ public sealed class Pkcs11Slot
     /// <summary>
     /// The factory this instance was constructed with (inherited from the owning
     /// <see cref="Pkcs11Library"/>), or <see langword="null"/> when the library was given none and
-    /// nothing logs. Handed down to every <c>Pkcs11Session</c> this slot opens.
+    /// nothing logs. Handed down to every <c>Pkcs11SessionCore</c> this slot opens.
     /// </summary>
     private readonly ILoggerFactory? _loggerFactory;
 
@@ -181,7 +181,7 @@ public sealed class Pkcs11Slot
         Array.Copy(labelBytes, 0, tokenLabel, 0, labelBytes.Length);
 
         // The PIN goes to the native call straight out of the pinned buffer SecurePin owns;
-        // no transient copy to zero. Matches Pkcs11Session.Login's pattern.
+        // no transient copy to zero. Matches Pkcs11SessionCore.Login's pattern.
         CKR rv = _pkcs11Library.C_InitToken(_slotId, soPin.Pin, tokenLabel);
         Pkcs11Exception.ThrowIfError(rv, Pkcs11Operations.OpInitToken);
     }
@@ -231,9 +231,9 @@ public sealed class Pkcs11Slot
     /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
     /// <returns>The opened session.</returns>
-    internal Pkcs11Session OpenSession(bool readWrite = true, ICryptoPolicy? policy = null)
+    internal Pkcs11SessionCore OpenSessionCore(bool readWrite = true, ICryptoPolicy? policy = null)
     {
-        Log.SlotTrace(_logger, (ulong)_slotId, "OpenSession");
+        Log.SlotTrace(_logger, (ulong)_slotId, "OpenSessionCore");
 
         ulong flags = CKF.CKF_SERIAL_SESSION;
         if (readWrite)
@@ -253,7 +253,7 @@ public sealed class Pkcs11Slot
                     "Opened {SessionType} session {SessionId} with token in slot {SlotId} under {PolicyName} policy",
                     readWrite ? "read-write" : "read-only", sessionId, _slotId, (policy ?? CryptoPolicy.SecureOnly).Name);
 
-            return new Pkcs11Session(_pkcs11Library, sessionHandle, _loggerFactory, policy);
+            return new Pkcs11SessionCore(_pkcs11Library, sessionHandle, _loggerFactory, policy);
         }
         catch
         {

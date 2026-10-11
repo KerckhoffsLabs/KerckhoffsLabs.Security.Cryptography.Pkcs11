@@ -25,11 +25,11 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
 {
     private const int ThreadCount = 8;
 
-    // Typed as the interface: OpenWorkspace is its default method, and picks the no-login path NSS needs.
+    // Typed as the interface: OpenSession is its default method, and picks the no-login path NSS needs.
     private readonly IPkcs11Backend _backend = backend;
 
     /// <summary>
-    /// Each thread owns a workspace and repeatedly generates, finds, inspects and destroys its own
+    /// Each thread owns a session and repeatedly generates, finds, inspects and destroys its own
     /// labelled session key while the others do the same. Every key must be found exactly once by
     /// its owner and be gone after its destroy — concurrent sessions must neither lose nor leak
     /// objects in the shared table.
@@ -41,33 +41,33 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
 
         RunTogether(ThreadCount, (t, start) =>
         {
-            using var workspace = _backend.OpenWorkspace();
+            using var session = _backend.OpenSession();
             start.ArriveAndWait();
 
             for (int i = 0; i < iterations; i++)
             {
                 string label = $"par-{t}-{i}-{Guid.NewGuid():N}";
-                using (var key = workspace.GenerateAesKey(bitLength: 256, label: label))
+                using (var key = session.GenerateAesKey(bitLength: 256, label: label))
                 using (var attrs = key.GetAttributeValue(CKA.CKA_VALUE_LEN))
                 {
                     Assert.Equal(32UL, Assert.Single(attrs).GetValueAsUlong());
                 }
 
                 using var filter = ObjectTemplate.Empty().Label(label).Build();
-                using (var found = workspace.FindKeys(filter))
+                using (var found = session.FindKeys(filter))
                 {
                     Assert.Single(found).Destroy();
                 }
 
-                using var after = workspace.FindKeys(filter);
+                using var after = session.FindKeys(filter);
                 Assert.Empty(after);
             }
         });
     }
 
     /// <summary>
-    /// Half the threads open a workspace, create session keys and close it without destroying them,
-    /// over and over; the other half keep one workspace open and search for, and read attributes of,
+    /// Half the threads open a session, create session keys and close it without destroying them,
+    /// over and over; the other half keep one session open and search for, and read attributes of,
     /// those same keys. Closing a session frees its objects (PKCS#11 v3.2 §5.6, <c>C_CloseSession</c>),
     /// so the searchers race object removal by design: a key that vanishes between find and read may
     /// fail with <see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/>, and nothing else is acceptable. Once all
@@ -93,11 +93,11 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
                 {
                     for (int r = 0; r < rounds; r++)
                     {
-                        using var workspace = _backend.OpenWorkspace();
+                        using var session = _backend.OpenSession();
                         for (int k = 0; k < keysPerRound; k++)
                         {
-                            // Deliberately not destroyed: the workspace's close must free it.
-                            using var key = workspace.GenerateAesKey(label: labels[(t * keysPerRound) + k]);
+                            // Deliberately not destroyed: the session's close must free it.
+                            using var key = session.GenerateAesKey(label: labels[(t * keysPerRound) + k]);
                         }
                     }
                 }
@@ -108,7 +108,7 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
                 return;
             }
 
-            using var searcher = _backend.OpenWorkspace();
+            using var searcher = _backend.OpenSession();
             start.ArriveAndWait();
             int next = t;
             while (Volatile.Read(ref closersRunning) > 0)
@@ -127,7 +127,7 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
             }
         });
 
-        using var check = _backend.OpenWorkspace();
+        using var check = _backend.OpenSession();
         foreach (ObjectTemplate filter in labels.Select(label => ObjectTemplate.Empty().Label(label).Build()))
         {
             using (filter)
@@ -137,21 +137,21 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
     }
 
     /// <summary>
-    /// Disposing a workspace while another thread is mid-call on it must wait for that call and then
+    /// Disposing a session while another thread is mid-call on it must wait for that call and then
     /// close the native session exactly once. The worker may see its call succeed, be refused by the
     /// busy guard while <c>Dispose</c> holds the session (<see cref="InvalidOperationException"/>),
-    /// or find the workspace already disposed (<see cref="ObjectDisposedException"/>); a
+    /// or find the session already disposed (<see cref="ObjectDisposedException"/>); a
     /// <see cref="Pkcs11Exception"/> would mean a native call reached a closed session handle.
     /// </summary>
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public async Task Dispose_RacingInFlightCallsOnTheSameWorkspace_NeverReachesAClosedSession()
+    public async Task Dispose_RacingInFlightCallsOnTheSameSession_NeverReachesAClosedSession()
     {
         const int rounds = 50;
 
         for (int r = 0; r < rounds; r++)
         {
-            var workspace = _backend.OpenWorkspace();
-            var key = workspace.GenerateAesKey();
+            var session = _backend.OpenSession();
+            var key = session.GenerateAesKey();
 
             using var started = new ManualResetEventSlim(false);
             Task worker = OnItsOwnThread(() =>
@@ -161,13 +161,13 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
                 {
                     while (true)
                     {
-                        _ = workspace.GenerateRandom(32);
+                        _ = session.GenerateRandom(32);
                         using var attrs = key.GetAttributeValue(CKA.CKA_VALUE_LEN);
                     }
                 }
                 catch (ObjectDisposedException)
                 {
-                    // Expected end of the loop: the workspace was disposed between calls.
+                    // Expected end of the loop: the session was disposed between calls.
                 }
                 catch (InvalidOperationException ex) when (ex.Message.Contains("Concurrent access", StringComparison.Ordinal))
                 {
@@ -177,7 +177,7 @@ public sealed class SessionParallelTests_Nss(NssBackendFixture backend)
 
             started.Wait(TestContext.Current.CancellationToken);
             Thread.Yield();
-            workspace.Dispose();
+            session.Dispose();
 
             // Anything else the worker threw, a Pkcs11Exception from a closed session included, fails here.
             await worker;

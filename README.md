@@ -61,10 +61,10 @@ using var library = Pkcs11Library.Load("/usr/lib/softhsm/libsofthsm2.so");
 //    buffer that is zeroed on dispose. Read it from a secret manager, not source — and if you can
 //    get it as a char[] rather than a string, pass that: new SecurePin(chars) never makes a string.
 using var pin = new SecurePin(Environment.GetEnvironmentVariable("TOKEN_PIN")!);
-using var workspace = library.OpenWorkspaceWithPin(slotLabel: "my-token", CKU.CKU_USER, pin);
+using var session = library.OpenSessionWithPin(slotLabel: "my-token", CKU.CKU_USER, pin);
 
 // 3. Generate a token-resident RSA signing key pair. The private key is non-extractable by default.
-using var key = workspace.GenerateRsaSigningKeyPair(modulusBits: 3072, label: "signing-key");
+using var key = session.GenerateRsaSigningKeyPair(modulusBits: 3072, label: "signing-key");
 
 // 4. Sign and verify through the familiar System.Security.Cryptography shape (RSA-PSS by default).
 using var rsa = new RSAPkcs11(key);
@@ -73,7 +73,7 @@ byte[] signature = rsa.SignData(message, HashAlgorithmName.SHA256, RSASignatureP
 bool ok = rsa.VerifyData(message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
 ```
 
-Reach for an existing key by label instead of generating one with `workspace.OpenKey("signing-key")`,
+Reach for an existing key by label instead of generating one with `session.OpenKey("signing-key")`,
 and see the [documentation](#documentation) for encryption, wrapping, key derivation, and the
 post-quantum mechanisms.
 
@@ -98,17 +98,17 @@ category.
 The high-level API is **secure by default**. A cryptographic operation whose mechanism is considered
 insecure is rejected before any call reaches the token.
 
-Every workspace enforces a **crypto policy**, chosen when it is opened:
+Every session enforces a **crypto policy**, chosen when it is opened:
 
 ```csharp
 // Default: SecureOnly — refuses broken algorithms, weak keys, and plaintext key export.
-using var workspace = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin);
+using var session = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin);
 
-// FIPS: only NIST-approved functions; overrides are refused for the workspace's lifetime.
-using var fips = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin, CryptoPolicy.FipsOnly);
+// FIPS: only NIST-approved functions; overrides are refused for the session's lifetime.
+using var fips = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, CryptoPolicy.FipsOnly);
 
-// Legacy interop for one operation (not available on a FipsOnly workspace):
-using (workspace.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
+// Legacy interop for one operation (not available on a FipsOnly session):
+using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
 ```
 
 Refusals throw `CryptoPolicyViolationException` (a `CryptographicException`) naming the policy and the
@@ -160,10 +160,10 @@ SecureOnlyPolicy reviewed = CryptoPolicy.SecureOnly.WithAllowedMechanism(
     0x8000_1001UL,                                    // your vendor's CK_MECHANISM_TYPE
     [CryptoOperation.Sign, CryptoOperation.Verify],
     "Vendor HSM signature scheme, reviewed for our release signing.");
-using var workspace = library.OpenWorkspaceWithPin(slotLabel, CKU.CKU_USER, pin, reviewed);
+using var session = library.OpenSessionWithPin(slotLabel, CKU.CKU_USER, pin, reviewed);
 
 // One-off legacy interop: lift the policy for a single, scoped operation.
-using (workspace.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }
+using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* decrypt one legacy archive */ }
 ```
 
 Hashes, curves and key-agreement KDFs cannot be added this way. The generated
@@ -186,7 +186,7 @@ RSA (Bleichenbacher / ROBOT territory), are gated. Prefer RSA-PSS for new code a
 
 ### Key role separation
 
-`Pkcs11Workspace`'s key-generation helpers each grant exactly one role, deliberately. Mixing
+`Pkcs11Session`'s key-generation helpers each grant exactly one role, deliberately. Mixing
 data-processing roles (encrypt/decrypt, sign/verify) with key-management roles (wrap/unwrap) on the
 same key turns the key into a self-service oracle: wrap an extractable key, then decrypt the
 resulting blob with the same key to read it in the clear; or encrypt a chosen plaintext, then unwrap

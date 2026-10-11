@@ -21,7 +21,7 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     private readonly MockBackendFixture _backend = f;
 
     // The four key-producing operations under test. Keyed by name so the [Theory] signature need not
-    // expose the internal Pkcs11Session type. The check fires before the native call; under the
+    // expose the internal Pkcs11SessionCore type. The check fires before the native call; under the
     // AllowInsecure policy the call proceeds to the mock, which fails the dummy/unsupported call with a
     // (non-insecure) Pkcs11Exception.
     // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
@@ -35,7 +35,7 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
          "UnwrapKey", "GenerateKey", "GenerateKeyPair", "CreateObject", "CopyObject"];
 #pragma warning restore CA1825
 
-    private static void Invoke(string operation, Pkcs11Session s, List<ObjectAttribute> template)
+    private static void Invoke(string operation, Pkcs11SessionCore s, List<ObjectAttribute> template)
     {
         switch (operation)
         {
@@ -95,7 +95,7 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
 
     // Opens a logged-in mock session, runs the body, and always closes it — leaking a session on
     // the shared Mock fixture would cascade into the other Mock-collection tests.
-    private void WithSession(Action<Pkcs11Session> body)
+    private void WithSession(Action<Pkcs11SessionCore> body)
     {
         var session = TestKeys.OpenLoggedInSession(_backend);
         try { body(session); }

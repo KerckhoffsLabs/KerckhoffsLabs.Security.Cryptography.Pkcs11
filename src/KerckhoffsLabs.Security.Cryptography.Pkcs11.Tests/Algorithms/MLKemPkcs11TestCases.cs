@@ -31,13 +31,13 @@ internal static class MLKemPkcs11TestCases
     ];
 #pragma warning restore CA1825
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -47,11 +47,11 @@ internal static class MLKemPkcs11TestCases
     // Generates an ML-KEM key pair for the parameter set, wraps it, runs the body, then cleans up.
     // Skips where the backend cannot operate ML-KEM, or where its CKM_ML_KEM_KEY_PAIR_GEN key-size
     // range does not cover this specific parameter set (e.g. NSS only added ML-KEM-512 in 3.129).
-    private static void WithMlKem(IPkcs11Backend backend, CkpMlKem parameterSet, Action<Pkcs11Workspace, MLKemPkcs11> body)
+    private static void WithMlKem(IPkcs11Backend backend, CkpMlKem parameterSet, Action<Pkcs11Session, MLKemPkcs11> body)
     {
         backend.RequireMlKemParameterSet(BclAlgorithm(parameterSet).EncapsulationKeySizeInBytes);
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"mlkem-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -63,11 +63,11 @@ internal static class MLKemPkcs11TestCases
             .Label(label).Id(id)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
-            body(workspace, mlkem);
+            body(session, mlkem);
         }
         finally
         {
@@ -77,27 +77,27 @@ internal static class MLKemPkcs11TestCases
 
     internal static void Assert_Ctor_NonMlKemKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"mlkem-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new MLKemPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_EncapsulateDecapsulate_RoundTrips(IPkcs11Backend backend, CkpMlKem parameterSet) =>
-        WithMlKem(backend, parameterSet, (workspace, mlkem) =>
+        WithMlKem(backend, parameterSet, (session, mlkem) =>
         {
             // Reading the shared secret is the extract-and-destroy path, gated by the secure-defaults policy.
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
             mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecretEnc);
             Assert.Equal(mlkem.Algorithm.CiphertextSizeInBytes, ciphertext.Length);
@@ -124,11 +124,11 @@ internal static class MLKemPkcs11TestCases
         if (!MLKem.IsSupported)
             Assert.Skip("Host BCL cannot operate ML-KEM (needs OpenSSL 3.5+ or a recent Windows).");
 
-        WithMlKem(backend, parameterSet, (workspace, mlkem) =>
+        WithMlKem(backend, parameterSet, (session, mlkem) =>
         {
             // Reading the token's decapsulated secret is the extract-and-destroy path, gated by the
             // secure-defaults policy.
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
             byte[] ek = mlkem.ExportEncapsulationKey();
             using var bcl = MLKem.ImportEncapsulationKey(BclAlgorithm(parameterSet), ek);
@@ -165,7 +165,7 @@ internal static class MLKemPkcs11TestCases
 
     // Regression guard for MLKemPkcs11's per-library CKA_VALUE_LEN quirk cache
     // (Pkcs11Library.MlKemDecapsulateOmitsValueLen): every other case above decapsulates at most once
-    // per key/workspace, so none of them exercises the *cached* branch of DecapsulateCore's switch
+    // per key/session, so none of them exercises the *cached* branch of DecapsulateCore's switch
     // (`bool omit => DecapsulateWith(...)`) at all -- only DecapsulateProbing's first-call path. A bug
     // that swapped the two outcomes in DecapsulateProbing (recording `true` where SoftHSM's rejection
     // should record `false`, or vice versa) would still pass every round-trip test above, because the
@@ -174,17 +174,17 @@ internal static class MLKemPkcs11TestCases
     // a wrong shared secret. Decapsulating twice against the same key forces both branches and pins the
     // exact per-backend value, per the divergence documented on MlKemDecapsulateOmitsValueLen itself.
     internal static void Assert_Decapsulate_CachesValueLenQuirkPerLibrary(IPkcs11Backend backend, bool expectedOmitsValueLen) =>
-        WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (workspace, mlkem) =>
+        WithMlKem(backend, CkpMlKem.CKP_ML_KEM_768, (session, mlkem) =>
         {
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             mlkem.Encapsulate(out byte[] ciphertext, out byte[] sharedSecretEnc);
 
             byte[] first = mlkem.Decapsulate(ciphertext);
             Assert.Equal(sharedSecretEnc, first);
-            Assert.Equal(expectedOmitsValueLen, workspace.Library.MlKemDecapsulateOmitsValueLen);
+            Assert.Equal(expectedOmitsValueLen, session.Library.MlKemDecapsulateOmitsValueLen);
 
             byte[] second = mlkem.Decapsulate(ciphertext);
             Assert.Equal(sharedSecretEnc, second);
-            Assert.Equal(expectedOmitsValueLen, workspace.Library.MlKemDecapsulateOmitsValueLen);
+            Assert.Equal(expectedOmitsValueLen, session.Library.MlKemDecapsulateOmitsValueLen);
         });
 }

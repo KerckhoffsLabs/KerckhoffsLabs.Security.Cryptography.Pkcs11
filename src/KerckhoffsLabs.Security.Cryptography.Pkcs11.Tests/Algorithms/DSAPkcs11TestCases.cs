@@ -45,13 +45,13 @@ internal static class DSAPkcs11TestCases
     private static readonly byte[] G = Convert.FromHexString(
         "74D6E59535228FFB244180ADBE81BE791C7C86A5B7E3E40D9E80ED9EC767F4E781B8B2359BF9DBE520D7B33B157A92994CFC523AD701C01715A9A67219802FF05E581B5DAB2B14BC4CBEBAEF6CD74A35361A03B8BAE5C7D5E708DEE143E3CA745D1DED52AF461175FD02F2A7BD7C159885707B33540748DAD3B2ADF31C24E532F8BC20663A8FF293D137AA2326C63BCAB9835F716284A5E09CEEF50D8F0B8E33F258E662BC9F6BA4AF996F30898F27CCCF4377A71547B7FF3FF56310D5194766B4BBCDDC5D11928A46BDA6E57BABAA905F8B7184B3906F1AECE20F2B5A7016422B5C52012B0F21EAC655054FAC6F1A56741BB7FDFED40A8B524314EFF8E94B93");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -65,12 +65,12 @@ internal static class DSAPkcs11TestCases
     private static void WithDsa(IPkcs11Backend backend, Action<DSAPkcs11> body)
         => WithDsa(backend, allowInsecure: true, (_, dsa) => body(dsa));
 
-    private static void WithDsa(IPkcs11Backend backend, bool allowInsecure, Action<Pkcs11Workspace, DSAPkcs11> body)
+    private static void WithDsa(IPkcs11Backend backend, bool allowInsecure, Action<Pkcs11Session, DSAPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DSA))
             Assert.Skip("Backend does not advertise CKM_DSA.");
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"dsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -86,19 +86,19 @@ internal static class DSAPkcs11TestCases
         // SecureOnly documents CKM_DSA_KEY_PAIR_GEN as refused, so key generation always opts in; the
         // body's own lease below decides whether the sign/verify under test does.
         Pkcs11Key generated;
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11009 // DSA key generation is the set-up under test
-            generated = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+            generated = session.GenerateKeyPair(new Mechanism(CKM.CKM_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
 #pragma warning restore KLPKCS11009
         }
 
         using var key = generated;
-        using IDisposable? insecure = allowInsecure ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using IDisposable? insecure = allowInsecure ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         try
         {
             using var dsa = new DSAPkcs11(key);
-            body(workspace, dsa);
+            body(session, dsa);
         }
         finally
         {
@@ -108,20 +108,20 @@ internal static class DSAPkcs11TestCases
 
     internal static void Assert_Ctor_NonDsaKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"dsa-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new DSAPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_SignVerifyData_RoundTrips(IPkcs11Backend backend) =>

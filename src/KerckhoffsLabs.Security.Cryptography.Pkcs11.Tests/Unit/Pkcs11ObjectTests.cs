@@ -21,13 +21,13 @@ public sealed class Pkcs11ObjectTests
     public void FindObjects_DataObject_ExposesClassLabelIdAndValue()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         string label = NewLabel();
         ObjectHandle handle;
         using (var tpl = ObjectTemplate.ForData().Label(label).Id([0x01, 0x02]).Value(Payload).Build())
-            handle = workspace.Session.CreateObject([.. tpl.Attributes]);
+            handle = session.Core.CreateObject([.. tpl.Attributes]);
 
-        using var objects = FindByLabel(workspace, label);
+        using var objects = FindByLabel(session, label);
 
         var obj = Assert.Single(objects);
         Assert.Equal(handle, obj.Handle);
@@ -41,11 +41,11 @@ public sealed class Pkcs11ObjectTests
     public void FindObjects_ObjectWithoutLabelOrId_ReportsNullLabelAndEmptyId()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         byte[] marker = NewMarker();
-        CreateBareDataObject(workspace, marker);
+        CreateBareDataObject(session, marker);
 
-        using var objects = FindByApplication(workspace, marker);
+        using var objects = FindByApplication(session, marker);
 
         var obj = Assert.Single(objects);
         Assert.Null(obj.Label);
@@ -60,11 +60,11 @@ public sealed class Pkcs11ObjectTests
     public void GetValue_WhenValueIsUnreadable_ThrowsAttributeSensitive()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         byte[] marker = NewMarker();
-        CreateBareDataObject(workspace, marker);
+        CreateBareDataObject(session, marker);
 
-        using var objects = FindByApplication(workspace, marker);
+        using var objects = FindByApplication(session, marker);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Assert.Single(objects).GetValue());
         Assert.Equal(CKR.CKR_ATTRIBUTE_SENSITIVE, ex.ReturnValue);
@@ -74,15 +74,15 @@ public sealed class Pkcs11ObjectTests
     public void Destroy_RemovesTheObjectFromTheToken()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         string label = NewLabel();
         using (var tpl = ObjectTemplate.ForData().Label(label).Value(Payload).Build())
-            workspace.Session.CreateObject([.. tpl.Attributes]);
+            session.Core.CreateObject([.. tpl.Attributes]);
 
-        using (var objects = FindByLabel(workspace, label))
+        using (var objects = FindByLabel(session, label))
             Assert.Single(objects).Destroy();
 
-        using var after = FindByLabel(workspace, label);
+        using var after = FindByLabel(session, label);
         Assert.Empty(after);
     }
 
@@ -91,12 +91,12 @@ public sealed class Pkcs11ObjectTests
     {
         var token = new ManagedSoftToken();
         using var library = token.Load();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         string label = NewLabel();
         using (var tpl = ObjectTemplate.ForData().Label(label).Value(Payload).Build())
-            workspace.Session.CreateObject([.. tpl.Attributes]);
+            session.Core.CreateObject([.. tpl.Attributes]);
 
-        using (var objects = FindByLabel(workspace, label))
+        using (var objects = FindByLabel(session, label))
         {
             token.DestroyObjectResultOverride = CKR.CKR_ACTION_PROHIBITED;
             try
@@ -110,7 +110,7 @@ public sealed class Pkcs11ObjectTests
             }
         }
 
-        using var after = FindByLabel(workspace, label);
+        using var after = FindByLabel(session, label);
         Assert.Single(after);
     }
 
@@ -122,12 +122,12 @@ public sealed class Pkcs11ObjectTests
     public void DisposedView_RefusesGetValueAndDestroy_AndLeavesTheObject()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         string label = NewLabel();
         using (var tpl = ObjectTemplate.ForData().Label(label).Value(Payload).Build())
-            workspace.Session.CreateObject([.. tpl.Attributes]);
+            session.Core.CreateObject([.. tpl.Attributes]);
 
-        using (var objects = FindByLabel(workspace, label))
+        using (var objects = FindByLabel(session, label))
         {
             var obj = Assert.Single(objects);
             obj.Dispose();
@@ -137,7 +137,7 @@ public sealed class Pkcs11ObjectTests
             Assert.Null(Record.Exception(obj.Dispose));
         }
 
-        using var after = FindByLabel(workspace, label);
+        using var after = FindByLabel(session, label);
         Assert.Single(after);
     }
 
@@ -147,9 +147,9 @@ public sealed class Pkcs11ObjectTests
     public void Constructor_NullId_IsExposedAsEmpty()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
-        using var obj = new Pkcs11Object(workspace, ObjectHandle.Invalid, CKO.CKO_DATA, label: null, id: null!);
+        using var obj = new Pkcs11Object(session, ObjectHandle.Invalid, CKO.CKO_DATA, label: null, id: null!);
 
         Assert.True(obj.Id.IsEmpty);
     }
@@ -159,21 +159,21 @@ public sealed class Pkcs11ObjectTests
     private static byte[] NewMarker() => Guid.NewGuid().ToByteArray();
 
     // A data object with no label, id or value, tagged with CKA_APPLICATION so it can be found again.
-    private static void CreateBareDataObject(Pkcs11Workspace workspace, byte[] marker)
+    private static void CreateBareDataObject(Pkcs11Session session, byte[] marker)
     {
         using var tpl = ObjectTemplate.ForData().Attribute(CKA.CKA_APPLICATION, marker).Build();
-        workspace.Session.CreateObject([.. tpl.Attributes]);
+        session.Core.CreateObject([.. tpl.Attributes]);
     }
 
-    private static ReadOnlyDisposableList<Pkcs11Object> FindByLabel(Pkcs11Workspace workspace, string label)
+    private static ReadOnlyDisposableList<Pkcs11Object> FindByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        return workspace.FindObjects(filter);
+        return session.FindObjects(filter);
     }
 
-    private static ReadOnlyDisposableList<Pkcs11Object> FindByApplication(Pkcs11Workspace workspace, byte[] marker)
+    private static ReadOnlyDisposableList<Pkcs11Object> FindByApplication(Pkcs11Session session, byte[] marker)
     {
         using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_APPLICATION, marker).Build();
-        return workspace.FindObjects(filter);
+        return session.FindObjects(filter);
     }
 }

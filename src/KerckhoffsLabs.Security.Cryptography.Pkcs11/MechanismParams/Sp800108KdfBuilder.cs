@@ -102,8 +102,8 @@ public sealed class Sp800108KdfBuilder
     /// (<c>CK_SP800_108_KEY_HANDLE</c>), without the value ever leaving the token.
     /// </summary>
     /// <remarks>
-    /// <paramref name="key"/> must come from the workspace that performs the derive; it is resolved to
-    /// its object handle when the operation runs, and a disposed key or one from another workspace is
+    /// <paramref name="key"/> must come from the session that performs the derive; it is resolved to
+    /// its object handle when the operation runs, and a disposed key or one from another session is
     /// refused there.
     /// </remarks>
     /// <param name="key">The key whose value is spliced in.</param>

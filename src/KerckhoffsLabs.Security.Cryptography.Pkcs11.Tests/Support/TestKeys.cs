@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 /// </summary>
 internal static class TestKeys
 {
-    public static ObjectHandle CreateAes256Key(Pkcs11Session session, byte[] rawKey)
+    public static ObjectHandle CreateAes256Key(Pkcs11SessionCore session, byte[] rawKey)
     {
         if (rawKey.Length != 32)
             throw new ArgumentException("AES-256 key must be 32 bytes.", nameof(rawKey));
@@ -33,7 +33,7 @@ internal static class TestKeys
     /// <summary>
     /// Generates a random 256-bit AES key with wrap/unwrap usage — a session-only KEK.
     /// </summary>
-    public static ObjectHandle GenerateAes256WrappingKey(Pkcs11Session session)
+    public static ObjectHandle GenerateAes256WrappingKey(Pkcs11SessionCore session)
     {
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
@@ -48,7 +48,7 @@ internal static class TestKeys
         return session.GenerateKey(mechanism, template);
     }
 
-    public static ObjectHandle CreateChaCha20Key(Pkcs11Session session, byte[] rawKey)
+    public static ObjectHandle CreateChaCha20Key(Pkcs11SessionCore session, byte[] rawKey)
     {
         if (rawKey.Length != 32)
             throw new ArgumentException("ChaCha20 key must be 32 bytes.", nameof(rawKey));
@@ -68,7 +68,7 @@ internal static class TestKeys
     /// <summary>
     /// Imports a generic-secret key with a known value (e.g. for HMAC known-answer tests).
     /// </summary>
-    public static ObjectHandle CreateGenericSecretKey(Pkcs11Session session, byte[] rawKey)
+    public static ObjectHandle CreateGenericSecretKey(Pkcs11SessionCore session, byte[] rawKey)
     {
         using var attrClass = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var attrKeyType = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
@@ -88,7 +88,7 @@ internal static class TestKeys
     /// <summary>
     /// Imports an Ed25519 private key from its 32-byte seed (RFC 8032 secret scalar input).
     /// </summary>
-    public static ObjectHandle CreateEd25519PrivateKey(Pkcs11Session session, byte[] seed)
+    public static ObjectHandle CreateEd25519PrivateKey(Pkcs11SessionCore session, byte[] seed)
     {
         if (seed.Length != 32)
             throw new ArgumentException("Ed25519 seed must be 32 bytes.", nameof(seed));
@@ -109,7 +109,7 @@ internal static class TestKeys
     /// Imports an Ed25519 public key from its 32-byte encoded point (RFC 8032 public key).
     /// CKA_EC_POINT is the point wrapped in a DER OCTET STRING, per PKCS#11 EdDSA.
     /// </summary>
-    public static ObjectHandle CreateEd25519PublicKey(Pkcs11Session session, byte[] point)
+    public static ObjectHandle CreateEd25519PublicKey(Pkcs11SessionCore session, byte[] point)
     {
         if (point.Length != 32)
             throw new ArgumentException("Ed25519 public point must be 32 bytes.", nameof(point));
@@ -131,11 +131,11 @@ internal static class TestKeys
     /// Opens a R/W session on the backend's slot, authenticated per the backend's model (a normal-user
     /// login on most backends; no login on a login-not-required token). Caller disposes.
     /// </summary>
-    public static Pkcs11Session OpenLoggedInSession(IPkcs11Backend backend)
+    public static Pkcs11SessionCore OpenLoggedInSession(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         try
         {
             if (backend.RequiresUserLogin)
@@ -158,7 +158,7 @@ internal static class TestKeys
     /// <c>C_Logout</c> would return <c>CKR_USER_NOT_LOGGED_IN</c>; this no-ops there. Lets the shared
     /// test cases tear down uniformly across both auth models.
     /// </summary>
-    public static void LogoutIfRequired(IPkcs11Backend backend, Pkcs11Session session)
+    public static void LogoutIfRequired(IPkcs11Backend backend, Pkcs11SessionCore session)
     {
         if (backend.RequiresUserLogin)
             session.Logout();
@@ -168,7 +168,7 @@ internal static class TestKeys
     /// Generates an RSA-2048 key pair as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048KeyPair(Pkcs11Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048KeyPair(Pkcs11SessionCore session)
     {
         var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
@@ -200,7 +200,7 @@ internal static class TestKeys
     /// Generates an RSA-2048 key pair configured for sign/verify (CKA_SIGN + CKA_VERIFY) as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048SigningKeyPair(Pkcs11Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateRsa2048SigningKeyPair(Pkcs11SessionCore session)
     {
         var mechanism = new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
 
@@ -243,14 +243,14 @@ internal static class TestKeys
     /// Generates an EC key pair on the P-256 (secp256r1) curve as session objects.
     /// Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcP256KeyPair(Pkcs11Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcP256KeyPair(Pkcs11SessionCore session)
         => GenerateEcKeyPair(session, EcP256Oid);
 
     /// <summary>
     /// Generates an EC key pair on the curve identified by the DER-encoded
     /// <paramref name="ecParams"/> OID, as session objects. Returns (publicHandle, privateHandle).
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(Pkcs11Session session, byte[] ecParams)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEcKeyPair(Pkcs11SessionCore session, byte[] ecParams)
     {
         var mechanism = new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN);
 
@@ -277,7 +277,7 @@ internal static class TestKeys
     /// Generates an Ed25519 key pair as session objects.
     /// Returns (publicHandle, privateHandle). Requires SoftHSM2 2.6+; not supported by pkcs11-mock.
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd25519KeyPair(Pkcs11Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd25519KeyPair(Pkcs11SessionCore session)
     {
         var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
 
@@ -308,7 +308,7 @@ internal static class TestKeys
     /// Generates an Ed448 key pair as session objects.
     /// Returns (publicHandle, privateHandle). Requires SoftHSM2 2.6+; not supported by pkcs11-mock.
     /// </summary>
-    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd448KeyPair(Pkcs11Session session)
+    public static (ObjectHandle pub, ObjectHandle priv) GenerateEd448KeyPair(Pkcs11SessionCore session)
     {
         var mechanism = new Mechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
 
@@ -338,7 +338,7 @@ internal static class TestKeys
     // === Fixed-key imports for known-answer tests =========================================
 
     /// <summary>Imports an RSA public key from its big-endian modulus and exponent (verify/encrypt).</summary>
-    public static ObjectHandle ImportRsaPublicKey(Pkcs11Session session, byte[] modulus, byte[] exponent)
+    public static ObjectHandle ImportRsaPublicKey(Pkcs11SessionCore session, byte[] modulus, byte[] exponent)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_RSA);
@@ -352,7 +352,7 @@ internal static class TestKeys
 
     /// <summary>Imports an RSA private key from its CRT components (big-endian), usable for decrypt.</summary>
     public static ObjectHandle ImportRsaPrivateKey(
-        Pkcs11Session session, byte[] modulus, byte[] publicExponent, byte[] privateExponent,
+        Pkcs11SessionCore session, byte[] modulus, byte[] publicExponent, byte[] privateExponent,
         byte[] prime1, byte[] prime2, byte[] exponent1, byte[] exponent2, byte[] coefficient)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
@@ -381,7 +381,7 @@ internal static class TestKeys
     }
 
     /// <summary>Imports a NIST P-256 public key from its affine coordinates (verify/derive peer).</summary>
-    public static ObjectHandle ImportEcP256PublicKey(Pkcs11Session session, byte[] x, byte[] y)
+    public static ObjectHandle ImportEcP256PublicKey(Pkcs11SessionCore session, byte[] x, byte[] y)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PUBLIC_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
@@ -393,7 +393,7 @@ internal static class TestKeys
     }
 
     /// <summary>Imports a NIST P-256 private key from its scalar (big-endian), usable for ECDH derive.</summary>
-    public static ObjectHandle ImportEcP256PrivateKey(Pkcs11Session session, byte[] scalar)
+    public static ObjectHandle ImportEcP256PrivateKey(Pkcs11SessionCore session, byte[] scalar)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_PRIVATE_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_EC);
@@ -405,7 +405,7 @@ internal static class TestKeys
     }
 
     /// <summary>Imports an AES key wrapping key (CKA_WRAP/CKA_UNWRAP) from raw bytes.</summary>
-    public static ObjectHandle ImportAesWrappingKey(Pkcs11Session session, byte[] rawKey)
+    public static ObjectHandle ImportAesWrappingKey(Pkcs11SessionCore session, byte[] rawKey)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
@@ -417,7 +417,7 @@ internal static class TestKeys
     }
 
     /// <summary>Imports an extractable AES key (a wrap target) from raw bytes.</summary>
-    public static ObjectHandle ImportExtractableAesKey(Pkcs11Session session, byte[] rawKey)
+    public static ObjectHandle ImportExtractableAesKey(Pkcs11SessionCore session, byte[] rawKey)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);

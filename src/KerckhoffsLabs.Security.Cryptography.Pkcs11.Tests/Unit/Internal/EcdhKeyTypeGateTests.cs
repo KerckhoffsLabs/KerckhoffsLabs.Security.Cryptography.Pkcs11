@@ -50,7 +50,7 @@ public sealed class EcdhKeyTypeGateTests
         }
     }
 
-    private static void Derive(Pkcs11Session session, CKM type = CKM.CKM_ECDH1_DERIVE)
+    private static void Derive(Pkcs11SessionCore session, CKM type = CKM.CKM_ECDH1_DERIVE)
     {
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         var mechanism = new Mechanism(type, new CkmEcdh1DeriveParams(CKD.CKD_SHA256_KDF, PeerPoint));

@@ -16,7 +16,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </summary>
 /// <remarks>
 /// <para><b>Lifetime contract:</b> the <see cref="Pkcs11Library"/> must outlive every
-/// <c>Pkcs11Session</c> and <see cref="Pkcs11Workspace"/> it produces. Disposing the library
+/// <c>Pkcs11SessionCore</c> and <see cref="Pkcs11Session"/> it produces. Disposing the library
 /// while sessions are open is supported as a safety net — <see cref="Dispose()"/> closes
 /// every tracked session before <c>C_Finalize</c> — but is not a substitute for orderly
 /// cleanup. Failure to dispose sessions first is a caller bug that delays graceful release.</para>
@@ -30,7 +30,7 @@ public sealed class Pkcs11Library : IDisposable
     /// <summary>
     /// The factory this instance was constructed with, or <see langword="null"/> when none was
     /// given and the instance does not log. Handed down to every <see cref="Pkcs11Slot"/> and
-    /// <c>Pkcs11Session</c> this library produces, so a whole library/slot/session chain shares one
+    /// <c>Pkcs11SessionCore</c> this library produces, so a whole library/slot/session chain shares one
     /// logging setup, configured per instance — there is no process-wide logging state.
     /// </summary>
     private readonly ILoggerFactory? _loggerFactory;
@@ -500,30 +500,30 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Opens an authenticated workspace against the slot whose token label matches
+    /// Opens an authenticated session against the slot whose token label matches
     /// <paramref name="slotLabel"/>.
     /// </summary>
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
     /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
-    /// <param name="pin">The PIN. The workspace does not retain the PIN past construction.</param>
-    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <param name="pin">The PIN. The session does not retain the PIN past construction.</param>
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
+    /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> or <paramref name="pin"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Workspace OpenWorkspaceWithPin(string slotLabel, CKU userType, SecurePin pin, ICryptoPolicy? policy = null)
+    public Pkcs11Session OpenSessionWithPin(string slotLabel, CKU userType, SecurePin pin, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
         ArgumentNullException.ThrowIfNull(pin);
 
         Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSession(policy: policy);
+        var session = matched.OpenSessionCore(policy: policy);
         try
         {
             session.Login(userType, pin);
-            return new Pkcs11Workspace(this, matched, session);
+            return new Pkcs11Session(this, matched, session);
         }
         catch
         {
@@ -533,7 +533,7 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Opens an authenticated workspace against the slot whose token label matches
+    /// Opens an authenticated session against the slot whose token label matches
     /// <paramref name="slotLabel"/>, logging in via the token's own pinpad rather than an
     /// application-supplied PIN. For tokens advertising <see cref="TokenFlags.ProtectedAuthenticationPath"/>
     /// — the PIN is entered on the device itself, and PKCS#11 signals this to the token by calling
@@ -543,22 +543,22 @@ public sealed class Pkcs11Library : IDisposable
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing
     /// spaces — PKCS#11 pads labels with spaces to 32 chars).</param>
     /// <param name="userType">The PKCS#11 user type to log in as.</param>
-    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
+    /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying PKCS#11 calls.</exception>
-    public Pkcs11Workspace OpenWorkspaceWithPinpad(string slotLabel, CKU userType, ICryptoPolicy? policy = null)
+    public Pkcs11Session OpenSessionWithPinpad(string slotLabel, CKU userType, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
 
         Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSession(policy: policy);
+        var session = matched.OpenSessionCore(policy: policy);
         try
         {
             session.Login(userType);
-            return new Pkcs11Workspace(this, matched, session);
+            return new Pkcs11Session(this, matched, session);
         }
         catch
         {
@@ -568,7 +568,7 @@ public sealed class Pkcs11Library : IDisposable
     }
 
     /// <summary>
-    /// Opens a workspace against the slot whose token label matches <paramref name="slotLabel"/>
+    /// Opens a session against the slot whose token label matches <paramref name="slotLabel"/>
     /// <em>without</em> logging in. For tokens that do not require authentication — the token's
     /// <c>CKF_LOGIN_REQUIRED</c> flag is clear (e.g. a software token's public crypto services) —
     /// where a <c>C_Login</c> call would be rejected with <see cref="CKR.CKR_USER_TYPE_INVALID"/>.
@@ -576,21 +576,21 @@ public sealed class Pkcs11Library : IDisposable
     /// (hashing, and operations on session-lifetime keys).
     /// </summary>
     /// <param name="slotLabel">The token label (case-sensitive, trimmed of trailing spaces).</param>
-    /// <param name="policy">The crypto policy the workspace enforces. <see langword="null"/> means
+    /// <param name="policy">The crypto policy the session enforces. <see langword="null"/> means
     /// <see cref="CryptoPolicy.SecureOnly"/>. See <see cref="ICryptoPolicy"/>.</param>
-    /// <returns>An open <see cref="Pkcs11Workspace"/>. Callers must <c>Dispose</c> it.</returns>
+    /// <returns>An open <see cref="Pkcs11Session"/>. Callers must <c>Dispose</c> it.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="slotLabel"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown if no slot with a matching token label is present.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_OpenSession</c> call.</exception>
-    public Pkcs11Workspace OpenWorkspaceWithoutLogin(string slotLabel, ICryptoPolicy? policy = null)
+    public Pkcs11Session OpenSessionWithoutLogin(string slotLabel, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(slotLabel);
 
         Pkcs11Slot matched = MatchSlotByLabel(slotLabel);
-        var session = matched.OpenSession(policy: policy);
+        var session = matched.OpenSessionCore(policy: policy);
         try
         {
-            return new Pkcs11Workspace(this, matched, session);
+            return new Pkcs11Session(this, matched, session);
         }
         catch
         {

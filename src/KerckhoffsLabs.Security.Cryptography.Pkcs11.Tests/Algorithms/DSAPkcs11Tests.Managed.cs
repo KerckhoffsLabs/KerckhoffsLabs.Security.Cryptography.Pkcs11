@@ -46,10 +46,10 @@ public sealed class DSAPkcs11Tests_Managed
     private static void WithDsa(Action<DSAPkcs11, DSA> body)
         => WithDsa((dsa, bcl, _) => body(dsa, bcl));
 
-    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Workspace> body)
+    private static void WithDsa(Action<DSAPkcs11, DSA, Pkcs11Session> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
         using var bcl = DSA.Create(2048);
         DSAParameters full = bcl.ExportParameters(includePrivateParameters: true);
@@ -63,16 +63,16 @@ public sealed class DSAPkcs11Tests_Managed
             .Attribute(CKA.CKA_PRIME, full.P!).Attribute(CKA.CKA_SUBPRIME, full.Q!)
             .Attribute(CKA.CKA_BASE, full.G!).Attribute(CKA.CKA_VALUE, full.Y!)
             .Verify().Build();
-        _ = workspace.ImportKey(pubTpl);
+        _ = session.ImportKey(pubTpl);
 
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_DSA)
             .Label(label).Id(id)
             .Attribute(CKA.CKA_PRIME, full.P!).Attribute(CKA.CKA_SUBPRIME, full.Q!)
             .Attribute(CKA.CKA_BASE, full.G!).Attribute(CKA.CKA_VALUE, full.X!)
             .Sign().Build();
-        using var key = workspace.ImportKey(privTpl);
+        using var key = session.ImportKey(privTpl);
         using var dsa = new DSAPkcs11(key);
-        body(dsa, bcl, workspace);
+        body(dsa, bcl, session);
     }
 
     // === Sign / verify data: on-token round-trip + tamper rejection =======================
@@ -81,12 +81,12 @@ public sealed class DSAPkcs11Tests_Managed
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
-    public void SignVerifyData_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _, workspace) =>
+    public void SignVerifyData_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _, session) =>
     {
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes($"dsa round trip over {hashName}");
         // DSA is FIPS-186-5-disallowed and gated at the mechanism layer; opt in to exercise it.
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = dsa.SignData(data, hash);
             Assert.True(dsa.VerifyData(data, sig, hash));
@@ -121,13 +121,13 @@ public sealed class DSAPkcs11Tests_Managed
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
-    public void TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _, workspace) =>
+    public void TrySignData_VerifyDataSpan_RoundTrips_AndRejectsTampering(string hashName) => WithDsa((dsa, _, session) =>
     {
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes($"span-based dsa round trip over {hashName}");
         Span<byte> destination = new byte[256];
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             Assert.True(dsa.TrySignData(data, destination, hash, out int bytesWritten));
             byte[] sig = destination[..bytesWritten].ToArray();
@@ -145,10 +145,10 @@ public sealed class DSAPkcs11Tests_Managed
     });
 
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
-    public void TrySignData_DestinationTooSmall_ReturnsFalse() => WithDsa((dsa, _, workspace) =>
+    public void TrySignData_DestinationTooSmall_ReturnsFalse() => WithDsa((dsa, _, session) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("destination too small");
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             bool ok = dsa.TrySignData(data, [], HashAlgorithmName.SHA256, out int bytesWritten);
             Assert.False(ok);
@@ -160,10 +160,10 @@ public sealed class DSAPkcs11Tests_Managed
     // adapter's own managed-fallback HashData helper has no SHA224 case — a real gap, surfaced only
     // via the fallback branch a backend without CKM_DSA_SHA224 support takes.
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
-    public void TrySignData_Sha224_ThrowsNotSupported_ViaManagedFallbackHasher() => WithDsa((dsa, _, workspace) =>
+    public void TrySignData_Sha224_ThrowsNotSupported_ViaManagedFallbackHasher() => WithDsa((dsa, _, session) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("sha224 is not in HashData's switch");
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             var ex = Assert.Throws<NotSupportedException>(
                 () => dsa.TrySignData(data, new byte[256], new HashAlgorithmName("SHA224"), out int unused));
@@ -190,12 +190,12 @@ public sealed class DSAPkcs11Tests_Managed
     [InlineData("SHA256")]
     [InlineData("SHA384")]
     [InlineData("SHA512")]
-    public void SignData_VerifiesUnderBclWithExportedPublicKey(string hashName) => WithDsa((dsa, _, workspace) =>
+    public void SignData_VerifiesUnderBclWithExportedPublicKey(string hashName) => WithDsa((dsa, _, session) =>
     {
         var hash = new HashAlgorithmName(hashName);
         byte[] data = Encoding.UTF8.GetBytes("interop with the BCL");
         byte[] sig;
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = dsa.SignData(data, hash);
 
         // Export the token's public parameters and verify the token signature with the BCL.
@@ -207,21 +207,21 @@ public sealed class DSAPkcs11Tests_Managed
 
     // Reverse direction: a signature produced by the originating BCL key must verify on-token.
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
-    public void VerifyData_BclSignature_OnToken() => WithDsa((dsa, bcl, workspace) =>
+    public void VerifyData_BclSignature_OnToken() => WithDsa((dsa, bcl, session) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("signed by the BCL, verified on the token");
         byte[] sig = bcl.SignData(data, HashAlgorithmName.SHA256);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.True(dsa.VerifyData(data, sig, HashAlgorithmName.SHA256));
     });
 
     // === Sign / verify a hash: raw CKM_DSA, IEEE P1363 (r‖s) ==============================
 
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
-    public void CreateSignature_VerifySignature_OverHash_RoundTrips() => WithDsa((dsa, _, workspace) =>
+    public void CreateSignature_VerifySignature_OverHash_RoundTrips() => WithDsa((dsa, _, session) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("hash to sign"));
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = dsa.CreateSignature(hash);
             Assert.True(dsa.VerifySignature(hash, sig));
@@ -238,11 +238,11 @@ public sealed class DSAPkcs11Tests_Managed
 
     // The raw-hash signature must also verify under the BCL public key.
     [Fact(SkipUnless = nameof(DsaSupported), Skip = "Requires " + nameof(DsaSupported))]
-    public void CreateSignature_VerifiesUnderBcl() => WithDsa((dsa, _, workspace) =>
+    public void CreateSignature_VerifiesUnderBcl() => WithDsa((dsa, _, session) =>
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("raw hash interop"));
         byte[] sig;
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = dsa.CreateSignature(hash);
 
         DSAParameters pub = dsa.ExportParameters(includePrivateParameters: false);
@@ -293,10 +293,10 @@ public sealed class DSAPkcs11Tests_Managed
     public void Ctor_NonDsaKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new DSAPkcs11(key));
         Assert.Equal("key", ex.ParamName);

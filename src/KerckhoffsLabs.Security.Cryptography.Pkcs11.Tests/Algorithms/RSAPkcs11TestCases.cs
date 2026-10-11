@@ -22,10 +22,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 internal static class RSAPkcs11TestCases
 {
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static Pkcs11Key GenerateRsaKey(Pkcs11Workspace workspace, int modulusBits = 2048)
+    private static Pkcs11Key GenerateRsaKey(Pkcs11Session session, int modulusBits = 2048)
     {
         string label = $"rsa-prov-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -36,13 +36,13 @@ internal static class RSAPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Decrypt().Build();
 
-        return workspace.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
+        return session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
     }
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -83,17 +83,17 @@ internal static class RSAPkcs11TestCases
         }
     }
 
-    // Generates a 2048-bit RSA key pair, wraps it as RSAPkcs11, runs the body with the workspace
+    // Generates a 2048-bit RSA key pair, wraps it as RSAPkcs11, runs the body with the session
     // (some tests need UsePolicy(CryptoPolicy.AllowInsecure)) and the adapter, then destroys both objects.
-    private static void WithRsa(IPkcs11Backend backend, Action<Pkcs11Workspace, RSAPkcs11> body)
+    private static void WithRsa(IPkcs11Backend backend, Action<Pkcs11Session, RSAPkcs11> body)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN);
-        using var workspace = OpenWorkspace(backend);
-        using var key = GenerateRsaKey(workspace);
+        using var session = OpenSession(backend);
+        using var key = GenerateRsaKey(session);
         try
         {
             using var rsa = new RSAPkcs11(key);
-            body(workspace, rsa);
+            body(session, rsa);
         }
         finally
         {
@@ -107,20 +107,20 @@ internal static class RSAPkcs11TestCases
 
     internal static void Assert_Ctor_NonRsaKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"rsa-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new RSAPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // Large RSA key generation (8192/16384) is only exercised on the Linux x64 CI leg (ubuntu-latest):
@@ -138,9 +138,9 @@ internal static class RSAPkcs11TestCases
             Assert.Skip($"RSA-{modulusBits} keygen is restricted to the Linux x64 CI leg (too slow elsewhere).");
 
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN, CKM.CKM_SHA256_RSA_PKCS_PSS);
-        using var workspace = OpenWorkspace(backend);
-        using IDisposable? insecure = modulusBits < 2048 ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
-        using var key = GenerateRsaKey(workspace, modulusBits);
+        using var session = OpenSession(backend);
+        using IDisposable? insecure = modulusBits < 2048 ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using var key = GenerateRsaKey(session, modulusBits);
         try
         {
             using var rsa = new RSAPkcs11(key);
@@ -209,9 +209,9 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_SignVerifyData_Sha224Pkcs1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_SHA224_RSA_PKCS);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 var hash = new HashAlgorithmName("SHA224");
                 byte[] data = Encoding.UTF8.GetBytes("sha224 pkcs1 payload");
@@ -232,9 +232,9 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_SignVerifyData_Sha224Pss_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_SHA224_RSA_PKCS_PSS);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 var hash = new HashAlgorithmName("SHA224");
                 byte[] data = Encoding.UTF8.GetBytes("sha224 pss payload");
@@ -333,9 +333,9 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_EncryptDecrypt_OaepSha1_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha1 payload");
                 byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.OaepSHA1);
@@ -353,9 +353,9 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_EncryptDecrypt_OaepSha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 var padding = RSAEncryptionPadding.CreateOaep(new HashAlgorithmName("SHA224"));
                 byte[] plaintext = Encoding.UTF8.GetBytes("oaep-sha224 payload");
@@ -375,10 +375,10 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_EncryptDecrypt_Pkcs1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("pkcs1 payload");
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] ct = rsa.Encrypt(plaintext, RSAEncryptionPadding.Pkcs1);
                 byte[] recovered = rsa.Decrypt(ct, RSAEncryptionPadding.Pkcs1);
@@ -424,9 +424,9 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_Decrypt_TamperedOaepCiphertext_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] ct = rsa.Encrypt(Encoding.UTF8.GetBytes("integrity matters"), RSAEncryptionPadding.OaepSHA1);
                 ct[ct.Length / 2] ^= 0xFF; // flip one ciphertext byte
@@ -439,12 +439,12 @@ internal static class RSAPkcs11TestCases
     internal static void Assert_Decrypt_OaepCiphertextFromDifferentKey_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_RSA_PKCS_OAEP);
-        WithRsa(backend, (workspace, rsa) =>
+        WithRsa(backend, (session, rsa) =>
         {
-            using Pkcs11Key other = GenerateRsaKey(workspace);
+            using Pkcs11Key other = GenerateRsaKey(session);
             try
             {
-                using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+                using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 {
                     using var otherRsa = new RSAPkcs11(other);
                     byte[] ct = otherRsa.Encrypt(Encoding.UTF8.GetBytes("for the other key"), RSAEncryptionPadding.OaepSHA1);

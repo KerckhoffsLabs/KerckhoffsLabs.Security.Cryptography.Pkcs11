@@ -68,8 +68,8 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
     {
         RequireIbmMlDsa();
 
-        // OpenWorkspace is a default interface method, so it is reached through IPkcs11Backend.
-        using var workspace = ((IPkcs11Backend)_backend).OpenWorkspace();
+        // OpenSession is a default interface method, so it is reached through IPkcs11Backend.
+        using var session = ((IPkcs11Backend)_backend).OpenSession();
         string label = $"ibm-mldsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -79,10 +79,10 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         // SecureOnly denies every vendor mechanism it has not been told about; the parameter block, not
         // the policy, is under test here.
-        using var vendorOptIn = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var vendorOptIn = session.UsePolicy(CryptoPolicy.AllowInsecure);
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("vendor parameter block, built by the library");

@@ -23,8 +23,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void ComputeHash_KnownAnswer_MatchesFips202Vector()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes("abc"));
 
@@ -38,8 +38,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void ComputeHash_KnownAnswer_EmptyInput()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         // NIST: SHA3-256("") = a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a
         byte[] digest = sha.ComputeHash([]);
@@ -55,8 +55,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void ComputeHash_MatchesBclSha3_256()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         Assert.Equal(SHA3_256.HashData(data), sha.ComputeHash(data));
@@ -66,8 +66,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] data = RandomNumberGenerator.GetBytes(1024);
         Assert.Equal(SHA3_256.HashData(data), sha.ComputeHash(data));
@@ -79,8 +79,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] part1 = Encoding.UTF8.GetBytes("hello ");
         byte[] part2 = Encoding.UTF8.GetBytes("world");
@@ -95,8 +95,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void ComputeHash_ManyBlocks_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] whole = RandomNumberGenerator.GetBytes(300);
         // Feed in irregular chunks; the buffered one-shot must equal a single hash of the whole.
@@ -118,8 +118,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] first = sha.ComputeHash(Encoding.UTF8.GetBytes("one"));
         byte[] second = sha.ComputeHash(Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize
@@ -131,8 +131,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void Initialize_DiscardsBufferedInput()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         byte[] stale = Encoding.UTF8.GetBytes("discard me");
         sha.TransformBlock(stale, 0, stale.Length, null, 0);
@@ -150,8 +150,8 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     public void HashSize_Is256Bits()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var sha = new SHA3_256Pkcs11(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        using var sha = new SHA3_256Pkcs11(session);
 
         Assert.Equal(256, sha.HashSize);
     }
@@ -159,9 +159,9 @@ public sealed class SHA3_256Pkcs11Tests_Managed
     // === Construction and argument validation (throws before any native call) =============
 
     [Fact]
-    public void Ctor_NullWorkspace_Throws()
+    public void Ctor_NullSession_Throws()
     {
         var ex = Assert.Throws<ArgumentNullException>(() => new SHA3_256Pkcs11(null!));
-        Assert.Equal("workspace", ex.ParamName);
+        Assert.Equal("session", ex.ParamName);
     }
 }

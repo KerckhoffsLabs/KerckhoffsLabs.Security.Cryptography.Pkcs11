@@ -23,7 +23,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         byte[] ciphertext = session.MessageEncrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16), [0xAD], Payload);
 
@@ -36,7 +36,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         byte[] plaintext = session.MessageDecrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]), [0xAD], Payload);
 
@@ -50,7 +50,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         byte[] ciphertext = session.MessageEncrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16), [0xAD], []);
 
@@ -64,7 +64,7 @@ public sealed class MessageAeadSizingTests
     {
         using var module = new MessageModule { Expands = 16 };
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         byte[] ciphertext = session.MessageEncrypt(Gcm(), new ObjectHandle(1), CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16), [0xAD], Payload);
 
@@ -80,7 +80,7 @@ public sealed class MessageAeadSizingTests
         public int Expands { get; init; }
         public bool SawALengthQuery { get; private set; }
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
         protected override CKR C_MessageEncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;

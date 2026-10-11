@@ -10,27 +10,27 @@ public sealed class Pkcs11KeyMechanismTests_Nss(NssBackendFixture backend)
 
     // These generate a token (persistent) key; NSS's generic token is write-protected, so they skip.
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithoutLogin(_backend.TokenLabel);
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void RsaPkcs_SignVerify_RoundTrip()
     {
-        using var workspace = OpenWorkspace();
-        Pkcs11KeyMechanismCases.Assert_RsaSignVerify_RoundTrips(workspace);
+        using var session = OpenSession();
+        Pkcs11KeyMechanismCases.Assert_RsaSignVerify_RoundTrips(session);
     }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void AesCbc_EncryptDecrypt_RoundTrip()
     {
-        using var workspace = OpenWorkspace();
-        Pkcs11KeyMechanismCases.Assert_AesCbcEncryptDecrypt_RoundTrips(workspace);
+        using var session = OpenSession();
+        Pkcs11KeyMechanismCases.Assert_AesCbcEncryptDecrypt_RoundTrips(session);
     }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.TokenObjectsAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.TokenObjectsAvailable))]
     public void AesKeyWrap_WrapUnwrap_RoundTrip()
     {
-        using var workspace = OpenWorkspace();
-        Pkcs11KeyMechanismCases.Assert_AesKeyWrapUnwrap_RoundTrips(workspace);
+        using var session = OpenSession();
+        Pkcs11KeyMechanismCases.Assert_AesKeyWrapUnwrap_RoundTrips(session);
     }
 }

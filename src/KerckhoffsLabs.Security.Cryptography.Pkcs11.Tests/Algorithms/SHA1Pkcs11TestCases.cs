@@ -21,13 +21,13 @@ internal static class SHA1Pkcs11TestCases
     // FIPS 180-4 / BCL: SHA1("abc").
     private static readonly byte[] KnownDigest = Convert.FromHexString("A9993E364706816ABA3E25717850C26C9CD0D89D");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
     internal static void Assert_ComputeHash_GatedByDefault_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA1Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA1Pkcs11(session);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => hash.ComputeHash(Encoding.UTF8.GetBytes("abc")));
@@ -39,9 +39,9 @@ internal static class SHA1Pkcs11TestCases
         if (!backend.Supports(CKM.CKM_SHA_1))
             Assert.Skip("Backend does not advertise CKM_SHA_1.");
 
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var hash = new SHA1Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var hash = new SHA1Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("abc");
         byte[] digest = hash.ComputeHash(data);

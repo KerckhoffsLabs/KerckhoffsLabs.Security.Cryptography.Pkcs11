@@ -29,14 +29,14 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 {
     private readonly MockBackendFixture _backend = backend;
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithPin(
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-    private static ObjectHandle FindByClass(Pkcs11Workspace workspace, CKO objectClass)
+    private static ObjectHandle FindByClass(Pkcs11Session session, CKO objectClass)
     {
         using var findClass = new ObjectAttribute(CKA.CKA_CLASS, objectClass);
-        return Assert.Single(workspace.Session.FindAllObjects([findClass]));
+        return Assert.Single(session.Core.FindAllObjects([findClass]));
     }
 
     // === GetAttributeValue ==================================================
@@ -44,14 +44,14 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void GetAttributeValue_SymmetricKeyPrivateHandleInvalid_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         // Deliberately mismatched: a symmetric key type always reads via the private handle, so a
         // key that only carries a "public" handle (however the caller obtained one) has no readable
         // handle at all from GetAttributeValue's point of view.
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_AES, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.GetAttributeValue(CKA.CKA_VALUE));
@@ -63,11 +63,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Sign_NoPrivateHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Sign(new Mechanism(CKM.CKM_RSA_PKCS), "data"u8));
@@ -77,11 +77,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Encrypt_AsymmetricNoPublicHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Encrypt(new Mechanism(CKM.CKM_RSA_PKCS), "data"u8));
@@ -91,11 +91,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Decrypt_NoPrivateHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => key.Decrypt(new Mechanism(CKM.CKM_RSA_PKCS), "data"u8));
@@ -107,11 +107,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void MessageEncrypt_AsymmetricNoPublicHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
@@ -123,14 +123,14 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void MessageEncrypt_ValidHandle_ReportsFunctionNotSupported()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle secretSentinel = FindByClass(workspace, CKO.CKO_SECRET_KEY);
+        using var session = OpenSession();
+        ObjectHandle secretSentinel = FindByClass(session, CKO.CKO_SECRET_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: []);
 
-        using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var scope = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var messageParams = CkmGcmMessageParams.ForEncrypt(new byte[12], tagBytes: 16);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
             key.MessageEncrypt(new Mechanism(CKM.CKM_AES_GCM), messageParams, [], "plaintext"u8.ToArray()));
@@ -140,11 +140,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void MessageDecrypt_NoPrivateHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
@@ -156,14 +156,14 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void MessageDecrypt_ValidHandle_ReportsFunctionNotSupported()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle secretSentinel = FindByClass(workspace, CKO.CKO_SECRET_KEY);
+        using var session = OpenSession();
+        ObjectHandle secretSentinel = FindByClass(session, CKO.CKO_SECRET_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: []);
 
-        using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var scope = session.UsePolicy(CryptoPolicy.AllowInsecure);
         var messageParams = CkmGcmMessageParams.ForDecrypt(new byte[12], new byte[16]);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() =>
             key.MessageDecrypt(new Mechanism(CKM.CKM_AES_GCM), messageParams, [], "ciphertext-ish"u8.ToArray()));
@@ -181,15 +181,15 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Wrap_AsymmetricNoPublicHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
-        ObjectHandle secretSentinel = FindByClass(workspace, CKO.CKO_SECRET_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
+        ObjectHandle secretSentinel = FindByClass(session, CKO.CKO_SECRET_KEY);
 
         using var wrapper = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA, label: null, id: []);
         using var target = new Pkcs11Key(
-            workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: []);
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
@@ -200,18 +200,18 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Wrap_HappyPath_ReturnsWrappedBytes()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
-        ObjectHandle secretSentinel = FindByClass(workspace, CKO.CKO_SECRET_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
+        ObjectHandle secretSentinel = FindByClass(session, CKO.CKO_SECRET_KEY);
 
         using var wrapper = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_RSA, label: null, id: []);
         using var target = new Pkcs11Key(
-            workspace, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: secretSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: []);
 
-        using var scope = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var scope = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] wrapped = wrapper.Wrap(new Mechanism(CKM.CKM_RSA_PKCS), target);
 
         Assert.NotEmpty(wrapped);
@@ -219,7 +219,7 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
 
     // Unwrap's happy path is NOT covered here, unlike Wrap's: C_UnwrapKey succeeds against the mock
     // (returns the SECRET_KEY sentinel), but Pkcs11Key.Unwrap then calls
-    // Pkcs11Workspace.HydrateExistingHandleAsKey on the result, which reads CKA_CLASS/CKA_KEY_TYPE —
+    // Pkcs11Session.HydrateExistingHandleAsKey on the result, which reads CKA_CLASS/CKA_KEY_TYPE —
     // attribute types pkcs11-mock's C_GetAttributeValue does not support at all (only CKA_LABEL and
     // CKA_VALUE; verified against vendor/pkcs11-mock/src/pkcs11-mock.c and empirically, where it
     // throws Pkcs11AttributeException). The same applies to EncapsulateKey/DecapsulateKey's result
@@ -230,13 +230,13 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Unwrap_NoPrivateHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         // Unwrapping is a decrypt-shaped operation: it must use the private handle exactly like
         // Decrypt does, never fall back to the public one. A public-only key has none available.
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
@@ -250,13 +250,13 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void Derive_NoPrivateHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         // ECDH derives from the local private key; the peer's public point travels as a mechanism
         // parameter, never as the base-key handle. A public-only key has no usable base handle.
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_EC, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
@@ -275,11 +275,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void EncapsulateKey_NoPublicHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
@@ -291,11 +291,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void EncapsulateKey_ValidHandle_ReportsFunctionNotSupported()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_ML_KEM, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
@@ -307,11 +307,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void DecapsulateKey_NoPrivateHandle_Throws()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
+            session, privateHandle: ObjectHandle.Invalid, publicHandle: publicSentinel,
             keyType: CKK.CKK_ML_KEM, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
@@ -323,11 +323,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void DecapsulateKey_ValidHandle_ReportsFunctionNotSupported()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_ML_KEM, label: null, id: []);
 
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
@@ -341,11 +341,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void GetSynthesizedRsaParameters_NonRsaKeyType_ReturnsNull()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_AES, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedRsaParameters());
@@ -354,12 +354,12 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void GetSynthesizedRsaParameters_PublicHandlePresent_ReturnsNull()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: publicSentinel,
+            session, privateHandle: privateSentinel, publicHandle: publicSentinel,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedRsaParameters());
@@ -368,11 +368,11 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void GetSynthesizedEcParameters_NonEcKeyType_ReturnsNull()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
+            session, privateHandle: privateSentinel, publicHandle: ObjectHandle.Invalid,
             keyType: CKK.CKK_RSA, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedEcParameters());
@@ -381,12 +381,12 @@ public sealed class Pkcs11KeyMockCoverageTests(MockBackendFixture backend)
     [Fact]
     public void GetSynthesizedEcParameters_PublicHandlePresent_ReturnsNull()
     {
-        using var workspace = OpenWorkspace();
-        ObjectHandle privateSentinel = FindByClass(workspace, CKO.CKO_PRIVATE_KEY);
-        ObjectHandle publicSentinel = FindByClass(workspace, CKO.CKO_PUBLIC_KEY);
+        using var session = OpenSession();
+        ObjectHandle privateSentinel = FindByClass(session, CKO.CKO_PRIVATE_KEY);
+        ObjectHandle publicSentinel = FindByClass(session, CKO.CKO_PUBLIC_KEY);
 
         using var key = new Pkcs11Key(
-            workspace, privateHandle: privateSentinel, publicHandle: publicSentinel,
+            session, privateHandle: privateSentinel, publicHandle: publicSentinel,
             keyType: CKK.CKK_EC, label: null, id: []);
 
         Assert.Null(key.GetSynthesizedEcParameters());

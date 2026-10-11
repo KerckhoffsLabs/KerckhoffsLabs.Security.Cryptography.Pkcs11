@@ -23,10 +23,10 @@ internal static class HkdfPkcs11TestCases
     private static readonly byte[] ProbeMessage = "hkdf-adapter-sign-probe"u8.ToArray();
     private static readonly HashAlgorithmName Sha256 = HashAlgorithmName.SHA256;
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -35,25 +35,25 @@ internal static class HkdfPkcs11TestCases
 
     // Imports value as a derive-capable generic-secret key. allowExport opens the scoped override the
     // byte-returning overloads need; the on-token overloads run without it.
-    private static void WithKey(IPkcs11Backend backend, byte[] value, bool allowExport, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithKey(IPkcs11Backend backend, byte[] value, bool allowExport, Action<Pkcs11Session, Pkcs11Key> body)
     {
         backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
-        using var workspace = backend.OpenWorkspace();
+        using var session = backend.OpenSession();
         string label = $"hkdf-adapter-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(value).Derive().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             if (!allowExport)
             {
-                body(workspace, key);
+                body(session, key);
                 return;
             }
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-            body(workspace, key);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+            body(session, key);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     private static byte[] Probe(Pkcs11Key derived)

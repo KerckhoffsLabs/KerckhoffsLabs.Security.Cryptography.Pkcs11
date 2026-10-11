@@ -24,13 +24,13 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
         return b;
     }
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -45,20 +45,20 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
         if (!backend.Supports(CKM.CKM_CHACHA20_POLY1305))
             Assert.Skip("Backend does not advertise CKM_CHACHA20_POLY1305.");
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"chacha-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_CHACHA20_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_CHACHA20_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             using var chacha = new ChaCha20Poly1305Pkcs11(key);
             body(chacha);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     private static void WithImportedChaCha(IPkcs11Backend backend, byte[] rawKey, Action<ChaCha20Poly1305Pkcs11> body)
@@ -66,37 +66,37 @@ internal static class ChaCha20Poly1305Pkcs11TestCases
         if (!backend.Supports(CKM.CKM_CHACHA20_POLY1305))
             Assert.Skip("Backend does not advertise CKM_CHACHA20_POLY1305.");
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"chacha-kat-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             using var chacha = new ChaCha20Poly1305Pkcs11(key);
             body(chacha);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // === Construction (only needs a non-ChaCha key) =======================
 
     internal static void Assert_Ctor_NonChaChaKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"chacha-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new ChaCha20Poly1305Pkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // === Argument validation (needs a constructed adapter, hence a ChaCha20 key) ===========

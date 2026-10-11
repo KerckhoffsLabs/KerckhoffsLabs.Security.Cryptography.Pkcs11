@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 
 /// <summary>
-/// Thrown when the workspace's <see cref="ICryptoPolicy"/> refuses an operation, or when the library
+/// Thrown when the session's <see cref="ICryptoPolicy"/> refuses an operation, or when the library
 /// refuses an operation on security grounds regardless of policy (for example, exporting private key
 /// material from a PKCS#11 key).
 /// </summary>

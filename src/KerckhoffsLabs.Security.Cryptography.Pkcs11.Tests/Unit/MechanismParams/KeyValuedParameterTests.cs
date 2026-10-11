@@ -17,10 +17,10 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 public sealed class KeyValuedParameterTests
 {
     [Fact]
-    public void KeyFromAnotherWorkspace_IsRefusedWhenMarshalled()
+    public void KeyFromAnotherSession_IsRefusedWhenMarshalled()
     {
         using var caller = new ParameterKeys();
-        using var other = caller.OtherWorkspace();
+        using var other = caller.OtherSession();
         var p = new CkmIke2PrfPlusDeriveParams(CKM.CKM_SHA256_HMAC, other.Secret(9), [0x01]);
         using var scope = caller.NewScope();
 
@@ -29,10 +29,10 @@ public sealed class KeyValuedParameterTests
     }
 
     [Fact]
-    public void KeyFromAnotherWorkspace_IsRefusedBeforeTheDeriveReachesTheModule()
+    public void KeyFromAnotherSession_IsRefusedBeforeTheDeriveReachesTheModule()
     {
         using var caller = new ParameterKeys(CryptoPolicy.AllowInsecure);
-        using var other = caller.OtherWorkspace();
+        using var other = caller.OtherSession();
         using var baseKey = caller.Secret(1);
 #pragma warning disable KLPKCS11009 // IKE PRF+ is legacy; the fixture's policy admits it so the call reaches marshalling.
         var mechanism = new Mechanism(CKM.CKM_IKE2_PRF_PLUS_DERIVE,
@@ -178,10 +178,10 @@ public sealed class KeyValuedParameterTests
     }
 
     [Fact]
-    public void ParameterWriterKey_RefusesAKeyFromAnotherWorkspace()
+    public void ParameterWriterKey_RefusesAKeyFromAnotherSession()
     {
         using var caller = new ParameterKeys();
-        using var other = caller.OtherWorkspace();
+        using var other = caller.OtherSession();
         using var scope = caller.NewScope();
 
         var e = Assert.Throws<ArgumentException>(() => new HandlePairParams(other.Pair(0x11, 0x22)).BuildMarshalable(scope));
