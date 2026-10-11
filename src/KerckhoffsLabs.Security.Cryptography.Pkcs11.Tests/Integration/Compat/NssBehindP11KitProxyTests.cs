@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
@@ -67,11 +66,9 @@ public sealed class NssBehindP11KitProxyTests
             actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, password, salt, 4096, HashAlgorithmName.SHA256, 32);
 
         Assert.Equal(Rfc2898DeriveBytes.Pbkdf2(password, salt, 4096, HashAlgorithmName.SHA256, 32), actual);
-        LowLevelPkcs11Library lowLevel = library.LowLevelLibrary!;
-        Assert.Equal(Pbkdf2PasswordLength.PerSlot, lowLevel.Pbkdf2PasswordLength);
         Assert.Equal(
             slotInfo.HardwareVersion is { Major: 3, Minor: < 114 },
-            lowLevel.Pbkdf2PasswordLengthByReferenceBySlot[slot.SlotId.Value]);
+            library.LowLevelLibrary!.Pbkdf2PasswordLengthByReferenceBySlot[slot.SlotId.Value]);
     }
 
     // Loads the proxy with a user configuration that adds the NSS under test as a module, then puts

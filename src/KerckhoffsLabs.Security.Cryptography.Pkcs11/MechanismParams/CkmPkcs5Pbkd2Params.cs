@@ -99,44 +99,34 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <summary>The PRF, for policy evaluation.</summary>
     internal CKP Prf => _prf;
 
-    // What NSS softoken reports as the manufacturer, of the module and of each of its slots.
+    // What NSS softoken reports as the manufacturer of the module and of each of its slots.
     private const string NssManufacturer = "Mozilla Foundation";
 
+    /// <summary>Whether a slot belongs to NSS softoken, loaded directly or behind a proxy.</summary>
+    internal static bool IsNss(SlotInfo info) => info.ManufacturerId == NssManufacturer;
+
     /// <summary>
-    /// Whether a module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what it
-    /// reports in <c>C_GetInfo</c>: true for NSS softoken before 3.114 and for any module implementing
-    /// a Cryptoki version before 2.40, false for any later NSS, and <see langword="null"/> for any other
-    /// module, which may be a proxy such as p11-kit's whose slots belong to different modules (see
-    /// <see cref="ReadsPasswordLengthByReference(SlotInfo)"/>).
+    /// Whether an NSS softoken slot reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>: true before
+    /// 3.114. NSS reports its release as each slot's <c>hardwareVersion</c>, and its manufacturer there
+    /// too, so a slot is recognized behind a proxy such as p11-kit's, which reports itself in
+    /// <c>C_GetInfo</c> but passes its modules' slot information on.
     /// </summary>
     /// <remarks>
-    /// <para>
     /// NSS softoken dereferences <c>ulPasswordLen</c> unconditionally up to 3.113, including from 3.52
     /// on, where it implements v3.0 and is bound through <c>C_GetInterface</c>. 3.114 accepts either
     /// structure, and can be built to accept only the corrected one, so from 3.114 on it gets that.
-    /// NSS reports its own release in <c>libraryVersion</c>.
-    /// </para>
-    /// <para>
-    /// The corrected structure first appeared in v2.40 Errata 01, so a module written against an
-    /// earlier version can only read the original one. A v2.40 module may read either, and gets the
-    /// standard structure unless it is recognized.
-    /// </para>
     /// </remarks>
-    internal static bool? ReadsPasswordLengthByReference(LibraryInfo info)
-    {
-        if (info.ManufacturerId == NssManufacturer)
-            return IsNssBefore3_114(info.LibraryVersion);
-        return info.CryptokiVersion < new Version(2, 40) ? true : null;
-    }
+    internal static bool ReadsPasswordLengthByReference(SlotInfo info)
+        => IsNss(info) && IsNssBefore3_114(info.HardwareVersion);
 
     /// <summary>
-    /// Whether a slot's module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what
-    /// the slot reports in <c>C_GetSlotInfo</c>: true for an NSS softoken slot before 3.114. This is
-    /// what reaches through a proxy, which reports itself in <c>C_GetInfo</c> but passes its modules'
-    /// slot information on; NSS reports its release as each slot's <c>hardwareVersion</c>.
+    /// Whether a module that is not NSS reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged
+    /// from the Cryptoki version it reports in <c>C_GetInfo</c>: true before 2.40. The corrected
+    /// structure first appeared in v2.40 Errata 01, so an earlier module can only read the original; a
+    /// v2.40 module may read either, and gets the standard structure.
     /// </summary>
-    internal static bool ReadsPasswordLengthByReference(SlotInfo info)
-        => info.ManufacturerId == NssManufacturer && IsNssBefore3_114(info.HardwareVersion);
+    internal static bool ReadsPasswordLengthByReference(LibraryInfo info)
+        => info.CryptokiVersion < new Version(2, 40);
 
     private static bool IsNssBefore3_114(Version version) => version is { Major: 3, Minor: < 114 };
 

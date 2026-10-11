@@ -145,10 +145,11 @@ public sealed class Pkcs11LibraryOptions
     /// Set it only for a module whose documentation or behaviour calls for it. A module given the
     /// structure it does not read crashes the process or derives from the wrong password length; see
     /// <see cref="Pkcs11.Pbkdf2ParametersLayout"/>. Detection recognizes NSS by the manufacturer and
-    /// library version it reports in <c>C_GetInfo</c>, or, behind a proxy such as p11-kit's, by the
-    /// manufacturer and hardware version each of its slots reports in <c>C_GetSlotInfo</c>. An NSS
-    /// that reports another manufacturer, including one given <c>manufacturerID=</c> in
-    /// <see cref="ModuleParameters"/>, needs this set explicitly.
+    /// hardware version each of its slots reports in <c>C_GetSlotInfo</c>, which a proxy such as
+    /// p11-kit's passes on. An NSS that reports another manufacturer, including one given
+    /// <c>manufacturerID=</c> in <see cref="ModuleParameters"/>, needs this set explicitly, as does a
+    /// proxy reporting a Cryptoki version before 2.40 in front of later modules. The setting applies to
+    /// every slot of the module.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">The value is not a defined <see cref="Pkcs11.Pbkdf2ParametersLayout"/>.</exception>

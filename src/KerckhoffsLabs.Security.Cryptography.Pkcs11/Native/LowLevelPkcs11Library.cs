@@ -130,24 +130,18 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
            && _module.Table.C_DecryptMessage is not null
            && _module.Table.C_MessageDecryptFinal is not null;
 
-    // Volatile, so a session on another thread sees a decision as soon as it is stored.
-    private volatile Pbkdf2PasswordLength _pbkdf2PasswordLength;
-
     /// <summary>
-    /// Whether <c>CKM_PKCS5_PBKD2</c> sends this module <c>CK_PKCS5_PBKD2_PARAMS</c>, whose
-    /// <c>ulPasswordLen</c> is a pointer, or <c>CK_PKCS5_PBKD2_PARAMS2</c>, or decides slot by slot
-    /// (<see cref="Pbkdf2PasswordLengthByReferenceBySlot"/>). A cache cell only: the session decides,
-    /// and stores its answer here so it is decided once per module binding.
+    /// Whether <c>CKM_PKCS5_PBKD2</c> sends every slot of this module <c>CK_PKCS5_PBKD2_PARAMS</c>, whose
+    /// <c>ulPasswordLen</c> is a pointer, rather than <c>CK_PKCS5_PBKD2_PARAMS2</c>, as configured;
+    /// <see langword="null"/> to decide slot by slot (<see cref="Pbkdf2PasswordLengthByReferenceBySlot"/>).
+    /// Set once, before any session exists.
     /// </summary>
-    internal Pbkdf2PasswordLength Pbkdf2PasswordLength
-    {
-        get => _pbkdf2PasswordLength;
-        set => _pbkdf2PasswordLength = value;
-    }
+    internal bool? Pbkdf2PasswordLengthByReference { get; set; }
 
     /// <summary>
-    /// Per slot ID, whether <c>CKM_PKCS5_PBKD2</c> sends that slot <c>CK_PKCS5_PBKD2_PARAMS</c>, once
-    /// decided, while <see cref="Pbkdf2PasswordLength"/> is <see cref="Native.Pbkdf2PasswordLength.PerSlot"/>.
+    /// Per slot ID, whether <c>CKM_PKCS5_PBKD2</c> sends that slot <c>CK_PKCS5_PBKD2_PARAMS</c>. A cache
+    /// only: a session decides the first time it derives on its slot and stores the answer here, so it
+    /// is decided once per slot of a module binding.
     /// </summary>
     internal ConcurrentDictionary<ulong, bool> Pbkdf2PasswordLengthByReferenceBySlot { get; } = new();
 
