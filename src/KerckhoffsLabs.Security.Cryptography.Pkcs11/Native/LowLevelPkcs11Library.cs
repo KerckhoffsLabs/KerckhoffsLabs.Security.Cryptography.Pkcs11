@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 
@@ -129,21 +130,26 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
            && _module.Table.C_DecryptMessage is not null
            && _module.Table.C_MessageDecryptFinal is not null;
 
-    // 0 until known, then 1 (by value) or 2 (by reference): an int, so a reader on another thread never
-    // sees half of a write.
-    private volatile int _pbkdf2PasswordLength;
+    // Volatile, so a session on another thread sees a decision as soon as it is stored.
+    private volatile Pbkdf2PasswordLength _pbkdf2PasswordLength;
 
     /// <summary>
     /// Whether <c>CKM_PKCS5_PBKD2</c> sends this module <c>CK_PKCS5_PBKD2_PARAMS</c>, whose
-    /// <c>ulPasswordLen</c> is a pointer, rather than <c>CK_PKCS5_PBKD2_PARAMS2</c>; <see langword="null"/>
-    /// until configured or detected. A cache cell only: the session decides, and stores its answer here
-    /// so it is decided once per module binding.
+    /// <c>ulPasswordLen</c> is a pointer, or <c>CK_PKCS5_PBKD2_PARAMS2</c>, or decides slot by slot
+    /// (<see cref="Pbkdf2PasswordLengthByReferenceBySlot"/>). A cache cell only: the session decides,
+    /// and stores its answer here so it is decided once per module binding.
     /// </summary>
-    internal bool? Pbkdf2PasswordLengthByReference
+    internal Pbkdf2PasswordLength Pbkdf2PasswordLength
     {
-        get => _pbkdf2PasswordLength switch { 0 => null, 2 => true, _ => false };
-        set => _pbkdf2PasswordLength = value switch { null => 0, true => 2, false => 1 };
+        get => _pbkdf2PasswordLength;
+        set => _pbkdf2PasswordLength = value;
     }
+
+    /// <summary>
+    /// Per slot ID, whether <c>CKM_PKCS5_PBKD2</c> sends that slot <c>CK_PKCS5_PBKD2_PARAMS</c>, once
+    /// decided, while <see cref="Pbkdf2PasswordLength"/> is <see cref="Native.Pbkdf2PasswordLength.PerSlot"/>.
+    /// </summary>
+    internal ConcurrentDictionary<ulong, bool> Pbkdf2PasswordLengthByReferenceBySlot { get; } = new();
 
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM

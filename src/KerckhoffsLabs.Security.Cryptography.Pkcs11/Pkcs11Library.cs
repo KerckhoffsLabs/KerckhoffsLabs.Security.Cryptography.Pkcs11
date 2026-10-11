@@ -159,11 +159,11 @@ public sealed class Pkcs11Library : IDisposable
         {
             Log.LoadingLibrary(_logger, _libraryPath);
             _pkcs11Library = load();
-            _pkcs11Library.Pbkdf2PasswordLengthByReference = options?.Pbkdf2ParametersLayout switch
+            _pkcs11Library.Pbkdf2PasswordLength = options?.Pbkdf2ParametersLayout switch
             {
-                Pbkdf2ParametersLayout.PasswordLengthByReference => true,
-                Pbkdf2ParametersLayout.PasswordLengthByValue => false,
-                _ => null,
+                Pbkdf2ParametersLayout.PasswordLengthByReference => Pbkdf2PasswordLength.ByReference,
+                Pbkdf2ParametersLayout.PasswordLengthByValue => Pbkdf2PasswordLength.ByValue,
+                _ => Pbkdf2PasswordLength.Undecided,
             };
             Initialize(options);
         }

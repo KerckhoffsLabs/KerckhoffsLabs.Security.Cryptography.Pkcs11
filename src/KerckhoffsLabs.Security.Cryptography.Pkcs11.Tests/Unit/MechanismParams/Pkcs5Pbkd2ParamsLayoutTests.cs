@@ -14,12 +14,15 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.MechanismParams
 /// and <c>CK_PKCS5_PBKD2_PARAMS2</c> (v2.40 Errata 01, v3.0) differ only in <c>ulPasswordLen</c>: a
 /// pointer in the first, a value in the second. NSS softoken before 3.114 reads the first whatever
 /// version it implements, and given the second dereferences the length as an address and segfaults;
-/// every other module gets the second unless the options say otherwise.
+/// every other module gets the second unless the options say otherwise. NSS is recognized from
+/// <c>C_GetInfo</c>, or behind a proxy, which reports itself there, slot by slot from <c>C_GetSlotInfo</c>.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs5Pbkd2ParamsLayoutTests
 {
     private const string Mozilla = "Mozilla Foundation";
+    private const string P11Kit = "PKCS#11 Kit";
+    private const string SoftHsm = "SoftHSM project";
     private static readonly byte[] Salt = "pbkdf2-salt-0123"u8.ToArray();
 
     [Theory]
@@ -80,7 +83,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         GenerateKey(session, "correct horse"u8);
 
         Assert.Equal(1, module.GetInfoCalls);
-        Assert.True(module.LowLevel.Pbkdf2PasswordLengthByReference);
+        Assert.Equal(Pbkdf2PasswordLength.ByReference, module.LowLevel.Pbkdf2PasswordLength);
     }
 
     [Theory]
@@ -89,14 +92,155 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
     public void ConfiguredLayout_OverridesDetection_WithoutAskingGetInfo(string manufacturer, bool byReference)
     {
         using var module = new Pbkd2Module(manufacturer, 3, 51);
-        module.LowLevel.Pbkdf2PasswordLengthByReference = byReference;
-        using var session = module.CreateSession(policy: CryptoPolicy.AllowInsecure);
+        module.Slots[1] = (Mozilla, 3, 51);
+        module.LowLevel.Pbkdf2PasswordLength = byReference ? Pbkdf2PasswordLength.ByReference : Pbkdf2PasswordLength.ByValue;
+        using var session = module.OpenSession(slot: 1);
 
         GenerateKey(session, "correct horse"u8);
 
         Assert.Equal(byReference, module.SentByReference);
         Assert.Equal("correct horse"u8.ToArray(), module.Password);
         Assert.Equal(0, module.GetInfoCalls);
+        Assert.Equal(0, module.GetSessionInfoCalls);
+        Assert.Equal(0, module.GetSlotInfoCalls);
+    }
+
+    /// <summary>
+    /// p11-kit's proxy reports itself in <c>C_GetInfo</c> but passes NSS's slot information on, and NSS
+    /// reports its release as each slot's hardware version.
+    /// </summary>
+    [Theory]
+    [InlineData(Mozilla, 3, 51, true)]
+    [InlineData(Mozilla, 3, 98, true)]
+    [InlineData(Mozilla, 3, 113, true)]
+    [InlineData(Mozilla, 3, 114, false)]
+    [InlineData(Mozilla, 3, 130, false)]
+    [InlineData(SoftHsm, 2, 6, false)]
+    [InlineData(SoftHsm, 3, 51, false)]
+    public void Detect_BehindAProxy_DecidesFromTheSlot(string slotManufacturer, byte major, byte minor, bool byReference)
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[0x11] = (slotManufacturer, major, minor);
+        using var session = module.OpenSession(slot: 0x11);
+
+        GenerateKey(session, "correct horse"u8);
+
+        Assert.Equal(byReference, module.SentByReference);
+        Assert.Equal("correct horse"u8.ToArray(), module.Password);
+        Assert.Equal(Salt, module.Salt);
+    }
+
+    /// <summary>
+    /// A proxy can put modules that read different layouts behind one library, so the answer for one
+    /// slot must not decide for another, whichever slot derives first.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Detect_ProxyMixingModules_DecidesPerSlot(bool nssFirst)
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[1] = (Mozilla, 3, 98);
+        module.Slots[2] = (SoftHsm, 2, 6);
+        using var nss = module.OpenSession(slot: 1);
+        using var softHsm = module.OpenSession(slot: 2);
+
+        bool[] order = nssFirst ? [true, false, true, false] : [false, true, false, true];
+        foreach (bool onNss in order)
+        {
+            GenerateKey(onNss ? nss : softHsm, "correct horse"u8);
+            Assert.Equal(onNss, module.SentByReference);
+            Assert.Equal("correct horse"u8.ToArray(), module.Password);
+        }
+
+        Assert.Equal(1, module.GetInfoCalls);
+        Assert.Equal(2, module.GetSlotInfoCalls);
+        Assert.Equal(Pbkdf2PasswordLength.PerSlot, module.LowLevel.Pbkdf2PasswordLength);
+    }
+
+    [Fact]
+    public void Detect_AsksSlotInfoOncePerSlot()
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[1] = (Mozilla, 3, 98);
+        using var first = module.OpenSession(slot: 1);
+        using var second = module.OpenSession(slot: 1);
+
+        GenerateKey(first, "correct horse"u8);
+        GenerateKey(second, "correct horse"u8);
+        GenerateKey(first, "correct horse"u8);
+
+        Assert.True(module.SentByReference);
+        Assert.Equal(1, module.GetInfoCalls);
+        Assert.Equal(1, module.GetSlotInfoCalls);
+    }
+
+    /// <summary>
+    /// NSS loaded directly decides for every slot from <c>C_GetInfo</c>, so its slots are never asked:
+    /// the common case costs one call.
+    /// </summary>
+    [Theory]
+    [InlineData(3, 98, true)]
+    [InlineData(3, 130, false)]
+    public void Detect_ModuleInfoNamesNss_SkipsSlotInfo(byte major, byte minor, bool byReference)
+    {
+        using var module = new Pbkd2Module(Mozilla, major, minor);
+        module.Slots[1] = (Mozilla, major, minor);
+        using var session = module.OpenSession(slot: 1);
+
+        GenerateKey(session, "correct horse"u8);
+
+        Assert.Equal(byReference, module.SentByReference);
+        Assert.Equal(0, module.GetSessionInfoCalls);
+        Assert.Equal(0, module.GetSlotInfoCalls);
+    }
+
+    /// <summary>
+    /// What cannot be asked gets the standard structure, and the derivation still runs. A session whose
+    /// slot cannot be asked decides nothing for that slot, so a later session on it still asks.
+    /// </summary>
+    [Fact]
+    public void Detect_SessionInfoUnavailable_GetsTheStandardStructure_AndCachesNothing()
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[1] = (Mozilla, 3, 98);
+        using var unknown = module.CreateSession(policy: CryptoPolicy.AllowInsecure);
+        using var known = module.OpenSession(slot: 1);
+
+        GenerateKey(unknown, "correct horse"u8);
+        Assert.False(module.SentByReference);
+        Assert.Equal("correct horse"u8.ToArray(), module.Password);
+        Assert.Empty(module.LowLevel.Pbkdf2PasswordLengthByReferenceBySlot);
+
+        GenerateKey(known, "correct horse"u8);
+        Assert.True(module.SentByReference);
+    }
+
+    [Fact]
+    public void Detect_SlotInfoUnavailable_GetsTheStandardStructure()
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        using var session = module.OpenSession(slot: 7); // a slot without information
+
+        GenerateKey(session, "correct horse"u8);
+        GenerateKey(session, "correct horse"u8);
+
+        Assert.False(module.SentByReference);
+        Assert.Equal("correct horse"u8.ToArray(), module.Password);
+        Assert.Equal(1, module.GetSlotInfoCalls);
+    }
+
+    /// <summary>A module that refuses <c>C_GetInfo</c> may still be a proxy, so its slot is asked.</summary>
+    [Fact]
+    public void Detect_ModuleWithoutGetInfo_StillAsksTheSlot()
+    {
+        using var module = new Pbkd2Module(manufacturer: null);
+        module.Slots[1] = (Mozilla, 3, 98);
+        using var session = module.OpenSession(slot: 1);
+
+        GenerateKey(session, "correct horse"u8);
+
+        Assert.True(module.SentByReference);
     }
 
     /// <summary>An empty password still gets a length to point at, not a null pointer.</summary>
@@ -113,16 +257,16 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
     }
 
     [Theory]
-    [InlineData(Pbkdf2ParametersLayout.Detect, null)]
-    [InlineData(Pbkdf2ParametersLayout.PasswordLengthByValue, false)]
-    [InlineData(Pbkdf2ParametersLayout.PasswordLengthByReference, true)]
-    public void Options_Layout_ReachesTheModuleBinding(Pbkdf2ParametersLayout layout, bool? byReference)
+    [InlineData(Pbkdf2ParametersLayout.Detect, nameof(Pbkdf2PasswordLength.Undecided))]
+    [InlineData(Pbkdf2ParametersLayout.PasswordLengthByValue, nameof(Pbkdf2PasswordLength.ByValue))]
+    [InlineData(Pbkdf2ParametersLayout.PasswordLengthByReference, nameof(Pbkdf2PasswordLength.ByReference))]
+    public void Options_Layout_ReachesTheModuleBinding(Pbkdf2ParametersLayout layout, string expected)
     {
         using var module = new Pbkd2Module(Mozilla, 3, 51);
 
         using var library = module.Load(new Pkcs11LibraryOptions { Pbkdf2ParametersLayout = layout });
 
-        Assert.Equal(byReference, library.LowLevelLibrary!.Pbkdf2PasswordLengthByReference);
+        Assert.Equal(Enum.Parse<Pbkdf2PasswordLength>(expected), library.LowLevelLibrary!.Pbkdf2PasswordLength);
     }
 
     [Fact]
@@ -144,11 +288,17 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
     }
 
     // Reports manufacturer and library version from C_GetInfo, or refuses it when the manufacturer is
-    // null, and records which layout each CKM_PKCS5_PBKD2 call carried. Overrides v2.40 functions only,
-    // so it exports just C_GetFunctionList.
+    // null; reports the slot of each session opened with OpenSession, and the manufacturer and hardware
+    // version of each slot in Slots, refusing both for anything else; and records which layout each
+    // CKM_PKCS5_PBKD2 call carried. Overrides v2.40 functions only, so it exports just C_GetFunctionList.
     private class Pbkd2Module(string? manufacturer, byte libraryMajor = 0, byte libraryMinor = 0) : SessionTestModule
     {
+        private readonly Dictionary<ulong, ulong> _sessionSlots = [];
+
+        public Dictionary<ulong, (string Manufacturer, byte Major, byte Minor)> Slots { get; } = [];
         public int GetInfoCalls { get; private set; }
+        public int GetSessionInfoCalls { get; private set; }
+        public int GetSlotInfoCalls { get; private set; }
         public bool? SentByReference { get; private set; }
         public byte[]? Password { get; private set; }
         public byte[]? Salt { get; private set; }
@@ -163,6 +313,34 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
             NativeTestStructs.FillPadded(info.ManufacturerId, manufacturer);
             NativeTestStructs.FillPadded(info.LibraryDescription, "PBKDF2 layout test module");
             info.LibraryVersion = new CK_VERSION { Major = libraryMajor, Minor = libraryMinor };
+            return CKR.CKR_OK;
+        }
+
+        /// <summary>A session on <paramref name="slot"/>, as far as <c>C_GetSessionInfo</c> tells.</summary>
+        public Pkcs11Session OpenSession(ulong slot)
+        {
+            ulong handle = (ulong)NewSessionHandle();
+            _sessionSlots[handle] = slot;
+            return CreateSession(handle, policy: CryptoPolicy.AllowInsecure);
+        }
+
+        protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
+        {
+            GetSessionInfoCalls++;
+            if (!_sessionSlots.TryGetValue((ulong)session, out ulong slot))
+                return CKR.CKR_FUNCTION_NOT_SUPPORTED;
+            info.SlotId = (NativeCULong)slot;
+            return CKR.CKR_OK;
+        }
+
+        protected override CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
+        {
+            GetSlotInfoCalls++;
+            if (!Slots.TryGetValue((ulong)slotId, out var slot))
+                return CKR.CKR_SLOT_ID_INVALID;
+            NativeTestStructs.FillPadded(info.SlotDescription, "PBKDF2 layout test slot");
+            NativeTestStructs.FillPadded(info.ManufacturerId, slot.Manufacturer);
+            info.HardwareVersion = new CK_VERSION { Major = slot.Major, Minor = slot.Minor };
             return CKR.CKR_OK;
         }
 

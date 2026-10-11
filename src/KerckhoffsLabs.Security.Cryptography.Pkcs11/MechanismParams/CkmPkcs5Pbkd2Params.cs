@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// Marshalled as <see cref="CK_PKCS5_PBKD2_PARAMS2"/>, the structure v2.40 Errata 01 and v3.0
 /// specify, whose <c>ulPasswordLen</c> is a value. A module that reads the original v2.40
 /// <see cref="CK_PKCS5_PBKD2_PARAMS"/>, whose <c>ulPasswordLen</c> is a <c>CK_ULONG_PTR</c>, gets that
-/// instead: one detected as such, or any module when
+/// instead: one detected as such, directly or behind a proxy, or any module when
 /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> says so. Sent the wrong one, such a module
 /// dereferences the length as an address and crashes the process (see
 /// <see cref="Pkcs11.Pbkdf2ParametersLayout"/>).
@@ -99,9 +99,14 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <summary>The PRF, for policy evaluation.</summary>
     internal CKP Prf => _prf;
 
+    // What NSS softoken reports as the manufacturer, of the module and of each of its slots.
+    private const string NssManufacturer = "Mozilla Foundation";
+
     /// <summary>
     /// Whether a module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what it
-    /// reports in <c>C_GetInfo</c>: true for NSS softoken before 3.114, false for every other module.
+    /// reports in <c>C_GetInfo</c>: true for NSS softoken before 3.114, false for any later NSS, and
+    /// <see langword="null"/> for any other module, which may be a proxy such as p11-kit's whose slots
+    /// belong to different modules (see <see cref="ReadsPasswordLengthByReference(SlotInfo)"/>).
     /// </summary>
     /// <remarks>
     /// NSS softoken dereferences <c>ulPasswordLen</c> unconditionally up to 3.113, including from 3.52
@@ -109,8 +114,19 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// structure, and can be built to accept only the corrected one, so from 3.114 on it gets that.
     /// NSS reports its own release in <c>libraryVersion</c>.
     /// </remarks>
-    internal static bool ReadsPasswordLengthByReference(LibraryInfo info)
-        => info is { ManufacturerId: "Mozilla Foundation", LibraryVersion: { Major: 3, Minor: < 114 } };
+    internal static bool? ReadsPasswordLengthByReference(LibraryInfo info)
+        => info.ManufacturerId == NssManufacturer ? IsNssBefore3_114(info.LibraryVersion) : null;
+
+    /// <summary>
+    /// Whether a slot's module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what
+    /// the slot reports in <c>C_GetSlotInfo</c>: true for an NSS softoken slot before 3.114. This is
+    /// what reaches through a proxy, which reports itself in <c>C_GetInfo</c> but passes its modules'
+    /// slot information on; NSS reports its release as each slot's <c>hardwareVersion</c>.
+    /// </summary>
+    internal static bool ReadsPasswordLengthByReference(SlotInfo info)
+        => info.ManufacturerId == NssManufacturer && IsNssBefore3_114(info.HardwareVersion);
+
+    private static bool IsNssBefore3_114(Version version) => version is { Major: 3, Minor: < 114 };
 
     /// <inheritdoc/>
     /// <exception cref="ObjectDisposedException">The borrowed <see cref="SecurePassword"/> has been disposed.</exception>

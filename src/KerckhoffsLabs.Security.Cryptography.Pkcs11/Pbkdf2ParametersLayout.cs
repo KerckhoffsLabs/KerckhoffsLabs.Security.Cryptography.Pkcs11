@@ -22,8 +22,8 @@ public enum Pbkdf2ParametersLayout
 {
     /// <summary>
     /// <c>CK_PKCS5_PBKD2_PARAMS2</c>, except for a module known to read the original structure:
-    /// Mozilla NSS softoken before 3.114, decided from <c>C_GetInfo</c> the first time the library
-    /// derives a key with PBKDF2.
+    /// Mozilla NSS softoken before 3.114, decided the first time the library derives a key with PBKDF2:
+    /// from <c>C_GetInfo</c>, or behind a proxy such as p11-kit's, slot by slot from <c>C_GetSlotInfo</c>.
     /// </summary>
     Detect,
 

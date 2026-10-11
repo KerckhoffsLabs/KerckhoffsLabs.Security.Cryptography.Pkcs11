@@ -2367,22 +2367,48 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// <summary>
     /// True when <c>CKM_PKCS5_PBKD2</c> must send this session's module the original
     /// <c>CK_PKCS5_PBKD2_PARAMS</c>, whose <c>ulPasswordLen</c> is a pointer: as
-    /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> configured it, or else as detected from
-    /// <c>C_GetInfo</c> (<see cref="CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference"/>) the first time
-    /// and kept for the module. A module that refuses <c>C_GetInfo</c> gets the standard structure.
+    /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> configured it, or else as detected the
+    /// first time. Detection asks <c>C_GetInfo</c>, and decides for the whole module when that names
+    /// NSS; otherwise it asks <c>C_GetSlotInfo</c> for this session's slot, which is what identifies NSS
+    /// behind a proxy, and decides for that slot. Whatever cannot be asked gets the standard structure.
     /// </summary>
     internal bool PassesPbkdf2PasswordLengthByReference
     {
         get
         {
-            if (_pkcs11Library.Pbkdf2PasswordLengthByReference is { } known)
-                return known;
+            switch (_pkcs11Library.Pbkdf2PasswordLength)
+            {
+                case Pbkdf2PasswordLength.ByValue:
+                    return false;
+                case Pbkdf2PasswordLength.ByReference:
+                    return true;
+                case Pbkdf2PasswordLength.Undecided:
+                    CK_INFO info = default;
+                    bool? module = _pkcs11Library.C_GetInfo(ref info) == CKR.CKR_OK
+                        ? CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(new LibraryInfo(info))
+                        : null;
+                    _pkcs11Library.Pbkdf2PasswordLength = module switch
+                    {
+                        true => Pbkdf2PasswordLength.ByReference,
+                        false => Pbkdf2PasswordLength.ByValue,
+                        null => Pbkdf2PasswordLength.PerSlot,
+                    };
+                    if (module is { } decided)
+                        return decided;
+                    break;
+            }
 
-            CK_INFO info = default;
-            bool byReference = _pkcs11Library.C_GetInfo(ref info) == CKR.CKR_OK
-                && CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(new LibraryInfo(info));
-            _pkcs11Library.Pbkdf2PasswordLengthByReference = byReference;
-            return byReference;
+            // Not cached when the session's slot cannot be asked: the next session may well be.
+            CK_SESSION_INFO session = default;
+            if (_pkcs11Library.C_GetSessionInfo(_sessionId, ref session) != CKR.CKR_OK)
+                return false;
+
+            return _pkcs11Library.Pbkdf2PasswordLengthByReferenceBySlot.GetOrAdd((ulong)session.SlotId, static (_, state) =>
+            {
+                CK_SLOT_INFO slot = default;
+                return state.Library.C_GetSlotInfo(state.SlotId, ref slot) == CKR.CKR_OK
+                    && CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(new SlotInfo(state.SlotId, slot));
+            }, (Library: _pkcs11Library, session.SlotId));
         }
     }
 

@@ -143,8 +143,9 @@ public sealed class Pkcs11LibraryOptions
     /// Set it only for a module whose documentation or behaviour calls for it. A module given the
     /// structure it does not read crashes the process or derives from the wrong password length; see
     /// <see cref="Pkcs11.Pbkdf2ParametersLayout"/>. Detection recognizes NSS by the manufacturer and
-    /// library version it reports in <c>C_GetInfo</c>, so an NSS build configured to report another
-    /// manufacturer needs this set explicitly.
+    /// library version it reports in <c>C_GetInfo</c>, or, behind a proxy such as p11-kit's, by the
+    /// manufacturer and hardware version each of its slots reports in <c>C_GetSlotInfo</c>; an NSS
+    /// build configured to report another manufacturer needs this set explicitly.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">The value is not a defined <see cref="Pkcs11.Pbkdf2ParametersLayout"/>.</exception>
