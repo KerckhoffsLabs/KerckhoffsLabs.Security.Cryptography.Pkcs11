@@ -334,7 +334,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         Assert.Equal(nameof(Pkcs11LibraryOptions.Pbkdf2ParametersLayout), ex.ParamName);
     }
 
-    private static void GenerateKey(Pkcs11Session session, ReadOnlySpan<byte> password)
+    private static void GenerateKey(Pkcs11SessionCore session, ReadOnlySpan<byte> password)
     {
         var parameters = new CkmPkcs5Pbkd2Params(Salt, 1000, CKP.CKP_PKCS5_PBKD2_HMAC_SHA256, password);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
@@ -363,8 +363,8 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         public ulong Iterations { get; private set; }
 
         /// <summary>A session on <paramref name="slot"/>, opened through <see cref="Pkcs11Slot"/> as an application does.</summary>
-        public Pkcs11Session OpenSession(ulong slot, ILoggerFactory? loggerFactory = null)
-            => new Pkcs11Slot(LowLevel, slot, loggerFactory).OpenSession(policy: CryptoPolicy.AllowInsecure);
+        public Pkcs11SessionCore OpenSession(ulong slot, ILoggerFactory? loggerFactory = null)
+            => new Pkcs11Slot(LowLevel, slot, loggerFactory).OpenSessionCore(policy: CryptoPolicy.AllowInsecure);
 
         protected override CKR C_OpenSession(NativeCULong slotId, NativeCULong flags, IntPtr application, IntPtr notify, ref NativeCULong session)
         {

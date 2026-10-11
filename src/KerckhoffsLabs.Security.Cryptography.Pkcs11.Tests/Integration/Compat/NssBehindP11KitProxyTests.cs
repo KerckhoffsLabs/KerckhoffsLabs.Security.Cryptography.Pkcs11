@@ -61,9 +61,9 @@ public sealed class NssBehindP11KitProxyTests
         byte[] password = Encoding.UTF8.GetBytes("passwordPASSWORDpassword");
         byte[] salt = Encoding.UTF8.GetBytes("saltSALTsaltSALTsaltSALTsaltSALTsalt");
         byte[] actual;
-        using (var workspace = library.OpenWorkspaceWithoutLogin(Settings.NssTokenLabel))
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
-            actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, password, salt, 4096, HashAlgorithmName.SHA256, 32);
+        using (var session = library.OpenSessionWithoutLogin(Settings.NssTokenLabel))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
+            actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(session, password, salt, 4096, HashAlgorithmName.SHA256, 32);
 
         Assert.Equal(Rfc2898DeriveBytes.Pbkdf2(password, salt, 4096, HashAlgorithmName.SHA256, 32), actual);
         Assert.Equal(
