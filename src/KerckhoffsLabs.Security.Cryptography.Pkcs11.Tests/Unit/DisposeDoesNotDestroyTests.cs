@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 /// <para>
 /// This is the invariant the whole ephemeral-vs-persistent question turns on. The wrapper cannot tell
 /// a session object from a persistent key — <c>CKA_TOKEN</c> is set at creation from a runtime
-/// template, or from the <c>persistOnToken</c> argument of the workspace factories — so an
+/// template, or from the <c>persistOnToken</c> argument of the session factories — so an
 /// auto-destroying <c>Dispose</c> would sometimes erase production key material and sometimes not,
 /// decided by a value that isn't visible at the call site.
 /// </para>
@@ -26,30 +26,30 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 [Collection(FakeModuleCollection.Name)]
 public sealed class DisposeDoesNotDestroyTests
 {
-    private static Pkcs11Workspace NewWorkspace(out Pkcs11Library library)
+    private static Pkcs11Session NewSession(out Pkcs11Library library)
     {
         library = ManagedToken.NewLibrary();
-        return ManagedToken.OpenWorkspace(library);
+        return ManagedToken.OpenSession(library);
     }
 
     /// <summary>Is an object with this label still on the token?</summary>
-    private static bool StillPresent(Pkcs11Workspace workspace, string label)
+    private static bool StillPresent(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        return workspace.FindObjects(filter).Count > 0;
+        return session.FindObjects(filter).Count > 0;
     }
 
     [Fact]
     public void DisposingAKey_DoesNotDestroyItOnTheToken()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            var key = workspace.GenerateAesKey(256, label: "dispose-inert");
+            var key = session.GenerateAesKey(256, label: "dispose-inert");
 
             key.Dispose();
 
-            Assert.True(StillPresent(workspace, "dispose-inert"),
+            Assert.True(StillPresent(session, "dispose-inert"),
                 "Dispose destroyed the token object; it must only release the managed wrapper.");
         }
     }
@@ -57,14 +57,14 @@ public sealed class DisposeDoesNotDestroyTests
     [Fact]
     public void DestroyingAKey_DoesDestroyIt()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            using var key = workspace.GenerateAesKey(256, label: "destroy-works");
+            using var key = session.GenerateAesKey(256, label: "destroy-works");
 
             key.Destroy();
 
-            Assert.False(StillPresent(workspace, "destroy-works"));
+            Assert.False(StillPresent(session, "destroy-works"));
         }
     }
 
@@ -75,15 +75,15 @@ public sealed class DisposeDoesNotDestroyTests
     [Fact]
     public void DestroyThenDispose_IsSafe()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            var key = workspace.GenerateAesKey(256, label: "destroy-then-dispose");
+            var key = session.GenerateAesKey(256, label: "destroy-then-dispose");
 
             key.Destroy();
 
             Assert.Null(Record.Exception(key.Dispose));
-            Assert.False(StillPresent(workspace, "destroy-then-dispose"));
+            Assert.False(StillPresent(session, "destroy-then-dispose"));
         }
     }
 
@@ -94,12 +94,12 @@ public sealed class DisposeDoesNotDestroyTests
     [Fact]
     public void DisposingAPersistentKey_LeavesItOnTheToken()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            using (var key = workspace.GenerateAesKey(256, label: "persistent", persistOnToken: true)) { }
+            using (var key = session.GenerateAesKey(256, label: "persistent", persistOnToken: true)) { }
 
-            Assert.True(StillPresent(workspace, "persistent"),
+            Assert.True(StillPresent(session, "persistent"),
                 "Dispose destroyed a key the caller asked to persist on the token.");
         }
     }

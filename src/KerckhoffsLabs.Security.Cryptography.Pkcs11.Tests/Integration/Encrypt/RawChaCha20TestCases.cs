@@ -25,33 +25,33 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Encrypt;
 /// </summary>
 internal static class RawChaCha20TestCases
 {
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
         }
     }
 
-    // Raw CKM_CHACHA20 is gated by default (no integrity protection — see Pkcs11Session's
+    // Raw CKM_CHACHA20 is gated by default (no integrity protection — see Pkcs11SessionCore's
     // CryptoPolicyViolationException for this mechanism), which is exactly what these tests exercise, so
     // The AllowInsecure policy is required.
     private static void WithImportedKey(IPkcs11Backend backend, byte[] rawKey, Action<Pkcs11Key> body)
     {
         backend.RequireMechanism(CKM.CKM_CHACHA20);
-        using var workspace = backend.OpenWorkspace();
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var session = backend.OpenSession();
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"chacha20-raw-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             body(key);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // PKCS#11 v3.0 CK_CHACHA20_PARAMS: little-endian block counter, IETF layout is 32-bit

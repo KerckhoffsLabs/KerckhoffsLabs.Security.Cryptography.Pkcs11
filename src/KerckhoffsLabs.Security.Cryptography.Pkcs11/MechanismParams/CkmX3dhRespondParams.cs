@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// High-level wrapper for <see cref="CK_X3DH_RESPOND_PARAMS"/>. Used with CKM_X3DH_RESPOND — Signal X3DH responder side (PKCS#11 v3.0).
 /// </summary>
 /// <remarks>
-/// <c>initiatorIdentity</c> must come from the workspace that performs the derive; it is resolved to
-/// its object handle when the operation runs, and a disposed key or one from another workspace is
+/// <c>initiatorIdentity</c> must come from the session that performs the derive; it is resolved to
+/// its object handle when the operation runs, and a disposed key or one from another session is
 /// refused there.
 /// </remarks>
 public sealed class CkmX3dhRespondParams : MechanismParameters

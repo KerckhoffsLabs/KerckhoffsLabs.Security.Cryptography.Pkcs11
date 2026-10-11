@@ -28,7 +28,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// <para>
 /// <b>Requires a policy that permits reading key material off the token, e.g.
-/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
+/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
 /// <c>byte[]</c>, so the derived value must be read off the token — this adapter cannot be
 /// implemented without extracting key material. The refusal comes from the library's single
 /// secure-defaults gate, which declines to create the extractable, non-sensitive key the
@@ -110,7 +110,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyMaterial(ECDiffieHellmanPublicKey otherPartyPublicKey)
         => DeriveKeyFromHash(otherPartyPublicKey, HashAlgorithmName.SHA256, null, null);
 
@@ -121,7 +121,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="otherPartyPublicKey"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
     public override byte[] DeriveRawSecretAgreement(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
@@ -171,7 +171,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <exception cref="ArgumentException">Thrown if <paramref name="hashAlgorithm"/> has no name, or <paramref name="otherPartyPublicKey"/> has no X or Y coordinate.</exception>
     /// <exception cref="Pkcs11ArgumentException">Thrown if <paramref name="otherPartyPublicKey"/>'s curve does not match this key's, its coordinate lengths don't match that curve's field size, or its point does not satisfy the curve equation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> agreement, or thrown when the derived secret cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public override byte[] DeriveKeyFromHmac(
         ECDiffieHellmanPublicKey otherPartyPublicKey,
         HashAlgorithmName hashAlgorithm,
@@ -212,7 +212,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
 
     private byte[] DeriveRawSecret(ECDiffieHellmanPublicKey otherPartyPublicKey)
     {
-        _key.Workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret));
+        _key.Session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.EcdhSharedSecret));
 
         ECParameters peer = otherPartyPublicKey.ExportParameters();
         byte[] x = peer.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(otherPartyPublicKey));
@@ -239,8 +239,8 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
             .Build();
 
         // Public, gated path — the same one an external caller would use. The template asks for an
-        // extractable, non-sensitive key, so Pkcs11Session.BuildSecureKeyDefaults refuses unless the
-        // workspace has opted in. That single check is the whole policy; there is no adapter-local
+        // extractable, non-sensitive key, so Pkcs11SessionCore.BuildSecureKeyDefaults refuses unless the
+        // session has opted in. That single check is the whole policy; there is no adapter-local
         // guard to keep in step with it.
         Pkcs11Key derived = _key.Derive(mech, template);
         bool operationFailed = true;
@@ -291,7 +291,7 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     /// <summary>
     /// Encodes an uncompressed EC point (0x04 ‖ X ‖ Y) as a DER OCTET STRING, the form PKCS#11 expects
     /// for the ECDH1 public-data parameter (the full <c>CKA_EC_POINT</c> value). Also used by
-    /// <see cref="Pkcs11Workspace.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/> to
+    /// <see cref="Pkcs11Session.DeriveSharedSecretEcdh(Pkcs11Key, ECParameters, int, CKD)"/> to
     /// build the raw-span form after validating the peer.
     /// </summary>
     internal static byte[] EncodeEcPointAsDerOctetString(byte[] x, byte[] y)
@@ -359,10 +359,10 @@ public sealed class ECDiffieHellmanPkcs11 : ECDiffieHellman
     public override void ImportParameters(ECParameters parameters)
         => throw new NotSupportedException(
             "ECDiffieHellmanPkcs11 wraps a PKCS#11 key handle; importing managed parameters is not supported. " +
-            "Use Pkcs11Workspace.ImportKey or GenerateKey instead.");
+            "Use Pkcs11Session.ImportKey or GenerateKey instead.");
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
     public override void GenerateKey(ECCurve curve)
-        => throw new NotSupportedException("Use Pkcs11Workspace.GenerateKey to generate keys on the token.");
+        => throw new NotSupportedException("Use Pkcs11Session.GenerateKey to generate keys on the token.");
 }

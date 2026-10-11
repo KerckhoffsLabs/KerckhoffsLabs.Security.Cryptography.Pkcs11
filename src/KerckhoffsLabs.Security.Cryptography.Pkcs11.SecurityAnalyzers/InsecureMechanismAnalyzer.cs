@@ -43,7 +43,7 @@ public sealed class InsecureMechanismAnalyzer : DiagnosticAnalyzer
         description:
             "Broken primitives (MD2/MD5/SHA-1, RC2/RC4, DES/3DES, SEED, CAST, RC5, Blowfish, Skipjack, " +
             "RIPEMD, DSA) and unauthenticated AES modes (ECB/CBC/CTR/CTS/OFB/CFB) are refused at runtime " +
-            "by the default SecureOnly crypto policy (Pkcs11Workspace.Policy). Prefer authenticated AES " +
+            "by the default SecureOnly crypto policy (Pkcs11Session.Policy). Prefer authenticated AES " +
             "(GCM/CCM) and SHA-2/SHA-3. Suppress this diagnostic only alongside a documented interop reason.",
         helpLinkUri:
             "https://kerckhoffslabs.github.io/KerckhoffsLabs.Security.Cryptography.Pkcs11/diagnostics.html#KLPKCS11009");

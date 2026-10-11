@@ -51,16 +51,16 @@ public sealed class ECDsaPkcs11Tests_Managed
         WithEcDsa(curve, (_, ec) => body(ec, hash));
     }
 
-    // As above, but hands the workspace to the body (for scoping to the AllowInsecure policy) and leaves the hash to
+    // As above, but hands the session to the body (for scoping to the AllowInsecure policy) and leaves the hash to
     // the caller — so the same key can be exercised across hash algorithms independent of the curve.
-    private static void WithEcDsa(string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
+    private static void WithEcDsa(string curve, Action<Pkcs11Session, ECDsaPkcs11> body)
     {
         var (eccurve, _, _) = Spec(curve);
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateEcKeyPair(eccurve);
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateEcKeyPair(eccurve);
         using var ec = new ECDsaPkcs11(key);
-        body(workspace, ec);
+        body(session, ec);
     }
 
     // === Construction =====================================================
@@ -69,10 +69,10 @@ public sealed class ECDsaPkcs11Tests_Managed
     public void Ctor_NonEcKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes").ValueLen(32).Encrypt().Decrypt().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new ECDsaPkcs11(key));
         Assert.Equal("key", ex.ParamName);
@@ -172,11 +172,11 @@ public sealed class ECDsaPkcs11Tests_Managed
     });
 
     [Fact]
-    public void VerifyData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (workspace, ec) =>
+    public void VerifyData_Sha1_GatedByDefault_Throws() => WithEcDsa("P-256", (session, ec) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");
         byte[] sig;
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             sig = ec.SignData(data, HashAlgorithmName.SHA1);
 
         Assert.Throws<CryptoPolicyViolationException>(
@@ -184,10 +184,10 @@ public sealed class ECDsaPkcs11Tests_Managed
     });
 
     [Fact]
-    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithEcDsa("P-256", (workspace, ec) =>
+    public void SignVerifyData_Sha1_AllowInsecure_RoundTrips() => WithEcDsa("P-256", (session, ec) =>
     {
         byte[] data = Encoding.UTF8.GetBytes("legacy");
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] sig = ec.SignData(data, HashAlgorithmName.SHA1);
             Assert.True(ec.VerifyData(data, sig, HashAlgorithmName.SHA1));
@@ -203,8 +203,8 @@ public sealed class ECDsaPkcs11Tests_Managed
     private static void WithFipsOnlyEcDsa(Action<ECDsaPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library, CryptoPolicy.FipsOnly);
-        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var session = ManagedToken.OpenSession(library, CryptoPolicy.FipsOnly);
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var ec = new ECDsaPkcs11(key);
         body(ec);
     }

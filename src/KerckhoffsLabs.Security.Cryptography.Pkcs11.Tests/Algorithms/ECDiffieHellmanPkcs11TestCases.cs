@@ -18,13 +18,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 internal static class ECDiffieHellmanPkcs11TestCases
 {
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -34,12 +34,12 @@ internal static class ECDiffieHellmanPkcs11TestCases
     // Generates a P-256 key pair on the token (private half CKA_DERIVE) and hands the adapter to the
     // body. Skips where the backend lacks EC key-pair generation or ECDH derivation.
     /// <summary>
-    /// Runs <paramref name="body"/> against an on-token EC key with the workspace opted in.
+    /// Runs <paramref name="body"/> against an on-token EC key with the session opted in.
     /// </summary>
     /// <remarks>
     /// Every <c>ECDiffieHellman</c> method returns <c>byte[]</c>, so this adapter reads the agreement
     /// off the token in all of them — it cannot be implemented without extraction. The single gate in
-    /// <c>Pkcs11Session.BuildSecureKeyDefaults</c> therefore refuses the whole adapter unless the
+    /// <c>Pkcs11SessionCore.BuildSecureKeyDefaults</c> therefore refuses the whole adapter unless the
     /// caller opts in, which is what these tests do. <c>WithEcdhStrict</c> keeps the default posture
     /// so the refusal itself stays covered.
     /// </remarks>
@@ -54,8 +54,8 @@ internal static class ECDiffieHellmanPkcs11TestCases
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDH1_DERIVE))
             Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
 
-        using var workspace = OpenWorkspace(backend);
-        using IDisposable? insecure = allowExtraction ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using var session = OpenSession(backend);
+        using IDisposable? insecure = allowExtraction ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
         string label = $"ecdh-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -64,7 +64,7 @@ internal static class ECDiffieHellmanPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Derive().Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var ecdh = new ECDiffieHellmanPkcs11(key);
@@ -78,20 +78,20 @@ internal static class ECDiffieHellmanPkcs11TestCases
 
     internal static void Assert_Ctor_NonEcKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"ecdh-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new ECDiffieHellmanPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_DeriveKeyFromHash_AgreesWithBcl(IPkcs11Backend backend) =>

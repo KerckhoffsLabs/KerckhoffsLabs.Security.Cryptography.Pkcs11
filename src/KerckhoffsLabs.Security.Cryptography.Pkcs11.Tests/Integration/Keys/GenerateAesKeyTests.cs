@@ -4,30 +4,30 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// Backend-agnostic assertions for <c>Pkcs11Workspace.GenerateAesKey</c>. The per-backend test
+/// Backend-agnostic assertions for <c>Pkcs11Session.GenerateAesKey</c>. The per-backend test
 /// classes live in <c>GenerateAesKeyTests.Pkcs11Mock.cs</c> and <c>GenerateAesKeyTests.SoftHsm2.cs</c>.
 /// </summary>
 internal static class GenerateAesKeyTestCases
 {
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
     internal static void Assert_RejectsWrongBitLength(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateAesKey(bitLength: 64));
-        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateAesKey(bitLength: 100));
-        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.GenerateAesKey(bitLength: 512));
+        using var session = OpenSession(backend);
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateAesKey(bitLength: 64));
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateAesKey(bitLength: 100));
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.GenerateAesKey(bitLength: 512));
     }
 
     internal static void Assert_GeneratesAes256Key(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var key = workspace.GenerateAesKey(bitLength: 256);
+        using var session = OpenSession(backend);
+        using var key = session.GenerateAesKey(bitLength: 256);
 
         Assert.False(key.PrivateHandle.IsInvalid);
 
-        using var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
+        using var attrs = session.Core.GetAttributeValue(key.PrivateHandle, [CKA.CKA_VALUE_LEN]);
         var attr = Assert.Single(attrs);
         Assert.Equal(32UL, attr.GetValueAsUlong());
     }
@@ -39,10 +39,10 @@ internal static class GenerateAesKeyTestCases
     /// </summary>
     internal static void Assert_GeneratedKey_HasNoWrapCapability(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var key = workspace.GenerateAesKey(bitLength: 256);
+        using var session = OpenSession(backend);
+        using var key = session.GenerateAesKey(bitLength: 256);
 
-        using var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP]);
+        using var attrs = session.Core.GetAttributeValue(key.PrivateHandle, [CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP]);
         Assert.True(attrs[0].GetValueAsBool());
         Assert.True(attrs[1].GetValueAsBool());
         Assert.False(attrs[2].GetValueAsBool());
@@ -55,12 +55,12 @@ internal static class GenerateAesKeyTestCases
     /// </summary>
     internal static void Assert_GeneratesKeyEncryptionKey_WrapUnwrapOnly(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var kek = workspace.GenerateAesKeyEncryptionKey(bitLength: 256);
+        using var session = OpenSession(backend);
+        using var kek = session.GenerateAesKeyEncryptionKey(bitLength: 256);
 
         Assert.False(kek.PrivateHandle.IsInvalid);
 
-        using var attrs = workspace.Session.GetAttributeValue(kek.PrivateHandle, [CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP]);
+        using var attrs = session.Core.GetAttributeValue(kek.PrivateHandle, [CKA.CKA_ENCRYPT, CKA.CKA_DECRYPT, CKA.CKA_WRAP, CKA.CKA_UNWRAP]);
         Assert.False(attrs[0].GetValueAsBool());
         Assert.False(attrs[1].GetValueAsBool());
         Assert.True(attrs[2].GetValueAsBool());

@@ -20,7 +20,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// Triple-DES has a 64-bit block, which makes it vulnerable to birthday-bound (Sweet32) collisions
 /// after a few GB under one key, and NIST has deprecated it. Like <see cref="AesPkcs11"/> /
 /// <see cref="DESPkcs11"/>, every operation throws <c>CryptoPolicyViolationException</c> unless
-/// the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it. Prefer
+/// the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it. Prefer
 /// <see cref="AesGcmPkcs11"/> or <see cref="AesCcmPkcs11"/>; this type exists only for legacy/interop
 /// scenarios.
 /// </para>
@@ -30,7 +30,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// reflects the token key's real length when it exposes <c>CKA_VALUE_LEN</c> (16 → 128, 24 → 192).
 /// </para>
 /// <para>
-/// Supported modes (on the token, once permitted by the workspace's policy):
+/// Supported modes (on the token, once permitted by the session's policy):
 /// <list type="bullet">
 /// <item>CBC — <see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> / <c>DecryptCbc</c>
 /// with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_DES3_CBC_PAD</c>) or <see cref="PaddingMode.None"/>
@@ -45,12 +45,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// NOT supported: CFB/OFB stream modes (PKCS#11 defines no <c>CKM_DES3_CFB/OFB</c> mechanism);
 /// <see cref="CreateEncryptor(byte[], byte[])"/> / <see cref="CreateDecryptor(byte[], byte[])"/> (no
 /// <see cref="ICryptoTransform"/> over a non-extractable token key); <see cref="GenerateKey"/>
-/// (generate via <c>Pkcs11Workspace</c> instead); the <see cref="Key"/> property; and any padding
+/// (generate via <c>Pkcs11Session</c> instead); the <see cref="Key"/> property; and any padding
 /// other than PKCS7/None. These throw <see cref="NotSupportedException"/>.
 /// </para>
 /// </remarks>
 [Obsolete("Triple-DES has a 64-bit block (Sweet32) and is NIST-deprecated. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "TripleDESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "TripleDESPkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's session.",
     DiagnosticId = DiagnosticIds.TripleDes,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class TripleDESPkcs11 : TripleDES
@@ -127,7 +127,7 @@ public sealed class TripleDESPkcs11 : TripleDES
         // Padded encryption (CKM_DES3_CBC_PAD) must emit a full padding block, so that path always
         // goes to the token.
         if (input.IsEmpty
-            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && _key.Session.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
             && !(encrypt && mechanism.Type == CKM.CKM_DES3_CBC_PAD))
         {
             bytesWritten = 0;
@@ -174,10 +174,10 @@ public sealed class TripleDESPkcs11 : TripleDES
     /// <summary>Generates a random initialization vector (8 bytes) for CBC mode.</summary>
     public override void GenerateIV() => IVValue = RandomNumberGenerator.GetBytes(BlockSize / 8);
 
-    /// <summary>Not supported — the Triple-DES key is token-resident. Generate keys via <c>Pkcs11Workspace</c>.</summary>
+    /// <summary>Not supported — the Triple-DES key is token-resident. Generate keys via <c>Pkcs11Session</c>.</summary>
     /// <exception cref="NotSupportedException">Always.</exception>
     public override void GenerateKey() =>
-        throw new NotSupportedException("TripleDESPkcs11 wraps a token-resident key; generate keys via Pkcs11Workspace.GenerateKey instead.");
+        throw new NotSupportedException("TripleDESPkcs11 wraps a token-resident key; generate keys via Pkcs11Session.GenerateKey instead.");
 
     /// <summary>Not supported — there is no <see cref="ICryptoTransform"/> over a non-extractable token key. Use the one-shot EncryptCbc/DecryptCbc API.</summary>
     /// <exception cref="NotSupportedException">Always.</exception>

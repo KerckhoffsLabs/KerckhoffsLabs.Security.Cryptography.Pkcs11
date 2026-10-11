@@ -13,14 +13,14 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
     private readonly KryopticBackendFixture _backend = backend;
 
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithPin(
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Rsa_PrivateOnly_HasSynthesizedPublicView()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
 
         string label = $"rsa-test-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -33,7 +33,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
             .Label(label).Id(id).Sign()
             .Build();
 
-        workspace.Session.GenerateKeyPair(
+        session.Core.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
             [.. pubTpl.Attributes],
             [.. privTpl.Attributes],
@@ -43,10 +43,10 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
         try
         {
             // Destroy the public-key object so only the private-side survives.
-            workspace.Session.DestroyObject(pubHandle);
+            session.Core.DestroyObject(pubHandle);
 
             // Now OpenKey by label — it should find ONLY the private and synthesize the public view.
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
 
             Assert.False(key.PrivateHandle.IsInvalid);
             Assert.True(key.PublicHandle.IsInvalid); // no CKO_PUBLIC_KEY companion left
@@ -57,7 +57,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
         }
         finally
         {
-            workspace.Session.DestroyObject(privHandle);
+            session.Core.DestroyObject(privHandle);
         }
     }
 
@@ -67,7 +67,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Rsa_PrivateOnly_ManagedVerify_Pkcs1AndPss_RoundTrip()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
         string label = $"rsa-managedverify-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -77,14 +77,14 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(label).Id(id).Sign().Build();
 
-        workspace.Session.GenerateKeyPair(
+        session.Core.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN),
             [.. pubTpl.Attributes], [.. privTpl.Attributes],
             out var pubHandle, out var privHandle);
         try
         {
-            workspace.Session.DestroyObject(pubHandle); // leave only the private-side
-            using var key = workspace.OpenKey(label);
+            session.Core.DestroyObject(pubHandle); // leave only the private-side
+            using var key = session.OpenKey(label);
             Assert.True(key.PublicHandle.IsInvalid);
 
             using var rsa = new RSAPkcs11(key);
@@ -104,7 +104,7 @@ public sealed class Pkcs11KeyPublicSynthesisTests_Kryoptic(KryopticBackendFixtur
         }
         finally
         {
-            workspace.Session.DestroyObject(privHandle);
+            session.Core.DestroyObject(privHandle);
         }
     }
 

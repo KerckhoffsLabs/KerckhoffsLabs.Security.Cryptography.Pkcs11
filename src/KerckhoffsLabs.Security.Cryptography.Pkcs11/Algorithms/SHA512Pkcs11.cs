@@ -6,24 +6,24 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <summary>
 /// BCL-aligned <see cref="SHA512"/> implementation backed by a PKCS#11 token's digest mechanism
 /// (<c>CKM_SHA512</c>), analogous to the framework's <c>SHA512Cng</c>. Does NOT take ownership of
-/// the supplied <see cref="Pkcs11Workspace"/>. See <see cref="SHA256Pkcs11"/> for the buffering
+/// the supplied <see cref="Pkcs11Session"/>. See <see cref="SHA256Pkcs11"/> for the buffering
 /// rationale (PKCS#11 single-part digest is one-shot).
 /// </summary>
 public sealed class SHA512Pkcs11 : SHA512
 {
-    private readonly Pkcs11Workspace _workspace;
+    private readonly Pkcs11Session _session;
     private readonly System.IO.MemoryStream _buffer = new();
 
     /// <summary>
-    /// Initialises a new PKCS#11-backed SHA-512 instance over <paramref name="workspace"/>.
+    /// Initialises a new PKCS#11-backed SHA-512 instance over <paramref name="session"/>.
     /// </summary>
-    /// <param name="workspace">An open workspace whose token supports <c>CKM_SHA512</c>. Borrowed,
+    /// <param name="session">An open session whose token supports <c>CKM_SHA512</c>. Borrowed,
     /// not owned — the caller remains responsible for disposing it.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="workspace"/> is null.</exception>
-    public SHA512Pkcs11(Pkcs11Workspace workspace)
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="session"/> is null.</exception>
+    public SHA512Pkcs11(Pkcs11Session session)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
-        _workspace = workspace;
+        ArgumentNullException.ThrowIfNull(session);
+        _session = session;
     }
 
     /// <summary>Resets the internal buffer so the instance can be reused for a new computation.</summary>
@@ -43,7 +43,7 @@ public sealed class SHA512Pkcs11 : SHA512
         var mech = new Mechanism(CKM.CKM_SHA512);
         byte[] data = _buffer.ToArray();
         _buffer.SetLength(0);
-        return _workspace.Digest(mech, data);
+        return _session.Digest(mech, data);
     }
 
     /// <inheritdoc/>

@@ -21,13 +21,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// </summary>
 internal static class MLDsaPkcs11TestCases
 {
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -42,7 +42,7 @@ internal static class MLDsaPkcs11TestCases
         if (!backend.SupportsMlDsa)
             Assert.Skip("Backend cannot operate ML-DSA (CKM_ML_DSA unavailable).");
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"mldsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -52,7 +52,7 @@ internal static class MLDsaPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mldsa = new MLDsaPkcs11(key);
@@ -66,20 +66,20 @@ internal static class MLDsaPkcs11TestCases
 
     internal static void Assert_Ctor_NonMlDsaKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"mldsa-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new MLDsaPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_SignVerifyData_RoundTrips(IPkcs11Backend backend, CkpMlDsa parameterSet) =>

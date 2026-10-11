@@ -37,7 +37,7 @@ public sealed class Pkcs11LibraryOptions
     private readonly string? _moduleParameters;
 
     /// <summary>
-    /// Logger factory for the library and every <see cref="Pkcs11Slot"/>/<c>Pkcs11Session</c> it
+    /// Logger factory for the library and every <see cref="Pkcs11Slot"/>/<c>Pkcs11SessionCore</c> it
     /// produces, or <see langword="null"/> (the default) for no logging.
     /// </summary>
     public ILoggerFactory? LoggerFactory { get; init; }

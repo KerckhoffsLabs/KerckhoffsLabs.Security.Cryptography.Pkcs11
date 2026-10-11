@@ -30,10 +30,10 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
     private static void WithImportedChaCha(byte[] key, Action<ChaCha20Poly1305Pkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_CHACHA20)
             .Label("chacha").Value(key).Encrypt().Decrypt().Build();
-        using var k = workspace.ImportKey(tpl);
+        using var k = session.ImportKey(tpl);
         using var chacha = new ChaCha20Poly1305Pkcs11(k);
         body(chacha);
     }
@@ -233,10 +233,10 @@ public sealed class ChaCha20Poly1305Pkcs11Tests_Managed
     public void Ctor_NonChaChaKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new ChaCha20Poly1305Pkcs11(key));
         Assert.Equal("key", ex.ParamName);

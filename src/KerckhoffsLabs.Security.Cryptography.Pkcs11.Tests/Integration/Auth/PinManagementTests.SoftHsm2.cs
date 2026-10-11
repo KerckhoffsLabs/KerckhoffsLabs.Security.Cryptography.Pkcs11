@@ -5,7 +5,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
 
 /// <summary>
-/// SoftHSM-only integration for <c>Pkcs11Workspace.SetPinWithPin</c> — performs a real <c>C_SetPIN</c>
+/// SoftHSM-only integration for <c>Pkcs11Session.SetPinWithPin</c> — performs a real <c>C_SetPIN</c>
 /// round-trip and always restores the shared token's user PIN.
 /// </summary>
 [Collection("SoftHsm")]
@@ -19,7 +19,7 @@ public sealed class PinManagementTests_SoftHsm(SoftHsmBackendFixture f)
         byte[] original = _backend.UserPin.ToArray();
         byte[] temp = Encoding.UTF8.GetBytes("87654321");
 
-        using var workspace = _backend.Library.OpenWorkspaceWithPin(
+        using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(original));
 
         bool atTemp = false;
@@ -27,14 +27,14 @@ public sealed class PinManagementTests_SoftHsm(SoftHsmBackendFixture f)
         {
             using (var o = new SecurePin(original))
             using (var n = new SecurePin(temp))
-                workspace.SetPinWithPin(o, n);
+                session.SetPinWithPin(o, n);
             atTemp = true;
 
             // Succeeds only if the PIN is now 'temp' — which proves the first change took effect —
             // and restores the shared token's PIN to its original value.
             using (var o = new SecurePin(temp))
             using (var n = new SecurePin(original))
-                workspace.SetPinWithPin(o, n);
+                session.SetPinWithPin(o, n);
             atTemp = false;
         }
         finally
@@ -43,7 +43,7 @@ public sealed class PinManagementTests_SoftHsm(SoftHsmBackendFixture f)
             {
                 using var o = new SecurePin(temp);
                 using var n = new SecurePin(original);
-                try { workspace.SetPinWithPin(o, n); } catch { /* best-effort restore of shared token */ }
+                try { session.SetPinWithPin(o, n); } catch { /* best-effort restore of shared token */ }
             }
         }
 

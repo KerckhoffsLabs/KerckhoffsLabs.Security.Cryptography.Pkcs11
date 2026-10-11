@@ -73,8 +73,8 @@ public sealed class CkmHkdfParams : MechanismParameters
     /// the salt never leaves the token.
     /// </summary>
     /// <remarks>
-    /// <paramref name="saltKey"/> must come from the workspace that performs the derive; it is resolved
-    /// to its object handle when the operation runs, and a disposed key or one from another workspace
+    /// <paramref name="saltKey"/> must come from the session that performs the derive; it is resolved
+    /// to its object handle when the operation runs, and a disposed key or one from another session
     /// is refused there.
     /// </remarks>
     /// <param name="operation">Which HKDF step(s) to perform.</param>

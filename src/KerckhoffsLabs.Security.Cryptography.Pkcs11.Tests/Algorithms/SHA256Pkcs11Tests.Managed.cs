@@ -17,8 +17,8 @@ public sealed class SHA256Pkcs11_Managed
 {
     public static bool Supported => true;
 
-    private static Pkcs11Workspace OpenWorkspace(Pkcs11Library library) =>
-        ManagedToken.OpenWorkspace(library);
+    private static Pkcs11Session OpenSession(Pkcs11Library library) =>
+        ManagedToken.OpenSession(library);
 
     // === Known-answer + BCL cross-checks =================================================
 
@@ -26,8 +26,8 @@ public sealed class SHA256Pkcs11_Managed
     public void ComputeHash_KnownAnswer_MatchesFips180Vector()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var sha = new SHA256Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var sha = new SHA256Pkcs11(session);
 
         byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes("abc"));
 
@@ -42,8 +42,8 @@ public sealed class SHA256Pkcs11_Managed
     public void ComputeHash_MatchesBclSha256()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var sha = new SHA256Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var sha = new SHA256Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         Assert.Equal(SHA256.HashData(data), sha.ComputeHash(data));
@@ -53,8 +53,8 @@ public sealed class SHA256Pkcs11_Managed
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var sha = new SHA256Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var sha = new SHA256Pkcs11(session);
 
         byte[] data = RandomNumberGenerator.GetBytes(517);
         Assert.Equal(SHA256.HashData(data), sha.ComputeHash(data));
@@ -64,8 +64,8 @@ public sealed class SHA256Pkcs11_Managed
     public void ComputeHash_EmptyInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var sha = new SHA256Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var sha = new SHA256Pkcs11(session);
 
         byte[] digest = sha.ComputeHash([]);
 
@@ -81,8 +81,8 @@ public sealed class SHA256Pkcs11_Managed
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var sha = new SHA256Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var sha = new SHA256Pkcs11(session);
 
         // Feed in chunks via TransformBlock/TransformFinalBlock; result must equal the one-shot hash.
         byte[] part1 = Encoding.UTF8.GetBytes("hello ");
@@ -98,8 +98,8 @@ public sealed class SHA256Pkcs11_Managed
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var sha = new SHA256Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var sha = new SHA256Pkcs11(session);
 
         byte[] first = sha.ComputeHash(Encoding.UTF8.GetBytes("one"));
         byte[] second = sha.ComputeHash(Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize
@@ -110,9 +110,9 @@ public sealed class SHA256Pkcs11_Managed
     // === Construction and argument validation (run before any native call) ================
 
     [Fact]
-    public void Ctor_NullWorkspace_Throws()
+    public void Ctor_NullSession_Throws()
     {
         var ex = Assert.Throws<ArgumentNullException>(() => new SHA256Pkcs11(null!));
-        Assert.Equal("workspace", ex.ParamName);
+        Assert.Equal("session", ex.ParamName);
     }
 }

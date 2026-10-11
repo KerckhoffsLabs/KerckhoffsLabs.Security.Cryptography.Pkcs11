@@ -17,16 +17,16 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Compat;
 /// </summary>
 internal static class SpecVersionGateTestSupport
 {
-    internal static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    internal static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
     /// <summary>AES-GCM round-trip + tamper rejection through <see cref="AesGcmPkcs11"/>.</summary>
-    internal static void AssertAesGcmRoundTrips(Pkcs11Workspace workspace)
+    internal static void AssertAesGcmRoundTrips(Pkcs11Session session)
     {
-        using var key = workspace.GenerateAesKey(256);
+        using var key = session.GenerateAesKey(256);
         using var gcm = new AesGcmPkcs11(key, 16);
 
-        byte[] nonce = workspace.GenerateRandom(12);
+        byte[] nonce = session.GenerateRandom(12);
         byte[] plaintext = Encoding.UTF8.GetBytes("spec-version gate round trip");
         byte[] aad = Encoding.UTF8.GetBytes("gate-aad");
         byte[] ciphertext = new byte[plaintext.Length];
@@ -47,17 +47,17 @@ internal static class SpecVersionGateTestSupport
     }
 
     /// <summary>SHA-256 through the token must match the BCL over the same input.</summary>
-    internal static void AssertSha256MatchesBcl(Pkcs11Workspace workspace)
+    internal static void AssertSha256MatchesBcl(Pkcs11Session session)
     {
         byte[] data = Encoding.UTF8.GetBytes("spec-version gate digest");
-        using var sha = new SHA256Pkcs11(workspace);
+        using var sha = new SHA256Pkcs11(session);
         Assert.Equal(SHA256.HashData(data), sha.ComputeHash(data));
     }
 
     /// <summary>RSA-PSS sign/verify round-trip through <see cref="RSAPkcs11"/>.</summary>
-    internal static void AssertRsaSignVerifyRoundTrips(Pkcs11Workspace workspace)
+    internal static void AssertRsaSignVerifyRoundTrips(Pkcs11Session session)
     {
-        using var key = workspace.GenerateRsaSigningKeyPair(2048);
+        using var key = session.GenerateRsaSigningKeyPair(2048);
         using var rsa = new RSAPkcs11(key);
 
         byte[] data = Encoding.UTF8.GetBytes("spec-version gate signature");
@@ -78,9 +78,9 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void Negotiation_ReportsV240OnlySurface()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
-        Assert.False(ws.Session.SupportsMessageApi);
-        Assert.False(ws.Session.SupportsV32Api);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
+        Assert.False(ws.Core.SupportsMessageApi);
+        Assert.False(ws.Core.SupportsV32Api);
     }
 
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
@@ -93,17 +93,17 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void LoginUser_Throws_FunctionNotSupported()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         using var pin = new SecurePin(_backend.UserPin.Span);
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ws.Session.LoginUser(CKU.CKU_USER, pin, "user"));
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ws.Core.LoginUser(CKU.CKU_USER, pin, "user"));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void CancelOperations_Throws_FunctionNotSupported()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
-        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ws.Session.CancelOperations((ulong)CKF.CKF_ENCRYPT));
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => ws.Core.CancelOperations((ulong)CKF.CKF_ENCRYPT));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
@@ -112,10 +112,10 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         var mech = new Mechanism(CKM.CKM_ML_KEM);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
-            () => ws.Session.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
+            () => ws.Core.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
@@ -125,22 +125,22 @@ public sealed class SpecVersionGateTests_V240(SoftHsmGate240Fixture backend)
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void AesGcm_RoundTrips_ViaV240ConcatFallback()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
-        Assert.False(ws.Session.SupportsMessageApi); // proves the fallback path is the one taken
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
+        Assert.False(ws.Core.SupportsMessageApi); // proves the fallback path is the one taken
         SpecVersionGateTestSupport.AssertAesGcmRoundTrips(ws);
     }
 
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void Sha256_MatchesBcl()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         SpecVersionGateTestSupport.AssertSha256MatchesBcl(ws);
     }
 
     [Fact(SkipUnless = nameof(SoftHsmGate240Fixture.Available), SkipType = typeof(SoftHsmGate240Fixture), Skip = "Requires " + nameof(SoftHsmGate240Fixture.Available))]
     public void RsaPss_SignVerify_RoundTrips()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         SpecVersionGateTestSupport.AssertRsaSignVerifyRoundTrips(ws);
     }
 }
@@ -153,20 +153,20 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
     [Fact(SkipUnless = nameof(SoftHsmGate30Fixture.Available), SkipType = typeof(SoftHsmGate30Fixture), Skip = "Requires " + nameof(SoftHsmGate30Fixture.Available))]
     public void Negotiation_ReportsV30Surface_WithoutV32()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         // The gate rewrote the interface version to {3,0}: message API bound, v3.2 additions not.
-        Assert.True(ws.Session.SupportsMessageApi);
-        Assert.False(ws.Session.SupportsV32Api);
+        Assert.True(ws.Core.SupportsMessageApi);
+        Assert.False(ws.Core.SupportsV32Api);
     }
 
     // The same v3.2 degradation contract holds on the v3.0 tier.
     [Fact(SkipUnless = nameof(SoftHsmGate30Fixture.Available), SkipType = typeof(SoftHsmGate30Fixture), Skip = "Requires " + nameof(SoftHsmGate30Fixture.Available))]
     public void EncapsulateKey_Throws_FunctionNotSupported()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         var mech = new Mechanism(CKM.CKM_ML_KEM);
         var ex = Assert.ThrowsAny<Pkcs11Exception>(
-            () => ws.Session.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
+            () => ws.Core.EncapsulateKey(mech, new Internal.ObjectHandle(1), []));
         Assert.Equal(CKR.CKR_FUNCTION_NOT_SUPPORTED, ex.ReturnValue);
     }
 
@@ -183,15 +183,15 @@ public sealed class SpecVersionGateTests_V30(SoftHsmGate30Fixture backend)
     [Fact(SkipUnless = nameof(SoftHsmGate30Fixture.Available), SkipType = typeof(SoftHsmGate30Fixture), Skip = "Requires " + nameof(SoftHsmGate30Fixture.Available))]
     public void AesGcm_RoundTrips()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
-        Assert.True(ws.Session.SupportsMessageApi);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
+        Assert.True(ws.Core.SupportsMessageApi);
         SpecVersionGateTestSupport.AssertAesGcmRoundTrips(ws);
     }
 
     [Fact(SkipUnless = nameof(SoftHsmGate30Fixture.Available), SkipType = typeof(SoftHsmGate30Fixture), Skip = "Requires " + nameof(SoftHsmGate30Fixture.Available))]
     public void Sha256_MatchesBcl()
     {
-        using var ws = SpecVersionGateTestSupport.OpenWorkspace(_backend);
+        using var ws = SpecVersionGateTestSupport.OpenSession(_backend);
         SpecVersionGateTestSupport.AssertSha256MatchesBcl(ws);
     }
 }

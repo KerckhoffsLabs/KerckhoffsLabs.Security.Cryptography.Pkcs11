@@ -18,7 +18,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// fill bytes mirror <see cref="HKDF"/> and produce the same output for the same inputs. Reading that
 /// output means taking key material off the token, so under the default policy they throw
 /// <see cref="CryptoPolicyViolationException"/> unless the caller opens a scoped
-/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>. The additions —
+/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>. The additions —
 /// <see cref="DeriveKey(HashAlgorithmName, Pkcs11Key, ObjectTemplate, ReadOnlySpan{byte}, ReadOnlySpan{byte})"/>,
 /// <see cref="ExtractKey"/> and <see cref="ExpandKey"/> — keep the result on the token as a
 /// <see cref="Pkcs11Key"/> and need no override: prefer them whenever the derived material only has to
@@ -59,7 +59,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="ikm"/> is not a generic-secret or HKDF key.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="outputLength"/> is not positive or exceeds 255 · the hash length; or <paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "Mirrors System.Security.Cryptography.HKDF's signatures one-for-one; the span overload binds only from span arguments, so no call site is ambiguous.")]
     public static byte[] DeriveKey(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, int outputLength, byte[]? salt = null, byte[]? info = null)
@@ -87,7 +87,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="ikm"/> is not a generic-secret or HKDF key; or <paramref name="output"/> is empty or longer than 255 · the hash length.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
     public static void DeriveKey(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, Span<byte> output, ReadOnlySpan<byte> salt, ReadOnlySpan<byte> info)
     {
@@ -114,7 +114,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="ikm"/> is not a generic-secret or HKDF key.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses the template or the mechanism.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses the template or the mechanism.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The template overload differs from the byte[]/span overloads in a required parameter's type (ObjectTemplate), so no call site is ambiguous.")]
     public static Pkcs11Key DeriveKey(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, ObjectTemplate template,
@@ -140,7 +140,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="ikm"/> is not a generic-secret or HKDF key.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "Mirrors System.Security.Cryptography.HKDF's signatures one-for-one; the span overload binds only from span arguments, so no call site is ambiguous.")]
     public static byte[] Extract(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, byte[]? salt = null)
@@ -166,7 +166,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="ikm"/> is not a generic-secret or HKDF key; or <paramref name="prk"/> is shorter than the hash length.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
     public static int Extract(HashAlgorithmName hashAlgorithmName, Pkcs11Key ikm, ReadOnlySpan<byte> salt, Span<byte> prk)
     {
@@ -224,7 +224,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="prk"/> is not a generic-secret or HKDF key, or the token reports it shorter than the hash length.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="outputLength"/> is not positive or exceeds 255 · the hash length; or <paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = "Mirrors System.Security.Cryptography.HKDF's signatures one-for-one; the span overload binds only from span arguments, so no call site is ambiguous.")]
     public static byte[] Expand(HashAlgorithmName hashAlgorithmName, Pkcs11Key prk, int outputLength, byte[]? info = null)
@@ -252,7 +252,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="prk"/> is not a generic-secret or HKDF key, or the token reports it shorter than the hash length; or <paramref name="output"/> is empty or longer than 255 · the hash length.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses reading the derived value off the token.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses reading the derived value off the token.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying token calls.</exception>
     public static void Expand(HashAlgorithmName hashAlgorithmName, Pkcs11Key prk, Span<byte> output, ReadOnlySpan<byte> info)
     {
@@ -279,7 +279,7 @@ public static class HkdfPkcs11
     /// <exception cref="ArgumentException"><paramref name="prk"/> is not a generic-secret or HKDF key, or the token reports it shorter than the hash length.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="hashAlgorithmName"/> is not a known hash.</exception>
     /// <exception cref="NotSupportedException"><paramref name="hashAlgorithmName"/> is SHA-1 or MD5.</exception>
-    /// <exception cref="CryptoPolicyViolationException">The workspace's policy refuses the template or the mechanism.</exception>
+    /// <exception cref="CryptoPolicyViolationException">The session's policy refuses the template or the mechanism.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public static Pkcs11Key ExpandKey(HashAlgorithmName hashAlgorithmName, Pkcs11Key prk, ObjectTemplate template, ReadOnlySpan<byte> info = default)
     {

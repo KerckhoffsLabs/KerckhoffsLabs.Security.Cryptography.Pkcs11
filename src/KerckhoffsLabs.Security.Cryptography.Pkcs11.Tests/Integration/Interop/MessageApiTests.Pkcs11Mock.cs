@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// <summary>
 /// Coverage for the PKCS#11 v3.0 message-based AEAD/sign/verify dispatch
 /// (<c>LowLevelPkcs11Library.MessageEncryption/Decryption/Signing/Verifying.cs</c>). pkcs11-mock advertises the full v3.0 function table — every
-/// <c>C_Message*</c> symbol resolves, so <see cref="Pkcs11Session.SupportsMessageApi"/> reports
+/// <c>C_Message*</c> symbol resolves, so <see cref="Pkcs11SessionCore.SupportsMessageApi"/> reports
 /// <c>true</c> — but each function's body is a hard-coded <c>return CKR_FUNCTION_NOT_SUPPORTED;</c>
 /// stub (verified against vendor/pkcs11-mock/src/pkcs11-mock.c). That distinction — a module can
 /// advertise a v3.0+ function in its table without the call actually working — is itself worth
@@ -91,7 +91,7 @@ public sealed class MessageApiTests(MockBackendFixture f)
         }
     }
 
-    // Message-based sign/verify have no high-level Pkcs11Session wrapper (unlike MessageEncrypt/
+    // Message-based sign/verify have no high-level Pkcs11SessionCore wrapper (unlike MessageEncrypt/
     // MessageDecrypt), so these go through the internal low-level accessor directly — the raw API
     // returns CKR rather than throwing, which is exactly the boundary LowLevelPkcs11Library owns.
     [Fact]

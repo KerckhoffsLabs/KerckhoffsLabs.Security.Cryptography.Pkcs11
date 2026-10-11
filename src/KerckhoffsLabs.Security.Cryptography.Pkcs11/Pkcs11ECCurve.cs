@@ -57,8 +57,8 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// True when this is a known catalog curve providing less than 128-bit security (field size
     /// &lt; 256-bit): the 160/192/224-bit NIST, Brainpool and SEC 2 Koblitz curves — ten in all,
     /// listed in <c>Pkcs11ECCurve.NamedCurves._belowBaselineOids</c>.
-    /// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/> refuses these unless
-    /// the workspace's <see cref="Pkcs11Workspace.Policy"/> permits it. An OID outside the catalog reports
+    /// <see cref="Pkcs11Session.GenerateEcKeyPair"/> refuses these unless
+    /// the session's <see cref="Pkcs11Session.Policy"/> permits it. An OID outside the catalog reports
     /// <see langword="false"/> — its strength can't be inferred from the OID alone.
     /// </summary>
     internal bool IsBelowSecurityBaseline => Oid is not null && _belowBaselineOids.Contains(Oid);

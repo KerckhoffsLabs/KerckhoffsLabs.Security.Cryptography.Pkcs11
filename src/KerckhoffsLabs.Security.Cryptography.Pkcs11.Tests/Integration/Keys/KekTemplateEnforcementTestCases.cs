@@ -6,7 +6,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 
 /// <summary>
-/// Confirms <c>Pkcs11Workspace.GenerateAesKeyEncryptionKey</c>'s documented security guarantee is
+/// Confirms <c>Pkcs11Session.GenerateAesKeyEncryptionKey</c>'s documented security guarantee is
 /// actually enforced by a real backend, not just marshalled correctly: its <c>CKA_WRAP_TEMPLATE</c>
 /// (only CKA_SENSITIVE keys are wrappable) and <c>CKA_UNWRAP_TEMPLATE</c> (every unwrapped key is
 /// forced CKA_SENSITIVE/non-extractable) actually constrain wrap/unwrap, not just marshal cleanly.
@@ -46,11 +46,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// </remarks>
 internal static class KekTemplateEnforcementTestCases
 {
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) => backend.OpenSession();
 
     // Matches the wrap-template filter (CKA_SENSITIVE) and is extractable, so it's wrappable at all.
-    private static Pkcs11Key GenerateWrappableTargetKey(Pkcs11Workspace workspace) =>
-        workspace.GenerateKey(
+    private static Pkcs11Key GenerateWrappableTargetKey(Pkcs11Session session) =>
+        session.GenerateKey(
             new Mechanism(CKM.CKM_AES_KEY_GEN),
             ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Sensitive().Extractable().Build());
 
@@ -58,10 +58,10 @@ internal static class KekTemplateEnforcementTestCases
     // is itself gated by GuardInsecureKeyAttributes (a plaintext-readable-off-token key), so this
     // deliberately-insecure key needs the same opt-in -- unrelated to the CKA_WRAP_TEMPLATE gate this
     // test exercises, just a prerequisite for constructing the mismatching key at all.
-    private static Pkcs11Key GenerateNonWrappableTargetKey(Pkcs11Workspace workspace)
+    private static Pkcs11Key GenerateNonWrappableTargetKey(Pkcs11Session session)
     {
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        return workspace.GenerateKey(
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        return session.GenerateKey(
             new Mechanism(CKM.CKM_AES_KEY_GEN),
             ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Sensitive(false).Extractable().Build());
     }
@@ -75,9 +75,9 @@ internal static class KekTemplateEnforcementTestCases
     private static Pkcs11Key Unwrap(Pkcs11Key kek, byte[] wrapped, ObjectTemplate template) =>
         kek.Unwrap(new Mechanism(CKM.CKM_AES_KEY_WRAP), wrapped, template);
 
-    private static bool GetBoolAttr(Pkcs11Workspace workspace, Pkcs11Key key, CKA attr)
+    private static bool GetBoolAttr(Pkcs11Session session, Pkcs11Key key, CKA attr)
     {
-        using var attrs = workspace.Session.GetAttributeValue(key.PrivateHandle, [attr]);
+        using var attrs = session.Core.GetAttributeValue(key.PrivateHandle, [attr]);
         return attrs[0].GetValueAsBool();
     }
 
@@ -86,9 +86,9 @@ internal static class KekTemplateEnforcementTestCases
     internal static void Assert_Wrap_SensitiveTargetKey_Succeeds(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_KEY_WRAP);
-        using var workspace = OpenWorkspace(backend);
-        using var kek = workspace.GenerateAesKeyEncryptionKey();
-        using var target = GenerateWrappableTargetKey(workspace);
+        using var session = OpenSession(backend);
+        using var kek = session.GenerateAesKeyEncryptionKey();
+        using var target = GenerateWrappableTargetKey(session);
 
         byte[] wrapped = Wrap(kek, target);
         Assert.NotEmpty(wrapped);
@@ -99,9 +99,9 @@ internal static class KekTemplateEnforcementTestCases
     internal static void Assert_Wrap_NonSensitiveTargetKey_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_KEY_WRAP);
-        using var workspace = OpenWorkspace(backend);
-        using var kek = workspace.GenerateAesKeyEncryptionKey();
-        using var target = GenerateNonWrappableTargetKey(workspace);
+        using var session = OpenSession(backend);
+        using var kek = session.GenerateAesKeyEncryptionKey();
+        using var target = GenerateNonWrappableTargetKey(session);
 
         Assert.ThrowsAny<Pkcs11Exception>(() => Wrap(kek, target));
     }
@@ -111,9 +111,9 @@ internal static class KekTemplateEnforcementTestCases
     internal static void Assert_Unwrap_ExplicitMatchingTemplate_Succeeds(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_KEY_WRAP);
-        using var workspace = OpenWorkspace(backend);
-        using var kek = workspace.GenerateAesKeyEncryptionKey();
-        using var target = GenerateWrappableTargetKey(workspace);
+        using var session = OpenSession(backend);
+        using var kek = session.GenerateAesKeyEncryptionKey();
+        using var target = GenerateWrappableTargetKey(session);
         byte[] wrapped = Wrap(kek, target);
 
         // Explicitly restates the values CKA_UNWRAP_TEMPLATE imposes (Sensitive=true,
@@ -122,8 +122,8 @@ internal static class KekTemplateEnforcementTestCases
             .Sensitive().NonExtractable().Build();
         using var unwrapped = Unwrap(kek, wrapped, unwrapTemplate);
 
-        Assert.True(GetBoolAttr(workspace, unwrapped, CKA.CKA_SENSITIVE));
-        Assert.False(GetBoolAttr(workspace, unwrapped, CKA.CKA_EXTRACTABLE));
+        Assert.True(GetBoolAttr(session, unwrapped, CKA.CKA_SENSITIVE));
+        Assert.False(GetBoolAttr(session, unwrapped, CKA.CKA_EXTRACTABLE));
     }
 
     // Both backends agree on CKR_TEMPLATE_INCONSISTENT for an explicit conflict (unlike the
@@ -131,9 +131,9 @@ internal static class KekTemplateEnforcementTestCases
     internal static void Assert_Unwrap_ExplicitConflictingTemplate_Throws(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_KEY_WRAP);
-        using var workspace = OpenWorkspace(backend);
-        using var kek = workspace.GenerateAesKeyEncryptionKey();
-        using var target = GenerateWrappableTargetKey(workspace);
+        using var session = OpenSession(backend);
+        using var kek = session.GenerateAesKeyEncryptionKey();
+        using var target = GenerateWrappableTargetKey(session);
         byte[] wrapped = Wrap(kek, target);
 
         // Explicitly requests Extractable=true, conflicting with the KEK's imposed false.
@@ -148,9 +148,9 @@ internal static class KekTemplateEnforcementTestCases
     internal static void Assert_Unwrap_OmittedAttributeTemplate_TreatsAsInherited(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_AES_KEY_WRAP);
-        using var workspace = OpenWorkspace(backend);
-        using var kek = workspace.GenerateAesKeyEncryptionKey();
-        using var target = GenerateWrappableTargetKey(workspace);
+        using var session = OpenSession(backend);
+        using var kek = session.GenerateAesKeyEncryptionKey();
+        using var target = GenerateWrappableTargetKey(session);
         byte[] wrapped = Wrap(kek, target);
 
         // No CKA_EXTRACTABLE/CKA_SENSITIVE at all -- ObjectTemplate.Empty() has no builder defaults
@@ -161,7 +161,7 @@ internal static class KekTemplateEnforcementTestCases
             .Build();
         using var unwrapped = Unwrap(kek, wrapped, unwrapTemplate);
 
-        Assert.True(GetBoolAttr(workspace, unwrapped, CKA.CKA_SENSITIVE));
-        Assert.False(GetBoolAttr(workspace, unwrapped, CKA.CKA_EXTRACTABLE));
+        Assert.True(GetBoolAttr(session, unwrapped, CKA.CKA_SENSITIVE));
+        Assert.False(GetBoolAttr(session, unwrapped, CKA.CKA_EXTRACTABLE));
     }
 }

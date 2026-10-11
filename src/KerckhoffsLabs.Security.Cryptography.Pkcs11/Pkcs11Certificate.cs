@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
-/// A certificate object on a PKCS#11 token, returned by <see cref="Pkcs11Workspace.FindCertificates"/>.
+/// A certificate object on a PKCS#11 token, returned by <see cref="Pkcs11Session.FindCertificates"/>.
 /// Exposes the parsed <see cref="X509Certificate2"/> (identity + public key), retains the token
 /// handle for <see cref="Destroy"/>, and bridges to the associated on-token private key — located by
 /// the certificate's <c>CKA_ID</c> — as a <see cref="Pkcs11Key"/>.
@@ -13,22 +13,22 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// The certificate and its private key are two distinct token objects (PKCS#11 models them
 /// separately, and a non-extractable key cannot be fused into a single <see cref="X509Certificate2"/>
 /// on the OpenSSL backend). Operations on a key returned by <see cref="TryOpenPrivateKey"/> run on
-/// the token and are valid only while the owning <see cref="Pkcs11Workspace"/> is open. Disposing
+/// the token and are valid only while the owning <see cref="Pkcs11Session"/> is open. Disposing
 /// this instance disposes the wrapped <see cref="X509Certificate2"/> but does not destroy the token
 /// object — use <see cref="Destroy"/>.
 /// </remarks>
 public sealed class Pkcs11Certificate : IDisposable
 {
-    private readonly Pkcs11Workspace _workspace;
+    private readonly Pkcs11Session _session;
     private readonly ObjectHandle _handle;
     private readonly byte[] _id;
     private readonly X509Certificate2 _certificate;
     private bool _disposed;
 
     internal Pkcs11Certificate(
-        Pkcs11Workspace workspace, ObjectHandle handle, string? label, byte[] id, X509Certificate2 certificate)
+        Pkcs11Session session, ObjectHandle handle, string? label, byte[] id, X509Certificate2 certificate)
     {
-        _workspace = workspace;
+        _session = session;
         _handle = handle;
         _id = id ?? [];
         _certificate = certificate;
@@ -62,7 +62,7 @@ public sealed class Pkcs11Certificate : IDisposable
     public Pkcs11Key? TryOpenPrivateKey()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _workspace.TryOpenPrivateKey(_id);
+        return _session.TryOpenPrivateKey(_id);
     }
 
     /// <summary>
@@ -75,7 +75,7 @@ public sealed class Pkcs11Certificate : IDisposable
     public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        _workspace.Session.DestroyObject(_handle);
+        _session.Core.DestroyObject(_handle);
     }
 
     /// <inheritdoc/>

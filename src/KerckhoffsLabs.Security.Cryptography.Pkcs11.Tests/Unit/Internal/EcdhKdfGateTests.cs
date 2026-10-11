@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// The key-agreement KDF inside <c>CK_ECDH1_DERIVE_PARAMS</c> is judged on every ECDH derivation and KEM,
-/// not only through <c>Pkcs11Workspace.DeriveSharedSecretEcdh</c>: <c>Pkcs11Key.Derive</c> and
+/// not only through <c>Pkcs11Session.DeriveSharedSecretEcdh</c>: <c>Pkcs11Key.Derive</c> and
 /// <c>EncapsulateKey</c> / <c>DecapsulateKey</c> reach the same session calls and meet the same allow-list.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -50,7 +50,7 @@ public sealed class EcdhKdfGateTests
         }
     }
 
-    private static void Derive(Pkcs11Session session, Mechanism mechanism)
+    private static void Derive(Pkcs11SessionCore session, Mechanism mechanism)
     {
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
         session.DeriveKey(mechanism, new ObjectHandle(5UL), [.. template.Attributes]);
@@ -173,12 +173,12 @@ public sealed class EcdhKdfGateTests
 
     // The public generic path: before this check it derived a key straight from the raw ECDH secret.
     [Fact]
-    public void Workspace_KeyDerive_RefusesCkdNull()
+    public void Session_KeyDerive_RefusesCkdNull()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using Pkcs11Key ours = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
-        using Pkcs11Key theirs = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var session = ManagedToken.OpenSession(library);
+        using Pkcs11Key ours = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using Pkcs11Key theirs = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         byte[] peerPoint = theirs.GetAttributeValue(CKA.CKA_EC_POINT)[0].GetValueAsByteArray();
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Build();
 

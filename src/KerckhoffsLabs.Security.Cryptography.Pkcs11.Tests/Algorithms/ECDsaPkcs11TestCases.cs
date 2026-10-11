@@ -26,10 +26,10 @@ internal static class ECDsaPkcs11TestCases
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown EC curve."),
     };
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static Pkcs11Key GenerateEcKey(Pkcs11Workspace workspace, byte[] ecOid)
+    private static Pkcs11Key GenerateEcKey(Pkcs11Session session, byte[] ecOid)
     {
         string label = $"ec-prov-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -39,13 +39,13 @@ internal static class ECDsaPkcs11TestCases
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Sign().Build();
 
-        return workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
+        return session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
     }
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -60,19 +60,19 @@ internal static class ECDsaPkcs11TestCases
     private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<ECDsaPkcs11> body) =>
         WithEcDsa(backend, curve, (_, ec) => body(ec));
 
-    // Overload exposing the workspace for tests that need UsePolicy(CryptoPolicy.AllowInsecure) (e.g. SHA-224/SHA-1).
-    private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<Pkcs11Workspace, ECDsaPkcs11> body)
+    // Overload exposing the session for tests that need UsePolicy(CryptoPolicy.AllowInsecure) (e.g. SHA-224/SHA-1).
+    private static void WithEcDsa(IPkcs11Backend backend, string curve, Action<Pkcs11Session, ECDsaPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDSA))
             Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDSA.");
 
         var (oid, _, _) = Spec(curve);
-        using var workspace = OpenWorkspace(backend);
-        using var key = GenerateEcKey(workspace, oid);
+        using var session = OpenSession(backend);
+        using var key = GenerateEcKey(session, oid);
         try
         {
             using var ec = new ECDsaPkcs11(key);
-            body(workspace, ec);
+            body(session, ec);
         }
         finally
         {
@@ -82,20 +82,20 @@ internal static class ECDsaPkcs11TestCases
 
     internal static void Assert_Ctor_NonEcKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"ec-wrongtype-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new ECDsaPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // Curve × hash matrix: ECDSA signs whatever digest it is handed, so curve and digest are
@@ -143,9 +143,9 @@ internal static class ECDsaPkcs11TestCases
     internal static void Assert_TrySignData_Sha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend, string curve)
     {
         backend.RequireMechanisms(CKM.CKM_ECDSA_SHA224);
-        WithEcDsa(backend, curve, (workspace, ec) =>
+        WithEcDsa(backend, curve, (session, ec) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 var hash = new HashAlgorithmName("SHA224");
                 byte[] data = Encoding.UTF8.GetBytes("sha224 combined hash+sign on token");

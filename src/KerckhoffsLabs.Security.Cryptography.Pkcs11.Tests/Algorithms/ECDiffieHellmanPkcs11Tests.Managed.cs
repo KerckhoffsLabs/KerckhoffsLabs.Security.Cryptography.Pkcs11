@@ -55,7 +55,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
 
     // Generates an EC key pair on the token (private half CKA_DERIVE) and hands the adapter to the body.
     /// <summary>
-    /// Opts the workspace in: every method on this adapter returns bytes read off the token, so the
+    /// Opts the session in: every method on this adapter returns bytes read off the token, so the
     /// single gate in <c>BuildSecureKeyDefaults</c> refuses all of them by default.
     /// <c>WithEcdhStrict</c> keeps the default posture for the tests that assert the refusal.
     /// </summary>
@@ -68,9 +68,9 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     private static void WithEcdh(string curve, Action<ECDiffieHellmanPkcs11> body, bool allowExtraction)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using IDisposable? insecure = allowExtraction ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
-        using var key = workspace.GenerateEcKeyPair(Curves(curve).token);
+        using var session = ManagedToken.OpenSession(library);
+        using IDisposable? insecure = allowExtraction ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using var key = session.GenerateEcKeyPair(Curves(curve).token);
         using var ecdh = new ECDiffieHellmanPkcs11(key);
         body(ecdh);
     }
@@ -150,7 +150,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     /// under the default posture — not just the raw-secret one.
     /// </summary>
     /// <remarks>
-    /// The refusal comes from <c>Pkcs11Session.BuildSecureKeyDefaults</c>, the single place that
+    /// The refusal comes from <c>Pkcs11SessionCore.BuildSecureKeyDefaults</c>, the single place that
     /// decides whether extractable key material may be created. The adapter carries no guard of its
     /// own, which is the point: there is nothing here that can drift out of step with the policy, and
     /// a new adapter cannot forget to apply it.
@@ -188,11 +188,11 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     public void DeriveRawSecret_BothOnTokenParties_Match_AndMatchBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // reads Z back on both sides
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // reads Z back on both sides
 
-        using var aliceKey = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
-        using var bobKey = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var aliceKey = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var bobKey = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         using var alice = new ECDiffieHellmanPkcs11(aliceKey);
         using var bob = new ECDiffieHellmanPkcs11(bobKey);
 
@@ -328,10 +328,10 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     public void Ctor_NonEcKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new ECDiffieHellmanPkcs11(key));
         Assert.Equal("key", ex.ParamName);

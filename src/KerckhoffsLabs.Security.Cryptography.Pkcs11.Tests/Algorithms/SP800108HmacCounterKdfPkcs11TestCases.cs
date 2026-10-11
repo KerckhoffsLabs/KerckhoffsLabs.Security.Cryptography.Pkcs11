@@ -31,13 +31,13 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     private static readonly byte[] Context = Encoding.UTF8.GetBytes("kdf-context");
     private static readonly byte[] ProbeMessage = "sp800-108-sign-probe"u8.ToArray();
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -45,42 +45,42 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
     }
 
     // Imports KeyBytes as a derive-capable generic-secret base key and hands the KDF to the body.
-    private static void WithImportedKdf(IPkcs11Backend backend, Action<Pkcs11Workspace, SP800108HmacCounterKdfPkcs11> body)
+    private static void WithImportedKdf(IPkcs11Backend backend, Action<Pkcs11Session, SP800108HmacCounterKdfPkcs11> body)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         // The byte-returning DeriveKey overloads read the derived value off the token, so the gate in
         // BuildSecureKeyDefaults refuses them under the default posture. Opt in here.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"kdf-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(KeyBytes).Derive().Sign().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             using var kdf = new SP800108HmacCounterKdfPkcs11(key, HashAlgorithmName.SHA256);
-            body(workspace, kdf);
+            body(session, kdf);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // Imports the base key and hands the raw Pkcs11Key (for ctor-validation tests).
-    private static void WithImportedKdfKey(IPkcs11Backend backend, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithImportedKdfKey(IPkcs11Backend backend, Action<Pkcs11Session, Pkcs11Key> body)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"kdf-raw-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(KeyBytes).Derive().Sign().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
-            body(workspace, key);
+            using var key = session.ImportKey(tpl);
+            body(session, key);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Ctor_NonGenericSecretKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"kdf-aes-{Guid.NewGuid():N}";
         byte[] aes = new byte[32];
         RandomNumberGenerator.Fill(aes);
@@ -88,12 +88,12 @@ internal static class SP800108HmacCounterKdfPkcs11TestCases
             .Label(label).Value(aes).Derive().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             var ex = Assert.Throws<ArgumentException>(
                 () => new SP800108HmacCounterKdfPkcs11(key, HashAlgorithmName.SHA256));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Ctor_UnsupportedPrfHash_Throws(IPkcs11Backend backend) =>

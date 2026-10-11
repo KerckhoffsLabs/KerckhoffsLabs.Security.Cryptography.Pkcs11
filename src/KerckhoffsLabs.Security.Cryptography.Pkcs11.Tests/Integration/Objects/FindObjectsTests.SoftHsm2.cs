@@ -10,7 +10,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Objects;
 
 /// <summary>
-/// SoftHSM-only: <see cref="Pkcs11Workspace.FindObjects"/> / <see cref="Pkcs11Object"/>
+/// SoftHSM-only: <see cref="Pkcs11Session.FindObjects"/> / <see cref="Pkcs11Object"/>
 /// enumerate and read back a non-key object — an X.509 certificate — which the key-only
 /// <c>FindKeys</c> path cannot reach.
 /// </summary>
@@ -22,7 +22,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
-        using var workspace = _backend.Library.OpenWorkspaceWithPin(
+        using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         // A self-signed X.509 cert to store on the token.
@@ -41,13 +41,13 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
             .OnToken()
             .Build())
         {
-            workspace.Session.CreateObject([.. tpl.Attributes]);
+            session.Core.CreateObject([.. tpl.Attributes]);
         }
 
         // FindObjects sees the certificate and reads it back.
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            using var objs = workspace.FindObjects(filter);
+            using var objs = session.FindObjects(filter);
             var obj = Assert.Single(objs);
             Assert.Equal(CKO.CKO_CERTIFICATE, obj.ObjectClass);
             Assert.Equal(der, obj.GetValue());
@@ -56,18 +56,18 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
         // Delete via the view; confirm it's gone.
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            var objs = workspace.FindObjects(filter);
+            var objs = session.FindObjects(filter);
             objs[0].Destroy();
             foreach (var o in objs) o.Dispose();
         }
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
-            Assert.Empty(workspace.FindObjects(filter));
+            Assert.Empty(session.FindObjects(filter));
     }
 
     [Fact(SkipUnless = nameof(SoftHsmBackendFixture.SoftHsmAvailable), SkipType = typeof(SoftHsmBackendFixture), Skip = "Requires " + nameof(SoftHsmBackendFixture.SoftHsmAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
-        using var workspace = _backend.Library.OpenWorkspaceWithPin(
+        using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         string baseLabel = $"certkey-{Guid.NewGuid():N}";
@@ -78,7 +78,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
             .Label(baseLabel).Id(id).Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]).OnToken().Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(baseLabel).Id(id).Sign().OnToken().Build();
-        using var keypair = workspace.GenerateKeyPair(
+        using var keypair = session.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
 
         // 2. Mint a cert SIGNED BY THE TOKEN KEY via X509SignatureGenerator (no CopyWithPrivateKey,
@@ -101,13 +101,13 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
         using (var certTpl = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
             .Label(certLabel).Id(id).Subject(subject).Value(der).OnToken().Build())
         {
-            workspace.Session.CreateObject([.. certTpl.Attributes]);
+            session.Core.CreateObject([.. certTpl.Attributes]);
         }
 
         try
         {
             // 4. FindCertificates -> Pkcs11Certificate; bridge to the on-token key and sign.
-            using var certs = workspace.FindCertificates();
+            using var certs = session.FindCertificates();
             Pkcs11Certificate? cert = certs.FirstOrDefault(c => c.Label == certLabel);
             Assert.NotNull(cert);
 
@@ -122,7 +122,7 @@ public sealed class FindObjectsTests_SoftHsm(SoftHsmBackendFixture f)
         finally
         {
             using (var cleanup = ObjectTemplate.Empty().Label(certLabel).Build())
-            using (var found = workspace.FindObjects(cleanup))
+            using (var found = session.FindObjects(cleanup))
                 foreach (var o in found) o.Destroy();
             keypair.Destroy();
         }

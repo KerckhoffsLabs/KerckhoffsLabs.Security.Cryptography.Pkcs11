@@ -31,7 +31,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
     private static void WithSlhDsa(CkpSlhDsa parameterSet, Action<SlhDsaPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
         string label = $"slhdsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
@@ -42,7 +42,7 @@ public sealed class SlhDsaPkcs11Tests_Managed
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_SLH_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKeyPair(
+        using var key = session.GenerateKeyPair(
             new Mechanism(CKM.CKM_SLH_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
@@ -200,11 +200,11 @@ public sealed class SlhDsaPkcs11Tests_Managed
     public void Ctor_NonSlhDsaKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes").ValueLen(32).Encrypt().Decrypt().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new SlhDsaPkcs11(key));
         Assert.Equal("key", ex.ParamName);

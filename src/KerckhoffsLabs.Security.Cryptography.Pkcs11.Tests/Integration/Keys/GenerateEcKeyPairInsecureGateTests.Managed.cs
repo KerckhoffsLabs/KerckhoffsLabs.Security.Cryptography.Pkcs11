@@ -32,11 +32,11 @@ public sealed class GenerateEcKeyPairInsecureGateTests
     public void WeakCurve_Throws_WithoutAllowInsecure()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
 #pragma warning disable KLPKCS11007 // exercising the gate with an intentionally-obsolete weak curve
         Assert.Throws<CryptoPolicyViolationException>(
-            () => workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224));
+            () => session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224));
 #pragma warning restore KLPKCS11007
     }
 
@@ -44,12 +44,12 @@ public sealed class GenerateEcKeyPairInsecureGateTests
     public void WeakCurve_Generates_UnderUsePolicyAllowInsecure()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
 #pragma warning disable KLPKCS11007
-            using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224);
+            using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP224);
 #pragma warning restore KLPKCS11007
             Assert.False(key.PrivateHandle.IsInvalid);
             Assert.False(key.PublicHandle.IsInvalid);
@@ -60,9 +60,9 @@ public sealed class GenerateEcKeyPairInsecureGateTests
     public void StrongCurve_Generates_WithoutAllowInsecure()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
-        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
         Assert.False(key.PrivateHandle.IsInvalid);
         Assert.False(key.PublicHandle.IsInvalid);
     }

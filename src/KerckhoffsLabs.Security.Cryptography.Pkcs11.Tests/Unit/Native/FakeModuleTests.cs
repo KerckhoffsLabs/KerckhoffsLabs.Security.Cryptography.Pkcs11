@@ -48,7 +48,7 @@ public sealed class FakeModuleTests
     {
         using var module = new SigningModule(signature: [1, 2, 3, 4, 5]);
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         byte[] signature = session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(7), "data"u8);
 
@@ -85,7 +85,7 @@ public sealed class FakeModuleTests
     {
         NativeCULong staleSession;
         using (var first = new SigningModule(signature: [9]))
-            staleSession = first.OpenSession();
+            staleSession = first.OpenSessionCore();
 
         using var second = new SigningModule(signature: [9]);
         using LowLevelPkcs11Library lowLevel = second.LoadLowLevel();
@@ -118,7 +118,7 @@ public sealed class FakeModuleTests
         public string? LastData { get; private set; }
         public ulong LastMechanism { get; private set; }
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 

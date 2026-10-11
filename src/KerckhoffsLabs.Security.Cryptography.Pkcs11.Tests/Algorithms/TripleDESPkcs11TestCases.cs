@@ -32,46 +32,46 @@ internal static class TripleDESPkcs11TestCases
 
     private static readonly byte[] Iv8 = Convert.FromHexString("1020304050607080");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
         }
     }
 
-    private static void WithImportedDes3(IPkcs11Backend backend, Action<Pkcs11Workspace, TripleDESPkcs11> body)
+    private static void WithImportedDes3(IPkcs11Backend backend, Action<Pkcs11Session, TripleDESPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DES3_CBC))
             Assert.Skip("Backend does not advertise CKM_DES3_CBC.");
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"des3-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_DES3)
             .Label(label).Value(Key192).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             using var des3 = new TripleDESPkcs11(key);
-            body(workspace, des3);
+            body(session, des3);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // Imports Key128 as a CKK_DES2 (two-key) token key. Some backends advertise CKM_DES3_CBC but
     // reject the CKK_DES2 key type/length itself — turned into a skip, not a failure, matching
     // OrSkipIfTokenLacksDes3's tolerance for that class of backend quirk.
-    private static void WithImportedDes2(IPkcs11Backend backend, Action<Pkcs11Workspace, TripleDESPkcs11> body)
+    private static void WithImportedDes2(IPkcs11Backend backend, Action<Pkcs11Session, TripleDESPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_DES3_CBC))
             Assert.Skip("Backend does not advertise CKM_DES3_CBC.");
 
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"des2-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_DES2)
             .Label(label).Value(Key128).Encrypt().Decrypt()
@@ -81,7 +81,7 @@ internal static class TripleDESPkcs11TestCases
             Pkcs11Key key;
             try
             {
-                key = workspace.ImportKey(tpl);
+                key = session.ImportKey(tpl);
             }
             catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_ATTRIBUTE_VALUE_INVALID
                 or CKR.CKR_TEMPLATE_INCONSISTENT or CKR.CKR_KEY_SIZE_RANGE)
@@ -93,10 +93,10 @@ internal static class TripleDESPkcs11TestCases
             using (key)
             {
                 using var des3 = new TripleDESPkcs11(key);
-                body(workspace, des3);
+                body(session, des3);
             }
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // Translate a token that advertises but does not implement 3DES (FIPS build) into a skip.
@@ -123,29 +123,29 @@ internal static class TripleDESPkcs11TestCases
 
     internal static void Assert_Ctor_NonDes3Key_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"nondes3-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).ValueLen(32).Sign().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new TripleDESPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
-        WithImportedDes3(backend, (workspace, des3) =>
+        WithImportedDes3(backend, (session, des3) =>
         {
             byte[] plaintext = Encoding.UTF8.GetBytes("3DES-CBC PKCS7 over a token key — variable length.");
             Assert.Throws<CryptoPolicyViolationException>(() => des3.EncryptCbc(plaintext, Iv8));
 
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclDes3();
             byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8)); // default PaddingMode.PKCS7
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv8), ct);
@@ -153,13 +153,13 @@ internal static class TripleDESPkcs11TestCases
         });
 
     internal static void Assert_EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
-        WithImportedDes3(backend, (workspace, des3) =>
+        WithImportedDes3(backend, (session, des3) =>
         {
             byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
             RandomNumberGenerator.Fill(plaintext);
             Assert.Throws<CryptoPolicyViolationException>(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
 
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclDes3();
             byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None), ct);
@@ -171,9 +171,9 @@ internal static class TripleDESPkcs11TestCases
             Assert.Throws<CryptoPolicyViolationException>(() => des3.EncryptEcb(new byte[8], PaddingMode.None)));
 
     internal static void Assert_EncryptEcb_WithAllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
-        WithImportedDes3(backend, (workspace, des3) =>
+        WithImportedDes3(backend, (session, des3) =>
         {
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] plaintext = new byte[8];
             RandomNumberGenerator.Fill(plaintext);
             using var bcl = BclDes3();
@@ -191,11 +191,11 @@ internal static class TripleDESPkcs11TestCases
             Assert.Throws<NotSupportedException>(() => des3.EncryptCbc(new byte[8], Iv8, PaddingMode.Zeros)));
 
     internal static void Assert_Cfb_NotSupported(IPkcs11Backend backend) =>
-        WithImportedDes3(backend, (workspace, des3) =>
+        WithImportedDes3(backend, (session, des3) =>
         {
             // TripleDESPkcs11 does not override the CFB cores: PKCS#11 defines no CKM_DES3_CFB mechanism,
             // so the base SymmetricAlgorithm surfaces NotSupportedException — even under the AllowInsecure policy.
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Throws<NotSupportedException>(
                 () => des3.EncryptCfb(new byte[8], Iv8, PaddingMode.None, feedbackSizeInBits: 8));
         });
@@ -208,11 +208,11 @@ internal static class TripleDESPkcs11TestCases
         });
 
     internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
-        WithImportedDes3(backend, (workspace, des3) =>
+        WithImportedDes3(backend, (session, des3) =>
         {
             Assert.Throws<CryptoPolicyViolationException>(() => des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
 
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Empty(des3.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
         });
 
@@ -239,11 +239,11 @@ internal static class TripleDESPkcs11TestCases
     // computed independently (Python's `cryptography` library, which expands K1||K2 to K1||K2||K1 the
     // same way PKCS#11 tokens do).
     internal static void Assert_TwoKeyDes3_EncryptCbc_KnownAnswer_MatchesReferenceVector(IPkcs11Backend backend) =>
-        WithImportedDes2(backend, (workspace, des3) =>
+        WithImportedDes2(backend, (session, des3) =>
         {
             byte[] plaintext = Convert.FromHexString("4E6F7720697320740000000000000000");
             byte[] expectedCt = Convert.FromHexString("8DC1D44886D99D3004C55BEE813BEC9F");
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
             byte[] ct = OrSkipIfTokenLacksDes3(() => des3.EncryptCbc(plaintext, Iv8, PaddingMode.None));
             Assert.Equal(expectedCt, ct);

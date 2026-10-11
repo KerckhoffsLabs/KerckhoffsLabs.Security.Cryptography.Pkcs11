@@ -36,7 +36,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), "data"u8);
 
@@ -50,7 +50,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
@@ -64,7 +64,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         session.Sign(new Mechanism(CKM.CKM_SHA512_HMAC), new ObjectHandle(1), "data"u8);
 
@@ -77,7 +77,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
 
         session.Encrypt(Gcm(), new ObjectHandle(1), "data"u8);
 
@@ -105,13 +105,13 @@ public sealed class OperationCostGuardTests
 
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
 
-    private delegate void Operation(Pkcs11Session session, ReadOnlySpan<byte> data);
+    private delegate void Operation(Pkcs11SessionCore session, ReadOnlySpan<byte> data);
 
     private static void AssertAllocationSlope(int maxBuffersPerInput, Operation operation)
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11Session(lowLevel, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
         byte[] small = new byte[SmallInput];
         byte[] large = new byte[LargeInput];
 
@@ -145,7 +145,7 @@ public sealed class OperationCostGuardTests
         private const int DigestLength = 32;
         private const int TagLength = 16;
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
         protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;

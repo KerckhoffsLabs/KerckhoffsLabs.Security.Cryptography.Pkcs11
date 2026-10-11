@@ -22,12 +22,12 @@ public sealed class DeriveKeyAdditionalKeysTests
     public void AdditionalDerivedKeys_AreUsableAndDestroyable()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // sibling templates below request extractable material
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // sibling templates below request extractable material
 
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("sp800108-base").Value(BaseKeyBytes).Derive().Build();
-        using var baseKey = workspace.ImportKey(baseTpl);
+        using var baseKey = session.ImportKey(baseTpl);
 
         using var siblingTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .ValueLen(16).Extractable().Sensitive(false).Build();
@@ -77,11 +77,11 @@ public sealed class DeriveKeyAdditionalKeysTests
     public void NoAdditionalDerivedKeysRequested_PropertyStaysEmptyAfterDerive()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
 
         using var baseTpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("sp800108-base-plain").Value(BaseKeyBytes).Derive().Build();
-        using var baseKey = workspace.ImportKey(baseTpl);
+        using var baseKey = session.ImportKey(baseTpl);
 
         var kdfParams = CkmSp800108KdfParams.CounterModeHmac(CKM.CKM_SHA256_HMAC, "label"u8.ToArray(), "context"u8.ToArray());
         var mechanism = new Mechanism(CKM.CKM_SP800_108_COUNTER_KDF, kdfParams);

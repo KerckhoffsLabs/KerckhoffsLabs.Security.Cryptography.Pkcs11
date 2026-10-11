@@ -15,7 +15,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <remarks>
 /// <para>
 /// Unlike <see cref="SP800108HmacCounterKdfPkcs11"/> or an HKDF wrapper, PBKDF2 has no pre-existing
-/// token key to wrap: the password is the input, so this type holds a <see cref="Pkcs11Workspace"/>
+/// token key to wrap: the password is the input, so this type holds a <see cref="Pkcs11Session"/>
 /// directly and creates an ephemeral token key on every derivation.
 /// </para>
 /// <para>
@@ -23,7 +23,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// overloads and marks every instance constructor <c>[Obsolete]</c> pointing at them (confirmed by
 /// reflecting over the real BCL type: all eight constructors carry the same obsoletion message;
 /// <c>GetBytes</c>, <c>Reset</c>, <c>Salt</c>, <c>IterationCount</c>, and <c>HashAlgorithm</c> do not).
-/// This wrapper mirrors that split exactly: the static <see cref="Pbkdf2(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName, int)"/>
+/// This wrapper mirrors that split exactly: the static <see cref="Pbkdf2(Pkcs11Session, byte[], byte[], int, HashAlgorithmName, int)"/>
 /// overloads are the recommended one-shot entry point, and the constructors are <c>[Obsolete]</c> in
 /// the same way, kept only for streaming <see cref="GetBytes"/> calls that continue one PBKDF2 byte
 /// stream across several output chunks. <c>CryptDeriveKey</c> is not mirrored: the BCL itself marks it
@@ -32,11 +32,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// <para>
 /// <b>Requires a policy that permits reading key material off the token, e.g.
-/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every derivation here returns
+/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every derivation here returns
 /// <c>byte[]</c> (or fills a caller-supplied buffer), so the value must be read back off the token —
 /// the library's single secure-defaults gate declines to create the extractable, non-sensitive key
 /// that read-back needs. Scope the policy override to one operation. To use the result as a key, call
-/// <see cref="Pbkdf2Key(Pkcs11Workspace, SecurePassword, ReadOnlySpan{byte}, int, HashAlgorithmName, ObjectTemplate)"/> instead: it keeps the derived key on the token (sensitive and
+/// <see cref="Pbkdf2Key(Pkcs11Session, SecurePassword, ReadOnlySpan{byte}, int, HashAlgorithmName, ObjectTemplate)"/> instead: it keeps the derived key on the token (sensitive and
 /// non-extractable by default) and needs no override.
 /// </para>
 /// <para>
@@ -53,7 +53,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         "The constructors on Rfc2898DeriveBytesPkcs11 are obsolete. Use the static Pbkdf2 method instead, " +
         "or Pbkdf2Key to keep the derived key on the token.";
 
-    private readonly Pkcs11Workspace _workspace;
+    private readonly Pkcs11Session _session;
     // The only copy of the password this instance keeps, borrowed by every derivation's parameters.
     private readonly SecurePassword _password;
     private byte[] _salt;
@@ -64,45 +64,45 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     private bool _disposed;
 
     /// <summary>Initializes the PBKDF2 wrapper from a password and salt.</summary>
-    /// <param name="workspace">The workspace to run <c>CKM_PKCS5_PBKD2</c> in. Borrowed, not owned.</param>
+    /// <param name="session">The session to run <c>CKM_PKCS5_PBKD2</c> in. Borrowed, not owned.</param>
     /// <param name="password">The password to derive from.</param>
     /// <param name="salt">The salt.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="workspace"/>, <paramref name="password"/>, or <paramref name="salt"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/>, or <paramref name="salt"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     [Obsolete(ConstructorsObsoleteMessage, DiagnosticId = DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors, UrlFormat = DiagnosticIds.UrlFormat)]
-    public Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm)
-        : this(workspace, (ReadOnlySpan<byte>)(password ?? throw new ArgumentNullException(nameof(password))),
+    public Rfc2898DeriveBytesPkcs11(Pkcs11Session session, byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm)
+        : this(session, (ReadOnlySpan<byte>)(password ?? throw new ArgumentNullException(nameof(password))),
               salt ?? throw new ArgumentNullException(nameof(salt)), iterations, hashAlgorithm)
     {
     }
 
     /// <summary>Initializes the PBKDF2 wrapper from a password and salt.</summary>
-    /// <inheritdoc cref="Rfc2898DeriveBytesPkcs11(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName)"/>
+    /// <inheritdoc cref="Rfc2898DeriveBytesPkcs11(Pkcs11Session, byte[], byte[], int, HashAlgorithmName)"/>
     [Obsolete(ConstructorsObsoleteMessage, DiagnosticId = DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors, UrlFormat = DiagnosticIds.UrlFormat)]
-    public Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm)
-        : this(workspace, salt, iterations, hashAlgorithm, new SecurePassword(password))
+    public Rfc2898DeriveBytesPkcs11(Pkcs11Session session, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm)
+        : this(session, salt, iterations, hashAlgorithm, new SecurePassword(password))
     {
     }
 
     /// <summary>Initializes the PBKDF2 wrapper from a UTF-8 password and salt.</summary>
-    /// <inheritdoc cref="Rfc2898DeriveBytesPkcs11(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName)"/>
+    /// <inheritdoc cref="Rfc2898DeriveBytesPkcs11(Pkcs11Session, byte[], byte[], int, HashAlgorithmName)"/>
     [Obsolete(ConstructorsObsoleteMessage, DiagnosticId = DiagnosticIds.Rfc2898DeriveBytesPkcs11Constructors, UrlFormat = DiagnosticIds.UrlFormat)]
-    public Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm)
-        : this(workspace, salt ?? throw new ArgumentNullException(nameof(salt)), iterations, hashAlgorithm,
+    public Rfc2898DeriveBytesPkcs11(Pkcs11Session session, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm)
+        : this(session, salt ?? throw new ArgumentNullException(nameof(salt)), iterations, hashAlgorithm,
               new SecurePassword(password ?? throw new ArgumentNullException(nameof(password))))
     {
     }
 
     // Takes ownership of password, releasing it if the arguments are refused.
-    private Rfc2898DeriveBytesPkcs11(Pkcs11Workspace workspace, ReadOnlySpan<byte> salt, int iterations,
+    private Rfc2898DeriveBytesPkcs11(Pkcs11Session session, ReadOnlySpan<byte> salt, int iterations,
         HashAlgorithmName hashAlgorithm, SecurePassword password)
     {
         try
         {
-            ArgumentNullException.ThrowIfNull(workspace);
+            ArgumentNullException.ThrowIfNull(session);
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
             _prf = PrfForHash(hashAlgorithm);
         }
@@ -112,7 +112,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
             throw;
         }
         _hashAlgorithm = hashAlgorithm;
-        _workspace = workspace;
+        _session = session;
         _salt = salt.ToArray();
         _iterationCount = iterations;
         _password = password;
@@ -187,14 +187,14 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="count"/> is not positive.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if this instance has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] GetBytes(int count)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
 
         int end = _position + count;
-        byte[] stream = DeriveExtractable(_workspace, _password, _salt, _iterationCount, _prf, end);
+        byte[] stream = DeriveExtractable(_session, _password, _salt, _iterationCount, _prf, end);
         byte[] slice = stream[_position..end];
         CryptographicOperations.ZeroMemory(stream);
         _position = end;
@@ -206,67 +206,67 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// construct or dispose. Mirrors <see cref="Rfc2898DeriveBytes.Pbkdf2(byte[], byte[], int, HashAlgorithmName, int)"/>
     /// and is the recommended way to call this wrapper.
     /// </summary>
-    /// <param name="workspace">The workspace to run <c>CKM_PKCS5_PBKD2</c> in.</param>
+    /// <param name="session">The session to run <c>CKM_PKCS5_PBKD2</c> in.</param>
     /// <param name="password">The password to derive from.</param>
     /// <param name="salt">The salt.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
     /// <param name="outputLength">Number of bytes to derive. Zero returns an empty array with no token call.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="workspace"/>, <paramref name="password"/>, or <paramref name="salt"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/>, or <paramref name="salt"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive, or <paramref name="outputLength"/> is negative.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
-    public static byte[] Pbkdf2(Pkcs11Workspace workspace, byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    public static byte[] Pbkdf2(Pkcs11Session session, byte[] password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(salt);
-        return Pbkdf2(workspace, (ReadOnlySpan<byte>)password, salt, iterations, hashAlgorithm, outputLength);
+        return Pbkdf2(session, (ReadOnlySpan<byte>)password, salt, iterations, hashAlgorithm, outputLength);
     }
 
     /// <summary>One-shot PBKDF2 from a UTF-8 password. Mirrors <see cref="Rfc2898DeriveBytes.Pbkdf2(string, byte[], int, HashAlgorithmName, int)"/>.</summary>
-    /// <inheritdoc cref="Pbkdf2(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName, int)"/>
-    public static byte[] Pbkdf2(Pkcs11Workspace workspace, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    /// <inheritdoc cref="Pbkdf2(Pkcs11Session, byte[], byte[], int, HashAlgorithmName, int)"/>
+    public static byte[] Pbkdf2(Pkcs11Session session, string password, byte[] salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(salt);
         using var secure = new SecurePassword(password);
-        return Pbkdf2Core(workspace, secure, salt, iterations, hashAlgorithm, outputLength);
+        return Pbkdf2Core(session, secure, salt, iterations, hashAlgorithm, outputLength);
     }
 
     /// <summary>One-shot PBKDF2. Mirrors <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, int, HashAlgorithmName, int)"/>.</summary>
-    /// <inheritdoc cref="Pbkdf2(Pkcs11Workspace, byte[], byte[], int, HashAlgorithmName, int)"/>
-    public static byte[] Pbkdf2(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    /// <inheritdoc cref="Pbkdf2(Pkcs11Session, byte[], byte[], int, HashAlgorithmName, int)"/>
+    public static byte[] Pbkdf2(Pkcs11Session session, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
         using var secure = new SecurePassword(password);
-        return Pbkdf2Core(workspace, secure, salt, iterations, hashAlgorithm, outputLength);
+        return Pbkdf2Core(session, secure, salt, iterations, hashAlgorithm, outputLength);
     }
 
     /// <summary>
     /// One-shot PBKDF2 into a caller-supplied buffer. Mirrors
     /// <see cref="Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan{byte}, ReadOnlySpan{byte}, Span{byte}, int, HashAlgorithmName)"/>.
     /// </summary>
-    /// <param name="workspace">The workspace to run <c>CKM_PKCS5_PBKD2</c> in.</param>
+    /// <param name="session">The session to run <c>CKM_PKCS5_PBKD2</c> in.</param>
     /// <param name="password">The password to derive from.</param>
     /// <param name="salt">The salt.</param>
     /// <param name="destination">Receives the derived bytes; its length is the derivation's output length. Left untouched if empty.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="workspace"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
-    public static void Pbkdf2(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, Span<byte> destination, int iterations, HashAlgorithmName hashAlgorithm)
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    public static void Pbkdf2(Pkcs11Session session, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, Span<byte> destination, int iterations, HashAlgorithmName hashAlgorithm)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(session);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
         if (destination.IsEmpty)
             return;
         CKP prf = PrfForHash(hashAlgorithm);
         byte[] derived;
         using (var secure = new SecurePassword(password))
-            derived = DeriveExtractable(workspace, secure, salt, iterations, prf, destination.Length);
+            derived = DeriveExtractable(session, secure, salt, iterations, prf, destination.Length);
         try
         {
             derived.CopyTo(destination);
@@ -279,15 +279,15 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
 
     // The byte[]-returning one-shots once each has its password in a SecurePassword; the one place
     // their arguments are checked.
-    private static byte[] Pbkdf2Core(Pkcs11Workspace workspace, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
+    private static byte[] Pbkdf2Core(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, HashAlgorithmName hashAlgorithm, int outputLength)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(session);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
         ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
         if (outputLength == 0)
             return [];
         CKP prf = PrfForHash(hashAlgorithm);
-        return DeriveExtractable(workspace, password, salt, iterations, prf, outputLength);
+        return DeriveExtractable(session, password, salt, iterations, prf, outputLength);
     }
 
     /// <summary>
@@ -308,70 +308,70 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
     /// using var password = new SecurePassword(passwordChars);
     /// using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
     /// using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(
-    ///     workspace, password, salt, 600_000, HashAlgorithmName.SHA256, template);
+    ///     session, password, salt, 600_000, HashAlgorithmName.SHA256, template);
     /// </code>
     /// </example>
-    /// <param name="workspace">The workspace to run <c>CKM_PKCS5_PBKD2</c> in.</param>
+    /// <param name="session">The session to run <c>CKM_PKCS5_PBKD2</c> in.</param>
     /// <param name="password">The password to derive from. Borrowed; the caller disposes it.</param>
     /// <param name="salt">The salt.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
     /// <param name="template">The derived key's template; its <c>CKA_VALUE_LEN</c> (or key type) sets the length derived.</param>
     /// <returns>The derived key.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="workspace"/>, <paramref name="password"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/>, <paramref name="password"/> or <paramref name="template"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if <paramref name="password"/> has been disposed.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses the PRF or the template.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses the PRF or the template.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
-    public static Pkcs11Key Pbkdf2Key(Pkcs11Workspace workspace, SecurePassword password, ReadOnlySpan<byte> salt, int iterations,
+    public static Pkcs11Key Pbkdf2Key(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations,
         HashAlgorithmName hashAlgorithm, ObjectTemplate template)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(template);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(iterations);
         CKP prf = PrfForHash(hashAlgorithm);
 
-        return workspace.GenerateKey(new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), template);
+        return session.GenerateKey(new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), template);
     }
 
     /// <summary>
     /// Runs PBKDF2 on the token and keeps the result there as a key shaped by <paramref name="template"/>.
-    /// Prefer the <see cref="Pbkdf2Key(Pkcs11Workspace, SecurePassword, ReadOnlySpan{byte}, int, HashAlgorithmName, ObjectTemplate)"/>
+    /// Prefer the <see cref="Pbkdf2Key(Pkcs11Session, SecurePassword, ReadOnlySpan{byte}, int, HashAlgorithmName, ObjectTemplate)"/>
     /// overload, which borrows a password the caller already holds securely.
     /// </summary>
     /// <remarks>
     /// The password is copied into a <see cref="SecurePassword"/> for the duration of the call and
     /// zeroed before this returns; zero your own copy yourself.
     /// </remarks>
-    /// <param name="workspace">The workspace to run <c>CKM_PKCS5_PBKD2</c> in.</param>
+    /// <param name="session">The session to run <c>CKM_PKCS5_PBKD2</c> in.</param>
     /// <param name="password">The password to derive from.</param>
     /// <param name="salt">The salt.</param>
     /// <param name="iterations">Number of PBKDF2 iterations. Must be positive.</param>
     /// <param name="hashAlgorithm">PRF hash — SHA1, SHA256, SHA384, or SHA512.</param>
     /// <param name="template">The derived key's template; its <c>CKA_VALUE_LEN</c> (or key type) sets the length derived.</param>
     /// <returns>The derived key.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="workspace"/> or <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="session"/> or <paramref name="template"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="iterations"/> is not positive.</exception>
     /// <exception cref="NotSupportedException">Thrown for an unsupported PRF hash.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses the PRF or the template.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses the PRF or the template.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_GenerateKey</c> call.</exception>
-    public static Pkcs11Key Pbkdf2Key(Pkcs11Workspace workspace, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations,
+    public static Pkcs11Key Pbkdf2Key(Pkcs11Session session, ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, int iterations,
         HashAlgorithmName hashAlgorithm, ObjectTemplate template)
     {
         using var secure = new SecurePassword(password);
-        return Pbkdf2Key(workspace, secure, salt, iterations, hashAlgorithm, template);
+        return Pbkdf2Key(session, secure, salt, iterations, hashAlgorithm, template);
     }
 
-    private static byte[] DeriveExtractable(Pkcs11Workspace workspace, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, int length)
+    private static byte[] DeriveExtractable(Pkcs11Session session, SecurePassword password, ReadOnlySpan<byte> salt, int iterations, CKP prf, int length)
     {
-        workspace.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
+        session.Enforce(new KeyMaterialExportRequest(KeyMaterialExportKind.KdfOutput));
 
-        return DeriveAndRead(workspace, new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), length);
+        return DeriveAndRead(session, new Mechanism(CKM.CKM_PKCS5_PBKD2, Pbkdf2Params(password, salt, iterations, prf)), length);
     }
 
-    private static byte[] DeriveAndRead(Pkcs11Workspace workspace, Mechanism mechanism, int length)
+    private static byte[] DeriveAndRead(Pkcs11Session session, Mechanism mechanism, int length)
     {
         // Session-scoped, extractable, non-sensitive generic secret so CKA_VALUE can be read back.
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
@@ -384,7 +384,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         // extractable, non-sensitive key, so the policy also judges it as a key template; the export
         // check above is what a policy that allows such templates but not plaintext KDF output
         // (a FIPS-style policy) relies on.
-        Pkcs11Key derived = workspace.GenerateKey(mechanism, template);
+        Pkcs11Key derived = session.GenerateKey(mechanism, template);
         bool operationFailed = true;
         try
         {
@@ -419,7 +419,7 @@ public sealed class Rfc2898DeriveBytesPkcs11 : IDisposable
         }
     }
 
-    /// <summary>Zeroizes the retained password and salt copies. Does not dispose the workspace.</summary>
+    /// <summary>Zeroizes the retained password and salt copies. Does not dispose the session.</summary>
     public void Dispose()
     {
         if (_disposed) return;

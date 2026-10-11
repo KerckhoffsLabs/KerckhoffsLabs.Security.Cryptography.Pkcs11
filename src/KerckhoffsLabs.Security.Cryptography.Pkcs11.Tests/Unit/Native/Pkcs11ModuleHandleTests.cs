@@ -44,7 +44,7 @@ public sealed class Pkcs11ModuleHandleTests
         using var module = new RecordingModule();
         LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
         lowLevel.C_Initialize(null);
-        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSession());
+        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSessionCore());
 
         lowLevel.FinalizeOnLastRelease();
         lowLevel.Dispose();
@@ -77,7 +77,7 @@ public sealed class Pkcs11ModuleHandleTests
     {
         using var module = new RecordingModule();
         LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSession());
+        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSessionCore());
 
         lowLevel.Dispose();
         session.Dispose();
@@ -189,9 +189,9 @@ public sealed class Pkcs11ModuleHandleTests
     {
         using var module = new RecordingModule();
         LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        NativeCULong failing = module.OpenSession();
+        NativeCULong failing = module.OpenSessionCore();
         _ = new Pkcs11SessionHandle(lowLevel, failing);
-        _ = new Pkcs11SessionHandle(lowLevel, module.OpenSession());
+        _ = new Pkcs11SessionHandle(lowLevel, module.OpenSessionCore());
         module.FailingClose = failing;
 
         lowLevel.Module.CloseAllTrackedSessions();
@@ -209,7 +209,7 @@ public sealed class Pkcs11ModuleHandleTests
         using var module = new NoCloseSessionModule();
         LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
         lowLevel.C_Initialize(null);
-        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSession());
+        var session = new Pkcs11SessionHandle(lowLevel, module.OpenSessionCore());
 
         lowLevel.FinalizeOnLastRelease();
         lowLevel.Dispose();
@@ -222,7 +222,7 @@ public sealed class Pkcs11ModuleHandleTests
     /// <summary>A module that opens sessions but has no <c>C_CloseSession</c>.</summary>
     private sealed class NoCloseSessionModule : FakeModule
     {
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
     }
 
     /// <summary>
@@ -239,7 +239,7 @@ public sealed class Pkcs11ModuleHandleTests
         public NativeCULong? FailingClose { get; set; }
         public List<string> Teardown { get; } = [];
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_Initialize(IntPtr pInitArgs)
             => InitializeRv != CKR.CKR_OK ? InitializeRv

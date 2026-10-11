@@ -17,7 +17,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 public sealed class MD5Pkcs11ArgumentTests
 {
     [Fact]
-    public void Ctor_NullWorkspace_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new MD5Pkcs11(workspace: null!));
+    public void Ctor_NullSession_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => new MD5Pkcs11(session: null!));
 }
 #pragma warning restore KLPKCS11001

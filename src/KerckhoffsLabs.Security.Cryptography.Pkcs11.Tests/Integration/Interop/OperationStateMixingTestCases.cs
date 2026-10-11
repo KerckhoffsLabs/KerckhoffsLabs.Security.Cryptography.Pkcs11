@@ -29,7 +29,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// state-machine property worth checking against our own backends.
 /// <para>
 /// Verified directly, not assumed (via the raw low-level dispatch, driving each session past the
-/// point <c>Pkcs11Session</c>'s own high-level API would ever reach — it always completes an entire
+/// point <c>Pkcs11SessionCore</c>'s own high-level API would ever reach — it always completes an entire
 /// operation, Init through Final, within a single method call, so this exact violation is not
 /// reachable through this library's own public surface at all): NSS, SoftHSM2, and Kryoptic each
 /// enforce SOME of these cases and not others, and none of the "not enforced" cases produce
@@ -65,7 +65,7 @@ internal static class OperationStateMixingTestCases
     private static readonly byte[] Data1 = "part one "u8.ToArray();
     private static readonly byte[] Data2 = "part two "u8.ToArray();
 
-    private static ObjectHandle CreateGenericSecret(Pkcs11Session session, byte[] rawKey)
+    private static ObjectHandle CreateGenericSecret(Pkcs11SessionCore session, byte[] rawKey)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
@@ -76,7 +76,7 @@ internal static class OperationStateMixingTestCases
         return session.CreateObject([c, t, tok, s, v, val]);
     }
 
-    private static ObjectHandle CreateAes(Pkcs11Session session, byte[] rawKey)
+    private static ObjectHandle CreateAes(Pkcs11SessionCore session, byte[] rawKey)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);
@@ -103,7 +103,7 @@ internal static class OperationStateMixingTestCases
         return enc.TransformFinalBlock(data, 0, data.Length);
     }
 
-    private static void WithRawSession(IPkcs11Backend backend, Action<LowLevelPkcs11Library, NativeCULong, Pkcs11Session> body)
+    private static void WithRawSession(IPkcs11Backend backend, Action<LowLevelPkcs11Library, NativeCULong, Pkcs11SessionCore> body)
     {
         var session = TestKeys.OpenLoggedInSession(backend);
         try

@@ -35,10 +35,10 @@ public sealed class AesGcmPkcs11Tests_Managed
     private static void WithImportedGcm(byte[] key, Action<AesGcmPkcs11> body, int tagSizeInBytes = 16)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("gcm").Value(key).Encrypt().Decrypt().Build();
-        using var key1 = workspace.ImportKey(tpl);
+        using var key1 = session.ImportKey(tpl);
         using var gcm = new AesGcmPkcs11(key1, tagSizeInBytes);
         body(gcm);
     }
@@ -281,10 +281,10 @@ public sealed class AesGcmPkcs11Tests_Managed
     public void Ctor_InvalidTagSize_Throws(int tagSizeInBytes)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("gcm").Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key, tagSizeInBytes));
         Assert.Equal("tagSizeInBytes", ex.ParamName);
@@ -320,10 +320,10 @@ public sealed class AesGcmPkcs11Tests_Managed
     public void Ctor_NonAesKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new AesGcmPkcs11(key, 16));
         Assert.Equal("key", ex.ParamName);
@@ -410,10 +410,10 @@ public sealed class AesGcmPkcs11Tests_Managed
     public void Decrypt_NonTagFailure_StaysPkcs11Exception()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("gcm-gone").Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var gcm = new AesGcmPkcs11(key, 16);
         byte[] nonce = Iota(12);
         byte[] pt = Iota(24);
@@ -423,7 +423,7 @@ public sealed class AesGcmPkcs11Tests_Managed
 
         using (var filter = ObjectTemplate.Empty().Label("gcm-gone").Build())
         {
-            foreach (var other in workspace.FindKeys(filter))
+            foreach (var other in session.FindKeys(filter))
             {
                 other.Destroy();
                 other.Dispose();

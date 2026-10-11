@@ -15,19 +15,19 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 [Collection(FakeModuleCollection.Name)]
 public sealed class EncapsulationResultTests
 {
-    private static Pkcs11Workspace NewWorkspace(out Pkcs11Library library)
+    private static Pkcs11Session NewSession(out Pkcs11Library library)
     {
         library = ManagedToken.NewLibrary();
-        return ManagedToken.OpenWorkspace(library);
+        return ManagedToken.OpenSession(library);
     }
 
     [Fact]
     public void Ctor_PairsCiphertextWithSharedSecret()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            using var key = workspace.GenerateAesKey(256, label: "encap-pair");
+            using var key = session.GenerateAesKey(256, label: "encap-pair");
             byte[] ciphertext = [1, 2, 3, 4];
 
             var result = new EncapsulationResult(ciphertext, key);
@@ -40,10 +40,10 @@ public sealed class EncapsulationResultTests
     [Fact]
     public void Deconstruct_YieldsCiphertextAndSharedSecret()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            using var key = workspace.GenerateAesKey(256, label: "encap-deconstruct");
+            using var key = session.GenerateAesKey(256, label: "encap-deconstruct");
             byte[] ciphertext = [5, 6, 7];
             var result = new EncapsulationResult(ciphertext, key);
 
@@ -57,10 +57,10 @@ public sealed class EncapsulationResultTests
     [Fact]
     public void Dispose_DisposesSharedSecret()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            var key = workspace.GenerateAesKey(256, label: "encap-dispose");
+            var key = session.GenerateAesKey(256, label: "encap-dispose");
             var result = new EncapsulationResult([1], key);
 
             result.Dispose();
@@ -72,10 +72,10 @@ public sealed class EncapsulationResultTests
     [Fact]
     public void Dispose_IsIdempotent()
     {
-        using var workspace = NewWorkspace(out var library);
+        using var session = NewSession(out var library);
         using (library)
         {
-            var key = workspace.GenerateAesKey(256, label: "encap-dispose-twice");
+            var key = session.GenerateAesKey(256, label: "encap-dispose-twice");
             var result = new EncapsulationResult([1], key);
 
             result.Dispose();

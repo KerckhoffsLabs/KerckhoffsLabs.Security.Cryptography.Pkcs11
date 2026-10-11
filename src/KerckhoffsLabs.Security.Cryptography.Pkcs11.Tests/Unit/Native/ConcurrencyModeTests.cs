@@ -89,7 +89,7 @@ public sealed class ConcurrencyModeTests
     {
         using var module = new LockingModule { CannotLock = true };
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         Task parked = Task.Run(() => library.GetInfo(), Token);
         Assert.True(module.Parked.Wait(Generous, Token), "the first call never reached the module");
@@ -136,7 +136,7 @@ public sealed class ConcurrencyModeTests
         public int PeakInFlight => Volatile.Read(ref _peakInFlight);
         public int GetInfoCalls => Volatile.Read(ref _getInfoCalls);
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_Initialize(IntPtr pInitArgs)
         {

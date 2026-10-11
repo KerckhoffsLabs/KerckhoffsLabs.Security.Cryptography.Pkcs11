@@ -13,6 +13,6 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 public sealed class SHA3_384Pkcs11ArgumentTests
 {
     [Fact]
-    public void Ctor_NullWorkspace_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new SHA3_384Pkcs11(workspace: null!));
+    public void Ctor_NullSession_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => new SHA3_384Pkcs11(session: null!));
 }

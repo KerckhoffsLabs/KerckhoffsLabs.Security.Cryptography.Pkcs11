@@ -28,14 +28,14 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         Assert.Equal(CKR.CKR_ARGUMENTS_BAD, ex.ReturnValue);
     }
 
-    // === Pkcs11Session (internal) ===========================================
+    // === Pkcs11SessionCore (internal) ===========================================
 
     [Fact]
     public void SessionLogin_NoPin_ReachesNativeCallAsNull()
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         try
         {
             AssertArgumentsBad(() => session.Login(CKU.CKU_USER));
@@ -51,7 +51,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         try
         {
             AssertArgumentsBad(() => session.SetPin());
@@ -67,7 +67,7 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         try
         {
             // C_InitPIN requires an SO-authenticated session before it even looks at the PIN
@@ -96,27 +96,27 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
         AssertArgumentsBad(() => slot.InitTokenWithPinpad(_backend.TokenLabel));
     }
 
-    // === Pkcs11Library / Pkcs11Workspace (public) ===========================
+    // === Pkcs11Library / Pkcs11Session (public) ===========================
 
     [Fact]
-    public void LibraryOpenWorkspaceWithPinpad_NoPin_ReachesNativeCallAsNull() =>
-        AssertArgumentsBad(() => _backend.Library.OpenWorkspaceWithPinpad(_backend.TokenLabel, CKU.CKU_USER));
+    public void LibraryOpenSessionWithPinpad_NoPin_ReachesNativeCallAsNull() =>
+        AssertArgumentsBad(() => _backend.Library.OpenSessionWithPinpad(_backend.TokenLabel, CKU.CKU_USER));
 
     [Fact]
-    public void WorkspaceSetPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
+    public void SessionSetPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
     {
-        using var workspace = _backend.Library.OpenWorkspaceWithPin(
+        using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
-        AssertArgumentsBad(workspace.SetPinWithPinpad);
+        AssertArgumentsBad(session.SetPinWithPinpad);
     }
 
     [Fact]
-    public void WorkspaceInitPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
+    public void SessionInitPinWithPinpad_NoArgs_ReachesNativeCallAsNull()
     {
-        using var workspace = _backend.Library.OpenWorkspaceWithPin(
+        using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_SO, new SecurePin(_backend.SoPin.Span));
 
-        AssertArgumentsBad(workspace.InitPinWithPinpad);
+        AssertArgumentsBad(session.InitPinWithPinpad);
     }
 }

@@ -33,7 +33,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// <para>
 /// <b>Requires a policy that permits reading key material off the token, e.g.
-/// <c>Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
+/// <c>Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)</c>.</b> Every method here returns
 /// <c>byte[]</c>, so the derived value must be read off the token — this adapter cannot be
 /// implemented without extracting key material. The refusal comes from the library's single
 /// secure-defaults gate, which declines to create the extractable, non-sensitive key the
@@ -85,7 +85,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(byte[] label, byte[] context, int derivedKeyLengthInBytes)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -100,7 +100,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public byte[] DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, int derivedKeyLengthInBytes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -117,7 +117,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the session's <see cref="Pkcs11Session.Policy"/> refuses it: the derived value is read off the token, which the secure-defaults gate refuses by default.</exception>
     public void DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -146,7 +146,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <param name="template">Template describing the derived key (class, type, length, attributes).</param>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
-    /// <exception cref="Exceptions.CryptoPolicyViolationException">Thrown if <paramref name="template"/> explicitly requests an extractable or non-sensitive key while the workspace's <see cref="Pkcs11Workspace.Policy"/> refuses it.</exception>
+    /// <exception cref="Exceptions.CryptoPolicyViolationException">Thrown if <paramref name="template"/> explicitly requests an extractable or non-sensitive key while the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, ObjectTemplate template)
     {

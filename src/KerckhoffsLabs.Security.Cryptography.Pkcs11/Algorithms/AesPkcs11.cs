@@ -19,12 +19,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// CBC, ECB and CFB provide confidentiality only, not integrity — they are malleable and (for CBC)
 /// padding-oracle prone. <b>All of them are gated by the secure-defaults policy</b>: every operation
-/// throws <c>CryptoPolicyViolationException</c> unless the wrapped key's workspace's
-/// <see cref="Pkcs11Workspace.Policy"/> permits it. Prefer authenticated encryption — <see cref="AesGcmPkcs11"/> or
+/// throws <c>CryptoPolicyViolationException</c> unless the wrapped key's session's
+/// <see cref="Pkcs11Session.Policy"/> permits it. Prefer authenticated encryption — <see cref="AesGcmPkcs11"/> or
 /// <see cref="AesCcmPkcs11"/>; this type exists only for legacy/interop scenarios.
 /// </para>
 /// <para>
-/// Supported modes (on the token, once permitted by the workspace's policy):
+/// Supported modes (on the token, once permitted by the session's policy):
 /// <list type="bullet">
 /// <item>CBC — <see cref="SymmetricAlgorithm.EncryptCbc(byte[], byte[], PaddingMode)"/> / <c>DecryptCbc</c>
 /// with <see cref="PaddingMode.PKCS7"/> (→ <c>CKM_AES_CBC_PAD</c>) or <see cref="PaddingMode.None"/>
@@ -42,7 +42,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// NOT supported (a token key is not extractable, so the streaming/managed-key contract of
 /// <see cref="SymmetricAlgorithm"/> does not apply): <see cref="CreateEncryptor(byte[], byte[])"/> /
 /// <see cref="CreateDecryptor(byte[], byte[])"/> (no <see cref="ICryptoTransform"/>),
-/// <see cref="GenerateKey"/> (generate via <c>Pkcs11Workspace</c> instead), the <see cref="Key"/>
+/// <see cref="GenerateKey"/> (generate via <c>Pkcs11Session</c> instead), the <see cref="Key"/>
 /// property, OFB/CTS/CTR modes, CFB feedback sizes other than 8/128, and non-PKCS7/None padding.
 /// These throw <see cref="NotSupportedException"/>.
 /// </para>
@@ -130,7 +130,7 @@ public sealed class AesPkcs11 : Aes
         // Padded encryption (CKM_AES_CBC_PAD) must emit a full padding block, so that path always
         // goes to the token.
         if (input.IsEmpty
-            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && _key.Session.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
             && !(encrypt && mechanism.Type == CKM.CKM_AES_CBC_PAD))
         {
             bytesWritten = 0;
@@ -190,10 +190,10 @@ public sealed class AesPkcs11 : Aes
     /// <summary>Generates a random initialization vector (16 bytes) for CBC mode.</summary>
     public override void GenerateIV() => IVValue = RandomNumberGenerator.GetBytes(BlockSize / 8);
 
-    /// <summary>Not supported — the AES key is token-resident. Generate keys via <c>Pkcs11Workspace</c>.</summary>
+    /// <summary>Not supported — the AES key is token-resident. Generate keys via <c>Pkcs11Session</c>.</summary>
     /// <exception cref="NotSupportedException">Always.</exception>
     public override void GenerateKey() =>
-        throw new NotSupportedException("AesPkcs11 wraps a token-resident key; generate keys via Pkcs11Workspace.GenerateKey instead.");
+        throw new NotSupportedException("AesPkcs11 wraps a token-resident key; generate keys via Pkcs11Session.GenerateKey instead.");
 
     /// <summary>Not supported — there is no <see cref="ICryptoTransform"/> over a non-extractable token key. Use the one-shot EncryptCbc/DecryptCbc API.</summary>
     /// <exception cref="NotSupportedException">Always.</exception>

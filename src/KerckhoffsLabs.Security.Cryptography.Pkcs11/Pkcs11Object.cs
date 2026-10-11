@@ -6,20 +6,20 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// A general view over a single PKCS#11 token object — certificate, data object, or any other
-/// class — returned by <see cref="Pkcs11Workspace.FindObjects(Objects.ObjectTemplate)"/>. Exposes
+/// class — returned by <see cref="Pkcs11Session.FindObjects(Objects.ObjectTemplate)"/>. Exposes
 /// the object class, label/id, and the raw <c>CKA_VALUE</c> payload. For key-specific operations
-/// (sign/verify/encrypt/wrap/…) use <see cref="Pkcs11Key"/> via the key-oriented workspace methods.
+/// (sign/verify/encrypt/wrap/…) use <see cref="Pkcs11Key"/> via the key-oriented session methods.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The view holds a non-owning handle into the workspace's session; the workspace must outlive it.
+/// The view holds a non-owning handle into the session; the session must outlive it.
 /// </para>
 /// <para>
 /// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper (and any
-/// workspace or library this instance owns); <c>Destroy</c> is the only member that calls
+/// session or library this instance owns); <c>Destroy</c> is the only member that calls
 /// <c>C_DestroyObject</c>. The two are kept apart deliberately: whether a handle refers to a
 /// short-lived session object or to a persistent key is decided at creation by <c>CKA_TOKEN</c> —
-/// a runtime template attribute, or the <c>persistOnToken</c> argument of the workspace factories —
+/// a runtime template attribute, or the <c>persistOnToken</c> argument of the session factories —
 /// so the wrapper cannot tell the two apart. Destroying when it should not is irreversible loss of
 /// key material; failing to destroy a session object costs nothing, because PKCS#11 collects those
 /// at <c>C_CloseSession</c>. Given that asymmetry, disposal stays inert and destruction stays
@@ -28,14 +28,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// </remarks>
 public sealed class Pkcs11Object : IDisposable
 {
-    private readonly Pkcs11Workspace _workspace;
+    private readonly Pkcs11Session _session;
     private readonly ObjectHandle _handle;
     private readonly byte[] _id;
     private bool _disposed;
 
-    internal Pkcs11Object(Pkcs11Workspace workspace, ObjectHandle handle, CKO objectClass, string? label, byte[] id)
+    internal Pkcs11Object(Pkcs11Session session, ObjectHandle handle, CKO objectClass, string? label, byte[] id)
     {
-        _workspace = workspace;
+        _session = session;
         _handle = handle;
         ObjectClass = objectClass;
         Label = label;
@@ -63,7 +63,7 @@ public sealed class Pkcs11Object : IDisposable
     public byte[] GetValue()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        using var attrs = _workspace.Session.GetAttributeValue(_handle, [CKA.CKA_VALUE]);
+        using var attrs = _session.Core.GetAttributeValue(_handle, [CKA.CKA_VALUE]);
         if (attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 "Pkcs11Object.GetValue (CKA_VALUE unreadable)");
@@ -83,7 +83,7 @@ public sealed class Pkcs11Object : IDisposable
     public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        _workspace.Session.DestroyObject(_handle);
+        _session.Core.DestroyObject(_handle);
     }
 
     /// <summary>

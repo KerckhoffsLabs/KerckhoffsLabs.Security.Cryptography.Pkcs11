@@ -220,7 +220,7 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     }
 
     // === Policy on the managed fallback ======================================
-    // A key with no public handle verifies in managed code. The workspace policy must judge that
+    // A key with no public handle verifies in managed code. The session policy must judge that
     // verification exactly as it judges one done on the token.
 
     private static FakeKey PrivateOnlyRsaKey(RSAParameters pub, ICryptoPolicy? policy) =>
@@ -342,8 +342,8 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     public void SupportsMechanism_WideVendorMechanism_IsFalse()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var key = workspace.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
+        using var session = ManagedToken.OpenSession(library);
+        using var key = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
 
         // CKM_SHA256 is on the managed token's mechanism list: the positive control that the probe works.
         Assert.True(key.SupportsMechanism(new Mechanism(CKM.CKM_SHA256)));

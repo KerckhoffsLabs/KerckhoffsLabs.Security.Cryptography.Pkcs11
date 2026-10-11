@@ -49,7 +49,7 @@ public sealed class ModuleLoadsTests
         using var module = new SharedStateModule();
         Pkcs11Library first = module.Load();
         Pkcs11Library second = module.Load();
-        var session = new Pkcs11Session(second.LowLevelLibrary!, (ulong)module.OpenSession());
+        var session = new Pkcs11SessionCore(second.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         first.Dispose();
 
@@ -133,7 +133,7 @@ public sealed class ModuleLoadsTests
     {
         using var module = new SharedStateModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         library.Dispose();
 
@@ -235,7 +235,7 @@ public sealed class ModuleLoadsTests
         public ManualResetEventSlim Release { get; } = new();
         public List<string> Teardown { get; } = [];
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_Initialize(IntPtr pInitArgs)
             => Interlocked.Exchange(ref _initialized, 1) == 1 ? CKR.CKR_CRYPTOKI_ALREADY_INITIALIZED : CKR.CKR_OK;

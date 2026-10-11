@@ -21,13 +21,13 @@ internal static class MD5Pkcs11TestCases
     // RFC 1321 / BCL: MD5("abc").
     private static readonly byte[] KnownDigest = Convert.FromHexString("900150983CD24FB0D6963F7D28E17F72");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
     internal static void Assert_ComputeHash_GatedByDefault_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new MD5Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new MD5Pkcs11(session);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => hash.ComputeHash(Encoding.UTF8.GetBytes("abc")));
@@ -39,9 +39,9 @@ internal static class MD5Pkcs11TestCases
         if (!backend.Supports(CKM.CKM_MD5))
             Assert.Skip("Backend does not advertise CKM_MD5.");
 
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var hash = new MD5Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var hash = new MD5Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("abc");
         byte[] digest = hash.ComputeHash(data);

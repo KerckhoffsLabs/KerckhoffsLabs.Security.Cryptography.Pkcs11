@@ -20,7 +20,7 @@ public sealed class OpenSessionCallbackTests
         using var module = new OpenSessionModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
 
-        using (Pkcs11Session session = new Pkcs11Slot(lowLevel, 0).OpenSession())
+        using (Pkcs11SessionCore session = new Pkcs11Slot(lowLevel, 0).OpenSessionCore())
         {
             Assert.Equal(1, module.CallCount("C_OpenSession"));
         }

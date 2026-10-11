@@ -14,7 +14,7 @@ internal static class SecurePinLoginTestCases
     {
         var slot = backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         try
         {
             using var pin = new SecurePin(backend.UserPin.Span);
@@ -31,7 +31,7 @@ internal static class SecurePinLoginTestCases
     {
         var slot = backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
-        var session = slot.OpenSession();
+        var session = slot.OpenSessionCore();
         try
         {
             Assert.Throws<ArgumentNullException>(() => session.Login(CKU.CKU_USER, (SecurePin)null!));

@@ -33,10 +33,10 @@ public sealed class LogTests
     public void SlotTrace_RendersOperation()
     {
         var log = new CapturingLogger();
-        Log.SlotTrace(log, 3, "OpenSession");
+        Log.SlotTrace(log, 3, "OpenSessionCore");
         var e = Only(log);
         Assert.Equal(LogLevel.Debug, e.Level);
-        Assert.Equal("Pkcs11Slot(3)::OpenSession", e.Message);
+        Assert.Equal("Pkcs11Slot(3)::OpenSessionCore", e.Message);
     }
 
     [Fact]

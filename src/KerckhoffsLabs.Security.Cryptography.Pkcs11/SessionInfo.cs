@@ -5,7 +5,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// A snapshot of a session's state, as reported by <c>C_GetSessionInfo</c>. Obtained from
-/// <see cref="Pkcs11Workspace.GetSessionInfo"/>. The library is the only producer; instances are
+/// <see cref="Pkcs11Session.GetSessionInfo"/>. The library is the only producer; instances are
 /// not constructed by consumers.
 /// </summary>
 public sealed record SessionInfo

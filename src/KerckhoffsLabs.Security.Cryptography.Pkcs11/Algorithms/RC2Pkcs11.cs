@@ -19,8 +19,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// RC2 (RFC 2268) is a weak legacy 64-bit block cipher with a variable, often-reduced effective key
 /// length; it is provided only for legacy/interop. Every operation throws
-/// <c>CryptoPolicyViolationException</c> unless the wrapped key's workspace's
-/// <see cref="Pkcs11Workspace.Policy"/> permits it, and there is no authenticated RC2 mode to fall back to. Prefer
+/// <c>CryptoPolicyViolationException</c> unless the wrapped key's session's
+/// <see cref="Pkcs11Session.Policy"/> permits it, and there is no authenticated RC2 mode to fall back to. Prefer
 /// <see cref="AesGcmPkcs11"/> or <see cref="AesCcmPkcs11"/>.
 /// </para>
 /// <para>
@@ -31,7 +31,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// in <c>CK_RC2_PARAMS</c>.
 /// </para>
 /// <para>
-/// Supported modes (on the token, once permitted by the workspace's policy):
+/// Supported modes (on the token, once permitted by the session's policy):
 /// <list type="bullet">
 /// <item>CBC — PKCS7 (→ <c>CKM_RC2_CBC_PAD</c>) or None (→ <c>CKM_RC2_CBC</c>, block-aligned input).</item>
 /// <item>ECB — None (→ <c>CKM_RC2_ECB</c>).</item>
@@ -46,7 +46,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 [Obsolete("RC2 (RFC 2268) is a weak legacy cipher with a reduced effective key length. Use AesGcmPkcs11 or AesCcmPkcs11. " +
-          "RC2Pkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Workspace.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's workspace.",
+          "RC2Pkcs11 throws CryptoPolicyViolationException unless a policy that permits it (e.g. Pkcs11Session.UsePolicy(CryptoPolicy.AllowInsecure)) is in effect on the wrapped key's session.",
     DiagnosticId = DiagnosticIds.Rc2,
     UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class RC2Pkcs11 : RC2
@@ -121,7 +121,7 @@ public sealed class RC2Pkcs11 : RC2
         // before the empty buffer reaches the token). Padded encryption (CKM_RC2_CBC_PAD) must emit
         // a full padding block, so that path always goes to the token.
         if (input.IsEmpty
-            && _key.Workspace.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
+            && _key.Session.IsPermitted(new MechanismUseRequest(mechanism, encrypt ? CryptoOperation.Encrypt : CryptoOperation.Decrypt))
             && !(encrypt && mechanism.Type == CKM.CKM_RC2_CBC_PAD))
         {
             bytesWritten = 0;
@@ -175,10 +175,10 @@ public sealed class RC2Pkcs11 : RC2
     /// <summary>Generates a random initialization vector (8 bytes) for CBC mode.</summary>
     public override void GenerateIV() => IVValue = RandomNumberGenerator.GetBytes(BlockSize / 8);
 
-    /// <summary>Not supported — the RC2 key is token-resident. Generate keys via <c>Pkcs11Workspace</c>.</summary>
+    /// <summary>Not supported — the RC2 key is token-resident. Generate keys via <c>Pkcs11Session</c>.</summary>
     /// <exception cref="NotSupportedException">Always.</exception>
     public override void GenerateKey() =>
-        throw new NotSupportedException("RC2Pkcs11 wraps a token-resident key; generate keys via Pkcs11Workspace.GenerateKey instead.");
+        throw new NotSupportedException("RC2Pkcs11 wraps a token-resident key; generate keys via Pkcs11Session.GenerateKey instead.");
 
     /// <summary>Not supported — there is no <see cref="ICryptoTransform"/> over a non-extractable token key. Use the one-shot EncryptCbc/DecryptCbc API.</summary>
     /// <exception cref="NotSupportedException">Always.</exception>

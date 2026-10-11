@@ -46,7 +46,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     private readonly List<ulong> _derivedHandles = [];
 
     // Populated by HydrateDerivedKeys, called by Pkcs11Key.Derive once it has both the raw handles
-    // (via AbsorbOutput, above) and the workspace needed to turn them into usable Pkcs11Key
+    // (via AbsorbOutput, above) and the session needed to turn them into usable Pkcs11Key
     // instances. Empty until then.
     private readonly List<Pkcs11Key?> _hydratedKeys = [];
 
@@ -112,7 +112,7 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// Raw <c>CK_OBJECT_HANDLE</c> values absorbed out of the scope-owned <c>CK_DERIVED_KEY</c> array
     /// by <see cref="AbsorbOutput"/>, before <see cref="HydrateDerivedKeys"/> turns them into
     /// <see cref="Pkcs11Key"/> instances. Exists so the marshalling round trip can be verified without
-    /// a live token/workspace; production code should use <see cref="AdditionalDerivedKeys"/>.
+    /// a live token/session; production code should use <see cref="AdditionalDerivedKeys"/>.
     /// </summary>
     internal IReadOnlyList<ulong> RawAdditionalDerivedKeyHandles => [.. _derivedHandles];
 
@@ -123,16 +123,16 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// Turns the raw handles <see cref="AbsorbOutput"/> collected into <see cref="Pkcs11Key"/>
     /// instances, populating <see cref="AdditionalDerivedKeys"/>. Called by
     /// <see cref="Pkcs11Key.Derive"/> right after a successful <c>C_DeriveKey</c> call — the only
-    /// place that has both the handles and the workspace needed to build them.
+    /// place that has both the handles and the session needed to build them.
     /// </summary>
-    internal void HydrateDerivedKeys(Pkcs11Workspace workspace)
+    internal void HydrateDerivedKeys(Pkcs11Session session)
     {
         _hydratedKeys.Clear();
         foreach (ulong handle in _derivedHandles)
         {
             _hydratedKeys.Add(handle == 0UL
                 ? null
-                : workspace.HydrateExistingHandleAsKey(new ObjectHandle(handle)));
+                : session.HydrateExistingHandleAsKey(new ObjectHandle(handle)));
         }
     }
 

@@ -17,14 +17,14 @@ internal static class SHA3_256Pkcs11TestCases
     private static readonly byte[] KnownDigest = Convert.FromHexString(
         "3A985DA74FE225B2045C172D6BD390BD855F086E3E9D525B46BFE24511431532");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
     internal static void Assert_ComputeHash_KnownAnswer(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA3_256);
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA3_256Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA3_256Pkcs11(session);
 
         byte[] digest = hash.ComputeHash(Encoding.UTF8.GetBytes("abc"));
         Assert.Equal(32, digest.Length);
@@ -36,8 +36,8 @@ internal static class SHA3_256Pkcs11TestCases
         backend.RequireMechanism(CKM.CKM_SHA3_256);
         if (!SHA3_256.IsSupported)
             Assert.Skip("Host BCL does not support SHA3-256 (needs OpenSSL 3.x or Windows 11+).");
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA3_256Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA3_256Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         Assert.Equal(SHA3_256.HashData(data), hash.ComputeHash(data));
@@ -48,8 +48,8 @@ internal static class SHA3_256Pkcs11TestCases
         backend.RequireMechanism(CKM.CKM_SHA3_256);
         if (!SHA3_256.IsSupported)
             Assert.Skip("Host BCL does not support SHA3-256 (needs OpenSSL 3.x or Windows 11+).");
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA3_256Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA3_256Pkcs11(session);
 
         byte[] part1 = Encoding.UTF8.GetBytes("hello ");
         byte[] part2 = Encoding.UTF8.GetBytes("world");
@@ -64,8 +64,8 @@ internal static class SHA3_256Pkcs11TestCases
         backend.RequireMechanism(CKM.CKM_SHA3_256);
         if (!SHA3_256.IsSupported)
             Assert.Skip("Host BCL does not support SHA3-256 (needs OpenSSL 3.x or Windows 11+).");
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA3_256Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA3_256Pkcs11(session);
 
         byte[] first = hash.ComputeHash(Encoding.UTF8.GetBytes("one"));
         byte[] second = hash.ComputeHash(Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize

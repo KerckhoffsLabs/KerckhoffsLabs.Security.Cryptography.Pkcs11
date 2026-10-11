@@ -34,11 +34,11 @@ public sealed class MLKemPkcs11Tests_Managed
 
     // Generates an ML-KEM key pair for the given parameter set on the managed token, wraps it as an
     // MLKemPkcs11, runs the body, then cleans up the key.
-    private static void WithMlKem(CkpMlKem parameterSet, bool allowInsecure, Action<Pkcs11Workspace, MLKemPkcs11> body)
+    private static void WithMlKem(CkpMlKem parameterSet, bool allowInsecure, Action<Pkcs11Session, MLKemPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using IDisposable? insecure = allowInsecure ? workspace.UsePolicy(CryptoPolicy.AllowInsecure) : null;
+        using var session = ManagedToken.OpenSession(library);
+        using IDisposable? insecure = allowInsecure ? session.UsePolicy(CryptoPolicy.AllowInsecure) : null;
 
         string label = $"mlkem-{Guid.NewGuid():N}";
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
@@ -49,11 +49,11 @@ public sealed class MLKemPkcs11Tests_Managed
             .Label(label)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
-            body(workspace, mlkem);
+            body(session, mlkem);
         }
         finally
         {
@@ -145,9 +145,9 @@ public sealed class MLKemPkcs11Tests_Managed
     // UsePolicy(CryptoPolicy.AllowInsecure) opts in only for its lifetime; outside it the gate re-engages.
     [Fact(SkipUnless = nameof(MLKem.IsSupported), SkipType = typeof(MLKem), Skip = "Requires " + nameof(MLKem.IsSupported))]
     public void Encapsulate_UsePolicyAllowInsecure_OptsInThenReengages() =>
-        WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (workspace, mlkem) =>
+        WithMlKem(CkpMlKem.CKP_ML_KEM_768, allowInsecure: false, (session, mlkem) =>
         {
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
                 mlkem.Encapsulate(out _, out _); // must not throw inside the scope
 
             Assert.Throws<CryptoPolicyViolationException>(() => mlkem.Encapsulate(out _, out _));
@@ -164,8 +164,8 @@ public sealed class MLKemPkcs11Tests_Managed
     {
         var token = new ManagedSoftToken();
         using var library = token.Load();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         string label = $"mlkem-{Guid.NewGuid():N}";
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_ML_KEM)
@@ -176,7 +176,7 @@ public sealed class MLKemPkcs11Tests_Managed
             .Label(label)
             .Attribute(CKA.CKA_DECAPSULATE, true).Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_KEM_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             using var mlkem = new MLKemPkcs11(key);
@@ -240,10 +240,10 @@ public sealed class MLKemPkcs11Tests_Managed
     public void Ctor_NonMlKemKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes").ValueLen(32).Encrypt().Decrypt().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new MLKemPkcs11(key));
         Assert.Equal("key", ex.ParamName);

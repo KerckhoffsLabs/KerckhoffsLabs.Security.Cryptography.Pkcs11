@@ -22,19 +22,19 @@ public sealed class DerivedKeyMaterial_Managed
     private static readonly byte[] KeyBytes =
         Convert.FromHexString("000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F");
 
-    private static void WithKdf(Action<ManagedSoftToken, Pkcs11Workspace, SP800108HmacCounterKdfPkcs11> body)
+    private static void WithKdf(Action<ManagedSoftToken, Pkcs11Session, SP800108HmacCounterKdfPkcs11> body)
     {
         var token = new ManagedSoftToken();
         using var library = token.Load();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure); // reading derived bytes back is gated
+        using var session = ManagedToken.OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // reading derived bytes back is gated
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf").Value(KeyBytes).Derive().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var kdf = new SP800108HmacCounterKdfPkcs11(key, HashAlgorithmName.SHA256);
         try
         {
-            body(token, workspace, kdf);
+            body(token, session, kdf);
         }
         finally
         {
@@ -46,21 +46,21 @@ public sealed class DerivedKeyMaterial_Managed
     private static byte[] Derive(SP800108HmacCounterKdfPkcs11 kdf) =>
         kdf.DeriveKey("label"u8.ToArray(), "context"u8.ToArray(), OutputLength);
 
-    private static int DerivedKeysOnToken(Pkcs11Workspace workspace)
+    private static int DerivedKeysOnToken(Pkcs11Session session)
     {
         using var filter = ObjectTemplate.Empty().Attribute(CKA.CKA_VALUE_LEN, (ulong)OutputLength).Build();
-        using var found = workspace.FindObjects(filter);
+        using var found = session.FindObjects(filter);
         return found.Count;
     }
 
     [Fact]
-    public void DeriveAndRead_ReturnsTheValue_AndDestroysTheEphemeralKey() => WithKdf((_, workspace, kdf) =>
+    public void DeriveAndRead_ReturnsTheValue_AndDestroysTheEphemeralKey() => WithKdf((_, session, kdf) =>
     {
         byte[] expected = SP800108HmacCounterKdf.DeriveBytes(
             KeyBytes, HashAlgorithmName.SHA256, "label"u8, "context"u8, OutputLength);
 
         Assert.Equal(expected, Derive(kdf));
-        Assert.Equal(0, DerivedKeysOnToken(workspace));
+        Assert.Equal(0, DerivedKeysOnToken(session));
     });
 
     /// <summary>
@@ -68,13 +68,13 @@ public sealed class DerivedKeyMaterial_Managed
     /// call, not hand back an empty array as if it were key material; the key is still cleaned up.
     /// </summary>
     [Fact]
-    public void DeriveAndRead_WhenTheValueIsWithheld_Throws_AndDestroysTheEphemeralKey() => WithKdf((token, workspace, kdf) =>
+    public void DeriveAndRead_WhenTheValueIsWithheld_Throws_AndDestroysTheEphemeralKey() => WithKdf((token, session, kdf) =>
     {
         token.DeriveWithholdsValue = true;
 
         var ex = Assert.Throws<InvalidOperationException>(() => Derive(kdf));
         Assert.Contains("CKA_VALUE", ex.Message);
-        Assert.Equal(0, DerivedKeysOnToken(workspace));
+        Assert.Equal(0, DerivedKeysOnToken(session));
     });
 
     /// <summary>
@@ -95,12 +95,12 @@ public sealed class DerivedKeyMaterial_Managed
     /// rather than being swallowed with the derived key left on the token.
     /// </summary>
     [Fact]
-    public void DeriveAndRead_WhenOnlyTheDestroyFails_SurfacesTheDestroyFailure() => WithKdf((token, workspace, kdf) =>
+    public void DeriveAndRead_WhenOnlyTheDestroyFails_SurfacesTheDestroyFailure() => WithKdf((token, session, kdf) =>
     {
         token.DestroyObjectResultOverride = CKR.CKR_FUNCTION_FAILED;
 
         var ex = Assert.ThrowsAny<Pkcs11Exception>(() => Derive(kdf));
         Assert.Equal(CKR.CKR_FUNCTION_FAILED, ex.ReturnValue);
-        Assert.Equal(1, DerivedKeysOnToken(workspace));
+        Assert.Equal(1, DerivedKeysOnToken(session));
     });
 }

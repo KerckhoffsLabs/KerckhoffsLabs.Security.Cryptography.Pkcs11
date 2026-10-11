@@ -12,7 +12,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 /// </summary>
 internal static class TestChaCha20Poly1305
 {
-    public static byte[] Encrypt(Pkcs11Session session, ObjectHandle key,
+    public static byte[] Encrypt(Pkcs11SessionCore session, ObjectHandle key,
         ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> aad = default)
     {
         var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);
@@ -20,7 +20,7 @@ internal static class TestChaCha20Poly1305
         return session.Encrypt(mech, key, plaintext);
     }
 
-    public static byte[] Decrypt(Pkcs11Session session, ObjectHandle key,
+    public static byte[] Decrypt(Pkcs11SessionCore session, ObjectHandle key,
         ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> ciphertextAndTag, ReadOnlySpan<byte> aad = default)
     {
         var p = new CkmSalsa20ChaCha20Poly1305Params(nonce, aad);

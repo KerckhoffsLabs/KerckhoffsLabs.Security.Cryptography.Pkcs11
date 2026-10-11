@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 
 /// <summary>
-/// A <see cref="FakeModule"/> for tests that drive a <see cref="Pkcs11Session"/> directly: it accepts
+/// A <see cref="FakeModule"/> for tests that drive a <see cref="Pkcs11SessionCore"/> directly: it accepts
 /// <c>C_CloseSession</c>, and <see cref="CreateSession"/> opens a session over the module through the real
 /// loader and wrappers. A test overrides only the functions its scenario calls; any other is absent, so the
 /// session sees <c>CKR_FUNCTION_NOT_SUPPORTED</c> for it.
@@ -27,7 +27,7 @@ internal abstract class SessionTestModule : FakeModule
     /// <param name="sessionId">The session's handle; a fresh one that routes to this module when omitted.</param>
     /// <param name="loggerFactory">Passed to the session.</param>
     /// <param name="policy">The session's policy; <see cref="CryptoPolicy.SecureOnly"/> when omitted.</param>
-    public Pkcs11Session CreateSession(ulong? sessionId = null, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+    public Pkcs11SessionCore CreateSession(ulong? sessionId = null, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
         => new(LowLevel, sessionId ?? (ulong)NewSessionHandle(), loggerFactory, policy);
 
     protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;

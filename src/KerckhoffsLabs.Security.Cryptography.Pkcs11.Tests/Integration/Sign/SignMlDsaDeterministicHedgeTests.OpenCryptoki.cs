@@ -26,7 +26,7 @@ public sealed class SignMlDsaDeterministicHedgeTests_OpenCryptoki(OpenCryptokiBa
         if (!_backend.Supports(CKM.CKM_ML_DSA_KEY_PAIR_GEN))
             Assert.Skip("opencryptoki: CKM_ML_DSA_KEY_PAIR_GEN not available (needs OpenSSL 3.5).");
 
-        using var workspace = ((IPkcs11Backend)_backend).OpenWorkspace();
+        using var session = ((IPkcs11Backend)_backend).OpenSession();
         string label = $"mldsa-det-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -36,7 +36,7 @@ public sealed class SignMlDsaDeterministicHedgeTests_OpenCryptoki(OpenCryptokiBa
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("deterministic hedge must reproduce the same signature");

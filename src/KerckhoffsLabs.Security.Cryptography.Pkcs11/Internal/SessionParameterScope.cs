@@ -8,8 +8,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// <see cref="MechanismParameterScope"/>.
 /// </summary>
 /// <param name="session">The session performing the call.</param>
-internal sealed class SessionParameterScope(Pkcs11Session session) : MechanismParameterScope
+internal sealed class SessionParameterScope(Pkcs11SessionCore session) : MechanismParameterScope
 {
     /// <summary>The session performing the call.</summary>
-    public Pkcs11Session Session { get; } = session;
+    public Pkcs11SessionCore Session { get; } = session;
 }

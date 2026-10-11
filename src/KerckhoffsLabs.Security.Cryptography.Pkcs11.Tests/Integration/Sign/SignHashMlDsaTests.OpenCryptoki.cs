@@ -37,7 +37,7 @@ public sealed class SignHashMlDsaTests_OpenCryptoki(OpenCryptokiBackendFixture b
     {
         RequireHashMlDsa();
 
-        using var workspace = ((IPkcs11Backend)_backend).OpenWorkspace();
+        using var session = ((IPkcs11Backend)_backend).OpenSession();
         string label = $"hash-mldsa-{Guid.NewGuid():N}";
         byte[] id = Encoding.ASCII.GetBytes(label);
 
@@ -47,7 +47,7 @@ public sealed class SignHashMlDsaTests_OpenCryptoki(OpenCryptokiBackendFixture b
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_ML_DSA)
             .Label(label).Id(id).Sign().Build();
 
-        using var key = workspace.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_ML_DSA_KEY_PAIR_GEN), pubTpl, privTpl);
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("HashML-DSA over CKM_HASH_ML_DSA_SHA256, raw message");

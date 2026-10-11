@@ -23,7 +23,7 @@ public sealed class EmptyFinalPartTests
     {
         using var module = new StreamModule();
         using Pkcs11Library library = module.Load();
-        using var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         Assert.Equal(Payload, Decrypt(session));
         Assert.Equal(Payload, Decrypt(session));
@@ -37,7 +37,7 @@ public sealed class EmptyFinalPartTests
     {
         using var module = new StreamModule();
         using Pkcs11Library library = module.Load();
-        using var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         Assert.Equal(Payload, Encrypt(session));
         Assert.Equal(Payload, Encrypt(session));
@@ -46,7 +46,7 @@ public sealed class EmptyFinalPartTests
         Assert.Equal(0, module.FinalsLeftActive);
     }
 
-    private static byte[] Decrypt(Pkcs11Session session)
+    private static byte[] Decrypt(Pkcs11SessionCore session)
     {
         using var input = new MemoryStream(Payload);
         using var output = new MemoryStream();
@@ -54,7 +54,7 @@ public sealed class EmptyFinalPartTests
         return output.ToArray();
     }
 
-    private static byte[] Encrypt(Pkcs11Session session)
+    private static byte[] Encrypt(Pkcs11SessionCore session)
     {
         using var input = new MemoryStream(Payload);
         using var output = new MemoryStream();
@@ -75,7 +75,7 @@ public sealed class EmptyFinalPartTests
 
         public int FinalsLeftActive { get; private set; }
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 

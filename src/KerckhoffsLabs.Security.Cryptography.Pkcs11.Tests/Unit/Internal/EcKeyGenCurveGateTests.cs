@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
 /// The EC curve is judged on every key-pair generation, not only through
-/// <see cref="Pkcs11Workspace.GenerateEcKeyPair"/>: the generic <c>GenerateKeyPair(mechanism, public, private)</c>
+/// <see cref="Pkcs11Session.GenerateEcKeyPair"/>: the generic <c>GenerateKeyPair(mechanism, public, private)</c>
 /// path reaches the same session call and must meet the same curve allow-list.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
@@ -32,7 +32,7 @@ public sealed class EcKeyGenCurveGateTests
         }
     }
 
-    private static void GenerateEc(Pkcs11Session session, byte[]? ecParams)
+    private static void GenerateEc(Pkcs11SessionCore session, byte[]? ecParams)
     {
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC).Verify();
         if (ecParams is not null)
@@ -116,14 +116,14 @@ public sealed class EcKeyGenCurveGateTests
 
     // The public generic path: before this check it generated a P-224 key the curve allow-list refuses.
     [Fact]
-    public void Workspace_GenericGenerateKey_RefusesAWeakCurve()
+    public void Session_GenericGenerateKey_RefusesAWeakCurve()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC).EcParams(Pkcs11ECCurve.NamedCurves.NistP224.GetEcParams()).Verify().Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC).Sign().Build();
 
         Assert.Throws<CryptoPolicyViolationException>(
-            () => workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl));
+            () => session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl));
     }
 }

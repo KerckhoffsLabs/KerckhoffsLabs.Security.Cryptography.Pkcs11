@@ -24,13 +24,13 @@ internal static class AesCcmPkcs11TestCases
         return b;
     }
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -42,56 +42,56 @@ internal static class AesCcmPkcs11TestCases
     private static void WithCcm(
         IPkcs11Backend backend, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var lease = policy is null ? null : workspace.UsePolicy(policy);
+        using var session = OpenSession(backend);
+        using var lease = policy is null ? null : session.UsePolicy(policy);
         string label = $"ccm-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             using var ccm = new AesCcmPkcs11(key, tagSizeInBytes);
             body(ccm);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     private static void WithImportedCcm(IPkcs11Backend backend, byte[] rawKey, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"ccm-kat-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).Value(rawKey).Encrypt().Decrypt().OnToken().Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             using var ccm = new AesCcmPkcs11(key, tagSizeInBytes);
             body(ccm);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // === Construction =====================================================
 
     internal static void Assert_Ctor_NonAesKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"ccm-nonaes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).ValueLen(32).Sign().OnToken().Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key, 16));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     // === Argument validation (no CCM support needed) ======================

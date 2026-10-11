@@ -50,7 +50,7 @@ public sealed class LibraryDisposeRaceTests
     {
         using var module = new ParkingModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         Task call = Task.Run(() => session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), "data"u8), Token);
         Assert.True(module.Entered.Wait(Generous, Token), "the call never reached the module");
@@ -118,7 +118,7 @@ public sealed class LibraryDisposeRaceTests
     }
 
     /// <summary>
-    /// A workspace's dispose logs out through <c>LogoutForDispose</c>, which waits for the session lock
+    /// A session's dispose logs out through <c>LogoutForDispose</c>, which waits for the session lock
     /// rather than going through <c>AcquireExclusive</c>. It must still hold the session's handle, as every
     /// other operation does, or a library disposed meanwhile closes the session under the logout.
     /// </summary>
@@ -127,7 +127,7 @@ public sealed class LibraryDisposeRaceTests
     {
         using var module = new ParkingModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11Session(library.LowLevelLibrary!, (ulong)module.OpenSession());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
 
         Task logout = Task.Run(session.LogoutForDispose, Token);
         Assert.True(module.Entered.Wait(Generous, Token), "the logout never reached the module");
@@ -157,7 +157,7 @@ public sealed class LibraryDisposeRaceTests
         public bool FinalizedWhileInFlight { get; private set; }
         public bool ClosedWhileInFlight { get; private set; }
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_Finalize(IntPtr pReserved)
         {

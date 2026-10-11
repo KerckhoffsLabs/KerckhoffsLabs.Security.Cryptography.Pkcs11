@@ -115,7 +115,7 @@ public sealed class OperationScopeTests
         Assert.Equal(64, signature.Length);
     }
 
-    private static Pkcs11Session Session(OperationFake fake, CapturingLogger? logger = null)
+    private static Pkcs11SessionCore Session(OperationFake fake, CapturingLogger? logger = null)
         => fake.CreateSession(SessionId, logger is null ? null : new CapturingLoggerFactory(logger));
 
     private static Mechanism Ecdsa() => new(CKM.CKM_ECDSA_SHA256);

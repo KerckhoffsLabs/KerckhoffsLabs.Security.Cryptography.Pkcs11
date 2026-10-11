@@ -29,7 +29,7 @@ public sealed class NestedAttributeReadBackTests
     public void ReadBack_ReturnsTheMembersValues()
     {
         using var module = new WrapTemplateModule();
-        using var session = OpenSession(module);
+        using var session = OpenSessionCore(module);
 
         using ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_WRAP_TEMPLATE]);
 
@@ -43,7 +43,7 @@ public sealed class NestedAttributeReadBackTests
     public void ReadBack_LeavesNoBufferBehind()
     {
         using var module = new WrapTemplateModule();
-        using var session = OpenSession(module);
+        using var session = OpenSessionCore(module);
         ReadAndDispose(session); // warm up one-time state
 
         int before = UnmanagedMemory.OutstandingAllocationCount;
@@ -58,7 +58,7 @@ public sealed class NestedAttributeReadBackTests
     public void ReadBack_AttributeOwnsOneBlock()
     {
         using var module = new WrapTemplateModule();
-        using var session = OpenSession(module);
+        using var session = OpenSessionCore(module);
         ReadAndDispose(session);
 
         int before = UnmanagedMemory.OutstandingAllocationCount;
@@ -73,7 +73,7 @@ public sealed class NestedAttributeReadBackTests
     public void InflatedLengthOnTheThirdCall_IsRefused_AndLeavesNothingBehind(Lie lie)
     {
         using var module = new WrapTemplateModule { Lie = lie };
-        using var session = OpenSession(module);
+        using var session = OpenSessionCore(module);
         Assert.Throws<Pkcs11AttributeException>(() => ReadAndDispose(session));
 
         int before = UnmanagedMemory.OutstandingAllocationCount;
@@ -91,7 +91,7 @@ public sealed class NestedAttributeReadBackTests
     public void RedirectedPointer_IsIgnored_AndTheReadComesFromTheSessionsBuffer()
     {
         using var module = new WrapTemplateModule { Lie = Lie.RedirectLabelOnSecondCall };
-        using var session = OpenSession(module);
+        using var session = OpenSessionCore(module);
 
         using (ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_LABEL]))
         {
@@ -105,10 +105,10 @@ public sealed class NestedAttributeReadBackTests
         Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
     }
 
-    private static Pkcs11Session OpenSession(WrapTemplateModule module)
-        => new(module.LoadLowLevel(), (ulong)module.OpenSession());
+    private static Pkcs11SessionCore OpenSessionCore(WrapTemplateModule module)
+        => new(module.LoadLowLevel(), (ulong)module.OpenSessionCore());
 
-    private static void ReadAndDispose(Pkcs11Session session)
+    private static void ReadAndDispose(Pkcs11SessionCore session)
         => session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_WRAP_TEMPLATE]).Dispose();
 
     public enum Lie
@@ -137,7 +137,7 @@ public sealed class NestedAttributeReadBackTests
         private bool ThirdCall => _call % 3 == 0;
         private bool SecondCall => _call % 2 == 0;
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 

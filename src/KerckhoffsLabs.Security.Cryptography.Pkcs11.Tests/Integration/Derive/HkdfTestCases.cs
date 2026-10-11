@@ -33,35 +33,35 @@ internal static class HkdfTestCases
     private static readonly byte[] Info = Convert.FromHexString("F0F1F2F3F4F5F6F7F8F9");
     private static readonly byte[] ProbeMessage = "hkdf-sign-probe"u8.ToArray();
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) => backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
         }
     }
 
-    // Imports Ikm as a derive-capable generic-secret base key and hands it (plus the open workspace)
+    // Imports Ikm as a derive-capable generic-secret base key and hands it (plus the open session)
     // to the body. the AllowInsecure policy is required because the cross-check needs to read the derived
     // key's raw value back off the token.
-    private static void WithImportedIkm(IPkcs11Backend backend, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithImportedIkm(IPkcs11Backend backend, Action<Pkcs11Session, Pkcs11Key> body)
     {
         backend.RequireMechanism(CKM.CKM_HKDF_DERIVE);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         string label = $"hkdf-ikm-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(Ikm).Derive().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var ikmKey = workspace.ImportKey(tpl);
-            body(workspace, ikmKey);
+            using var ikmKey = session.ImportKey(tpl);
+            body(session, ikmKey);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     private static byte[] DeriveAndReadValue(Pkcs11Key baseKey, Mechanism mechanism, int outputLength)

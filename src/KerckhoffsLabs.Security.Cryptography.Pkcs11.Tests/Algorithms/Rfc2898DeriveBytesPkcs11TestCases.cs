@@ -32,21 +32,21 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     private static readonly byte[] Salt = Encoding.UTF8.GetBytes("saltSALTsaltSALTsaltSALTsaltSALTsalt");
     private const int Iterations = 4096;
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) => backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) => backend.OpenSession();
 
     // Constructing the instance makes no token call, so it needs no opt-in. Every GetBytes does: it
     // reads the derived value back off the token, which the default SecureOnly policy refuses. The
     // opt-in therefore has to span the calls to GetBytes, not just construction — callers that derive
     // hold a UsePolicy(CryptoPolicy.AllowInsecure) lease for the instance's whole use.
-    private static Rfc2898DeriveBytesPkcs11 NewKdf(Pkcs11Workspace workspace, HashAlgorithmName hash, byte[]? password = null, byte[]? salt = null, int iterations = Iterations)
-        => new(workspace, password ?? Password, salt ?? Salt, iterations, hash);
+    private static Rfc2898DeriveBytesPkcs11 NewKdf(Pkcs11Session session, HashAlgorithmName hash, byte[]? password = null, byte[]? salt = null, int iterations = Iterations)
+        => new(session, password ?? Password, salt ?? Salt, iterations, hash);
 
     private static byte[] GetBytes(IPkcs11Backend backend, HashAlgorithmName hash, int count, byte[]? password = null, byte[]? salt = null, int iterations = Iterations)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var kdf = NewKdf(workspace, hash, password, salt, iterations);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var kdf = NewKdf(session, hash, password, salt, iterations);
         return kdf.GetBytes(count);
     }
 
@@ -111,11 +111,11 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_GetBytes_SuccessiveCalls_ContinueOneStream(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
 
-        using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
+        using var kdf = NewKdf(session, HashAlgorithmName.SHA256);
         byte[] first = kdf.GetBytes(16);
         byte[] second = kdf.GetBytes(16);
 
@@ -127,9 +127,9 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_GetBytes_AfterSettingSalt_RestartsStream(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var kdf = NewKdf(session, HashAlgorithmName.SHA256);
 
         byte[] first = kdf.GetBytes(16);
         kdf.Salt = Salt; // same value, but the setter must still restart the stream
@@ -142,9 +142,9 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_Reset_RestartsStream(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var kdf = NewKdf(session, HashAlgorithmName.SHA256);
 
         byte[] first = kdf.GetBytes(16);
         kdf.Reset();
@@ -153,54 +153,54 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
         Assert.Equal(first, second);
     }
 
-    internal static void Assert_Ctor_NullWorkspace_Throws(IPkcs11Backend backend) =>
+    internal static void Assert_Ctor_NullSession_Throws(IPkcs11Backend backend) =>
         Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(null!, Password, Salt, Iterations, HashAlgorithmName.SHA256));
 
     internal static void Assert_Ctor_NullPassword_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(workspace, (byte[])null!, Salt, Iterations, HashAlgorithmName.SHA256));
+        using var session = OpenSession(backend);
+        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(session, (byte[])null!, Salt, Iterations, HashAlgorithmName.SHA256));
     }
 
     internal static void Assert_Ctor_NullSalt_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(workspace, Password, null!, Iterations, HashAlgorithmName.SHA256));
+        using var session = OpenSession(backend);
+        Assert.Throws<ArgumentNullException>(() => new Rfc2898DeriveBytesPkcs11(session, Password, null!, Iterations, HashAlgorithmName.SHA256));
     }
 
     internal static void Assert_Ctor_NonPositiveIterations_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Rfc2898DeriveBytesPkcs11(workspace, Password, Salt, 0, HashAlgorithmName.SHA256));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Rfc2898DeriveBytesPkcs11(workspace, Password, Salt, -1, HashAlgorithmName.SHA256));
+        using var session = OpenSession(backend);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Rfc2898DeriveBytesPkcs11(session, Password, Salt, 0, HashAlgorithmName.SHA256));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Rfc2898DeriveBytesPkcs11(session, Password, Salt, -1, HashAlgorithmName.SHA256));
     }
 
     internal static void Assert_Ctor_UnsupportedHash_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<NotSupportedException>(() => new Rfc2898DeriveBytesPkcs11(workspace, Password, Salt, Iterations, HashAlgorithmName.MD5));
+        using var session = OpenSession(backend);
+        Assert.Throws<NotSupportedException>(() => new Rfc2898DeriveBytesPkcs11(session, Password, Salt, Iterations, HashAlgorithmName.MD5));
     }
 
     internal static void Assert_GetBytes_NonPositiveCount_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
+        using var session = OpenSession(backend);
+        using var kdf = NewKdf(session, HashAlgorithmName.SHA256);
         Assert.Throws<ArgumentOutOfRangeException>(() => kdf.GetBytes(0));
         Assert.Throws<ArgumentOutOfRangeException>(() => kdf.GetBytes(-1));
     }
 
     internal static void Assert_GetBytes_AfterDispose_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        var kdf = NewKdf(workspace, HashAlgorithmName.SHA256);
+        using var session = OpenSession(backend);
+        var kdf = NewKdf(session, HashAlgorithmName.SHA256);
         kdf.Dispose();
         Assert.Throws<ObjectDisposedException>(() => kdf.GetBytes(16));
     }
 
     internal static void Assert_HashAlgorithm_ReturnsConstructedValue(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        using var kdf = NewKdf(workspace, HashAlgorithmName.SHA384);
+        using var session = OpenSession(backend);
+        using var kdf = NewKdf(session, HashAlgorithmName.SHA384);
         Assert.Equal(HashAlgorithmName.SHA384, kdf.HashAlgorithm);
     }
 
@@ -209,48 +209,48 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_StaticPbkdf2_MatchesBcl(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
-        byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
+        byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
         Assert.Equal(expected, actual);
     }
 
     internal static void Assert_StaticPbkdf2_DestinationSpan_MatchesBcl(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var session = OpenSession(backend);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
 
         byte[] expected = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
         byte[] actual = new byte[32];
-        Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, actual, Iterations, HashAlgorithmName.SHA256);
+        Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, actual, Iterations, HashAlgorithmName.SHA256);
         Assert.Equal(expected, actual);
     }
 
     internal static void Assert_StaticPbkdf2_ZeroOutputLength_ReturnsEmptyWithNoTokenCall(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         // No mechanism check or crypto-policy check: a zero-length request must short-circuit before any
         // token call, so this must pass even on backends that do not implement CKM_PKCS5_PBKD2.
-        byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, 0);
+        byte[] actual = Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, Iterations, HashAlgorithmName.SHA256, 0);
         Assert.Empty(actual);
     }
 
-    internal static void Assert_StaticPbkdf2_NullWorkspace_Throws(IPkcs11Backend backend) =>
+    internal static void Assert_StaticPbkdf2_NullSession_Throws(IPkcs11Backend backend) =>
         Assert.Throws<ArgumentNullException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(null!, Password, Salt, Iterations, HashAlgorithmName.SHA256, 32));
 
     internal static void Assert_StaticPbkdf2_NegativeOutputLength_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<ArgumentOutOfRangeException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, -1));
+        using var session = OpenSession(backend);
+        Assert.Throws<ArgumentOutOfRangeException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, Iterations, HashAlgorithmName.SHA256, -1));
     }
 
     internal static void Assert_StaticPbkdf2_UnsupportedHash_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
-        Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(workspace, Password, Salt, Iterations, HashAlgorithmName.MD5, 32));
+        using var session = OpenSession(backend);
+        Assert.Throws<NotSupportedException>(() => Rfc2898DeriveBytesPkcs11.Pbkdf2(session, Password, Salt, Iterations, HashAlgorithmName.MD5, 32));
     }
 
     // === Pbkdf2Key (on-token result, no export) ===========================================
@@ -260,11 +260,11 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_Pbkdf2Key_UnderSecureOnly_MatchesBcl(IPkcs11Backend backend)
     {
         backend.RequireMechanisms(CKM.CKM_PKCS5_PBKD2, CKM.CKM_AES_GCM);
-        using var workspace = OpenWorkspace(backend);
-        Assert.Same(CryptoPolicy.SecureOnly, workspace.Policy);
+        using var session = OpenSession(backend);
+        Assert.Same(CryptoPolicy.SecureOnly, session.Policy);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_AES).ValueLen(32).Encrypt().Decrypt().Build();
 
-        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
+        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
 
         // The key cannot be read, so prove its value by decrypting on the BCL with the expected bytes.
         byte[] expectedKey = Rfc2898DeriveBytes.Pbkdf2(Password, Salt, Iterations, HashAlgorithmName.SHA256, 32);
@@ -284,10 +284,10 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
     internal static void Assert_Pbkdf2Key_IsSensitiveAndNonExtractableByDefault(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_PKCS5_PBKD2);
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
-        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
+        using Pkcs11Key key = Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, Password, Salt, Iterations, HashAlgorithmName.SHA256, template);
 
         using var attrs = key.GetAttributeValue(CKA.CKA_SENSITIVE, CKA.CKA_EXTRACTABLE);
         Assert.True(attrs[0].GetValueAsBool());
@@ -296,18 +296,18 @@ internal static class Rfc2898DeriveBytesPkcs11TestCases
 
     internal static void Assert_Pbkdf2Key_Sha1Prf_IsRefusedUnderSecureOnly(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         using var template = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).ValueLen(32).Build();
 
         // Refused by the policy before the token is asked, so this holds on every backend.
         Assert.Throws<CryptoPolicyViolationException>(() =>
-            Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA1, template));
+            Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, Password, Salt, Iterations, HashAlgorithmName.SHA1, template));
     }
 
     internal static void Assert_Pbkdf2Key_NullTemplate_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         Assert.Throws<ArgumentNullException>(() =>
-            Rfc2898DeriveBytesPkcs11.Pbkdf2Key(workspace, Password, Salt, Iterations, HashAlgorithmName.SHA256, null!));
+            Rfc2898DeriveBytesPkcs11.Pbkdf2Key(session, Password, Salt, Iterations, HashAlgorithmName.SHA256, null!));
     }
 }

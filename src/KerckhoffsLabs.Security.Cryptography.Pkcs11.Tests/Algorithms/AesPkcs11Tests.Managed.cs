@@ -26,17 +26,17 @@ public sealed class AesPkcs11_Managed
     private static readonly byte[] Iv16 =
         Convert.FromHexString("0F0E0D0C0B0A09080706050403020100");
 
-    // Imports Key256 as a managed-token AES key and hands a wrapping AesPkcs11 (and its workspace)
+    // Imports Key256 as a managed-token AES key and hands a wrapping AesPkcs11 (and its session)
     // to the body.
-    private static void WithImportedAes(Action<Pkcs11Workspace, AesPkcs11> body)
+    private static void WithImportedAes(Action<Pkcs11Session, AesPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes").Value(Key256).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var aes = new AesPkcs11(key);
-        body(workspace, aes);
+        body(session, aes);
     }
 
     private static Aes BclAes()
@@ -59,10 +59,10 @@ public sealed class AesPkcs11_Managed
     public void Ctor_NonAesKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new AesPkcs11(key));
         Assert.Equal("key", ex.ParamName);
@@ -71,14 +71,14 @@ public sealed class AesPkcs11_Managed
     // === CBC: gated, and the token's output must match the BCL once unlocked ==============
 
     [Fact]
-    public void EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl() => WithImportedAes((workspace, aes) =>
+    public void EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl() => WithImportedAes((session, aes) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a managed-token key — variable length.");
 
         // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
         Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16));
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
@@ -88,14 +88,14 @@ public sealed class AesPkcs11_Managed
     });
 
     [Fact]
-    public void EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl() => WithImportedAes((workspace, aes) =>
+    public void EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl() => WithImportedAes((session, aes) =>
     {
         byte[] plaintext = new byte[32]; // exactly two blocks
         RandomNumberGenerator.Fill(plaintext);
 
         Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16, PaddingMode.None);
@@ -106,14 +106,14 @@ public sealed class AesPkcs11_Managed
 
     // Reverse direction: a ciphertext produced by the BCL must decrypt on the token.
     [Fact]
-    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedAes((workspace, aes) =>
+    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedAes((session, aes) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("BCL → token interop over CBC-PKCS7.");
         byte[] ct;
         using (var bcl = BclAes())
             ct = bcl.EncryptCbc(plaintext, Iv16);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(plaintext, aes.DecryptCbc(ct, Iv16));
     });
 
@@ -122,14 +122,14 @@ public sealed class AesPkcs11_Managed
         Assert.Throws<NotSupportedException>(() => aes.EncryptCbc(new byte[16], Iv16, PaddingMode.Zeros)));
 
     [Fact]
-    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((workspace, aes) =>
+    public void Cbc_EmptyInput_NoOp_ReturnsEmpty() => WithImportedAes((session, aes) =>
     {
         // Even the empty-input fast path honors the secure-defaults gate: without the AllowInsecure policy the
         // gated mechanism throws before the (empty) buffer reaches the token.
         Assert.Throws<CryptoPolicyViolationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
 
         // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
     });
 
@@ -140,12 +140,12 @@ public sealed class AesPkcs11_Managed
         Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptEcb(new byte[16], PaddingMode.None)));
 
     [Fact]
-    public void EncryptEcb_WithAllowInsecure_MatchesBcl() => WithImportedAes((workspace, aes) =>
+    public void EncryptEcb_WithAllowInsecure_MatchesBcl() => WithImportedAes((session, aes) =>
     {
         byte[] plaintext = new byte[48]; // three blocks
         RandomNumberGenerator.Fill(plaintext);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             using var bcl = BclAes();
             byte[] ct = aes.EncryptEcb(plaintext, PaddingMode.None);
@@ -155,11 +155,11 @@ public sealed class AesPkcs11_Managed
     });
 
     [Fact]
-    public void EncryptEcb_UnsupportedPadding_Throws() => WithImportedAes((workspace, aes) =>
+    public void EncryptEcb_UnsupportedPadding_Throws() => WithImportedAes((session, aes) =>
     {
         // The padding switch runs before the token call, so the gate is irrelevant here; assert the
         // NotSupportedException both inside and (by default) outside the insecure scope.
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Throws<NotSupportedException>(() => aes.EncryptEcb(new byte[16], PaddingMode.PKCS7));
     });
 
@@ -171,9 +171,9 @@ public sealed class AesPkcs11_Managed
             () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128)));
 
     [Fact]
-    public void Cfb_WithAllowInsecure_GateBypassed() => WithImportedAes((workspace, aes) =>
+    public void Cfb_WithAllowInsecure_GateBypassed() => WithImportedAes((session, aes) =>
     {
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             // The managed token does not implement CFB, so the token call may fail — but the
             // secure-defaults gate must NOT fire once the AllowInsecure policy is used.
@@ -211,14 +211,14 @@ public sealed class AesPkcs11_Managed
     public void GeneratedKey_CbcPkcs7_RoundTrips()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("aes-gen").ValueLen(32).Encrypt().Decrypt().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl);
         using var aes = new AesPkcs11(key);
 
         byte[] plaintext = RandomNumberGenerator.GetBytes(40);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = aes.EncryptCbc(plaintext, Iv16);
             Assert.NotEqual(plaintext, ct);

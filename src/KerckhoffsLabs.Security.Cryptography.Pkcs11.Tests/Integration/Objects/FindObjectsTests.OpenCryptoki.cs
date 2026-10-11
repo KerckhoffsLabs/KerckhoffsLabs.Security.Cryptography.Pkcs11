@@ -17,14 +17,14 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
 {
     private readonly OpenCryptokiBackendFixture _backend = backend;
 
-    private Pkcs11Workspace OpenWorkspace() =>
-        _backend.Library.OpenWorkspaceWithPin(
+    private Pkcs11Session OpenSession() =>
+        _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void FindObjects_ReadsAndDeletes_CertificateObject()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
 
         using var rsa = RSA.Create(2048);
         var req = new CertificateRequest("CN=pkcs11 find-objects test", rsa,
@@ -37,12 +37,12 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         using (var tpl = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
             .Label(label).Subject(cert.SubjectName.RawData).Value(der).OnToken().Build())
         {
-            workspace.Session.CreateObject([.. tpl.Attributes]);
+            session.Core.CreateObject([.. tpl.Attributes]);
         }
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            using var objs = workspace.FindObjects(filter);
+            using var objs = session.FindObjects(filter);
             var obj = Assert.Single(objs);
             Assert.Equal(CKO.CKO_CERTIFICATE, obj.ObjectClass);
             Assert.Equal(der, obj.GetValue());
@@ -50,18 +50,18 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
 
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            var objs = workspace.FindObjects(filter);
+            var objs = session.FindObjects(filter);
             objs[0].Destroy();
             foreach (var o in objs) o.Dispose();
         }
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
-            Assert.Empty(workspace.FindObjects(filter));
+            Assert.Empty(session.FindObjects(filter));
     }
 
     [Fact(SkipUnless = nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable), SkipType = typeof(OpenCryptokiBackendFixture), Skip = "Requires " + nameof(OpenCryptokiBackendFixture.OpenCryptokiAvailable))]
     public void FindCertificates_BridgesToTokenPrivateKey_AndSigns()
     {
-        using var workspace = OpenWorkspace();
+        using var session = OpenSession();
 
         string baseLabel = $"octk-certkey-{Guid.NewGuid():N}";
         byte[] id = Guid.NewGuid().ToByteArray();
@@ -70,7 +70,7 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
             .Label(baseLabel).Id(id).Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]).OnToken().Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_RSA)
             .Label(baseLabel).Id(id).Sign().OnToken().Build();
-        using var keypair = workspace.GenerateKeyPair(
+        using var keypair = session.GenerateKeyPair(
             new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTpl, privTpl);
 
         byte[] der;
@@ -90,12 +90,12 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         using (var certTpl = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
             .Label(certLabel).Id(id).Subject(subject).Value(der).OnToken().Build())
         {
-            workspace.Session.CreateObject([.. certTpl.Attributes]);
+            session.Core.CreateObject([.. certTpl.Attributes]);
         }
 
         try
         {
-            using var certs = workspace.FindCertificates();
+            using var certs = session.FindCertificates();
             Pkcs11Certificate? cert = certs.FirstOrDefault(c => c.Label == certLabel);
             Assert.NotNull(cert);
 
@@ -110,7 +110,7 @@ public sealed class FindObjectsTests_OpenCryptoki(OpenCryptokiBackendFixture bac
         finally
         {
             using (var cleanup = ObjectTemplate.Empty().Label(certLabel).Build())
-            using (var found = workspace.FindObjects(cleanup))
+            using (var found = session.FindObjects(cleanup))
                 foreach (var o in found) o.Destroy();
             keypair.Destroy();
         }

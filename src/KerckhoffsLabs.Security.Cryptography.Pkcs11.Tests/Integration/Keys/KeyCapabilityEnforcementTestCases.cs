@@ -32,7 +32,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// </remarks>
 internal static class KeyCapabilityEnforcementTestCases
 {
-    private static ObjectHandle CreateGenericSecret(Pkcs11Session session, byte[] rawKey, bool sign, bool verify)
+    private static ObjectHandle CreateGenericSecret(Pkcs11SessionCore session, byte[] rawKey, bool sign, bool verify)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_GENERIC_SECRET);
@@ -43,7 +43,7 @@ internal static class KeyCapabilityEnforcementTestCases
         return session.CreateObject([c, t, tok, s, v, val]);
     }
 
-    private static ObjectHandle CreateAes(Pkcs11Session session, byte[] rawKey, bool encrypt, bool decrypt)
+    private static ObjectHandle CreateAes(Pkcs11SessionCore session, byte[] rawKey, bool encrypt, bool decrypt)
     {
         using var c = new ObjectAttribute(CKA.CKA_CLASS, CKO.CKO_SECRET_KEY);
         using var t = new ObjectAttribute(CKA.CKA_KEY_TYPE, CKK.CKK_AES);

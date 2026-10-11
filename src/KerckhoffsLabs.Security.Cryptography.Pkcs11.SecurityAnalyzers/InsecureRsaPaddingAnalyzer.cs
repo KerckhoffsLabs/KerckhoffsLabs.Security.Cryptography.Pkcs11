@@ -43,7 +43,7 @@ public sealed class InsecureRsaPaddingAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description:
             "RSAES-PKCS#1 v1.5 and raw RSA encryption are refused at runtime by the default SecureOnly " +
-            "crypto policy (Pkcs11Workspace.Policy). Suppress this diagnostic only alongside a documented " +
+            "crypto policy (Pkcs11Session.Policy). Suppress this diagnostic only alongside a documented " +
             "reason to keep the legacy padding; RSASSA-PKCS#1 v1.5 signatures with a strong hash are " +
             "unaffected and remain allowed.",
         helpLinkUri:

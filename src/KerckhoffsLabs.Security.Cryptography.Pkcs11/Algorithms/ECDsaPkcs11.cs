@@ -94,7 +94,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// this method — see the class remarks.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override bool TrySignData(
         ReadOnlySpan<byte> data,
@@ -120,7 +120,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// HashAlgorithmName)</c> convenience overload does NOT reach this method — see the class remarks.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> permits it.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyData(
         ReadOnlySpan<byte> data,
@@ -144,7 +144,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     // hashing and the digest verification are otherwise exactly what the base class does.
 
     /// <inheritdoc/>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses <paramref name="hashAlgorithm"/> for verification.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's session's <see cref="Pkcs11Session.Policy"/> refuses <paramref name="hashAlgorithm"/> for verification.</exception>
     public override bool VerifyData(byte[] data, int offset, int count, byte[] signature, HashAlgorithmName hashAlgorithm)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -189,7 +189,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     // cannot be overridden and goes straight to it — that override can then report Verify.
 
     /// <inheritdoc/>
-    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's workspace's <see cref="Pkcs11Workspace.Policy"/> refuses <paramref name="hashAlgorithm"/> for signing.</exception>
+    /// <exception cref="CryptoPolicyViolationException">Thrown when the wrapped key's session's <see cref="Pkcs11Session.Policy"/> refuses <paramref name="hashAlgorithm"/> for signing.</exception>
     public override byte[] SignData(Stream data, HashAlgorithmName hashAlgorithm)
     {
         ArgumentNullException.ThrowIfNull(data);
@@ -248,7 +248,7 @@ public sealed class ECDsaPkcs11 : ECDsa
         return _key.Sign(raw, hash);
     }
 
-    // Submits the hash choice to the wrapped key's workspace policy, mirroring SecureOnlyPolicy's
+    // Submits the hash choice to the wrapped key's session policy, mirroring SecureOnlyPolicy's
     // rejection of the combined CKM_ECDSA_SHA1 mechanism. Gating here (the managed-side pre-hash)
     // closes the gap for tokens that lack the combined mechanism. Every entry point that knows the hash
     // algorithm is gated with its own direction: the verification overloads above hash with Verify, the
@@ -257,7 +257,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     // Stream verification overload) with Verify. SignHash / VerifyHash(byte[]) take
     // caller-supplied digest bytes and cannot know the algorithm, so they are outside this gate.
     private void GuardWeakHash(HashAlgorithmName hashAlgorithm, CryptoOperation operation)
-        => _key.Workspace.Enforce(new HashUseRequest(hashAlgorithm, operation));
+        => _key.Session.Enforce(new HashUseRequest(hashAlgorithm, operation));
 
     /// <inheritdoc/>
     protected override byte[] HashData(byte[] data, int offset, int count, HashAlgorithmName hashAlgorithm)
@@ -333,11 +333,11 @@ public sealed class ECDsaPkcs11 : ECDsa
     public override void ImportParameters(ECParameters parameters)
         => throw new NotSupportedException(
             "ECDsaPkcs11 wraps a PKCS#11 key handle; importing managed parameters is not supported. " +
-            "Use Pkcs11Workspace.ImportKey or GenerateKey instead.");
+            "Use Pkcs11Session.ImportKey or GenerateKey instead.");
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">Always thrown.</exception>
     public override void GenerateKey(ECCurve curve)
         => throw new NotSupportedException(
-            "Use Pkcs11Workspace.GenerateKey to generate keys on the token.");
+            "Use Pkcs11Session.GenerateKey to generate keys on the token.");
 }

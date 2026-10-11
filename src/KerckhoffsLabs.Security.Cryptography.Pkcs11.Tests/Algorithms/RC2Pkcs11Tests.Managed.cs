@@ -51,16 +51,16 @@ public sealed class RC2Pkcs11Tests_Managed
     private static readonly byte[] Iv8 = RC2Pkcs11TestCases.Iv8;
     private const int EffectiveBits = RC2Pkcs11TestCases.EffectiveBits;
 
-    // Imports Key128 as a token RC2 key and hands a wrapping RC2Pkcs11 (and its workspace) to the body.
-    private static void WithImportedRc2(Action<Pkcs11Workspace, RC2Pkcs11> body)
+    // Imports Key128 as a token RC2 key and hands a wrapping RC2Pkcs11 (and its session) to the body.
+    private static void WithImportedRc2(Action<Pkcs11Session, RC2Pkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
             .Label($"rc2-{Guid.NewGuid():N}").Value(Key128).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var rc2 = new RC2Pkcs11(key) { EffectiveKeySize = EffectiveBits };
-        body(workspace, rc2);
+        body(session, rc2);
     }
 
     private static RC2 BclRc2() => RC2Pkcs11TestCases.BclRc2();
@@ -78,10 +78,10 @@ public sealed class RC2Pkcs11Tests_Managed
     public void Ctor_NonRc2Key_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new RC2Pkcs11(key));
         Assert.Equal("key", ex.ParamName);
@@ -93,10 +93,10 @@ public sealed class RC2Pkcs11Tests_Managed
     public void Ctor_ReflectsTokenKeySize()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_RC2)
             .Label($"rc2-{Guid.NewGuid():N}").Value(Key128).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var rc2 = new RC2Pkcs11(key);
         Assert.Equal(128, rc2.KeySize);
     }
@@ -122,13 +122,13 @@ public sealed class RC2Pkcs11Tests_Managed
     // === Known-answer round-trips vs the BCL (the managed token implements RC2 wherever the host does) ==
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
+    public void EncryptCbc_Pkcs7_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("RC2-CBC PKCS7 over a token key — variable length.");
 
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8); // default PaddingMode.PKCS7
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptCbc(plaintext, Iv8);
             Assert.Equal(expected, ct);
@@ -137,14 +137,14 @@ public sealed class RC2Pkcs11Tests_Managed
     });
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
+    public void EncryptCbc_NonePadding_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
     {
         byte[] plaintext = new byte[16]; // exactly two 8-byte blocks
         RandomNumberGenerator.Fill(plaintext);
 
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptCbc(plaintext, Iv8, PaddingMode.None);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptCbc(plaintext, Iv8, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -153,14 +153,14 @@ public sealed class RC2Pkcs11Tests_Managed
     });
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void EncryptEcb_AllowInsecure_MatchesBcl() => WithImportedRc2((workspace, rc2) =>
+    public void EncryptEcb_AllowInsecure_MatchesBcl() => WithImportedRc2((session, rc2) =>
     {
         byte[] plaintext = new byte[8];
         RandomNumberGenerator.Fill(plaintext);
 
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptEcb(plaintext, PaddingMode.None);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptEcb(plaintext, PaddingMode.None);
             Assert.Equal(expected, ct);
@@ -190,19 +190,19 @@ public sealed class RC2Pkcs11Tests_Managed
 
     // Reverse direction: ciphertext produced by the BCL must decrypt on the token.
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedRc2((workspace, rc2) =>
+    public void DecryptCbc_BclCiphertext_RoundTrips() => WithImportedRc2((session, rc2) =>
     {
         byte[] plaintext = Encoding.UTF8.GetBytes("token decrypts BCL RC2 ciphertext");
         using var bcl = BclRc2();
         byte[] ct = bcl.EncryptCbc(plaintext, Iv8);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(plaintext, rc2.DecryptCbc(ct, Iv8));
     });
 
     // A wrong IV corrupts the leading block under CBC (no integrity, so it does not throw).
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void DecryptCbc_WrongIv_ProducesDifferentPlaintext() => WithImportedRc2((workspace, rc2) =>
+    public void DecryptCbc_WrongIv_ProducesDifferentPlaintext() => WithImportedRc2((session, rc2) =>
     {
         byte[] plaintext = new byte[16];
         RandomNumberGenerator.Fill(plaintext);
@@ -211,7 +211,7 @@ public sealed class RC2Pkcs11Tests_Managed
 
         byte[] wrongIv = [.. Iv8];
         wrongIv[0] ^= 0xFF;
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] dec = rc2.DecryptCbc(ct, wrongIv, PaddingMode.None);
             Assert.NotEqual(plaintext, dec);
@@ -227,21 +227,21 @@ public sealed class RC2Pkcs11Tests_Managed
         Assert.Throws<CryptoPolicyViolationException>(() => rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8)));
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedRc2((workspace, rc2) =>
+    public void DecryptCbc_EmptyInput_AllowInsecure_NoOp_ReturnsEmpty() => WithImportedRc2((session, rc2) =>
     {
         // Under the AllowInsecure policy, empty decrypt is a no-op returned without touching the token.
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Empty(rc2.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv8));
     });
 
     [Fact(SkipUnless = nameof(Rc2Supported), Skip = "Requires " + nameof(Rc2Supported))]
-    public void EncryptCbc_Pkcs7_EmptyInput_AllowInsecure_EmitsPaddingBlock() => WithImportedRc2((workspace, rc2) =>
+    public void EncryptCbc_Pkcs7_EmptyInput_AllowInsecure_EmitsPaddingBlock() => WithImportedRc2((session, rc2) =>
     {
         // Empty plaintext with PKCS7 must still emit a full 8-byte padding block; that path goes to the
         // token rather than the empty-input fast path. Cross-check against the BCL.
         using var bcl = BclRc2();
         byte[] expected = bcl.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] ct = rc2.EncryptCbc(ReadOnlySpan<byte>.Empty, Iv8);
             Assert.Equal(8, ct.Length);

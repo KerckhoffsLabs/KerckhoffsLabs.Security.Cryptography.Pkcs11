@@ -17,14 +17,14 @@ internal static class SHA384Pkcs11TestCases
     private static readonly byte[] KnownDigest = Convert.FromHexString(
         "CB00753F45A35E8BB5A03D699AC65007272C32AB0EDED1631A8B605A43FF5BED8086072BA1E7CC2358BAECA134C825A7");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
     internal static void Assert_ComputeHash_KnownAnswer(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA384);
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA384Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA384Pkcs11(session);
 
         byte[] digest = hash.ComputeHash(Encoding.UTF8.GetBytes("abc"));
         Assert.Equal(48, digest.Length);
@@ -34,8 +34,8 @@ internal static class SHA384Pkcs11TestCases
     internal static void Assert_ComputeHash_MatchesBcl(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA384);
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA384Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA384Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         Assert.Equal(SHA384.HashData(data), hash.ComputeHash(data));
@@ -44,8 +44,8 @@ internal static class SHA384Pkcs11TestCases
     internal static void Assert_ComputeHash_Streamed_MatchesOneShot(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA384);
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA384Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA384Pkcs11(session);
 
         byte[] part1 = Encoding.UTF8.GetBytes("hello ");
         byte[] part2 = Encoding.UTF8.GetBytes("world");
@@ -58,8 +58,8 @@ internal static class SHA384Pkcs11TestCases
     internal static void Assert_Reuse_AfterInitialize_ProducesFreshHash(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA384);
-        using var workspace = OpenWorkspace(backend);
-        using var hash = new SHA384Pkcs11(workspace);
+        using var session = OpenSession(backend);
+        using var hash = new SHA384Pkcs11(session);
 
         byte[] first = hash.ComputeHash(Encoding.UTF8.GetBytes("one"));
         byte[] second = hash.ComputeHash(Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize

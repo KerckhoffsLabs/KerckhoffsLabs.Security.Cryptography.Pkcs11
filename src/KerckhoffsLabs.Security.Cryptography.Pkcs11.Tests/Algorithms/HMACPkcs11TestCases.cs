@@ -31,13 +31,13 @@ internal static class HMACPkcs11TestCases
         _ => throw new ArgumentOutOfRangeException(nameof(hashName), hashName, "Unexpected HMAC hash."),
     };
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
@@ -46,35 +46,35 @@ internal static class HMACPkcs11TestCases
 
     // Generates an ephemeral generic-secret key of the given length (SoftHSM enforces a per-mechanism
     // minimum HMAC key size, so callers size the key to the digest length) and runs the body.
-    private static void WithHmacKey(IPkcs11Backend backend, int keyLen, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithHmacKey(IPkcs11Backend backend, int keyLen, Action<Pkcs11Session, Pkcs11Key> body)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"hmac-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).ValueLen(keyLen).Sign().Verify().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
-            body(workspace, key);
+            using var key = session.OpenKey(label);
+            body(session, key);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     private static void WithImportedHmacKey(IPkcs11Backend backend, byte[] rawKey, Action<Pkcs11Key> body)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"hmac-kat-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).Value(rawKey).Sign().Verify().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             body(key);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_ComputeHash_DeterministicForSameKeyAndInput(IPkcs11Backend backend, string hashName, int expectedLen)
@@ -98,13 +98,13 @@ internal static class HMACPkcs11TestCases
     internal static void Assert_ComputeHash_Sha1_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA_1_HMAC);
-        WithHmacKey(backend, 20, (workspace, key) =>
+        WithHmacKey(backend, 20, (session, key) =>
         {
             using var hmac = new HMACPkcs11(key, HashAlgorithmName.SHA1);
             Assert.Equal(160, hmac.HashSize); // 20-byte digest reported in bits
 
             byte[] data = Encoding.UTF8.GetBytes("sha1 hmac");
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] mac = hmac.ComputeHash(data);
                 Assert.Equal(20, mac.Length);
@@ -117,13 +117,13 @@ internal static class HMACPkcs11TestCases
     internal static void Assert_ComputeHash_Sha224_UnderAllowInsecure_RoundTrips(IPkcs11Backend backend)
     {
         backend.RequireMechanism(CKM.CKM_SHA224_HMAC);
-        WithHmacKey(backend, 28, (workspace, key) =>
+        WithHmacKey(backend, 28, (session, key) =>
         {
             using var hmac = new HMACPkcs11(key, new HashAlgorithmName("SHA224"));
             Assert.Equal(224, hmac.HashSize); // 28-byte digest reported in bits
 
             byte[] data = Encoding.UTF8.GetBytes("sha224 hmac");
-            using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+            using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             {
                 byte[] mac = hmac.ComputeHash(data);
                 Assert.Equal(28, mac.Length);

@@ -50,7 +50,7 @@ public sealed class CountArrayCapacityTests
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
         Span<NativeCULong> objects = stackalloc NativeCULong[4];
 
-        CKR rv = lowLevel.C_FindObjects(module.OpenSession(), objects, out NativeCULong count);
+        CKR rv = lowLevel.C_FindObjects(module.OpenSessionCore(), objects, out NativeCULong count);
 
         Assert.Equal(CKR.CKR_OK, rv);
         Assert.Equal(4, module.FindCapacity);
@@ -63,7 +63,7 @@ public sealed class CountArrayCapacityTests
         public bool SlotListWasNull { get; private set; }
         public int FindCapacity { get; private set; }
 
-        public NativeCULong OpenSession() => NewSessionHandle();
+        public NativeCULong OpenSessionCore() => NewSessionHandle();
 
         protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 

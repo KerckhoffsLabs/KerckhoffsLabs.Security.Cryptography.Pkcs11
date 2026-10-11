@@ -16,27 +16,27 @@ public sealed class DeleteKeyTests_Kryoptic(KryopticBackendFixture f)
     [Fact(SkipUnless = nameof(KryopticBackendFixture.KryopticAvailable), SkipType = typeof(KryopticBackendFixture), Skip = "Requires " + nameof(KryopticBackendFixture.KryopticAvailable))]
     public void Delete_RemovesKeyFromToken()
     {
-        using var workspace = _backend.Library.OpenWorkspaceWithPin(
+        using var session = _backend.Library.OpenSessionWithPin(
             _backend.TokenLabel, CKU.CKU_USER, new SecurePin(_backend.UserPin.Span));
 
         string label = $"del-{Guid.NewGuid():N}";
         using (var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).ValueLen(32).Encrypt().Decrypt().OnToken().Build())
-        using (workspace.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl)) { }
+        using (session.GenerateKey(new Mechanism(CKM.CKM_AES_KEY_GEN), tpl)) { }
 
         // Present on the token before deletion.
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
         {
-            var before = workspace.FindKeys(filter);
+            var before = session.FindKeys(filter);
             Assert.NotEmpty(before);
             foreach (var k in before) k.Dispose();
         }
 
-        using (var key = workspace.OpenKey(label))
+        using (var key = session.OpenKey(label))
             key.Destroy();
 
         // Gone after deletion.
         using (var filter = ObjectTemplate.Empty().Label(label).Build())
-            Assert.Empty(workspace.FindKeys(filter));
+            Assert.Empty(session.FindKeys(filter));
     }
 }

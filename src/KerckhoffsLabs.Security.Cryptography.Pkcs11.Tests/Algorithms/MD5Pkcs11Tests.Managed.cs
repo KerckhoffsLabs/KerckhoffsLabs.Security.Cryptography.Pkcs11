@@ -24,8 +24,8 @@ public sealed class MD5Pkcs11_Managed
 {
     public static bool Supported => true;
 
-    private static Pkcs11Workspace OpenWorkspace(Pkcs11Library library) =>
-        ManagedToken.OpenWorkspace(library);
+    private static Pkcs11Session OpenSession(Pkcs11Library library) =>
+        ManagedToken.OpenSession(library);
 
     // === The gate: MD5 is blocked by default, unlocked only inside an insecure scope =======
 
@@ -33,8 +33,8 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_GatedByDefault_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
         var ex = Assert.Throws<CryptoPolicyViolationException>(
             () => md5.ComputeHash(Encoding.UTF8.GetBytes("abc")));
@@ -45,11 +45,11 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_OutsideScope_AfterScopeClosed_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("abc");
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             _ = md5.ComputeHash(data); // allowed
         }
@@ -65,14 +65,14 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_WithUsePolicyAllowInsecure_KnownAnswer_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("abc");
         // RFC 1321 / BCL: MD5("abc") = 900150983cd24fb0d6963f7d28e17f72
         byte[] expected = Convert.FromHexString("900150983CD24FB0D6963F7D28E17F72");
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] digest = md5.ComputeHash(data);
             Assert.Equal(16, digest.Length);
@@ -85,9 +85,9 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_WithAllowInsecureFlag_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var md5 = new MD5Pkcs11(session);
 
         byte[] data = Encoding.UTF8.GetBytes("The quick brown fox jumps over the lazy dog");
         // RFC 1321 test suite vector.
@@ -102,13 +102,13 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_EmptyInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
         // RFC 1321 / BCL: MD5("") = d41d8cd98f00b204e9800998ecf8427e
         byte[] expected = Convert.FromHexString("D41D8CD98F00B204E9800998ECF8427E");
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] digest = md5.ComputeHash([]);
             Assert.Equal(expected, digest);
@@ -120,11 +120,11 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_RandomInput_MatchesBcl()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
         byte[] data = RandomNumberGenerator.GetBytes(517);
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
             Assert.Equal(MD5.HashData(data), md5.ComputeHash(data));
     }
 
@@ -134,12 +134,12 @@ public sealed class MD5Pkcs11_Managed
     public void ComputeHash_Streamed_MatchesOneShot()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
         byte[] part1 = Encoding.UTF8.GetBytes("hello ");
         byte[] part2 = Encoding.UTF8.GetBytes("world");
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             md5.TransformBlock(part1, 0, part1.Length, null, 0);
             md5.TransformFinalBlock(part2, 0, part2.Length);
@@ -153,10 +153,10 @@ public sealed class MD5Pkcs11_Managed
     public void Reuse_AfterInitialize_ProducesFreshHash()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = OpenWorkspace(library);
-        using var md5 = new MD5Pkcs11(workspace);
+        using var session = OpenSession(library);
+        using var md5 = new MD5Pkcs11(session);
 
-        using (workspace.UsePolicy(CryptoPolicy.AllowInsecure))
+        using (session.UsePolicy(CryptoPolicy.AllowInsecure))
         {
             byte[] first = md5.ComputeHash(Encoding.UTF8.GetBytes("one"));
             byte[] second = md5.ComputeHash(Encoding.UTF8.GetBytes("two")); // ComputeHash calls Initialize
@@ -168,10 +168,10 @@ public sealed class MD5Pkcs11_Managed
     // === Construction and argument validation (run before any native call) ================
 
     [Fact]
-    public void Ctor_NullWorkspace_Throws()
+    public void Ctor_NullSession_Throws()
     {
         var ex = Assert.Throws<ArgumentNullException>(() => new MD5Pkcs11(null!));
-        Assert.Equal("workspace", ex.ParamName);
+        Assert.Equal("session", ex.ParamName);
     }
 }
 #pragma warning restore KLPKCS11001

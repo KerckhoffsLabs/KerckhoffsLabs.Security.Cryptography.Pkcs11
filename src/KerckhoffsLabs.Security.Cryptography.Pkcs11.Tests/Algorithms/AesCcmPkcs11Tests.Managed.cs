@@ -36,10 +36,10 @@ public sealed class AesCcmPkcs11Tests_Managed
         byte[] key, Action<AesCcmPkcs11> body, int tagSizeInBytes = 16, ICryptoPolicy? policy = null)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library, policy);
+        using var session = ManagedToken.OpenSession(library, policy);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("ccm").Value(key).Encrypt().Decrypt().Build();
-        using var key1 = workspace.ImportKey(tpl);
+        using var key1 = session.ImportKey(tpl);
         using var ccm = new AesCcmPkcs11(key1, tagSizeInBytes);
         body(ccm);
     }
@@ -298,10 +298,10 @@ public sealed class AesCcmPkcs11Tests_Managed
     public void Ctor_InvalidTagSize_Throws(int tagSizeInBytes)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("ccm").Value(RandomNumberGenerator.GetBytes(32)).Encrypt().Decrypt().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key, tagSizeInBytes));
         Assert.Equal("tagSizeInBytes", ex.ParamName);
@@ -337,10 +337,10 @@ public sealed class AesCcmPkcs11Tests_Managed
     public void Ctor_NonAesKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("gen").ValueLen(32).Sign().Build();
-        using var key = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
+        using var key = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), tpl);
 
         var ex = Assert.Throws<ArgumentException>(() => new AesCcmPkcs11(key, 16));
         Assert.Equal("key", ex.ParamName);

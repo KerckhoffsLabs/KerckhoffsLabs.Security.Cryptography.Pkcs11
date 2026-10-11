@@ -32,33 +32,33 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     private static readonly byte[] Context = Encoding.UTF8.GetBytes("kdf-context");
 
     // Imports KeyBytes as a derive-capable generic-secret base key and hands the KDF to the body.
-    private static void WithImportedKdf(HashAlgorithmName hash, Action<Pkcs11Workspace, SP800108HmacCounterKdfPkcs11> body)
+    private static void WithImportedKdf(HashAlgorithmName hash, Action<Pkcs11Session, SP800108HmacCounterKdfPkcs11> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         // Every byte-returning DeriveKey overload reads the derived value off the token, so the gate
         // in BuildSecureKeyDefaults refuses them under the default posture. Opt in here; the refusal
         // itself is covered by its own test.
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf").Value(KeyBytes).Derive().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
         using var kdf = new SP800108HmacCounterKdfPkcs11(key, hash);
-        body(workspace, kdf);
+        body(session, kdf);
     }
 
-    private static void WithImportedKdf(Action<Pkcs11Workspace, SP800108HmacCounterKdfPkcs11> body) =>
+    private static void WithImportedKdf(Action<Pkcs11Session, SP800108HmacCounterKdfPkcs11> body) =>
         WithImportedKdf(HashAlgorithmName.SHA256, body);
 
     // Imports the base key and hands the raw Pkcs11Key (for ctor-validation tests).
-    private static void WithImportedKdfKey(Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithImportedKdfKey(Action<Pkcs11Session, Pkcs11Key> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label("kdf").Value(KeyBytes).Derive().Build();
-        using var key = workspace.ImportKey(tpl);
-        body(workspace, key);
+        using var key = session.ImportKey(tpl);
+        body(session, key);
     }
 
     // === Known-answer derivations: cross-checked against the BCL =========================
@@ -217,12 +217,12 @@ public sealed class SP800108HmacCounterKdfPkcs11_Managed
     public void Ctor_NonGenericSecretKey_Throws()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         byte[] aes = new byte[32];
         RandomNumberGenerator.Fill(aes);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label("kdf-aes").Value(aes).Derive().Build();
-        using var key = workspace.ImportKey(tpl);
+        using var key = session.ImportKey(tpl);
 
         var ex = Assert.Throws<ArgumentException>(
             () => new SP800108HmacCounterKdfPkcs11(key, HashAlgorithmName.SHA256));

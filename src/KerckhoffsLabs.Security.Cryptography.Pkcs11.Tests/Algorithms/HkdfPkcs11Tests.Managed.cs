@@ -43,22 +43,22 @@ public sealed class HkdfPkcs11Tests_Managed
 
     // Imports Ikm as a derive-capable generic-secret key. The byte-returning overloads read the derived
     // value off the token, so they need the export opt-in; the on-token overloads must work without it.
-    private static void WithIkm(bool allowExport, Action<Pkcs11Workspace, Pkcs11Key> body)
+    private static void WithIkm(bool allowExport, Action<Pkcs11Session, Pkcs11Key> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET).Label("ikm").Value(Ikm).Derive().Build();
-        using var ikm = workspace.ImportKey(tpl);
+        using var ikm = session.ImportKey(tpl);
         if (!allowExport)
         {
-            body(workspace, ikm);
+            body(session, ikm);
             return;
         }
-        using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
-        body(workspace, ikm);
+        using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        body(session, ikm);
     }
 
-    private static void WithIkm(Action<Pkcs11Workspace, Pkcs11Key> body) => WithIkm(allowExport: true, body);
+    private static void WithIkm(Action<Pkcs11Session, Pkcs11Key> body) => WithIkm(allowExport: true, body);
 
     private static byte[] ValueOf(Pkcs11Key key)
     {
@@ -289,9 +289,9 @@ public sealed class HkdfPkcs11Tests_Managed
     public void AKeyThatIsNotGenericSecretOrHkdf_IsRefused()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES).Label("aes").Value(new byte[32]).Derive().Build();
-        using var aes = workspace.ImportKey(tpl);
+        using var aes = session.ImportKey(tpl);
         using var template = SecretTemplate(32);
 
         Assert.Equal("ikm", Assert.Throws<ArgumentException>(() => HkdfPkcs11.DeriveKey(Sha256, aes, 32)).ParamName);
@@ -306,9 +306,9 @@ public sealed class HkdfPkcs11Tests_Managed
     public void AnHkdfKeyType_IsAccepted()
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
+        using var session = ManagedToken.OpenSession(library);
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_HKDF).Label("hkdf").Value(Ikm).Derive().Build();
-        using var ikm = workspace.ImportKey(tpl);
+        using var ikm = session.ImportKey(tpl);
         using var template = SecretTemplate(32);
 
         using Pkcs11Key derived = HkdfPkcs11.DeriveKey(Sha256, ikm, template, Salt, Info);

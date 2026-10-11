@@ -49,7 +49,7 @@ public sealed class Pkcs11ParameterWriter
     /// token objects.
     /// </summary>
     /// <remarks>
-    /// <paramref name="key"/> must come from the workspace performing the call; a handle only means
+    /// <paramref name="key"/> must come from the session performing the call; a handle only means
     /// something to the session it came from.
     /// </remarks>
     /// <param name="key">The key the field refers to.</param>
@@ -58,7 +58,7 @@ public sealed class Pkcs11ParameterWriter
     /// <returns>This writer, for chaining.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if <paramref name="key"/> has been disposed.</exception>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> belongs to another workspace, or has no object of the requested kind.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> belongs to another session, or has no object of the requested kind.</exception>
     public Pkcs11ParameterWriter Key(Pkcs11Key key, KeyHandlePart part = KeyHandlePart.Private)
     {
         ArgumentNullException.ThrowIfNull(key);

@@ -5,7 +5,7 @@
 Modern, secure-by-default **PKCS#11 v3.2** interop for .NET.
 
 This site hosts the generated API reference. Browse the [**API documentation**](api/index.md) for the
-full surface: the high-level façade (`Pkcs11Library`, `Pkcs11Workspace`, `Pkcs11Session`), the
+full surface: the high-level façade (`Pkcs11Library`, `Pkcs11Slot`, `Pkcs11Session`), the
 algorithm adapters (`RSAPkcs11`, `ECDsaPkcs11`, `AesGcmPkcs11`, `MLKemPkcs11`, `MLDsaPkcs11`,
 `SlhDsaPkcs11`, …), the object/attribute model, and the low-level interop types.
 

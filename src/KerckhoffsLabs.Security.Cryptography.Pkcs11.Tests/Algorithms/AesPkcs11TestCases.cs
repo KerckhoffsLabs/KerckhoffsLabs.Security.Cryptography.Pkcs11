@@ -22,33 +22,33 @@ internal static class AesPkcs11TestCases
     private static readonly byte[] Iv16 =
         Convert.FromHexString("0F0E0D0C0B0A09080706050403020100");
 
-    private static Pkcs11Workspace OpenWorkspace(IPkcs11Backend backend) =>
-        backend.OpenWorkspace();
+    private static Pkcs11Session OpenSession(IPkcs11Backend backend) =>
+        backend.OpenSession();
 
-    private static void DestroyByLabel(Pkcs11Workspace workspace, string label)
+    private static void DestroyByLabel(Pkcs11Session session, string label)
     {
         using var filter = ObjectTemplate.Empty().Label(label).Build();
-        foreach (var k in workspace.FindKeys(filter))
+        foreach (var k in session.FindKeys(filter))
         {
             k.Destroy();
             k.Dispose();
         }
     }
 
-    // Imports Key256 as a token AES key and hands a wrapping AesPkcs11 (and its workspace) to the body.
-    private static void WithImportedAes(IPkcs11Backend backend, Action<Pkcs11Workspace, AesPkcs11> body)
+    // Imports Key256 as a token AES key and hands a wrapping AesPkcs11 (and its session) to the body.
+    private static void WithImportedAes(IPkcs11Backend backend, Action<Pkcs11Session, AesPkcs11> body)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"aes-{Guid.NewGuid():N}";
         using var tpl = ObjectTemplate.ForSecretKey(CKK.CKK_AES)
             .Label(label).Value(Key256).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             using var aes = new AesPkcs11(key);
-            body(workspace, aes);
+            body(session, aes);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     private static Aes BclAes()
@@ -60,24 +60,24 @@ internal static class AesPkcs11TestCases
 
     internal static void Assert_Ctor_NonAesKey_Throws(IPkcs11Backend backend)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"nonaes-{Guid.NewGuid():N}";
         using (var t = ObjectTemplate.ForSecretKey(CKK.CKK_GENERIC_SECRET)
             .Label(label).ValueLen(32).Sign().OnToken(backend.SupportsTokenObjects).Build())
         {
-            using var _ = workspace.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
+            using var _ = session.GenerateKey(new Mechanism(CKM.CKM_GENERIC_SECRET_KEY_GEN), t);
         }
         try
         {
-            using var key = workspace.OpenKey(label);
+            using var key = session.OpenKey(label);
             var ex = Assert.Throws<ArgumentException>(() => new AesPkcs11(key));
             Assert.Equal("key", ex.ParamName);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_EncryptCbc_Pkcs7_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
-        WithImportedAes(backend, (workspace, aes) =>
+        WithImportedAes(backend, (session, aes) =>
         {
             backend.RequireMechanism(CKM.CKM_AES_CBC);
             byte[] plaintext = Encoding.UTF8.GetBytes("AES-CBC PKCS7 over a token key — variable length.");
@@ -85,7 +85,7 @@ internal static class AesPkcs11TestCases
             // CBC (even with PKCS7) is unauthenticated and gated by the secure-defaults policy.
             Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16));
 
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16); // default PaddingMode.PKCS7
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv16), ct);
@@ -93,7 +93,7 @@ internal static class AesPkcs11TestCases
         });
 
     internal static void Assert_EncryptCbc_NonePadding_GatedByDefault_AllowInsecureMatchesBcl(IPkcs11Backend backend) =>
-        WithImportedAes(backend, (workspace, aes) =>
+        WithImportedAes(backend, (session, aes) =>
         {
             backend.RequireMechanism(CKM.CKM_AES_CBC);
             byte[] plaintext = new byte[32]; // exactly two blocks
@@ -101,7 +101,7 @@ internal static class AesPkcs11TestCases
 
             Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptCbc(plaintext, Iv16, PaddingMode.None));
 
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             using var bcl = BclAes();
             byte[] ct = aes.EncryptCbc(plaintext, Iv16, PaddingMode.None);
             Assert.Equal(bcl.EncryptCbc(plaintext, Iv16, PaddingMode.None), ct);
@@ -114,9 +114,9 @@ internal static class AesPkcs11TestCases
                 () => aes.EncryptCfb(new byte[16], Iv16, PaddingMode.None, feedbackSizeInBits: 128)));
 
     internal static void Assert_Cfb_WithAllowInsecure_GateBypassed(IPkcs11Backend backend) =>
-        WithImportedAes(backend, (workspace, aes) =>
+        WithImportedAes(backend, (session, aes) =>
         {
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             // The token may not implement CFB, so the call may fail — but the secure-defaults gate must
             // NOT fire once the AllowInsecure policy is used.
             Exception? ex = Record.Exception(
@@ -139,10 +139,10 @@ internal static class AesPkcs11TestCases
             Assert.Throws<CryptoPolicyViolationException>(() => aes.EncryptEcb(new byte[16], PaddingMode.None)));
 
     internal static void Assert_EncryptEcb_WithAllowInsecure_MatchesBcl(IPkcs11Backend backend) =>
-        WithImportedAes(backend, (workspace, aes) =>
+        WithImportedAes(backend, (session, aes) =>
         {
             backend.RequireMechanism(CKM.CKM_AES_ECB);
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             byte[] plaintext = new byte[16];
             RandomNumberGenerator.Fill(plaintext);
             using var bcl = BclAes();
@@ -161,7 +161,7 @@ internal static class AesPkcs11TestCases
 
     internal static void Assert_KeySize_ReflectsTokenKeyLength(IPkcs11Backend backend, int keyBytes, int expectedBits)
     {
-        using var workspace = OpenWorkspace(backend);
+        using var session = OpenSession(backend);
         string label = $"aes-ks-{Guid.NewGuid():N}";
         byte[] raw = new byte[keyBytes];
         RandomNumberGenerator.Fill(raw);
@@ -169,22 +169,22 @@ internal static class AesPkcs11TestCases
             .Label(label).Value(raw).Encrypt().Decrypt().OnToken(backend.SupportsTokenObjects).Build();
         try
         {
-            using var key = workspace.ImportKey(tpl);
+            using var key = session.ImportKey(tpl);
             using var aes = new AesPkcs11(key);
             Assert.Equal(expectedBits, aes.KeySize);
         }
-        finally { DestroyByLabel(workspace, label); }
+        finally { DestroyByLabel(session, label); }
     }
 
     internal static void Assert_Cbc_EmptyInput_NoOp_ReturnsEmpty(IPkcs11Backend backend) =>
-        WithImportedAes(backend, (workspace, aes) =>
+        WithImportedAes(backend, (session, aes) =>
         {
             // The empty-input fast path still honors the gate: without the AllowInsecure policy the gated mechanism
             // throws before the (empty) buffer reaches the token.
             Assert.Throws<CryptoPolicyViolationException>(() => aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
 
             // Under the AllowInsecure policy, empty input is a no-op returned without touching the token.
-            using var insecure = workspace.UsePolicy(CryptoPolicy.AllowInsecure);
+            using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
             Assert.Empty(aes.DecryptCbc(ReadOnlySpan<byte>.Empty, Iv16));
         });
 

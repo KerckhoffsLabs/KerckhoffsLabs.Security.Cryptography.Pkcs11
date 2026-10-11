@@ -20,13 +20,13 @@ public sealed class Pkcs11CertificateExtensions_Managed
     private static readonly byte[] Data = "sign via the certificate's on-token key"u8.ToArray();
 
     [Fact]
-    public void GetRSAPrivateKey_ReturnsTheOnTokenKey_ThatSignsForTheCertificate() => WithWorkspace(workspace =>
+    public void GetRSAPrivateKey_ReturnsTheOnTokenKey_ThatSignsForTheCertificate() => WithSession(session =>
     {
         byte[] id = NewId();
-        byte[] der = MintWithTokenKey(GenerateRsaKeyPair(workspace, id));
-        StoreCertificate(workspace, der, id);
+        byte[] der = MintWithTokenKey(GenerateRsaKeyPair(session, id));
+        StoreCertificate(session, der, id);
 
-        using var certs = workspace.FindCertificates();
+        using var certs = session.FindCertificates();
         using RSA? rsa = Assert.Single(certs).GetRSAPrivateKey();
 
         Assert.IsType<RSAPkcs11>(rsa);
@@ -38,14 +38,14 @@ public sealed class Pkcs11CertificateExtensions_Managed
 
     /// <summary>The BCL treats an <c>id-RSASSA-PSS</c> SubjectPublicKeyInfo as RSA, and so must we.</summary>
     [Fact]
-    public void GetRSAPrivateKey_RecognizesAnRsaPssSubjectPublicKeyInfo() => WithWorkspace(workspace =>
+    public void GetRSAPrivateKey_RecognizesAnRsaPssSubjectPublicKeyInfo() => WithSession(session =>
     {
         byte[] id = NewId();
-        using Pkcs11Key key = GenerateRsaKeyPair(workspace, id);
+        using Pkcs11Key key = GenerateRsaKeyPair(session, id);
         byte[] der = MintRsaPssSpkiWithTokenKey(key);
-        StoreCertificate(workspace, der, id);
+        StoreCertificate(session, der, id);
 
-        using var certs = workspace.FindCertificates();
+        using var certs = session.FindCertificates();
         var certificate = Assert.Single(certs);
         Assert.Equal(RsaPssOid, certificate.Certificate.GetKeyAlgorithm());
 
@@ -54,13 +54,13 @@ public sealed class Pkcs11CertificateExtensions_Managed
     });
 
     [Fact]
-    public void GetECDsaPrivateKey_ReturnsTheOnTokenKey_ThatSignsForTheCertificate() => WithWorkspace(workspace =>
+    public void GetECDsaPrivateKey_ReturnsTheOnTokenKey_ThatSignsForTheCertificate() => WithSession(session =>
     {
         byte[] id = NewId();
-        byte[] der = MintWithTokenKey(GenerateEcKeyPair(workspace, id));
-        StoreCertificate(workspace, der, id);
+        byte[] der = MintWithTokenKey(GenerateEcKeyPair(session, id));
+        StoreCertificate(session, der, id);
 
-        using var certs = workspace.FindCertificates();
+        using var certs = session.FindCertificates();
         using ECDsa? ecdsa = Assert.Single(certs).GetECDsaPrivateKey();
 
         Assert.IsType<ECDsaPkcs11>(ecdsa);
@@ -75,25 +75,25 @@ public sealed class Pkcs11CertificateExtensions_Managed
     /// on the token: an RSA certificate has no ECDsa key, and the reverse.
     /// </summary>
     [Fact]
-    public void Getters_ReturnNull_ForTheOtherAlgorithm() => WithWorkspace(workspace =>
+    public void Getters_ReturnNull_ForTheOtherAlgorithm() => WithSession(session =>
     {
         byte[] rsaId = NewId();
-        StoreCertificate(workspace, MintWithTokenKey(GenerateRsaKeyPair(workspace, rsaId)), rsaId, "rsa");
+        StoreCertificate(session, MintWithTokenKey(GenerateRsaKeyPair(session, rsaId)), rsaId, "rsa");
         byte[] ecId = NewId();
-        StoreCertificate(workspace, MintWithTokenKey(GenerateEcKeyPair(workspace, ecId)), ecId, "ec");
+        StoreCertificate(session, MintWithTokenKey(GenerateEcKeyPair(session, ecId)), ecId, "ec");
 
-        using var certs = workspace.FindCertificates();
+        using var certs = session.FindCertificates();
         Assert.Null(certs.Single(c => c.Label == "rsa").GetECDsaPrivateKey());
         Assert.Null(certs.Single(c => c.Label == "ec").GetRSAPrivateKey());
     });
 
     [Fact]
-    public void Getters_ReturnNull_WhenNoKeyHasTheCertificatesId() => WithWorkspace(workspace =>
+    public void Getters_ReturnNull_WhenNoKeyHasTheCertificatesId() => WithSession(session =>
     {
-        StoreCertificate(workspace, SelfSignedRsa(), NewId(), "rsa");
-        StoreCertificate(workspace, SelfSignedEc(), NewId(), "ec");
+        StoreCertificate(session, SelfSignedRsa(), NewId(), "rsa");
+        StoreCertificate(session, SelfSignedEc(), NewId(), "ec");
 
-        using var certs = workspace.FindCertificates();
+        using var certs = session.FindCertificates();
         Assert.Null(certs.Single(c => c.Label == "rsa").GetRSAPrivateKey());
         Assert.Null(certs.Single(c => c.Label == "ec").GetECDsaPrivateKey());
     });
@@ -103,14 +103,14 @@ public sealed class Pkcs11CertificateExtensions_Managed
     /// unrelated key, here one generated without an id either.
     /// </summary>
     [Fact]
-    public void Getters_ReturnNull_WhenTheCertificateHasNoId() => WithWorkspace(workspace =>
+    public void Getters_ReturnNull_WhenTheCertificateHasNoId() => WithSession(session =>
     {
-        using var rsaKey = GenerateRsaKeyPair(workspace, id: null);
-        using var ecKey = GenerateEcKeyPair(workspace, id: null);
-        StoreCertificate(workspace, SelfSignedRsa(), id: null, "rsa");
-        StoreCertificate(workspace, SelfSignedEc(), id: null, "ec");
+        using var rsaKey = GenerateRsaKeyPair(session, id: null);
+        using var ecKey = GenerateEcKeyPair(session, id: null);
+        StoreCertificate(session, SelfSignedRsa(), id: null, "rsa");
+        StoreCertificate(session, SelfSignedEc(), id: null, "ec");
 
-        using var certs = workspace.FindCertificates();
+        using var certs = session.FindCertificates();
         Assert.Null(certs.Single(c => c.Label == "rsa").GetRSAPrivateKey());
         Assert.Null(certs.Single(c => c.Label == "ec").GetECDsaPrivateKey());
     });
@@ -126,16 +126,16 @@ public sealed class Pkcs11CertificateExtensions_Managed
 
     // === Helpers =========================================================
 
-    private static void WithWorkspace(Action<Pkcs11Workspace> body)
+    private static void WithSession(Action<Pkcs11Session> body)
     {
         using var library = ManagedToken.NewLibrary();
-        using var workspace = ManagedToken.OpenWorkspace(library);
-        body(workspace);
+        using var session = ManagedToken.OpenSession(library);
+        body(session);
     }
 
     private static byte[] NewId() => Guid.NewGuid().ToByteArray();
 
-    private static Pkcs11Key GenerateRsaKeyPair(Pkcs11Workspace workspace, byte[]? id)
+    private static Pkcs11Key GenerateRsaKeyPair(Pkcs11Session session, byte[]? id)
     {
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_RSA)
             .Verify().ModulusBits(2048).PublicExponent([0x01, 0x00, 0x01]);
@@ -147,10 +147,10 @@ public sealed class Pkcs11CertificateExtensions_Managed
         }
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
-        return workspace.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTemplate, privTemplate);
+        return session.GenerateKeyPair(new Mechanism(CKM.CKM_RSA_PKCS_KEY_PAIR_GEN), pubTemplate, privTemplate);
     }
 
-    private static Pkcs11Key GenerateEcKeyPair(Pkcs11Workspace workspace, byte[]? id)
+    private static Pkcs11Key GenerateEcKeyPair(Pkcs11Session session, byte[]? id)
     {
         var pub = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
             .Verify().EcParams(Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams());
@@ -162,7 +162,7 @@ public sealed class Pkcs11CertificateExtensions_Managed
         }
         using var pubTemplate = pub.Build();
         using var privTemplate = priv.Build();
-        return workspace.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTemplate, privTemplate);
+        return session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTemplate, privTemplate);
     }
 
     // Mints a certificate for the token key, signed by it through X509SignatureGenerator, so its
@@ -233,7 +233,7 @@ public sealed class Pkcs11CertificateExtensions_Managed
         return cert.Export(X509ContentType.Cert);
     }
 
-    private static void StoreCertificate(Pkcs11Workspace workspace, byte[] der, byte[]? id, string label = "cert")
+    private static void StoreCertificate(Pkcs11Session session, byte[] der, byte[]? id, string label = "cert")
     {
         using var cert = X509CertificateLoader.LoadCertificate(der);
         var builder = ObjectTemplate.ForCertificate(CKC.CKC_X_509)
@@ -241,6 +241,6 @@ public sealed class Pkcs11CertificateExtensions_Managed
         if (id is not null)
             builder = builder.Id(id);
         using var template = builder.Build();
-        workspace.Session.CreateObject([.. template.Attributes]);
+        session.Core.CreateObject([.. template.Attributes]);
     }
 }

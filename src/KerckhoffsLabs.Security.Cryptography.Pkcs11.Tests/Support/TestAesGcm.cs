@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests;
 /// </summary>
 internal static class TestAesGcm
 {
-    public static byte[] Encrypt(Pkcs11Session session, ObjectHandle key,
+    public static byte[] Encrypt(Pkcs11SessionCore session, ObjectHandle key,
         ReadOnlySpan<byte> iv, ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> aad = default)
     {
         var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
@@ -21,7 +21,7 @@ internal static class TestAesGcm
         return session.Encrypt(mech, key, plaintext);
     }
 
-    public static byte[] Decrypt(Pkcs11Session session, ObjectHandle key,
+    public static byte[] Decrypt(Pkcs11SessionCore session, ObjectHandle key,
         ReadOnlySpan<byte> iv, ReadOnlySpan<byte> ciphertextAndTag, ReadOnlySpan<byte> aad = default)
     {
         var p = new CkmAesGcmParams(iv, aad, tagBits: 128);
