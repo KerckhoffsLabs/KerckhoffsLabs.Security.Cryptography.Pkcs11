@@ -19,9 +19,18 @@ internal static class LayerDependencies
     /// a type of this library outside <paramref name="layer"/> and <paramref name="allowed"/>, sorted.
     /// </summary>
     public static string[] Violations(string layer, params string[] allowed)
+        => Violations(layer, allowed, allowedExactly: []);
+
+    /// <summary>
+    /// As <see cref="Violations(string, string[])"/>, also allowing each namespace in
+    /// <paramref name="allowedExactly"/> but none of the namespaces under it. The library's root namespace
+    /// holds the public façade and contains every layer, so a layer that may use the façade allows it
+    /// this way.
+    /// </summary>
+    public static string[] Violations(string layer, string[] allowed, string[] allowedExactly)
         => [.. Library.GetTypes()
             .Where(t => InNamespace(t, layer))
-            .SelectMany(t => ReferencedTypes(t).SelectMany(RootTypes).Where(r => IsOutside(r, [layer, .. allowed]))
+            .SelectMany(t => ReferencedTypes(t).SelectMany(RootTypes).Where(r => IsOutside(r, [layer, .. allowed], allowedExactly))
                 .Select(r => $"{t.FullName} -> {r.FullName}"))
             .Distinct()
             .Order(StringComparer.Ordinal)];
@@ -33,9 +42,17 @@ internal static class LayerDependencies
     /// coverage tool injects when it instruments the library.
     /// </remarks>
     public static bool IsOutside(Type type, string[] allowed)
+        => IsOutside(type, allowed, allowedExactly: []);
+
+    /// <summary>
+    /// Whether <paramref name="type"/> is a type of this library outside every namespace in
+    /// <paramref name="allowed"/> and not directly in any namespace in <paramref name="allowedExactly"/>.
+    /// </summary>
+    public static bool IsOutside(Type type, string[] allowed, string[] allowedExactly)
         => type.Assembly == Library
            && InNamespace(type, Root)
-           && !allowed.Any(ns => InNamespace(type, ns));
+           && !allowed.Any(ns => InNamespace(type, ns))
+           && !allowedExactly.Contains(type.Namespace, StringComparer.Ordinal);
 
     private static bool InNamespace(Type type, string ns)
         => type.Namespace is { } n && (n == ns || n.StartsWith(ns + ".", StringComparison.Ordinal));
