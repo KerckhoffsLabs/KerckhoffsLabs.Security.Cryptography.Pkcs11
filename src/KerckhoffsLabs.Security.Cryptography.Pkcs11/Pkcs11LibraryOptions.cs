@@ -135,17 +135,20 @@ public sealed class Pkcs11LibraryOptions
     /// <remarks>
     /// <para>
     /// The default sends the corrected <c>CK_PKCS5_PBKD2_PARAMS2</c> that v2.40 Errata 01 and v3.0
-    /// specify, except to a module known to read the original <c>CK_PKCS5_PBKD2_PARAMS</c>. Neither the
-    /// Cryptoki version a module reports nor the function list it was bound through says which one it
-    /// reads: NSS softoken implements v3.0 from 3.52 yet reads the original structure until 3.114.
+    /// specify, except to a module known to read the original <c>CK_PKCS5_PBKD2_PARAMS</c>: one that
+    /// implements a Cryptoki version before 2.40, which predates the corrected structure, or NSS softoken
+    /// before 3.114. From v2.40 on, neither the Cryptoki version a module reports nor the function list
+    /// it was bound through says which one it reads: NSS softoken implements v3.0 from 3.52 yet reads the
+    /// original structure until 3.114.
     /// </para>
     /// <para>
     /// Set it only for a module whose documentation or behaviour calls for it. A module given the
     /// structure it does not read crashes the process or derives from the wrong password length; see
     /// <see cref="Pkcs11.Pbkdf2ParametersLayout"/>. Detection recognizes NSS by the manufacturer and
     /// library version it reports in <c>C_GetInfo</c>, or, behind a proxy such as p11-kit's, by the
-    /// manufacturer and hardware version each of its slots reports in <c>C_GetSlotInfo</c>; an NSS
-    /// build configured to report another manufacturer needs this set explicitly.
+    /// manufacturer and hardware version each of its slots reports in <c>C_GetSlotInfo</c>. An NSS
+    /// that reports another manufacturer, including one given <c>manufacturerID=</c> in
+    /// <see cref="ModuleParameters"/>, needs this set explicitly.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">The value is not a defined <see cref="Pkcs11.Pbkdf2ParametersLayout"/>.</exception>

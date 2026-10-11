@@ -93,7 +93,7 @@ public sealed class NssBehindP11KitProxyTests
             }
             finally
             {
-                SoftHsmBackendFixture.SetNativeEnv("HOME", originalHome ?? "/");
+                SoftHsmBackendFixture.SetOrUnsetNativeEnv("HOME", originalHome);
             }
         }
         finally

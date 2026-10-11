@@ -235,6 +235,26 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     [LibraryImport("libSystem.dylib", EntryPoint = "setenv", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial int MacSetEnv(string name, string value, int overwrite);
 
+    [LibraryImport("libc", EntryPoint = "unsetenv", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+    private static partial int LinuxUnsetEnv(string name);
+
+    [LibraryImport("libSystem.dylib", EntryPoint = "unsetenv", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+    private static partial int MacUnsetEnv(string name);
+
+    /// <summary>Sets <paramref name="name"/> for native code, or removes it when <paramref name="value"/> is null.</summary>
+    internal static void SetOrUnsetNativeEnv(string name, string? value)
+    {
+        if (value is not null)
+        {
+            SetNativeEnv(name, value);
+            return;
+        }
+        if (OperatingSystem.IsWindows()) return;
+        int rc = OperatingSystem.IsMacOS() ? MacUnsetEnv(name) : LinuxUnsetEnv(name);
+        if (rc != 0)
+            throw new InvalidOperationException($"unsetenv({name}) failed with errno {Marshal.GetLastPInvokeError()}.");
+    }
+
     internal static void SetNativeEnv(string name, string value)
     {
         if (OperatingSystem.IsWindows()) return; // SetEnvironmentVariable already propagates here.

@@ -1,4 +1,5 @@
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -2369,9 +2370,15 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// <c>CK_PKCS5_PBKD2_PARAMS</c>, whose <c>ulPasswordLen</c> is a pointer: as
     /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> configured it, or else as detected the
     /// first time. Detection asks <c>C_GetInfo</c>, and decides for the whole module when that names
-    /// NSS; otherwise it asks <c>C_GetSlotInfo</c> for this session's slot, which is what identifies NSS
-    /// behind a proxy, and decides for that slot. Whatever cannot be asked gets the standard structure.
+    /// NSS or a Cryptoki version before 2.40; otherwise it asks <c>C_GetSlotInfo</c> for this session's
+    /// slot, which is what identifies NSS behind a proxy, and decides for that slot.
     /// </summary>
+    /// <remarks>
+    /// A module that does not implement one of those functions gets the standard structure. Any other
+    /// failure of <c>C_GetSessionInfo</c> or <c>C_GetSlotInfo</c> fails the derivation and decides
+    /// nothing: guessing would crash the process on an NSS slot, and a later call may well succeed.
+    /// </remarks>
+    /// <exception cref="Pkcs11Exception"><c>C_GetSessionInfo</c> or <c>C_GetSlotInfo</c> failed.</exception>
     internal bool PassesPbkdf2PasswordLengthByReference
     {
         get
@@ -2398,19 +2405,33 @@ internal sealed class Pkcs11SessionCore : IDisposable
                     break;
             }
 
-            // Not cached when the session's slot cannot be asked: the next session may well be.
-            CK_SESSION_INFO session = default;
-            if (_pkcs11Library.C_GetSessionInfo(_sessionId, ref session) != CKR.CKR_OK)
-                return false;
-
-            return _pkcs11Library.Pbkdf2PasswordLengthByReferenceBySlot.GetOrAdd((ulong)session.SlotId, static (_, state) =>
+            // A session never changes slot, so it asks once.
+            if (_pbkdf2SlotId is not { } slotId)
             {
-                CK_SLOT_INFO slot = default;
-                return state.Library.C_GetSlotInfo(state.SlotId, ref slot) == CKR.CKR_OK
-                    && CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(new SlotInfo(state.SlotId, slot));
-            }, (Library: _pkcs11Library, session.SlotId));
+                CK_SESSION_INFO session = default;
+                CKR rv = _pkcs11Library.C_GetSessionInfo(_sessionId, ref session);
+                if (rv == CKR.CKR_FUNCTION_NOT_SUPPORTED)
+                    return false;
+                Pkcs11Exception.ThrowIfError(rv, OpGetSessionInfo);
+                _pbkdf2SlotId = slotId = session.SlotId;
+            }
+
+            ConcurrentDictionary<ulong, bool> bySlot = _pkcs11Library.Pbkdf2PasswordLengthByReferenceBySlot;
+            if (bySlot.TryGetValue((ulong)slotId, out bool byReference))
+                return byReference;
+
+            CK_SLOT_INFO slot = default;
+            CKR slotRv = _pkcs11Library.C_GetSlotInfo(slotId, ref slot);
+            if (slotRv == CKR.CKR_FUNCTION_NOT_SUPPORTED)
+                return bySlot.GetOrAdd((ulong)slotId, false);
+            Pkcs11Exception.ThrowIfError(slotRv, OpGetSlotInfo);
+            return bySlot.GetOrAdd((ulong)slotId, CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(new SlotInfo(slotId, slot)));
         }
     }
+
+    // The slot C_GetSessionInfo reported for this session, once asked by PassesPbkdf2PasswordLengthByReference.
+    // Read and written under the busy lock, like every other native-touching member.
+    private NativeCULong? _pbkdf2SlotId;
 
     /// <summary>
     /// One-shot AEAD encrypt via the PKCS#11 v3.0 message-based API

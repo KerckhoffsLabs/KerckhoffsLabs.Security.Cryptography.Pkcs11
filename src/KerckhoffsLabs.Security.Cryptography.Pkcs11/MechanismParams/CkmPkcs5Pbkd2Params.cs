@@ -104,18 +104,30 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
 
     /// <summary>
     /// Whether a module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what it
-    /// reports in <c>C_GetInfo</c>: true for NSS softoken before 3.114, false for any later NSS, and
-    /// <see langword="null"/> for any other module, which may be a proxy such as p11-kit's whose slots
-    /// belong to different modules (see <see cref="ReadsPasswordLengthByReference(SlotInfo)"/>).
+    /// reports in <c>C_GetInfo</c>: true for NSS softoken before 3.114 and for any module implementing
+    /// a Cryptoki version before 2.40, false for any later NSS, and <see langword="null"/> for any other
+    /// module, which may be a proxy such as p11-kit's whose slots belong to different modules (see
+    /// <see cref="ReadsPasswordLengthByReference(SlotInfo)"/>).
     /// </summary>
     /// <remarks>
+    /// <para>
     /// NSS softoken dereferences <c>ulPasswordLen</c> unconditionally up to 3.113, including from 3.52
     /// on, where it implements v3.0 and is bound through <c>C_GetInterface</c>. 3.114 accepts either
     /// structure, and can be built to accept only the corrected one, so from 3.114 on it gets that.
     /// NSS reports its own release in <c>libraryVersion</c>.
+    /// </para>
+    /// <para>
+    /// The corrected structure first appeared in v2.40 Errata 01, so a module written against an
+    /// earlier version can only read the original one. A v2.40 module may read either, and gets the
+    /// standard structure unless it is recognized.
+    /// </para>
     /// </remarks>
     internal static bool? ReadsPasswordLengthByReference(LibraryInfo info)
-        => info.ManufacturerId == NssManufacturer ? IsNssBefore3_114(info.LibraryVersion) : null;
+    {
+        if (info.ManufacturerId == NssManufacturer)
+            return IsNssBefore3_114(info.LibraryVersion);
+        return info.CryptokiVersion < new Version(2, 40) ? true : null;
+    }
 
     /// <summary>
     /// Whether a slot's module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what

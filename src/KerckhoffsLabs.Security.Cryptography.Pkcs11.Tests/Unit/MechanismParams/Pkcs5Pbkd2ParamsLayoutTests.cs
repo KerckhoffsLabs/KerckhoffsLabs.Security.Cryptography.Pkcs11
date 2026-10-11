@@ -1,5 +1,6 @@
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
@@ -217,10 +218,10 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
     }
 
     [Fact]
-    public void Detect_SlotInfoUnavailable_GetsTheStandardStructure()
+    public void Detect_SlotInfoNotSupported_GetsTheStandardStructure()
     {
         using var module = new Pbkd2Module(P11Kit, 0, 25);
-        using var session = module.OpenSession(slot: 7); // a slot without information
+        using var session = module.OpenSession(slot: 7); // C_GetSlotInfo: CKR_FUNCTION_NOT_SUPPORTED
 
         GenerateKey(session, "correct horse"u8);
         GenerateKey(session, "correct horse"u8);
@@ -228,6 +229,91 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         Assert.False(module.SentByReference);
         Assert.Equal("correct horse"u8.ToArray(), module.Password);
         Assert.Equal(1, module.GetSlotInfoCalls);
+    }
+
+    /// <summary>
+    /// Any other failure fails the derivation rather than guessing, which on an NSS slot would crash the
+    /// process, and decides nothing: the next derivation asks again.
+    /// </summary>
+    [Theory]
+    [InlineData(CKR.CKR_DEVICE_ERROR)]
+    [InlineData(CKR.CKR_HOST_MEMORY)]
+    [InlineData(CKR.CKR_SLOT_ID_INVALID)]
+    public void Detect_SlotInfoFails_FailsTheDerivation_AndAsksAgain(CKR error)
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[1] = (Mozilla, 3, 98);
+        module.SlotInfoErrors.Enqueue(error);
+        using var session = module.OpenSession(slot: 1);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => GenerateKey(session, "correct horse"u8));
+        Assert.Equal(error, ex.ReturnValue);
+        Assert.Null(module.SentByReference);
+        Assert.Empty(module.LowLevel.Pbkdf2PasswordLengthByReferenceBySlot);
+
+        GenerateKey(session, "correct horse"u8);
+        Assert.True(module.SentByReference);
+        Assert.Equal(2, module.GetSlotInfoCalls);
+    }
+
+    [Theory]
+    [InlineData(CKR.CKR_DEVICE_ERROR)]
+    [InlineData(CKR.CKR_SESSION_HANDLE_INVALID)]
+    public void Detect_SessionInfoFails_FailsTheDerivation_AndAsksAgain(CKR error)
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[1] = (Mozilla, 3, 98);
+        module.SessionInfoErrors.Enqueue(error);
+        using var session = module.OpenSession(slot: 1);
+
+        var ex = Assert.ThrowsAny<Pkcs11Exception>(() => GenerateKey(session, "correct horse"u8));
+        Assert.Equal(error, ex.ReturnValue);
+        Assert.Null(module.SentByReference);
+
+        GenerateKey(session, "correct horse"u8);
+        Assert.True(module.SentByReference);
+    }
+
+    /// <summary>A session's slot never changes, so it is asked once however many derivations follow.</summary>
+    [Fact]
+    public void Detect_AsksSessionInfoOncePerSession()
+    {
+        using var module = new Pbkd2Module(P11Kit, 0, 25);
+        module.Slots[1] = (SoftHsm, 2, 6);
+        using var session = module.OpenSession(slot: 1);
+
+        GenerateKey(session, "correct horse"u8);
+        GenerateKey(session, "correct horse"u8);
+        GenerateKey(session, "correct horse"u8);
+
+        Assert.False(module.SentByReference);
+        Assert.Equal(1, module.GetSessionInfoCalls);
+        Assert.Equal(1, module.GetSlotInfoCalls);
+    }
+
+    /// <summary>
+    /// The corrected structure first appeared in v2.40 Errata 01, so a module implementing an earlier
+    /// version gets the original one, decided for the whole module without asking its slots. From
+    /// v2.40 on, the version says nothing and the slot decides.
+    /// </summary>
+    [Theory]
+    [InlineData(2, 11, true)]
+    [InlineData(2, 20, true)]
+    [InlineData(2, 30, true)]
+    [InlineData(2, 40, false)]
+    [InlineData(3, 0, false)]
+    [InlineData(3, 2, false)]
+    public void Detect_ModuleBeforeV2_40_GetsThePointer(byte cryptokiMajor, byte cryptokiMinor, bool byReference)
+    {
+        using var module = new Pbkd2Module("Acme HSM", 5, 1, cryptokiMajor, cryptokiMinor);
+        module.Slots[1] = ("Acme HSM", 5, 1);
+        using var session = module.OpenSession(slot: 1);
+
+        GenerateKey(session, "correct horse"u8);
+
+        Assert.Equal(byReference, module.SentByReference);
+        Assert.Equal("correct horse"u8.ToArray(), module.Password);
+        Assert.Equal(byReference ? 0 : 1, module.GetSlotInfoCalls);
     }
 
     /// <summary>A module that refuses <c>C_GetInfo</c> may still be a proxy, so its slot is asked.</summary>
@@ -291,7 +377,8 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
     // null; reports the slot of each session opened with OpenSession, and the manufacturer and hardware
     // version of each slot in Slots, refusing both for anything else; and records which layout each
     // CKM_PKCS5_PBKD2 call carried. Overrides v2.40 functions only, so it exports just C_GetFunctionList.
-    private class Pbkd2Module(string? manufacturer, byte libraryMajor = 0, byte libraryMinor = 0) : SessionTestModule
+    private class Pbkd2Module(string? manufacturer, byte libraryMajor = 0, byte libraryMinor = 0, byte cryptokiMajor = 3, byte cryptokiMinor = 0)
+        : SessionTestModule
     {
         private readonly Dictionary<ulong, ulong> _sessionSlots = [];
 
@@ -299,6 +386,12 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         public int GetInfoCalls { get; private set; }
         public int GetSessionInfoCalls { get; private set; }
         public int GetSlotInfoCalls { get; private set; }
+
+        /// <summary>Errors the next C_GetSessionInfo calls return, before answering normally again.</summary>
+        public Queue<CKR> SessionInfoErrors { get; } = new();
+
+        /// <summary>Errors the next C_GetSlotInfo calls return, before answering normally again.</summary>
+        public Queue<CKR> SlotInfoErrors { get; } = new();
         public bool? SentByReference { get; private set; }
         public byte[]? Password { get; private set; }
         public byte[]? Salt { get; private set; }
@@ -309,7 +402,7 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
             GetInfoCalls++;
             if (manufacturer is null)
                 return CKR.CKR_FUNCTION_NOT_SUPPORTED;
-            info.CryptokiVersion = new CK_VERSION { Major = 3, Minor = 0 };
+            info.CryptokiVersion = new CK_VERSION { Major = cryptokiMajor, Minor = cryptokiMinor };
             NativeTestStructs.FillPadded(info.ManufacturerId, manufacturer);
             NativeTestStructs.FillPadded(info.LibraryDescription, "PBKDF2 layout test module");
             info.LibraryVersion = new CK_VERSION { Major = libraryMajor, Minor = libraryMinor };
@@ -327,6 +420,8 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         protected override CKR C_GetSessionInfo(NativeCULong session, ref CK_SESSION_INFO info)
         {
             GetSessionInfoCalls++;
+            if (SessionInfoErrors.TryDequeue(out CKR error))
+                return error;
             if (!_sessionSlots.TryGetValue((ulong)session, out ulong slot))
                 return CKR.CKR_FUNCTION_NOT_SUPPORTED;
             info.SlotId = (NativeCULong)slot;
@@ -336,8 +431,10 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         protected override CKR C_GetSlotInfo(NativeCULong slotId, ref CK_SLOT_INFO info)
         {
             GetSlotInfoCalls++;
+            if (SlotInfoErrors.TryDequeue(out CKR error))
+                return error;
             if (!Slots.TryGetValue((ulong)slotId, out var slot))
-                return CKR.CKR_SLOT_ID_INVALID;
+                return CKR.CKR_FUNCTION_NOT_SUPPORTED;
             NativeTestStructs.FillPadded(info.SlotDescription, "PBKDF2 layout test slot");
             NativeTestStructs.FillPadded(info.ManufacturerId, slot.Manufacturer);
             info.HardwareVersion = new CK_VERSION { Major = slot.Major, Minor = slot.Minor };
