@@ -35,15 +35,8 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        var session = slot.OpenSessionCore();
-        try
-        {
-            AssertArgumentsBad(() => session.Login(CKU.CKU_USER));
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        using var session = slot.OpenSessionCore();
+        AssertArgumentsBad(() => session.Login(CKU.CKU_USER));
     }
 
     [Fact]
@@ -51,15 +44,8 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        var session = slot.OpenSessionCore();
-        try
-        {
-            AssertArgumentsBad(() => session.SetPin());
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        using var session = slot.OpenSessionCore();
+        AssertArgumentsBad(() => session.SetPin());
     }
 
     [Fact]
@@ -67,20 +53,13 @@ public sealed class ProtectedAuthenticationPathTests(MockBackendFixture f)
     {
         var slot = _backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == _backend.SlotId);
-        var session = slot.OpenSessionCore();
-        try
-        {
-            // C_InitPIN requires an SO-authenticated session before it even looks at the PIN
-            // pointer, so log in with a real PIN first — only InitPin itself is under test.
-            using var soPin = new SecurePin(_backend.SoPin.Span);
-            session.Login(CKU.CKU_SO, soPin);
+        using var session = slot.OpenSessionCore();
+        // C_InitPIN requires an SO-authenticated session before it even looks at the PIN
+        // pointer, so log in with a real PIN first — only InitPin itself is under test.
+        using var soPin = new SecurePin(_backend.SoPin.Span);
+        session.Login(CKU.CKU_SO, soPin);
 
-            AssertArgumentsBad(() => session.InitPin());
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        AssertArgumentsBad(() => session.InitPin());
     }
 
     // === Pkcs11Slot (public) =================================================

@@ -14,32 +14,18 @@ internal static class SecurePinLoginTestCases
     {
         var slot = backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
-        var session = slot.OpenSessionCore();
-        try
-        {
-            using var pin = new SecurePin(backend.UserPin.Span);
-            session.Login(CKU.CKU_USER, pin);
-            session.Logout();
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        using var session = slot.OpenSessionCore();
+        using var pin = new SecurePin(backend.UserPin.Span);
+        session.Login(CKU.CKU_USER, pin);
+        session.Logout();
     }
 
     internal static void Assert_Login_RejectsNullSecurePin(IPkcs11Backend backend)
     {
         var slot = backend.Library.GetSlotList()
             .First(s => (NativeCULong)s.SlotId.Value == backend.SlotId);
-        var session = slot.OpenSessionCore();
-        try
-        {
-            Assert.Throws<ArgumentNullException>(() => session.Login(CKU.CKU_USER, (SecurePin)null!));
-        }
-        finally
-        {
-            session.Dispose();
-        }
+        using var session = slot.OpenSessionCore();
+        Assert.Throws<ArgumentNullException>(() => session.Login(CKU.CKU_USER, (SecurePin)null!));
     }
 }
 

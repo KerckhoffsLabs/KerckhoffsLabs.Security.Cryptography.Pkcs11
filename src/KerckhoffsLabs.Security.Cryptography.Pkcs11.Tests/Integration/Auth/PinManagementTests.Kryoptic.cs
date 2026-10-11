@@ -1,5 +1,6 @@
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Fixtures;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Auth;
@@ -43,7 +44,7 @@ public sealed class PinManagementTests_Kryoptic(KryopticBackendFixture f)
             {
                 using var o = new SecurePin(temp);
                 using var n = new SecurePin(original);
-                try { session.SetPinWithPin(o, n); } catch { /* best-effort restore of shared token */ }
+                try { session.SetPinWithPin(o, n); } catch (Pkcs11Exception) { /* best-effort restore of shared token */ }
             }
         }
 
