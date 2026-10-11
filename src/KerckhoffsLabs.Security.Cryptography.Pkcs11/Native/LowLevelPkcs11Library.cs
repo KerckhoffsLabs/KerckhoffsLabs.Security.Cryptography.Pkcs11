@@ -129,17 +129,21 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
            && _module.Table.C_DecryptMessage is not null
            && _module.Table.C_MessageDecryptFinal is not null;
 
+    // 0 until known, then 1 (by value) or 2 (by reference): an int, so a reader on another thread never
+    // sees half of a write.
+    private volatile int _pbkdf2PasswordLength;
+
     /// <summary>
-    /// True when the module was bound through a v3.x interface table from <c>C_GetInterface</c>; false
-    /// when only its v2.40 <c>C_GetFunctionList</c> table was available.
+    /// Whether <c>CKM_PKCS5_PBKD2</c> sends this module <c>CK_PKCS5_PBKD2_PARAMS</c>, whose
+    /// <c>ulPasswordLen</c> is a pointer, rather than <c>CK_PKCS5_PBKD2_PARAMS2</c>; <see langword="null"/>
+    /// until configured or detected. A cache cell only: the session decides, and stores its answer here
+    /// so it is decided once per module binding.
     /// </summary>
-    /// <remarks>
-    /// A v2.40 table is read only up to its last slot, so every v3.x slot — <c>C_GetInterface</c>'s own
-    /// included — is null; a v3.x table is handed out by <c>C_GetInterface</c>, so that slot is set.
-    /// Distinct from <see cref="IsMessageApiSupported"/>: a v3.x module may still leave optional
-    /// functions unimplemented. Use it where the two versions disagree on a structure's layout.
-    /// </remarks>
-    public unsafe bool IsBoundThroughV3Interface => _module.Table.C_GetInterface is not null;
+    internal bool? Pbkdf2PasswordLengthByReference
+    {
+        get => _pbkdf2PasswordLength switch { 0 => null, 2 => true, _ => false };
+        set => _pbkdf2PasswordLength = value switch { null => 0, true => 2, false => 1 };
+    }
 
     /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM

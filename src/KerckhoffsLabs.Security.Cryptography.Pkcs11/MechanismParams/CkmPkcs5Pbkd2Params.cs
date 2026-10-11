@@ -12,13 +12,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Marshalled as <see cref="CK_PKCS5_PBKD2_PARAMS2"/>, the corrected structure whose
-/// <c>ulPasswordLen</c> is a value — except for a session on a module bound only through its v2.40
-/// function list, which gets <see cref="CK_PKCS5_PBKD2_PARAMS"/>, whose <c>ulPasswordLen</c> is a
-/// <c>CK_ULONG_PTR</c>. The two have the same size, so a module cannot tell them apart: one that reads
-/// the v2.40 layout dereferences a length passed by value as an address and crashes the process
-/// (NSS softoken before 3.52 does). Every v2.40 module reads the original structure, while the
-/// corrected one, added by v2.40 Errata 01, is only guaranteed from v3.0.
+/// Marshalled as <see cref="CK_PKCS5_PBKD2_PARAMS2"/>, the structure v2.40 Errata 01 and v3.0
+/// specify, whose <c>ulPasswordLen</c> is a value. A module that reads the original v2.40
+/// <see cref="CK_PKCS5_PBKD2_PARAMS"/>, whose <c>ulPasswordLen</c> is a <c>CK_ULONG_PTR</c>, gets that
+/// instead: one detected as such, or any module when
+/// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> says so. Sent the wrong one, such a module
+/// dereferences the length as an address and crashes the process (see
+/// <see cref="Pkcs11.Pbkdf2ParametersLayout"/>).
 /// </para>
 /// <para>
 /// The password is a secret, and how it is held depends on the constructor. The
@@ -99,6 +99,19 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
     /// <summary>The PRF, for policy evaluation.</summary>
     internal CKP Prf => _prf;
 
+    /// <summary>
+    /// Whether a module reads the original <see cref="CK_PKCS5_PBKD2_PARAMS"/>, judged from what it
+    /// reports in <c>C_GetInfo</c>: true for NSS softoken before 3.114, false for every other module.
+    /// </summary>
+    /// <remarks>
+    /// NSS softoken dereferences <c>ulPasswordLen</c> unconditionally up to 3.113, including from 3.52
+    /// on, where it implements v3.0 and is bound through <c>C_GetInterface</c>. 3.114 accepts either
+    /// structure, and can be built to accept only the corrected one, so from 3.114 on it gets that.
+    /// NSS reports its own release in <c>libraryVersion</c>.
+    /// </remarks>
+    internal static bool ReadsPasswordLengthByReference(LibraryInfo info)
+        => info is { ManufacturerId: "Mozilla Foundation", LibraryVersion: { Major: 3, Minor: < 114 } };
+
     /// <inheritdoc/>
     /// <exception cref="ObjectDisposedException">The borrowed <see cref="SecurePassword"/> has been disposed.</exception>
     internal override Pkcs11ParameterBlock BuildMarshalable(MechanismParameterScope scope)
@@ -106,8 +119,8 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
         // Read straight from the caller's password into the scope, whose memory is zeroed when the call returns.
         ReadOnlySpan<byte> password = _borrowedPassword is { } borrowed ? borrowed.Password : _password;
 
-        // A v2.40-only module reads ulPasswordLen through a pointer (see the type remarks).
-        if (scope is SessionParameterScope { Session.IsBoundThroughV3Interface: false })
+        // A module that reads the original structure gets ulPasswordLen through a pointer (see the type remarks).
+        if (scope is SessionParameterScope { Session.PassesPbkdf2PasswordLengthByReference: true })
         {
             return scope.WriteParameter(new CK_PKCS5_PBKD2_PARAMS
             {

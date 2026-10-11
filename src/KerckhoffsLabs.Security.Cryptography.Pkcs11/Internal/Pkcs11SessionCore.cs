@@ -2365,11 +2365,26 @@ internal sealed class Pkcs11SessionCore : IDisposable
     public bool SupportsMessageApi => _pkcs11Library.IsMessageApiSupported;
 
     /// <summary>
-    /// True when the module was bound through a v3.x interface; false for a v2.40-only module, whose
-    /// structures follow the v2.40 layouts where the versions differ (see
-    /// <see cref="LowLevelPkcs11Library.IsBoundThroughV3Interface"/>).
+    /// True when <c>CKM_PKCS5_PBKD2</c> must send this session's module the original
+    /// <c>CK_PKCS5_PBKD2_PARAMS</c>, whose <c>ulPasswordLen</c> is a pointer: as
+    /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> configured it, or else as detected from
+    /// <c>C_GetInfo</c> (<see cref="CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference"/>) the first time
+    /// and kept for the module. A module that refuses <c>C_GetInfo</c> gets the standard structure.
     /// </summary>
-    internal bool IsBoundThroughV3Interface => _pkcs11Library.IsBoundThroughV3Interface;
+    internal bool PassesPbkdf2PasswordLengthByReference
+    {
+        get
+        {
+            if (_pkcs11Library.Pbkdf2PasswordLengthByReference is { } known)
+                return known;
+
+            CK_INFO info = default;
+            bool byReference = _pkcs11Library.C_GetInfo(ref info) == CKR.CKR_OK
+                && CkmPkcs5Pbkd2Params.ReadsPasswordLengthByReference(new LibraryInfo(info));
+            _pkcs11Library.Pbkdf2PasswordLengthByReference = byReference;
+            return byReference;
+        }
+    }
 
     /// <summary>
     /// One-shot AEAD encrypt via the PKCS#11 v3.0 message-based API
