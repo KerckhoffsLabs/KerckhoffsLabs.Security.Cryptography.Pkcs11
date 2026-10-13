@@ -51,10 +51,12 @@ public sealed class NssBehindP11KitProxyTests
         // Otherwise the module-level check decides, and this proves nothing about the slot fallback.
         Assert.NotEqual("Mozilla Foundation", library.GetInfo().ManufacturerId);
 
-        Pkcs11Slot? slot = library.GetSlotList()
-            .FirstOrDefault(s => s.GetTokenInfo().Label.TrimEnd() == Settings.NssTokenLabel);
-        if (slot is null)
+        if (library.GetSlotList().FirstOrDefault(s => s.GetTokenInfo().Label.TrimEnd() == Settings.NssTokenLabel)
+            is not { } slot)
+        {
             Assert.Skip("p11-kit did not load NSS: user module configuration is disabled on this host.");
+            return;
+        }
         SlotInfo slotInfo = slot.GetSlotInfo();
         Assert.Equal("Mozilla Foundation", slotInfo.ManufacturerId);
 
