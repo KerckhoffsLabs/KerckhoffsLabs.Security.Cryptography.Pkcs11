@@ -36,7 +36,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
 
         session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(1), "data"u8);
 
@@ -50,7 +50,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
 
         session.Digest(new Mechanism(CKM.CKM_SHA256), "data"u8);
 
@@ -64,7 +64,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
 
         session.Sign(new Mechanism(CKM.CKM_SHA512_HMAC), new ObjectHandle(1), "data"u8);
 
@@ -77,7 +77,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
 
         session.Encrypt(Gcm(), new ObjectHandle(1), "data"u8);
 
@@ -111,7 +111,7 @@ public sealed class OperationCostGuardTests
     {
         using var module = new EchoModule();
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
         byte[] small = new byte[SmallInput];
         byte[] large = new byte[LargeInput];
 

@@ -89,7 +89,7 @@ public sealed class ConcurrencyModeTests
     {
         using var module = new LockingModule { CannotLock = true };
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
 
         Task parked = Task.Run(() => library.GetInfo(), Token);
         Assert.True(module.Parked.Wait(Generous, Token), "the first call never reached the module");

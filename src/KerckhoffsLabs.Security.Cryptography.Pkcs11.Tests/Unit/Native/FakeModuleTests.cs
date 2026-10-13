@@ -48,7 +48,7 @@ public sealed class FakeModuleTests
     {
         using var module = new SigningModule(signature: [1, 2, 3, 4, 5]);
         using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
-        using var session = new Pkcs11SessionCore(lowLevel, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
 
         byte[] signature = session.Sign(new Mechanism(CKM.CKM_ECDSA_SHA256), new ObjectHandle(7), "data"u8);
 

@@ -23,12 +23,12 @@ internal abstract class SessionTestModule : FakeModule
     /// <summary>This module bound through the real loader, once; disposed with the module.</summary>
     public LowLevelPkcs11Library LowLevel => _lowLevel ??= LoadLowLevel();
 
-    /// <summary>A session on this module, as the library would hand out after <c>C_OpenSession</c>.</summary>
+    /// <summary>A session on slot 0 of this module, as the library would hand out after <c>C_OpenSession</c>.</summary>
     /// <param name="sessionId">The session's handle; a fresh one that routes to this module when omitted.</param>
     /// <param name="loggerFactory">Passed to the session.</param>
     /// <param name="policy">The session's policy; <see cref="CryptoPolicy.SecureOnly"/> when omitted.</param>
     public Pkcs11SessionCore CreateSession(ulong? sessionId = null, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
-        => new(LowLevel, sessionId ?? (ulong)NewSessionHandle(), loggerFactory, policy);
+        => new(LowLevel, slotId: default, sessionId ?? (ulong)NewSessionHandle(), loggerFactory, policy);
 
     protected override CKR C_CloseSession(NativeCULong session) => CKR.CKR_OK;
 

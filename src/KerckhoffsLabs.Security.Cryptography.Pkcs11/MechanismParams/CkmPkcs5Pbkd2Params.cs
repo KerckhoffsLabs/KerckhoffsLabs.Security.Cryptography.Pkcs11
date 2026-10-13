@@ -138,7 +138,7 @@ public sealed class CkmPkcs5Pbkd2Params : MechanismParameters
         ReadOnlySpan<byte> password = _borrowedPassword is { } borrowed ? borrowed.Password : _password;
 
         // A module that reads the original structure gets ulPasswordLen through a pointer (see the type remarks).
-        if (scope is SessionParameterScope { Session.PassesPbkdf2PasswordLengthByReference: true })
+        if (scope is SessionParameterScope session && session.Session.ResolvePbkdf2PasswordLengthByReference())
         {
             return scope.WriteParameter(new CK_PKCS5_PBKD2_PARAMS
             {

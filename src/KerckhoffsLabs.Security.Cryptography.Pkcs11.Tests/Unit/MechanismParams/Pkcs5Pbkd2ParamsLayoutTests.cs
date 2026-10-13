@@ -242,21 +242,6 @@ public sealed class Pkcs5Pbkd2ParamsLayoutTests
         Assert.True(module.SentByReference);
     }
 
-    /// <summary>A session not opened through a slot has none to ask about.</summary>
-    [Fact]
-    public void Detect_SessionWithoutASlot_GetsTheStandardStructure_WithoutAsking()
-    {
-        using var module = new Pbkd2Module(Mozilla, cryptokiMajor: 2, cryptokiMinor: 20);
-        module.Slots[1] = (Mozilla, 3, 98);
-        using var session = module.CreateSession(policy: CryptoPolicy.AllowInsecure);
-
-        GenerateKey(session, "correct horse"u8);
-
-        Assert.False(module.SentByReference);
-        Assert.Equal(0, module.GetSlotInfoCalls);
-        Assert.Equal(0, module.GetInfoCalls);
-    }
-
     /// <summary>
     /// A wrong structure can take the process down with no exception, so the choice is logged before the
     /// first derivation on a slot.

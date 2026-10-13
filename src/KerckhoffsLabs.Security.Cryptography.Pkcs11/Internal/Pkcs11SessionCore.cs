@@ -33,8 +33,8 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// </summary>
     private readonly ILogger _logger;
 
-    // The slot this session was opened on; null for a session not opened through a Pkcs11Slot.
-    private readonly NativeCULong? _slotId;
+    // The slot this session was opened on: what CKM_PKCS5_PBKD2 asks about to pick its parameter layout.
+    private readonly NativeCULong _slotId;
 
     /// <summary>
     /// Low level PKCS#11 wrapper
@@ -383,6 +383,10 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// Wraps an already-open PKCS#11 session handle.
     /// </summary>
     /// <param name="pkcs11Library">Low level PKCS#11 wrapper</param>
+    /// <param name="slotId">
+    /// The slot the session was opened on. Required: <c>CKM_PKCS5_PBKD2</c> picks its parameter layout
+    /// from it, and a session that sent NSS softoken before 3.114 the wrong one would crash the process.
+    /// </param>
     /// <param name="sessionId">PKCS#11 handle of session</param>
     /// <param name="loggerFactory">
     /// Logger factory inherited from the owning <see cref="Pkcs11Slot"/>/<see cref="Pkcs11Library"/>;
@@ -391,9 +395,8 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// <param name="policy">
     /// The policy to enforce on this session; <see langword="null"/> means <see cref="CryptoPolicy.SecureOnly"/>.
     /// </param>
-    /// <param name="slotId">The slot the session was opened on, when known.</param>
-    internal Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null, NativeCULong? slotId = null)
-        : this(pkcs11Library, OwnSession(pkcs11Library, sessionId), loggerFactory, policy, slotId)
+    internal Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, NativeCULong slotId, ulong sessionId, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
+        : this(pkcs11Library, slotId, OwnSession(pkcs11Library, sessionId), loggerFactory, policy)
     {
     }
 
@@ -401,7 +404,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// Takes ownership of an open session's <paramref name="sessionHandle"/>: if construction throws, the
     /// handle is disposed and the session closed, so it can never be left open with no owner.
     /// </summary>
-    internal Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, Pkcs11SessionHandle sessionHandle, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null, NativeCULong? slotId = null)
+    internal Pkcs11SessionCore(LowLevelPkcs11Library pkcs11Library, NativeCULong slotId, Pkcs11SessionHandle sessionHandle, ILoggerFactory? loggerFactory = null, ICryptoPolicy? policy = null)
     {
         ArgumentNullException.ThrowIfNull(sessionHandle);
         _sessionHandle = sessionHandle;
@@ -2371,32 +2374,29 @@ internal sealed class Pkcs11SessionCore : IDisposable
     public bool SupportsMessageApi => _pkcs11Library.IsMessageApiSupported;
 
     /// <summary>
-    /// True when <c>CKM_PKCS5_PBKD2</c> must send this session's slot the original
+    /// Whether <c>CKM_PKCS5_PBKD2</c> must send this session's slot the original
     /// <c>CK_PKCS5_PBKD2_PARAMS</c>, whose <c>ulPasswordLen</c> is a pointer: as
     /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> configured it, or else as detected the
     /// first time a session on this slot asks (<see cref="DetectPbkdf2PasswordLengthByReference"/>).
-    /// A session not opened through a <see cref="Pkcs11Slot"/> has no slot to ask about, and gets the
-    /// standard structure unless one is configured.
     /// </summary>
+    /// <remarks>
+    /// A method, not a property: the first call on a slot asks the module through <c>C_GetSlotInfo</c>
+    /// and possibly <c>C_GetInfo</c>, and may throw.
+    /// </remarks>
     /// <exception cref="Pkcs11Exception"><c>C_GetSlotInfo</c> or <c>C_GetInfo</c> failed.</exception>
-    internal bool PassesPbkdf2PasswordLengthByReference
+    internal bool ResolvePbkdf2PasswordLengthByReference()
     {
-        get
-        {
-            if (_pkcs11Library.Pbkdf2PasswordLengthByReference is { } configured)
-                return configured;
-            if (_slotId is not { } slotId)
-                return false;
+        if (_pkcs11Library.Pbkdf2PasswordLengthByReference is { } configured)
+            return configured;
 
-            ConcurrentDictionary<ulong, bool> bySlot = _pkcs11Library.Pbkdf2PasswordLengthByReferenceBySlot;
-            if (bySlot.TryGetValue((ulong)slotId, out bool known))
-                return known;
+        ConcurrentDictionary<ulong, bool> bySlot = _pkcs11Library.Pbkdf2PasswordLengthByReferenceBySlot;
+        if (bySlot.TryGetValue((ulong)_slotId, out bool known))
+            return known;
 
-            bool byReference = DetectPbkdf2PasswordLengthByReference(slotId, out string reason);
-            Log.Pbkdf2Layout(_logger, (ulong)_sessionId,
-                byReference ? "CK_PKCS5_PBKD2_PARAMS" : "CK_PKCS5_PBKD2_PARAMS2", (ulong)slotId, reason);
-            return bySlot.GetOrAdd((ulong)slotId, byReference);
-        }
+        bool byReference = DetectPbkdf2PasswordLengthByReference(_slotId, out string reason);
+        Log.Pbkdf2Layout(_logger, (ulong)_sessionId,
+            byReference ? "CK_PKCS5_PBKD2_PARAMS" : "CK_PKCS5_PBKD2_PARAMS2", (ulong)_slotId, reason);
+        return bySlot.GetOrAdd((ulong)_slotId, byReference);
     }
 
     /// <summary>
