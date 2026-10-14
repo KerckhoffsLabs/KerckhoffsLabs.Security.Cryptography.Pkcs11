@@ -101,40 +101,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
 
-      # SoftHSM is built against OpenSSL 3.5+ so ML-DSA (CKM_ML_DSA) compiles in — ubuntu-latest
-      # ships OpenSSL 3.0, so we build 3.5.7 from source (the same release the upstream SoftHSM CI
-      # uses) into a user-writable prefix (cache-friendly, no sudo). build-softhsmv2.sh reads
-      # OPENSSL_PREFIX and bakes an rpath so libsofthsm2 loads this OpenSSL at runtime. The same
-      # OpenSSL 3.5 is reused by opencryptoki on the ubuntu-latest leg (ML-DSA/ML-KEM, incl. signing).
-      - name: Cache OpenSSL 3.5
+      # OpenSSL 3.5 for SoftHSM's ML-DSA, and for opencryptoki and Kryoptic on the ubuntu-latest leg;
+      # see the action for why the whole process, not just the modules, must load it.
+      - name: OpenSSL 3.5 (Linux)
         if: runner.os == 'Linux'
-        id: cache-openssl
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/openssl-3.5
-          key: openssl-3.5.7-${{ runner.arch }}
-      - name: Build OpenSSL 3.5.7 (on cache miss)
-        if: runner.os == 'Linux' && steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          work="$(mktemp -d)"; cd "$work"
-          curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
-          echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c -
-          tar -xf openssl-3.5.7.tar.gz && cd openssl-3.5.7
-          ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
-          make -j"$(nproc)" >/dev/null
-          make install_sw >/dev/null
-          ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
-      # OPENSSL_PREFIX: build-softhsmv2.sh links SoftHSM against this OpenSSL.
-      # LD_LIBRARY_PATH: at runtime the .NET host loads the system libcrypto.so.3 (OpenSSL 3.0)
-      # first, so the rpath in libsofthsm2 loses to the already-loaded soname and ML-DSA symbols
-      # (OPENSSL_3.4.0+) are missing. Putting the 3.5 libdir on the loader path makes the whole
-      # process use OpenSSL 3.5 (which .NET also supports), resolving the collision. opencryptoki's
-      # ML-DSA/ML-KEM tests rely on the same loader path.
-      - name: Point SoftHSM at OpenSSL 3.5 (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+        uses: ./.github/actions/openssl35
 
       # macOS: SoftHSM builds with autotools against Homebrew OpenSSL 3. Unlike Linux, .NET on macOS
       # uses Apple's crypto (not system OpenSSL), so there is no in-process libcrypto collision — no
@@ -302,8 +273,8 @@ jobs:
       # token. Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA) and "pqc"
       # (ML-KEM/ML-DSA/SLH-DSA) needs >= 3.5, so it links against the same OpenSSL 3.5 built above
       # for SoftHSM/opencryptoki (ossl-sys locates it via pkg-config; PKG_CONFIG_PATH is set inside
-      # build-kryoptic.sh from OPENSSL_PREFIX, already exported process-wide by the "Point SoftHSM
-      # at OpenSSL 3.5" step). AES-CCM and SLH-DSA are the two mechanism families that had zero real-
+      # build-kryoptic.sh from OPENSSL_PREFIX, which the OpenSSL 3.5 step exports for the whole
+      # job). AES-CCM and SLH-DSA are the two mechanism families that had zero real-
       # backend coverage even with SoftHSM + opencryptoki + NSS (see KryopticBackendFixture).
       - name: Kryoptic submodule revision
         if: matrix.os == 'ubuntu-latest'
