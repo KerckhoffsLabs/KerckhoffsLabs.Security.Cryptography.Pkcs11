@@ -7,7 +7,8 @@
 # Outputs (relative to <test-output-dir>):
 #   runtimes/<rid>/native/libkryoptic_pkcs11.so
 #
-# Idempotent: skips rebuild when the output is newer than the submodule HEAD.
+# Idempotent: skips the rebuild when the staged output was built from this submodule commit by this
+# script (see is_built_from).
 #
 # Linux only for now: Kryoptic (Rust/cargo) is cross-platform in principle, but this
 # backend is wired into CI on the ubuntu-latest leg only (see ci.yml) — matching how
@@ -36,13 +37,13 @@ DEST_LIB="${DEST_DIR}/libkryoptic_pkcs11.so"
 
 mkdir -p "${DEST_DIR}"
 
-# Skip rebuild if the output is newer than the submodule HEAD commit.
-HEAD_TS="$(git -C "${SRC_DIR}" log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
-LIB_TS="$( { [[ -f "${DEST_LIB}" ]] && stat -c %Y "${DEST_LIB}" 2>/dev/null; } || echo 0)"
-if (( LIB_TS > HEAD_TS )); then
+STAMP_FILE="${DEST_LIB}.built-from"
+STAMP="$(build_stamp "${SRC_DIR}")"
+if is_built_from "${STAMP_FILE}" "${STAMP}" "${DEST_LIB}"; then
   echo "kryoptic up to date at ${DEST_LIB}"
   exit 0
 fi
+rm -f "${STAMP_FILE}"
 
 echo "Building Kryoptic for ${RID}..."
 
@@ -84,4 +85,5 @@ if [[ ! -f "${SRC_LIB}" ]]; then
 fi
 
 cp "${SRC_LIB}" "${DEST_LIB}"
+record_build "${STAMP_FILE}" "${STAMP}"
 echo "Installed ${DEST_LIB}"

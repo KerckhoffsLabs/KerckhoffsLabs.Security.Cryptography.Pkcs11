@@ -16,7 +16,8 @@
 # patchelf is available) so it finds its NSS siblings without LD_LIBRARY_PATH; CI sets
 # LD_LIBRARY_PATH to the staging dir as well.
 #
-# Idempotent: skips the rebuild when the staged module is newer than the submodule HEAD.
+# Idempotent: skips the rebuild when the staged module was built from this submodule commit by this
+# script (see is_built_from).
 
 set -euo pipefail
 
@@ -37,14 +38,14 @@ DEST_LIB="${DEST_DIR}/libsoftokn3.so"
 
 mkdir -p "${DEST_DIR}"
 
-# Skip rebuild if the staged module is newer than the submodule HEAD commit.
-HEAD_TS="$(git -C "${SRC_DIR}" log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
-_ts() { local f="$1"; [[ -f "$f" ]] && (stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0) || echo 0; }
-if (( "$(_ts "${DEST_LIB}")" > HEAD_TS )); then
+STAMP_FILE="${DEST_DIR}/.built-from"
+STAMP="$(build_stamp "${SRC_DIR}")"
+if is_built_from "${STAMP_FILE}" "${STAMP}" "${DEST_LIB}"; then
   echo "nss up to date at ${DEST_DIR}" >&2
   echo "${DEST_LIB}"
   exit 0
 fi
+rm -f "${STAMP_FILE}"
 
 echo "Building NSS softoken for ${RID}..." >&2
 
@@ -103,5 +104,6 @@ if command -v patchelf >/dev/null 2>&1; then
   patchelf --set-rpath '$ORIGIN' "${DEST_LIB}" || true
 fi
 
+record_build "${STAMP_FILE}" "${STAMP}"
 echo "Installed ${DEST_LIB}" >&2
 echo "${DEST_LIB}"

@@ -53,3 +53,34 @@ fetch_deb() {
   dpkg-deb -x "${deb}" "${work}/root"
   return 0
 }
+
+# build_stamp <source-dir>: prints what a build is made from, the source's HEAD commit and the
+# calling script's own git blob hash, so a different submodule commit or a changed build script
+# both count as a different build. Prints nothing when either cannot be read.
+build_stamp() {
+  local head script
+  head="$(git -C "$1" rev-parse HEAD 2>/dev/null)" || return 0
+  script="$(git hash-object "$0" 2>/dev/null)" || return 0
+  echo "${head} ${script}"
+}
+
+# is_built_from <stamp-file> <stamp> <output>...: succeeds when every <output> exists and
+# <stamp-file> records <stamp>, the build_stamp written by record_build after the outputs were
+# staged. A file's age is no evidence of what it was built from: a cache can restore an older
+# build with a newer timestamp than the commit it was not built from.
+is_built_from() {
+  local file="$1" stamp="$2"
+  shift 2
+  [[ -n "${stamp}" && -f "${file}" && "$(cat "${file}")" == "${stamp}" ]] || return 1
+  local output
+  for output in "$@"; do
+    [[ -f "${output}" ]] || return 1
+  done
+  return 0
+}
+
+# record_build <stamp-file> <stamp>: records that the staged outputs were built from <stamp>. Call
+# it last, once every output is in place, so an interrupted build is not taken as complete.
+record_build() {
+  echo "$2" > "$1"
+}
