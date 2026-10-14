@@ -49,7 +49,8 @@ internal static class KnownOutputLength
     /// the buffer from the query can never sign Ed25519 there. The guess costs nothing elsewhere: an Ed25519
     /// signature is always 64 bytes, and an Ed448 one (114 bytes) is answered with
     /// <c>CKR_BUFFER_TOO_SMALL</c> and the length, then signed on the second call, as many calls as the query
-    /// takes. Safe to remove once a fixed NSS is the oldest one supported.
+    /// takes. A module that refuses the guess without reporting the length (opencryptoki's <c>ec_sign</c>) is
+    /// then queried, one call more. Safe to remove once a fixed NSS is the oldest one supported.
     /// </remarks>
     public static int? OfSignature(CKM mechanism)
         => mechanism == CKM.CKM_EDDSA ? Ed25519Signature : Of(mechanism);

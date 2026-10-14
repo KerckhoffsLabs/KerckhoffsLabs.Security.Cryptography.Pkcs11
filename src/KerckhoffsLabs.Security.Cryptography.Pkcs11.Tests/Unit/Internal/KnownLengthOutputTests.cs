@@ -97,6 +97,21 @@ public sealed class KnownLengthOutputTests
         Assert.Equal(2, module.CallCount("C_Sign"));
     }
 
+    // opencryptoki's ec_sign: CKR_BUFFER_TOO_SMALL with the length left as the caller passed it.
+    [Fact]
+    public void Ed448_FromAModuleThatDoesNotReportTheLength_IsQueried()
+    {
+        using var module = new OutputModule { Produces = 114, LeavesTheLengthOnBufferTooSmall = true };
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+
+        byte[] signature = session.Sign(new Mechanism(CKM.CKM_EDDSA), new ObjectHandle(1), "data"u8);
+
+        Assert.Equal(114, signature.Length);
+        Assert.Equal(1, module.CallCount("C_SignInit"));
+        Assert.Equal(3, module.CallCount("C_Sign"));
+    }
+
     [Fact]
     public void EdDsa_IsGuessedOnlyWhenSigning()
     {
@@ -125,7 +140,9 @@ public sealed class KnownLengthOutputTests
     /// <summary>
     /// Digests and signs to <see cref="Produces"/> bytes. Asked to fill a buffer that is too small, it reports
     /// the length it needs and, with <see cref="EndsOnBufferTooSmall"/>, also ends the operation. With
-    /// <see cref="TakesOnlyAnExactBuffer"/> it refuses any other buffer size, as NSS does for EdDSA.
+    /// <see cref="TakesOnlyAnExactBuffer"/> it refuses any other buffer size, as NSS does for EdDSA, and with
+    /// <see cref="LeavesTheLengthOnBufferTooSmall"/> it does not report the length it needs, as opencryptoki
+    /// does for EC signatures.
     /// </summary>
     private sealed class OutputModule : FakeModule
     {
@@ -138,6 +155,8 @@ public sealed class KnownLengthOutputTests
         public int? Reports { get; init; }
 
         public bool TakesOnlyAnExactBuffer { get; init; }
+
+        public bool LeavesTheLengthOnBufferTooSmall { get; init; }
 
         public NativeCULong OpenSessionCore() => NewSessionHandle();
 
@@ -172,6 +191,8 @@ public sealed class KnownLengthOutputTests
             length = (NativeCULong)(ulong)Produces;
             if (output.Span.Length < Produces)
             {
+                if (LeavesTheLengthOnBufferTooSmall)
+                    length = (NativeCULong)(ulong)output.Span.Length;
                 _active = !EndsOnBufferTooSmall;
                 return CKR.CKR_BUFFER_TOO_SMALL;
             }
