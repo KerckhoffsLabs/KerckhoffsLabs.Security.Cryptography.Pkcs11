@@ -18,7 +18,8 @@ public sealed class WrapUnwrapCurve25519Tests_Kryoptic(KryopticBackendFixture ba
     // write the 48-byte 30 2E ... 04 22 04 20 <key>. import_from_wrapped mirrors it, so an RFC 8410 key
     // unwraps to a 34-byte CKA_VALUE (04 20 <key>) that C_SignInit and C_DeriveKey then refuse with
     // CKR_DEVICE_ERROR. Its own wrap and unwrap agree, so it only fails against another
-    // implementation, which is what every case here is. Still so on upstream main as of 2026-10.
+    // implementation, which is what every case here is. Reported upstream as
+    // https://github.com/latchset/kryoptic/issues/527; enable once a fixed Kryoptic is vendored.
     public static bool SupportsRfc8410PrivateKeys => false;
 
     [Fact(SkipUnless = nameof(SupportsRfc8410PrivateKeys), Skip = "Requires " + nameof(SupportsRfc8410PrivateKeys))]
