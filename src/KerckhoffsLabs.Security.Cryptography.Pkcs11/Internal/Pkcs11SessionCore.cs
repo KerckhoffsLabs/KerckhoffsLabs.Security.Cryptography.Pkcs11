@@ -2728,7 +2728,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
         byte[] signature = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, lengthOnly, out len),
             OpSign,
-            KnownOutputLength.Of(mechanism.Type),
+            KnownOutputLength.OfSignature(mechanism.Type),
             () => _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId));
         operation.Completed();
 

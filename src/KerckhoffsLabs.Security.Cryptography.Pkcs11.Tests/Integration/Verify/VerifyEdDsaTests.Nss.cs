@@ -6,16 +6,14 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Verify;
 /// <summary>
 /// Cross-backend port of the SoftHSM2 EdDSA verify test, run against NSS. Generates the key
 /// pair on the token, so it exercises on-token keygen + sign + verify (tamper rejection). Gated on the
-/// live mechanism list.
+/// live mechanism list (CKM_EDDSA from NSS 3.125).
 /// </summary>
 [Collection("Nss")]
 public sealed class VerifyEdDsaTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
 
-    // NSS's CKM_EDDSA needs a CK_EDDSA_PARAMS the shared bare-parameter case does not pass; skip.
-
-    [Fact(SkipUnless = nameof(NssBackendFixture.EdDsaAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.EdDsaAvailable))]
+    [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     public void Ed25519_RejectsTamperedData()
     {
         if (!_backend.Supports(CKM.CKM_EDDSA) || !_backend.Supports(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN))

@@ -7,7 +7,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Internal;
 
 /// <summary>
-/// A digest or MAC whose length the mechanism fixes is sized up front, without a length query. The size is
+/// A digest or MAC whose length the mechanism fixes, and an EdDSA signature, is sized up front, without a
+/// length query. The size is
 /// a guess as far as the module is concerned, so these tests give it modules that disagree: one that writes
 /// less, one that needs more and keeps the operation active (PKCS#11 v3.2 §5.2), and one that needs more
 /// and ends the operation (as NSS does), which must be restarted.
@@ -68,6 +69,43 @@ public sealed class KnownLengthOutputTests
         Assert.Equal(2, module.CallCount("C_SignInit"));
     }
 
+    // NSS's softoken: the length query says 144, and only a buffer of exactly 64 bytes signs.
+    [Fact]
+    public void Ed25519_FromAModuleThatOnlyTakesAnExactBuffer_IsSizedWithoutAQuery()
+    {
+        using var module = new OutputModule { Produces = 64, Reports = 144, TakesOnlyAnExactBuffer = true };
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+
+        byte[] signature = session.Sign(new Mechanism(CKM.CKM_EDDSA), new ObjectHandle(1), "data"u8);
+
+        Assert.Equal(64, signature.Length);
+        Assert.Equal(1, module.CallCount("C_Sign"));
+    }
+
+    [Fact]
+    public void Ed448_LongerThanTheEd25519Guess_IsRetriedAtTheReportedLength()
+    {
+        using var module = new OutputModule { Produces = 114 };
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+
+        byte[] signature = session.Sign(new Mechanism(CKM.CKM_EDDSA), new ObjectHandle(1), "data"u8);
+
+        Assert.Equal(114, signature.Length);
+        Assert.Equal(1, module.CallCount("C_SignInit"));
+        Assert.Equal(2, module.CallCount("C_Sign"));
+    }
+
+    [Fact]
+    public void EdDsa_IsGuessedOnlyWhenSigning()
+    {
+        Assert.Equal(64, KnownOutputLength.OfSignature(CKM.CKM_EDDSA));
+        Assert.Null(KnownOutputLength.Of(CKM.CKM_EDDSA));
+        Assert.Equal(32, KnownOutputLength.OfSignature(CKM.CKM_SHA256_HMAC));
+        Assert.Null(KnownOutputLength.OfSignature(CKM.CKM_ECDSA_SHA256));
+    }
+
     [Theory]
     [InlineData(CKM.CKM_SHA_1, 20)]
     [InlineData(CKM.CKM_SHA384_HMAC, 48)]
@@ -86,7 +124,8 @@ public sealed class KnownLengthOutputTests
 
     /// <summary>
     /// Digests and signs to <see cref="Produces"/> bytes. Asked to fill a buffer that is too small, it reports
-    /// the length it needs and, with <see cref="EndsOnBufferTooSmall"/>, also ends the operation.
+    /// the length it needs and, with <see cref="EndsOnBufferTooSmall"/>, also ends the operation. With
+    /// <see cref="TakesOnlyAnExactBuffer"/> it refuses any other buffer size, as NSS does for EdDSA.
     /// </summary>
     private sealed class OutputModule : FakeModule
     {
@@ -94,6 +133,11 @@ public sealed class KnownLengthOutputTests
 
         public int Produces { get; init; }
         public bool EndsOnBufferTooSmall { get; init; }
+
+        /// <summary>The length the query reports, when it is not <see cref="Produces"/>.</summary>
+        public int? Reports { get; init; }
+
+        public bool TakesOnlyAnExactBuffer { get; init; }
 
         public NativeCULong OpenSessionCore() => NewSessionHandle();
 
@@ -117,9 +161,15 @@ public sealed class KnownLengthOutputTests
         {
             if (!_active)
                 return CKR.CKR_OPERATION_NOT_INITIALIZED;
-            length = (NativeCULong)(ulong)Produces;
+            length = (NativeCULong)(ulong)(Reports ?? Produces);
             if (output.IsNull)
                 return CKR.CKR_OK;
+            if (TakesOnlyAnExactBuffer && output.Span.Length != Produces)
+            {
+                _active = false;
+                return CKR.CKR_ARGUMENTS_BAD;
+            }
+            length = (NativeCULong)(ulong)Produces;
             if (output.Span.Length < Produces)
             {
                 _active = !EndsOnBufferTooSmall;
