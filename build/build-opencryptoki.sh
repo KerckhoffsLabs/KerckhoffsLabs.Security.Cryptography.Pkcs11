@@ -8,7 +8,7 @@
 # test assembly), opencryptoki is daemon-backed: the library talks to pkcsslotd over shared
 # memory and loads its STDLLs from a fixed layout. So this installs a real tree rather than
 # copying one file. Runtime provisioning (pkcs11 group, token store, daemon start, token
-# init) is the caller's job — see the opencryptoki job in .github/workflows/ci.yml.
+# init) is provision-opencryptoki.sh's job.
 #
 # Layout is split so the runtime paths match a distro package:
 #   --prefix=/usr/local       libs + binaries (libopencryptoki.so, pkcsslotd, pkcsconf, ...)

@@ -61,6 +61,18 @@
     <Using Include="KerckhoffsLabs.Security.Cryptography.Pkcs11.Policy" />
   </ItemGroup>
 
+  <!-- SkipNativeBuilds=true skips every native build below (pkcs11-mock, the ABI oracle, the gate
+       shims, SoftHSM and Kryoptic), for a managed-only build that needs neither the submodules nor a
+       C toolchain. Each target keeps its own Skip* switch; a value passed on the command line still
+       wins over this one. -->
+  <PropertyGroup Condition="'$(SkipNativeBuilds)' == 'true'">
+    <SkipPkcs11MockBuild>true</SkipPkcs11MockBuild>
+    <SkipAbiProbeBuild>true</SkipAbiProbeBuild>
+    <SkipPkcs11GateBuild>true</SkipPkcs11GateBuild>
+    <SkipSoftHsmV2Build>true</SkipSoftHsmV2Build>
+    <BuildKryoptic>false</BuildKryoptic>
+  </PropertyGroup>
+
   <Target Name="BuildPkcs11Mock" BeforeTargets="PrepareForBuild" Condition="'$(SkipPkcs11MockBuild)' != 'true'">
     <PropertyGroup>
       <_MockOutputDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_MockOutputDir>
