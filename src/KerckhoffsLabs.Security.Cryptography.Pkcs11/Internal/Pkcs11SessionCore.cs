@@ -2039,14 +2039,20 @@ internal sealed class Pkcs11SessionCore : IDisposable
             if (filled != CKR.CKR_BUFFER_TOO_SMALL)
                 throw Pkcs11Exception.Create(filled, operation);
 
-            byte[] sized = new byte[ReportedLength.ForAllocation(written, operation)];
-            filled = call(first, second, sized, lengthOnly: false, out written);
-            if (filled != CKR.CKR_OPERATION_NOT_INITIALIZED || restart is null)
+            // PKCS#11 v3.2 §5.2 has the module report the length it needs, but some leave the length
+            // as it was (opencryptoki's ec_sign does). Only a length past the guess was reported; with
+            // any other, the operation is still active and the module is asked below.
+            if ((ulong)written > (ulong)guessed)
             {
-                Pkcs11Exception.ThrowIfError(filled, operation);
-                return ReportedLength.Trim(sized, written, operation);
+                byte[] sized = new byte[ReportedLength.ForAllocation(written, operation)];
+                filled = call(first, second, sized, lengthOnly: false, out written);
+                if (filled != CKR.CKR_OPERATION_NOT_INITIALIZED || restart is null)
+                {
+                    Pkcs11Exception.ThrowIfError(filled, operation);
+                    return ReportedLength.Trim(sized, written, operation);
+                }
+                Pkcs11Exception.ThrowIfError(restart(), operation);
             }
-            Pkcs11Exception.ThrowIfError(restart(), operation);
         }
 
         CKR rv = call(first, second, default, lengthOnly: true, out NativeCULong reported);
@@ -2728,7 +2734,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
         byte[] signature = CallWithLengthProbe(data,
             (ReadOnlySpan<byte> input, Span<byte> buf, bool lengthOnly, out NativeCULong len) => _pkcs11Library.C_Sign(_sessionId, input, buf, lengthOnly, out len),
             OpSign,
-            KnownOutputLength.Of(mechanism.Type),
+            KnownOutputLength.OfSignature(mechanism.Type),
             () => _pkcs11Library.C_SignInit(_sessionId, ref ckMechanism, (NativeCULong)keyHandle.ObjectId));
         operation.Completed();
 

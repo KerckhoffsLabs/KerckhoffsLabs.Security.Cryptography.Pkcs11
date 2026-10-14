@@ -29,10 +29,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Keys;
 /// on the softoken release.
 /// </para>
 /// <para>
-/// The Ed25519 cases compare key bytes rather than signatures: NSS reports <c>MAX_ECKEY_LEN * 2</c>
-/// as the <c>CKM_EDDSA</c> signature length, then refuses any buffer but exactly 64 bytes with
-/// <see cref="CKR.CKR_ARGUMENTS_BAD"/>, so a sign sized from its length query cannot succeed. The
-/// X25519 cases do agree a secret: against RFC 7748's, or between the original and the copy.
+/// Each known-answer case also uses the key it unwrapped: the Ed25519 one signs RFC 8032's message
+/// to RFC 8032's signature, and the X25519 one agrees RFC 7748's secret. The X25519 round trip agrees
+/// a secret with the original and with the copy and compares the two; the Ed25519 one signs with both.
 /// </para>
 /// </remarks>
 [Collection("Nss")]
@@ -48,9 +47,13 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     private static readonly byte[] Ed25519Params = [0x06, 0x03, 0x2B, 0x65, Ed25519Oid];
     private static readonly byte[] X25519Params = [0x06, 0x03, 0x2B, 0x65, X25519Oid];
 
-    // RFC 8032 §7.1, TEST 1.
-    private static readonly byte[] Rfc8032Test1Secret =
-        Convert.FromHexString("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
+    // RFC 8032 §7.1, TEST 2: the secret key, a one-byte message, and its signature.
+    private static readonly byte[] Rfc8032Test2Secret =
+        Convert.FromHexString("4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb");
+    private static readonly byte[] Rfc8032Test2Message = [0x72];
+    private static readonly byte[] Rfc8032Test2Signature = Convert.FromHexString(
+        "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da" +
+        "085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00");
 
     // RFC 7748 §6.1: Alice's private key, Bob's public key, and the secret they share.
     private static readonly byte[] Rfc7748AlicePrivate =
@@ -63,18 +66,20 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     private static readonly byte[] Message = "wrapped Curve25519 key"u8.ToArray();
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Unwrap_Rfc8410Ed25519Key_WrapsBackToTheSamePkcs8()
+    public void Unwrap_Rfc8410Ed25519Key_SignsTheRfc8032Signature()
     {
         RequireWrapping();
+        _backend.RequireMechanism(CKM.CKM_EDDSA);
         RunInSession(session =>
         {
             using var kek = new Kek(session);
-            byte[] pkcs8 = Pkcs8(Ed25519Oid, Rfc8032Test1Secret);
+            byte[] pkcs8 = Pkcs8(Ed25519Oid, Rfc8032Test2Secret);
 
             ObjectHandle key = kek.Unwrap(pkcs8, CKK.CKK_EC_EDWARDS);
 
             AssertUsage(session, key, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
             Assert.Equal(pkcs8, kek.Wrap(key));
+            Assert.Equal(Rfc8032Test2Signature, session.Sign(new Mechanism(CKM.CKM_EDDSA), key, Rfc8032Test2Message));
         });
     }
 
@@ -103,6 +108,7 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     {
         RequireWrapping();
         _backend.RequireMechanism(CKM.CKM_EC_EDWARDS_KEY_PAIR_GEN);
+        _backend.RequireMechanism(CKM.CKM_EDDSA);
         RunInSession(session =>
         {
             using var kek = new Kek(session);
@@ -114,6 +120,9 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
 
             AssertUsage(session, copy, CKK.CKK_EC_EDWARDS, sign: true, derive: false);
             Assert.Equal(pkcs8, kek.Wrap(copy));
+            // Ed25519 is deterministic, so the same key signs a message to the same signature.
+            var eddsa = new Mechanism(CKM.CKM_EDDSA);
+            Assert.Equal(session.Sign(eddsa, original, Message), session.Sign(eddsa, copy, Message));
         });
     }
 

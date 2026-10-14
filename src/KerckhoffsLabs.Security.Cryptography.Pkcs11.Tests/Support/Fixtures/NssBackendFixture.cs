@@ -72,15 +72,6 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// façade, which is covered by the AEAD façade tests.</summary>
     public static bool SupportsClassicAesGcm => false;
 
-    /// <summary>True when EdDSA works the way the shared pure-Ed25519 case drives it (a bare
-    /// <see cref="CKM.CKM_EDDSA"/>, the signature buffer sized from <c>C_Sign</c>'s length query).
-    /// NSS 3.125+ advertises <c>CKM_EDDSA</c>, so the mechanism-list gate would let the case run, but
-    /// softoken refuses any <c>CK_EDDSA_PARAMS</c> with <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/>,
-    /// and with the bare form reports <c>MAX_ECKEY_LEN * 2</c> (144) as the signature length, then
-    /// fails a sign into a buffer of that size with <see cref="CKR.CKR_ARGUMENTS_BAD"/>: freebl's
-    /// <c>ED_SignMessage</c> takes exactly 64 bytes. So those cases skip.</summary>
-    public static bool SupportsEdDsa => false;
-
     /// <summary>Gate for cases that specifically need a writable token (persistent keys / token
     /// objects). Always false: NSS's generic token never persists token objects.</summary>
     public static bool TokenObjectsAvailable => false;
@@ -118,9 +109,6 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
 
     /// <summary>Gate for cases that exercise the classic <c>CK_GCM_PARAMS</c> AES-GCM path.</summary>
     public static bool ClassicAesGcmAvailable => NssAvailable && SupportsClassicAesGcm;
-
-    /// <summary>Gate for the shared bare-parameter EdDSA cases.</summary>
-    public static bool EdDsaAvailable => NssAvailable && SupportsEdDsa;
 
     /// <summary>True when the backend will derive a readable (extractable, non-sensitive) key whose
     /// value can be read back. NSS softoken refuses with <see cref="CKR.CKR_KEY_FUNCTION_NOT_PERMITTED"/>
