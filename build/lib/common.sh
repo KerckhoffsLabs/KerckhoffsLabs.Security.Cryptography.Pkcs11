@@ -58,8 +58,8 @@ fetch_deb() {
 # calling script's own git blob hash, so a different submodule commit or a changed build script
 # both count as a different build. Prints nothing when either cannot be read.
 build_stamp() {
-  local head script
-  head="$(git -C "$1" rev-parse HEAD 2>/dev/null)" || return 0
+  local src="$1" head script
+  head="$(git -C "${src}" rev-parse HEAD 2>/dev/null)" || return 0
   script="$(git hash-object "$0" 2>/dev/null)" || return 0
   echo "${head} ${script}"
 }
@@ -82,5 +82,7 @@ is_built_from() {
 # record_build <stamp-file> <stamp>: records that the staged outputs were built from <stamp>. Call
 # it last, once every output is in place, so an interrupted build is not taken as complete.
 record_build() {
-  echo "$2" > "$1"
+  local file="$1" stamp="$2"
+  echo "${stamp}" > "${file}"
+  return 0
 }
