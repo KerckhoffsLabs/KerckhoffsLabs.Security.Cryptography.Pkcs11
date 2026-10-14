@@ -49,7 +49,7 @@ public sealed class ModuleLoadsTests
         using var module = new SharedStateModule();
         Pkcs11Library first = module.Load();
         Pkcs11Library second = module.Load();
-        var session = new Pkcs11SessionCore(second.LowLevelLibrary!, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(second.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
 
         first.Dispose();
 
@@ -133,7 +133,7 @@ public sealed class ModuleLoadsTests
     {
         using var module = new SharedStateModule();
         Pkcs11Library library = module.Load();
-        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
+        var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
 
         library.Dispose();
 

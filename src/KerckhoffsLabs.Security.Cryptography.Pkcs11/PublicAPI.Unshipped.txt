@@ -2038,6 +2038,12 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.LoggerFactory.i
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.ModuleParameters.get -> string?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.ModuleParameters.init -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Pkcs11LibraryOptions() -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Pbkdf2ParametersLayout.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.Pbkdf2ParametersLayout.init -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout.Detect = 0 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout.PasswordLengthByReference = 2 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout.PasswordLengthByValue = 1 -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pbkdf2ParametersLayout
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CantCreateOsThreads.get -> bool
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CantCreateOsThreads.init -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.get -> bool

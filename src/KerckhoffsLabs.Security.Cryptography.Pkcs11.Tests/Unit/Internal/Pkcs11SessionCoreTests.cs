@@ -34,7 +34,7 @@ public sealed class Pkcs11SessionCoreTests
 
     [Fact]
     public void Ctor_NullLibrary_Throws() =>
-        Assert.Throws<ArgumentNullException>(() => new Pkcs11SessionCore(null!, SessionId));
+        Assert.Throws<ArgumentNullException>(() => new Pkcs11SessionCore(null!, slotId: default, SessionId));
 
     [Fact]
     public void Ctor_InvalidHandle_Throws()

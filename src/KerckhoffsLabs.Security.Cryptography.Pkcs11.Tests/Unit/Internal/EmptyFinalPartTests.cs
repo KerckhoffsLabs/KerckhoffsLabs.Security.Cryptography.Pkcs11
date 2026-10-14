@@ -23,7 +23,7 @@ public sealed class EmptyFinalPartTests
     {
         using var module = new StreamModule();
         using Pkcs11Library library = module.Load();
-        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
 
         Assert.Equal(Payload, Decrypt(session));
         Assert.Equal(Payload, Decrypt(session));
@@ -37,7 +37,7 @@ public sealed class EmptyFinalPartTests
     {
         using var module = new StreamModule();
         using Pkcs11Library library = module.Load();
-        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, (ulong)module.OpenSessionCore());
+        using var session = new Pkcs11SessionCore(library.LowLevelLibrary!, slotId: default, (ulong)module.OpenSessionCore());
 
         Assert.Equal(Payload, Encrypt(session));
         Assert.Equal(Payload, Encrypt(session));

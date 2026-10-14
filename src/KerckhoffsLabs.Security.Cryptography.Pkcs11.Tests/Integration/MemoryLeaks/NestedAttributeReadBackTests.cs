@@ -106,7 +106,7 @@ public sealed class NestedAttributeReadBackTests
     }
 
     private static Pkcs11SessionCore OpenSessionCore(WrapTemplateModule module)
-        => new(module.LoadLowLevel(), (ulong)module.OpenSessionCore());
+        => new(module.LoadLowLevel(), slotId: default, (ulong)module.OpenSessionCore());
 
     private static void ReadAndDispose(Pkcs11SessionCore session)
         => session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_WRAP_TEMPLATE]).Dispose();

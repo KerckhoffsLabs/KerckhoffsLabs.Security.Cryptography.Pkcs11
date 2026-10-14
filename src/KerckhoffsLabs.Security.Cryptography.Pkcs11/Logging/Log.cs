@@ -53,6 +53,11 @@ internal static partial class Log
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): {PolicyName} policy refused {Request}")]
     public static partial void PolicyDenied(ILogger logger, ulong sessionId, string policyName, string request);
 
+    // Written before the first derivation on a slot: sent the structure it does not read, a module may
+    // crash the process, and this line is then the only trace of the choice.
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Session({SessionId}): CKM_PKCS5_PBKD2 sends {Structure} to slot {SlotId} ({Reason})")]
+    public static partial void Pbkdf2Layout(ILogger logger, ulong sessionId, string structure, ulong slotId, string reason);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Session({SessionId}): policy override {FromPolicy} -> {ToPolicy}")]
     public static partial void PolicyOverridden(ILogger logger, ulong sessionId, string fromPolicy, string toPolicy);
 

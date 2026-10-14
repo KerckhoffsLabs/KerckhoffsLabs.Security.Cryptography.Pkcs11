@@ -253,7 +253,7 @@ public sealed class Pkcs11Slot
                     "Opened {SessionType} session {SessionId} with token in slot {SlotId} under {PolicyName} policy",
                     readWrite ? "read-write" : "read-only", sessionId, _slotId, (policy ?? CryptoPolicy.SecureOnly).Name);
 
-            return new Pkcs11SessionCore(_pkcs11Library, sessionHandle, _loggerFactory, policy);
+            return new Pkcs11SessionCore(_pkcs11Library, _slotId, sessionHandle, _loggerFactory, policy);
         }
         catch
         {

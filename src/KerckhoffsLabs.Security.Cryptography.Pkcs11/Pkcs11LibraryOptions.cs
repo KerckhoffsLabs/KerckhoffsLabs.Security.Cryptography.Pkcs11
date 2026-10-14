@@ -5,8 +5,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// Settings for <see cref="Pkcs11Library.Load(string, Pkcs11LibraryOptions?)"/> and
-/// <see cref="Pkcs11Library.LoadStaticallyLinked(Pkcs11LibraryOptions?)"/>: logging, and anything
-/// module-specific the PKCS#11 module needs to initialize.
+/// <see cref="Pkcs11Library.LoadStaticallyLinked(Pkcs11LibraryOptions?)"/>: logging, anything
+/// module-specific the PKCS#11 module needs to initialize, and how to talk to a module that departs
+/// from the standard.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -35,6 +36,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public sealed class Pkcs11LibraryOptions
 {
     private readonly string? _moduleParameters;
+    private readonly Pbkdf2ParametersLayout _pbkdf2ParametersLayout;
 
     /// <summary>
     /// Logger factory for the library and every <see cref="Pkcs11Slot"/>/<c>Pkcs11SessionCore</c> it
@@ -123,6 +125,42 @@ public sealed class Pkcs11LibraryOptions
                 }
             }
             _moduleParameters = value;
+        }
+    }
+
+    /// <summary>
+    /// Which structure <c>CKM_PKCS5_PBKD2</c> sends the module. Defaults to
+    /// <see cref="Pkcs11.Pbkdf2ParametersLayout.Detect"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The default sends the corrected <c>CK_PKCS5_PBKD2_PARAMS2</c> that v2.40 Errata 01 and v3.0
+    /// specify, except to a module known to read the original <c>CK_PKCS5_PBKD2_PARAMS</c>: one that
+    /// implements a Cryptoki version before 2.40, which predates the corrected structure, or NSS softoken
+    /// before 3.114. From v2.40 on, neither the Cryptoki version a module reports nor the function list
+    /// it was bound through says which one it reads: NSS softoken implements v3.0 from 3.52 yet reads the
+    /// original structure until 3.114.
+    /// </para>
+    /// <para>
+    /// Set it only for a module whose documentation or behaviour calls for it. A module given the
+    /// structure it does not read crashes the process or derives from the wrong password length; see
+    /// <see cref="Pkcs11.Pbkdf2ParametersLayout"/>. Detection recognizes NSS by the manufacturer and
+    /// hardware version each of its slots reports in <c>C_GetSlotInfo</c>, which a proxy such as
+    /// p11-kit's passes on. An NSS that reports another manufacturer, including one given
+    /// <c>manufacturerID=</c> in <see cref="ModuleParameters"/>, needs this set explicitly, as does a
+    /// proxy reporting a Cryptoki version before 2.40 in front of later modules. The setting applies to
+    /// every slot of the module.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is not a defined <see cref="Pkcs11.Pbkdf2ParametersLayout"/>.</exception>
+    public Pbkdf2ParametersLayout Pbkdf2ParametersLayout
+    {
+        get => _pbkdf2ParametersLayout;
+        init
+        {
+            if (!Enum.IsDefined(value))
+                throw new ArgumentOutOfRangeException(nameof(Pbkdf2ParametersLayout), value, "Not a defined PBKDF2 parameters layout.");
+            _pbkdf2ParametersLayout = value;
         }
     }
 

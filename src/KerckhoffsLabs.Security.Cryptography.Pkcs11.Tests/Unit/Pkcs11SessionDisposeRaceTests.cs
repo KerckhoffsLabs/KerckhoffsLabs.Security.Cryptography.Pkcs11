@@ -79,7 +79,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
         using var fake = new ParkingFake();
         using var library = fake.Load();
         using var lowLevel = fake.LoadLowLevel();
-        var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11SessionCore(lowLevel, SessionId));
+        var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11SessionCore(lowLevel, slotId: default, SessionId));
 
         Task worker = OnItsOwnThread(() => _ = session.GenerateRandom(8));
         Assert.True(fake.Entered.Wait(Generous, TestContext.Current.CancellationToken), "the worker never reached the native call");
@@ -118,7 +118,7 @@ public sealed class Pkcs11SessionDisposeRaceTests
         using var fake = new RejectingLogoutFake();
         using var library = fake.Load();
         using var lowLevel = fake.LoadLowLevel();
-        var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11SessionCore(lowLevel, SessionId));
+        var session = new Pkcs11Session(library, new Pkcs11Slot(lowLevel, slotId: 1), new Pkcs11SessionCore(lowLevel, slotId: default, SessionId));
 
         session.Dispose();
 
