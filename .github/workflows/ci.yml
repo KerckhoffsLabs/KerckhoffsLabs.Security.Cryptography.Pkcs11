@@ -191,12 +191,13 @@ jobs:
           key: vcpkg-openssl-${{ matrix.arch || 'x64' }}-windows-v1
 
       # Second independent real backend, on the Linux x64 leg only: opencryptoki's software token,
-      # built from source from the pinned vendor/opencryptoki submodule (v3.27.0) — reproducible and
-      # independent of what ubuntu-latest ships. Running the same operations against a module unrelated
-      # to SoftHSM catches a mis-encoding the wrapper and SoftHSM happen to share. It is built against
-      # the OpenSSL 3.5 above, staged to /opt (outside /home) so the daemon — which runs under the
-      # shipped unit's ProtectHome=yes — can load it via the baked rpath; that compiles in the ML-DSA
-      # sign-message path (#ifdef EVP_PKEY_OP_SIGNMSG, OpenSSL 3.5 only) so ML-DSA signing works.
+      # built from source from the pinned vendor/opencryptoki submodule (master after v3.27.0) —
+      # reproducible and independent of what ubuntu-latest ships. Running the same operations
+      # against a module unrelated to SoftHSM catches a mis-encoding the wrapper and SoftHSM happen
+      # to share. It is built against the OpenSSL 3.5 above, staged to /opt (outside /home) so the
+      # daemon — which runs under the shipped unit's ProtectHome=yes — can load it via the baked
+      # rpath; that compiles in the ML-DSA sign-message path (#ifdef EVP_PKEY_OP_SIGNMSG, OpenSSL
+      # 3.5 only) so ML-DSA signing works.
       - name: Stage OpenSSL 3.5 outside /home (opencryptoki)
         if: matrix.os == 'ubuntu-latest'
         run: sudo cp -a "$HOME/openssl-3.5" /opt/openssl-3.5
