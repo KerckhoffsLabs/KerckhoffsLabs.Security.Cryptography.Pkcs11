@@ -51,4 +51,5 @@ fetch_deb() {
   curl --proto '=https' --proto-redir '=https' -fsSL -o "${deb}" "${url}"
   echo "${sha256}  ${deb}" | sha256sum -c - >&2
   dpkg-deb -x "${deb}" "${work}/root"
+  return 0
 }

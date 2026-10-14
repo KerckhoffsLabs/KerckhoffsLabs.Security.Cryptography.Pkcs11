@@ -31,6 +31,7 @@ case "${RID}" in
   linux-x64)   ARCH_FLAGS="-m64";           LIB_SUFFIX="x64";   LIB_EXT="so";    BUILD_SUBDIR="build/linux" ;;
   linux-arm64) ARCH_FLAGS="-march=armv8-a"; LIB_SUFFIX="arm64"; LIB_EXT="so";    BUILD_SUBDIR="build/linux" ;;
   osx-*)                                                          LIB_EXT="dylib"; BUILD_SUBDIR="build/macos" ;;
+  *) echo "no pkcs11-mock build for ${RID}" >&2; exit 1 ;;
 esac
 
 DEST_DIR="${OUT_BASE}/runtimes/${RID}/native"
@@ -67,8 +68,9 @@ case "${RID}" in
     make -f Makefile.host
     rm -f Makefile.host
     ;;
-  osx-*)
-    # build.sh produces a universal pkcs11-mock.dylib via lipo.
+  *)
+    # osx-*, the only other RID the first case accepts: build.sh produces a universal
+    # pkcs11-mock.dylib via lipo.
     bash build.sh
     ;;
 esac
@@ -78,7 +80,7 @@ popd >/dev/null
 # Locate the produced library.
 case "${RID}" in
   linux-*) SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock-${LIB_SUFFIX}.${LIB_EXT}" ;;
-  osx-*)   SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock.${LIB_EXT}" ;;
+  *)       SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock.${LIB_EXT}" ;; # osx-*
 esac
 
 if [[ ! -f "${SRC_LIB}" ]]; then
