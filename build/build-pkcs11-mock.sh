@@ -5,8 +5,8 @@
 # Usage: build-pkcs11-mock.sh <test-output-dir>
 #   <test-output-dir> e.g. src/.../Pkcs11.Tests/bin/Debug/net9.0
 #
-# Idempotent: if the target binary already exists and is newer than the
-# submodule HEAD commit, it is reused.
+# Idempotent: the target binary is reused when it was built from this submodule
+# commit by this script (see is_built_from).
 #
 # NOTE on upstream Makefile quirks:
 #   Linux:  The default Makefile only builds a 32-bit (-m32) library.
@@ -39,16 +39,13 @@ DEST_FILE="${DEST_DIR}/pkcs11-mock.${LIB_EXT}"
 
 mkdir -p "${DEST_DIR}"
 
-# Skip rebuild if dest is newer than the mock submodule HEAD.
-MOCK_HEAD_TS="$(git -C "${MOCK_DIR}" log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
-DEST_TS=0
-if [[ -f "${DEST_FILE}" ]]; then
-  DEST_TS=$(stat -c %Y "${DEST_FILE}" 2>/dev/null || stat -f %m "${DEST_FILE}" 2>/dev/null || echo 0)
-fi
-if (( DEST_TS > MOCK_HEAD_TS )); then
+STAMP_FILE="${DEST_FILE}.built-from"
+STAMP="$(build_stamp "${MOCK_DIR}")"
+if is_built_from "${STAMP_FILE}" "${STAMP}" "${DEST_FILE}"; then
   echo "pkcs11-mock up to date at ${DEST_FILE}"
   exit 0
 fi
+rm -f "${STAMP_FILE}"
 
 echo "Building pkcs11-mock for ${RID}..."
 
@@ -91,4 +88,5 @@ if [[ ! -f "${SRC_LIB}" ]]; then
 fi
 
 cp "${SRC_LIB}" "${DEST_FILE}"
+record_build "${STAMP_FILE}" "${STAMP}"
 echo "Installed ${DEST_FILE}"

@@ -8,7 +8,8 @@
 #   runtimes/<rid>/native/libsofthsm2.<ext>
 #   runtimes/<rid>/native/softhsm2-util
 #
-# Idempotent: skips rebuild when outputs are newer than the submodule HEAD.
+# Idempotent: skips the rebuild when the staged outputs were built from this submodule commit by
+# this script (see is_built_from).
 
 set -euo pipefail
 
@@ -32,15 +33,13 @@ DEST_UTIL="${DEST_DIR}/softhsm2-util"
 
 mkdir -p "${DEST_DIR}"
 
-# Skip rebuild if both outputs are newer than the submodule HEAD commit.
-HEAD_TS="$(git -C "${SRC_DIR}" log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
-_ts() { local f="$1"; [[ -f "$f" ]] && (stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0) || echo 0; }
-LIB_TS="$(_ts "${DEST_LIB}")"
-UTIL_TS="$(_ts "${DEST_UTIL}")"
-if (( LIB_TS > HEAD_TS && UTIL_TS > HEAD_TS )); then
+STAMP_FILE="${DEST_LIB}.built-from"
+STAMP="$(build_stamp "${SRC_DIR}")"
+if is_built_from "${STAMP_FILE}" "${STAMP}" "${DEST_LIB}" "${DEST_UTIL}"; then
   echo "softhsmv2 up to date at ${DEST_DIR}"
   exit 0
 fi
+rm -f "${STAMP_FILE}"
 
 echo "Building SoftHSMv2 for ${RID}..."
 
@@ -104,6 +103,7 @@ fi
 cp "${SRC_LIB}"  "${DEST_LIB}"
 cp "${SRC_UTIL}" "${DEST_UTIL}"
 chmod +x "${DEST_UTIL}"
+record_build "${STAMP_FILE}" "${STAMP}"
 echo "Installed ${DEST_LIB}"
 echo "Installed ${DEST_UTIL}"
 
