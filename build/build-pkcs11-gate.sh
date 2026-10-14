@@ -18,10 +18,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <test-output-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<test-output-dir>" "$@"
 
 OUT_BASE="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,26 +37,12 @@ if ! command -v "${CC_BIN}" >/dev/null 2>&1; then
   exit 0
 fi
 
-UNAME_S="$(uname -s)"
-UNAME_M="$(uname -m)"
-case "${UNAME_S}" in
-  Linux)
-    case "${UNAME_M}" in
-      aarch64|arm64) RID="linux-arm64" ;;
-      *)             RID="linux-x64" ;;
-    esac
-    ;;
-  Darwin)
-    case "${UNAME_M}" in
-      arm64) RID="osx-arm64" ;;
-      *)     RID="osx-x64" ;;
-    esac
-    ;;
-  *)
-    echo "pkcs11-gate: unsupported platform ${UNAME_S}; skipping gate build." >&2
-    exit 0
-    ;;
-esac
+# Optional, like the checks above: on a platform with no runtimes/<rid> directory, skip rather
+# than fail the build.
+if ! RID="$(host_rid)"; then
+  echo "pkcs11-gate: unsupported platform; skipping gate build." >&2
+  exit 0
+fi
 
 NATIVE_DIR="${OUT_BASE}/runtimes/${RID}/native"
 mkdir -p "${NATIVE_DIR}"

@@ -150,7 +150,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
-          key: ${{ steps.rev.outputs.native }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1') }}-v1
+          key: ${{ steps.rev.outputs.native }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1', 'build/lib/common.sh') }}-v1
 
       # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft
       # token, built by the Build step below. Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA)
@@ -189,29 +189,6 @@ jobs:
         with:
           path: ~\AppData\Local\vcpkg\archives
           key: vcpkg-openssl-${{ matrix.arch || 'x64' }}-windows-v1
-
-      # Auditable record of which SoftHSM the Linux job will exercise. The vendored
-      # BuildSoftHsmV2 target places libsofthsm2.so + softhsm2-util next to the test
-      # assembly; if the build silently failed to place them, this surfaces it in the
-      # log and the SoftHsm_IsAvailable_OnCiBuildPlatforms test fails the job.
-      - name: Report SoftHSM build (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          util=$(find . -path '*runtimes*native*' -name 'softhsm2-util' | head -1)
-          if [ -n "$util" ]; then echo "Built SoftHSM: $util"; "$util" --version; \
-          else echo "::warning::built softhsm2-util not found under runtimes/*/native"; fi
-
-      - name: Report SoftHSM build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $util = Get-ChildItem -Recurse -Path . -Filter softhsm2-util.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($util) {
-            Write-Host "Built SoftHSM: $($util.FullName)"; & $util.FullName --version
-            Write-Host "Native dir contents (libsofthsm2.dll + OpenSSL runtime must be present):"
-            Get-ChildItem (Split-Path $util.FullName) | Select-Object Length, Name | Format-Table -AutoSize | Out-String | Write-Host
-          }
-          else { Write-Host "::warning::built softhsm2-util.exe not found under runtimes/*/native" }
 
       # Second independent real backend, on the Linux x64 leg only: opencryptoki's software token,
       # built from source from the pinned vendor/opencryptoki submodule (v3.27.0) — reproducible and
@@ -257,7 +234,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/nss
-          key: nss-${{ steps.rev.outputs.nss }}-${{ hashFiles('build/build-nss.sh') }}-v1
+          key: nss-${{ steps.rev.outputs.nss }}-${{ hashFiles('build/build-nss.sh', 'build/lib/common.sh') }}-v1
 
       # build.sh drives gyp + ninja against the distro NSPR (--system-nspr); patchelf bakes an
       # $ORIGIN runpath so the module finds its NSS siblings. The heavy build toolchain is installed

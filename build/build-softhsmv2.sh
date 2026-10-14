@@ -12,46 +12,19 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <test-output-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<test-output-dir>" "$@"
 
 OUT_BASE="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${REPO_ROOT}/vendor/softhsmv2"
 
-if [[ ! -d "${SRC_DIR}" ]]; then
-  echo "softhsmv2 submodule missing at ${SRC_DIR}." >&2
-  echo "Run: git submodule update --init --recursive" >&2
-  exit 1
-fi
+require_submodule "${SRC_DIR}" softhsmv2
 
-UNAME_S="$(uname -s)"
-UNAME_M="$(uname -m)"
-
-case "${UNAME_S}" in
-  Linux)
-    case "${UNAME_M}" in
-      x86_64)  RID="linux-x64"   ;;
-      aarch64) RID="linux-arm64" ;;
-      *) echo "unsupported Linux arch: ${UNAME_M}" >&2; exit 1 ;;
-    esac
-    LIB_NAME="libsofthsm2.so"
-    ;;
-  Darwin)
-    case "${UNAME_M}" in
-      x86_64) RID="osx-x64"   ;;
-      arm64)  RID="osx-arm64" ;;
-      *) echo "unsupported macOS arch: ${UNAME_M}" >&2; exit 1 ;;
-    esac
-    # libsofthsm2 is built with libtool `-module`, which produces a `.so` bundle on macOS (not a
-    # `.dylib`). dlopen and .NET's NativeLibrary.Load load `.so` bundles fine, so keep the `.so` name.
-    LIB_NAME="libsofthsm2.so"
-    ;;
-  *)
-    echo "unsupported OS: ${UNAME_S}" >&2; exit 1 ;;
-esac
+RID="$(host_rid)"
+# Also on macOS: libsofthsm2 is built with libtool `-module`, which produces a `.so` bundle there
+# (not a `.dylib`). dlopen and .NET's NativeLibrary.Load load `.so` bundles fine, so keep the name.
+LIB_NAME="libsofthsm2.so"
 
 DEST_DIR="${OUT_BASE}/runtimes/${RID}/native"
 DEST_LIB="${DEST_DIR}/${LIB_NAME}"

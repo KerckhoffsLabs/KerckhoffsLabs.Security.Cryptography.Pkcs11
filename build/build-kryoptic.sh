@@ -15,10 +15,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <test-output-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<test-output-dir>" "$@"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "build-kryoptic.sh: Kryoptic is wired up on Linux only for now (got $(uname -s)); nothing to do." >&2
@@ -29,17 +27,9 @@ OUT_BASE="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${REPO_ROOT}/vendor/kryoptic"
 
-if [[ ! -f "${SRC_DIR}/Cargo.toml" ]]; then
-  echo "kryoptic submodule missing at ${SRC_DIR}." >&2
-  echo "Run: git submodule update --init --recursive" >&2
-  exit 1
-fi
+require_submodule "${SRC_DIR}/Cargo.toml" kryoptic
 
-case "$(uname -m)" in
-  x86_64)  RID="linux-x64"   ;;
-  aarch64) RID="linux-arm64" ;;
-  *) echo "unsupported Linux arch: $(uname -m)" >&2; exit 1 ;;
-esac
+RID="$(host_rid)"
 
 DEST_DIR="${OUT_BASE}/runtimes/${RID}/native"
 DEST_LIB="${DEST_DIR}/libkryoptic_pkcs11.so"

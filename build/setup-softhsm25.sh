@@ -14,10 +14,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <stage-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<stage-dir>" "$@"
 
 STAGE="$1"
 SNAP="https://snapshot.debian.org"
@@ -36,11 +34,7 @@ DEB_URL[libssl1.1]="${SNAP}/archive/debian-security/20260615T025018Z/pool/update
 DEB_SHA256[libssl1.1]="dcc68a543de6cb955a57077b66dcdb15f61d1e31e072f2c6cc4082c37da1b00d"
 
 for pkg in libsofthsm2 softhsm2 libssl1.1; do
-  dest="${WORK}/${pkg}.deb"
-  echo "fetching ${pkg}" >&2
-  curl --proto '=https' --proto-redir '=https' -fsSL -o "${dest}" "${DEB_URL[$pkg]}"
-  echo "${DEB_SHA256[$pkg]}  ${dest}" | sha256sum -c - >&2
-  dpkg-deb -x "${dest}" "${WORK}/root"
+  fetch_deb "${DEB_URL[$pkg]}" "${DEB_SHA256[$pkg]}" "${WORK}"
 done
 
 LIB_SRC="$(find "${WORK}/root" -name 'libsofthsm2.so' | head -1)"

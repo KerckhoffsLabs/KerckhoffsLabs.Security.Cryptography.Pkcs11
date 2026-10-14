@@ -17,47 +17,20 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <test-output-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<test-output-dir>" "$@"
 
 OUT_BASE="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MOCK_DIR="${REPO_ROOT}/vendor/pkcs11-mock"
 
-if [[ ! -d "${MOCK_DIR}" ]]; then
-  echo "pkcs11-mock submodule missing at ${MOCK_DIR}." >&2
-  echo "Run: git submodule update --init --recursive" >&2
-  exit 1
-fi
+require_submodule "${MOCK_DIR}" pkcs11-mock
 
-UNAME_S="$(uname -s)"
-UNAME_M="$(uname -m)"
-
-case "${UNAME_S}" in
-  Linux)
-    case "${UNAME_M}" in
-      x86_64)  RID="linux-x64";   ARCH_FLAGS="-m64"; LIB_SUFFIX="x64"  ;;
-      aarch64) RID="linux-arm64"; ARCH_FLAGS="-march=armv8-a"; LIB_SUFFIX="arm64" ;;
-      *) echo "unsupported Linux arch: ${UNAME_M}" >&2; exit 1 ;;
-    esac
-    LIB_EXT="so"
-    BUILD_SUBDIR="build/linux"
-    ;;
-  Darwin)
-    case "${UNAME_M}" in
-      x86_64) RID="osx-x64"   ;;
-      arm64)  RID="osx-arm64" ;;
-      *) echo "unsupported macOS arch: ${UNAME_M}" >&2; exit 1 ;;
-    esac
-    LIB_EXT="dylib"
-    BUILD_SUBDIR="build/macos"
-    ;;
-  *)
-    echo "unsupported OS: ${UNAME_S}" >&2
-    exit 1
-    ;;
+RID="$(host_rid)"
+case "${RID}" in
+  linux-x64)   ARCH_FLAGS="-m64";           LIB_SUFFIX="x64";   LIB_EXT="so";    BUILD_SUBDIR="build/linux" ;;
+  linux-arm64) ARCH_FLAGS="-march=armv8-a"; LIB_SUFFIX="arm64"; LIB_EXT="so";    BUILD_SUBDIR="build/linux" ;;
+  osx-*)                                                          LIB_EXT="dylib"; BUILD_SUBDIR="build/macos" ;;
 esac
 
 DEST_DIR="${OUT_BASE}/runtimes/${RID}/native"
@@ -80,8 +53,8 @@ echo "Building pkcs11-mock for ${RID}..."
 
 pushd "${MOCK_DIR}/${BUILD_SUBDIR}" >/dev/null
 
-case "${UNAME_S}" in
-  Linux)
+case "${RID}" in
+  linux-*)
     # The default Makefile only targets -m32; patch ARCH_FLAGS and LIBNAME
     # in-memory so we build the host-architecture 64-bit library.
     LIBNAME="pkcs11-mock-${LIB_SUFFIX}.${LIB_EXT}"
@@ -94,30 +67,18 @@ case "${UNAME_S}" in
     make -f Makefile.host
     rm -f Makefile.host
     ;;
-  Darwin)
+  osx-*)
     # build.sh produces a universal pkcs11-mock.dylib via lipo.
     bash build.sh
-    ;;
-  *)
-    echo "unsupported OS: ${UNAME_S}" >&2
-    exit 1
     ;;
 esac
 
 popd >/dev/null
 
 # Locate the produced library.
-case "${UNAME_S}" in
-  Linux)
-    SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock-${LIB_SUFFIX}.${LIB_EXT}"
-    ;;
-  Darwin)
-    SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock.${LIB_EXT}"
-    ;;
-  *)
-    echo "unsupported OS: ${UNAME_S}" >&2
-    exit 1
-    ;;
+case "${RID}" in
+  linux-*) SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock-${LIB_SUFFIX}.${LIB_EXT}" ;;
+  osx-*)   SRC_LIB="${MOCK_DIR}/${BUILD_SUBDIR}/pkcs11-mock.${LIB_EXT}" ;;
 esac
 
 if [[ ! -f "${SRC_LIB}" ]]; then

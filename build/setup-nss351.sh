@@ -14,10 +14,8 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <stage-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<stage-dir>" "$@"
 
 STAGE="$1"
 SNAP="https://snapshot.debian.org"
@@ -35,11 +33,7 @@ DEB_URL[libnspr4]="${SNAP}/archive/debian/20200311T090704Z/pool/main/n/nspr/libn
 DEB_SHA256[libnspr4]="38c9cdc7296cdd0538bd2e405cee7f3366ce482e990151e9ccef0f86d0502660"
 
 for pkg in libnss3 libnspr4; do
-  dest="${WORK}/${pkg}.deb"
-  echo "fetching ${pkg}" >&2
-  curl --proto '=https' --proto-redir '=https' -fsSL -o "${dest}" "${DEB_URL[$pkg]}"
-  echo "${DEB_SHA256[$pkg]}  ${dest}" | sha256sum -c - >&2
-  dpkg-deb -x "${dest}" "${WORK}/root"
+  fetch_deb "${DEB_URL[$pkg]}" "${DEB_SHA256[$pkg]}" "${WORK}"
 done
 
 # Softoken dlopens freebl from its own directory and links nssutil/NSPR, so everything is staged

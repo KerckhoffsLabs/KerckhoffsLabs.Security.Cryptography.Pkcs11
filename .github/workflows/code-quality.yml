@@ -130,12 +130,6 @@ jobs:
           BuildKryoptic: 'true'
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release -p:UseMicrosoftTestingPlatformRunner=true
 
-      - name: Report Kryoptic build
-        run: |
-          lib=$(find . -path '*runtimes*native*' -name 'libkryoptic_pkcs11.so' | head -1)
-          if [ -n "$lib" ]; then echo "Built Kryoptic: $lib"; \
-          else echo "::warning::built libkryoptic_pkcs11.so not found under runtimes/*/native"; fi
-
       # Three backends present on Linux → coverage spans the mock, SoftHSM2, and Kryoptic paths. A
       # single pass emits BOTH coverage formats — OpenCover (Sonar's first-class .NET format,
       # imported by the begin-step glob) and Cobertura (uploaded to Codecov below) — so the suite
