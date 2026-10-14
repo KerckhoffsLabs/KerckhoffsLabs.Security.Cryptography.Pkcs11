@@ -20,7 +20,7 @@ public sealed class SoftHsmAvailabilityTests
             Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase);
 
         // Enforced on every CI leg — all build the vendored SoftHSM for their own architecture.
-        // Locally a developer may skip the native build (SkipSoftHsmV2Build).
+        // Locally a developer may skip the native build (SkipSoftHsmV2Build or SkipNativeBuilds).
         if (!inCi) return;
 
         Assert.True(SoftHsmBackendFixture.SoftHsmAvailable,

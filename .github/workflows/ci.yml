@@ -21,12 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Lint builds managed code only; skip the native vendor builds and the ABI probe so
-      # this job needs neither the submodules nor a C toolchain.
-      SkipPkcs11MockBuild: true
-      SkipSoftHsmV2Build: true
-      SkipPkcs11GateBuild: true
-      SkipAbiProbeBuild: true
+      # Lint builds managed code only, so this job needs neither the submodules nor a C toolchain.
+      SkipNativeBuilds: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -220,54 +216,15 @@ jobs:
           ./build/build-opencryptoki.sh
           sudo ldconfig
 
+      # One soft-token slot, the pkcsslotd daemon and an initialized token; the script prints the
+      # library path. The token label and user PIN are the tests' defaults (see the script), so only
+      # the library path is exported.
       - name: Provision opencryptoki software token
         if: matrix.os == 'ubuntu-latest'
         run: |
-          set -euxo pipefail
-          sudo usermod -a -G pkcs11 "$(id -un)"
-
-          # Our minimal build installs only the software-token STDLL (libpkcs11_sw.so). The default
-          # config declares five slots (TPM/ICA/CCA/SW/EP11); pkcsslotd then spins trying to load the
-          # four STDLLs that don't exist and never creates its socket, so clients fail C_Initialize
-          # with CKR_FUNCTION_FAILED. Replace it with a single soft-token slot.
-          printf 'version opencryptoki-3.27\n\nslot 0\n{\n    stdll = libpkcs11_sw.so\n    tokversion = 3.12\n}\n' \
-            | sudo tee /etc/opencryptoki/opencryptoki.conf >/dev/null
-          echo "=== opencryptoki.conf ==="; cat /etc/opencryptoki/opencryptoki.conf
-          echo "=== stdll ==="; ls -la /usr/local/lib/opencryptoki/stdll/ 2>/dev/null || true
-
-          # The software token's object store must exist and be writable by the pkcs11 group, else the
-          # soft-token STDLL fails to initialize and C_GetSlotList reports zero tokens.
-          sudo mkdir -p /var/lib/opencryptoki/swtok/TOK_OBJ
-          sudo chgrp -R pkcs11 /var/lib/opencryptoki || true
-          sudo chmod -R g+rwx /var/lib/opencryptoki || true
-
-          # Start pkcsslotd via the shipped systemd unit (the same mechanism the distro package
-          # uses): it runs the daemon as the dedicated pkcsslotd user / pkcs11 group — systemd
-          # performs the uid/gid switch with its own capabilities, and creates the runtime dirs.
-          sudo cp /usr/local/lib/systemd/system/pkcsslotd.service /etc/systemd/system/pkcsslotd.service
-          sudo systemd-tmpfiles --create 2>/dev/null || true
-          sudo systemctl daemon-reload
-          sudo systemctl start pkcsslotd
-          sleep 2
-          sudo systemctl --no-pager -l status pkcsslotd || true
-          echo "=== pkcsslotd journal ==="; sudo journalctl -u pkcsslotd --no-pager | tail -30 || true
-          echo "=== pkcsconf -s ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -s"
-          echo "=== pkcsconf -t ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -t"
-
-          SLOT=0
-          # opencryptoki's default (pre-init) SO PIN is 87654321.
-          # pkcsconf -I prompts for: SO PIN, then a token label.
-          sg pkcs11 -c "printf '87654321\nkl-octk\n' | /usr/local/sbin/pkcsconf -c $SLOT -I"
-          # pkcsconf -u (init user PIN) prompts for: SO PIN, new user PIN, confirm user PIN.
-          sg pkcs11 -c "printf '87654321\n12345678\n12345678\n' | /usr/local/sbin/pkcsconf -c $SLOT -u"
-          sg pkcs11 -c "/usr/local/sbin/pkcsconf -t"
-          echo "=== mechanisms (pkcsconf -m) ==="; sg pkcs11 -c "/usr/local/sbin/pkcsconf -m -c $SLOT" || true
-          LIB="$(find /usr/local/lib -name libopencryptoki.so 2>/dev/null | head -1)"
-          test -n "$LIB"
-          {
-            echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$LIB"
-            echo "PKCS11_TEST_OPENCRYPTOKI_TOKEN=kl-octk"
-          } >> "$GITHUB_ENV"
+          set -euo pipefail
+          lib="$(./build/provision-opencryptoki.sh)"
+          echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$lib" >> "$GITHUB_ENV"
 
       # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft
       # token. Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA) and "pqc"
@@ -565,14 +522,11 @@ jobs:
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
 
-      # The staged module is used directly, so skip every vendored native build.
+      # The staged module is used directly, and the ABI oracle feeds the unit tests, which this job
+      # filters out (one backend's suite only), so skip every native build.
       - name: Build
         env:
-          SkipPkcs11MockBuild: true
-          SkipSoftHsmV2Build: true
-          SkipPkcs11GateBuild: true
-          # The ABI oracle feeds the unit tests, which this job filters out (one backend's suite only).
-          SkipAbiProbeBuild: true
+          SkipNativeBuilds: true
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Run the backend's suite against the staged module. The mechanism-list and capability gates
