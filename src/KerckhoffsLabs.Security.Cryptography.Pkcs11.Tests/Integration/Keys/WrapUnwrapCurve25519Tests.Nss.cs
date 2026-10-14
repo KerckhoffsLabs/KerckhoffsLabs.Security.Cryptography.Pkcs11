@@ -154,7 +154,7 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
     // agreement are what is under test, and SecureOnly refuses all three.
     private void RunInSession(Action<Pkcs11SessionCore> body)
     {
-        var session = TestKeys.OpenLoggedInSession(_backend);
+        using var session = TestKeys.OpenLoggedInSession(_backend);
         try
         {
             using (session.UsePolicy(CryptoPolicy.AllowInsecure))
@@ -163,7 +163,6 @@ public sealed class WrapUnwrapCurve25519Tests_Nss(NssBackendFixture backend)
         finally
         {
             TestKeys.LogoutIfRequired(_backend, session);
-            session.Dispose();
         }
     }
 
