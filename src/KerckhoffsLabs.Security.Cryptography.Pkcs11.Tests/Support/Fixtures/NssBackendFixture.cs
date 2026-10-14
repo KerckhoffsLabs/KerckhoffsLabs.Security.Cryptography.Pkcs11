@@ -73,10 +73,12 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     public static bool SupportsClassicAesGcm => false;
 
     /// <summary>True when EdDSA works the way the shared pure-Ed25519 case drives it (a bare
-    /// <see cref="CKM.CKM_EDDSA"/> with no parameter). NSS 3.125+ advertises <c>CKM_EDDSA</c>, so the
-    /// mechanism-list gate would let the case run, but NSS's softoken requires a <c>CK_EDDSA_PARAMS</c>
-    /// and rejects a bare sign with <see cref="CKR.CKR_ARGUMENTS_BAD"/>; SoftHSM accepts the bare form.
-    /// EdDSA-with-params is a distinct mechanism contract not modelled here, so those cases skip.</summary>
+    /// <see cref="CKM.CKM_EDDSA"/>, the signature buffer sized from <c>C_Sign</c>'s length query).
+    /// NSS 3.125+ advertises <c>CKM_EDDSA</c>, so the mechanism-list gate would let the case run, but
+    /// softoken refuses any <c>CK_EDDSA_PARAMS</c> with <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/>,
+    /// and with the bare form reports <c>MAX_ECKEY_LEN * 2</c> (144) as the signature length, then
+    /// fails a sign into a buffer of that size with <see cref="CKR.CKR_ARGUMENTS_BAD"/>: freebl's
+    /// <c>ED_SignMessage</c> takes exactly 64 bytes. So those cases skip.</summary>
     public static bool SupportsEdDsa => false;
 
     /// <summary>Gate for cases that specifically need a writable token (persistent keys / token
@@ -86,6 +88,21 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>True when the loaded softoken exposes the v3.0 message API (NSS 3.52 and later); false
     /// for the v2.40-only releases, and when NSS is unavailable.</summary>
     public bool SupportsMessageApi { get; }
+
+    /// <summary>The softoken release, which NSS reports as each slot's <c>hardwareVersion</c>
+    /// (3.131 for NSS 3.131); <c>0.0</c> when NSS is unavailable.</summary>
+    public Version SoftokenVersion { get; } = new(0, 0);
+
+    /// <summary>
+    /// Skips the calling test unless the softoken is at least <paramref name="major"/>.<paramref name="minor"/>:
+    /// for behaviour a release adds without changing its mechanism list, which the mechanism gates
+    /// cannot see.
+    /// </summary>
+    public void RequireSoftoken(int major, int minor, string reason)
+    {
+        if (SoftokenVersion < new Version(major, minor))
+            Assert.Skip($"NSS {SoftokenVersion} is older than {major}.{minor}: {reason}");
+    }
 
     /// <summary>
     /// Skips the calling test unless AES-GCM can run on this softoken. <c>AesGcmPkcs11</c> uses the
@@ -157,6 +174,7 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
             SlotId = (NativeCULong)found.SlotId.Value;
             SupportedMechanisms = new HashSet<CKM>(found.GetMechanismList());
             SupportsMessageApi = Library.LowLevelLibrary!.IsMessageApiSupported;
+            SoftokenVersion = found.GetSlotInfo().HardwareVersion;
         }
         catch
         {
