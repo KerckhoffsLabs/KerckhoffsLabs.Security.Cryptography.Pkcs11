@@ -20,43 +20,17 @@
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <test-output-dir>" >&2
-  exit 2
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+require_args 1 "<test-output-dir>" "$@"
 
 OUT_BASE="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${REPO_ROOT}/vendor/nss"
 
-if [[ ! -d "${SRC_DIR}" ]]; then
-  echo "nss submodule missing at ${SRC_DIR}." >&2
-  echo "Run: git submodule update --init --recursive" >&2
-  exit 1
-fi
-
-UNAME_S="$(uname -s)"
-UNAME_M="$(uname -m)"
+require_submodule "${SRC_DIR}" nss
 
 # NSS's gyp build produces `.so` shared objects on both Linux and macOS.
-case "${UNAME_S}" in
-  Linux)
-    case "${UNAME_M}" in
-      x86_64)  RID="linux-x64"   ;;
-      aarch64) RID="linux-arm64" ;;
-      *) echo "unsupported Linux arch: ${UNAME_M}" >&2; exit 1 ;;
-    esac
-    ;;
-  Darwin)
-    case "${UNAME_M}" in
-      x86_64) RID="osx-x64"   ;;
-      arm64)  RID="osx-arm64" ;;
-      *) echo "unsupported macOS arch: ${UNAME_M}" >&2; exit 1 ;;
-    esac
-    ;;
-  *)
-    echo "unsupported OS: ${UNAME_S}" >&2; exit 1 ;;
-esac
+RID="$(host_rid)"
 
 DEST_DIR="${OUT_BASE}/runtimes/${RID}/native/nss"
 DEST_LIB="${DEST_DIR}/libsoftokn3.so"
