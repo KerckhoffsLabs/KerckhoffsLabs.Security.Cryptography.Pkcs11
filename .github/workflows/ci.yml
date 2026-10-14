@@ -136,17 +136,35 @@ jobs:
       # on both vendored submodule SHAs and the build scripts, so a submodule bump or script change
       # rebuilds. On a hit we set SkipPkcs11MockBuild/SkipSoftHsmV2Build so the BeforeTargets don't run
       # and the restored artifacts are used as-is (the vcpkg/OpenSSL caches stay as the miss fallback).
-      - name: Native build cache key
-        id: native-key
+      # Also records the Kryoptic and NSS revisions, which key their own caches on ubuntu-latest.
+      - name: Submodule revisions
+        id: rev
         shell: bash
-        run: echo "key=native-${{ runner.os }}-${{ runner.arch }}-${{ matrix.arch || 'native' }}-mock_$(git -C vendor/pkcs11-mock rev-parse HEAD)-hsm_$(git -C vendor/softhsmv2 rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "native=native-${{ runner.os }}-${{ runner.arch }}-${{ matrix.arch || 'native' }}-mock_$(git -C vendor/pkcs11-mock rev-parse HEAD)-hsm_$(git -C vendor/softhsmv2 rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "kryoptic=$(git -C vendor/kryoptic rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "nss=$(git -C vendor/nss rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Cache built native libraries
         id: native-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
-          key: ${{ steps.native-key.outputs.key }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1') }}-v1
+          key: ${{ steps.rev.outputs.native }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1') }}-v1
+
+      # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft
+      # token, built by the Build step below. Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA)
+      # and "pqc" (ML-KEM/ML-DSA/SLH-DSA) needs >= 3.5, so it links against the same OpenSSL 3.5 as
+      # SoftHSM (ossl-sys locates it via pkg-config; PKG_CONFIG_PATH is set inside build-kryoptic.sh
+      # from OPENSSL_PREFIX, which the OpenSSL 3.5 step exports for the whole job). AES-CCM and
+      # SLH-DSA are the two mechanism families that had zero real-backend coverage even with
+      # SoftHSM + opencryptoki + NSS (see KryopticBackendFixture).
+      - name: Cache Kryoptic build
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor/kryoptic/target
+          key: kryoptic-${{ runner.arch }}-${{ steps.rev.outputs.kryoptic }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
 
       - name: Restore
         run: dotnet restore src/KerckhoffsLabs.sln
@@ -157,6 +175,9 @@ jobs:
           # native build scripts so the BeforeTargets don't recompile from the vendored submodules.
           SkipPkcs11MockBuild: ${{ steps.native-cache.outputs.cache-hit == 'true' && 'true' || '' }}
           SkipSoftHsmV2Build: ${{ steps.native-cache.outputs.cache-hit == 'true' && 'true' || '' }}
+          # Kryoptic's BeforeTarget places libkryoptic_pkcs11.so next to the test assembly, where
+          # KryopticBackendFixture finds it, as code-quality.yml does.
+          BuildKryoptic: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
         run: dotnet build src/KerckhoffsLabs.sln --no-restore -c Release
 
       # Persist the vcpkg OpenSSL build right after it's produced, even if the Test step later fails
@@ -226,54 +247,17 @@ jobs:
           lib="$(./build/provision-opencryptoki.sh)"
           echo "PKCS11_TEST_OPENCRYPTOKI_LIBRARY=$lib" >> "$GITHUB_ENV"
 
-      # Fourth independent real backend (ubuntu-latest only): Kryoptic, a Rust/OpenSSL PKCS#11 soft
-      # token. Its "standard" feature set needs OpenSSL >= 3.2 (EdDSA) and "pqc"
-      # (ML-KEM/ML-DSA/SLH-DSA) needs >= 3.5, so it links against the same OpenSSL 3.5 built above
-      # for SoftHSM/opencryptoki (ossl-sys locates it via pkg-config; PKG_CONFIG_PATH is set inside
-      # build-kryoptic.sh from OPENSSL_PREFIX, which the OpenSSL 3.5 step exports for the whole
-      # job). AES-CCM and SLH-DSA are the two mechanism families that had zero real-
-      # backend coverage even with SoftHSM + opencryptoki + NSS (see KryopticBackendFixture).
-      - name: Kryoptic submodule revision
-        if: matrix.os == 'ubuntu-latest'
-        id: kryopticrev
-        run: echo "sha=$(git -C vendor/kryoptic rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Kryoptic build
-        if: matrix.os == 'ubuntu-latest'
-        id: kryoptic-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: vendor/kryoptic/target
-          key: kryoptic-${{ runner.arch }}-${{ steps.kryopticrev.outputs.sha }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
-
-      - name: Build Kryoptic from source
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          BuildKryoptic: 'true'
-        run: |
-          set -euxo pipefail
-          dotnet build src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.csproj \
-            --no-restore -c Release -t:BuildKryoptic
-          LIB="$(find "$PWD/src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes" -name libkryoptic_pkcs11.so | head -1)"
-          test -n "$LIB"
-          echo "PKCS11_TEST_KRYOPTIC_LIBRARY=$LIB" >> "$GITHUB_ENV"
-
       # Third independent real backend (ubuntu-latest only): Mozilla NSS softoken, built from the
       # pinned vendor/nss submodule. NSS is an unrelated crypto stack (freebl, not
       # OpenSSL) with a login-free generic token — no daemon or PIN — and it uniquely implements
       # ChaCha20-Poly1305 and the SP800-108 KDF, which neither SoftHSM nor opencryptoki does.
-      - name: NSS submodule revision
-        if: matrix.os == 'ubuntu-latest'
-        id: nssrev
-        run: echo "sha=$(git -C vendor/nss rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Cache NSS softoken
         if: matrix.os == 'ubuntu-latest'
         id: nss-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/nss
-          key: nss-${{ steps.nssrev.outputs.sha }}-${{ hashFiles('build/build-nss.sh') }}-v1
+          key: nss-${{ steps.rev.outputs.nss }}-${{ hashFiles('build/build-nss.sh') }}-v1
 
       # build.sh drives gyp + ninja against the distro NSPR (--system-nspr); patchelf bakes an
       # $ORIGIN runpath so the module finds its NSS siblings. The heavy build toolchain is installed
@@ -307,9 +291,10 @@ jobs:
       # re-set *inside* the sg command: sg is set-group-ID, so the loader runs it in secure-execution
       # mode and strips LD_LIBRARY_PATH from the environment it passes on — without it, libsofthsm2.so,
       # the opencryptoki soft-token STDLL, and libkryoptic_pkcs11.so (each built against OpenSSL 3.5)
-      # resolve against the system OpenSSL 3.0 and fail to load. PKCS11_TEST_OPENCRYPTOKI_*/
-      # PKCS11_TEST_KRYOPTIC_LIBRARY survive (not security-sensitive). All four backend-gated
-      # suites run alongside the mock suite in a single pass.
+      # resolve against the system OpenSSL 3.0 and fail to load. PKCS11_TEST_OPENCRYPTOKI_* and
+      # PKCS11_TEST_NSS_* survive (not security-sensitive); Kryoptic needs no variable, its fixture
+      # finds the library the Build step placed. All four backend-gated suites run alongside the mock
+      # suite in a single pass.
       - name: Test (incl. opencryptoki + Kryoptic + NSS)
         if: matrix.os == 'ubuntu-latest'
         env:
@@ -322,8 +307,8 @@ jobs:
           PKCS11_TEST_EXPECT_KRYOPTIC: '1'
           PKCS11_TEST_EXPECT_NSS: '1'
         # NSS's libsoftokn3 carries an $ORIGIN runpath for its own siblings; its dir is also added to
-        # LD_LIBRARY_PATH (belt-and-suspenders under sg's stripped environment). PKCS11_TEST_NSS_*/
-        # PKCS11_TEST_KRYOPTIC_LIBRARY come from $GITHUB_ENV set by the build steps above.
+        # LD_LIBRARY_PATH (belt-and-suspenders under sg's stripped environment). PKCS11_TEST_NSS_* come
+        # from $GITHUB_ENV, set by the NSS step above.
         run: sg pkcs11 -c "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$PKCS11_TEST_NSS_DIR dotnet test --solution src/KerckhoffsLabs.sln --no-build -c Release --output Detailed"
 
   # Native-AOT smoke test: publishes tests/AotSmoke — a standalone app that references only the
