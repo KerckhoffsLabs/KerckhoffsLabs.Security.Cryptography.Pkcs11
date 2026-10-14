@@ -64,38 +64,15 @@ jobs:
       - name: Install native build deps
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev autoconf automake libtool
 
-      # Build SoftHSM against OpenSSL 3.5+ so ML-DSA compiles in (ubuntu-latest ships 3.0). Same
-      # release as upstream SoftHSM CI; user-writable prefix for caching; build-softhsmv2.sh reads
-      # OPENSSL_PREFIX.
-      - name: Cache OpenSSL 3.5
-        id: cache-openssl
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/openssl-3.5
-          key: openssl-3.5.7-${{ runner.arch }}
-      - name: Build OpenSSL 3.5.7 (on cache miss)
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          work="$(mktemp -d)"; cd "$work"
-          curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
-          echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c -
-          tar -xf openssl-3.5.7.tar.gz && cd openssl-3.5.7
-          ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
-          make -j"$(nproc)" >/dev/null
-          make install_sw >/dev/null
-          ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
-      # LD_LIBRARY_PATH: ensure the whole process uses OpenSSL 3.5 (the .NET host otherwise loads
-      # system libcrypto 3.0 first, so libsofthsm2's rpath loses and ML-DSA symbols are missing).
-      - name: Point SoftHSM at OpenSSL 3.5
-        run: |
-          echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+      # OpenSSL 3.5 for SoftHSM's ML-DSA and Kryoptic's "pqc" feature; see the action.
+      - name: OpenSSL 3.5
+        uses: ./.github/actions/openssl35
 
       # Fourth real backend, so its coverage counts toward the Sonar/Codecov numbers too (a
       # KryopticBackendFixture-only line change previously showed as 0% covered new code and
       # failed the Sonar quality gate, since Kryoptic is opt-in and wasn't built here). Same
       # OpenSSL 3.5 as SoftHSM/opencryptoki above (ossl-sys locates it via pkg-config, which
-      # build-kryoptic.sh points at OPENSSL_PREFIX, already exported by the step above).
+      # build-kryoptic.sh points at OPENSSL_PREFIX, which the OpenSSL 3.5 step exports).
       - name: Kryoptic submodule revision
         id: kryopticrev
         run: echo "sha=$(git -C vendor/kryoptic rev-parse HEAD)" >> "$GITHUB_OUTPUT"

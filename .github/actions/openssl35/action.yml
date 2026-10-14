@@ -1,0 +1,44 @@
+name: OpenSSL 3.5
+description: >
+  Builds OpenSSL 3.5.7 into ~/openssl-3.5 (cached per runner architecture) and points the rest of
+  the job at it through OPENSSL_PREFIX and LD_LIBRARY_PATH. Linux only.
+
+# Native backends are built against OpenSSL 3.5+ so ML-DSA (CKM_ML_DSA) compiles into SoftHSM, and
+# Kryoptic's "pqc" feature and opencryptoki's ML-DSA/ML-KEM work; ubuntu-latest ships 3.0. 3.5.7 is
+# the release upstream SoftHSM CI uses. It goes into a user-writable prefix: cache-friendly, no sudo.
+#
+# OPENSSL_PREFIX: build-softhsmv2.sh, build-kryoptic.sh and build-opencryptoki.sh link against it.
+# LD_LIBRARY_PATH: at runtime the .NET host loads the system libcrypto.so.3 (OpenSSL 3.0) first, so
+# the rpath baked into those modules loses to the already-loaded soname and the OPENSSL_3.4.0+
+# symbols ML-DSA needs are missing. Putting the 3.5 libdir on the loader path makes the whole
+# process use OpenSSL 3.5, which .NET also supports.
+
+runs:
+  using: composite
+  steps:
+    - name: Cache OpenSSL 3.5
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/openssl-3.5
+        key: openssl-3.5.7-${{ runner.arch }}
+
+    - name: Build OpenSSL 3.5.7 (on cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        work="$(mktemp -d)"; cd "$work"
+        curl -fsSL --proto '=https' --proto-redir '=https' -O https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
+        echo "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8  openssl-3.5.7.tar.gz" | sha256sum -c -
+        tar -xf openssl-3.5.7.tar.gz && cd openssl-3.5.7
+        ./config shared zlib no-ssl3 no-weak-ssl-ciphers --prefix="$HOME/openssl-3.5" --openssldir="$HOME/openssl-3.5"
+        make -j"$(nproc)" >/dev/null
+        make install_sw >/dev/null
+        ( cd "$HOME/openssl-3.5" && ln -sf lib64 lib ) || true
+
+    - name: Point the job at OpenSSL 3.5
+      shell: bash
+      run: |
+        echo "OPENSSL_PREFIX=$HOME/openssl-3.5" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$HOME/openssl-3.5/lib64:$HOME/openssl-3.5/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
