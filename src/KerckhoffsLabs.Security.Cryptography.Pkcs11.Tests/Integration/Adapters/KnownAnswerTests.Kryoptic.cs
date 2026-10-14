@@ -23,6 +23,9 @@ public sealed class KnownAnswerTests_Kryoptic(KryopticBackendFixture backend)
     public void AesGcm_Kat() => KnownAnswerTestCases.Assert_AesGcm_Kat(_backend);
 
     [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
+    public void AesGcm_Multipart_Kat() => KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat(_backend);
+
+    [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]
     public void HmacSha256_Kat() => KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend);
 
     [Fact(SkipUnless = nameof(KryopticAvailable), Skip = "Requires " + nameof(KryopticAvailable))]

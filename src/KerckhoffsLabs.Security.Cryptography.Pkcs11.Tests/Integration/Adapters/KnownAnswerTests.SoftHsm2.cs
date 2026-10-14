@@ -43,6 +43,51 @@ internal static class KnownAnswerTestCases
         finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
     }
 
+    // The same vector, encrypted and decrypted in pieces through C_EncryptUpdate / C_DecryptUpdate. A
+    // token holds back the last 16 bytes of the ciphertext as the possible tag, so multipart decryption
+    // has to track which input it has consumed across calls. Pieces longer than the tag are the hard
+    // case: Kryoptic before 5f1e7e6 decrypted them wrongly.
+    internal static void Assert_AesGcm_Multipart_Kat(IPkcs11Backend backend)
+    {
+        byte[] key = H("feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308");
+        byte[] iv = H("cafebabefacedbaddecaf888");
+        byte[] aad = H("feedfacedeadbeeffeedfacedeadbeefabaddad2");
+        byte[] pt = H("d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a721c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39");
+        byte[] expected = H(
+            "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662" +
+            "76fc6ece0f4e1768cddf8853bb2d551b");
+
+        var session = TestKeys.OpenLoggedInSession(backend);
+        try
+        {
+            ObjectHandle k = TestKeys.CreateAes256Key(session, key);
+            try
+            {
+                foreach (int chunk in (int[])[16, 17, 32, 64])
+                    AssertRoundTrip(chunk);
+            }
+            finally { session.DestroyObject(k); }
+
+            void AssertRoundTrip(int chunk)
+            {
+                var mech = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(iv, aad, tagBits: 128));
+                using var ctOut = new MemoryStream();
+                using (var ptIn = new MemoryStream(pt))
+                    session.Encrypt(mech, k, ptIn, ctOut, chunk);
+                Assert.True(Convert.ToHexString(expected) == Convert.ToHexString(ctOut.ToArray()),
+                    $"encrypting in {chunk}-byte pieces");
+
+                mech = new Mechanism(CKM.CKM_AES_GCM, new CkmAesGcmParams(iv, aad, tagBits: 128));
+                using var ptOut = new MemoryStream();
+                using (var ctIn = new MemoryStream(expected))
+                    session.Decrypt(mech, k, ctIn, ptOut, chunk);
+                Assert.True(Convert.ToHexString(pt) == Convert.ToHexString(ptOut.ToArray()),
+                    $"decrypting in {chunk}-byte pieces");
+            }
+        }
+        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+    }
+
     // HMAC-SHA256, RFC 4231 test case 6 (131-byte key, larger than the block size).
     internal static void Assert_HmacSha256_Kat(IPkcs11Backend backend)
     {
@@ -344,6 +389,9 @@ public sealed class KnownAnswerTests_SoftHsm(SoftHsmBackendFixture f)
 
     [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
     public void AesGcm_Kat() => KnownAnswerTestCases.Assert_AesGcm_Kat(_backend);
+
+    [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
+    public void AesGcm_Multipart_Kat() => KnownAnswerTestCases.Assert_AesGcm_Multipart_Kat(_backend);
 
     [Fact(SkipUnless = nameof(SoftHsmAvailable), Skip = "Requires " + nameof(SoftHsmAvailable))]
     public void HmacSha256_Kat() => KnownAnswerTestCases.Assert_HmacSha256_Kat(_backend);
