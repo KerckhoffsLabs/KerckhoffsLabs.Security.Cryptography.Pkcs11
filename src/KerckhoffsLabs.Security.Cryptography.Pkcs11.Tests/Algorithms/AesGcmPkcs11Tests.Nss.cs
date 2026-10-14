@@ -46,28 +46,60 @@ public sealed class AesGcmPkcs11Tests_Nss(NssBackendFixture backend)
     public void Decrypt_AfterDispose_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_AfterDispose_Throws(_backend);
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void EncryptDecrypt_RoundTrips_WithAad() => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_WithAad(_backend);
+    public void EncryptDecrypt_RoundTrips_WithAad()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_WithAad(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void EncryptDecrypt_RoundTrips_NoAad() => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_NoAad(_backend);
+    public void EncryptDecrypt_RoundTrips_NoAad()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_NoAad(_backend);
+    }
 
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
     [InlineData(12)]
     [InlineData(16)]
-    public void EncryptDecrypt_RoundTrips_VariousTagSizes(int tagLen) => AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_VariousTagSizes(_backend, tagLen);
+    public void EncryptDecrypt_RoundTrips_VariousTagSizes(int tagLen)
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_EncryptDecrypt_RoundTrips_VariousTagSizes(_backend, tagLen);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Decrypt_TamperedTag_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_TamperedTag_Throws(_backend);
+    public void Decrypt_TamperedTag_Throws()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_Decrypt_TamperedTag_Throws(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Decrypt_TamperedCiphertext_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_TamperedCiphertext_Throws(_backend);
+    public void Decrypt_TamperedCiphertext_Throws()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_Decrypt_TamperedCiphertext_Throws(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Decrypt_WrongAad_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_WrongAad_Throws(_backend);
+    public void Decrypt_WrongAad_Throws()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_Decrypt_WrongAad_Throws(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Decrypt_WrongNonce_Throws() => AesGcmPkcs11TestCases.Assert_Decrypt_WrongNonce_Throws(_backend);
+    public void Decrypt_WrongNonce_Throws()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_Decrypt_WrongNonce_Throws(_backend);
+    }
 
     [Fact(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]
-    public void Encrypt_KnownAnswer_MatchesReferenceVector() => AesGcmPkcs11TestCases.Assert_Encrypt_KnownAnswer_MatchesReferenceVector(_backend);
+    public void Encrypt_KnownAnswer_MatchesReferenceVector()
+    {
+        _backend.RequireAesGcm();
+        AesGcmPkcs11TestCases.Assert_Encrypt_KnownAnswer_MatchesReferenceVector(_backend);
+    }
 }
