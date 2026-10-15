@@ -25,11 +25,11 @@ public sealed class CkmIke1PrfDeriveParams : MechanismParameters
     /// </summary>
     /// <param name="prfMechanism">PRF mechanism.</param>
     /// <param name="keygxy">The shared-secret key g^xy.</param>
-    /// <param name="prevKey">The previous-iteration key, or <c>null</c> when there is none.</param>
+    /// <param name="prevKey">The previous-iteration key, or <see langword="null"/> when there is none.</param>
     /// <param name="ckyI">Initiator cookie (CKY_I).</param>
     /// <param name="ckyR">Responder cookie (CKY_R).</param>
     /// <param name="keyNumber">KEYMAT_INDEX byte.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="keygxy"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="keygxy"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if a key has no secret-key object.</exception>
     public CkmIke1PrfDeriveParams(CKM prfMechanism, Pkcs11Key keygxy, Pkcs11Key? prevKey, ReadOnlySpan<byte> ckyI, ReadOnlySpan<byte> ckyR, byte keyNumber)
     {

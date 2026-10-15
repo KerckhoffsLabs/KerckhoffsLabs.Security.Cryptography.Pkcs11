@@ -32,7 +32,7 @@ public sealed class ChaCha20Poly1305Pkcs11 : IDisposable
     /// </summary>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
     /// is <see cref="CKK.CKK_CHACHA20"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not a ChaCha20 key.</exception>
     public ChaCha20Poly1305Pkcs11(Pkcs11Key key)
     {

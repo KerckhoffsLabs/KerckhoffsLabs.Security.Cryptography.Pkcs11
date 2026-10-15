@@ -36,7 +36,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// </para>
 /// </remarks>
 /// <param name="key">A token-resident SLH-DSA key (<see cref="CKK.CKK_SLH_DSA"/>).</param>
-/// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
+/// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
 /// <exception cref="ArgumentException"><paramref name="key"/> is not an SLH-DSA key, or its parameter set is unrecognized / unreadable.</exception>
 [Experimental("SYSLIB5006", UrlFormat = "https://aka.ms/dotnet-warnings/{0}")]
 public sealed class SlhDsaPkcs11(Pkcs11Key key) : SlhDsa(ResolveAlgorithm(key))

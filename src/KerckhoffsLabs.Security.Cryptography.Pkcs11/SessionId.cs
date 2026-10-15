@@ -8,7 +8,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// Wraps the raw session handle in a dedicated value type — the same pattern the library uses
 /// for object handles — so it cannot be mixed with slot numbers or other integers. Session
 /// handles are transient, process-local values produced only by the module; the constructor is
-/// <c>internal</c> because a consumer-fabricated handle has nothing valid to be compared against
+/// <see langword="internal"/> because a consumer-fabricated handle has nothing valid to be compared against
 /// or used for.
 /// </remarks>
 public readonly record struct SessionId

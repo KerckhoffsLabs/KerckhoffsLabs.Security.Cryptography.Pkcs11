@@ -28,7 +28,7 @@ public sealed class CkmIkePrfDeriveParams : MechanismParameters
     /// <param name="rekey">True to perform a rekey-style derivation.</param>
     /// <param name="ni">Initiator nonce (Ni).</param>
     /// <param name="nr">Responder nonce (Nr).</param>
-    /// <param name="newKey">New key used in some rekey flows, or <c>null</c> when there is none.</param>
+    /// <param name="newKey">New key used in some rekey flows, or <see langword="null"/> when there is none.</param>
     /// <exception cref="ArgumentException">Thrown if <paramref name="newKey"/> has no secret-key object.</exception>
     public CkmIkePrfDeriveParams(CKM prfMechanism, bool dataAsKey, bool rekey, ReadOnlySpan<byte> ni, ReadOnlySpan<byte> nr, Pkcs11Key? newKey = null)
     {

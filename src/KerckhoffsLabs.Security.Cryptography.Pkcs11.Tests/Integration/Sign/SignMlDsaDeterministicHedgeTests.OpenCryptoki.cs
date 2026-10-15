@@ -51,7 +51,8 @@ public sealed class SignMlDsaDeterministicHedgeTests_OpenCryptoki(OpenCryptokiBa
                 throw new Xunit.Sdk.XunitException(
                     "opencryptoki rejected CKH_DETERMINISTIC_REQUIRED as a malformed "
                     + "CK_SIGN_ADDITIONAL_CONTEXT block, or its OpenSSL build lacks deterministic "
-                    + "ML-DSA support (OSSL_SIGNATURE_PARAM_DETERMINISTIC).");
+                    + "ML-DSA support (OSSL_SIGNATURE_PARAM_DETERMINISTIC).",
+                    ex);
             }
             catch (Pkcs11Exception ex)
             {

@@ -13,7 +13,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// Coverage for the PKCS#11 v3.0 message-based AEAD/sign/verify dispatch
 /// (<c>LowLevelPkcs11Library.MessageEncryption/Decryption/Signing/Verifying.cs</c>). pkcs11-mock advertises the full v3.0 function table — every
 /// <c>C_Message*</c> symbol resolves, so <see cref="Pkcs11SessionCore.SupportsMessageApi"/> reports
-/// <c>true</c> — but each function's body is a hard-coded <c>return CKR_FUNCTION_NOT_SUPPORTED;</c>
+/// <see langword="true"/> — but each function's body is a hard-coded <c>return CKR_FUNCTION_NOT_SUPPORTED;</c>
 /// stub (verified against vendor/pkcs11-mock/src/pkcs11-mock.c). That distinction — a module can
 /// advertise a v3.0+ function in its table without the call actually working — is itself worth
 /// pinning, and calling each function for real (rather than skipping because "Mock doesn't support

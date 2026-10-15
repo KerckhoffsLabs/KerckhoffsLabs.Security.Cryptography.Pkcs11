@@ -99,21 +99,21 @@ public static class Settings
         // Matches SoftHsmBackendFixture.GetRid, reused by the other real-backend fixtures.
         Architecture arch = RuntimeInformation.ProcessArchitecture;
         string rid =
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            OperatingSystem.IsWindows()
                 ? arch switch
                 {
                     Architecture.X86 => "win-x86",
                     Architecture.Arm64 => "win-arm64",
                     _ => "win-x64",
                 }
-            : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            : OperatingSystem.IsMacOS()
                 ? (arch == Architecture.Arm64 ? "osx-arm64" : "osx-x64")
             : arch == Architecture.Arm64 ? "linux-arm64"
             : "linux-x64";
 
         string fileName =
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "pkcs11-mock.dll" :
-            RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "pkcs11-mock.dylib"
+            OperatingSystem.IsWindows() ? "pkcs11-mock.dll" :
+            OperatingSystem.IsMacOS() ? "pkcs11-mock.dylib"
             : "pkcs11-mock.so";
 
         return Path.Join(baseDir, "runtimes", rid, "native", fileName);

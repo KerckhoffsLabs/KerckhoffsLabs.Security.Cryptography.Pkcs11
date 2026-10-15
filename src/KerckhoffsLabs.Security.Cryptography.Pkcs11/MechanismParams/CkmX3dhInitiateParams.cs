@@ -34,7 +34,7 @@ public sealed class CkmX3dhInitiateParams : MechanismParameters
     /// <param name="onetimeKey">Optional peer one-time prekey value.</param>
     /// <param name="ownIdentity">Our own identity key; its private-key object is used.</param>
     /// <param name="ownEphemeral">Our own ephemeral key; its private-key object is used.</param>
-    /// <exception cref="ArgumentNullException">Thrown if any key is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if any key is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if a peer key has no public-key object, or an own key has no private-key object.</exception>
     public CkmX3dhInitiateParams(CKM kdf, Pkcs11Key peerIdentity, Pkcs11Key peerPrekey, ReadOnlySpan<byte> prekeySignature, ReadOnlySpan<byte> onetimeKey, Pkcs11Key ownIdentity, Pkcs11Key ownEphemeral)
     {

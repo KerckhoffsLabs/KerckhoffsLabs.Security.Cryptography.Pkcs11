@@ -57,7 +57,7 @@ public sealed class Pkcs11Library : IDisposable
     /// omit <c>CKA_VALUE_LEN</c>. Tokens disagree on the unwrap-created key — SoftHSM rejects
     /// <c>CKA_VALUE_LEN</c> as read-only, opencryptoki requires it — and PKCS#11 offers no way to
     /// query this, so it is learned the first time <see cref="Algorithms.MLKemPkcs11"/> decapsulates
-    /// against this token and reused thereafter. <c>null</c> until probed; constant for a given module.
+    /// against this token and reused thereafter. <see langword="null"/> until probed; constant for a given module.
     /// </summary>
     internal bool? MlKemDecapsulateOmitsValueLen { get; set; }
 
@@ -333,8 +333,8 @@ public sealed class Pkcs11Library : IDisposable
     /// Obtains a list of slots in the system.
     /// </summary>
     /// <param name="tokenPresent">
-    /// When <c>true</c> (the default), returns only slots that currently have a token
-    /// inserted. When <c>false</c>, returns all slots regardless of token presence —
+    /// When <see langword="true"/> (the default), returns only slots that currently have a token
+    /// inserted. When <see langword="false"/>, returns all slots regardless of token presence —
     /// useful for diagnostic enumeration.
     /// </param>
     /// <returns>Read-only list of available slots.</returns>
@@ -411,7 +411,7 @@ public sealed class Pkcs11Library : IDisposable
     /// Obtains a single interface descriptor by name (PKCS#11 v3.0 <c>C_GetInterface</c>) — a direct
     /// lookup, versus enumerating every interface with <see cref="GetInterfaces"/>.
     /// </summary>
-    /// <param name="interfaceName">The interface name to request (e.g. <c>"PKCS 11"</c>), or <c>null</c> for the module's default interface.</param>
+    /// <param name="interfaceName">The interface name to request (e.g. <c>"PKCS 11"</c>), or <see langword="null"/> for the module's default interface.</param>
     /// <returns>The matching interface descriptor.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the library has been disposed.</exception>
     /// <exception cref="Pkcs11Exception">
@@ -467,8 +467,8 @@ public sealed class Pkcs11Library : IDisposable
     /// Waits for a slot event, such as token insertion or token removal, to occur.
     /// </summary>
     /// <param name="nonBlocking">
-    /// When <c>true</c>, returns immediately even if no event is pending (the result will be
-    /// <see langword="null"/>). When <c>false</c>, blocks until an event occurs.
+    /// When <see langword="true"/>, returns immediately even if no event is pending (the result will be
+    /// <see langword="null"/>). When <see langword="false"/>, blocks until an event occurs.
     /// </param>
     /// <returns>
     /// The PKCS#11 handle of the slot the event occurred in, or <see langword="null"/> if no event

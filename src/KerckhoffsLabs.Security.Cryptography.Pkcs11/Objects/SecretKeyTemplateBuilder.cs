@@ -10,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 /// <remarks>
 /// Every capability attribute (<c>CKA_ENCRYPT</c>, <c>CKA_DECRYPT</c>, <c>CKA_SIGN</c>,
 /// <c>CKA_VERIFY</c>, <c>CKA_WRAP</c>, <c>CKA_UNWRAP</c>, <c>CKA_DERIVE</c>) also defaults to
-/// <c>false</c>. PKCS#11's own spec default for an omitted capability attribute is <c>CK_TRUE</c>
+/// <see langword="false"/>. PKCS#11's own spec default for an omitted capability attribute is <c>CK_TRUE</c>
 /// (verified against NSS and SoftHSM) — an omission-means-safe assumption would silently grant
 /// every role on every key this builder produces. Callers opt in to each role explicitly.
 /// </remarks>
@@ -34,7 +34,7 @@ public sealed class SecretKeyTemplateBuilder : ObjectTemplateBuilderBase<SecretK
         Set(new ObjectAttribute(CKA.CKA_DERIVE, false));
     }
 
-    /// <summary>Sets <c>CKA_SENSITIVE</c>. Defaults to <c>true</c> on construction.</summary>
+    /// <summary>Sets <c>CKA_SENSITIVE</c>. Defaults to <see langword="true"/> on construction.</summary>
     public SecretKeyTemplateBuilder Sensitive(bool value = true)
         => Attribute(CKA.CKA_SENSITIVE, value);
 
@@ -105,7 +105,7 @@ public sealed class SecretKeyTemplateBuilder : ObjectTemplateBuilderBase<SecretK
     /// key. Keys that do not match cannot be wrapped, so this narrows what this key can exfiltrate.
     /// Contrast <see cref="UnwrapTemplate"/>, which imposes attributes rather than matching them.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public SecretKeyTemplateBuilder WrapTemplate(Action<NestedKeyTemplateBuilder> configure)
@@ -116,7 +116,7 @@ public sealed class SecretKeyTemplateBuilder : ObjectTemplateBuilderBase<SecretK
     /// key. The token applies them as if the object already carried them, before any caller-supplied
     /// template. Contrast <see cref="WrapTemplate"/>, which matches rather than imposes.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public SecretKeyTemplateBuilder UnwrapTemplate(Action<NestedKeyTemplateBuilder> configure)
@@ -125,7 +125,7 @@ public sealed class SecretKeyTemplateBuilder : ObjectTemplateBuilderBase<SecretK
     /// <summary>
     /// Sets <c>CKA_DERIVE_TEMPLATE</c> — attributes <b>imposed</b> on every key derived from this key.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public SecretKeyTemplateBuilder DeriveTemplate(Action<NestedKeyTemplateBuilder> configure)

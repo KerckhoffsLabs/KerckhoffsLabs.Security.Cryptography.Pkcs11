@@ -24,7 +24,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// <para>
 /// Note: NIST FIPS 186-5 (2023) disallows DSA for signature generation; this adapter is for interop
 /// with existing DSA keys. Private-key parameter export is refused (PKCS#11 keys are non-extractable);
-/// <see cref="ExportParameters(bool)"/> with <c>false</c> reads the domain parameters and public value
+/// <see cref="ExportParameters(bool)"/> with <see langword="false"/> reads the domain parameters and public value
 /// (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) from the public handle.
 /// </para>
 /// </remarks>
@@ -42,7 +42,7 @@ public sealed class DSAPkcs11 : DSA
     /// disposing this provider does not dispose <paramref name="key"/>.
     /// </summary>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/> is <see cref="CKK.CKK_DSA"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not a DSA key.</exception>
     public DSAPkcs11(Pkcs11Key key)
     {
@@ -88,7 +88,7 @@ public sealed class DSAPkcs11 : DSA
     // -----------------------------------------------------------------------
 
     /// <inheritdoc/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated because FIPS 186-5 disallows DSA signature generation.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] CreateSignature(byte[] rgbHash)
@@ -99,7 +99,7 @@ public sealed class DSAPkcs11 : DSA
     }
 
     /// <inheritdoc/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> or <paramref name="rgbSignature"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="rgbHash"/> or <paramref name="rgbSignature"/> is <see langword="null"/>.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it: every <c>CKM_DSA</c> mechanism is gated.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifySignature(byte[] rgbHash, byte[] rgbSignature)
@@ -182,7 +182,7 @@ public sealed class DSAPkcs11 : DSA
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">
-    /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
+    /// Always thrown when <paramref name="includePrivateParameters"/> is <see langword="true"/>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Thrown when the domain parameters or public value (<c>CKA_PRIME</c> / <c>CKA_SUBPRIME</c> / <c>CKA_BASE</c> / <c>CKA_VALUE</c>) are sensitive or cannot be read.</exception>

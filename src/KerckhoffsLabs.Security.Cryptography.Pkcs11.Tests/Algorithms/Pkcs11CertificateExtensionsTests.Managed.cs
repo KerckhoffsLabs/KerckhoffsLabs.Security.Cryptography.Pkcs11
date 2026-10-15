@@ -11,7 +11,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Algorithms;
 /// <summary>
 /// <see cref="Pkcs11CertificateExtensions"/> over the managed token: a certificate stored next to a
 /// key pair with the same <c>CKA_ID</c> bridges to that key as the matching BCL adapter, and every
-/// mismatch — wrong algorithm, no key with that id, no id at all — yields <c>null</c>.
+/// mismatch — wrong algorithm, no key with that id, no id at all — yields <see langword="null"/>.
 /// </summary>
 [Collection(FakeModuleCollection.Name)]
 public sealed class Pkcs11CertificateExtensions_Managed

@@ -21,7 +21,7 @@ public sealed class ObjectAttribute : IDisposable
     /// those point inside the array attribute's own block, and freeing one from here would release
     /// memory that attribute still owns.
     /// </summary>
-    /// <remarks>Defaults to <c>true</c>: every value-constructing overload allocates its own buffer.
+    /// <remarks>Defaults to <see langword="true"/>: every value-constructing overload allocates its own buffer.
     /// Only the explicit view constructor opts out.</remarks>
     private readonly bool _ownsValue = true;
 
@@ -150,7 +150,7 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute holding a UTF-8 string with no null terminator.</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
     public ObjectAttribute(CKA type, string value)
     {
@@ -184,7 +184,7 @@ public sealed class ObjectAttribute : IDisposable
     /// The children's values are copied in: this attribute owns its whole array, so the children may
     /// be disposed, or collected, as soon as the constructor returns.
     /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if one of the children has been disposed.</exception>
     public ObjectAttribute(CKA type, IReadOnlyList<ObjectAttribute> value)
@@ -210,7 +210,7 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute holding a list of <c>CK_ULONG</c> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or an element of <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
     public ObjectAttribute(CKA type, IReadOnlyList<ulong> value)
     {
@@ -224,7 +224,7 @@ public sealed class ObjectAttribute : IDisposable
     }
 
     /// <summary>Creates an attribute holding a list of <see cref="CKM"/> values (encoded as a contiguous CK_ULONG[] in unmanaged memory).</summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="value"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="type"/> or an element of <paramref name="value"/> is wider than this platform's <c>CK_ULONG</c>.</exception>
     public ObjectAttribute(CKA type, IReadOnlyList<CKM> value)
     {
@@ -250,7 +250,7 @@ public sealed class ObjectAttribute : IDisposable
 
     // --- Read-back -----------------------------------------------------------
 
-    /// <summary>Reads the value as a PKCS#11 <c>CK_BBOOL</c> (single byte; non-zero is <c>true</c>).</summary>
+    /// <summary>Reads the value as a PKCS#11 <c>CK_BBOOL</c> (single byte; non-zero is <see langword="true"/>).</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
     /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or is not exactly one byte.</exception>
     public bool GetValueAsBool()
@@ -326,7 +326,7 @@ public sealed class ObjectAttribute : IDisposable
         return len;
     }
 
-    /// <summary>Reads the value as a PKCS#11 <c>CK_DATE</c> (UTC); returns <c>null</c> when empty or unparseable.</summary>
+    /// <summary>Reads the value as a PKCS#11 <c>CK_DATE</c> (UTC); returns <see langword="null"/> when empty or unparseable.</summary>
     /// <exception cref="ObjectDisposedException">Thrown if the attribute has been disposed.</exception>
     /// <exception cref="Pkcs11AttributeException">Thrown if the value is unreadable (sensitive or unextractable) or its length is neither 0 nor 8 bytes.</exception>
     public DateTime? GetValueAsDateTime()

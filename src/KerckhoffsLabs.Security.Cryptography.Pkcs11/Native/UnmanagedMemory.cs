@@ -59,7 +59,7 @@ internal static class UnmanagedMemory
     private static readonly ConcurrentDictionary<IntPtr, int> _allocations = new();
 
     /// <summary>
-    /// When <c>true</c>, every <see cref="Allocate"/> / <see cref="Free"/> writes a debug log line.
+    /// When <see langword="true"/>, every <see cref="Allocate"/> / <see cref="Free"/> writes a debug log line.
     /// The allocation dictionary is populated <em>unconditionally</em> (independent of this flag); only
     /// the log output is gated, so toggling at runtime is safe — pointers allocated with the flag off
     /// can still be freed after it is turned on without tripping the untracked-memory check.

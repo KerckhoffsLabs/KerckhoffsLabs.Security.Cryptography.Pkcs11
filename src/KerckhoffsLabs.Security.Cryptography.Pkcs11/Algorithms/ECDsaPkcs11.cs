@@ -37,7 +37,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// </summary>
     /// <param name="key">A token-resident PKCS#11 key whose <see cref="Pkcs11Key.KeyType"/>
     /// is <see cref="CKK.CKK_EC"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an EC key.</exception>
     public ECDsaPkcs11(Pkcs11Key key)
     {
@@ -219,7 +219,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// Signs the caller-supplied digest with raw <c>CKM_ECDSA</c>. The hash algorithm is not
     /// conveyed on this path, so the SHA-1 secure-defaults gate does not apply here.
     /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="hash"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="hash"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Sign</c> call.</exception>
     public override byte[] SignHash(byte[] hash)
     {
@@ -229,7 +229,7 @@ public sealed class ECDsaPkcs11 : ECDsa
     }
 
     /// <inheritdoc/>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="hash"/> or <paramref name="signature"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="hash"/> or <paramref name="signature"/> is <see langword="null"/>.</exception>
     /// <exception cref="Pkcs11Exception">Propagated from the underlying <c>C_Verify</c> call.</exception>
     public override bool VerifyHash(byte[] hash, byte[] signature)
     {
@@ -298,7 +298,7 @@ public sealed class ECDsaPkcs11 : ECDsa
 
     /// <inheritdoc/>
     /// <exception cref="CryptoPolicyViolationException">
-    /// Always thrown when <paramref name="includePrivateParameters"/> is <c>true</c>.
+    /// Always thrown when <paramref name="includePrivateParameters"/> is <see langword="true"/>.
     /// PKCS#11 keys are non-extractable by design.
     /// </exception>
     /// <exception cref="Pkcs11Exception">Thrown when the public point (<c>CKA_EC_POINT</c> / <c>CKA_EC_PARAMS</c>) is sensitive, cannot be read from any available handle, or cannot be parsed as a named-curve uncompressed point.</exception>

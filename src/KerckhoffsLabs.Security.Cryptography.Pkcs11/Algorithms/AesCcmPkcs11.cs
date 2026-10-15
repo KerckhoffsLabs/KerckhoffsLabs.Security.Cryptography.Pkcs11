@@ -43,7 +43,7 @@ public sealed class AesCcmPkcs11 : IDisposable
     /// <param name="tagSizeInBytes">The authentication-tag size, in bytes, one of <see cref="TagByteSizes"/>.
     /// Prefer 16, the full tag. Under <c>CryptoPolicy.SecureOnly</c> (the default) or <c>CryptoPolicy.FipsOnly</c>,
     /// 4 and 6 bytes are refused when the key is used, as MACs under 64 bits (SP 800-38C Appendix B.2).</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="key"/> is not an AES key, or
     /// <paramref name="tagSizeInBytes"/> is not a size in <see cref="TagByteSizes"/>.</exception>
     public AesCcmPkcs11(Pkcs11Key key, int tagSizeInBytes)

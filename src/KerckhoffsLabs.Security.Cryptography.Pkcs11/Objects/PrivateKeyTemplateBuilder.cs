@@ -9,7 +9,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 /// </summary>
 /// <remarks>
 /// Every capability attribute (<c>CKA_SIGN</c>, <c>CKA_SIGN_RECOVER</c>, <c>CKA_DECRYPT</c>,
-/// <c>CKA_UNWRAP</c>, <c>CKA_DERIVE</c>) also defaults to <c>false</c>. PKCS#11's own spec default
+/// <c>CKA_UNWRAP</c>, <c>CKA_DERIVE</c>) also defaults to <see langword="false"/>. PKCS#11's own spec default
 /// for an omitted capability attribute is <c>CK_TRUE</c> (verified against NSS and SoftHSM) — an
 /// omission-means-safe assumption would silently grant every role on every key this builder
 /// produces. Callers opt in to each role explicitly.
@@ -66,7 +66,7 @@ public sealed class PrivateKeyTemplateBuilder : ObjectTemplateBuilderBase<Privat
     /// key. The token applies them as if the object already carried them, before any caller-supplied
     /// template.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public PrivateKeyTemplateBuilder UnwrapTemplate(Action<NestedKeyTemplateBuilder> configure)
@@ -75,7 +75,7 @@ public sealed class PrivateKeyTemplateBuilder : ObjectTemplateBuilderBase<Privat
     /// <summary>
     /// Sets <c>CKA_DERIVE_TEMPLATE</c> — attributes <b>imposed</b> on every key derived from this key.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="configure"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the builder has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the builder has already produced an <see cref="ObjectTemplate"/>.</exception>
     public PrivateKeyTemplateBuilder DeriveTemplate(Action<NestedKeyTemplateBuilder> configure)

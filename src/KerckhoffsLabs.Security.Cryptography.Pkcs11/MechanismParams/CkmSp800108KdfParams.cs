@@ -87,13 +87,13 @@ public sealed class CkmSp800108KdfParams : MechanismParameters
     /// <see cref="Sp800108KdfBuilder.AddDerivedKey"/>. Read after the <c>C_DeriveKey</c> call
     /// completes (i.e. after <see cref="Pkcs11Key.Derive"/> returns) — empty before that, and also
     /// when none were requested. A slot the token left unwritten (<c>CK_INVALID_HANDLE</c>) is
-    /// <c>null</c> in the list rather than a key wrapping an invalid handle.
+    /// <see langword="null"/> in the list rather than a key wrapping an invalid handle.
     /// </summary>
     /// <remarks>
     /// <para>
     /// The caller owns every non-null entry and must dispose it (and call <see cref="Pkcs11Key.Destroy"/>
     /// if it should not outlive this call) — same obligation as the primary key <c>Derive</c> returns.
-    /// Previously this returned raw <c>ulong</c> handles that no public API could turn into a usable
+    /// Previously this returned raw <see langword="ulong"/> handles that no public API could turn into a usable
     /// key, so a sibling with <c>CKA_TOKEN=true</c> was unreachable and undestroyable.
     /// </para>
     /// <para>A snapshot, not a view: the returned list does not change if the same params are reused

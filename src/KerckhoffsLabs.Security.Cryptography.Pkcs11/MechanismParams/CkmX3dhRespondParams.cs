@@ -33,7 +33,7 @@ public sealed class CkmX3dhRespondParams : MechanismParameters
     /// <param name="onetimeId">One-time prekey identifier bytes.</param>
     /// <param name="initiatorIdentity">Initiator's identity key; its public-key object is used.</param>
     /// <param name="initiatorEphemeral">Initiator's ephemeral public-key bytes.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="initiatorIdentity"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="initiatorIdentity"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">Thrown if <paramref name="initiatorIdentity"/> has no public-key object.</exception>
     public CkmX3dhRespondParams(CKM kdf, ReadOnlySpan<byte> identityId, ReadOnlySpan<byte> prekeyId, ReadOnlySpan<byte> onetimeId, Pkcs11Key initiatorIdentity, ReadOnlySpan<byte> initiatorEphemeral)
     {

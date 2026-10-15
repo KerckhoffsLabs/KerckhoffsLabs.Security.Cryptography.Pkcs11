@@ -127,7 +127,7 @@ internal static class RSAPkcs11TestCases
     // it is slow enough on macOS / Windows / arm runners to dominate the job. The smaller sizes still
     // run everywhere, so exported-encoding and round-trip correctness keep full cross-platform coverage.
     private static bool LargeRsaKeysEnabled =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && RuntimeInformation.OSArchitecture == Architecture.X64;
+        OperatingSystem.IsLinux() && RuntimeInformation.OSArchitecture == Architecture.X64;
 
     // === Key sizes: sign/verify round-trips scale with the modulus =========
     // RSA < 2048 is refused under SecureOnly (NIST SP 800-131A), so the 1024 case generates under an

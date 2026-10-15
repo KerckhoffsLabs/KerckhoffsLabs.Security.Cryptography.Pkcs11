@@ -38,7 +38,7 @@ public sealed class SecurePassword : IDisposable
     /// <summary>Initializes a new <see cref="SecurePassword"/> from characters, encoded as UTF-8.</summary>
     /// <remarks>
     /// The preferred input when the password is typed or read into a <c>char[]</c> or
-    /// <c>stackalloc</c> buffer: it is encoded straight into this instance's pinned buffer, so no
+    /// <see langword="stackalloc"/> buffer: it is encoded straight into this instance's pinned buffer, so no
     /// string and no intermediate byte array ever holds the password. Zero your own character buffer
     /// once this returns.
     /// </remarks>

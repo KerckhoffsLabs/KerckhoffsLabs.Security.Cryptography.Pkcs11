@@ -38,7 +38,7 @@ public sealed class Pkcs11Certificate : IDisposable
     /// <summary>The parsed X.509 certificate (identity + public key). Owned by this instance.</summary>
     public X509Certificate2 Certificate => _certificate;
 
-    /// <summary>The object's <c>CKA_LABEL</c>, or <c>null</c> if unset.</summary>
+    /// <summary>The object's <c>CKA_LABEL</c>, or <see langword="null"/> if unset.</summary>
     public string? Label { get; }
 
     /// <summary>The object's <c>CKA_ID</c> — also the link to the associated key objects. Empty if unset.</summary>
@@ -49,7 +49,7 @@ public sealed class Pkcs11Certificate : IDisposable
 
     /// <summary>
     /// Opens the certificate's matching on-token private key (located by <see cref="Id"/>) as a
-    /// <see cref="Pkcs11Key"/>. Returns <c>null</c> when no private key with this certificate's
+    /// <see cref="Pkcs11Key"/>. Returns <see langword="null"/> when no private key with this certificate's
     /// <c>CKA_ID</c> exists on the token. The caller owns the returned key.
     /// </summary>
     /// <remarks>

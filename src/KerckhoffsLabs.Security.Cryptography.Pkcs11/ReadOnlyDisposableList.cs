@@ -4,7 +4,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 
 /// <summary>
 /// A fixed collection of disposables that releases every element when it is disposed, so a returned
-/// collection can be held by a <c>using</c> instead of a hand-written cleanup loop at each call site.
+/// collection can be held by a <see langword="using"/> instead of a hand-written cleanup loop at each call site.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,7 +19,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// the unmanaged buffer behind its value, so abandoning the rest of the list would leave key material
 /// in memory — the outcome disposal exists to prevent. Failures are recorded in
 /// <see cref="DisposalFailures"/> rather than thrown, so releasing the list can never displace the
-/// exception that a <c>using</c> was already unwinding.
+/// exception that a <see langword="using"/> was already unwinding.
 /// </para>
 /// </remarks>
 /// <typeparam name="T">Element type; every element is disposed by <see cref="Dispose"/>.</typeparam>
@@ -36,7 +36,7 @@ public sealed class ReadOnlyDisposableList<T> : IReadOnlyList<T>, IDisposable wh
     /// Creates a list holding a snapshot of <paramref name="items"/> and taking ownership of them.
     /// </summary>
     /// <param name="items">Elements whose ownership passes to this list.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="items"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="items"/> is <see langword="null"/>.</exception>
     public ReadOnlyDisposableList(IEnumerable<T> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -100,7 +100,7 @@ public sealed class ReadOnlyDisposableList<T> : IReadOnlyList<T>, IDisposable wh
     /// <c>Dispose</c> threw.
     /// </summary>
     /// <remarks>
-    /// Failures are recorded rather than thrown. Disposal usually runs from a <c>using</c>, and a
+    /// Failures are recorded rather than thrown. Disposal usually runs from a <see langword="using"/>, and a
     /// throw there <i>replaces</i> an exception already in flight — so reporting a release failure
     /// that way would hide whatever actually went wrong, which is invariably the more useful of the
     /// two. The same reasoning governs the destroy-then-dispose helpers in this library.

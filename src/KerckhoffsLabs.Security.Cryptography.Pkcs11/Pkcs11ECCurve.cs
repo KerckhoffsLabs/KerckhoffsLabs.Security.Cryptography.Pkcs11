@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Formats.Asn1;
 using System.Security.Cryptography;
 
@@ -18,7 +19,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// (X25519/X448) curves use different key types and key-pair-gen mechanisms and are intentionally
 /// outside this type.
 /// </para>
-/// <para>This is a value type; the uninitialized <c>default</c> has no OID and throws from
+/// <para>This is a value type; the uninitialized <see langword="default"/> has no OID and throws from
 /// <see cref="GetEcParams"/>.</para>
 /// </remarks>
 public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
@@ -42,7 +43,7 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
 
     /// <summary>
     /// The category of this curve. Every curve this type can represent is a named curve and reports
-    /// <see cref="ECCurve.ECCurveType.Named"/>; the uninitialized <c>default</c> reports
+    /// <see cref="ECCurve.ECCurveType.Named"/>; the uninitialized <see langword="default"/> reports
     /// <see cref="ECCurve.ECCurveType.Implicit"/>.
     /// </summary>
     public ECCurve.ECCurveType CurveType => Oid is null ? ECCurve.ECCurveType.Implicit : ECCurve.ECCurveType.Named;
@@ -76,7 +77,7 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// ASN.1 <c>OBJECT IDENTIFIER</c> (the PKCS#11 <i>namedCurve</i> choice). Returns a fresh copy on
     /// each call, so this is a method rather than a property.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The curve is the uninitialized <c>default</c>.</exception>
+    /// <exception cref="InvalidOperationException">The curve is the uninitialized <see langword="default"/>.</exception>
     public byte[] GetEcParams() => _ecParams is null
         ? throw new InvalidOperationException("The Pkcs11ECCurve is uninitialized (default); specify a curve.")
         : (byte[])_ecParams.Clone();
@@ -142,7 +143,7 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     }
 
     /// <summary>Bridges to the BCL <see cref="ECCurve"/> (a named curve over the same OID).</summary>
-    /// <exception cref="InvalidOperationException">The curve is the uninitialized <c>default</c>.</exception>
+    /// <exception cref="InvalidOperationException">The curve is the uninitialized <see langword="default"/>.</exception>
     public ECCurve ToECCurve()
     {
         if (Oid is null)
@@ -163,7 +164,7 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// <inheritdoc/>
     public bool Equals(Pkcs11ECCurve other) => string.Equals(Oid, other.Oid, StringComparison.Ordinal);
     /// <inheritdoc/>
-    public override bool Equals(object? obj) => obj is Pkcs11ECCurve other && Equals(other);
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is Pkcs11ECCurve other && Equals(other);
     /// <inheritdoc/>
     public override int GetHashCode() => Oid?.GetHashCode(StringComparison.Ordinal) ?? 0;
     /// <summary>Indicates whether two curves have the same OID.</summary>

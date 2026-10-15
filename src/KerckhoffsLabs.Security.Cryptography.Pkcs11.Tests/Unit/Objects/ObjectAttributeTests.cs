@@ -279,7 +279,7 @@ public sealed class ObjectAttributeTests
 
     /// <summary>
     /// The views handed back by <c>GetValueAsAttributeArray</c> point at buffers the nested
-    /// children own. They must not free on disposal, or a stray <c>using</c> over the read-back
+    /// children own. They must not free on disposal, or a stray <see langword="using"/> over the read-back
     /// array would release memory the original children still describe — and, now that
     /// ObjectAttribute has a finalizer, would do so unprompted at the next GC.
     /// </summary>

@@ -81,7 +81,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// Derives <paramref name="derivedKeyLengthInBytes"/> bytes of keying material. Mirrors
     /// <see cref="SP800108HmacCounterKdf.DeriveKey(byte[], byte[], int)"/>.
     /// </summary>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> or <paramref name="context"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="label"/> or <paramref name="context"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="derivedKeyLengthInBytes"/> is negative.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call, or thrown when the derived bytes cannot be read back.</exception>
@@ -145,7 +145,7 @@ public sealed class SP800108HmacCounterKdfPkcs11 : IDisposable
     /// <param name="context">SP800-108 context bytes.</param>
     /// <param name="template">Template describing the derived key (class, type, length, attributes).</param>
     /// <exception cref="ObjectDisposedException">Thrown if the KDF has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="template"/> is <see langword="null"/>.</exception>
     /// <exception cref="Exceptions.CryptoPolicyViolationException">Thrown if <paramref name="template"/> explicitly requests an extractable or non-sensitive key while the session's <see cref="Pkcs11Session.Policy"/> refuses it.</exception>
     /// <exception cref="Exceptions.Pkcs11Exception">Propagated from the underlying <c>C_DeriveKey</c> call.</exception>
     public Pkcs11Key DeriveKey(ReadOnlySpan<byte> label, ReadOnlySpan<byte> context, ObjectTemplate template)

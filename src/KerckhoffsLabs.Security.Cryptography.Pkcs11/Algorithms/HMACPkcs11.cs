@@ -42,7 +42,7 @@ public sealed class HMACPkcs11 : HMAC
     /// The hash algorithm (SHA1, SHA224, SHA256, SHA384, or SHA512). The corresponding
     /// <c>CKM_*_HMAC</c> mechanism will be selected automatically.
     /// </param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">
     /// Thrown when <paramref name="hashAlgorithm"/> is not one of the five supported algorithms.
     /// </exception>

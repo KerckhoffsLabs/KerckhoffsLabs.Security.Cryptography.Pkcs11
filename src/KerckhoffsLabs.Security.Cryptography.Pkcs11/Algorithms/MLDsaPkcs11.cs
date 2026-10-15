@@ -31,7 +31,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Algorithms;
 /// ownership — disposing this provider does not dispose <paramref name="key"/>.
 /// </remarks>
 /// <param name="key">A token-resident ML-DSA key (<see cref="CKK.CKK_ML_DSA"/>).</param>
-/// <exception cref="ArgumentNullException"><paramref name="key"/> is <c>null</c>.</exception>
+/// <exception cref="ArgumentNullException"><paramref name="key"/> is <see langword="null"/>.</exception>
 /// <exception cref="ArgumentException"><paramref name="key"/> is not an ML-DSA key, or its parameter set is unrecognized / unreadable.</exception>
 public sealed class MLDsaPkcs11(Pkcs11Key key) : MLDsa(ResolveAlgorithm(key))
 {

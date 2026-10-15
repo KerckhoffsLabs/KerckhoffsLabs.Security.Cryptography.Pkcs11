@@ -16,7 +16,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// <para>
 /// Instances are produced exclusively by <see cref="Pkcs11SessionCore"/> factory methods
 /// (<c>FindObjects</c>, <c>GenerateKey</c>, <c>GenerateKeyPair</c>, <c>CreateObject</c>,
-/// <c>DeriveKey</c>, <c>UnwrapKey</c>). The constructor is <c>internal</c> so external
+/// <c>DeriveKey</c>, <c>UnwrapKey</c>). The constructor is <see langword="internal"/> so external
 /// code cannot fabricate a handle with an arbitrary <see cref="ObjectId"/> and feed it
 /// to a session — that would either fail with <c>CKR_OBJECT_HANDLE_INVALID</c> at the
 /// PKCS#11 boundary or, worse, act on an unrelated object that happens to share the
@@ -27,7 +27,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 /// <para>
 /// <c>default(ObjectHandle)</c> equals <see cref="Invalid"/> — the underlying integer
 /// is <c>0</c>, which is <see cref="CK.CK_INVALID_HANDLE"/>. Callers can safely use
-/// <c>default</c> as a sentinel and check <see cref="IsInvalid"/>.
+/// <see langword="default"/> as a sentinel and check <see cref="IsInvalid"/>.
 /// </para>
 /// </remarks>
 internal readonly record struct ObjectHandle
@@ -57,7 +57,7 @@ internal readonly record struct ObjectHandle
     public static ObjectHandle Invalid => default;
 
     /// <summary>
-    /// <c>true</c> when this handle equals <see cref="CK.CK_INVALID_HANDLE"/> (i.e. <c>default</c>).
+    /// <see langword="true"/> when this handle equals <see cref="CK.CK_INVALID_HANDLE"/> (i.e. <see langword="default"/>).
     /// </summary>
     public bool IsInvalid => ObjectId == CK.CK_INVALID_HANDLE;
 

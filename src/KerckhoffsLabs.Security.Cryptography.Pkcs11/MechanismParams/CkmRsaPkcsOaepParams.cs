@@ -20,7 +20,7 @@ public sealed class CkmRsaPkcsOaepParams : MechanismParameters
     /// </summary>
     /// <param name="hashAlg">Hash mechanism (typically <see cref="CKM.CKM_SHA256"/>).</param>
     /// <param name="mgf">Mask generation function (typically <see cref="CKG.CKG_MGF1_SHA256"/>).</param>
-    /// <param name="sourceData">Optional encoding-parameter source data; pass <c>default</c> for none.</param>
+    /// <param name="sourceData">Optional encoding-parameter source data; pass <see langword="default"/> for none.</param>
     public CkmRsaPkcsOaepParams(CKM hashAlg, CKG mgf, ReadOnlySpan<byte> sourceData = default)
     {
         _sourceDataBytes = sourceData.ToArray();

@@ -14,7 +14,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Interop;
 /// <c>C_UnwrapKeyAuthenticated</c>, <c>C_GetSessionValidationFlags</c>, <c>C_AsyncComplete/GetID/Join</c>)
 /// — previously 0% covered. Unlike the v3.0 message API, none of these symbols exist at all in
 /// pkcs11-mock's function table (verified against vendor/pkcs11-mock/src/pkcs11-mock.c) — no
-/// released backend in this project's test matrix implements v3.2 — so <c>Has*</c> is <c>false</c>
+/// released backend in this project's test matrix implements v3.2 — so <c>Has*</c> is <see langword="false"/>
 /// for every one of them and the guard clause in <c>LowLevelPkcs11Library</c> fires before any
 /// native call is attempted. That guard clause, not real v3.2 behaviour, is what these tests pin:
 /// a consumer must get a clean <see cref="CKR.CKR_FUNCTION_NOT_SUPPORTED"/> response, never a

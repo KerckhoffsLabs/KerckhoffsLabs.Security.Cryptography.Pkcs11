@@ -100,7 +100,8 @@ public sealed class SignIbmMlDsaContextTests_OpenCryptoki(OpenCryptokiBackendFix
                 // The one outcome that indicts our marshalling rather than the token's capabilities.
                 throw new Xunit.Sdk.XunitException(
                     "opencryptoki rejected the CK_IBM_SIGN_ADDITIONAL_CONTEXT block as malformed "
-                    + $"(CKR_MECHANISM_PARAM_INVALID). Expected length {(3 * IntPtr.Size)} bytes on this platform.");
+                    + $"(CKR_MECHANISM_PARAM_INVALID). Expected length {(3 * IntPtr.Size)} bytes on this platform.",
+                    ex);
             }
             catch (Pkcs11Exception ex)
             {

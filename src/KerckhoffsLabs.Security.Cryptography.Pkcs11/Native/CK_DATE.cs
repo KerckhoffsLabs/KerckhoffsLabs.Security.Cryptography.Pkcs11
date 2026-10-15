@@ -20,14 +20,14 @@ internal struct CK_DATE
     /// <summary>Day, two ASCII digits ("01"–"31").</summary>
     public Char2 Day;
 
-    /// <summary>Fixed 4-byte inline buffer (replaces <c>fixed byte[4]</c> — no <c>unsafe</c>).</summary>
+    /// <summary>Fixed 4-byte inline buffer (replaces <c>fixed byte[4]</c> — no <see langword="unsafe"/>).</summary>
     [InlineArray(4)]
     internal struct Char4
     {
         private byte _element0;
     }
 
-    /// <summary>Fixed 2-byte inline buffer (replaces <c>fixed byte[2]</c> — no <c>unsafe</c>).</summary>
+    /// <summary>Fixed 2-byte inline buffer (replaces <c>fixed byte[2]</c> — no <see langword="unsafe"/>).</summary>
     [InlineArray(2)]
     internal struct Char2
     {

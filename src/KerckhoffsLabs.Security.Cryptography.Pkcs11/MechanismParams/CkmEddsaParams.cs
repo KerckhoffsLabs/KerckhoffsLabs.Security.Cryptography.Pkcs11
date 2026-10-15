@@ -15,7 +15,7 @@ public sealed class CkmEddsaParams : MechanismParameters
     /// Initializes EdDSA parameters.
     /// </summary>
     /// <param name="phFlag">True selects the prehash variant (Ed25519ph / Ed448ph).</param>
-    /// <param name="contextData">Optional context bytes; pass <c>default</c> for the unsalted vanilla signature.</param>
+    /// <param name="contextData">Optional context bytes; pass <see langword="default"/> for the unsalted vanilla signature.</param>
     public CkmEddsaParams(bool phFlag, ReadOnlySpan<byte> contextData = default)
     {
         _contextDataBytes = contextData.ToArray();

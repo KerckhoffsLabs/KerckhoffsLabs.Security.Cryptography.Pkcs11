@@ -57,7 +57,7 @@ internal static class DerivedKeyMaterial
     /// Destroys an ephemeral derived key without letting a cleanup failure hide a real one.
     /// </summary>
     /// <remarks>
-    /// A throw from <c>finally</c> <i>replaces</i> an exception already in flight, so a failed
+    /// A throw from <see langword="finally"/> <i>replaces</i> an exception already in flight, so a failed
     /// <c>C_DestroyObject</c> would reach the caller in place of whatever actually went wrong. This
     /// suppresses the destroy failure only on that path: when the operation succeeded, the destroy
     /// failure is the only news and is allowed to surface. The key is a session object either way, so
