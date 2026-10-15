@@ -6,9 +6,6 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.Pkcs11Fakes;
 
-// ML-KEM / ML-DSA are evaluation-only BCL APIs (SYSLIB5006).
-#pragma warning disable SYSLIB5006
-
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Policy;
 
 /// <summary>
