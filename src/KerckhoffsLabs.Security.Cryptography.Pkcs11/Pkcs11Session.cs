@@ -135,11 +135,17 @@ public sealed class Pkcs11Session : IDisposable
     }
 
     /// <summary>
-    /// Looks up a key by CKA_LABEL. If a matching private key is found, attempts to
-    /// pair it with its public companion via CKA_ID; if the lookup hits a symmetric key
+    /// Looks up a key by CKA_LABEL. If a matching private key is found, it is paired with its
+    /// public companion via CKA_ID when first needed; if the lookup hits a symmetric key
     /// (or a private key with no companion), the returned <see cref="Pkcs11Key"/> carries
     /// a single handle.
     /// </summary>
+    /// <remarks>
+    /// The other half of a key pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) is looked up the first
+    /// time an operation on the key needs it, not here. If that lookup fails, the error comes from that
+    /// operation (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the
+    /// next use looks again.
+    /// </remarks>
     /// <param name="label">The CKA_LABEL string to match.</param>
     /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
@@ -158,6 +164,12 @@ public sealed class Pkcs11Session : IDisposable
     /// <summary>
     /// Looks up a key by CKA_ID.
     /// </summary>
+    /// <remarks>
+    /// The other half of a key pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) is looked up the first
+    /// time an operation on the key needs it, not here. If that lookup fails, the error comes from that
+    /// operation (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the
+    /// next use looks again.
+    /// </remarks>
     /// <param name="id">The CKA_ID bytes to match.</param>
     /// <returns>A new <see cref="Pkcs11Key"/>. Caller must <c>Dispose</c> it.</returns>
     /// <exception cref="ObjectDisposedException">Thrown if the session has been disposed.</exception>
@@ -176,6 +188,12 @@ public sealed class Pkcs11Session : IDisposable
     /// <summary>
     /// Finds all keys matching the given template.
     /// </summary>
+    /// <remarks>
+    /// The other half of a key pair (same <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>) is looked up the first
+    /// time an operation on the key needs it, not here. If that lookup fails, the error comes from that
+    /// operation (<c>Verify</c>, <c>Encrypt</c>, <c>Sign</c>, <c>GetAttributeValue</c>, …), and the
+    /// next use looks again.
+    /// </remarks>
     /// <param name="filter">Attribute filter. Use <see cref="ObjectTemplate.Empty"/>-based builder.</param>
     /// <returns>A list of <see cref="Pkcs11Key"/>. May be empty. The list owns the keys: dispose it
     /// (a <c>using</c> will do) to release them all.</returns>
@@ -871,10 +889,16 @@ public sealed class Pkcs11Session : IDisposable
     internal Pkcs11Key HydrateExistingHandleAsKey(ObjectHandle handle)
         => HydrateKeyFromHandle(handle);
 
-    private ObjectHandle FindCompanion(CKO companionClass, byte[] id)
+    /// <summary>
+    /// Finds the other half of a key pair: the object of <paramref name="companionClass"/> with the same
+    /// <c>CKA_ID</c> and <c>CKA_KEY_TYPE</c>. Matching the key type too keeps a short, reused id (a
+    /// <c>pkcs11-tool --id 01</c> on several keys) from pairing a key with a public key of another type.
+    /// </summary>
+    internal ObjectHandle FindCompanion(CKO companionClass, byte[] id, CKK keyType)
     {
         using var filter = ObjectTemplate.Empty()
             .Attribute(CKA.CKA_CLASS, (ulong)companionClass)
+            .Attribute(CKA.CKA_KEY_TYPE, (ulong)keyType)
             .Id(id)
             .Build();
         var handles = _core.FindAllObjects([.. filter.Attributes]);
@@ -893,8 +917,8 @@ public sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Reads CKA_CLASS, CKA_KEY_TYPE, CKA_LABEL, CKA_ID off the handle and constructs a
-    /// <see cref="Pkcs11Key"/>. If the handle is a private key with a non-empty CKA_ID,
-    /// searches for a matching public companion and attaches both handles.
+    /// <see cref="Pkcs11Key"/>. A private or public key with a non-empty CKA_ID is marked to look up
+    /// its other half the first time an operation needs it; nothing is searched here.
     /// </summary>
     private Pkcs11Key HydrateKeyFromHandle(ObjectHandle handle)
     {
@@ -926,21 +950,20 @@ public sealed class Pkcs11Session : IDisposable
         ObjectHandle privateHandle = ObjectHandle.Invalid;
         ObjectHandle publicHandle = ObjectHandle.Invalid;
 
+        // A private key is paired with its public key, and a public key with its private key (a
+        // search may return either half first, and Sign/Decrypt need the private one). The search
+        // waits for first use: a listing of N keys would otherwise scan the token N more times for
+        // halves the caller may never touch. Without an id there is no reliable way to match.
+        bool companionPending = false;
         if (objectClass == CKO.CKO_PRIVATE_KEY)
         {
             privateHandle = handle;
-            // Search for public companion by CKA_ID. Empty ID disables the lookup.
-            if (id.Length > 0)
-                publicHandle = FindCompanion(CKO.CKO_PUBLIC_KEY, id);
+            companionPending = id.Length > 0;
         }
         else if (objectClass == CKO.CKO_PUBLIC_KEY)
         {
             publicHandle = handle;
-            // Mirror the private-side lookup. FindAllObjects orders pub/priv arbitrarily
-            // — if the public came back first, we must still hydrate the private half so
-            // Sign/Decrypt work. Empty ID disables the lookup (no reliable way to match).
-            if (id.Length > 0)
-                privateHandle = FindCompanion(CKO.CKO_PRIVATE_KEY, id);
+            companionPending = id.Length > 0;
         }
         else // CKO_SECRET_KEY or other
         {
@@ -953,6 +976,7 @@ public sealed class Pkcs11Session : IDisposable
             publicHandle: publicHandle,
             keyType: keyType,
             label: label,
-            id: id);
+            id: id,
+            companionPending: companionPending);
     }
 }

@@ -20,11 +20,12 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// remains visible to the test assembly via <c>InternalsVisibleTo</c>.
 /// </para>
 /// <para>
-/// Asymmetric keys may carry both a private and a public handle (paired automatically
-/// via <c>CKA_ID</c> by <c>Pkcs11Session.OpenKey</c>) or only one. A
-/// public-only key has <c>privateHandle == ObjectHandle.Invalid</c>; a private-only
-/// key on a token without a stored <c>CKO_PUBLIC_KEY</c> companion has
-/// <c>publicHandle == ObjectHandle.Invalid</c>.
+/// Asymmetric keys may carry both a private and a public handle or only one. A key opened or
+/// found through one half is paired with the other half (same <c>CKA_ID</c> and
+/// <c>CKA_KEY_TYPE</c>) the first time an operation needs it, not when it is opened: a listing of
+/// many keys then costs no searches for halves nobody uses. A public-only key has
+/// <c>privateHandle == ObjectHandle.Invalid</c>; a private-only key on a token without a stored
+/// <c>CKO_PUBLIC_KEY</c> companion has <c>publicHandle == ObjectHandle.Invalid</c>.
 /// </para>
 /// <para>
 /// <b>Disposal never destroys token state.</b> <c>Dispose</c> releases the managed wrapper only;
@@ -41,8 +42,11 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public sealed class Pkcs11Key : IDisposable
 {
     private readonly Pkcs11Session _session;
-    private readonly ObjectHandle _privateHandle;
-    private readonly ObjectHandle _publicHandle;
+    // The halves known so far. Read them only through PrivateHandle and PublicHandle, which look up
+    // a pending companion first.
+    private ObjectHandle _knownPrivateHandle;
+    private ObjectHandle _knownPublicHandle;
+    private bool _companionPending;
     private readonly CKK _keyType;
     private readonly byte[] _id;
     private bool _disposed;
@@ -53,7 +57,8 @@ public sealed class Pkcs11Key : IDisposable
         ObjectHandle publicHandle,
         CKK keyType,
         string? label,
-        byte[] id)
+        byte[] id,
+        bool companionPending = false)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (privateHandle.IsInvalid && publicHandle.IsInvalid)
@@ -62,8 +67,9 @@ public sealed class Pkcs11Key : IDisposable
                 nameof(privateHandle));
 
         _session = session;
-        _privateHandle = privateHandle;
-        _publicHandle = publicHandle;
+        _knownPrivateHandle = privateHandle;
+        _knownPublicHandle = publicHandle;
+        _companionPending = companionPending && (privateHandle.IsInvalid || publicHandle.IsInvalid);
         _keyType = keyType;
         Label = label;
         _id = id ?? [];
@@ -117,9 +123,9 @@ public sealed class Pkcs11Key : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        ObjectHandle handle = (IsAsymmetricKeyType(_keyType) && !_publicHandle.IsInvalid)
-            ? _publicHandle
-            : _privateHandle;
+        ObjectHandle handle = (IsAsymmetricKeyType(_keyType) && !PublicHandle.IsInvalid)
+            ? PublicHandle
+            : PrivateHandle;
 
         if (handle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
@@ -131,11 +137,66 @@ public sealed class Pkcs11Key : IDisposable
     /// <summary>Internal accessor for the session this key belongs to.</summary>
     internal Pkcs11Session Session => _session;
 
-    /// <summary>Internal accessor for the private handle. <see cref="ObjectHandle.Invalid"/> for public-only keys.</summary>
-    internal ObjectHandle PrivateHandle => _privateHandle;
+    /// <summary>
+    /// Internal accessor for the private handle. <see cref="ObjectHandle.Invalid"/> for public-only keys.
+    /// Looks up a pending private companion first.
+    /// </summary>
+    internal ObjectHandle PrivateHandle
+    {
+        get
+        {
+            if (_knownPrivateHandle.IsInvalid)
+                ResolveCompanion();
+            return _knownPrivateHandle;
+        }
+    }
 
-    /// <summary>Internal accessor for the public handle. <see cref="ObjectHandle.Invalid"/> when no companion exists and synthesis is unavailable.</summary>
-    internal ObjectHandle PublicHandle => _publicHandle;
+    /// <summary>
+    /// Internal accessor for the public handle. <see cref="ObjectHandle.Invalid"/> when no companion
+    /// exists and synthesis is unavailable. Looks up a pending public companion first.
+    /// </summary>
+    internal ObjectHandle PublicHandle
+    {
+        get
+        {
+            if (_knownPublicHandle.IsInvalid)
+                ResolveCompanion();
+            return _knownPublicHandle;
+        }
+    }
+
+    /// <summary>
+    /// Searches for the missing half of the pair, once, the first time it is needed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The search runs under the session's lease, and the pending flag is cleared only after it
+    /// returns. Clearing it first would let a second thread see "no companion" mid-search and quietly
+    /// take <see cref="Verify"/>'s managed fallback; under the lease that thread gets the session's
+    /// concurrent-use error instead, as for any other call. A search that throws leaves the flag set,
+    /// so the next use searches again rather than settling for "none".
+    /// </para>
+    /// <para>
+    /// The lease is reentrant on its own thread, so the search's own <c>C_FindObjects*</c> calls take it
+    /// again without contention.
+    /// </para>
+    /// </remarks>
+    private void ResolveCompanion()
+    {
+        if (!Volatile.Read(ref _companionPending))
+            return;
+
+        using var _ = _session.Core.AcquireExclusive();
+        if (!_companionPending)
+            return;
+
+        if (_knownPublicHandle.IsInvalid)
+            _knownPublicHandle = _session.FindCompanion(CKO.CKO_PUBLIC_KEY, _id, _keyType);
+        else
+            _knownPrivateHandle = _session.FindCompanion(CKO.CKO_PRIVATE_KEY, _id, _keyType);
+
+        Volatile.Write(ref _companionPending, false);
+    }
 
     /// <summary>
     /// Checks that this key has the token object a mechanism parameter asks for, so a parameter type
@@ -179,19 +240,19 @@ public sealed class Pkcs11Key : IDisposable
         switch (part)
         {
             case KeyHandlePart.Private:
-                if (_privateHandle.IsInvalid)
+                if (PrivateHandle.IsInvalid)
                     throw new ArgumentException(
                         "The key has no private-key or secret-key object on the token; this parameter needs one.",
                         paramName);
-                return _privateHandle;
+                return PrivateHandle;
 
             case KeyHandlePart.Public:
-                if (_publicHandle.IsInvalid)
+                if (PublicHandle.IsInvalid)
                     throw new ArgumentException(
                         "The key has no public-key object on the token (a secret key never has one); this " +
                         "parameter needs one.",
                         paramName);
-                return _publicHandle;
+                return PublicHandle;
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(part), part, "Not a defined KeyHandlePart member.");
@@ -208,10 +269,10 @@ public sealed class Pkcs11Key : IDisposable
     internal System.Security.Cryptography.RSAParameters? GetSynthesizedRsaParameters()
     {
         if (_keyType != CKK.CKK_RSA) return null;
-        if (!_publicHandle.IsInvalid) return null;
-        if (_privateHandle.IsInvalid) return null;
+        if (!PublicHandle.IsInvalid) return null;
+        if (PrivateHandle.IsInvalid) return null;
 
-        return Pkcs11PublicKeyView.TrySynthesizeRsa(_session.Core, _privateHandle);
+        return Pkcs11PublicKeyView.TrySynthesizeRsa(_session.Core, PrivateHandle);
     }
 
     /// <summary>
@@ -223,9 +284,9 @@ public sealed class Pkcs11Key : IDisposable
     internal System.Security.Cryptography.ECParameters? GetSynthesizedEcParameters()
     {
         if (_keyType != CKK.CKK_EC) return null;
-        if (!_publicHandle.IsInvalid) return null;
-        if (_privateHandle.IsInvalid) return null;
-        return Pkcs11PublicKeyView.TrySynthesizeEc(_session.Core, _privateHandle);
+        if (!PublicHandle.IsInvalid) return null;
+        if (PrivateHandle.IsInvalid) return null;
+        return Pkcs11PublicKeyView.TrySynthesizeEc(_session.Core, PrivateHandle);
     }
 
     /// <summary>
@@ -246,8 +307,8 @@ public sealed class Pkcs11Key : IDisposable
     public void Destroy()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_privateHandle.IsInvalid) _session.Core.DestroyObject(_privateHandle);
-        if (!_publicHandle.IsInvalid) _session.Core.DestroyObject(_publicHandle);
+        if (!PrivateHandle.IsInvalid) _session.Core.DestroyObject(PrivateHandle);
+        if (!PublicHandle.IsInvalid) _session.Core.DestroyObject(PublicHandle);
     }
 
     /// <inheritdoc/>
@@ -274,11 +335,11 @@ public sealed class Pkcs11Key : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (_privateHandle.IsInvalid)
+        if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Sign (no private handle)");
 
-        return _session.Core.Sign(mechanism, _privateHandle, data);
+        return _session.Core.Sign(mechanism, PrivateHandle, data);
     }
 
     /// <summary>
@@ -299,9 +360,9 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
         // Prefer the real public handle.
-        if (!_publicHandle.IsInvalid)
+        if (!PublicHandle.IsInvalid)
         {
-            _session.Core.Verify(mechanism, _publicHandle, data, signature, out bool isValid);
+            _session.Core.Verify(mechanism, PublicHandle, data, signature, out bool isValid);
             return isValid;
         }
 
@@ -342,8 +403,8 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
 
         ObjectHandle handle = IsAsymmetricKeyType(_keyType)
-            ? _publicHandle
-            : _privateHandle;
+            ? PublicHandle
+            : PrivateHandle;
 
         if (handle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
@@ -365,11 +426,11 @@ public sealed class Pkcs11Key : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(mechanism);
 
-        if (_privateHandle.IsInvalid)
+        if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Decrypt (no private handle)");
 
-        return _session.Core.Decrypt(mechanism, _privateHandle, ciphertext);
+        return _session.Core.Decrypt(mechanism, PrivateHandle, ciphertext);
     }
 
     /// <summary>
@@ -411,7 +472,7 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        ObjectHandle handle = IsAsymmetricKeyType(_keyType) ? _publicHandle : _privateHandle;
+        ObjectHandle handle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
         if (handle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.MessageEncrypt (handle unavailable)");
@@ -437,11 +498,11 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(messageParams);
 
-        if (_privateHandle.IsInvalid)
+        if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.MessageDecrypt (no private handle)");
 
-        return _session.Core.MessageDecrypt(mechanism, _privateHandle, messageParams, associatedData, ciphertext);
+        return _session.Core.MessageDecrypt(mechanism, PrivateHandle, messageParams, associatedData, ciphertext);
     }
 
     /// <summary>
@@ -461,14 +522,14 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(targetKey);
 
-        ObjectHandle wrapHandle = IsAsymmetricKeyType(_keyType) ? _publicHandle : _privateHandle;
+        ObjectHandle wrapHandle = IsAsymmetricKeyType(_keyType) ? PublicHandle : PrivateHandle;
         if (wrapHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Wrap (wrapping-key handle unavailable)");
 
-        ObjectHandle targetHandle = targetKey._privateHandle.IsInvalid
-            ? targetKey._publicHandle
-            : targetKey._privateHandle;
+        ObjectHandle targetHandle = targetKey.PrivateHandle.IsInvalid
+            ? targetKey.PublicHandle
+            : targetKey.PrivateHandle;
         if (targetHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Wrap (target-key handle unavailable)");
@@ -493,12 +554,12 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        if (_privateHandle.IsInvalid)
+        if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Unwrap (no private handle)");
 
         ObjectHandle resulting = _session.Core.UnwrapKey(
-            mechanism, _privateHandle, wrappedBytes, [.. template.Attributes]);
+            mechanism, PrivateHandle, wrappedBytes, [.. template.Attributes]);
 
         return _session.HydrateExistingHandleAsKey(resulting);
     }
@@ -532,12 +593,12 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
 
-        if (_publicHandle.IsInvalid)
+        if (PublicHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.EncapsulateKey (no public handle)");
 
         var (ct, sharedHandle) = _session.Core.EncapsulateKey(
-            mechanism, _publicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
+            mechanism, PublicHandle, [.. sharedSecretTemplate.Attributes], expectedCiphertextLen);
         return new EncapsulationResult(ct, _session.HydrateExistingHandleAsKey(sharedHandle));
     }
 
@@ -559,12 +620,12 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(sharedSecretTemplate);
 
-        if (_privateHandle.IsInvalid)
+        if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.DecapsulateKey (no private handle)");
 
         ObjectHandle sharedHandle = _session.Core.DecapsulateKey(
-            mechanism, _privateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
+            mechanism, PrivateHandle, ciphertext, [.. sharedSecretTemplate.Attributes]);
         return _session.HydrateExistingHandleAsKey(sharedHandle);
     }
 
@@ -588,12 +649,12 @@ public sealed class Pkcs11Key : IDisposable
         ArgumentNullException.ThrowIfNull(mechanism);
         ArgumentNullException.ThrowIfNull(template);
 
-        if (_privateHandle.IsInvalid)
+        if (PrivateHandle.IsInvalid)
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.Derive (no private handle)");
 
         ObjectHandle resulting = _session.Core.DeriveKey(
-            mechanism, _privateHandle, [.. template.Attributes]);
+            mechanism, PrivateHandle, [.. template.Attributes]);
 
         // SP800-108 sibling keys: the params object absorbed their raw handles during the call
         // above; turn them into usable Pkcs11Key instances now, while the session is at hand.
