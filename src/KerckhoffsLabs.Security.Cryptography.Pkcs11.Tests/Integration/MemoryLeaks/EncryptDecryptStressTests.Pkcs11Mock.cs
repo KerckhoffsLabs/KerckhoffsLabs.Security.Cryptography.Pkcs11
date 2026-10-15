@@ -33,10 +33,7 @@ public sealed class EncryptDecryptStressTests : IDisposable
         _backend = new MockBackendFixture();
     }
 
-    public void Dispose()
-    {
-        _backend.Dispose();
-    }
+    public void Dispose() => _backend.Dispose();
 
     [Fact]
     public void EncryptDecrypt_100Cycles_NoLeak()
