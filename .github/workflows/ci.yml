@@ -24,11 +24,11 @@ jobs:
       # Lint builds managed code only, so this job needs neither the submodules nor a C toolchain.
       SkipNativeBuilds: true
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: '10.0.x'
 
@@ -71,13 +71,13 @@ jobs:
       # from source during `dotnet build`. The ubuntu-latest leg additionally builds opencryptoki
       # (vendor/opencryptoki) and Kryoptic (vendor/kryoptic) from source as additional independent
       # real backends — recursive pulls all of them.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           persist-credentials: false
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: '10.0.x'
           # macOS runners are Apple Silicon: use the native arm64 SDK. Forcing x64 there runs
@@ -101,7 +101,7 @@ jobs:
       # see the action for why the whole process, not just the modules, must load it.
       - name: OpenSSL 3.5 (Linux)
         if: runner.os == 'Linux'
-        uses: ./.github/actions/openssl35
+        uses: $/.github/actions/openssl35
 
       # macOS: SoftHSM builds with autotools against Homebrew OpenSSL 3. Unlike Linux, .NET on macOS
       # uses Apple's crypto (not system OpenSSL), so there is no in-process libcrypto collision — no
@@ -126,7 +126,7 @@ jobs:
       - name: Restore vcpkg OpenSSL cache (Windows)
         if: runner.os == 'Windows'
         id: vcpkg-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@v6.1.0
         with:
           path: ~\AppData\Local\vcpkg\archives
           key: vcpkg-openssl-${{ matrix.arch || 'x64' }}-windows-v1
@@ -147,7 +147,7 @@ jobs:
 
       - name: Cache built native libraries
         id: native-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: src/KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests/bin/Release/net10.0/runtimes
           key: ${{ steps.rev.outputs.native }}-${{ hashFiles('build/build-softhsmv2.sh', 'build/build-softhsmv2.ps1', 'build/build-pkcs11-mock.sh', 'build/build-pkcs11-mock.ps1', 'build/lib/common.sh') }}-v1
@@ -161,7 +161,7 @@ jobs:
       # SoftHSM + opencryptoki + NSS (see KryopticBackendFixture).
       - name: Cache Kryoptic build
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: vendor/kryoptic/target
           key: kryoptic-${{ runner.arch }}-${{ steps.rev.outputs.kryoptic }}-${{ hashFiles('build/build-kryoptic.sh') }}-v1
@@ -185,7 +185,7 @@ jobs:
       # x64 and x86 legs build different OpenSSL triplets, so the cache key includes the arch.
       - name: Save vcpkg OpenSSL cache (Windows)
         if: always() && runner.os == 'Windows' && steps.vcpkg-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/save@v6.1.0
         with:
           path: ~\AppData\Local\vcpkg\archives
           key: vcpkg-openssl-${{ matrix.arch || 'x64' }}-windows-v1
@@ -231,7 +231,7 @@ jobs:
       - name: Cache NSS softoken
         if: matrix.os == 'ubuntu-latest'
         id: nss-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: ${{ runner.temp }}/nss
           key: nss-${{ steps.rev.outputs.nss }}-${{ hashFiles('build/build-nss.sh', 'build/lib/common.sh') }}-v1
@@ -331,14 +331,14 @@ jobs:
     steps:
       # Only pkcs11-mock is needed here, so skip the (large) SoftHSM/opencryptoki submodules
       # that `submodules: recursive` would pull — init just the one module after checkout.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Init pkcs11-mock submodule
         run: git submodule update --init --depth 1 vendor/pkcs11-mock
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: '10.0.x'
 
@@ -455,12 +455,12 @@ jobs:
             expect-var: PKCS11_TEST_EXPECT_NSS_V240
             filter: /*/*/*Nss*/*
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: '10.0.x'
 
