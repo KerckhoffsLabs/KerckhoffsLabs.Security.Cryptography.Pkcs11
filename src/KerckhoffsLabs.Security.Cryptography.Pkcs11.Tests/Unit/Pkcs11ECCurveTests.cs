@@ -211,18 +211,14 @@ public sealed class Pkcs11ECCurveTests
         }
     }
 
-    public static TheoryData<Pkcs11ECCurve, int> CatalogFieldSizes() => new()
-    {
-        { Pkcs11ECCurve.NamedCurves.NistP256, 256 },
-        { Pkcs11ECCurve.NamedCurves.NistP521, 521 },
-        { Pkcs11ECCurve.NamedCurves.Secp256k1, 256 },
-        { Pkcs11ECCurve.NamedCurves.BrainpoolP512r1, 512 },
-    };
-
+    // By OID rather than by Pkcs11ECCurve value, which xUnit cannot serialize (xUnit1044).
     [Theory]
-    [MemberData(nameof(CatalogFieldSizes))]
-    public void FieldSizeBits_CatalogCurve_IsItsFieldSize(Pkcs11ECCurve curve, int bits)
-        => Assert.Equal(bits, curve.FieldSizeBits);
+    [InlineData("1.2.840.10045.3.1.7", 256)]    // nistP256
+    [InlineData("1.3.132.0.35", 521)]           // nistP521
+    [InlineData("1.3.132.0.10", 256)]           // secp256k1
+    [InlineData("1.3.36.3.3.2.8.1.1.13", 512)]  // brainpoolP512r1
+    public void FieldSizeBits_CatalogCurve_IsItsFieldSize(string oid, int bits)
+        => Assert.Equal(bits, Pkcs11ECCurve.CreateFromValue(oid).FieldSizeBits);
 
     [Fact]
     public void FieldSizeBits_OidOutsideTheCatalog_IsNull()
