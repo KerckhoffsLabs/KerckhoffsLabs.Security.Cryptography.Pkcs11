@@ -65,13 +65,6 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// skip via <see cref="TokenObjectsAvailable"/>.</summary>
     public bool SupportsTokenObjects => false;
 
-    /// <summary>True when AES-GCM works through the classic <c>C_EncryptInit</c> + <c>CK_GCM_PARAMS</c>
-    /// path. NSS softoken rejects that path's spec-legal <c>ulIvBits = 0</c> with
-    /// <see cref="CKR.CKR_MECHANISM_PARAM_INVALID"/> (setting it non-zero breaks SoftHSM, so the shared
-    /// params keep 0); GCM against NSS instead goes through the message-based <c>AesGcmPkcs11</c>
-    /// façade, which is covered by the AEAD façade tests.</summary>
-    public static bool SupportsClassicAesGcm => false;
-
     /// <summary>Gate for cases that specifically need a writable token (persistent keys / token
     /// objects). Always false: NSS's generic token never persists token objects.</summary>
     public static bool TokenObjectsAvailable => false;
@@ -98,17 +91,44 @@ public sealed class NssBackendFixture : IPkcs11Backend, IDisposable
     /// <summary>
     /// Skips the calling test unless AES-GCM can run on this softoken. <c>AesGcmPkcs11</c> uses the
     /// message API where the module has one and otherwise falls back to classic <c>C_EncryptInit</c>
-    /// with <c>CK_GCM_PARAMS</c>, which NSS does not accept (see <see cref="SupportsClassicAesGcm"/>):
-    /// NSS before 3.52 has no message API and fails that call with <see cref="CKR.CKR_HOST_MEMORY"/>.
+    /// with <c>CK_GCM_PARAMS</c>, which NSS before 3.52 cannot read (see <see cref="RequireClassicAesGcm"/>):
+    /// with no message API either, it fails that call with <see cref="CKR.CKR_HOST_MEMORY"/>.
     /// </summary>
     public void RequireAesGcm()
     {
         if (!SupportsMessageApi)
-            Assert.Skip("NSS before 3.52 has no message API, and AES-GCM's classic CK_GCM_PARAMS path does not work on NSS.");
+            Assert.Skip("NSS before 3.52 has no message API, and reads CK_GCM_PARAMS without ulIvBits, so AES-GCM does not work on it.");
     }
 
-    /// <summary>Gate for cases that exercise the classic <c>CK_GCM_PARAMS</c> AES-GCM path.</summary>
-    public static bool ClassicAesGcmAvailable => NssAvailable && SupportsClassicAesGcm;
+    /// <summary>
+    /// Gate for cases that exercise the classic <c>CK_GCM_PARAMS</c> AES-GCM path. Which softoken releases
+    /// accept it is only known once NSS is loaded, so such a case also calls
+    /// <see cref="RequireClassicAesGcm"/>.
+    /// </summary>
+    public static bool ClassicAesGcmAvailable => NssAvailable;
+
+    /// <summary>
+    /// Skips the calling test unless AES-GCM works through classic <c>C_EncryptInit</c> +
+    /// <c>CK_GCM_PARAMS</c> here: on NSS 3.52 and later, which the library binds through a v3.x interface
+    /// and so sends <c>ulIvBits = ulIvLen * 8</c>, as they require. NSS before 3.52 reads a five-field
+    /// struct without <c>ulIvBits</c>; the library sends it 0, which it takes as a NULL AAD pointer, and
+    /// the call fails.
+    /// </summary>
+    public void RequireClassicAesGcm()
+    {
+        if (!Library.LowLevelLibrary!.IsBoundThroughV3Interface)
+            Assert.Skip("NSS before 3.52 reads CK_GCM_PARAMS without ulIvBits, so classic AES-GCM does not work on it.");
+    }
+
+    /// <summary>True when classic AES-GCM can be fed in pieces through <c>C_EncryptUpdate</c> /
+    /// <c>C_DecryptUpdate</c>. Always false, whatever the parameters: softoken's
+    /// <c>sftk_CryptInit</c> marks a <see cref="CKM.CKM_AES_GCM"/> context single-part
+    /// (<c>context->multi = PR_FALSE</c>), so the update calls fail with
+    /// <see cref="CKR.CKR_OPERATION_NOT_INITIALIZED"/>.</summary>
+    public static bool SupportsMultipartClassicAesGcm => false;
+
+    /// <summary>Gate for cases that feed classic AES-GCM in pieces.</summary>
+    public static bool MultipartClassicAesGcmAvailable => ClassicAesGcmAvailable && SupportsMultipartClassicAesGcm;
 
     /// <summary>True when the backend will derive a readable (extractable, non-sensitive) key whose
     /// value can be read back. NSS softoken refuses with <see cref="CKR.CKR_KEY_FUNCTION_NOT_PERMITTED"/>

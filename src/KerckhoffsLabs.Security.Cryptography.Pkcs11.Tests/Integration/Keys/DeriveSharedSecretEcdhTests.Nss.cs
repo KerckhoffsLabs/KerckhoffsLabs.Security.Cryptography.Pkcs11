@@ -11,8 +11,8 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
 
-    // The round-trip verifies the derived key with classic-params AES-GCM, which NSS rejects; the
-    // derive itself works, but the verification path does not, so this case skips (see NssBackendFixture).
+    // The round-trip verifies the derived key with classic-params AES-GCM, which only NSS 3.52 and later
+    // accept (see NssBackendFixture.RequireClassicAesGcm).
 
     private Pkcs11Session OpenSession() =>
         _backend.Library.OpenSessionWithoutLogin(_backend.TokenLabel);
@@ -27,6 +27,7 @@ public sealed class DeriveSharedSecretEcdhTests_Nss(NssBackendFixture backend)
     [Fact(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     public void TwoParties_DeriveMatchingAesKey()
     {
+        _backend.RequireClassicAesGcm();
         using var session = OpenSession();
         using var insecure = session.UsePolicy(CryptoPolicy.AllowInsecure); // CKD_NULL is gated by default — it's what's under test here
         using var alice = session.GenerateEcKeyPair(Pkcs11ECCurve.NamedCurves.NistP256);
