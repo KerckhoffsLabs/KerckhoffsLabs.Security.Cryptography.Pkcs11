@@ -1437,6 +1437,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Certificate.TryOpenPrivateKey(
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.CurveType.get -> System.Security.Cryptography.ECCurve.ECCurveType
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve other) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.FieldSizeBits.get -> int?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.FriendlyName.get -> string?
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.GetEcParams() -> byte[]!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.IsDefault.get -> bool
