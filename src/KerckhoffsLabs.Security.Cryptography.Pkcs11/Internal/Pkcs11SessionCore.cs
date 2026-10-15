@@ -1048,6 +1048,21 @@ internal sealed class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
+    /// Reads the class, label, id and (when <paramref name="withKeyType"/>) key type of an object in one
+    /// <c>C_GetAttributeValue</c> call. Returns <see langword="false"/> whenever that read is not
+    /// clean — an unreadable or missing attribute, a value longer than the stack buffers, any return
+    /// value but <c>CKR_OK</c> — and the caller then reads through <see cref="GetAttributeValue"/>.
+    /// </summary>
+    internal bool TryReadIdentity(ObjectHandle objectHandle, bool withKeyType, out ObjectIdentity identity)
+    {
+        using var _ = AcquireExclusive();
+
+        Log.SessionTrace(_logger, (ulong)_sessionId, "TryReadIdentity");
+
+        return ObjectIdentityReader.TryRead(_pkcs11Library, _sessionId, (NativeCULong)objectHandle.ObjectId, withKeyType, out identity);
+    }
+
+    /// <summary>
     /// The most attributes a read lays out on the stack: the template and the two arrays that record
     /// what was allocated for it. A longer read puts them on the heap, so no caller can exhaust the
     /// stack by asking for many attributes.
