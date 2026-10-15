@@ -46,7 +46,7 @@ public enum CKD : ulong
     CKD_SHA512_KDF = 0x00000008,
 
     /// <summary>
-    /// CryptoPro KEK Diversification Algorithm described in section 6.5 of RFC 4357 
+    /// CryptoPro KEK Diversification Algorithm described in section 6.5 of RFC 4357
     /// </summary>
     CKD_CPDIVERSIFY_KDF = 0x00000009,
 
