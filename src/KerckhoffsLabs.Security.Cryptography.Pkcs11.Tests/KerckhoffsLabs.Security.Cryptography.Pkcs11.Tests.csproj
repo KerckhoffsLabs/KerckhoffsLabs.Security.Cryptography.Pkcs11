@@ -43,9 +43,9 @@
   <ItemGroup>
     <!-- coverlet.collector is the VSTest-collector shim; MTP-native runs (dotnet test's coverage
          option) need coverlet's own MTP extension instead. -->
-    <PackageReference Include="coverlet.MTP" Version="10.0.1" />
-    <PackageReference Include="xunit.v3" Version="4.0.1" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageReference Include="coverlet.MTP" Version="10.1.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
   </ItemGroup>
 
   <ItemGroup>
