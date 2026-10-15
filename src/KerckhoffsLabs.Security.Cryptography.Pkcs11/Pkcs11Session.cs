@@ -72,7 +72,9 @@ public sealed class Pkcs11Session : IDisposable
 
     /// <summary>
     /// Enforces <paramref name="policy"/> until the returned lease is disposed. Logged as a warning. Scope it to the operation that needs it:
-    /// <code>using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }</code>
+    /// <code>
+    /// using (session.UsePolicy(CryptoPolicy.AllowInsecure)) { /* one legacy operation */ }
+    /// </code>
     /// Open leases form a stack: the most recently opened lease still open decides the policy, and the
     /// session's own policy applies once none is open. Disposing a lease withdraws only that lease, so
     /// disposing them out of order never re-instates a policy whose lease is already closed. The override

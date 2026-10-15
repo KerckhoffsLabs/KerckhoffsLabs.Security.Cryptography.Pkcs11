@@ -116,8 +116,9 @@ public sealed class ECDsaPkcs11 : ECDsa
     /// <inheritdoc/>
     /// <remarks>
     /// The virtual span entry-point: callers who invoke this directly get the complete, un-hashed
-    /// data forwarded to PKCS#11. The BCL's non-virtual <c>VerifyData(byte[], byte[],
-    /// HashAlgorithmName)</c> convenience overload does NOT reach this method — see the class remarks.
+    /// data forwarded to PKCS#11. The BCL's non-virtual
+    /// <see cref="ECDsa.VerifyData(byte[], byte[], HashAlgorithmName)"/> convenience overload does NOT
+    /// reach this method — see the class remarks.
     /// </remarks>
     /// <exception cref="NotSupportedException">Thrown if <paramref name="hashAlgorithm"/> is not one of SHA-1/224/256/384/512.</exception>
     /// <exception cref="CryptoPolicyViolationException">Thrown when <paramref name="hashAlgorithm"/> is SHA-1 (broken) or SHA-224 (no BCL constant, no benefit over SHA-256) unless the wrapped key's session's <see cref="Pkcs11Session.Policy"/> permits it.</exception>
