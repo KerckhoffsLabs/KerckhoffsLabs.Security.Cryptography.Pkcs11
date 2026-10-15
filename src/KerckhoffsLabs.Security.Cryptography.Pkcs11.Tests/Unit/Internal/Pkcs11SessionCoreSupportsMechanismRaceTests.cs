@@ -41,7 +41,7 @@ public sealed class Pkcs11SessionCoreSupportsMechanismRaceTests
         {
             _inFlight = true;
             Entered.Set();
-            Release.Wait(Generous);
+            Release.Wait(Generous, TestContext.Current.CancellationToken);
             _inFlight = false;
             return CKR.CKR_OK;
         }
@@ -115,7 +115,7 @@ public sealed class Pkcs11SessionCoreSupportsMechanismRaceTests
         { IsBackground = true };
 
         worker.Start();
-        Assert.True(fake.Entered.Wait(Generous), "the worker never reached the native call");
+        Assert.True(fake.Entered.Wait(Generous, TestContext.Current.CancellationToken), "the worker never reached the native call");
 
         // The worker is now parked inside C_GenerateRandom holding the busy lock.
         prober.Start();

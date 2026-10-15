@@ -144,7 +144,7 @@ public sealed class Pkcs11KeyCompanionTests
             using (scope.Session.Core.AcquireExclusive())
             {
                 held.Set();
-                release.Wait();
+                release.Wait(TestContext.Current.CancellationToken);
             }
         });
         holder.Start();

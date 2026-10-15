@@ -42,7 +42,7 @@ public sealed class Pkcs11SessionCoreDisposeRaceTests
         {
             _inFlight = true;
             Entered.Set();
-            Release.Wait(Generous);
+            Release.Wait(Generous, TestContext.Current.CancellationToken);
             _inFlight = false;
             return CKR.CKR_OK;
         }
