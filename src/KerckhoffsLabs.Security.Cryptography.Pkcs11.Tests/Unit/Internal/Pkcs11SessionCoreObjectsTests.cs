@@ -187,12 +187,11 @@ public sealed class Pkcs11SessionCoreObjectsTests
     }
 
     [Fact]
-    public void GetAttributeValue_NullOrEmpty_Throw()
+    public void GetAttributeValue_Empty_Throws()
     {
         using var fake = new AttrFake();
         using var s = fake.CreateSession(SessionId);
-        Assert.Throws<ArgumentNullException>(() => s.GetAttributeValue(new ObjectHandle(1), (List<CKA>)null!));
-        Assert.Throws<ArgumentException>(() => s.GetAttributeValue(new ObjectHandle(1), new List<CKA>()));
+        Assert.Throws<ArgumentException>(() => s.GetAttributeValue(new ObjectHandle(1), []));
     }
 
     [Fact]
@@ -215,5 +214,39 @@ public sealed class Pkcs11SessionCoreObjectsTests
         using var fake = new AttrFake { Rv = CKR.CKR_DEVICE_ERROR };
         using var s = fake.CreateSession(SessionId);
         Assert.ThrowsAny<Pkcs11Exception>(() => s.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE]));
+    }
+
+    /// <summary>Answers every attribute with its own type as the value, so each result can be matched to its request.</summary>
+    private sealed class TypeEchoFake : SessionTestModule
+    {
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
+        {
+            for (int i = 0; i < template.Length; i++)
+                AnswerAttribute(ref template[i], BitConverter.GetBytes((ulong)template[i].type));
+            return CKR.CKR_OK;
+        }
+    }
+
+    // 16 attributes are laid out on the stack and 17 on the heap; both must come back whole and in order.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(16)]
+    [InlineData(17)]
+    [InlineData(40)]
+    public void GetAttributeValue_ReturnsEveryAttributeInRequestOrder(int count)
+    {
+        using var fake = new TypeEchoFake();
+        using var s = fake.CreateSession(SessionId);
+        CKA[] requested = [.. Enumerable.Range(0, count).Select(i => CKA.CKA_VENDOR_DEFINED + (ulong)i)];
+
+        using ReadOnlyDisposableList<ObjectAttribute> result = s.GetAttributeValue(new ObjectHandle(1), requested);
+
+        Assert.Equal(count, result.Count);
+        for (int i = 0; i < count; i++)
+        {
+            Assert.Equal(requested[i], result[i].Type);
+            Assert.Equal(BitConverter.GetBytes((ulong)requested[i]), result[i].GetValueAsByteArray());
+        }
+        Assert.Equal(2, fake.CallCount("C_GetAttributeValue"));
     }
 }

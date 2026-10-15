@@ -111,12 +111,11 @@ public sealed class Pkcs11Key : IDisposable
     /// token does not expose come back with <see cref="ObjectAttribute.CannotBeRead"/> set. The list
     /// owns the values: dispose it (a <c>using</c> will do) to release and zeroize their buffers.</returns>
     /// <exception cref="ObjectDisposedException">Thrown when the key has been disposed.</exception>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="types"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="types"/> is empty.</exception>
     /// <exception cref="Pkcs11Exception"><see cref="CKR.CKR_OBJECT_HANDLE_INVALID"/> when the key exposes no readable handle; otherwise propagated from the underlying <c>C_GetAttributeValue</c> call.</exception>
-    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(params CKA[] types)
+    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(params ReadOnlySpan<CKA> types)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentNullException.ThrowIfNull(types);
 
         ObjectHandle handle = (IsAsymmetricKeyType(_keyType) && !_publicHandle.IsInvalid)
             ? _publicHandle
@@ -126,7 +125,7 @@ public sealed class Pkcs11Key : IDisposable
             throw Pkcs11Exception.Create(CKR.CKR_OBJECT_HANDLE_INVALID,
                 "Pkcs11Key.GetAttributeValue (no readable handle)");
 
-        return _session.Core.GetAttributeValue(handle, [.. types]);
+        return _session.Core.GetAttributeValue(handle, types);
     }
 
     /// <summary>Internal accessor for the session this key belongs to.</summary>
