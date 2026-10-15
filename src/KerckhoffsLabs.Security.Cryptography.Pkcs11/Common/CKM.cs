@@ -1588,7 +1588,7 @@ public enum CKM : ulong
     CKM_GOST28147_ECB = 0x00001221,
 
     /// <summary>
-    /// GOST 28147-89 encryption mechanism with with cipher feedback mode (CFB) and additional CBC mode defined in section 2 of RFC 4357
+    /// GOST 28147-89 encryption mechanism with cipher feedback mode (CFB) and additional CBC mode defined in section 2 of RFC 4357
     /// </summary>
     CKM_GOST28147 = 0x00001222,
 
