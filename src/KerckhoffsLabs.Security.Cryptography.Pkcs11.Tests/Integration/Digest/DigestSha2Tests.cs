@@ -14,7 +14,7 @@ internal static class DigestSha2TestCases
     /// <summary>Real SHA-256 over "abc" matches the published test vector.</summary>
     internal static void Assert_Sha256_KnownAnswer(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             byte[] data = Encoding.UTF8.GetBytes("abc");
@@ -30,13 +30,12 @@ internal static class DigestSha2TestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 
     internal static void Assert_Sha384_OutputLength(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             var mech = new Mechanism(CKM.CKM_SHA384);
@@ -46,13 +45,12 @@ internal static class DigestSha2TestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 
     internal static void Assert_Sha512_OutputLength(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             var mech = new Mechanism(CKM.CKM_SHA512);
@@ -62,7 +60,6 @@ internal static class DigestSha2TestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 }

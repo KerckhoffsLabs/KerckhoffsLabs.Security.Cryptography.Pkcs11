@@ -16,7 +16,7 @@ internal static class WrapUnwrapKeyTestCases
 
     internal static void Assert_AesKeyWrap_RoundTrip(IPkcs11Backend backend, CKM wrapMechanism)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             // KEK can stay non-extractable — it's the wrapping key, not wrapped.
@@ -84,7 +84,6 @@ internal static class WrapUnwrapKeyTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 
@@ -92,7 +91,7 @@ internal static class WrapUnwrapKeyTestCases
     // it, runs <paramref name="body"/> with (session, kek, wrappedBytes), then tears everything down.
     private static void WithWrappedAesKey(IPkcs11Backend backend, CKM wrapMechanism, Action<Pkcs11SessionCore, ObjectHandle, byte[]> body)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle kek = TestKeys.GenerateAes256WrappingKey(session);
@@ -126,7 +125,6 @@ internal static class WrapUnwrapKeyTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 

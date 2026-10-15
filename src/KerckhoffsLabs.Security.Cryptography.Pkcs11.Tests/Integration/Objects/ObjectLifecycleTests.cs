@@ -11,7 +11,7 @@ internal static class ObjectLifecycleTestCases
 {
     internal static void Assert_CreateFindDestroy_DataObject(IPkcs11Backend backend)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             string label = "phase-4a-test-" + Guid.NewGuid().ToString("N");
@@ -53,7 +53,6 @@ internal static class ObjectLifecycleTestCases
         finally
         {
             TestKeys.LogoutIfRequired(backend, session);
-            session.Dispose();
         }
     }
 }
