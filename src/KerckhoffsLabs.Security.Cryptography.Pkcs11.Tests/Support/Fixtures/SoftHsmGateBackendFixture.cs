@@ -69,7 +69,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
         // Private copy of libsofthsm2: dlopen of a distinct path/inode yields an independent
         // native instance, so the gate's C_Initialize state and token store never collide with
         // the main SoftHSM fixture's.
-        _gateDir = Path.Join(Path.GetDirectoryName(gatePath)!, $"gate{level}");
+        _gateDir = Path.Join(Path.GetDirectoryName(gatePath), $"gate{level}");
         Directory.CreateDirectory(_gateDir);
         _targetCopyPath = Path.Join(_gateDir, Path.GetFileName(softHsmPath));
         File.Copy(softHsmPath, _targetCopyPath, overwrite: true);

@@ -52,7 +52,7 @@ internal static class SHA384Pkcs11TestCases
         hash.TransformBlock(part1, 0, part1.Length, null, 0);
         hash.TransformFinalBlock(part2, 0, part2.Length);
 
-        Assert.Equal(SHA384.HashData(Encoding.UTF8.GetBytes("hello world")), hash.Hash!);
+        Assert.Equal(SHA384.HashData(Encoding.UTF8.GetBytes("hello world")), hash.Hash);
     }
 
     internal static void Assert_Reuse_AfterInitialize_ProducesFreshHash(IPkcs11Backend backend)

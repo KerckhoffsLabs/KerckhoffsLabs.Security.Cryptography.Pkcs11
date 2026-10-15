@@ -112,7 +112,7 @@ public sealed class SHA3_512Pkcs11Tests_Managed
         }
         sha.TransformFinalBlock(whole, offset, whole.Length - offset);
 
-        Assert.Equal(SHA3_512.HashData(whole), sha.Hash!);
+        Assert.Equal(SHA3_512.HashData(whole), sha.Hash);
     }
 
     // === Reuse ===========================================================================

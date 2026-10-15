@@ -54,7 +54,7 @@ internal static class SHA256Pkcs11TestCases
         sha.TransformBlock(part1, 0, part1.Length, null, 0);
         sha.TransformFinalBlock(part2, 0, part2.Length);
 
-        Assert.Equal(SHA256.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash!);
+        Assert.Equal(SHA256.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash);
     }
 
     internal static void Assert_Reuse_AfterInitialize_ProducesFreshHash(IPkcs11Backend backend)
