@@ -36,6 +36,23 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         catch (CryptographicException) { return false; }
     }
 
+    // prime239v1 (X9.62) is outside Pkcs11ECCurve's catalog, and its 239-bit field is not a whole number
+    // of bytes. Available wherever the BCL's backend implements it (OpenSSL does; CNG does not).
+    private const string Prime239v1Oid = "1.2.840.10045.3.1.4";
+
+    public static bool Prime239v1Supported { get; } = ProbeCurve(Prime239v1Oid);
+
+    private static bool ProbeCurve(string oid)
+    {
+        try
+        {
+            using (ECDiffieHellman.Create(BclECCurve.CreateFromValue(oid))) { }
+            return true;
+        }
+        catch (PlatformNotSupportedException) { return false; }
+        catch (CryptographicException) { return false; }
+    }
+
     private static byte[] H(string hex) => Convert.FromHexString(hex);
 
     // Maps a named-curve name to the production Pkcs11ECCurve (token side) and the BCL ECCurve (peer side).
@@ -44,6 +61,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         "P-256" => (Pkcs11ECCurve.NamedCurves.NistP256, BclECCurve.NamedCurves.nistP256),
         "P-384" => (Pkcs11ECCurve.NamedCurves.NistP384, BclECCurve.NamedCurves.nistP384),
         "P-521" => (Pkcs11ECCurve.NamedCurves.NistP521, BclECCurve.NamedCurves.nistP521),
+        "prime239v1" => (Pkcs11ECCurve.CreateFromValue(Prime239v1Oid, "prime239v1"), BclECCurve.CreateFromValue(Prime239v1Oid)),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown curve."),
     };
 
@@ -52,6 +70,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         "P-256" => 32,
         "P-384" => 48,
         "P-521" => 66,
+        "prime239v1" => 30,
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown curve."),
     };
 
@@ -143,6 +162,21 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
 
         Assert.Equal(FieldSize(curve), aliceZ.Length);
+        Assert.Equal(bobZ, aliceZ);
+    });
+
+    // Outside the catalog the adapter has no field size, so it sizes the secret by the peer's coordinate,
+    // which the BCL pads to the field: 30 bytes for a 239-bit field.
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void DeriveRawSecretAgreement_CurveOutsideTheCatalog_MatchesBcl() => WithEcdh("prime239v1", alice =>
+    {
+        Assert.Null(Curves("prime239v1").token.FieldSizeBits);
+        using var bob = ECDiffieHellman.Create(Curves("prime239v1").bcl);
+
+        byte[] aliceZ = alice.DeriveRawSecretAgreement(bob.PublicKey);
+        byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
+
+        Assert.Equal(FieldSize("prime239v1"), aliceZ.Length);
         Assert.Equal(bobZ, aliceZ);
     });
 
