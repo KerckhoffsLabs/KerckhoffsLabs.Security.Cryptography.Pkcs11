@@ -42,7 +42,6 @@ public sealed class DualFunctionDispatchTests
     public static TheoryData<string> OutputFunctions => [.. Outputs.Keys];
 
     private static readonly HashSet<string> TakesInput = [nameof(LowLevelPkcs11Library.C_DigestEncryptUpdate), nameof(LowLevelPkcs11Library.C_DecryptDigestUpdate), nameof(LowLevelPkcs11Library.C_SignEncryptUpdate), nameof(LowLevelPkcs11Library.C_DecryptVerifyUpdate)];
-    private static readonly HashSet<string> TakesKey = [];
 
     private delegate CKR OutputCall(LowLevelPkcs11Library lowLevel, Span<byte> output, bool lengthOnly, out NativeCULong length);
 
@@ -55,10 +54,6 @@ public sealed class DualFunctionDispatchTests
         Assert.Equal(CKR.CKR_OK, DispatchSmoke.ReachesTheModule(module, Cases[function]));
 
         Assert.Equal((ulong)DispatchSmoke.Session, (ulong)module.LastSession);
-        if (function.EndsWith("Init", StringComparison.Ordinal))
-            Assert.Equal((ulong)CKM.CKM_AES_CBC_PAD, module.LastMechanism);
-        if (TakesKey.Contains(function))
-            Assert.Equal(3UL, module.LastKey);
         if (TakesInput.Contains(function))
             Assert.Equal(Input, module.LastInput);
     }
@@ -141,8 +136,6 @@ public sealed class DualFunctionDispatchTests
         Assert.Throws<Pkcs11UnclassifiedException>(() => Outputs[function](lowLevel, default, lengthOnly: true, out _));
     }
 
-    private static CK_MECHANISM Mechanism() => new() { Mechanism = (NativeCULong)(ulong)CKM.CKM_AES_CBC_PAD };
-
     /// <summary>
     /// Implements the whole family, records what each call received, and answers an output call the way a
     /// module does: the length for a NULL buffer, the bytes when they fit.
@@ -154,8 +147,6 @@ public sealed class DualFunctionDispatchTests
         public NativeCULong? QueryReports { get; init; }
 
         public NativeCULong LastSession { get; private set; }
-        public ulong LastMechanism { get; private set; }
-        public ulong LastKey { get; private set; }
         public byte[]? LastInput { get; private set; }
         public bool OutputWasNull { get; private set; }
 
@@ -167,14 +158,6 @@ public sealed class DualFunctionDispatchTests
             => Output(session, input, output, ref length);
         protected override CKR C_DecryptVerifyUpdate(NativeCULong session, ReadOnlySpan<byte> input, NativeBuffer<byte> output, ref NativeCULong length)
             => Output(session, input, output, ref length);
-
-        private CKR Init(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key)
-        {
-            LastSession = session;
-            LastMechanism = (ulong)mechanism.Mechanism;
-            LastKey = (ulong)key;
-            return CKR.CKR_OK;
-        }
 
         private CKR Received(NativeCULong session, ReadOnlySpan<byte> input)
         {
