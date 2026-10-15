@@ -4,6 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.MechanismParams;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
@@ -278,6 +279,10 @@ public sealed class Pkcs11Session : IDisposable
 
     private Pkcs11Object HydrateObjectFromHandle(ObjectHandle handle)
     {
+        // One round trip when the token answers cleanly; the generic two-call read otherwise.
+        if (_core.TryReadIdentity(handle, withKeyType: false, out ObjectIdentity identity))
+            return new Pkcs11Object(this, handle, identity.ObjectClass, identity.Label, identity.Id);
+
         using var attrs = _core.GetAttributeValue(handle, [CKA.CKA_CLASS, CKA.CKA_LABEL, CKA.CKA_ID]);
         var objectClass = (CKO)attrs[0].GetValueAsUlong();
         string? label = attrs[1].CannotBeRead ? null : attrs[1].GetValueAsString();
@@ -893,17 +898,30 @@ public sealed class Pkcs11Session : IDisposable
     /// </summary>
     private Pkcs11Key HydrateKeyFromHandle(ObjectHandle handle)
     {
-        using var attrs = _core.GetAttributeValue(handle,
-        [
-            CKA.CKA_CLASS,
-            CKA.CKA_KEY_TYPE,
-            CKA.CKA_LABEL,
-            CKA.CKA_ID,
-        ]);
-        var objectClass = (CKO)attrs[0].GetValueAsUlong();
-        var keyType = (CKK)attrs[1].GetValueAsUlong();
-        string? label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
-        byte[] id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
+        CKO objectClass;
+        CKK keyType;
+        string? label;
+        byte[] id;
+
+        // One round trip when the token answers cleanly; the generic two-call read otherwise.
+        if (_core.TryReadIdentity(handle, withKeyType: true, out ObjectIdentity identity))
+        {
+            (objectClass, keyType, label, id) = identity;
+        }
+        else
+        {
+            using var attrs = _core.GetAttributeValue(handle,
+            [
+                CKA.CKA_CLASS,
+                CKA.CKA_KEY_TYPE,
+                CKA.CKA_LABEL,
+                CKA.CKA_ID,
+            ]);
+            objectClass = (CKO)attrs[0].GetValueAsUlong();
+            keyType = (CKK)attrs[1].GetValueAsUlong();
+            label = attrs[2].CannotBeRead ? null : attrs[2].GetValueAsString();
+            id = attrs[3].CannotBeRead ? [] : attrs[3].GetValueAsByteArray();
+        }
 
         ObjectHandle privateHandle = ObjectHandle.Invalid;
         ObjectHandle publicHandle = ObjectHandle.Invalid;
