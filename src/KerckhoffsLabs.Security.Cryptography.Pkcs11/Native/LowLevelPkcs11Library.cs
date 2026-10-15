@@ -131,6 +131,14 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
            && _module.Table.C_MessageDecryptFinal is not null;
 
     /// <summary>
+    /// True when the module was bound through a v3.x interface table from <c>C_GetInterface</c>, false
+    /// when through the v2.40 table from <c>C_GetFunctionList</c>. Every v3.x table carries
+    /// <c>C_GetInterface</c> itself, which the module implements since the table came from it, and a
+    /// v2.40 binding leaves every v3.x slot NULL.
+    /// </summary>
+    public unsafe bool IsBoundThroughV3Interface => _module.Table.C_GetInterface is not null;
+
+    /// <summary>
     /// Whether <c>CKM_PKCS5_PBKD2</c> sends every slot of this module <c>CK_PKCS5_PBKD2_PARAMS</c>, whose
     /// <c>ulPasswordLen</c> is a pointer, rather than <c>CK_PKCS5_PBKD2_PARAMS2</c>, as configured;
     /// <see langword="null"/> to decide slot by slot (<see cref="Pbkdf2PasswordLengthByReferenceBySlot"/>).

@@ -14,7 +14,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
 {
     private readonly NssBackendFixture _backend = backend;
 
-    // Verifies the unwrapped key via the classic CK_GCM_PARAMS path NSS rejects; skip (see NssBackendFixture).
+    // Verifies the unwrapped key through classic CK_GCM_PARAMS AES-GCM (see NssBackendFixture.RequireClassicAesGcm).
 
     [Theory(SkipUnless = nameof(NssBackendFixture.ClassicAesGcmAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.ClassicAesGcmAvailable))]
     [InlineData(CKM.CKM_AES_KEY_WRAP)]
@@ -24,6 +24,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
     public void AesKeyWrap_RoundTrip(CKM wrapMechanism)
     {
         _backend.RequireMechanism(wrapMechanism);
+        _backend.RequireClassicAesGcm();
         WrapUnwrapKeyTestCases.Assert_AesKeyWrap_RoundTrip(_backend, wrapMechanism);
     }
 
@@ -42,8 +43,7 @@ public sealed class WrapUnwrapKeyTests_Nss(NssBackendFixture backend)
     // unrecoverably, since NSS only updates the reported length on success, never on failure.
     // Pkcs11SessionCore.TryWrapKeyKwp works around this by computing the wrapped length itself instead of
     // trusting the token's probe, so this needs its own real-backend proof rather than reusing
-    // AesKeyWrap_RoundTrip's shared case (which also isn't reachable here anyway --
-    // ClassicAesGcmAvailable gates it off NSS-wide for an unrelated GCM-verification reason).
+    // AesKeyWrap_RoundTrip's shared case.
     // Sizes: 1 (sub-block), 8 (exactly one AES block), 15 (non-block-aligned, exercises the
     // round-up-to-8 math), 40 (several blocks).
     [Theory(SkipUnless = nameof(NssBackendFixture.NssAvailable), SkipType = typeof(NssBackendFixture), Skip = "Requires " + nameof(NssBackendFixture.NssAvailable))]

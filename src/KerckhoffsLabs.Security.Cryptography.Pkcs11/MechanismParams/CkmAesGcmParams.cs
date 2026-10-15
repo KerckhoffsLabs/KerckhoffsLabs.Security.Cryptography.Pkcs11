@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 
@@ -45,12 +46,16 @@ public sealed class CkmAesGcmParams : MechanismParameters
         {
             Iv = scope.Write(_ivBytes),
             IvLen = (NativeCULong)_ivBytes.Length,
-            // Legacy field; PKCS#11 v3.2 §2.5.13 allows 0 and the IV length is taken from IvLen.
-            // Some tokens reject a non-zero value (SoftHSM's AES-GCM KAT fails when it is set), so
-            // leave it 0 for maximum interoperability. NSS softoken's classic C_EncryptInit GCM path
-            // conversely rejects 0, so GCM against NSS goes through the message-based AesGcmPkcs11
-            // façade (C_MessageEncrypt), not this classic-params path.
-            IvBits = (NativeCULong)0,
+            // PKCS#11 v2.40 left this field ambiguous: its header has ulIvBits, its text did not, and
+            // NSS before 3.52 followed the text with a five-field struct. Such a module reads this
+            // six-field struct's ulIvBits as pAAD, so anything but 0 would be dereferenced. A module
+            // bound through a v3.x interface implements the reconciled layout, where ulIvBits is the
+            // IV length in bits: NSS 3.52 and later reject the call unless it equals ulIvLen * 8, and
+            // SoftHSM, Kryoptic and OpenCryptoki accept that value. So the IV length in bits for a
+            // v3.x module, and 0 for a v2.x one or when the call has no session to ask.
+            IvBits = scope is SessionParameterScope session && session.Session.SendsGcmIvBits
+                ? (NativeCULong)((ulong)_ivBytes.Length * 8)
+                : (NativeCULong)0,
             AAD = scope.Write(_aadBytes),
             AADLen = (NativeCULong)_aadBytes.Length,
             TagBits = (NativeCULong)_tagBits,
