@@ -161,7 +161,11 @@ public sealed class Pkcs11ECCurveTests
         Pkcs11ECCurve p256 = Pkcs11ECCurve.NamedCurves.NistP256;
         Assert.True(p256.Equals((object)Pkcs11ECCurve.CreateFromValue("1.2.840.10045.3.1.7")));
         Assert.False(p256.Equals("not a curve"));
-        Assert.False(p256.Equals(null));
+        // Equals(object) must return false for null. Passed through a variable, not as a literal: the
+        // null-argument-to-Equals check targets code that calls Equals(null) by mistake, and here the
+        // call is what is under test.
+        object? nothing = null;
+        Assert.False(p256.Equals(nothing));
         Assert.Equal(0, default(Pkcs11ECCurve).GetHashCode());
     }
 
