@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Cryptography;
 using BclECCurve = System.Security.Cryptography.ECCurve;
 
@@ -227,4 +228,20 @@ public sealed class Pkcs11ECCurveTests
     [Fact]
     public void FieldSizeBits_Default_IsNull()
         => Assert.Null(default(Pkcs11ECCurve).FieldSizeBits);
+
+    // Every NamedCurves shortcut must have its row in the catalog: a property without one would still
+    // build, with no friendly name and no field size.
+    [Fact]
+    public void NamedCurves_EveryShortcut_IsInTheCatalog()
+    {
+        PropertyInfo[] shortcuts = typeof(Pkcs11ECCurve.NamedCurves).GetProperties(BindingFlags.Public | BindingFlags.Static);
+        Assert.NotEmpty(shortcuts);
+        Assert.All(shortcuts, p =>
+        {
+            var curve = (Pkcs11ECCurve)p.GetValue(null)!;
+            Assert.NotNull(curve.FriendlyName);
+            Assert.NotNull(curve.FieldSizeBits);
+            Assert.Equal(curve, Pkcs11ECCurve.CreateFromFriendlyName(curve.FriendlyName!));
+        });
+    }
 }
