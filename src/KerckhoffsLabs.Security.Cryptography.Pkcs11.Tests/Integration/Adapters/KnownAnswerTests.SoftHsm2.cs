@@ -57,7 +57,7 @@ internal static class KnownAnswerTestCases
             "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662" +
             "76fc6ece0f4e1768cddf8853bb2d551b");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle k = TestKeys.CreateAes256Key(session, key);
@@ -85,7 +85,7 @@ internal static class KnownAnswerTestCases
                     $"decrypting in {chunk}-byte pieces");
             }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // HMAC-SHA256, RFC 4231 test case 6 (131-byte key, larger than the block size).
