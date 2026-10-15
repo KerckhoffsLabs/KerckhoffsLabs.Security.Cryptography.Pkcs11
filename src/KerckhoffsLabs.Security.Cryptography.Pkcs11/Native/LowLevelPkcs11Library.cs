@@ -146,6 +146,16 @@ internal sealed partial class LowLevelPkcs11Library : IDisposable
     internal ConcurrentDictionary<ulong, bool> Pbkdf2PasswordLengthByReferenceBySlot { get; } = new();
 
     /// <summary>
+    /// The (slot ID, mechanism) pairs whose single-part <c>C_Decrypt</c> has answered
+    /// <c>CKR_BUFFER_TOO_SMALL</c> for a destination that then held the whole result: the module wants
+    /// a buffer the size of the input, not of the output (SoftHSM 2.7's AEAD decrypt does). Once a pair
+    /// is here, a destination shorter than the input goes straight to a scratch buffer, so the decrypt
+    /// takes one call instead of two. Only ever added to: a wrong entry costs one pooled copy, not a
+    /// wrong result. Keyed by slot because one library can front several modules (p11-kit).
+    /// </summary>
+    internal ConcurrentDictionary<(ulong Slot, CKM Mechanism), bool> DecryptWantsInputSizedOutput { get; } = new();
+
+    /// <summary>
     /// True when the loaded PKCS#11 library exposes the v3.2 surface (ML-KEM
     /// encapsulate/decapsulate, authenticated wrap/unwrap, signature-only verify, and
     /// validation-flags inspection). False on v2.40 / v3.0 / v3.1 libraries.

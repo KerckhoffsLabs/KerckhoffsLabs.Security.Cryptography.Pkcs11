@@ -131,6 +131,21 @@ public sealed class OperationCostGuardTests
         Assert.True(allocated <= 480, $"Reading one attribute allocated {allocated} B; the budget is 480 B.");
     }
 
+    // The span-first workers write where the caller says: no buffer that scales with the input, on
+    // either side.
+    [Fact]
+    public void TryEncryptInto_AllocatesNoInputSizedBuffer()
+        => AssertAllocationSlope(maxBuffersPerInput: 0, (session, data) =>
+            session.TryEncryptInto(Gcm(), new ObjectHandle(1), data, Destination.AsSpan(0, data.Length + 16), out _));
+
+    [Fact]
+    public void TryDecryptInto_AllocatesNoInputSizedBuffer()
+        => AssertAllocationSlope(maxBuffersPerInput: 0, (session, data) =>
+            session.TryDecryptInto(Gcm(), new ObjectHandle(1), data, Destination.AsSpan(0, data.Length - 16), out _));
+
+    // Large enough for the 2 MiB input plus a tag; reused so the destination is not what is measured.
+    private static readonly byte[] Destination = new byte[LargeInput + 16];
+
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
 
     private delegate void Operation(Pkcs11SessionCore session, ReadOnlySpan<byte> data);
@@ -165,7 +180,8 @@ public sealed class OperationCostGuardTests
 
     /// <summary>
     /// A module whose operations need no keys: fixed-size signatures and digests, and an encryption
-    /// that returns the plaintext followed by a 16-byte tag, the shape of AES-GCM's output. Every
+    /// that returns the plaintext followed by a 16-byte tag, the shape of AES-GCM's output, and its
+    /// inverse. Every
     /// attribute reads as eight zero bytes.
     /// </summary>
     private sealed class EchoModule : FakeModule
@@ -180,6 +196,24 @@ public sealed class OperationCostGuardTests
         protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => CKR.CKR_OK;
         protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+        protected override CKR C_DecryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+
+        // The inverse of C_Encrypt: the input without its 16-byte tag.
+        protected override CKR C_Decrypt(NativeCULong session, ReadOnlySpan<byte> encryptedData, NativeBuffer<byte> data, ref NativeCULong dataLen)
+        {
+            int length = encryptedData.Length - TagLength;
+            if (!data.IsNull)
+            {
+                if (data.Span.Length < length)
+                {
+                    dataLen = (NativeCULong)(ulong)length;
+                    return CKR.CKR_BUFFER_TOO_SMALL;
+                }
+                encryptedData[..length].CopyTo(data.Span);
+            }
+            dataLen = (NativeCULong)(ulong)length;
+            return CKR.CKR_OK;
+        }
 
         protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
         {
