@@ -27,8 +27,8 @@ public sealed class MechanismParamsMarshalTests
         var s = p.BuildMarshalable(scope).Read<CK_GCM_PARAMS>();
 
         Assert.Equal((ulong)iv.Length, (ulong)s.IvLen);
-        // IvBits is a legacy field (PKCS#11 v3.2 §2.5.13); we always marshal it as 0 since the IV
-        // length is carried by IvLen and some tokens reject a non-zero value.
+        // 0 without a session to say which module receives it; a v3.x module gets the IV length in
+        // bits instead (GcmIvBitsTests).
         Assert.Equal(0UL, (ulong)s.IvBits);
         Assert.Equal((ulong)aad.Length, (ulong)s.AADLen);
         Assert.Equal(96UL, (ulong)s.TagBits);

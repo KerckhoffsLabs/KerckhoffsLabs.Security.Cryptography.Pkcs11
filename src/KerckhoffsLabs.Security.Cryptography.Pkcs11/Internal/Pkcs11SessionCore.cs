@@ -2397,6 +2397,13 @@ internal sealed class Pkcs11SessionCore : IDisposable
     public bool SupportsMessageApi => _pkcs11Library.IsMessageApiSupported;
 
     /// <summary>
+    /// Whether <c>CK_GCM_PARAMS</c> sent to this session's module carries the IV length in
+    /// <c>ulIvBits</c>, rather than 0: when the module was bound through a v3.x interface. See
+    /// <see cref="CkmAesGcmParams"/>.
+    /// </summary>
+    internal bool SendsGcmIvBits => _pkcs11Library.IsBoundThroughV3Interface;
+
+    /// <summary>
     /// Whether <c>CKM_PKCS5_PBKD2</c> must send this session's slot the original
     /// <c>CK_PKCS5_PBKD2_PARAMS</c>, whose <c>ulPasswordLen</c> is a pointer: as
     /// <see cref="Pkcs11LibraryOptions.Pbkdf2ParametersLayout"/> configured it, or else as detected the

@@ -247,7 +247,8 @@ public sealed class BuildMarshalableTests
         Assert.Equal(12UL, (ulong)s.IvLen);
         Assert.Equal(2UL, (ulong)s.AADLen);
         Assert.Equal(128UL, (ulong)s.TagBits);
-        // Deliberately 0: the IV length travels in IvLen, and some tokens reject a non-zero IvBits.
+        // 0 without a session to say which module receives it; a v3.x module gets the IV length in
+        // bits instead (GcmIvBitsTests).
         Assert.Equal(0UL, (ulong)s.IvBits);
         AssertBlockHolds(s.Iv, iv);
         AssertBlockHolds(s.AAD, aad);
