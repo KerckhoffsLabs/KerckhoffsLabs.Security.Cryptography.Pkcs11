@@ -103,8 +103,7 @@ public readonly partial struct Pkcs11ECCurve
     }
 
     // OID constants for every catalog curve, each referenced from more than one table below
-    // (NamedCurves, _namesByOid, _fieldSizeBitsByOid, and — for the below-baseline curves —
-    // _belowBaselineOids) — avoids repeating the literal.
+    // (NamedCurves, _namesByOid, _fieldSizeBitsByOid) — avoids repeating the literal.
     private const string NistP192Oid = "1.2.840.10045.3.1.1";
     private const string NistP224Oid = "1.3.132.0.33";
     private const string NistP256Oid = "1.2.840.10045.3.1.7";
@@ -185,21 +184,5 @@ public readonly partial struct Pkcs11ECCurve
         [BrainpoolP512r1Oid] = 512,      // brainpoolP512r1
         [BrainpoolP512t1Oid] = 512,      // brainpoolP512t1
         [Sm2Oid] = 256,                  // sm2
-    };
-
-    // Catalog curves providing < 128-bit security (field size < 256-bit): the 160/192/224-bit NIST
-    // and Brainpool curves. GenerateEcKeyPair gates these behind the session's crypto policy. See IsBelowSecurityBaseline.
-    private static readonly HashSet<string> _belowBaselineOids = new(StringComparer.Ordinal)
-    {
-        NistP192Oid,          // nistP192        ~96-bit
-        NistP224Oid,          // nistP224        ~112-bit
-        Secp192k1Oid,         // secp192k1       ~96-bit
-        Secp224k1Oid,         // secp224k1       ~112-bit
-        BrainpoolP160r1Oid,   // brainpoolP160r1 ~80-bit
-        BrainpoolP160t1Oid,   // brainpoolP160t1 ~80-bit
-        BrainpoolP192r1Oid,   // brainpoolP192r1 ~96-bit
-        BrainpoolP192t1Oid,   // brainpoolP192t1 ~96-bit
-        BrainpoolP224r1Oid,   // brainpoolP224r1 ~112-bit
-        BrainpoolP224t1Oid,   // brainpoolP224t1 ~112-bit
     };
 }
