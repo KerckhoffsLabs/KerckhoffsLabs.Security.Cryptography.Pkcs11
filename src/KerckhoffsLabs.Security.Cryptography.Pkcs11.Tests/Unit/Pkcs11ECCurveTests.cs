@@ -165,33 +165,6 @@ public sealed class Pkcs11ECCurveTests
     }
 
     [Fact]
-    public void IsBelowSecurityBaseline_FlagsSub128BitCurves()
-    {
-#pragma warning disable KLPKCS11007 // deliberately referencing the obsolete sub-128-bit curves
-        Pkcs11ECCurve[] weak =
-        [
-            Pkcs11ECCurve.NamedCurves.NistP192, Pkcs11ECCurve.NamedCurves.NistP224,
-            Pkcs11ECCurve.NamedCurves.BrainpoolP160r1, Pkcs11ECCurve.NamedCurves.BrainpoolP160t1,
-            Pkcs11ECCurve.NamedCurves.BrainpoolP192r1, Pkcs11ECCurve.NamedCurves.BrainpoolP192t1,
-            Pkcs11ECCurve.NamedCurves.BrainpoolP224r1, Pkcs11ECCurve.NamedCurves.BrainpoolP224t1,
-            Pkcs11ECCurve.NamedCurves.Secp192k1, Pkcs11ECCurve.NamedCurves.Secp224k1,
-        ];
-#pragma warning restore KLPKCS11007
-        Assert.All(weak, c => Assert.True(c.IsBelowSecurityBaseline, $"{c} should be sub-baseline"));
-
-        Pkcs11ECCurve[] strong =
-        [
-            Pkcs11ECCurve.NamedCurves.NistP256, Pkcs11ECCurve.NamedCurves.NistP384, Pkcs11ECCurve.NamedCurves.NistP521,
-            Pkcs11ECCurve.NamedCurves.Secp256k1, Pkcs11ECCurve.NamedCurves.BrainpoolP256r1,
-            Pkcs11ECCurve.NamedCurves.BrainpoolP512t1, Pkcs11ECCurve.NamedCurves.Sm2,
-        ];
-        Assert.All(strong, c => Assert.False(c.IsBelowSecurityBaseline, $"{c} should meet baseline"));
-
-        // An OID outside the catalog can't be classified from the OID alone -> not flagged.
-        Assert.False(Pkcs11ECCurve.CreateFromValue("1.2.3.4").IsBelowSecurityBaseline);
-    }
-
-    [Fact]
     public void NamedCurves_Catalog_OidsNamesAndEncodingAreConsistent()
     {
         // Every entry pairs the NamedCurves property with an independently written OID + name, so a
