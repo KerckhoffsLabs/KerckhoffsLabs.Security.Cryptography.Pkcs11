@@ -777,7 +777,7 @@ public enum CKM : ulong
     CKM_CONCATENATE_DATA_AND_BASE = 0x00000363,
 
     /// <summary>
-    /// Key derivation mechanism that 
+    /// Key derivation mechanism that
     /// </summary>
     CKM_XOR_BASE_AND_DATA = 0x00000364,
 
