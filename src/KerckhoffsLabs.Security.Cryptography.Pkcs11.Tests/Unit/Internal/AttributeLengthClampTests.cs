@@ -67,7 +67,7 @@ public sealed class AttributeLengthClampTests
         using (fake)
         {
             using var session = fake.CreateSession(1);
-            return session.GetAttributeValue(new ObjectHandle(ObjectId), [(ulong)CKA.CKA_VALUE]);
+            return session.GetAttributeValue(new ObjectHandle(ObjectId), [CKA.CKA_VALUE]);
         }
     }
 

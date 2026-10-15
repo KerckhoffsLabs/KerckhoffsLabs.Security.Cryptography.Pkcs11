@@ -1048,64 +1048,56 @@ internal sealed class Pkcs11SessionCore : IDisposable
     }
 
     /// <summary>
-    /// Obtains the value of one or more attributes of an object
+    /// The most attributes a read lays out on the stack: the template and the two arrays that record
+    /// what was allocated for it. A longer read puts them on the heap, so no caller can exhaust the
+    /// stack by asking for many attributes.
     /// </summary>
-    /// <param name="objectHandle">Handle of object whose attributes should be read</param>
-    /// <param name="attributes">List of attributes that should be read</param>
-    /// <returns>Object attributes</returns>
-    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<CKA> attributes)
-    {
-        using var _ = AcquireExclusive();
-
-        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue1");
-
-
-        ArgumentNullException.ThrowIfNull(attributes);
-
-        if (attributes.Count < 1)
-            throw new ArgumentException("No attributes specified", nameof(attributes));
-
-        List<ulong> ulongs = [];
-        foreach (CKA attribute in attributes)
-            ulongs.Add((ulong)attribute.ToCULong());
-
-        return GetAttributeValue(objectHandle, ulongs);
-    }
+    private const int StackAttributeCount = 16;
 
     /// <summary>
     /// Obtains the value of one or more attributes of an object
     /// </summary>
     /// <param name="objectHandle">Handle of object whose attributes should be read</param>
-    /// <param name="attributes">List of attributes that should be read</param>
-    /// <returns>Object attributes</returns>
-    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, List<ulong> attributes)
+    /// <param name="attributes">Attributes that should be read</param>
+    /// <returns>Object attributes, in the order of <paramref name="attributes"/></returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="attributes"/> is empty.</exception>
+    public ReadOnlyDisposableList<ObjectAttribute> GetAttributeValue(ObjectHandle objectHandle, ReadOnlySpan<CKA> attributes)
     {
         using var _ = AcquireExclusive();
 
-        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue2");
+        Log.SessionTrace(_logger, (ulong)_sessionId, "GetAttributeValue");
 
 
-        ArgumentNullException.ThrowIfNull(attributes);
-
-        if (attributes.Count < 1)
+        if (attributes.IsEmpty)
             throw new ArgumentException("No attributes specified", nameof(attributes));
 
-        CK_ATTRIBUTE[] template = BuildTypeOnlyTemplate(attributes);
+        bool onStack = attributes.Length <= StackAttributeCount;
+        Span<CK_ATTRIBUTE> template = onStack
+            ? stackalloc CK_ATTRIBUTE[StackAttributeCount]
+            : new CK_ATTRIBUTE[attributes.Length];
+        template = template[..attributes.Length];
+        BuildTypeOnlyTemplate(attributes, template);
 
         // The buffer handed to the module for each attribute, and its size. After every call the
         // template's pointers are reset from here and its lengths checked against it: the module fills
-        // the buffers, it never chooses them.
-        IntPtr[] allocatedAt = new IntPtr[template.Length];
-        NativeCULong[] allocatedLen = new NativeCULong[template.Length];
+        // the buffers, it never chooses them. An unreadable attribute keeps a null pointer and a zero
+        // size, so both start cleared.
+        Span<IntPtr> allocatedAt = onStack ? stackalloc IntPtr[StackAttributeCount] : new IntPtr[attributes.Length];
+        allocatedAt = allocatedAt[..attributes.Length];
+        allocatedAt.Clear();
+        Span<NativeCULong> allocatedLen = onStack ? stackalloc NativeCULong[StackAttributeCount] : new NativeCULong[attributes.Length];
+        allocatedLen = allocatedLen[..attributes.Length];
+        allocatedLen.Clear();
 
         // Every block handed to the module. Ownership passes to the ObjectAttributes only at the very
         // end, so until then a failure anywhere below has to free them here or they leak — which the
         // fatal-return paths and the malformed-nested-template throw did before this.
-        List<IntPtr> allocatedBlocks = [];
+        List<IntPtr> allocatedBlocks = new(attributes.Length);
 
         // Each member of an array attribute: where it sits in its parent's block, and the buffer and
-        // size given to it, so the third call is checked the same way.
-        List<NestedMember> nestedMembers = [];
+        // size given to it, so the third call is checked the same way. Created only when a read
+        // actually returns an array attribute with members.
+        List<NestedMember>? nestedMembers = null;
 
         // First call: determine the size of each attribute value.
         ReadAttributeValues(objectHandle, template);
@@ -1119,17 +1111,17 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
             // Third call, needed only if some attribute is an array attribute whose children still
             // have no buffers. It rewrites the whole template, so the top level is checked again too.
-            if (AllocateNestedBuffers(template, allocatedBlocks, nestedMembers))
+            if (AllocateNestedBuffers(template, allocatedBlocks, ref nestedMembers))
             {
                 ReadAttributeValues(objectHandle, template);
                 RestoreAndGuard(template, allocatedAt, allocatedLen);
-                foreach (NestedMember member in nestedMembers)
+                foreach (NestedMember member in nestedMembers!)
                     member.RestoreAndGuardSlot();
             }
 
             // Each array attribute ends up as one block its ObjectAttribute owns outright, and every
             // block not kept that way is freed (and zeroized) here rather than leaked.
-            FoldAttributeArrays(template, allocatedBlocks);
+            FoldAttributeArrays(template, allocatedBlocks, membersLaidOut: nestedMembers is not null);
         }
         catch
         {
@@ -1139,16 +1131,17 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         // Convert CK_ATTRIBUTEs to ObjectAttributes. Deliberately outside the try: from here the
         // ObjectAttributes own the blocks, and freeing them here too would be a double free.
-        List<ObjectAttribute> outAttributes = [];
+        var outAttributes = new ObjectAttribute[template.Length];
         for (int i = 0; i < template.Length; i++)
-            outAttributes.Add(new ObjectAttribute(template[i]));
+            outAttributes[i] = new ObjectAttribute(template[i]);
 
-        // The blocks belong to the caller from here; the returned list is what releases them.
-        return new ReadOnlyDisposableList<ObjectAttribute>(outAttributes);
+        // The blocks belong to the caller from here; the returned list is what releases them. It
+        // adopts the array rather than copying it: nothing else holds a reference to it.
+        return ReadOnlyDisposableList<ObjectAttribute>.TakeOwnership(outAttributes);
     }
 
     /// <summary>
-    /// Builds the type-only template the first <c>C_GetAttributeValue</c> call takes: it asks the
+    /// Fills the type-only template the first <c>C_GetAttributeValue</c> call takes: it asks the
     /// module how long each value is, so the template carries no values and needs no buffers.
     /// </summary>
     /// <remarks>
@@ -1158,20 +1151,17 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// wrapper's pointer, so disposing would leave the template pointing at freed memory the moment a
     /// type-only attribute ever allocated one. Not creating the disposable avoids the question.
     /// </remarks>
-    private static CK_ATTRIBUTE[] BuildTypeOnlyTemplate(List<ulong> attributes)
+    private static void BuildTypeOnlyTemplate(ReadOnlySpan<CKA> attributes, Span<CK_ATTRIBUTE> template)
     {
-        CK_ATTRIBUTE[] template = new CK_ATTRIBUTE[attributes.Count];
-        for (int i = 0; i < attributes.Count; i++)
+        for (int i = 0; i < attributes.Length; i++)
         {
             template[i] = new CK_ATTRIBUTE
             {
-                type = (NativeCULong)attributes[i],
+                type = attributes[i].ToCULong(),
                 value = IntPtr.Zero,
                 valueLen = (NativeCULong)0,
             };
         }
-
-        return template;
     }
 
     /// <summary>
@@ -1179,7 +1169,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// return value that is fatal to the read — all three calls of the sequence go through here, so
     /// none of them can drift from the others on what counts as fatal.
     /// </summary>
-    private void ReadAttributeValues(ObjectHandle objectHandle, CK_ATTRIBUTE[] template)
+    private void ReadAttributeValues(ObjectHandle objectHandle, Span<CK_ATTRIBUTE> template)
     {
         CKR rv = _pkcs11Library.C_GetAttributeValue(_sessionId, (NativeCULong)(objectHandle.ObjectId), template);
         if (IsGetAttributeValueFatal(rv))
@@ -1190,7 +1180,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// Allocates a buffer for every attribute the module reported a length for, recording both the
     /// size allocated and the block, and leaves the unreadable ones alone.
     /// </summary>
-    private static void AllocateValueBuffers(CK_ATTRIBUTE[] template, IntPtr[] allocatedAt, NativeCULong[] allocatedLen, List<IntPtr> allocatedBlocks)
+    private static void AllocateValueBuffers(Span<CK_ATTRIBUTE> template, Span<IntPtr> allocatedAt, Span<NativeCULong> allocatedLen, List<IntPtr> allocatedBlocks)
     {
         for (int i = 0; i < template.Length; i++)
         {
@@ -1219,9 +1209,9 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// needed to fill them.
     /// </summary>
     private static bool AllocateNestedBuffers(
-        CK_ATTRIBUTE[] template,
+        Span<CK_ATTRIBUTE> template,
         List<IntPtr> allocatedBlocks,
-        List<NestedMember> nestedMembers)
+        ref List<NestedMember>? nestedMembers)
     {
         bool thirdCallNeeded = false;
 
@@ -1238,7 +1228,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
             if (template[i].valueLen == NativeCULong.MaxValue)
                 continue;
 
-            thirdCallNeeded |= AllocateNestedChildBuffers(in template[i], allocatedBlocks, nestedMembers);
+            thirdCallNeeded |= AllocateNestedChildBuffers(in template[i], allocatedBlocks, ref nestedMembers);
         }
 
         return thirdCallNeeded;
@@ -1255,7 +1245,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     private static bool AllocateNestedChildBuffers(
         in CK_ATTRIBUTE parent,
         List<IntPtr> allocatedBlocks,
-        List<NestedMember> nestedMembers)
+        ref List<NestedMember>? nestedMembers)
     {
         int ckAttributeSize = UnmanagedMemory.SizeOf<CK_ATTRIBUTE>();
 
@@ -1280,7 +1270,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
                 buffer = UnmanagedMemory.Allocate((int)allocated);
                 allocatedBlocks.Add(buffer);
             }
-            nestedMembers.Add(new NestedMember(tempPointer, buffer, allocated));
+            (nestedMembers ??= []).Add(new NestedMember(tempPointer, buffer, allocated));
 
             tempAttribute.value = buffer;
             UnmanagedMemory.Write(tempPointer, in tempAttribute);
@@ -1298,7 +1288,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// it could hand back a different pointer. Restoring ours means the buffers read and freed later
     /// are always the ones this session allocated, never an address the module chose.
     /// </remarks>
-    private static void RestoreAndGuard(CK_ATTRIBUTE[] template, IntPtr[] allocatedAt, NativeCULong[] allocatedLen)
+    private static void RestoreAndGuard(Span<CK_ATTRIBUTE> template, ReadOnlySpan<IntPtr> allocatedAt, ReadOnlySpan<NativeCULong> allocatedLen)
     {
         for (int i = 0; i < template.Length; i++)
         {
@@ -1335,11 +1325,14 @@ internal sealed class Pkcs11SessionCore : IDisposable
     /// <see cref="ObjectAttribute"/> owns only its own value, and the views
     /// <see cref="ObjectAttribute.GetValueAsAttributeArray"/> returns own nothing. Folding them into
     /// the parent's block gives every byte one owner. On success <paramref name="allocatedBlocks"/>
-    /// is emptied: what is not freed here belongs to the attributes.
+    /// is emptied: what is not freed here belongs to the attributes. When no member was ever laid out
+    /// and nothing was folded, every block is still the one its attribute points at, so all of them are
+    /// kept without checking. Members laid out for a parent the third call then reported unreadable are
+    /// not folded, and must still be found and freed.
     /// </remarks>
-    private static void FoldAttributeArrays(CK_ATTRIBUTE[] template, List<IntPtr> allocatedBlocks)
+    private static void FoldAttributeArrays(Span<CK_ATTRIBUTE> template, List<IntPtr> allocatedBlocks, bool membersLaidOut)
     {
-        List<IntPtr> created = [];
+        List<IntPtr>? created = null;
         try
         {
             for (int i = 0; i < template.Length; i++)
@@ -1353,18 +1346,27 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
                 CK_ATTRIBUTE[] members = AttributeArrayBlock.ReadMembers(attribute.type, attribute.value, attribute.valueLen);
                 IntPtr block = AttributeArrayBlock.Create(members, out NativeCULong arrayLength);
-                created.Add(block);
+                (created ??= []).Add(block);
                 template[i].value = block;
                 template[i].valueLen = arrayLength;
             }
         }
         catch
         {
-            FreeAllocatedBlocks(created);
+            if (created is not null)
+                FreeAllocatedBlocks(created);
             throw;
         }
 
-        var kept = new HashSet<IntPtr>(template.Select(a => a.value));
+        if (created is null && !membersLaidOut)
+        {
+            allocatedBlocks.Clear();
+            return;
+        }
+
+        var kept = new HashSet<IntPtr>(template.Length);
+        foreach (CK_ATTRIBUTE attribute in template)
+            kept.Add(attribute.value);
         Span<IntPtr> blocks = CollectionsMarshal.AsSpan(allocatedBlocks);
         for (int i = 0; i < blocks.Length; i++)
         {

@@ -31,7 +31,7 @@ public sealed class NestedAttributeReadBackTests
         using var module = new WrapTemplateModule();
         using var session = OpenSessionCore(module);
 
-        using ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_WRAP_TEMPLATE]);
+        using ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_WRAP_TEMPLATE]);
 
         ObjectAttribute[] members = read[0].GetValueAsAttributeArray();
         Assert.Equal((ulong)CKO.CKO_SECRET_KEY, members[0].GetValueAsUlong());
@@ -62,7 +62,7 @@ public sealed class NestedAttributeReadBackTests
         ReadAndDispose(session);
 
         int before = UnmanagedMemory.OutstandingAllocationCount;
-        using ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_WRAP_TEMPLATE]);
+        using ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_WRAP_TEMPLATE]);
 
         Assert.Equal(before + 1, UnmanagedMemory.OutstandingAllocationCount);
     }
@@ -84,6 +84,25 @@ public sealed class NestedAttributeReadBackTests
     }
 
     /// <summary>
+    /// The members were given buffers for the third call, but the module then calls the whole array
+    /// unreadable, so nothing is folded into one block. Those buffers still have to be freed.
+    /// </summary>
+    [Fact]
+    public void ArrayWithdrawnOnTheThirdCall_ReadsAsUnreadable_AndLeavesNothingBehind()
+    {
+        using var module = new WrapTemplateModule { Lie = Lie.WithdrawArrayOnThirdCall };
+        using var session = OpenSessionCore(module);
+        using (ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_WRAP_TEMPLATE]))
+            Assert.True(read[0].CannotBeRead);
+
+        int before = UnmanagedMemory.OutstandingAllocationCount;
+        for (int i = 0; i < Rounds; i++)
+            ReadAndDispose(session);
+
+        Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
+    }
+
+    /// <summary>
     /// A module that hands back its own pointer must not get it read or freed: freeing memory that
     /// was never allocated here throws, and on the finalizer thread that ends the process.
     /// </summary>
@@ -93,7 +112,7 @@ public sealed class NestedAttributeReadBackTests
         using var module = new WrapTemplateModule { Lie = Lie.RedirectLabelOnSecondCall };
         using var session = OpenSessionCore(module);
 
-        using (ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_LABEL]))
+        using (ReadOnlyDisposableList<ObjectAttribute> read = session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_LABEL]))
         {
             // The module wrote the real label into the buffer it was given, and its decoy elsewhere.
             Assert.Equal("outer", read[0].GetValueAsString());
@@ -101,7 +120,7 @@ public sealed class NestedAttributeReadBackTests
 
         int before = UnmanagedMemory.OutstandingAllocationCount;
         for (int i = 0; i < Rounds; i++)
-            session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_LABEL]).Dispose();
+            session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_LABEL]).Dispose();
         Assert.Equal(before, UnmanagedMemory.OutstandingAllocationCount);
     }
 
@@ -109,7 +128,7 @@ public sealed class NestedAttributeReadBackTests
         => new(module.LoadLowLevel(), slotId: default, (ulong)module.OpenSessionCore());
 
     private static void ReadAndDispose(Pkcs11SessionCore session)
-        => session.GetAttributeValue(new ObjectHandle(1), [(ulong)CKA.CKA_WRAP_TEMPLATE]).Dispose();
+        => session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_WRAP_TEMPLATE]).Dispose();
 
     public enum Lie
     {
@@ -117,6 +136,7 @@ public sealed class NestedAttributeReadBackTests
         InflateTopLevelOnThirdCall,
         InflateMemberOnThirdCall,
         RedirectLabelOnSecondCall,
+        WithdrawArrayOnThirdCall,
     }
 
     /// <summary>
@@ -164,6 +184,8 @@ public sealed class NestedAttributeReadBackTests
                         attribute.valueLen = (NativeCULong)(ulong)(2 * stride);
                         if (Lie == Lie.InflateTopLevelOnThirdCall && ThirdCall)
                             attribute.valueLen = (NativeCULong)(ulong)(4 * stride);
+                        if (Lie == Lie.WithdrawArrayOnThirdCall && ThirdCall)
+                            attribute.valueLen = NativeCULong.MaxValue;
                         break;
 
                     default:

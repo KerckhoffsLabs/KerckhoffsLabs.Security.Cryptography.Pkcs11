@@ -48,7 +48,7 @@ public sealed class AttributeLengthClampLeakTests
         using var fake = new LyingLengthFake();
         using var session = fake.CreateSession(1);
         Assert.Throws<Pkcs11AttributeException>(
-            () => session.GetAttributeValue(new ObjectHandle(7), [(ulong)CKA.CKA_VALUE]));
+            () => session.GetAttributeValue(new ObjectHandle(7), [CKA.CKA_VALUE]));
     }
 
     [Fact]

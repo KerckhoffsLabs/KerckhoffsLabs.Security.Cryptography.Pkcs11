@@ -103,6 +103,34 @@ public sealed class OperationCostGuardTests
         => AssertAllocationSlope(maxBuffersPerInput: 1, (session, data) =>
             session.Encrypt(Gcm(), new ObjectHandle(1), data));
 
+    // One call for the lengths and one for the values: a value that fits its buffer needs no third.
+    [Fact]
+    public void GetAttributeValue_MakesALengthCallAndAValueCall()
+    {
+        using var module = new EchoModule();
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+
+        session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE_LEN]).Dispose();
+
+        Assert.Equal(2, module.CallCount("C_GetAttributeValue"));
+    }
+
+    // The managed cost of reading one attribute: the result list, its one ObjectAttribute and the
+    // block bookkeeping. 1,128 B before the read took a span and stopped copying its template and
+    // result; 424 B on 64-bit after. A ceiling, so a smaller pointer size passes too.
+    [Fact]
+    public void GetAttributeValue_OfOneAttribute_StaysWithinItsAllocationBudget()
+    {
+        using var module = new EchoModule();
+        using LowLevelPkcs11Library lowLevel = module.LoadLowLevel();
+        using var session = new Pkcs11SessionCore(lowLevel, slotId: default, (ulong)module.OpenSessionCore());
+
+        long allocated = Allocated(() => session.GetAttributeValue(new ObjectHandle(1), [CKA.CKA_VALUE_LEN]).Dispose());
+
+        Assert.True(allocated <= 480, $"Reading one attribute allocated {allocated} B; the budget is 480 B.");
+    }
+
     private static Mechanism Gcm() => new(CKM.CKM_AES_GCM, new CkmAesGcmParams(new byte[12], [], tagBits: 128));
 
     private delegate void Operation(Pkcs11SessionCore session, ReadOnlySpan<byte> data);
@@ -137,7 +165,8 @@ public sealed class OperationCostGuardTests
 
     /// <summary>
     /// A module whose operations need no keys: fixed-size signatures and digests, and an encryption
-    /// that returns the plaintext followed by a 16-byte tag, the shape of AES-GCM's output.
+    /// that returns the plaintext followed by a 16-byte tag, the shape of AES-GCM's output. Every
+    /// attribute reads as eight zero bytes.
     /// </summary>
     private sealed class EchoModule : FakeModule
     {
@@ -151,6 +180,14 @@ public sealed class OperationCostGuardTests
         protected override CKR C_SignInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
         protected override CKR C_DigestInit(NativeCULong session, CK_MECHANISM mechanism) => CKR.CKR_OK;
         protected override CKR C_EncryptInit(NativeCULong session, CK_MECHANISM mechanism, NativeCULong key) => CKR.CKR_OK;
+
+        protected override CKR C_GetAttributeValue(NativeCULong session, NativeCULong objectHandle, Span<CK_ATTRIBUTE> template)
+        {
+            Span<byte> value = stackalloc byte[8];
+            for (int i = 0; i < template.Length; i++)
+                AnswerAttribute(ref template[i], value);
+            return CKR.CKR_OK;
+        }
 
         protected override CKR C_Sign(NativeCULong session, ReadOnlySpan<byte> data, NativeBuffer<byte> signature, ref NativeCULong signatureLen)
             => FixedLength(SignatureLength, signature, ref signatureLen);

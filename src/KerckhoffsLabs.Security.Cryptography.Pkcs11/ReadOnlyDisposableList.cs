@@ -43,6 +43,19 @@ public sealed class ReadOnlyDisposableList<T> : IReadOnlyList<T>, IDisposable wh
         _items = [.. items];
     }
 
+    private ReadOnlyDisposableList(T[] items) => _items = items;
+
+    /// <summary>
+    /// Creates a list that adopts <paramref name="items"/> as its storage instead of copying it.
+    /// </summary>
+    /// <remarks>
+    /// Internal on purpose: the snapshot the public constructor takes is what stops a caller from
+    /// changing or freeing an element behind the list's back. Only code that built the array itself
+    /// and keeps no other reference to it may hand it over this way.
+    /// </remarks>
+    /// <param name="items">An array no one else holds; this list owns it and its elements from here.</param>
+    internal static ReadOnlyDisposableList<T> TakeOwnership(T[] items) => new(items);
+
     /// <summary>Gets the element at <paramref name="index"/>.</summary>
     /// <param name="index">Zero-based index.</param>
     /// <exception cref="ObjectDisposedException">Thrown if the list has been disposed.</exception>

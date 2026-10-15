@@ -1453,7 +1453,7 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Destroy() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Dispose() -> void
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.EncapsulateKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate! sharedSecretTemplate, int expectedCiphertextLen = 0) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.EncapsulationResult
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Encrypt(KerckhoffsLabs.Security.Cryptography.Pkcs11.Mechanism! mechanism, System.ReadOnlySpan<byte> plaintext) -> byte[]!
-KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.GetAttributeValue(params KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKA[]! types) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ReadOnlyDisposableList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectAttribute!>!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.GetAttributeValue(params System.ReadOnlySpan<KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKA> types) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.ReadOnlyDisposableList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectAttribute!>!
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Id.get -> System.ReadOnlySpan<byte>
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.KeyType.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Key.Label.get -> string?
