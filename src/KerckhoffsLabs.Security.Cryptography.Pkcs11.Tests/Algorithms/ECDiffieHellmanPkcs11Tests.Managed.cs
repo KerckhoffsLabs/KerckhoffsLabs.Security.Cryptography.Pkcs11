@@ -180,6 +180,58 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
         Assert.Equal(bobZ, aliceZ);
     });
 
+    // === A curve outside the built-in set, described through Pkcs11LibraryOptions.CurveCatalog ===
+
+    private static readonly Pkcs11CurveCatalog Prime239v1Catalog =
+        Pkcs11CurveCatalog.Default.With(new Pkcs11CurveInfo(Prime239v1Oid, "prime239v1", 239));
+
+    // AllowInsecure: the default policy refuses both a key on an unlisted curve and the raw-secret read-back.
+    private static void WithPrime239v1Catalog(Action<ECDiffieHellmanPkcs11> body)
+    {
+        using var library = new ManagedSoftToken().Load(new Pkcs11LibraryOptions { CurveCatalog = Prime239v1Catalog });
+        using var session = ManagedToken.OpenSession(library);
+        using IDisposable insecure = session.UsePolicy(CryptoPolicy.AllowInsecure);
+        using var key = session.GenerateEcKeyPair(Curves("prime239v1").token);
+        using var ecdh = new ECDiffieHellmanPkcs11(key);
+        body(ecdh);
+    }
+
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void KeySize_CurveInTheLibraryCatalog_IsItsFieldSize() => WithPrime239v1Catalog(alice =>
+        Assert.Equal(239, alice.KeySize));
+
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void KeySize_CurveOutsideTheLibraryCatalog_StaysAtBclDefault() => WithEcdh("prime239v1", alice =>
+        Assert.Equal(0, alice.KeySize));
+
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void DeriveRawSecretAgreement_CurveInTheLibraryCatalog_MatchesBcl() => WithPrime239v1Catalog(alice =>
+    {
+        using var bob = ECDiffieHellman.Create(Curves("prime239v1").bcl);
+
+        byte[] aliceZ = alice.DeriveRawSecretAgreement(bob.PublicKey);
+        byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
+
+        Assert.Equal(FieldSize("prime239v1"), aliceZ.Length);
+        Assert.Equal(bobZ, aliceZ);
+    });
+
+    // With the catalog entry, the coordinate-length check that only built-in curves used to get runs:
+    // the refusal names the field size, so it is that check, not the point-on-curve one, that caught it.
+    [Fact(SkipUnless = nameof(Prime239v1Supported), Skip = "Requires " + nameof(Prime239v1Supported))]
+    public void DeriveRawSecretAgreement_CurveInTheLibraryCatalog_PeerCoordinateLengthMismatch_Throws() => WithPrime239v1Catalog(alice =>
+    {
+        int wrongSize = FieldSize("prime239v1") + 2;
+        var badPeer = new FixedPublicKey(new ECParameters
+        {
+            Curve = Curves("prime239v1").bcl,
+            Q = new ECPoint { X = new byte[wrongSize], Y = new byte[wrongSize] },
+        });
+
+        var ex = Assert.Throws<Pkcs11ArgumentException>(() => alice.DeriveRawSecretAgreement(badPeer));
+        Assert.Contains("30-byte field size", ex.Message, StringComparison.Ordinal);
+    });
+
     // === The AllowInsecure policy ============================================================
 
     /// <summary>

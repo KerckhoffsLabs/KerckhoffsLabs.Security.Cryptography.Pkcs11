@@ -36,6 +36,9 @@ public sealed class Pkcs11Library : IDisposable
 
     private readonly string? _libraryPath;
 
+    /// <summary>The curve catalog from <see cref="Pkcs11LibraryOptions.CurveCatalog"/>, shared by every session.</summary>
+    internal Pkcs11CurveCatalog CurveCatalog { get; }
+
     private LowLevelPkcs11Library? _pkcs11Library;
 
     /// <summary>
@@ -149,6 +152,7 @@ public sealed class Pkcs11Library : IDisposable
     {
         ILoggerFactory? loggerFactory = options?.LoggerFactory;
         _loggerFactory = loggerFactory;
+        CurveCatalog = options?.CurveCatalog ?? Pkcs11CurveCatalog.Default;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Pkcs11Library>();
         Log.LibraryTrace(_logger, libraryPath, "ctor");
 

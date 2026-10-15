@@ -15,7 +15,8 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 /// The <see cref="NamedCurves"/> nested class provides the prime-field (Weierstrass) curves a PKCS#11
 /// v3.2 token may implement via <c>CKM_EC_KEY_PAIR_GEN</c> — the NIST primes, the Koblitz curves
 /// (secp192k1/secp224k1/secp256k1), the Brainpool family (RFC 5639), and SM2. Any other curve can be selected with
-/// <see cref="CreateFromValue(string, string?)"/>. Twisted-Edwards (Ed25519/Ed448) and Montgomery
+/// <see cref="CreateFromValue(string, string?, int?)"/>, and described to the library (name, field size) through a
+/// <see cref="Pkcs11CurveCatalog"/>. Twisted-Edwards (Ed25519/Ed448) and Montgomery
 /// (X25519/X448) curves use different key types and key-pair-gen mechanisms and are intentionally
 /// outside this type.
 /// </para>
@@ -25,11 +26,13 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11;
 public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
 {
     private readonly byte[]? _ecParams;
+    private readonly int? _fieldSizeBits;
 
-    private Pkcs11ECCurve(string oid, string? friendlyName)
+    private Pkcs11ECCurve(string oid, string? friendlyName, int? fieldSizeBits = null)
     {
         Oid = oid;
         FriendlyName = friendlyName;
+        _fieldSizeBits = fieldSizeBits ?? (Pkcs11CurveCatalog.Default.TryGetByOid(oid, out Pkcs11CurveInfo? info) ? info.FieldSizeBits : null);
         var writer = new AsnWriter(AsnEncodingRules.DER);
         writer.WriteObjectIdentifier(oid);
         _ecParams = writer.Encode();
@@ -55,17 +58,26 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     public bool IsDefault => Oid is null;
 
     /// <summary>
-    /// The curve's field size in bits (e.g. 256 for NIST P-256, 521 for P-521) when this is a curve of
-    /// <see cref="NamedCurves"/>; otherwise <see langword="null"/>, including for the uninitialized
-    /// <see langword="default"/>: the field size of an arbitrary OID can't be inferred without decoding
-    /// its domain parameters, which this type does not do.
+    /// The curve's field size in bits (e.g. 256 for NIST P-256, 521 for P-521) when known: for a curve
+    /// of <see cref="Pkcs11CurveCatalog.Default"/> (every curve of <see cref="NamedCurves"/>), or one
+    /// created with a field size (<see cref="CreateFromValue(string, string?, int?)"/>,
+    /// <see cref="Pkcs11CurveInfo.ToCurve"/>). Otherwise <see langword="null"/>, including for the
+    /// uninitialized <see langword="default"/>: the field size of an arbitrary OID can't be inferred
+    /// without decoding its domain parameters, which this type does not do.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// This is the key size the BCL reports for the curve (<see cref="AsymmetricAlgorithm.KeySize"/>).
     /// A coordinate, and a raw ECDH shared secret, is <c>(FieldSizeBits + 7) / 8</c> bytes: 66 for P-521,
     /// not 521 / 8.
+    /// </para>
+    /// <para>
+    /// Not part of equality, which compares OIDs only. A curve read off a token
+    /// (<see cref="FromEcParams"/>) knows only the field size of a built-in curve; a token key's curve
+    /// is resolved through the library's <see cref="Pkcs11LibraryOptions.CurveCatalog"/>.
+    /// </para>
     /// </remarks>
-    public int? FieldSizeBits => Oid is not null && _fieldSizeBitsByOid.TryGetValue(Oid, out int bits) ? bits : null;
+    public int? FieldSizeBits => _fieldSizeBits;
 
     /// <summary>
     /// Gets the <c>CKA_EC_PARAMS</c> value for this curve: the DER encoding of the curve OID as an
@@ -78,17 +90,34 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
         : (byte[])_ecParams.Clone();
 
     /// <summary>
-    /// Creates a named curve from a dotted-decimal OID value, with an optional friendly name. Mirrors
-    /// <see cref="ECCurve.CreateFromValue(string)"/>.
+    /// Creates a named curve from a dotted-decimal OID value, with an optional friendly name and field
+    /// size. Mirrors <see cref="ECCurve.CreateFromValue(string)"/>.
     /// </summary>
     /// <param name="oidValue">Dotted-decimal OID (e.g. <c>1.3.132.0.10</c>).</param>
-    /// <param name="friendlyName">Optional human-readable name; resolved from the known set when omitted.</param>
+    /// <param name="friendlyName">Optional human-readable name; resolved from <see cref="Pkcs11CurveCatalog.Default"/> when omitted.</param>
+    /// <param name="fieldSizeBits">
+    /// Optional field size in bits, for a curve outside <see cref="Pkcs11CurveCatalog.Default"/>;
+    /// reported by <see cref="FieldSizeBits"/>. For a built-in curve it may be omitted, and must match
+    /// when given.
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="oidValue"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="oidValue"/> is not a valid OID.</exception>
-    public static Pkcs11ECCurve CreateFromValue(string oidValue, string? friendlyName = null)
+    /// <exception cref="ArgumentException">
+    /// <paramref name="oidValue"/> is not a valid OID, or <paramref name="fieldSizeBits"/> contradicts the
+    /// built-in curve with that OID.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="fieldSizeBits"/> is not positive.</exception>
+    public static Pkcs11ECCurve CreateFromValue(string oidValue, string? friendlyName = null, int? fieldSizeBits = null)
     {
         ArgumentNullException.ThrowIfNull(oidValue);
-        return new Pkcs11ECCurve(oidValue, friendlyName ?? LookupName(oidValue));
+        if (fieldSizeBits is int bits)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bits, nameof(fieldSizeBits));
+            if (Pkcs11CurveCatalog.Default.TryGetByOid(oidValue, out Pkcs11CurveInfo? builtIn) && builtIn.FieldSizeBits != bits)
+                throw new ArgumentException(
+                    $"{builtIn.Name} ({oidValue}) has a {builtIn.FieldSizeBits}-bit field, not {bits}.", nameof(fieldSizeBits));
+        }
+
+        return new Pkcs11ECCurve(oidValue, friendlyName ?? LookupName(oidValue), fieldSizeBits);
     }
 
     /// <summary>
@@ -108,15 +137,16 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// <summary>
     /// Creates a named curve from a friendly name (e.g. <c>nistP256</c>). Mirrors
     /// <see cref="ECCurve.CreateFromFriendlyName(string)"/>; resolves the OID
-    /// from the known set, falling back to the BCL's name resolution.
+    /// from <see cref="Pkcs11CurveCatalog.Default"/>, falling back to the BCL's name resolution. For a
+    /// curve of a custom catalog, use <see cref="Pkcs11CurveCatalog.TryGetByName"/>.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="friendlyName"/> is null.</exception>
     /// <exception cref="ArgumentException">The name cannot be resolved to a curve OID.</exception>
     public static Pkcs11ECCurve CreateFromFriendlyName(string friendlyName)
     {
         ArgumentNullException.ThrowIfNull(friendlyName);
-        if (_oidsByName.TryGetValue(friendlyName, out var oid))
-            return new Pkcs11ECCurve(oid, friendlyName);
+        if (Pkcs11CurveCatalog.Default.TryGetByName(friendlyName, out Pkcs11CurveInfo? info))
+            return info.ToCurve();
         return FromECCurve(ECCurve.CreateFromFriendlyName(friendlyName));
     }
 
@@ -169,5 +199,9 @@ public readonly partial struct Pkcs11ECCurve : IEquatable<Pkcs11ECCurve>
     /// <inheritdoc/>
     public override string ToString() => FriendlyName is null ? (Oid ?? "<default>") : $"{FriendlyName} ({Oid})";
 
-    private static string? LookupName(string oid) => _namesByOid.TryGetValue(oid, out var n) ? n : null;
+    /// <summary>Creates the curve a catalog entry describes, with its name and field size.</summary>
+    internal static Pkcs11ECCurve FromInfo(Pkcs11CurveInfo info) => new(info.Oid, info.Name, info.FieldSizeBits);
+
+    private static string? LookupName(string oid)
+        => Pkcs11CurveCatalog.Default.TryGetByOid(oid, out Pkcs11CurveInfo? info) ? info.Name : null;
 }

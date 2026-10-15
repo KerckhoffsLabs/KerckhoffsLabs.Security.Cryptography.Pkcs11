@@ -48,6 +48,9 @@ public sealed class Pkcs11Session : IDisposable
     /// <summary>The library that hosts this session. The session does not own the library.</summary>
     public Pkcs11Library Library { get; }
 
+    /// <summary>The curves this session's library knows the name and field size of; see <see cref="Pkcs11LibraryOptions.CurveCatalog"/>.</summary>
+    internal Pkcs11CurveCatalog CurveCatalog => Library.CurveCatalog;
+
     /// <summary>The session's native calls and policy enforcement. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11SessionCore Core => _core;
 
@@ -608,7 +611,7 @@ public sealed class Pkcs11Session : IDisposable
     /// Generates an EC key pair on a NIST prime curve. The private key is sensitive,
     /// non-extractable, and usable for signing and ECDH derivation.
     /// </summary>
-    /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?)"/>).
+    /// <param name="curve">Named curve from <see cref="Pkcs11ECCurve.NamedCurves"/> (or <see cref="Pkcs11ECCurve.CreateFromValue(string, string?, int?)"/>).
     /// Defaults to <see cref="Pkcs11ECCurve.NamedCurves.NistP256"/> when omitted. The token must support the curve.</param>
     /// <param name="label">Optional <c>CKA_LABEL</c> applied to both halves. Default none.</param>
     /// <param name="persistOnToken">If true, both halves are token objects (persistent). Default false.</param>

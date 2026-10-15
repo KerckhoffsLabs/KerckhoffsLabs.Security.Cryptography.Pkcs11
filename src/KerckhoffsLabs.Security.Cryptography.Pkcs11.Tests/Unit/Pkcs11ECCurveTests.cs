@@ -229,6 +229,42 @@ public sealed class Pkcs11ECCurveTests
     public void FieldSizeBits_Default_IsNull()
         => Assert.Null(default(Pkcs11ECCurve).FieldSizeBits);
 
+    [Fact]
+    public void CreateFromValue_WithFieldSize_OutsideTheCatalog_ReportsIt()
+    {
+        Pkcs11ECCurve curve = Pkcs11ECCurve.CreateFromValue("1.2.840.10045.3.1.4", "prime239v1", fieldSizeBits: 239);
+        Assert.Equal(239, curve.FieldSizeBits);
+        Assert.Equal("prime239v1", curve.FriendlyName);
+    }
+
+    [Fact]
+    public void CreateFromValue_WithFieldSize_MatchingTheCatalog_IsAccepted()
+        => Assert.Equal(256, Pkcs11ECCurve.CreateFromValue("1.2.840.10045.3.1.7", fieldSizeBits: 256).FieldSizeBits);
+
+    // A caller can't redescribe a built-in curve: a wrong field size would weaken the peer-key checks.
+    [Fact]
+    public void CreateFromValue_WithFieldSize_ContradictingTheCatalog_Throws()
+        => Assert.Throws<ArgumentException>("fieldSizeBits",
+            () => Pkcs11ECCurve.CreateFromValue("1.2.840.10045.3.1.7", fieldSizeBits: 384));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CreateFromValue_NonPositiveFieldSize_Throws(int bits)
+        => Assert.Throws<ArgumentOutOfRangeException>("fieldSizeBits",
+            () => Pkcs11ECCurve.CreateFromValue("1.2.3.4", fieldSizeBits: bits));
+
+    // The field size is metadata, not identity: the same OID read back off a token carries none.
+    [Fact]
+    public void FieldSize_IsNotPartOfEquality()
+    {
+        Pkcs11ECCurve described = Pkcs11ECCurve.CreateFromValue("1.2.3.4", fieldSizeBits: 256);
+        Pkcs11ECCurve bare = Pkcs11ECCurve.FromEcParams(described.GetEcParams());
+        Assert.Null(bare.FieldSizeBits);
+        Assert.Equal(described, bare);
+        Assert.Equal(described.GetHashCode(), bare.GetHashCode());
+    }
+
     // Every NamedCurves shortcut must have its row in the catalog: a property without one would still
     // build, with no friendly name and no field size.
     [Fact]
@@ -243,5 +279,6 @@ public sealed class Pkcs11ECCurveTests
             Assert.NotNull(curve.FieldSizeBits);
             Assert.Equal(curve, Pkcs11ECCurve.CreateFromFriendlyName(curve.FriendlyName!));
         });
+        Assert.Equal(shortcuts.Length, Pkcs11CurveCatalog.Default.Curves.Count);
     }
 }

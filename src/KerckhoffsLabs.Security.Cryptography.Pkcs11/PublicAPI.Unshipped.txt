@@ -1950,7 +1950,7 @@ static KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate.ForPub
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.ObjectTemplate.ForSecretKey(KerckhoffsLabs.Security.Cryptography.Pkcs11.Common.CKK keyType) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Objects.SecretKeyTemplateBuilder!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.CreateFromFriendlyName(string! friendlyName) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.CreateFromOid(System.Security.Cryptography.Oid! curveOid) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
-static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.CreateFromValue(string! oidValue, string? friendlyName = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.CreateFromValue(string! oidValue, string? friendlyName = null, int? fieldSizeBits = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.FromECCurve(System.Security.Cryptography.ECCurve curve) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.FromEcParams(System.ReadOnlySpan<byte> ecParams) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve.NamedCurves.BrainpoolP160r1.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
@@ -2051,3 +2051,24 @@ KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.ge
 KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.UseOsLocking.init -> void
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.Load(string! libraryPath, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions? options = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
 static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library.LoadStaticallyLinked(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions? options = null) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11Library!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog.Curves.get -> System.Collections.Generic.IReadOnlyList<KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo!>!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog.TryGetByName(string! name, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? curve) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog.TryGetByOid(string! oid, out KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? curve) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog.With(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo! curve) -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.<Clone>$() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Equals(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? other) -> bool
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.FieldSizeBits.get -> int
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Name.get -> string!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Oid.get -> string!
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Pkcs11CurveInfo(string! oid, string! name, int fieldSizeBits) -> void
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.ToCurve() -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11ECCurve
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CurveCatalog.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog?
+KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11LibraryOptions.CurveCatalog.init -> void
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.Equals(object? obj) -> bool
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.GetHashCode() -> int
+override KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.ToString() -> string!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog.Default.get -> KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveCatalog!
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.operator !=(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? right) -> bool
+static KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo.operator ==(KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? left, KerckhoffsLabs.Security.Cryptography.Pkcs11.Pkcs11CurveInfo? right) -> bool
