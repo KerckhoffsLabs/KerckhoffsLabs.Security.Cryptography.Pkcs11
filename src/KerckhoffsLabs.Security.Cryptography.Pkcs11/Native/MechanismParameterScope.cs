@@ -18,6 +18,7 @@ internal class MechanismParameterScope : IDisposable
     private readonly List<IntPtr> _owned = [];
     private bool _disposed;
 
+    /// <summary>Throws if this scope has been disposed.</summary>
     /// <exception cref="ObjectDisposedException">The scope has been disposed.</exception>
     internal void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
