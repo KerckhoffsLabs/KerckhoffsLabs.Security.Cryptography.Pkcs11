@@ -2,11 +2,11 @@ using System.Security.Cryptography;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
-// Covers Pkcs11PublicKeyView.TryParseEcPublicKey: building an ECParameters view from raw CKA_EC_POINT
+// Covers EcPointEncoding: the CKA_EC_POINT encoder/decoder pair, and TryParsePublicKey building an ECParameters view from raw CKA_EC_POINT
 // + CKA_EC_PARAMS. Since the curve is resolved through Pkcs11ECCurve.FromEcParams, the whole named-curve
 // catalog is supported — not just the NIST primes the helper used to hardcode. The point bytes are
 // only parsed for structure (not validated on-curve), so synthetic coordinates are fine here.
-public sealed class Pkcs11PublicKeyViewTests
+public sealed class EcPointEncodingTests
 {
     // CKA_EC_POINT is a DER OCTET STRING wrapping the uncompressed point 0x04 || X || Y.
     private static byte[] EcPoint(int coordLen)
@@ -27,13 +27,13 @@ public sealed class Pkcs11PublicKeyViewTests
     [InlineData("secp256k1", 32)]     // previously unsupported -> returned a broken default curve
     [InlineData("brainpoolP256r1", 32)]
     [InlineData("nistP521", 66)]      // 133-byte point -> exercises the long-form DER length branch
-    public void TryParseEcPublicKey_ResolvesNamedCurveFromEcParams(string curveName, int coordLen)
+    public void TryParsePublicKey_ResolvesNamedCurveFromEcParams(string curveName, int coordLen)
     {
         Pkcs11ECCurve curve = Pkcs11ECCurve.CreateFromFriendlyName(curveName);
         byte[] ecParams = curve.GetEcParams();
         byte[] ecPoint = EcPoint(coordLen);
 
-        ECParameters? parsed = Pkcs11PublicKeyView.TryParseEcPublicKey(ecPoint, ecParams);
+        ECParameters? parsed = EcPointEncoding.TryParsePublicKey(ecPoint, ecParams);
 
         Assert.NotNull(parsed);
         Assert.True(parsed!.Value.Curve.IsNamed);
@@ -43,18 +43,38 @@ public sealed class Pkcs11PublicKeyViewTests
     }
 
     [Fact]
-    public void TryParseEcPublicKey_MalformedEcParams_ReturnsNull()
+    public void TryParsePublicKey_MalformedEcParams_ReturnsNull()
     {
         byte[] ecPoint = EcPoint(coordLen: 32);
-        Assert.Null(Pkcs11PublicKeyView.TryParseEcPublicKey(ecPoint, [0x01, 0x02, 0x03]));
+        Assert.Null(EcPointEncoding.TryParsePublicKey(ecPoint, [0x01, 0x02, 0x03]));
     }
 
     [Fact]
-    public void TryParseEcPublicKey_NonUncompressedPoint_ReturnsNull()
+    public void TryParsePublicKey_NonUncompressedPoint_ReturnsNull()
     {
         // 0x02-prefixed compressed point is not supported by the uncompressed-only parser.
         byte[] ecParams = Pkcs11ECCurve.NamedCurves.NistP256.GetEcParams();
         byte[] compressed = [0x04, 0x21, 0x02, .. new byte[32]];
-        Assert.Null(Pkcs11PublicKeyView.TryParseEcPublicKey(compressed, ecParams));
+        Assert.Null(EcPointEncoding.TryParsePublicKey(compressed, ecParams));
     }
+
+    [Theory]
+    [InlineData(32)]  // short-form DER length
+    [InlineData(66)]  // 133-byte point: long-form DER length
+    public void Encode_RoundTripsThroughTryDecode(int coordLen)
+    {
+        byte[] x = [.. Enumerable.Range(1, coordLen).Select(i => (byte)i)];
+        byte[] y = [.. Enumerable.Range(100, coordLen).Select(i => (byte)i)];
+
+        byte[] encoded = EcPointEncoding.Encode(x, y);
+
+        Assert.Equal(EcPoint(coordLen)[..2], encoded[..2]);
+        Assert.True(EcPointEncoding.TryDecode(encoded, out byte[] decodedX, out byte[] decodedY));
+        Assert.Equal(x, decodedX);
+        Assert.Equal(y, decodedY);
+    }
+
+    [Fact]
+    public void TryDecode_NotAnOctetString_ReturnsFalse()
+        => Assert.False(EcPointEncoding.TryDecode([0x03, 0x01, 0x04], out _, out _));
 }

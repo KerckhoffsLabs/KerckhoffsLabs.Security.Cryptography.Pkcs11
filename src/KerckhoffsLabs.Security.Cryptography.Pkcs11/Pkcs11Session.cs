@@ -744,15 +744,10 @@ public sealed class Pkcs11Session : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(ecPrivateKey);
-        byte[] x = peerPublicKey.Q.X ?? throw new ArgumentException("Peer public key has no X coordinate.", nameof(peerPublicKey));
-        byte[] y = peerPublicKey.Q.Y ?? throw new ArgumentException("Peer public key has no Y coordinate.", nameof(peerPublicKey));
 
-        const string op = "Pkcs11Session.DeriveSharedSecretEcdh";
-        Pkcs11ECCurve localCurve = Pkcs11PublicKeyView.GetCurve(ecPrivateKey, op);
-        Pkcs11PublicKeyView.ValidatePeerEcKey(localCurve, peerPublicKey, x, y, op);
-
-        byte[] peerPoint = Algorithms.ECDiffieHellmanPkcs11.EncodeEcPointAsDerOctetString(x, y);
-        return DeriveSharedSecretEcdh(ecPrivateKey, peerPoint, aesBitLength, kdf);
+        ValidatedEcdhPeer peer = EcdhPeerValidator.Validate(
+            ecPrivateKey, peerPublicKey, nameof(peerPublicKey), "Pkcs11Session.DeriveSharedSecretEcdh");
+        return DeriveSharedSecretEcdh(ecPrivateKey, peer.EncodedPoint, aesBitLength, kdf);
     }
 
     /// <summary>

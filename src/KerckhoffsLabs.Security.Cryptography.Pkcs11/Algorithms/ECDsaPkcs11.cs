@@ -308,18 +308,7 @@ public sealed class ECDsaPkcs11 : ECDsa
             throw new CryptoPolicyViolationException(
                 "Refusing to export EC private parameters. PKCS#11 keys are non-extractable.");
 
-        // Pkcs11Key.GetAttributeValue picks the public-key handle for asymmetric keys when one
-        // exists and falls back to the private-key handle otherwise — covering both real key-pair
-        // companions and private-only objects that carry CKA_EC_POINT / CKA_EC_PARAMS.
-        using var attrs = _key.GetAttributeValue(CKA.CKA_EC_POINT, CKA.CKA_EC_PARAMS);
-        if (attrs[0].CannotBeRead || attrs[1].CannotBeRead)
-            throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
-                "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS not readable from any available handle)");
-
-        var ec = Pkcs11PublicKeyView.TryParseEcPublicKey(
-            attrs[0].GetValueAsByteArray(), attrs[1].GetValueAsByteArray());
-        return ec ?? throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_VALUE_INVALID,
-            "ECDsaPkcs11.ExportParameters (CKA_EC_POINT / CKA_EC_PARAMS could not be parsed as a named-curve uncompressed point)");
+        return Pkcs11PublicKeyView.ReadEcPublicKey(_key, "ECDsaPkcs11.ExportParameters");
     }
 
     /// <inheritdoc/>
