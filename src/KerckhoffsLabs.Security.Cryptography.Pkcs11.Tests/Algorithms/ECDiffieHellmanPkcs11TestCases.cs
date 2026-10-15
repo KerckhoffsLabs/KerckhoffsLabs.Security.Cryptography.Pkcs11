@@ -45,6 +45,10 @@ internal static class ECDiffieHellmanPkcs11TestCases
     /// covers it.
     /// </remarks>
     private static void WithEcdh(IPkcs11Backend backend, Action<ECDiffieHellmanPkcs11> body)
+        => WithEcdh(backend, TestKeys.EcP256Oid, body);
+
+    // As above, on the curve ecParams selects; skips where the token does not generate keys on it.
+    private static void WithEcdh(IPkcs11Backend backend, byte[] ecParams, Action<ECDiffieHellmanPkcs11> body)
     {
         if (!backend.Supports(CKM.CKM_EC_KEY_PAIR_GEN) || !backend.Supports(CKM.CKM_ECDH1_DERIVE))
             Assert.Skip("Backend does not advertise CKM_EC_KEY_PAIR_GEN + CKM_ECDH1_DERIVE.");
@@ -55,11 +59,11 @@ internal static class ECDiffieHellmanPkcs11TestCases
         byte[] id = Encoding.ASCII.GetBytes(label);
 
         using var pubTpl = ObjectTemplate.ForPublicKey(CKK.CKK_EC)
-            .Label(label).Id(id).EcParams(TestKeys.EcP256Oid).Build();
+            .Label(label).Id(id).EcParams(ecParams).Build();
         using var privTpl = ObjectTemplate.ForPrivateKey(CKK.CKK_EC)
             .Label(label).Id(id).Derive().Build();
 
-        using var key = session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), pubTpl, privTpl);
+        using var key = GenerateKeyPairOrSkip(session, pubTpl, privTpl);
         try
         {
             using var ecdh = new ECDiffieHellmanPkcs11(key);
@@ -68,6 +72,19 @@ internal static class ECDiffieHellmanPkcs11TestCases
         finally
         {
             try { key.Destroy(); } catch { /* best-effort */ }
+        }
+    }
+
+    private static Pkcs11Key GenerateKeyPairOrSkip(Pkcs11Session session, ObjectTemplate publicKey, ObjectTemplate privateKey)
+    {
+        try
+        {
+            return session.GenerateKeyPair(new Mechanism(CKM.CKM_EC_KEY_PAIR_GEN), publicKey, privateKey);
+        }
+        catch (Pkcs11Exception ex) when (ex.ReturnValue is CKR.CKR_CURVE_NOT_SUPPORTED or CKR.CKR_DOMAIN_PARAMS_INVALID)
+        {
+            Assert.Skip($"The token does not generate keys on this curve ({ex.ReturnValue}).");
+            throw; // unreachable: Assert.Skip throws
         }
     }
 
@@ -146,6 +163,20 @@ internal static class ECDiffieHellmanPkcs11TestCases
             byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
 
             Assert.Equal(32, aliceZ.Length);
+            Assert.Equal(bobZ, aliceZ);
+        });
+
+    // P-521's field is 521 bits, so its secret is 66 bytes: a byte count rounded down to 65 used to
+    // truncate the secret the token derives.
+    internal static void Assert_DeriveRawSecretAgreement_P521_MatchesBcl(IPkcs11Backend backend) =>
+        WithEcdh(backend, Pkcs11ECCurve.NamedCurves.NistP521.GetEcParams(), alice =>
+        {
+            using var bob = ECDiffieHellman.Create(BclECCurve.NamedCurves.nistP521);
+
+            byte[] aliceZ = alice.DeriveRawSecretAgreement(bob.PublicKey);
+            byte[] bobZ = bob.DeriveRawSecretAgreement(alice.PublicKey);
+
+            Assert.Equal(66, aliceZ.Length);
             Assert.Equal(bobZ, aliceZ);
         });
 

@@ -43,6 +43,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     {
         "P-256" => (Pkcs11ECCurve.NamedCurves.NistP256, BclECCurve.NamedCurves.nistP256),
         "P-384" => (Pkcs11ECCurve.NamedCurves.NistP384, BclECCurve.NamedCurves.nistP384),
+        "P-521" => (Pkcs11ECCurve.NamedCurves.NistP521, BclECCurve.NamedCurves.nistP521),
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown curve."),
     };
 
@@ -50,6 +51,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     {
         "P-256" => 32,
         "P-384" => 48,
+        "P-521" => 66,
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown curve."),
     };
 
@@ -132,6 +134,7 @@ public sealed class ECDiffieHellmanPkcs11Tests_Managed
     [Theory(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]
     [InlineData("P-256")]
     [InlineData("P-384")]
+    [InlineData("P-521")]
     public void DeriveRawSecretAgreement_MatchesBcl(string curve) => WithEcdh(curve, alice =>
     {
         using var bob = ECDiffieHellman.Create(Curves(curve).bcl);
