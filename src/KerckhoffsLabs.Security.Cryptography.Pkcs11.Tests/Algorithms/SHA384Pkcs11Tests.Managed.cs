@@ -78,7 +78,7 @@ public sealed class SHA384Pkcs11_Managed
         sha.TransformBlock(part1, 0, part1.Length, null, 0);
         sha.TransformFinalBlock(part2, 0, part2.Length);
 
-        Assert.Equal(SHA384.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash!);
+        Assert.Equal(SHA384.HashData(Encoding.UTF8.GetBytes("hello world")), sha.Hash);
     }
 
     [Fact(SkipUnless = nameof(Supported), Skip = "Requires " + nameof(Supported))]

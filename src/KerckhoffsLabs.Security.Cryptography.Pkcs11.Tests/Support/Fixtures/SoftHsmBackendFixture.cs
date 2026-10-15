@@ -195,7 +195,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
     internal static string ResolveUtil(string libPath)
     {
         string utilName = OperatingSystem.IsWindows() ? "softhsm2-util.exe" : "softhsm2-util";
-        string builtUtil = Path.Join(Path.GetDirectoryName(libPath)!, utilName);
+        string builtUtil = Path.Join(Path.GetDirectoryName(libPath), utilName);
         if (!File.Exists(builtUtil))
             throw new FileNotFoundException(
                 $"{utilName} not found next to the built libsofthsm2 at '{builtUtil}'. " +

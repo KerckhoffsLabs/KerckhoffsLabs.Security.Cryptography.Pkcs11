@@ -109,7 +109,7 @@ public sealed class SHA3_256Pkcs11Tests_Managed
         }
         sha.TransformFinalBlock(whole, offset, whole.Length - offset);
 
-        Assert.Equal(SHA3_256.HashData(whole), sha.Hash!);
+        Assert.Equal(SHA3_256.HashData(whole), sha.Hash);
     }
 
     // === Reuse ===========================================================================

@@ -265,7 +265,7 @@ public sealed class FipsOnlyPolicyTests
                 : @"(SP 800-|FIPS 1|FIPS 2|is not on the FipsOnly allow-list \(not reviewed\)\.)";
 
             foreach (PolicyDecision d in decisions.Where(d => !d.IsAllowed))
-                Assert.Matches(pattern, d.Reason!);
+                Assert.Matches(pattern, d.Reason);
         }
     }
 
