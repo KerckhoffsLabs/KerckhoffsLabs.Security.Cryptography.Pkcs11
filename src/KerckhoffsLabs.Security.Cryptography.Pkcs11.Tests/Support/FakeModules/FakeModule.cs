@@ -63,6 +63,7 @@ internal abstract unsafe partial class FakeModule : IDisposable
     {
     }
 
+    /// <summary>Creates the module and builds its function tables.</summary>
     /// <param name="bindsLifecycle">
     /// <see langword="false"/> leaves <c>C_Initialize</c> and <c>C_Finalize</c> out of the table too, for a
     /// module that lacks even those.

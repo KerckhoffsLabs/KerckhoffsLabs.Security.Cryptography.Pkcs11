@@ -9,6 +9,9 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.Smoke;
 /// </summary>
 internal static class SmokeTestAssertions
 {
+    /// <summary>
+    /// Asserts that the module's <c>C_GetInfo</c> answer is well formed and that it reports at least one slot.
+    /// </summary>
     /// <param name="backend">The backend fixture under test.</param>
     /// <param name="expectNonZeroLibraryVersion">
     /// Most modules report a real vendor library version; Kryoptic 1.5.2 hardcodes
