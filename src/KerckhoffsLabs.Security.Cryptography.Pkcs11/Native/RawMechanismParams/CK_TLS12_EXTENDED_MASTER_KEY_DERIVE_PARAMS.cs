@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_TLS12_EXTENDED_MASTER_KEY_DERIVE_PARAMS
+internal struct CK_TLS12_EXTENDED_MASTER_KEY_DERIVE_PARAMS
 {
     /// <summary>PRF mechanism (e.g. CKM_SHA256).</summary>
     public NativeCULong PrfHashMechanism;

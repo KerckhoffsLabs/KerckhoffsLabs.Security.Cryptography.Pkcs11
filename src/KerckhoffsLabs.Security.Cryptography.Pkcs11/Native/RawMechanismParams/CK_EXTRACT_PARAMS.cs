@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_EXTRACT_PARAMS
+internal struct CK_EXTRACT_PARAMS
 {
     /// <summary>
     /// Specifies which bit of the base key should be used as the first bit of the derived key

@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_X3DH_RESPOND_PARAMS
+internal struct CK_X3DH_RESPOND_PARAMS
 {
     /// <summary>
     /// KDF algorithm tag (CK_X3DH_KDF_TYPE).

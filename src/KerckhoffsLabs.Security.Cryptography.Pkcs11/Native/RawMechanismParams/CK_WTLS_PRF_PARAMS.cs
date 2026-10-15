@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native.RawMechanismParams;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_WTLS_PRF_PARAMS
+internal struct CK_WTLS_PRF_PARAMS
 {
     /// <summary>
     /// Digest mechanism to be used (CKM)

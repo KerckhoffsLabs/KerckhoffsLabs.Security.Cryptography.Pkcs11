@@ -7,7 +7,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 [PackedForPkcs11]
-internal partial struct CK_INFO
+internal struct CK_INFO
 {
     /// <summary>
     /// Cryptoki interface version number, for compatibility with future revisions of this interface.
