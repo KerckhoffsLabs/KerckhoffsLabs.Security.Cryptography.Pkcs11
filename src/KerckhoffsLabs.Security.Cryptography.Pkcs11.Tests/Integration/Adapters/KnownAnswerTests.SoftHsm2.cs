@@ -28,7 +28,7 @@ internal static class KnownAnswerTestCases
             "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662" +
             "76fc6ece0f4e1768cddf8853bb2d551b");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle k = TestKeys.CreateAes256Key(session, key);
@@ -40,7 +40,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // The same vector, encrypted and decrypted in pieces through C_EncryptUpdate / C_DecryptUpdate. A
@@ -96,7 +96,7 @@ internal static class KnownAnswerTestCases
         byte[] data = Encoding.ASCII.GetBytes("Test Using Larger Than Block-Size Key - Hash Key First");
         byte[] expected = H("60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle k = TestKeys.CreateGenericSecretKey(session, key);
@@ -107,7 +107,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // Ed25519, RFC 8032 test 3 (2-byte message 0xaf82). Signature is deterministic, so the KAT
@@ -122,7 +122,7 @@ internal static class KnownAnswerTestCases
             "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac" +
             "18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle priv = TestKeys.CreateEd25519PrivateKey(session, seed);
@@ -143,7 +143,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(priv); session.DestroyObject(pub); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // ChaCha20-Poly1305, RFC 8439 section 2.8.2. SoftHSM does not implement this mechanism, so the
@@ -160,7 +160,7 @@ internal static class KnownAnswerTestCases
             "7ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116" +
             "1ae10b594f09e26a7e902ecbd0600691");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle k = TestKeys.CreateChaCha20Key(session, key);
@@ -172,7 +172,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // HMAC-SHA384, RFC 4231 test case 6 (131-byte key, larger than the block size).
@@ -199,7 +199,7 @@ internal static class KnownAnswerTestCases
 
     private static void AssertHmacKat(IPkcs11Backend backend, CKM mechanism, byte[] key, byte[] data, byte[] expected)
     {
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle k = TestKeys.CreateGenericSecretKey(session, key);
@@ -210,7 +210,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(k); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // AES Key Wrap, RFC 3394 section 4.6 (256-bit KEK wrapping 256 bits of key data). CKM_AES_KEY_WRAP
@@ -221,7 +221,7 @@ internal static class KnownAnswerTestCases
         byte[] keyData = H("00112233445566778899aabbccddeeff000102030405060708090a0b0c0d0e0f");
         byte[] expected = H("28c9f404c4b810f4cbccb35cfb87f8263f5786e2d80ed326cbc7f0e71a99f43bfb988b9b7a02dd21");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle wrappingKey = TestKeys.ImportAesWrappingKey(session, kek);
@@ -233,7 +233,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(target); session.DestroyObject(wrappingKey); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // RSA-OAEP (SHA-1 / MGF1-SHA1) decrypt KAT: a fixed ciphertext produced for a fixed 2048-bit key
@@ -245,7 +245,7 @@ internal static class KnownAnswerTestCases
         byte[] ct = H("2891fee133d34bea1cfe90fd7dde58eba1cf024c0d0a40dea08bc1ff4b9da8249ce010ca44a57606363a334a954177d6d9d9b29af7af9cc57d7430baa1776dcdde005baa93d17dbb097aff817f275cab23e107f1f7e53e3c8d296da0e2a6868b78da6ae22c141bff6a6fd74fa2b3b1eb25a55069e74654ecf81a05e75b13d5f33d65573ce9b43576c1942e29860ac0ef9b61c9011b0e263a22ec23cdaa320c3c7d8c15aa62225731b97f163ef049f7c886843d55b3b581372b6f6c27275d1cf9162de7c6b8631c528349c2185c79933852997a5e511156753ddf7b172a7a194cf35b4431b19dbdbbd0ec1a7cd0ae0bc9f635aec13026f1c0c4e70a652d337d4f");
         byte[] expectedPt = H("4b41543a205253412d4f4145502d53484131206d61727368616c6c696e67");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle priv = ImportRsaPrivateKey(session);
@@ -258,7 +258,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(priv); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // RSA-PSS (SHA-256 / MGF1-SHA256, salt = 32) verify KAT: the token must accept a fixed published
@@ -269,7 +269,7 @@ internal static class KnownAnswerTestCases
         byte[] msg = H("4b41543a205253412d5053532d534841323536206d61727368616c6c696e67");
         byte[] sig = H("5df789229891d1de979a891cc2c6e2bae087d4d0b4b59773e2a613e31c56043caa844b67e9b6de99029ee5eb85c56d1eab65793cca81f218ae0ed3ead217b4b3e1f88fab2f72c51d799c5f8221dab8bdf446bfe6259d5b4bbd87536f038a4d3613fefd4f86568be75f7e8c4fbc65372695e2e77c3805423aeb57c50424cb8abc0a7c3ac9458a582bf3d37d0aeb398010dd83707645f0869b3adc865783aeb0ba121cda9596d3f287798279bff2495b87a99ca01a906dc121dc57a2733a0be22b4fc4586eda26c85d987f12b553fe954a42caba73d05a6605081259be0f3d10425608beb231b8669977c605ed87363626d5b4235c3cfabc9c7c029746fdc1b54c");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle pub = TestKeys.ImportRsaPublicKey(session, RsaModulus, RsaPublicExponent);
@@ -287,7 +287,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(pub); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // ECDSA P-256 verify KAT over a fixed hash. CKM_ECDSA takes the raw signature as r‖s (P1363, no DER),
@@ -299,7 +299,7 @@ internal static class KnownAnswerTestCases
         byte[] hash = H("151606195ca4c477eca06906104edce10627489ed3b69b5789d080362af5cbf8");
         byte[] sig = H("6dffab28a14958c6cc3bc85cd55b63bf7dc33a671d001cc60b7f788841082928eb026507951d5c65c198c6996735a599ed3c51022af4840656d90b83a764a406");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle pub = TestKeys.ImportEcP256PublicKey(session, qx, qy);
@@ -316,7 +316,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(pub); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // ECDH P-256 derive KAT (CKD_NULL → raw shared secret Z). Pins the CK_ECDH1_DERIVE_PARAMS peer-point
@@ -329,7 +329,7 @@ internal static class KnownAnswerTestCases
         byte[] peerY = H("ec9add0f07b0315110793e437934ae1835015713f0b30a7312213d7f9a494cdc");
         byte[] expectedZ = H("05c83b263aef2b5648428467f18a7e2bb566a5a77ef5a1732cc13fedca838b71");
 
-        var session = TestKeys.OpenLoggedInSession(backend);
+        using var session = TestKeys.OpenLoggedInSession(backend);
         try
         {
             ObjectHandle priv = TestKeys.ImportEcP256PrivateKey(session, privScalar);
@@ -359,7 +359,7 @@ internal static class KnownAnswerTestCases
             }
             finally { session.DestroyObject(priv); }
         }
-        finally { TestKeys.LogoutIfRequired(backend, session); session.Dispose(); }
+        finally { TestKeys.LogoutIfRequired(backend, session); }
     }
 
     // Fixed 2048-bit RSA key (BCL-generated) shared by the RSA-OAEP and RSA-PSS KATs.
