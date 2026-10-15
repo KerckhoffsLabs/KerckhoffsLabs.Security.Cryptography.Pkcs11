@@ -127,7 +127,7 @@ public sealed class TestCollectionConventionTests
                     (collection is null
                         ? "declares no [Collection]"
                         : $"joins [Collection(\"{collection}\")]") +
-                    $". It must be [Collection(FakeModuleCollection.Name)].");
+                    ". It must be [Collection(FakeModuleCollection.Name)].");
             }
         }
 

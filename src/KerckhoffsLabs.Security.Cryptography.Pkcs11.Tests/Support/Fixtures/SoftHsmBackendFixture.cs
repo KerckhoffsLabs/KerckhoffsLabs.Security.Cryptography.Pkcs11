@@ -143,7 +143,7 @@ public sealed partial class SoftHsmBackendFixture : IPkcs11Backend, IDisposable
         // Remove any leftover token with the same label from a previous run.
         RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true);
 
-        RunUtil($"--init-token --free " +
+        RunUtil("--init-token --free " +
                 $"--label \"{TokenLabel}\" " +
                 $"--so-pin \"{Settings.SoPin}\" " +
                 $"--pin \"{Settings.UserPin}\"");

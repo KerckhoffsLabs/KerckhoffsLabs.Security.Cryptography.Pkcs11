@@ -27,7 +27,7 @@ public sealed class MockBackendFixture : IPkcs11Backend, IDisposable
         if (!File.Exists(LibraryPath))
             throw new InvalidOperationException(
                 $"pkcs11-mock not found at '{LibraryPath}'. " +
-                $"Run build/build-pkcs11-mock.sh to produce it.");
+                "Run build/build-pkcs11-mock.sh to produce it.");
 
         Library = Pkcs11Library.Load(LibraryPath);
         try

@@ -83,7 +83,7 @@ public abstract class SoftHsmGateBackendFixture : IPkcs11Backend, IDisposable
             "log.level = ERROR\n");
 
         RunUtil($"--delete-token --token \"{TokenLabel}\" --force", ignoreFailure: true);
-        RunUtil($"--init-token --free " +
+        RunUtil("--init-token --free " +
                 $"--label \"{TokenLabel}\" " +
                 $"--so-pin \"{Settings.SoPin}\" " +
                 $"--pin \"{Settings.UserPin}\"");

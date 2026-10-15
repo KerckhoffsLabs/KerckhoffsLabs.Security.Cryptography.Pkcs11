@@ -141,9 +141,9 @@ internal sealed class Pkcs11SessionCore : IDisposable
         if (!Monitor.TryEnter(_busyLock))
         {
             throw new InvalidOperationException(
-                $"Concurrent access to a PKCS#11 Session is not supported. " +
+                "Concurrent access to a PKCS#11 Session is not supported. " +
                 $"Method '{caller ?? "<unknown>"}' was invoked while another operation is in progress " +
-                $"on a different thread. Use a separate Session per thread.");
+                "on a different thread. Use a separate Session per thread.");
         }
 
         var lease = new ExclusiveLease(_busyLock);
