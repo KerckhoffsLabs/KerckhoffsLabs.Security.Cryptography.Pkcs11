@@ -48,9 +48,6 @@ public sealed class Pkcs11Session : IDisposable
     /// <summary>The library that hosts this session. The session does not own the library.</summary>
     public Pkcs11Library Library { get; }
 
-    /// <summary>The curves this session's library knows the name and field size of; see <see cref="Pkcs11LibraryOptions.CurveCatalog"/>.</summary>
-    internal Pkcs11CurveCatalog CurveCatalog => Library.CurveCatalog;
-
     /// <summary>The session's native calls and policy enforcement. Used by <c>Pkcs11Key</c> to delegate operations.</summary>
     internal Pkcs11SessionCore Core => _core;
 

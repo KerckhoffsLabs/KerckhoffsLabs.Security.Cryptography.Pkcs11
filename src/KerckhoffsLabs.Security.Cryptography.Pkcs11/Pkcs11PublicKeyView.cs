@@ -99,7 +99,7 @@ internal static class Pkcs11PublicKeyView
         if (attrs.Count == 0 || attrs[0].CannotBeRead)
             throw Pkcs11Exception.Create(CKR.CKR_ATTRIBUTE_SENSITIVE,
                 $"{operationName} (local CKA_EC_PARAMS not readable — cannot validate the peer's curve)");
-        return key.Session.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()));
+        return key.Session.Library.CurveCatalog.Resolve(Pkcs11ECCurve.FromEcParams(attrs[0].GetValueAsByteArray()));
     }
 
     /// <summary>
