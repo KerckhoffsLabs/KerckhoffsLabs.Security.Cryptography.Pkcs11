@@ -4,7 +4,7 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLeaks;
 
 // In the MemoryLeaks collection so it serializes with the allocation-sensitive tests (the leak
-// snapshots and DebugModeEnabled static state). CK_VERSION is a plain (non-[PackedForPkcs11])
+// snapshots). CK_VERSION is a plain (non-[PackedForPkcs11])
 // blittable struct; CK_MECHANISM_INFO is [PackedForPkcs11] — together they cover both branches of
 // the SizeOf/Write/Read overloads.
 [Collection("MemoryLeaks")]

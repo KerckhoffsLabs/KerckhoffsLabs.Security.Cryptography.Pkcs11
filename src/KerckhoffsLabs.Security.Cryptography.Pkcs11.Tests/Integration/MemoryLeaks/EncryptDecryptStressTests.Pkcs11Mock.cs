@@ -27,18 +27,14 @@ public sealed class EncryptDecryptStressTests : IDisposable
     // declare MockBackendFixture as an ICollectionFixture, so constructor
     // injection is not available. We own the lifetime here.
     private readonly MockBackendFixture _backend;
-    private readonly bool _wasDebug;
 
     public EncryptDecryptStressTests()
     {
         _backend = new MockBackendFixture();
-        _wasDebug = UnmanagedMemory.DebugModeEnabled;
-        UnmanagedMemory.DebugModeEnabled = true;
     }
 
     public void Dispose()
     {
-        UnmanagedMemory.DebugModeEnabled = _wasDebug;
         _backend.Dispose();
     }
 

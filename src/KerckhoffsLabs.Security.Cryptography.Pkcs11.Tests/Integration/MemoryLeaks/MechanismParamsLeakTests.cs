@@ -5,14 +5,10 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLeaks;
 
 [Collection("MemoryLeaks")]
-public sealed class MechanismParamsLeakTests : IDisposable
+public sealed class MechanismParamsLeakTests
 {
-    private readonly bool _wasDebug;
-
     public MechanismParamsLeakTests()
     {
-        _wasDebug = UnmanagedMemory.DebugModeEnabled;
-        UnmanagedMemory.DebugModeEnabled = true;
         // Settle any pending finalizers from prior tests so they can't fire
         // between the per-test baseline snapshot and the final assertion and
         // drift OutstandingAllocationCount downward. UnmanagedMemory's tracking
@@ -22,8 +18,6 @@ public sealed class MechanismParamsLeakTests : IDisposable
         GC.WaitForPendingFinalizers();
         GC.Collect();
     }
-
-    public void Dispose() => UnmanagedMemory.DebugModeEnabled = _wasDebug;
 
     /// <summary>
     /// Drives the full per-call cycle ten times — construct the descriptor, marshal it into a scope,

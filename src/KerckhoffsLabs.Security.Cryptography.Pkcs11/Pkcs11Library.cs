@@ -230,9 +230,7 @@ public sealed class Pkcs11Library : IDisposable
                 // Token refused OS locking. Retry without.
                 if (rv == CKR.CKR_CANT_LOCK)
                 {
-                    _logger.LogWarning(
-                        "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
-                        _libraryPath);
+                    Log.OsLockingRefused(_logger, _libraryPath);
                     rv = LowLevel.C_Initialize(withoutOsLocking);
                 }
             }

@@ -1,3 +1,4 @@
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -58,16 +59,6 @@ public sealed class LogTests
     }
 
     [Fact]
-    public void ClosingSession_IsInformation()
-    {
-        var log = new CapturingLogger();
-        Log.ClosingSession(log, 7);
-        var e = Only(log);
-        Assert.Equal(LogLevel.Information, e.Level);
-        Assert.Equal("Closing session 7", e.Message);
-    }
-
-    [Fact]
     public void LoggingOutSession_IsInformation()
     {
         var log = new CapturingLogger();
@@ -103,21 +94,105 @@ public sealed class LogTests
     }
 
     [Fact]
-    public void AllocatedMemory_RendersSizeAddressCount()
+    public void LoggingIn_IsInformation()
     {
         var log = new CapturingLogger();
-        Log.AllocatedMemory(log, 64, 4096, 3);
+        Log.LoggingIn(log, "normal user", 7);
         var e = Only(log);
-        Assert.Equal(LogLevel.Debug, e.Level);
-        Assert.Equal("Allocated 64 bytes at 4096. Allocations: 3", e.Message);
+        Assert.Equal(LogLevel.Information, e.Level);
+        Assert.Equal("Logging as normal user into session 7", e.Message);
     }
 
     [Fact]
-    public void FreeingMemory_RendersSizeAddressCount()
+    public void LoggingInProtectedPath_IsInformation()
     {
         var log = new CapturingLogger();
-        Log.FreeingMemory(log, 64, 4096, 2);
-        Assert.Equal("Freeing 64 bytes at 4096. Allocations: 2", Only(log).Message);
+        Log.LoggingInProtectedPath(log, "security officer", 7);
+        var e = Only(log);
+        Assert.Equal(LogLevel.Information, e.Level);
+        Assert.Equal("Logging as security officer into session 7 via protected authentication path", e.Message);
+    }
+
+    [Fact]
+    public void LoggingInUser_IsInformation()
+    {
+        var log = new CapturingLogger();
+        Log.LoggingInUser(log, "normal user", 7);
+        var e = Only(log);
+        Assert.Equal(LogLevel.Information, e.Level);
+        Assert.Equal("Logging in as normal user (username supplied) on session 7", e.Message);
+    }
+
+    [Fact]
+    public void SessionOpened_IsInformation()
+    {
+        var log = new CapturingLogger();
+        Log.SessionOpened(log, "read-write", 7, 1, "SecureOnly");
+        var e = Only(log);
+        Assert.Equal(LogLevel.Information, e.Level);
+        Assert.Equal("Opened read-write session 7 with token in slot 1 under SecureOnly policy", e.Message);
+    }
+
+    [Fact]
+    public void SessionCancelFailed_IsWarning()
+    {
+        var log = new CapturingLogger();
+        Log.SessionCancelFailed(log, 7, "Encrypt", CKR.CKR_FUNCTION_FAILED);
+        var e = Only(log);
+        Assert.Equal(LogLevel.Warning, e.Level);
+        Assert.Equal("Session(7)::Encrypt: C_SessionCancel returned CKR_FUNCTION_FAILED during cleanup", e.Message);
+    }
+
+    [Fact]
+    public void FindObjectsFinalFailed_IsWarning()
+    {
+        var log = new CapturingLogger();
+        Log.FindObjectsFinalFailed(log, 7, CKR.CKR_FUNCTION_FAILED);
+        var e = Only(log);
+        Assert.Equal(LogLevel.Warning, e.Level);
+        Assert.Equal("Session(7)::FindAllObjects: C_FindObjectsFinal returned CKR_FUNCTION_FAILED", e.Message);
+    }
+
+    [Fact]
+    public void MessageEncryptFinalFailed_IsWarning()
+    {
+        var log = new CapturingLogger();
+        Log.MessageEncryptFinalFailed(log, CKR.CKR_FUNCTION_FAILED);
+        Assert.Equal(LogLevel.Warning, Only(log).Level);
+        Assert.Equal("C_MessageEncryptFinal returned CKR_FUNCTION_FAILED", Only(log).Message);
+    }
+
+    [Fact]
+    public void MessageDecryptFinalFailed_IsWarning()
+    {
+        var log = new CapturingLogger();
+        Log.MessageDecryptFinalFailed(log, CKR.CKR_FUNCTION_FAILED);
+        Assert.Equal(LogLevel.Warning, Only(log).Level);
+        Assert.Equal("C_MessageDecryptFinal returned CKR_FUNCTION_FAILED", Only(log).Message);
+    }
+
+    [Fact]
+    public void OsLockingRefused_IsWarning()
+    {
+        var log = new CapturingLogger();
+        Log.OsLockingRefused(log, "lib.so");
+        var e = Only(log);
+        Assert.Equal(LogLevel.Warning, e.Level);
+        Assert.Equal("PKCS#11 library lib.so refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it", e.Message);
+    }
+
+    [Theory]
+    [InlineData(CKU.CKU_SO, "security officer")]
+    [InlineData(CKU.CKU_USER, "normal user")]
+    [InlineData(CKU.CKU_CONTEXT_SPECIFIC, "context specific user")]
+    public void UserTypeName_KnownUserTypes_MapToLabels(CKU userType, string expected)
+        => Assert.Equal(expected, Log.UserTypeName(userType));
+
+    [Fact]
+    public void UserTypeName_UnknownUserType_FallsBackToEnumName()
+    {
+        var unknown = (CKU)99;
+        Assert.Equal(unknown.ToString(), Log.UserTypeName(unknown));
     }
 
     [Fact]
@@ -125,7 +200,7 @@ public sealed class LogTests
     {
         var log = new CapturingLogger { Enabled = false };
         Log.SessionTrace(log, 5, "Sign");
-        Log.ClosingSession(log, 5);
+        Log.LoggingOutSession(log, 5);
         Assert.Empty(log.Entries);
     }
 }

@@ -6,23 +6,16 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLeaks;
 
 [Collection("MemoryLeaks")]
-public sealed class MechanismAndObjectAttributeLeakTests : IDisposable
+public sealed class MechanismAndObjectAttributeLeakTests
 {
-    private readonly bool _wasDebug;
-
     public MechanismAndObjectAttributeLeakTests()
     {
-        _wasDebug = UnmanagedMemory.DebugModeEnabled;
-        UnmanagedMemory.DebugModeEnabled = true;
         // Settle any pending finalizers from prior tests so they can't drift
-        // OutstandingAllocationCount mid-test (UnmanagedMemory's tracker is
-        // process-wide and now always populated regardless of the debug flag).
+        // OutstandingAllocationCount mid-test (UnmanagedMemory's tracker is process-wide).
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
     }
-
-    public void Dispose() => UnmanagedMemory.DebugModeEnabled = _wasDebug;
 
     // A mechanism with no parameter marshals to a null Parameter and allocates nothing, so there is
     // no rise to assert here — the property is only that the cycle stays flat. The

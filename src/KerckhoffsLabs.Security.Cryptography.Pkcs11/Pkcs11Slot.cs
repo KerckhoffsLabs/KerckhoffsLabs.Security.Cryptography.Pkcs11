@@ -248,10 +248,8 @@ public sealed class Pkcs11Slot
         var sessionHandle = new Pkcs11SessionHandle(_pkcs11Library, sessionId);
         try
         {
-            if (_logger.IsEnabled(LogLevel.Information))
-                _logger.LogInformation(
-                    "Opened {SessionType} session {SessionId} with token in slot {SlotId} under {PolicyName} policy",
-                    readWrite ? "read-write" : "read-only", sessionId, _slotId, (policy ?? CryptoPolicy.SecureOnly).Name);
+            Log.SessionOpened(_logger, readWrite ? "read-write" : "read-only", (ulong)sessionId, (ulong)_slotId,
+                (policy ?? CryptoPolicy.SecureOnly).Name);
 
             return new Pkcs11SessionCore(_pkcs11Library, _slotId, sessionHandle, _loggerFactory, policy);
         }
