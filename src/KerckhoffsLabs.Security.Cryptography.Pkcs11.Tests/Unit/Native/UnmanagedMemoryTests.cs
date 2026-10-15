@@ -55,22 +55,6 @@ public sealed class UnmanagedMemoryTests
         Assert.Throws<InvalidOperationException>(() => UnmanagedMemory.Free(ref bogus));
     }
 
-    [Fact]
-    public void DebugMode_Toggle_TracksAllocateAndFree()
-    {
-        bool prev = UnmanagedMemory.DebugModeEnabled;
-        UnmanagedMemory.DebugModeEnabled = true;
-        try
-        {
-            Assert.True(UnmanagedMemory.DebugModeEnabled);
-            IntPtr p = UnmanagedMemory.Allocate(16); // exercises the debug-log branch
-            Assert.True(UnmanagedMemory.OutstandingAllocationCount >= 1); // process-wide; no exact delta
-            UnmanagedMemory.Free(ref p);             // exercises the debug-log branch
-            Assert.Equal(IntPtr.Zero, p);
-        }
-        finally { UnmanagedMemory.DebugModeEnabled = prev; }
-    }
-
     // === Write / Read: byte[] and spans =====================================
 
     [Fact]

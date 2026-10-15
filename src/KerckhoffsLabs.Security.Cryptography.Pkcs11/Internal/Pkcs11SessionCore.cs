@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -580,8 +579,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login");
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation("Logging as {UserType} into session {SessionId}", Pkcs11LogUtils.ToString(userType), _sessionId);
+        Log.LoggingIn(_logger, userType, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, pin.Pin);
         Pkcs11Exception.ThrowIfError(rv, OpLogin);
@@ -600,10 +598,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "Login (protected authentication path)");
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation(
-                "Logging as {UserType} into session {SessionId} via protected authentication path",
-                Pkcs11LogUtils.ToString(userType), _sessionId);
+        Log.LoggingInProtectedPath(_logger, userType, (ulong)_sessionId);
 
         CKR rv = _pkcs11Library.C_Login(_sessionId, userType, default);
         Pkcs11Exception.ThrowIfError(rv, OpLogin);
@@ -632,10 +627,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
 
         Log.SessionTrace(_logger, (ulong)_sessionId, "LoginUser");
 
-        if (_logger.IsEnabled(LogLevel.Information))
-            _logger.LogInformation(
-                "Logging in as {UserType} (username supplied) on session {SessionId}",
-                Pkcs11LogUtils.ToString(userType), _sessionId);
+        Log.LoggingInUser(_logger, userType, (ulong)_sessionId);
 
         byte[] usernameBytes = Encoding.UTF8.GetBytes(username);
         try
@@ -783,9 +775,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
                 return;
             default:
                 _operationsAbandoned |= operations;
-                _logger.LogWarning(
-                    "Session({SessionId})::{Operation}: C_SessionCancel returned {Rv} during cleanup",
-                    _sessionId, operationName, rv);
+                Log.SessionCancelFailed(_logger, (ulong)_sessionId, operationName, rv);
                 return;
         }
     }
@@ -1566,7 +1556,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
             // already be in a state where finalize fails harmlessly.
             CKR finalRv = _pkcs11Library.C_FindObjectsFinal(_sessionId);
             if (finalRv != CKR.CKR_OK)
-                _logger.LogWarning("Session({SessionId})::FindAllObjects: C_FindObjectsFinal returned {Rv}", _sessionId, finalRv);
+                Log.FindObjectsFinalFailed(_logger, (ulong)_sessionId, finalRv);
         }
 
         return foundObjects;
@@ -2529,7 +2519,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
         {
             CKR finalRv = _pkcs11Library.C_MessageEncryptFinal(_sessionId);
             if (finalRv != CKR.CKR_OK)
-                _logger.LogWarning("C_MessageEncryptFinal returned {Rv}", finalRv);
+                Log.MessageEncryptFinalFailed(_logger, finalRv);
         }
     }
 
@@ -2726,7 +2716,7 @@ internal sealed class Pkcs11SessionCore : IDisposable
         {
             CKR finalRv = _pkcs11Library.C_MessageDecryptFinal(_sessionId);
             if (finalRv != CKR.CKR_OK)
-                _logger.LogWarning("C_MessageDecryptFinal returned {Rv}", finalRv);
+                Log.MessageDecryptFinalFailed(_logger, finalRv);
         }
     }
 

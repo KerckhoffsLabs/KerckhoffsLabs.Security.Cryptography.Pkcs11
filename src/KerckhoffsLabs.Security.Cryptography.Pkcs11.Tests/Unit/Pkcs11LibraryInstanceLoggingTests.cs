@@ -1,9 +1,11 @@
+using System.Reflection;
 using KerckhoffsLabs.Runtime.InteropServices;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
+using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Support.FakeModules;
 using Microsoft.Extensions.Logging;
 
-namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit.Logging;
+namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Unit;
 
 /// <summary>
 /// Coverage for the per-instance <see cref="ILoggerFactory"/> a <see cref="Pkcs11Library"/> is
@@ -52,12 +54,18 @@ public sealed class Pkcs11LibraryInstanceLoggingTests
     [Fact]
     public void Assembly_ExportsNoLoggingConfigurationTypes()
     {
-        string[] loggingTypes =
-            [.. typeof(Pkcs11Library).Assembly.GetExportedTypes()
-                .Where(static t => t.Namespace == "KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging")
-                .Select(static t => t.FullName!)];
+        const BindingFlags PublicStatic = BindingFlags.Public | BindingFlags.Static;
+        static bool IsLogging(Type type) =>
+            typeof(ILogger).IsAssignableFrom(type) || typeof(ILoggerFactory).IsAssignableFrom(type);
 
-        Assert.Empty(loggingTypes);
+        string[] channels =
+            [.. typeof(Pkcs11Library).Assembly.GetExportedTypes()
+                .SelectMany(static t =>
+                    t.GetProperties(PublicStatic).Where(p => IsLogging(p.PropertyType)).Select(p => $"{t.FullName}.{p.Name}")
+                    .Concat(t.GetFields(PublicStatic).Where(f => IsLogging(f.FieldType)).Select(f => $"{t.FullName}.{f.Name}")))];
+
+        Assert.Empty(channels);
+        Assert.False(typeof(Log).IsVisible);
     }
 
     [Fact]

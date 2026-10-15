@@ -4,7 +4,6 @@ using System.Text;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Exceptions;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Common;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Internal;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
 using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -230,9 +229,7 @@ public sealed class Pkcs11Library : IDisposable
                 // Token refused OS locking. Retry without.
                 if (rv == CKR.CKR_CANT_LOCK)
                 {
-                    _logger.LogWarning(
-                        "PKCS#11 library {LibraryPath} refused CKF_OS_LOCKING_OK; retrying without OS locking, and serializing every call into it",
-                        _libraryPath);
+                    Log.OsLockingRefused(_logger, _libraryPath);
                     rv = LowLevel.C_Initialize(withoutOsLocking);
                 }
             }

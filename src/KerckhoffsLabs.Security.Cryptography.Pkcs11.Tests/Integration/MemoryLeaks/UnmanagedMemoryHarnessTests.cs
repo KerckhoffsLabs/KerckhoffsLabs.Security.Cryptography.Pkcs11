@@ -4,18 +4,8 @@ using KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Tests.Integration.MemoryLeaks;
 
 [Collection("MemoryLeaks")]
-public sealed class UnmanagedMemoryHarnessTests : IDisposable
+public sealed class UnmanagedMemoryHarnessTests
 {
-    private readonly bool _wasDebug;
-
-    public UnmanagedMemoryHarnessTests()
-    {
-        _wasDebug = UnmanagedMemory.DebugModeEnabled;
-        UnmanagedMemory.DebugModeEnabled = true;
-    }
-
-    public void Dispose() => UnmanagedMemory.DebugModeEnabled = _wasDebug;
-
     [Fact]
     public void OutstandingAllocationCount_IsAccessible()
     {

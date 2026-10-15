@@ -33,8 +33,8 @@ dotnet test -- --filter-query "/*/*.Tests.Integration*/*/*"
   `CapturingLogger`. The ambient helpers intentionally keep the **assembly-root namespace**
   (`…Tests`) so any test can use them without an extra `using`.
 - **`Integration/MemoryLeaks/`** is kept as one group even though some of its tests are hermetic:
-  they share a single serialized xUnit collection (the `UnmanagedMemory.DebugModeEnabled` /
-  allocation-tracker static state must not be toggled concurrently), and that cohesion outranks the
+  they share a single serialized xUnit collection (the process-wide `UnmanagedMemory` allocation
+  tracker must not see concurrent allocations during a leak snapshot), and that cohesion outranks the
   unit/integration split.
 - A type can legitimately appear in both areas — e.g. `Pkcs11SessionCore` has fake-driven unit tests
   *and* SoftHSM behavioral tests. That's expected: they're different kinds of test.

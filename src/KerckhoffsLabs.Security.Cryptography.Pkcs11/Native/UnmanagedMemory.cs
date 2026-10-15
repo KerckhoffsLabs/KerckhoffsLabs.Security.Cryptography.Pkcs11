@@ -2,9 +2,6 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using KerckhoffsLabs.Security.Cryptography.Pkcs11.Logging;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 
@@ -13,7 +10,7 @@ namespace KerckhoffsLabs.Security.Cryptography.Pkcs11.Native;
 /// callers needing this surface should expose the relevant lifecycle through a
 /// high-level type (see <c>Mechanism</c>, <c>ObjectAttribute</c>).
 /// Visible to the test assembly via <c>InternalsVisibleTo</c> for the leak-detection
-/// harness (<see cref="OutstandingAllocationCount"/>, <see cref="DebugModeEnabled"/>).
+/// harness (<see cref="OutstandingAllocationCount"/>).
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "S6640:Using unsafe code blocks is security-sensitive",
     Justification = "This type exists to read and write raw unmanaged addresses: allocate a block, zero it, "
@@ -39,13 +36,6 @@ internal static class UnmanagedMemory
     public static int NativeULongSize { get; } = Unsafe.SizeOf<NativeCULong>();
 
     /// <summary>
-    /// Where the allocation trace goes when <see cref="DebugModeEnabled"/> is on. A null logger by
-    /// default: this is a diagnostic for the library's own tests, not a consumer logging channel —
-    /// this class has no library instance to take an <see cref="ILoggerFactory"/> from.
-    /// </summary>
-    internal static ILogger Logger { get; set; } = NullLogger.Instance;
-
-    /// <summary>
     /// Every allocation performed by this class, by pointer and size.
     /// </summary>
     /// <remarks>
@@ -59,18 +49,8 @@ internal static class UnmanagedMemory
     private static readonly ConcurrentDictionary<IntPtr, int> _allocations = new();
 
     /// <summary>
-    /// When <see langword="true"/>, every <see cref="Allocate"/> / <see cref="Free"/> writes a debug log line.
-    /// The allocation dictionary is populated <em>unconditionally</em> (independent of this flag); only
-    /// the log output is gated, so toggling at runtime is safe — pointers allocated with the flag off
-    /// can still be freed after it is turned on without tripping the untracked-memory check.
-    /// </summary>
-    public static bool DebugModeEnabled { get; set; }
-
-    /// <summary>
     /// Number of unmanaged allocations currently outstanding (allocated but not yet freed).
-    /// Always accurate — the tracker dictionary is populated unconditionally so finalizer-time
-    /// frees of objects created before <see cref="DebugModeEnabled"/> was toggled are still
-    /// recognized as ours.
+    /// Always accurate: every allocation is tracked, including those a finalizer frees later.
     /// </summary>
     /// <remarks>
     /// Intended for diagnostic and leak-detection tests. To measure leaks across a workload,
@@ -113,9 +93,6 @@ internal static class UnmanagedMemory
                 $"Allocation tracker corrupted: {_allocations[memory]} bytes already tracked at {memory}.");
         }
 
-        if (DebugModeEnabled)
-            Log.AllocatedMemory(Logger, size, memory, _allocations.Count);
-
         return memory;
     }
 
@@ -139,9 +116,6 @@ internal static class UnmanagedMemory
             throw new InvalidOperationException(
                 $"Cannot free untracked memory at {memory} — not allocated through {nameof(UnmanagedMemory)} or already freed.");
         }
-
-        if (DebugModeEnabled)
-            Log.FreeingMemory(Logger, size, memory, _allocations.Count);
 
         Zeroize(memory, size);
         Marshal.FreeHGlobal(memory);
