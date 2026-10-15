@@ -24,8 +24,6 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     // expose the internal Pkcs11SessionCore type. The check fires before the native call; under the
     // AllowInsecure policy the call proceeds to the mock, which fails the dummy/unsupported call with a
     // (non-insecure) Pkcs11Exception.
-    // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
-#pragma warning disable CA1825
     // Every session method that can create a token object belongs here. This list was previously
     // four entries, and the four it omitted — GenerateKey, GenerateKeyPair, CreateObject, CopyObject
     // — were precisely the four that did not run the gate. The list mirrored the gap rather than
@@ -33,7 +31,6 @@ public sealed class KeyCreationSecureDefaultsTests_Mock(MockBackendFixture f)
     public static TheoryData<string> Operations() =>
         ["DeriveKey", "EncapsulateKey", "DecapsulateKey", "UnwrapKeyAuthenticated",
          "UnwrapKey", "GenerateKey", "GenerateKeyPair", "CreateObject", "CopyObject"];
-#pragma warning restore CA1825
 
     private static void Invoke(string operation, Pkcs11SessionCore s, List<ObjectAttribute> template)
     {

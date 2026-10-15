@@ -44,8 +44,6 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
     // xUnit1044: HashAlgorithmName/RSASignaturePadding aren't serializable, which breaks Test
     // Explorer's per-row enumeration — carry only the (serializable) CKM and derive the hash/padding
     // from it in the test body instead, since each mechanism determines them uniquely anyway.
-    // CA1825 false-positives on the xUnit TheoryData collection expression (not a zero-length array).
-#pragma warning disable CA1825
     public static TheoryData<CKM> RsaMechanisms() =>
     [
         CKM.CKM_SHA1_RSA_PKCS,
@@ -57,7 +55,6 @@ public sealed class Pkcs11KeyVerifyManagedFallbackTests
         CKM.CKM_SHA384_RSA_PKCS_PSS,
         CKM.CKM_SHA512_RSA_PKCS_PSS,
     ];
-#pragma warning restore CA1825
 
     private static (HashAlgorithmName Hash, RSASignaturePadding Padding) HashAndPaddingFor(CKM mechanismType) => mechanismType switch
     {
